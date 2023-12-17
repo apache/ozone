@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -57,8 +56,7 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(
-      OzoneManager ozoneManager, long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+      OzoneManager ozoneManager, long transactionLogIndex) {
     LOG.trace("Request: {}", getOmRequest());
     OMResponse.Builder responseBuilder =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
@@ -107,10 +105,8 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
     } catch (IOException e) {
       response = new OMFinalizeUpgradeResponse(
           createErrorOMResponse(responseBuilder, e), -1);
-    } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, response,
-          ozoneManagerDoubleBufferHelper);
     }
+
     return response;
   }
 

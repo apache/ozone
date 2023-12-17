@@ -63,8 +63,7 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
 
     // Execute original request
     OMClientResponse omClientResponse = omKeyPrefixAclRequest
-        .validateAndUpdateCache(ozoneManager, 2,
-            ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 2);
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
   }
@@ -89,8 +88,7 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
     OMPrefixAddAclRequest omKeyPrefixAclRequest = new OMPrefixAddAclRequest(
         originalRequest);
     omKeyPrefixAclRequest.preExecute(ozoneManager);
-    omKeyPrefixAclRequest.validateAndUpdateCache(ozoneManager, 2,
-        ozoneManagerDoubleBufferHelper);
+    omKeyPrefixAclRequest.validateAndUpdateCache(ozoneManager, 2);
 
     // Remove existing prefix acl.
     OMRequest validRemoveAclRequest = createRemoveAclKeyRequest(acl, keyName);
@@ -98,8 +96,7 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
         new OMPrefixRemoveAclRequest(validRemoveAclRequest);
     omPrefixRemoveAclRequest1.preExecute(ozoneManager);
     OMClientResponse omClientResponse1 = omPrefixRemoveAclRequest1
-        .validateAndUpdateCache(ozoneManager, 3,
-            ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 3);
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse1.getOMResponse().getStatus());
 
@@ -109,8 +106,7 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
         new OMPrefixRemoveAclRequest(invalidRemoveAclRequest);
     omPrefixRemoveAclRequest1.preExecute(ozoneManager);
     OMClientResponse omClientResponse2 = omPrefixRemoveAclRequest2
-        .validateAndUpdateCache(ozoneManager, 4,
-            ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 4);
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.PREFIX_NOT_FOUND,
         omClientResponse2.getOMResponse().getStatus());
   }

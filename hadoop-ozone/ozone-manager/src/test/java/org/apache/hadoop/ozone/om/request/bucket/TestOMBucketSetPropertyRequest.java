@@ -99,8 +99,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
         new OMBucketSetPropertyRequest(omRequest);
 
     OMClientResponse omClientResponse =
-        omBucketSetPropertyRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omBucketSetPropertyRequest.validateAndUpdateCache(ozoneManager, 1);
 
     Assertions.assertTrue(omMetadataManager.getBucketTable().get(
             omMetadataManager.getBucketKey(volumeName, bucketName))
@@ -127,8 +126,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
         new OMBucketSetPropertyRequest(omRequest);
 
     OMClientResponse omClientResponse =
-        omBucketSetPropertyRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omBucketSetPropertyRequest.validateAndUpdateCache(ozoneManager, 1);
 
     Assertions.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
         omMetadataManager.getBucketTable().get(
@@ -152,8 +150,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
         new OMBucketSetPropertyRequest(omRequest);
 
     OMClientResponse omClientResponse =
-        omBucketSetPropertyRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omBucketSetPropertyRequest.validateAndUpdateCache(ozoneManager, 1);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
@@ -198,8 +195,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
             );
 
     OMClientResponse omClientResponse = omBucketSetPropertyRequest
-        .validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 1);
 
     //capture the error log
     Assertions.assertTrue(logs.getOutput().contains(
@@ -236,8 +232,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
 
     // WHEN
     OMClientResponse omClientResponse = omBucketSetPropertyRequest
-        .validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 1);
 
     // THEN
     Assertions.assertFalse(omClientResponse.getOMResponse().getSuccess());
@@ -277,8 +272,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
         new OMBucketSetPropertyRequest(omRequest);
 
     OMClientResponse omClientResponse = omBucketSetPropertyRequest
-        .validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 1);
 
     Assertions.assertTrue(omClientResponse.getOMResponse().getSuccess());
 
@@ -325,8 +319,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
             new OMBucketSetPropertyRequest(omRequest);
 
     OMClientResponse omClientResponse = omBucketSetPropertyRequest
-            .validateAndUpdateCache(ozoneManager, 1,
-                    ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 1);
 
     Assertions.assertTrue(omClientResponse.getOMResponse().getSuccess());
 
@@ -364,8 +357,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
             new OMBucketSetPropertyRequest(omRequest);
 
     OMClientResponse omClientResponse = omBucketSetPropertyRequest
-            .validateAndUpdateCache(ozoneManager, 1,
-                    ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 1);
 
     Assertions.assertTrue(omClientResponse.getOMResponse().getSuccess());
 
@@ -404,8 +396,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
         new OMBucketSetPropertyRequest(omRequest);
 
     OMClientResponse omClientResponse = omBucketSetPropertyRequest
-        .validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 1);
 
     Assertions.assertFalse(omClientResponse.getOMResponse().getSuccess());
     Assertions.assertEquals(omClientResponse.getOMResponse().getStatus(),
@@ -437,8 +428,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
         new OMBucketSetPropertyRequest(omRequest);
 
     OMClientResponse omClientResponse = omBucketSetPropertyRequest
-        .validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 1);
 
     Assertions.assertFalse(omClientResponse.getOMResponse().getSuccess());
     Assertions.assertEquals(omClientResponse.getOMResponse().getStatus(),
@@ -473,8 +463,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
             new OMBucketSetPropertyRequest(omRequest);
 
     OMClientResponse omClientResponse = omBucketSetPropertyRequest
-            .validateAndUpdateCache(ozoneManager, 1,
-                    ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 1);
 
     Assertions.assertTrue(omClientResponse.getOMResponse().getSuccess());
 
@@ -511,8 +500,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
             new OMBucketSetPropertyRequest(omRequest);
 
     omClientResponse = omBucketSetPropertyRequest
-            .validateAndUpdateCache(ozoneManager, 1,
-                    ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 1);
 
     Assertions.assertTrue(omClientResponse.getOMResponse().getSuccess());
 

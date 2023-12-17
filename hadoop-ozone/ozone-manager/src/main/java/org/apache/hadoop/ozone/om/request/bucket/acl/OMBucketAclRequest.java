@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.bucket.acl.OMBucketAclResponse;
 import org.apache.hadoop.ozone.om.request.util.ObjectParser;
@@ -64,8 +63,7 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+      long transactionLogIndex) {
 
     // protobuf guarantees acls are non-null.
     List<OzoneAcl> ozoneAcls = getAcls();
@@ -140,8 +138,6 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
       exception = ex;
       omClientResponse = onFailure(omResponse, exception);
     } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
       if (lockAcquired) {
         mergeOmLockDetails(
             omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volume,

@@ -73,8 +73,7 @@ public class TestOMVolumeDeleteRequest extends TestOMVolumeRequest {
     Assertions.assertNotNull(omMetadataManager.getUserTable().get(ownerKey));
 
     OMClientResponse omClientResponse =
-        omVolumeDeleteRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeDeleteRequest.validateAndUpdateCache(ozoneManager, 1);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
@@ -100,8 +99,7 @@ public class TestOMVolumeDeleteRequest extends TestOMVolumeRequest {
     omVolumeDeleteRequest.preExecute(ozoneManager);
 
     OMClientResponse omClientResponse =
-        omVolumeDeleteRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeDeleteRequest.validateAndUpdateCache(ozoneManager, 1);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
@@ -134,8 +132,7 @@ public class TestOMVolumeDeleteRequest extends TestOMVolumeRequest {
     OMRequestTestUtils.addVolumeToDB(volumeName, ownerName, omMetadataManager);
 
     OMClientResponse omClientResponse =
-        omVolumeDeleteRequest.validateAndUpdateCache(ozoneManager, 1L,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeDeleteRequest.validateAndUpdateCache(ozoneManager, 1L);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
