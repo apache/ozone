@@ -22,12 +22,13 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenRenewer;
 
 import java.io.IOException;
+
+import static org.apache.hadoop.ozone.client.OzoneClientFactory.getOzoneClient;
 
 /**
  * Ozone Delegation Token Renewer.
@@ -59,10 +60,10 @@ public class OzoneDelegationTokenRenewer extends TokenRenewer {
   public long renew(Token<?> token, Configuration conf) throws IOException {
     Token<OzoneTokenIdentifier> ozoneDt =
         (Token<OzoneTokenIdentifier>) token;
-    OzoneClient ozoneClient =
-        OzoneClientFactory.getOzoneClient(OzoneConfiguration.of(conf),
-            ozoneDt);
-    return ozoneClient.getObjectStore().renewDelegationToken(ozoneDt);
+    OzoneConfiguration ozoneConf = OzoneConfiguration.of(conf);
+    try (OzoneClient ozoneClient = getOzoneClient(ozoneConf, ozoneDt)) {
+      return ozoneClient.getObjectStore().renewDelegationToken(ozoneDt);
+    }
   }
 
   @Override
@@ -70,9 +71,9 @@ public class OzoneDelegationTokenRenewer extends TokenRenewer {
       throws IOException, InterruptedException {
     Token<OzoneTokenIdentifier> ozoneDt =
         (Token<OzoneTokenIdentifier>) token;
-    OzoneClient ozoneClient =
-        OzoneClientFactory.getOzoneClient(OzoneConfiguration.of(conf),
-            ozoneDt);
-    ozoneClient.getObjectStore().cancelDelegationToken(ozoneDt);
+    OzoneConfiguration ozoneConf = OzoneConfiguration.of(conf);
+    try (OzoneClient ozoneClient = getOzoneClient(ozoneConf, ozoneDt)) {
+      ozoneClient.getObjectStore().cancelDelegationToken(ozoneDt);
+    }
   }
 }
