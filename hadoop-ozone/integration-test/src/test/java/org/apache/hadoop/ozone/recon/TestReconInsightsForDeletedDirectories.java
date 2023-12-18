@@ -202,17 +202,17 @@ public class TestReconInsightsForDeletedDirectories {
 
     if (directoryObjectId == null) {
       Assertions.fail("directoryObjectId is null. Test case cannot proceed.");
+    } else {
+      // Retrieve Namespace Summary for dir1 from Recon.
+      ReconNamespaceSummaryManagerImpl namespaceSummaryManager =
+          (ReconNamespaceSummaryManagerImpl) cluster.getReconServer()
+              .getReconNamespaceSummaryManager();
+      NSSummary summary =
+          namespaceSummaryManager.getNSSummary(directoryObjectId);
+      // Assert that the directory dir1 has 10 sub-files and size of 1000 bytes.
+      Assertions.assertEquals(10, summary.getNumOfFiles());
+      Assertions.assertEquals(10, summary.getSizeOfFiles());
     }
-
-    // Retrieve Namespace Summary for dir1 from Recon.
-    ReconNamespaceSummaryManagerImpl namespaceSummaryManager =
-        (ReconNamespaceSummaryManagerImpl) cluster.getReconServer()
-            .getReconNamespaceSummaryManager();
-    NSSummary summary =
-        namespaceSummaryManager.getNSSummary(directoryObjectId);
-    // Assert that the directory dir1 has 10 sub-files and size of 1000 bytes.
-    Assertions.assertEquals(10, summary.getNumOfFiles());
-    Assertions.assertEquals(10, summary.getSizeOfFiles());
 
     // Delete the entire directory dir1.
     fs.delete(dir1, true);
