@@ -1018,31 +1018,31 @@ public class TestRootedOzoneFileSystem {
    */
   @Test
   public void testListStatusWithDifferentBucketOwner() throws IOException {
-    String volumeName = getRandomNonExistVolumeName();
-    objectStore.createVolume(volumeName);
-    OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
+    String volName = getRandomNonExistVolumeName();
+    objectStore.createVolume(volName);
+    OzoneVolume ozoneVolume = objectStore.getVolume(volName);
 
-    String bucketName = "bucket-" + RandomStringUtils.randomNumeric(5);
+    String buckName = "bucket-" + RandomStringUtils.randomNumeric(5);
     UserGroupInformation currUgi = UserGroupInformation.getCurrentUser();
     String bucketOwner = currUgi.getUserName() + RandomStringUtils.randomNumeric(5);
     BucketArgs bucketArgs = BucketArgs.newBuilder()
         .setOwner(bucketOwner)
         .build();
-    ozoneVolume.createBucket(bucketName, bucketArgs);
+    ozoneVolume.createBucket(buckName, bucketArgs);
 
-    Path volumePath = new Path(OZONE_URI_DELIMITER + volumeName);
+    Path volPath = new Path(OZONE_URI_DELIMITER + volName);
 
-    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(buckName);
 
-    FileStatus[] fileStatusVolume = ofs.listStatus(volumePath);
+    FileStatus[] fileStatusVolume = ofs.listStatus(volPath);
     assertEquals(1, fileStatusVolume.length);
     // FileStatus owner is different from the volume owner.
     // Owner is the same as the bucket owner returned by the ObjectStore.
     assertNotEquals(ozoneVolume.getOwner(), fileStatusVolume[0].getOwner());
     assertEquals(ozoneBucket.getOwner(), fileStatusVolume[0].getOwner());
 
-    ozoneVolume.deleteBucket(bucketName);
-    objectStore.deleteVolume(volumeName);
+    ozoneVolume.deleteBucket(buckName);
+    objectStore.deleteVolume(volName);
   }
 
   /**
