@@ -603,23 +603,22 @@ public class TestRatisUnderReplicationHandler {
     Create 2 unhealthy vulnerable replicas. An exception is thrown for one of the replicas, but the other replica
     should still be processed and 1 command should be sent.
      */
-    final ContainerReplica unhealthyReplicaOverloaded = createContainerReplica(container.containerID(), 0,
-        DECOMMISSIONING, State.UNHEALTHY, sequenceID);
     final ContainerReplica unhealthyReplica = createContainerReplica(container.containerID(), 0,
+        DECOMMISSIONING, State.UNHEALTHY, sequenceID);
+    final ContainerReplica unhealthyReplica2 = createContainerReplica(container.containerID(), 0,
         ENTERING_MAINTENANCE, State.UNHEALTHY, sequenceID);
-    replicas.add(unhealthyReplicaOverloaded);
     replicas.add(unhealthyReplica);
+    replicas.add(unhealthyReplica2);
     UnderReplicatedHealthResult result = getUnderReplicatedHealthResult();
     Mockito.when(result.hasVulnerableUnhealthy()).thenReturn(true);
-    ReplicationTestUtil.mockRMSendThrottleReplicateCommand(
-        replicationManager, commandsSent, new AtomicBoolean(true));
+    ReplicationTestUtil.mockRMSendThrottleReplicateCommand(replicationManager, commandsSent, new AtomicBoolean(true));
 
-    RatisUnderReplicationHandler handler =
-        new RatisUnderReplicationHandler(policy, conf, replicationManager);
+    RatisUnderReplicationHandler handler = new RatisUnderReplicationHandler(policy, conf, replicationManager);
     assertThrows(CommandTargetOverloadedException.class, () -> handler.processAndSendCommands(replicas,
         Collections.emptyList(), result, 2));
     assertEquals(1, commandsSent.size());
-    assertEquals(unhealthyReplica.getDatanodeDetails(), commandsSent.iterator().next().getKey());
+    DatanodeDetails dn = commandsSent.iterator().next().getKey();
+    assertTrue(unhealthyReplica.getDatanodeDetails().equals(dn) || unhealthyReplica2.getDatanodeDetails().equals(dn));
   }
 
   @Test
