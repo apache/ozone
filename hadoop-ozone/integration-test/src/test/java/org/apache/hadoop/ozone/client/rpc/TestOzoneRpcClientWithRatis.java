@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -52,15 +51,14 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * This class is to test all the public facing APIs of Ozone Client with an
@@ -117,8 +115,8 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
 
     // Write data into a key
     try (OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes(UTF_8).length, ReplicationType.RATIS,
-        THREE, new HashMap<>())) {
+        value.getBytes(UTF_8).length, ReplicationConfig.fromTypeAndFactor(
+            ReplicationType.RATIS, THREE), new HashMap<>())) {
       out.write(value.getBytes(UTF_8));
     }
 
@@ -132,7 +130,7 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] b = new byte[value.getBytes(UTF_8).length];
       is.read(b);
-      Assert.assertTrue(Arrays.equals(b, value.getBytes(UTF_8)));
+      Assertions.assertArrayEquals(b, value.getBytes(UTF_8));
     } catch (OzoneChecksumException e) {
       fail("Read key should succeed");
     }
@@ -141,7 +139,7 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] b = new byte[value.getBytes(UTF_8).length];
       is.read(b);
-      Assert.assertTrue(Arrays.equals(b, value.getBytes(UTF_8)));
+      Assertions.assertArrayEquals(b, value.getBytes(UTF_8));
     } catch (OzoneChecksumException e) {
       fail("Read file should succeed");
     }
@@ -156,7 +154,7 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
       try (OzoneInputStream is = newBucket.readKey(keyName)) {
         byte[] b = new byte[value.getBytes(UTF_8).length];
         is.read(b);
-        Assert.assertTrue(Arrays.equals(b, value.getBytes(UTF_8)));
+        Assertions.assertArrayEquals(b, value.getBytes(UTF_8));
       } catch (OzoneChecksumException e) {
         fail("Read key should succeed");
       }
@@ -165,7 +163,7 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
       try (OzoneInputStream is = newBucket.readFile(keyName)) {
         byte[] b = new byte[value.getBytes(UTF_8).length];
         is.read(b);
-        Assert.assertTrue(Arrays.equals(b, value.getBytes(UTF_8)));
+        Assertions.assertArrayEquals(b, value.getBytes(UTF_8));
       } catch (OzoneChecksumException e) {
         fail("Read file should succeed");
       }
@@ -197,9 +195,9 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
 
     assertNotNull(multipartInfo);
     String uploadID = multipartInfo.getUploadID();
-    Assert.assertEquals(volumeName, multipartInfo.getVolumeName());
-    Assert.assertEquals(bucketName, multipartInfo.getBucketName());
-    Assert.assertEquals(keyName, multipartInfo.getKeyName());
+    Assertions.assertEquals(volumeName, multipartInfo.getVolumeName());
+    Assertions.assertEquals(bucketName, multipartInfo.getBucketName());
+    Assertions.assertEquals(keyName, multipartInfo.getKeyName());
     assertNotNull(multipartInfo.getUploadID());
 
     OzoneDataStreamOutput ozoneStreamOutput = bucket.createMultipartStreamKey(
@@ -211,11 +209,11 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
     OzoneMultipartUploadPartListParts parts =
         bucket.listParts(keyName, uploadID, 0, 1);
 
-    Assert.assertEquals(parts.getPartInfoList().size(), 1);
+    Assertions.assertEquals(parts.getPartInfoList().size(), 1);
 
     OzoneMultipartUploadPartListParts.PartInfo partInfo =
         parts.getPartInfoList().get(0);
-    Assert.assertEquals(valueLength, partInfo.getSize());
+    Assertions.assertEquals(valueLength, partInfo.getSize());
 
   }
 
