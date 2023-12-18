@@ -24,6 +24,8 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
@@ -39,7 +41,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import java.io.File;
 import java.util.UUID;
 import java.nio.file.Path;
@@ -55,7 +56,7 @@ public class TestOMSnapshotDeleteResponse {
   @TempDir
   private Path folder;
   
-  private OmMetadataManagerImpl omMetadataManager;
+  private OMMetadataManager omMetadataManager;
   private BatchOperation batchOperation;
   private OzoneConfiguration ozoneConfiguration;
 
