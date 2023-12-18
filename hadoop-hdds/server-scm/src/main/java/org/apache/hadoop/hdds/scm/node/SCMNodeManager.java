@@ -83,6 +83,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -1095,16 +1096,16 @@ public class SCMNodeManager implements NodeManager {
     long timeDiff = currentTime - lastHeartbeatTime;
 
     // Time is in ms. Calculate total time in seconds.
-    long seconds = timeDiff / 1000;
-    // Calculate days and subtract them from seconds.
-    long days = seconds / (24 * 60 * 60);
-    seconds -= days * 24 * 60 * 60;
-    // Calculate hours and subtract them from seconds.
-    long hours = seconds / (60 * 60);
-    seconds -= hours * 60 * 60;
-    // Calculate minutes and subtract them from seconds.
-    long minutes = seconds / 60;
-    seconds -= minutes * 60;
+    long seconds = TimeUnit.MILLISECONDS.toSeconds(timeDiff);
+    // Calculate days, convert the number back to seconds and subtract it from seconds.
+    long days = TimeUnit.SECONDS.toDays(seconds);
+    seconds -= TimeUnit.DAYS.toSeconds(days);
+    // Calculate hours, convert the number back to seconds and subtract it from seconds.
+    long hours = TimeUnit.SECONDS.toHours(seconds);
+    seconds -= TimeUnit.HOURS.toSeconds(hours);
+    // Calculate minutes, convert the number back to seconds and subtract it from seconds.
+    long minutes = TimeUnit.SECONDS.toMinutes(seconds);
+    seconds -= TimeUnit.MINUTES.toSeconds(minutes);
 
     StringBuilder stringBuilder = new StringBuilder();
     if (days > 0) {
