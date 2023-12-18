@@ -25,7 +25,6 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Unhealthy;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -41,6 +40,8 @@ import java.util.UUID;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for LeaderChoosePolicy.
@@ -93,9 +94,9 @@ public class TestLeaderChoosePolicy {
       leaderCount.put(leader, leaderCount.get(leader) + 1);
     }
 
-    Assert.assertTrue(leaderCount.size() == dnNum);
+    assertTrue(leaderCount.size() == dnNum);
     for (Map.Entry<UUID, Integer> entry: leaderCount.entrySet()) {
-      Assert.assertTrue(leaderCount.get(entry.getKey()) == leaderNumOfEachDn);
+      assertTrue(leaderCount.get(entry.getKey()) == leaderNumOfEachDn);
     }
   }
 
@@ -114,7 +115,7 @@ public class TestLeaderChoosePolicy {
     // make sure two pipelines are created
     waitForPipelines(pipelineNum);
     // No Factor ONE pipeline is auto created.
-    Assert.assertEquals(0,
+    assertEquals(0,
         pipelineManager.getPipelines(RatisReplicationConfig.getInstance(
             ReplicationFactor.ONE)).size());
 
@@ -132,7 +133,7 @@ public class TestLeaderChoosePolicy {
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipelines();
 
-    Assert.assertEquals(
+    assertEquals(
         pipelinesBeforeRestart.size(), pipelinesAfterRestart.size());
 
     for (Pipeline p : pipelinesBeforeRestart) {
@@ -144,7 +145,7 @@ public class TestLeaderChoosePolicy {
         }
       }
 
-      Assert.assertTrue(equal);
+      assertTrue(equal);
     }
   }
 
@@ -163,7 +164,7 @@ public class TestLeaderChoosePolicy {
     // make sure pipelines are created
     waitForPipelines(pipelineNum);
     // No Factor ONE pipeline is auto created.
-    Assert.assertEquals(0, pipelineManager.getPipelines(
+    assertEquals(0, pipelineManager.getPipelines(
         RatisReplicationConfig.getInstance(
             ReplicationFactor.ONE)).size());
 
