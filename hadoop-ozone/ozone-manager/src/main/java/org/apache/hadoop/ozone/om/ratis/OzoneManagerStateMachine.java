@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -114,7 +115,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private ConcurrentMap<Long, Long> ratisTransactionMap =
       new ConcurrentSkipListMap<>();
   // Dummy response to update ratis transaction to last applied map
-  private final OMClientResponse dummyResponse;
+  private final OMClientResponse dummyResponse
+      = new OMRatisTransactionUpdate();
 
 
   public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer,
@@ -141,14 +143,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .setNameFormat(threadPrefix + "InstallSnapshotThread").build();
     this.installSnapshotExecutor =
         HadoopExecutors.newSingleThreadExecutor(installSnapshotThreadFactory);
-
-    // init dummy response
-    OMResponse response = OmResponseUtil.getDummySuccessResponse();
-    dummyResponse = new OMClientResponse(response) {
-      protected void addToDBBatch(
-          OMMetadataManager mgr, BatchOperation opr) throws IOException {
-      }
-    };
   }
 
   /**
@@ -215,7 +209,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       Thread.interrupted();
     }
     ratisTransactionMap.put(index, currentTerm);
-    ozoneManagerDoubleBuffer.add(dummyResponse, index);
+    CompletableFuture.supplyAsync(
+        () -> ozoneManagerDoubleBuffer.add(dummyResponse, index),
+        executorService);
   }
 
   /**
@@ -675,6 +671,19 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
             getLastAppliedTermIndex());
       }
     }
+
+    // cleanup extra entries and release double buffer transaction
+    long missingIdx = applyTransactionMap.entrySet().stream().filter(
+        entry -> entry.getKey() <= lastFlushedIndex).count();
+    missingIdx += ratisTransactionMap.entrySet().stream().filter(
+        entry -> entry.getKey() <= lastFlushedIndex).count();
+    if (missingIdx > 0) {
+      applyTransactionMap.entrySet().removeIf(
+          entry -> entry.getKey() <= lastFlushedIndex);
+      ratisTransactionMap.entrySet().removeIf(
+          entry -> entry.getKey() <= lastFlushedIndex);
+      ozoneManagerDoubleBuffer.releaseUnFlushedTransactions((int) missingIdx);
+    }
   }
 
   private Long getTermIndexFromTransactionMap(Long index) {
@@ -746,7 +755,15 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @return
    */
   public long getTermForIndex(long transactionIndex) {
-    return applyTransactionMap.get(transactionIndex);
+    if (applyTransactionMap.containsKey(transactionIndex)) {
+      return applyTransactionMap.get(transactionIndex);
+    }
+    if (ratisTransactionMap.containsKey(transactionIndex)) {
+      return ratisTransactionMap.get(transactionIndex);
+    }
+    LOG.error("Missing transaction index {}, returning term 0",
+        transactionIndex);
+    return 0;
   }
 
   /**
@@ -762,4 +779,14 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   public OzoneManagerDoubleBuffer getOzoneManagerDoubleBuffer() {
     return ozoneManagerDoubleBuffer;
   }
+
+  @CleanupTableInfo
+  private static class OMRatisTransactionUpdate extends OMClientResponse {
+    OMRatisTransactionUpdate() {
+      super(OmResponseUtil.getDummySuccessResponse());
+    }
+    protected void addToDBBatch(
+        OMMetadataManager mgr, BatchOperation opr) throws IOException {
+    }
+  };
 }
