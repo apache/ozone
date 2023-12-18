@@ -551,6 +551,12 @@ public class TestRatisUnderReplicationHandler {
             command.getKey()));
   }
 
+  /**
+   * A QUASI_CLOSED container may end up having UNHEALTHY replicas with the correct sequence ID, while none of the
+   * healthy replicas have the correct sequence ID. If any of these UNHEALTHY replicas is unique and is being taken
+   * offline, then it needs to be replicated to another DN for decommission to progress. This test asserts that a
+   * replicate command is sent for one such replica.
+   */
   @Test
   public void testUnderReplicationWithVulnerableReplicas() throws IOException {
     final long sequenceID = 20;
@@ -570,8 +576,50 @@ public class TestRatisUnderReplicationHandler {
 
     final Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = testProcessing(replicas, Collections.emptyList(),
         result, 2, 1);
-    assertEquals(1, commands.size());
     assertEquals(unhealthyReplica.getDatanodeDetails(), commands.iterator().next().getKey());
+  }
+
+  /**
+   * In the push replication model, a replicate command is sent to the DN hosting the replica, and that DN is
+   * expected to "push" the replica to another DN. If the DN hosting the replica has too many commands already, an
+   * exception is thrown. This test asserts that other vulnerable UNHEALTHY replicas are still handled when an
+   * exception is caught for one of the replicas. Also asserts that the first thrown exception isn't lost and is
+   * actually rethrown once other replicas are processed, so that the container can be re-queued.
+   */
+  @Test
+  public void testUnderReplicationWithVulnerableReplicasAndTargetOverloadedException()
+      throws NotLeaderException, CommandTargetOverloadedException {
+    final long sequenceID = 20;
+    container = ReplicationTestUtil.createContainerInfo(RATIS_REPLICATION_CONFIG, 1,
+        HddsProtos.LifeCycleState.QUASI_CLOSED, sequenceID);
+
+    final Set<ContainerReplica> replicas = new HashSet<>(5);
+    for (int i = 0; i < 3; i++) {
+      replicas.add(createContainerReplica(container.containerID(), 0, IN_SERVICE, State.QUASI_CLOSED,
+          sequenceID - 1));
+    }
+
+    /*
+    Create 2 unhealthy vulnerable replicas. An exception is thrown for one of the replicas, but the other replica
+    should still be processed and 1 command should be sent.
+     */
+    final ContainerReplica unhealthyReplicaOverloaded = createContainerReplica(container.containerID(), 0,
+        DECOMMISSIONING, State.UNHEALTHY, sequenceID);
+    final ContainerReplica unhealthyReplica = createContainerReplica(container.containerID(), 0,
+        ENTERING_MAINTENANCE, State.UNHEALTHY, sequenceID);
+    replicas.add(unhealthyReplicaOverloaded);
+    replicas.add(unhealthyReplica);
+    UnderReplicatedHealthResult result = getUnderReplicatedHealthResult();
+    Mockito.when(result.hasVulnerableUnhealthy()).thenReturn(true);
+    ReplicationTestUtil.mockRMSendThrottleReplicateCommand(
+        replicationManager, commandsSent, new AtomicBoolean(true));
+
+    RatisUnderReplicationHandler handler =
+        new RatisUnderReplicationHandler(policy, conf, replicationManager);
+    assertThrows(CommandTargetOverloadedException.class, () -> handler.processAndSendCommands(replicas,
+        Collections.emptyList(), result, 2));
+    assertEquals(1, commandsSent.size());
+    assertEquals(unhealthyReplica.getDatanodeDetails(), commandsSent.iterator().next().getKey());
   }
 
   @Test

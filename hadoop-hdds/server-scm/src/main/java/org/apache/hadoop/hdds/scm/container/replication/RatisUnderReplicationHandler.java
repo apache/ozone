@@ -195,7 +195,7 @@ public class RatisUnderReplicationHandler
 
     /*
     Since we're replicating UNHEALTHY replicas, it's possible that replication keeps on failing. Shuffling gives
-    other replicas a chance to be replicated since there's a limit on inflight adds.
+    other replicas a chance to be replicated since there's a limit on in-flight adds.
     */
     Collections.shuffle(vulnerableUnhealthy);
     return replicateEachSource(replicaCount, vulnerableUnhealthy, pendingOps);
@@ -238,8 +238,7 @@ public class RatisUnderReplicationHandler
       try {
         count = sendReplicationCommands(container, ImmutableList.of(replica.getDatanodeDetails()), target);
       } catch (CommandTargetOverloadedException e) {
-        LOG.info("Exception while replicating replica {} to target {} for container {}.", replica, target, container,
-            e);
+        LOG.info("Exception while replicating {} to target {} for container {}.", replica, target, container, e);
         if (firstException == null) {
           firstException = e;
         }
