@@ -48,6 +48,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -62,6 +63,8 @@ class TestManagedSstFileReader {
   @TempDir
   private File tempDir;
 
+  private final AtomicInteger fileCounter = new AtomicInteger();
+
   // Key prefix containing all characters, to check if all characters can be
   // written & read from rocksdb through SSTDumptool
   private static final String KEY_PREFIX = IntStream.range(0, 256).boxed()
@@ -70,7 +73,7 @@ class TestManagedSstFileReader {
 
   private String createRandomSSTFile(TreeMap<String, Integer> keys)
       throws RocksDBException {
-    File file = new File(tempDir, "tmp_sst_file.sst");
+    File file = new File(tempDir, "tmp_sst_file" + fileCounter.incrementAndGet() + ".sst");
 
     try (ManagedOptions managedOptions = new ManagedOptions();
          ManagedEnvOptions managedEnvOptions = new ManagedEnvOptions();
@@ -87,6 +90,7 @@ class TestManagedSstFileReader {
       }
       sstFileWriter.finish();
     }
+    Assertions.assertTrue(file.exists());
     return file.getAbsolutePath();
   }
 
@@ -145,7 +149,7 @@ class TestManagedSstFileReader {
                  new ManagedSstFileReader(files).getKeyStream(
                      lowerBound.orElse(null), upperBound.orElse(null))) {
           keyStream.forEach(key -> {
-            Assertions.assertEquals(keysInBoundary.get(key), 1);
+            Assertions.assertEquals(1, keysInBoundary.get(key));
             Assertions.assertNotNull(keysInBoundary.remove(key));
           });
           keysInBoundary.values()
