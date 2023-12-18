@@ -24,7 +24,6 @@ public interface OmTableHandler {
    * @param objectCountMap           A map storing object counts.
    * @param unReplicatedSizeMap A map storing unReplicated size counts.
    * @param replicatedSizeMap   A map storing replicated size counts.
-   * @throws IOException If an I/O error occurs during processing.
    */
   void handlePutEvent(OMDBUpdateEvent<String, Object> event,
                       String tableName,
@@ -42,7 +41,6 @@ public interface OmTableHandler {
    * @param objectCountMap           A map storing object counts.
    * @param unReplicatedSizeMap A map storing unReplicated size counts.
    * @param replicatedSizeMap   A map storing replicated size counts.
-   * @throws IOException If an I/O error occurs during processing.
    */
   void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
                          String tableName,

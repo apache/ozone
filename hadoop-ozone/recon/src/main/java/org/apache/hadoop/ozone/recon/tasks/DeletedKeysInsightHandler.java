@@ -116,7 +116,7 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
                                 HashMap<String, Long> objectCountMap,
                                 HashMap<String, Long> unReplicatedSizeMap,
                                 HashMap<String, Long> replicatedSizeMap) {
-    // The size of deleted directories cannot change hence no-op.
+    // The size of deleted keys cannot change hence no-op.
     return;
   }
 
@@ -142,7 +142,6 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
           Pair<Long, Long> result = repeatedOmKeyInfo.getTotalSize();
           unReplicatedSize += result.getRight();
           replicatedSize += result.getLeft();
-          // Since we can have multiple deleted keys of same name
           count += repeatedOmKeyInfo.getOmKeyInfoList().size();
         }
       }
