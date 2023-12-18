@@ -120,12 +120,12 @@ public class ScmTopologyClient {
       InnerNode newTopology = scmBlockLocationProtocol.getClusterTree();
       if (!newTopology.equals(current)) {
         cache.set(newTopology);
-        LOG.info("Updated network topology schema file fetched from " +
+        LOG.info("Updated network topology cluster tree fetched from " +
             "SCM: {}.", newTopology);
       }
     } catch (IOException e) {
       throw new UncheckedIOException(
-          "Error fetching updated network topology schema file from SCM", e);
+          "Error fetching updated network topology cluster tree from SCM", e);
     }
   }
 }
