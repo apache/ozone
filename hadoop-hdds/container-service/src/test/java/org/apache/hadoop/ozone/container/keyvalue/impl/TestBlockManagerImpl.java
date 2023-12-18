@@ -37,8 +37,6 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 import java.nio.file.Path;
@@ -82,10 +80,6 @@ public class TestBlockManagerImpl {
     this.config = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, config);
     initilaze();
-  }
-
-  private static Iterable<Object[]> getVersionParameters() {
-    return ContainerTestVersionInfo.versionParameters();
   }
 
   private void initilaze() throws Exception {
@@ -148,8 +142,7 @@ public class TestBlockManagerImpl {
     BlockUtils.shutdownCache(config);
   }
 
-  @ParameterizedTest
-  @MethodSource("getVersionParameters")
+  @ContainerTestVersionInfo.ContainerTest
   public void testPutBlock(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initTest(versionInfo);
@@ -179,8 +172,7 @@ public class TestBlockManagerImpl {
 
   }
 
-  @ParameterizedTest
-  @MethodSource("getVersionParameters")
+  @ContainerTestVersionInfo.ContainerTest
   public void testPutAndGetBlock(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initTest(versionInfo);
@@ -202,8 +194,7 @@ public class TestBlockManagerImpl {
 
   }
 
-  @ParameterizedTest
-  @MethodSource("getVersionParameters")
+  @ContainerTestVersionInfo.ContainerTest
   public void testListBlock(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initTest(versionInfo);

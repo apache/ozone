@@ -78,8 +78,7 @@ public class TestOMCancelPrepareRequest extends TestOMKeyRequest {
         new OMCancelPrepareRequest(omRequest);
 
     OMClientResponse omClientResponse =
-        cancelPrepareRequest.validateAndUpdateCache(ozoneManager,
-            LOG_INDEX, ozoneManagerDoubleBufferHelper);
+        cancelPrepareRequest.validateAndUpdateCache(ozoneManager, LOG_INDEX);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());

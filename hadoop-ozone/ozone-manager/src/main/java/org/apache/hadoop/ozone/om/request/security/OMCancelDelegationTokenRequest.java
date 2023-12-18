@@ -22,7 +22,6 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -86,8 +85,7 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+      long transactionLogIndex) {
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     Token<OzoneTokenIdentifier> token = getToken();
@@ -124,9 +122,6 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
       exception = ex;
       omClientResponse = new OMCancelDelegationTokenResponse(null,
           createErrorOMResponse(omResponse, exception));
-    } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
     }
 
     auditLog(auditLogger,

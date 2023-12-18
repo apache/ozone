@@ -1975,10 +1975,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             <require.test.libhadoop>${require.test.libhadoop}</require.test.libhadoop>
           </systemPropertyVariables>
           <properties>
-            <property>
-              <name>listener</name>
-              <value>org.apache.ozone.test.TimedOutTestsListener</value>
-            </property>
+            <configurationParameters>
+              junit.platform.output.capture.stdout = true
+              junit.platform.output.capture.stderr = true
+            </configurationParameters>
           </properties>
           <includes>
             <include>**/Test*.java</include>

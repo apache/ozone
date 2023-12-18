@@ -66,8 +66,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
             getOmKeyDeleteRequest(modifiedOmRequest);
 
     OMClientResponse omClientResponse =
-        omKeyDeleteRequest.validateAndUpdateCache(ozoneManager,
-        100L, ozoneManagerDoubleBufferHelper);
+        omKeyDeleteRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
@@ -93,8 +92,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
         omMetadataManager, getBucketLayout());
 
     OMClientResponse omClientResponse =
-        omKeyDeleteRequest.validateAndUpdateCache(ozoneManager,
-            100L, ozoneManagerDoubleBufferHelper);
+        omKeyDeleteRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
@@ -109,8 +107,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
             getOmKeyDeleteRequest(modifiedOmRequest);
 
     OMClientResponse omClientResponse = omKeyDeleteRequest
-        .validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
@@ -127,8 +124,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
     OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
 
     OMClientResponse omClientResponse = omKeyDeleteRequest
-        .validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
             omClientResponse.getOMResponse().getStatus());

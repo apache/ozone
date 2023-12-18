@@ -196,8 +196,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
         omBucketInfo.getUsedBytes());
     OMDirectoriesPurgeResponseWithFSO omClientResponse
         = (OMDirectoriesPurgeResponseWithFSO) omKeyPurgeRequest
-        .validateAndUpdateCache(ozoneManager, 100L,
-        ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 100L);
     omBucketInfo = omMetadataManager.getBucketTable().get(
         bucketKey);
     Assertions.assertEquals(0L * deletedKeyNames.size(),
@@ -250,8 +249,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     // perform delete
     OMDirectoriesPurgeResponseWithFSO omClientResponse
         = (OMDirectoriesPurgeResponseWithFSO) omKeyPurgeRequest
-        .validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 100L);
     
     // validate bucket info, no change expected
     omBucketInfo = omMetadataManager.getBucketTable().get(

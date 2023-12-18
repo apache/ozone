@@ -100,8 +100,6 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -136,10 +134,6 @@ public class TestContainerPersistence {
     this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
-  }
-
-  private static Iterable<Object[]> versionInfo() {
-    return ContainerTestVersionInfo.versionParameters();
   }
 
   @BeforeAll
@@ -224,8 +218,7 @@ public class TestContainerPersistence {
     return container;
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testCreateContainer(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initSchemaAndVersionInfo(versionInfo);
@@ -250,8 +243,7 @@ public class TestContainerPersistence {
     }
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testCreateDuplicateContainer(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initSchemaAndVersionInfo(versionInfo);
@@ -266,8 +258,7 @@ public class TestContainerPersistence {
     }
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testAddingBlockToDeletedContainer(
       ContainerTestVersionInfo versionInfo) throws Exception {
     initSchemaAndVersionInfo(versionInfo);
@@ -301,8 +292,7 @@ public class TestContainerPersistence {
         Matchers.containsString("Error opening DB."));
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testDeleteNonEmptyContainer(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initSchemaAndVersionInfo(versionInfo);
@@ -340,8 +330,7 @@ public class TestContainerPersistence {
             "Non-force deletion of non-empty container is not allowed."));
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testDeleteContainer(ContainerTestVersionInfo versionInfo)
       throws IOException {
     initSchemaAndVersionInfo(versionInfo);
@@ -434,8 +423,7 @@ public class TestContainerPersistence {
    *
    * @throws Exception
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testDeleteContainerWithRenaming(
       ContainerTestVersionInfo versionInfo) throws Exception {
     initSchemaAndVersionInfo(versionInfo);
@@ -532,8 +520,7 @@ public class TestContainerPersistence {
     assertEquals(0, deleteDirFilesArray.length);
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testGetContainerReports(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initSchemaAndVersionInfo(versionInfo);
@@ -570,8 +557,7 @@ public class TestContainerPersistence {
    *
    * @throws IOException
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testListContainer(ContainerTestVersionInfo versionInfo)
       throws IOException {
     initSchemaAndVersionInfo(versionInfo);
@@ -639,8 +625,7 @@ public class TestContainerPersistence {
    * @throws IOException
    * @throws NoSuchAlgorithmException
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testWriteChunk(ContainerTestVersionInfo versionInfo)
       throws IOException {
     initSchemaAndVersionInfo(versionInfo);
@@ -656,8 +641,7 @@ public class TestContainerPersistence {
    * @throws IOException
    * @throws NoSuchAlgorithmException
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testWritReadManyChunks(ContainerTestVersionInfo versionInfo)
       throws IOException {
     initSchemaAndVersionInfo(versionInfo);
@@ -705,8 +689,7 @@ public class TestContainerPersistence {
    *
    * @throws IOException
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testOverWrite(ContainerTestVersionInfo versionInfo)
       throws IOException {
     initSchemaAndVersionInfo(versionInfo);
@@ -742,8 +725,7 @@ public class TestContainerPersistence {
    *
    * @throws IOException
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testDeleteChunk(ContainerTestVersionInfo versionInfo)
       throws IOException {
     initSchemaAndVersionInfo(versionInfo);
@@ -769,8 +751,7 @@ public class TestContainerPersistence {
    *
    * @throws IOException
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testPutBlock(ContainerTestVersionInfo versionInfo)
       throws IOException {
     initSchemaAndVersionInfo(versionInfo);
@@ -796,8 +777,7 @@ public class TestContainerPersistence {
    *
    * @throws IOException
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testPutBlockWithInvalidBCSId(ContainerTestVersionInfo versionInfo)
       throws IOException {
     initSchemaAndVersionInfo(versionInfo);
@@ -855,8 +835,7 @@ public class TestContainerPersistence {
    *
    * @throws IOException
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testPutBlockWithLotsOfChunks(ContainerTestVersionInfo versionInfo)
       throws IOException {
     initSchemaAndVersionInfo(versionInfo);
@@ -910,8 +889,7 @@ public class TestContainerPersistence {
    *
    * @throws IOException
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testUpdateContainer(ContainerTestVersionInfo versionInfo)
       throws IOException {
     initSchemaAndVersionInfo(versionInfo);
@@ -995,8 +973,7 @@ public class TestContainerPersistence {
     return blockData;
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testListBlock(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initSchemaAndVersionInfo(versionInfo);
