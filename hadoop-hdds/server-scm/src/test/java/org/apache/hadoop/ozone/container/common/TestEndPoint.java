@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -79,6 +80,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -285,6 +287,32 @@ public class TestEndPoint {
           = new DatanodeLayoutStorage(ozoneConf,
           "na_expect_storage_initialized");
       assertEquals(scmServerImpl.getClusterId(), layout.getClusterID());
+
+      // Delete storage volume info
+      File storageDir = ozoneContainer.getVolumeSet()
+          .getVolumesList().get(0).getStorageDir();
+      FileUtils.forceDelete(storageDir);
+
+      // Format volume VERSION file with
+      // different clusterId than SCM clusterId.
+      ozoneContainer.getVolumeSet().getVolumesList()
+          .get(0).format("different_cluster_id");
+      // Update layout clusterId and persist it.
+      layout.setClusterId("different_cluster_id");
+      layout.persistCurrentState();
+
+      // As the volume level clusterId didn't match with SCM clusterId
+      // Even after the version call, the datanode layout file should
+      // not update its clusterID field.
+      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
+      versionTask.call();
+      DatanodeLayoutStorage layout1
+          = new DatanodeLayoutStorage(ozoneConf,
+          "na_expect_storage_initialized");
+
+      assertEquals("different_cluster_id", layout1.getClusterID());
+      assertNotEquals(scmServerImpl.getClusterId(), layout1.getClusterID());
+      FileUtils.forceDelete(storageDir);
     }
   }
 

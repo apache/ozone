@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.shell.keys;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.hadoop.fs.CompositeCrcFileChecksum;
+import org.apache.hadoop.ozone.client.checksum.CompositeCrcFileChecksum;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
-import org.apache.hadoop.util.CrcUtil;
+import org.apache.hadoop.ozone.client.checksum.CrcUtil;
 import org.apache.hadoop.util.DataChecksum;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;

@@ -82,8 +82,7 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
       omKeyCreateRequest = getOMKeyCreateRequest(modifiedOmRequest);
 
       OMClientResponse omKeyCreateResponse =
-          omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
-              ozoneManagerDoubleBufferHelper);
+          omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
       Assertions.assertTrue(omKeyCreateResponse.getOMResponse().getSuccess());
       Assertions.assertEquals(keyName,
           omKeyCreateResponse.getOMResponse()

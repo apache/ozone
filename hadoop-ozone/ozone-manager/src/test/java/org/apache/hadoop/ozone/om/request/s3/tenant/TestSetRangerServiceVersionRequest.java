@@ -21,7 +21,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMSetRangerServiceVersionResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
@@ -48,9 +47,6 @@ public class TestSetRangerServiceVersionRequest {
   private Path folder;
 
   private OzoneManager ozoneManager;
-  // Set ozoneManagerDoubleBuffer to do nothing.
-  private final OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
-      ((response, transactionIndex) -> null);
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -95,7 +91,7 @@ public class TestSetRangerServiceVersionRequest {
 
     // Run validateAndUpdateCaches
     OMClientResponse clientResponse = request.validateAndUpdateCache(
-            ozoneManager, txLogIndex, ozoneManagerDoubleBufferHelper);
+            ozoneManager, txLogIndex);
 
     // Check response type and cast
     Assertions.assertTrue(clientResponse

@@ -122,7 +122,7 @@ public class TestOMGetDelegationTokenRequest extends
 
     long txLogIndex = 1L;
     return reqPreExecuted.validateAndUpdateCache(
-        ozoneManager, txLogIndex, ozoneManagerDoubleBufferHelper);
+        ozoneManager, txLogIndex);
   }
 
   @Test
