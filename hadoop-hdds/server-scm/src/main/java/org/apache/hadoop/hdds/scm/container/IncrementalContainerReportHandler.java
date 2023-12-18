@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -116,6 +117,9 @@ public class IncrementalContainerReportHandler extends
             LOG.error("Exception while processing ICR for container {}",
                 replicaProto.getContainerID(), ex);
           }
+        } catch (NotLeaderException ex) {
+          LOG.info("Exception while processing ICR for container {}",
+              replicaProto.getContainerID(), ex);
         } catch (IOException | InvalidStateTransitionException |
                  TimeoutException e) {
           LOG.error("Exception while processing ICR for container {}",
