@@ -19,16 +19,10 @@ package org.apache.hadoop.hdds.scm.cli.container;
 
 import java.io.IOException;
 
-import org.apache.hadoop.hdds.cli.GenericParentCommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 
-import static org.apache.hadoop.hdds.scm.cli.container.ContainerCommands.checkContainerExists;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
@@ -42,30 +36,12 @@ import picocli.CommandLine.Parameters;
     versionProvider = HddsVersionProvider.class)
 public class CloseSubcommand extends ScmSubcommand {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(CloseSubcommand.class);
-
-  @CommandLine.Spec
-  private CommandLine.Model.CommandSpec spec;
-
   @Parameters(description = "Id of the container to close")
   private long containerId;
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    checkContainerExists(scmClient, containerId);
-    try {
-      scmClient.closeContainer(containerId);
-    } catch (IOException ioe) {
-      boolean verbose = spec != null && spec.root()
-          .userObject() instanceof GenericParentCommand &&
-          ((GenericParentCommand) spec.root().userObject()).isVerbose();
-      if (!verbose) {
-        LOG.error("Unable to close container : {}", ioe.getMessage());
-      } else {
-        LOG.error("Unable to close container", ioe);
-      }
-    }
+    scmClient.closeContainer(containerId);
   }
 
 }
