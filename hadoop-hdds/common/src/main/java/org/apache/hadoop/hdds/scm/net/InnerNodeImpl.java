@@ -463,7 +463,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
                 NodeImpl.toProtobuf(getNetworkName(), getNetworkLocation(),
                     getCost()));
 
-    if (childrenMap != null || !childrenMap.isEmpty()) {
+    if (childrenMap != null && !childrenMap.isEmpty()) {
       for (Map.Entry<String, Node> entry : childrenMap.entrySet()) {
         if (entry.getValue() != null) {
           ScmBlockLocationProtocolProtos.ChildrenMap childrenMapProto =
