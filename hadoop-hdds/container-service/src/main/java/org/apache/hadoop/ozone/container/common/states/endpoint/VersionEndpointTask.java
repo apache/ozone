@@ -76,10 +76,6 @@ public class VersionEndpointTask implements
           // If end point is passive, datanode does not need to check volumes.
           String scmId = response.getValue(OzoneConsts.SCM_ID);
           String clusterId = response.getValue(OzoneConsts.CLUSTER_ID);
-          DatanodeLayoutStorage layoutStorage
-              = new DatanodeLayoutStorage(configuration);
-          layoutStorage.setClusterId(clusterId);
-          layoutStorage.persistCurrentState();
 
           Preconditions.checkNotNull(scmId,
               "Reply from SCM: scmId cannot be null");
@@ -91,6 +87,11 @@ public class VersionEndpointTask implements
 
           // Check HddsVolumes
           checkVolumeSet(ozoneContainer.getVolumeSet(), scmId, clusterId);
+
+          DatanodeLayoutStorage layoutStorage
+              = new DatanodeLayoutStorage(configuration);
+          layoutStorage.setClusterId(clusterId);
+          layoutStorage.persistCurrentState();
 
           // Start the container services after getting the version information
           ozoneContainer.start(clusterId);

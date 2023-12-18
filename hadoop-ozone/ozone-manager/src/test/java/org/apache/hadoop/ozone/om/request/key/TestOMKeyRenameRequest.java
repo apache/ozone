@@ -73,8 +73,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
             getOMKeyRenameRequest(modifiedOmRequest);
 
     OMClientResponse omKeyRenameResponse =
-        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omKeyRenameResponse.getOMResponse().getStatus());
@@ -109,8 +108,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omKeyRenameResponse =
-        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND,
         omKeyRenameResponse.getOMResponse().getStatus());
@@ -125,8 +123,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omKeyRenameResponse =
-        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omKeyRenameResponse.getOMResponse().getStatus());
@@ -144,8 +141,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omKeyRenameResponse =
-        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
         omKeyRenameResponse.getOMResponse().getStatus());
@@ -168,8 +164,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omKeyRenameResponse =
-        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_KEY_NAME,
         omKeyRenameResponse.getOMResponse().getStatus());
@@ -192,8 +187,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omKeyRenameResponse =
-        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_KEY_NAME,
         omKeyRenameResponse.getOMResponse().getStatus());

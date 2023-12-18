@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyRenameResponse;
@@ -85,10 +84,6 @@ public class TestOMSnapshotCreateRequest {
   private String bucketName;
   private String snapshotName1;
   private String snapshotName2;
-
-  // No-op ozoneManagerDoubleBuffer for testing.
-  private final OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
-      ((response, transactionIndex) -> null);
 
   @BeforeEach
   public void setup() throws Exception {
@@ -205,8 +200,7 @@ public class TestOMSnapshotCreateRequest {
 
     // Run validateAndUpdateCache.
     OMClientResponse omClientResponse =
-        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1);
 
     assertNotNull(omClientResponse.getOMResponse());
 
@@ -282,8 +276,7 @@ public class TestOMSnapshotCreateRequest {
     OMSnapshotCreateRequest omSnapshotCreateRequest = doPreExecute(omRequest);
 
     assertNull(omMetadataManager.getSnapshotInfoTable().get(key));
-    omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-        ozoneManagerDoubleBufferHelper);
+    omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1);
 
     assertNotNull(omMetadataManager.getSnapshotInfoTable().get(key));
 
@@ -291,8 +284,7 @@ public class TestOMSnapshotCreateRequest {
     omRequest = createSnapshotRequest(volumeName, bucketName, snapshotName1);
     omSnapshotCreateRequest = doPreExecute(omRequest);
     OMClientResponse omClientResponse =
-        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 2,
-            ozoneManagerDoubleBufferHelper);
+        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 2);
 
     OMResponse omResponse = omClientResponse.getOMResponse();
     assertNotNull(omResponse.getCreateSnapshotResponse());
@@ -363,8 +355,7 @@ public class TestOMSnapshotCreateRequest {
     OMSnapshotCreateRequest omSnapshotCreateRequest = doPreExecute(omRequest);
     //create entry
     OMClientResponse omClientResponse =
-        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1);
     omClientResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
   }

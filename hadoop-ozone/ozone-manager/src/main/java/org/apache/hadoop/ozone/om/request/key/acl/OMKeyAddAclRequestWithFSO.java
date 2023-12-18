@@ -25,7 +25,6 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.acl.OMKeyAclResponse;
@@ -134,10 +133,9 @@ public class OMKeyAddAclRequestWithFSO extends OMKeyAclRequestWithFSO {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+      long trxnLogIndex) {
     ozoneManager.getMetrics().incNumAddAcl();
-    return super.validateAndUpdateCache(ozoneManager, trxnLogIndex,
-        omDoubleBufferHelper);
+    return super.validateAndUpdateCache(ozoneManager, trxnLogIndex);
   }
 
   @Override

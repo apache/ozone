@@ -29,7 +29,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmFSOFile;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -105,8 +104,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+      long transactionLogIndex) {
     RecoverLeaseRequest recoverLeaseRequest = getOmRequest()
         .getRecoverLeaseRequest();
     Preconditions.checkNotNull(recoverLeaseRequest);
@@ -163,8 +161,6 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       omClientResponse = new OMRecoverLeaseResponse(
           createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
       if (acquiredLock) {
         mergeOmLockDetails(
             omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK,

@@ -349,7 +349,6 @@ public class CertificateClientTestImpl implements CertificateClient {
     x509Certificate = newX509Certificate;
     certificateMap.put(x509Certificate.getSerialNumber().toString(),
         x509Certificate);
-    System.out.println(new Date() + " certificated is renewed");
 
     // notify notification receivers
     notificationReceivers.forEach(r -> r.notifyCertificateRenewed(this,

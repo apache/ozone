@@ -23,7 +23,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -51,7 +50,7 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+      long trxnLogIndex) {
 
     OMClientResponse omClientResponse = null;
     OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
@@ -92,10 +91,8 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
     } catch (IOException ex) {
       omClientResponse = new OMSnapshotSetPropertyResponse(
           createErrorOMResponse(omResponse, ex));
-    } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
     }
+
     return omClientResponse;
   }
 }
