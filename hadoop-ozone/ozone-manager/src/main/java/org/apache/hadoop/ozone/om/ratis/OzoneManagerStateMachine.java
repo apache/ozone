@@ -645,42 +645,34 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   public void updateLastAppliedIndex(List<Long> flushedEpochs) {
     Preconditions.checkArgument(flushedEpochs.size() > 0);
     computeAndUpdateLastAppliedIndex(
-        flushedEpochs.get(flushedEpochs.size() - 1), -1L, flushedEpochs, true);
+        flushedEpochs.get(flushedEpochs.size() - 1), flushedEpochs);
   }
 
   /**
    * Update State machine lastAppliedTermIndex.
-   * @param lastFlushedIndex
-   * @param currentTerm
-   * @param flushedEpochs - list of ratis transactions flushed to DB. If it
-   * is just one index and term, this can be set to null.
-   * @param checkMap - if true check applyTransactionMap, ratisTransaction
-   * Map and update lastAppliedTermIndex accordingly, else check
-   * lastAppliedTermIndex and update it.
+   * @param lastFlushedIndex last flush index
+   * @param flushedEpochs - list of ratis transactions flushed to DB.
    */
   private synchronized void computeAndUpdateLastAppliedIndex(
-      long lastFlushedIndex, long currentTerm, List<Long> flushedEpochs,
-      boolean checkMap) {
-    if (checkMap) {
-      List<Long> flushedTrans = new ArrayList<>(flushedEpochs);
-      Long appliedTerm = null;
-      long appliedIndex = -1;
-      for (Long flushedIdx : flushedTrans) {
-        final Long removed = getTermIndexFromTransactionMap(flushedIdx);
-        if (null != removed) {
-          appliedIndex = flushedIdx;
-          appliedTerm = removed;
-        } else {
-          LOG.warn("flushed index {} missing in transaction map," +
-                  " last flush index {}", flushedIdx, lastFlushedIndex);
-        }
+      long lastFlushedIndex, List<Long> flushedEpochs) {
+    List<Long> flushedTrans = new ArrayList<>(flushedEpochs);
+    Long appliedTerm = null;
+    long appliedIndex = -1;
+    for (Long flushedIdx : flushedTrans) {
+      final Long removed = getTermIndexFromTransactionMap(flushedIdx);
+      if (null != removed) {
+        appliedIndex = flushedIdx;
+        appliedTerm = removed;
+      } else {
+        LOG.warn("flushed index {} missing in transaction map," +
+            " last flush index {}", flushedIdx, lastFlushedIndex);
       }
-      if (appliedTerm != null) {
-        updateLastAppliedTermIndex(appliedTerm, appliedIndex);
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("ComputeAndUpdateLastAppliedIndex due to SM is {}",
-              getLastAppliedTermIndex());
-        }
+    }
+    if (appliedTerm != null) {
+      updateLastAppliedTermIndex(appliedTerm, appliedIndex);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("ComputeAndUpdateLastAppliedIndex due to SM is {}",
+            getLastAppliedTermIndex());
       }
     }
   }
