@@ -552,6 +552,29 @@ public class TestRatisUnderReplicationHandler {
   }
 
   @Test
+  public void testUnderReplicationWithVulnerableReplicas() throws IOException {
+    final long sequenceID = 20;
+    container = ReplicationTestUtil.createContainerInfo(RATIS_REPLICATION_CONFIG, 1,
+        HddsProtos.LifeCycleState.QUASI_CLOSED, sequenceID);
+
+    final Set<ContainerReplica> replicas = new HashSet<>(4);
+    for (int i = 0; i < 3; i++) {
+      replicas.add(createContainerReplica(container.containerID(), 0, IN_SERVICE, State.QUASI_CLOSED,
+          sequenceID - 1));
+    }
+    final ContainerReplica unhealthyReplica = createContainerReplica(container.containerID(), 0,
+            DECOMMISSIONING, State.UNHEALTHY, sequenceID);
+    replicas.add(unhealthyReplica);
+    UnderReplicatedHealthResult result = getUnderReplicatedHealthResult();
+    Mockito.when(result.hasVulnerableUnhealthy()).thenReturn(true);
+
+    final Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = testProcessing(replicas, Collections.emptyList(),
+        result, 2, 1);
+    assertEquals(1, commands.size());
+    assertEquals(unhealthyReplica.getDatanodeDetails(), commands.iterator().next().getKey());
+  }
+
+  @Test
   public void testOnlyQuasiClosedReplicaWithWrongSequenceIdIsAvailable()
       throws IOException {
     final long sequenceID = 20;
