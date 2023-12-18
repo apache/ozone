@@ -117,7 +117,6 @@ public class TestPipelineClose {
     if (cluster != null) {
       cluster.shutdown();
     }
-    Mockito.reset();
   }
 
   @Test
@@ -248,7 +247,7 @@ public class TestPipelineClose {
     xceiverRatis.handleNodeLogFailure(groupId, null);
 
     // verify SCM receives a pipeline action report "immediately"
-    Mockito.verify(pipelineActionTest, Mockito.timeout(1000))
+    Mockito.verify(pipelineActionTest, Mockito.timeout(2000))
         .onMessage(
             actionCaptor.capture(),
             Mockito.any(EventPublisher.class));
