@@ -46,8 +46,6 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 import java.io.File;
@@ -204,8 +202,7 @@ public class TestContainerReader {
     return blkNames;
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testContainerReader(ContainerTestVersionInfo versionInfo)
       throws Exception {
     setLayoutAndSchemaVersion(versionInfo);
@@ -252,8 +249,7 @@ public class TestContainerReader {
     }
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testContainerReaderWithLoadException(
       ContainerTestVersionInfo versionInfo) throws Exception {
     setLayoutAndSchemaVersion(versionInfo);
@@ -303,8 +299,7 @@ public class TestContainerReader {
     Assertions.assertEquals(containerCount - 1, containerSet1.containerCount());
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testMultipleContainerReader(ContainerTestVersionInfo versionInfo)
       throws Exception {
     setLayoutAndSchemaVersion(versionInfo);
@@ -384,8 +379,7 @@ public class TestContainerReader {
     Assertions.assertEquals(0, cache.size());
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testMarkedDeletedContainerCleared(
       ContainerTestVersionInfo versionInfo) throws Exception {
     setLayoutAndSchemaVersion(versionInfo);
@@ -454,9 +448,5 @@ public class TestContainerReader {
     schemaVersion = versionInfo.getSchemaVersion();
     conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
-  }
-
-  private static Iterable<Object[]> versionInfo() {
-    return ContainerTestVersionInfo.versionParameters();
   }
 }

@@ -48,8 +48,6 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -93,10 +91,6 @@ public class TestOzoneContainer {
     setup();
   }
 
-  private static Iterable<Object[]> getVersionInfo() {
-    return ContainerTestVersionInfo.versionParameters();
-  }
-
   private void setup() throws Exception {
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, folder.toString());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
@@ -118,8 +112,7 @@ public class TestOzoneContainer {
     }
   }
 
-  @ParameterizedTest
-  @MethodSource("getVersionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testBuildContainerMap(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initTest(versionInfo);
@@ -167,8 +160,7 @@ public class TestOzoneContainer {
     verifyCommittedSpace(ozoneContainer);
   }
 
-  @ParameterizedTest
-  @MethodSource("getVersionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testBuildNodeReport(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initTest(versionInfo);
@@ -198,8 +190,7 @@ public class TestOzoneContainer {
         ozoneContainer.getNodeReport().getDbStorageReportList().size());
   }
 
-  @ParameterizedTest
-  @MethodSource("getVersionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testBuildNodeReportWithDefaultRatisLogDir(
       ContainerTestVersionInfo versionInfo) throws Exception {
     initTest(versionInfo);
@@ -212,9 +203,7 @@ public class TestOzoneContainer {
             .size());
   }
 
-
-  @ParameterizedTest
-  @MethodSource("getVersionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testContainerCreateDiskFull(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initTest(versionInfo);

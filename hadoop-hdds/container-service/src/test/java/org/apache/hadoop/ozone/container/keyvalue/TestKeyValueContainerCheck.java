@@ -29,8 +29,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.File;
 import java.io.RandomAccessFile;
@@ -49,8 +47,7 @@ public class TestKeyValueContainerCheck
   /**
    * Sanity test, when there are no corruptions induced.
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testKeyValueContainerCheckNoCorruption(
       ContainerTestVersionInfo versionInfo) throws Exception {
     initTestData(versionInfo);
@@ -85,8 +82,7 @@ public class TestKeyValueContainerCheck
   /**
    * Sanity test, when there are corruptions induced.
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testKeyValueContainerCheckCorruption(
       ContainerTestVersionInfo versionInfo) throws Exception {
     initTestData(versionInfo);
