@@ -210,7 +210,7 @@ public class TestPipelineClose {
   @Flaky("HDDS-5604")
   public void testPipelineCloseWithLogFailure()
       throws IOException, TimeoutException {
-
+    Mockito.reset();
     EventQueue eventQ = (EventQueue) scm.getEventQueue();
     PipelineActionHandler pipelineActionTest =
         Mockito.mock(PipelineActionHandler.class);
