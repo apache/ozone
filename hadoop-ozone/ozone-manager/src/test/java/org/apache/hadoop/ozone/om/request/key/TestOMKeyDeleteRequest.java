@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import java.util.UUID;
 
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -30,13 +29,11 @@ import org.junit.jupiter.api.Test;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .DeleteKeyRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -45,23 +42,24 @@ import org.junit.jupiter.params.provider.ValueSource;
 public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
 
   @ParameterizedTest
-  @ValueSource(strings = {"keyName", "a/b/keyName",
-      "a/.snapshot/keyName", "a.snapshot/b/keyName"})
+  @ValueSource(strings = {"keyName", "a/b/keyName", "a/.snapshot/keyName", "a.snapshot/b/keyName"})
   public void testPreExecute(String testKeyName) throws Exception {
     doPreExecute(createDeleteKeyRequest(testKeyName));
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {".snapshot/snapName", ".snapshot/snapName/keyName"})
-  public void testPreExecuteFailure(String testKeyName) {
+  @CsvSource(value = {".snapshot,Cannot delete key with reserved name: .snapshot",
+      ".snapshot/snapName,Cannot delete key under path reserved for snapshot: .snapshot/",
+      ".snapshot/snapName/keyName,Cannot delete key under path reserved for snapshot: .snapshot/"})
+  public void testPreExecuteFailure(String testKeyName,
+                                    String expectedExceptionMessage) {
     OMKeyDeleteRequest deleteKeyRequest =
         getOmKeyDeleteRequest(createDeleteKeyRequest(testKeyName));
     OMException omException = Assertions.assertThrows(OMException.class,
         () -> deleteKeyRequest.preExecute(ozoneManager));
-    Assertions.assertEquals(OmUtils.SNAPSHOT_DELETE_KEY_EXCEPTION_MESSAGE,
-        omException.getMessage());
-    Assertions.assertEquals(OMException.ResultCodes.INVALID_KEY_NAME,
-        omException.getResult());
+    System.out.println(omException.getMessage());
+    Assertions.assertEquals(expectedExceptionMessage, omException.getMessage());
+    Assertions.assertEquals(OMException.ResultCodes.INVALID_KEY_NAME, omException.getResult());
   }
 
   @Test

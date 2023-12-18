@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -60,9 +61,10 @@ public class DeleteKeyHandler extends KeyHandler {
     OzoneBucket bucket = vol.getBucket(bucketName);
     String keyName = address.getKeyName();
 
-    if (OmUtils.keyNameWithSnapshotReservedWord(keyName)) {
-      out().printf("Operation not permitted: %s %n",
-          OmUtils.SNAPSHOT_DELETE_KEY_EXCEPTION_MESSAGE);
+    try {
+      OmUtils.verifyKeyNameWithSnapshotReservedWordForDeletion(keyName);
+    } catch (OMException omException) {
+      out().printf("Operation not permitted: %s %n", omException.getMessage());
       return;
     }
 

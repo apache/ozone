@@ -103,13 +103,6 @@ public final class OmUtils {
   public static final int EPOCH_WHEN_RATIS_NOT_ENABLED = 1;
   public static final int EPOCH_WHEN_RATIS_ENABLED = 2;
 
-  public static final String SNAPSHOT_CREATE_KEY_EXCEPTION_MESSAGE =
-      "Cannot create key under path reserved for snapshot: " +
-          OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX;
-  public static final String SNAPSHOT_DELETE_KEY_EXCEPTION_MESSAGE =
-      "Cannot delete key under path reserved for snapshot: " +
-          OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX;
-
   private OmUtils() {
   }
 
@@ -630,25 +623,45 @@ public final class OmUtils {
    */
   public static void verifyKeyNameWithSnapshotReservedWord(String keyName)
       throws OMException {
-    if (keyNameWithSnapshotReservedWord(keyName)) {
-      throw new OMException(SNAPSHOT_CREATE_KEY_EXCEPTION_MESSAGE,
-          OMException.ResultCodes.INVALID_KEY_NAME);
-    }
-  }
-
-  public static boolean keyNameWithSnapshotReservedWord(String keyName) {
     if (keyName != null &&
         keyName.startsWith(OM_SNAPSHOT_INDICATOR)) {
       if (keyName.length() > OM_SNAPSHOT_INDICATOR.length()) {
-        return (keyName.substring(OM_SNAPSHOT_INDICATOR.length())
-            .startsWith(OM_KEY_PREFIX));
+        if (keyName.substring(OM_SNAPSHOT_INDICATOR.length())
+            .startsWith(OM_KEY_PREFIX)) {
+          throw new OMException(
+              "Cannot create key under path reserved for snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
+              OMException.ResultCodes.INVALID_KEY_NAME);
+        }
       } else {
         // We checked for startsWith OM_SNAPSHOT_INDICATOR, and the length is
         // the same, so it must be equal OM_SNAPSHOT_INDICATOR.
-        return true;
+        throw new OMException("Cannot create key with reserved name: " + OM_SNAPSHOT_INDICATOR,
+            OMException.ResultCodes.INVALID_KEY_NAME);
       }
     }
-    return false;
+  }
+
+  /**
+   * Verify if key name contains snapshot reserved word.
+   * This is similar to verifyKeyNameWithSnapshotReservedWord. The only difference is exception message.
+   */
+  public static void verifyKeyNameWithSnapshotReservedWordForDeletion(String keyName)  throws OMException {
+    if (keyName != null &&
+        keyName.startsWith(OM_SNAPSHOT_INDICATOR)) {
+      if (keyName.length() > OM_SNAPSHOT_INDICATOR.length()) {
+        if (keyName.substring(OM_SNAPSHOT_INDICATOR.length())
+            .startsWith(OM_KEY_PREFIX)) {
+          throw new OMException(
+              "Cannot delete key under path reserved for snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
+              OMException.ResultCodes.INVALID_KEY_NAME);
+        }
+      } else {
+        // We checked for startsWith OM_SNAPSHOT_INDICATOR, and the length is
+        // the same, so it must be equal OM_SNAPSHOT_INDICATOR.
+        throw new OMException("Cannot delete key with reserved name: " + OM_SNAPSHOT_INDICATOR,
+            OMException.ResultCodes.INVALID_KEY_NAME);
+      }
+    }
   }
 
   /**
