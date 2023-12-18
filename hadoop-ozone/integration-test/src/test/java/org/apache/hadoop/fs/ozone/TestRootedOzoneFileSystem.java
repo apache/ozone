@@ -1013,6 +1013,39 @@ public class TestRootedOzoneFileSystem {
   }
 
   /**
+   * Create a bucket with a different owner than the volume owner
+   * and test the owner on listStatus.
+   */
+  @Test
+  public void testListStatusWithDifferentBucketOwner() throws IOException {
+    String volumeName = getRandomNonExistVolumeName();
+    objectStore.createVolume(volumeName);
+    OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
+
+    String bucketName = "bucket-" + RandomStringUtils.randomNumeric(5);
+    UserGroupInformation currUgi = UserGroupInformation.getCurrentUser();
+    String bucketOwner = currUgi.getUserName() + RandomStringUtils.randomNumeric(5);
+    BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setOwner(bucketOwner)
+        .build();
+    ozoneVolume.createBucket(bucketName, bucketArgs);
+
+    Path volumePath = new Path(OZONE_URI_DELIMITER + volumeName);
+
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
+
+    FileStatus[] fileStatusVolume = ofs.listStatus(volumePath);
+    assertEquals(1, fileStatusVolume.length);
+    // FileStatus owner is different from the volume owner.
+    // Owner is the same as the bucket owner returned by the ObjectStore.
+    assertNotEquals(ozoneVolume.getOwner(), fileStatusVolume[0].getOwner());
+    assertEquals(ozoneBucket.getOwner(), fileStatusVolume[0].getOwner());
+
+    ozoneVolume.deleteBucket(bucketName);
+    objectStore.deleteVolume(volumeName);
+  }
+
+  /**
    * OFS: Test non-recursive listStatus on root and volume.
    */
   @Test
