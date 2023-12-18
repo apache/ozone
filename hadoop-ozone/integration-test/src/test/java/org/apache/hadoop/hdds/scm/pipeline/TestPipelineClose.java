@@ -117,6 +117,7 @@ public class TestPipelineClose {
     if (cluster != null) {
       cluster.shutdown();
     }
+    Mockito.reset();
   }
 
   @Test
