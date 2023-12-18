@@ -70,7 +70,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -631,7 +630,7 @@ public class TestBlockDeletion {
         = scm.getContainerManager().getContainerReplicas(containerId);
 
     // Ensure for all replica isEmpty are false in SCM
-    Assert.assertTrue(scm.getContainerManager().getContainerReplicas(
+    Assertions.assertTrue(scm.getContainerManager().getContainerReplicas(
             containerId).stream().
         allMatch(replica -> !replica.isEmpty()));
 
