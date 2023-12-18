@@ -87,7 +87,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 
 import org.apache.ozone.test.GenericTestUtils;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -931,7 +930,7 @@ public class TestOMDbCheckpointServlet {
       ExecutorService executorService) {
     Future<Boolean> test = checkLock(handler, executorService);
     // Handler should fail to take the lock because the servlet has taken it.
-    Assert.assertThrows(TimeoutException.class,
+    Assertions.assertThrows(TimeoutException.class,
          () -> test.get(500, TimeUnit.MILLISECONDS));
   }
 
@@ -943,7 +942,7 @@ public class TestOMDbCheckpointServlet {
         handler.getBootstrapStateLock().lock()) {
       Future<Boolean> test = checkLock(servlet, executorService);
       // Servlet should fail to lock when other handler has taken it.
-      Assert.assertThrows(TimeoutException.class,
+      Assertions.assertThrows(TimeoutException.class,
           () -> test.get(500, TimeUnit.MILLISECONDS));
     }
   }
