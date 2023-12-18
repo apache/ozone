@@ -408,6 +408,11 @@ public class SCMBlockProtocolServer implements
   }
 
   @Override
+  public InnerNode getClusterTree() {
+    return scm.getClusterMap().getClusterTree();
+  }
+
+  @Override
   public AuditMessage buildAuditMessageForSuccess(
       AuditAction op, Map<String, String> auditMap) {
 

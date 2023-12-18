@@ -44,6 +44,9 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.net.InnerNode;
+import org.apache.hadoop.hdds.scm.net.InnerNodeImpl;
+import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -121,6 +124,9 @@ public class TestKeyManagerUnit {
         testDir.toString());
     containerClient = Mockito.mock(StorageContainerLocationProtocol.class);
     blockClient = Mockito.mock(ScmBlockLocationProtocol.class);
+    InnerNode.Factory factory = InnerNodeImpl.FACTORY;
+    when(blockClient.getClusterTree()).thenReturn(
+        factory.newInnerNode("", "", null, NetConstants.ROOT_LEVEL, 1));
 
     OmTestManagers omTestManagers
         = new OmTestManagers(configuration, blockClient, containerClient);

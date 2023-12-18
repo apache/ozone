@@ -240,6 +240,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <version>${io.grpc.version}</version>
       <scope>compile</scope>
     </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-interface-server</artifactId>
+    </dependency>
   </dependencies>
 
   <build>

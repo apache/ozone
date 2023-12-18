@@ -668,6 +668,12 @@ public final class OzoneConfigKeys {
   public static final String OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION =
       "ozone.scm.close.container.wait.duration";
 
+  public static final String
+      OZONE_SCM_NETWORK_TOPOLOGY_CLUSTER_TREE_REFRESH_DURATION =
+      "ozone.scm.network.topology.cluster.tree.refresh.duration";
+  public static final String
+      OZONE_SCM_NETWORK_TOPOLOGY_CLUSTER_TREE_REFRESH_DURATION_DEFAULT = "1h";
+
   /**
    * There is no need to instantiate this class.
    */

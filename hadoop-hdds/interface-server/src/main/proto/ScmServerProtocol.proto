@@ -29,7 +29,7 @@ option java_generate_equals_and_hash = true;
 package hadoop.hdds.block;
 
 import "hdds.proto";
-
+import "ScmServerDatanodeHeartbeatProtocol.proto";
 
 // SCM Block protocol
 
@@ -39,6 +39,7 @@ enum Type {
   GetScmInfo         = 13;
   SortDatanodes      = 14;
   AddScm             = 15;
+  GetClusterTree     = 16;
 }
 
 message SCMBlockLocationRequest {
@@ -56,6 +57,7 @@ message SCMBlockLocationRequest {
   optional hadoop.hdds.GetScmInfoRequestProto getScmInfoRequest         = 13;
   optional SortDatanodesRequestProto          sortDatanodesRequest      = 14;
   optional hadoop.hdds.AddScmRequestProto     addScmRequestProto       = 15;
+  optional GetClusterTreeRequestProto         getClusterTreeRequest     = 16;
 }
 
 message SCMBlockLocationResponse {
@@ -80,6 +82,7 @@ message SCMBlockLocationResponse {
   optional hadoop.hdds.GetScmInfoResponseProto getScmInfoResponse         = 13;
   optional SortDatanodesResponseProto          sortDatanodesResponse      = 14;
   optional hadoop.hdds.AddScmResponseProto     addScmResponse        = 15;
+  optional GetClusterTreeResponseProto         getClusterTreeResponse     = 16;
 }
 
 /**
@@ -228,6 +231,60 @@ message SortDatanodesRequestProto{
 
 message SortDatanodesResponseProto{
   repeated DatanodeDetailsProto node = 1;
+}
+
+message NodeImpl {
+  required string name = 1;
+  required string location = 2;
+  required uint32 cost = 3;
+}
+
+message CommandCount {
+  required SCMCommandProto.Type command = 1;
+  required uint32 count = 2;
+}
+
+message NodeStatus {
+  required NodeOperationalState operationalState = 1;
+  required NodeState health = 2;
+  required uint64 opStateExpiryEpochSeconds = 3;
+}
+
+message DatanodeInfo {
+  required DatanodeDetailsProto datanodeDetails = 1;
+  required uint64 lastHeartbeatTime = 2;
+  required uint64 lastStatsUpdatedTime = 3;
+  required uint32 failedVolumeCount = 4;
+  repeated StorageReportProto storageReportProto = 5;
+  repeated MetadataStorageReportProto metadataStorageReportProto = 6;
+  required LayoutVersionProto layoutVersionProto = 7;
+  repeated CommandCount commandCount = 8;
+  required NodeStatus nodeStatus = 9;
+}
+
+message NodeType {
+  optional DatanodeDetailsProto datanodeDetails = 1;
+  optional DatanodeInfo datanodeInfo = 2;
+  optional InnerNode innerNode = 3;
+  optional NodeImpl nodeImpl = 4;
+}
+
+message ChildrenMap {
+  required string networkName = 1;
+  required NodeType nodeType = 2;
+}
+
+message InnerNode {
+  repeated ChildrenMap childrenMap = 1;
+  optional uint32 numOfLeaves = 2;
+  required NodeImpl nodeImpl = 3;
+}
+
+message GetClusterTreeRequestProto {
+}
+
+message GetClusterTreeResponseProto {
+  required InnerNode clusterTree = 1;
 }
 
 /**

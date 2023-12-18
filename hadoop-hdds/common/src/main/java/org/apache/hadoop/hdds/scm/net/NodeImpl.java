@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.net;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
@@ -227,6 +228,48 @@ public class NodeImpl implements Node {
     }
     return NetUtils.addSuffix(this.getNetworkFullPath()).startsWith(
         NetUtils.addSuffix(nodePath));
+  }
+
+  @Override
+  public ScmBlockLocationProtocolProtos.NodeType toProtobuf(int clientVersion) {
+    ScmBlockLocationProtocolProtos.NodeImpl nodeImpl =
+        ScmBlockLocationProtocolProtos.NodeImpl.newBuilder()
+            .setName(name)
+            .setLocation(location)
+            .setCost(cost)
+            .build();
+
+    ScmBlockLocationProtocolProtos.NodeType nodeType =
+        ScmBlockLocationProtocolProtos.NodeType.newBuilder()
+            .setNodeImpl(nodeImpl).build();
+
+    return nodeType;
+  }
+
+  public static ScmBlockLocationProtocolProtos.NodeImpl toProtobuf(String name,
+      String location, int cost) {
+
+    ScmBlockLocationProtocolProtos.NodeImpl.Builder nodeImplBuilder =
+        ScmBlockLocationProtocolProtos.NodeImpl.newBuilder()
+            .setName(name)
+            .setLocation(location)
+            .setCost(cost);
+
+    ScmBlockLocationProtocolProtos.NodeImpl nodeImpl = nodeImplBuilder.build();
+    return nodeImpl;
+  }
+
+  public static Node fromProtobuf(
+      ScmBlockLocationProtocolProtos.NodeType nodeType) {
+    return nodeType.hasNodeImpl()
+        ? InnerNodeImpl.fromProtobuf(nodeType.getNodeImpl())
+        : null;
+  }
+
+  public static NodeImpl fromProtobuf(
+      ScmBlockLocationProtocolProtos.NodeImpl nodeImpl) {
+    return new NodeImpl(nodeImpl.getName(), nodeImpl.getLocation(),
+        nodeImpl.getCost());
   }
 
   @Override

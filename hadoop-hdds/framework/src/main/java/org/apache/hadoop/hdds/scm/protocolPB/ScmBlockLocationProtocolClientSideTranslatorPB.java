@@ -38,6 +38,8 @@ import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Allo
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateScmBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmKeyBlocksRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.DeleteScmKeyBlocksResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.GetClusterTreeRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.GetClusterTreeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.KeyBlocks;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos
     .SortDatanodesRequestProto;
@@ -48,6 +50,8 @@ import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.net.InnerNode;
+import org.apache.hadoop.hdds.scm.net.InnerNodeImpl;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
@@ -322,6 +326,22 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
         .map(node -> DatanodeDetails.getFromProtoBuf(node))
         .collect(Collectors.toList()));
     return results;
+  }
+
+  @Override
+  public InnerNode getClusterTree() throws IOException {
+    GetClusterTreeRequestProto request =
+        GetClusterTreeRequestProto.newBuilder().build();
+    SCMBlockLocationRequest wrapper = createSCMBlockRequest(Type.GetClusterTree)
+        .setGetClusterTreeRequest(request)
+        .build();
+
+    final SCMBlockLocationResponse wrappedResponse =
+        handleError(submitRequest(wrapper));
+    GetClusterTreeResponseProto resp =
+        wrappedResponse.getGetClusterTreeResponse();
+
+    return InnerNodeImpl.fromProtobuf(resp.getClusterTree());
   }
 
   @Override

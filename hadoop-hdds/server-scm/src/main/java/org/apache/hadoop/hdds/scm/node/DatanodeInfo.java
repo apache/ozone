@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVer
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto
@@ -30,6 +31,8 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
+import org.apache.hadoop.hdds.scm.net.Node;
+import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,6 +83,26 @@ public class DatanodeInfo extends DatanodeDetails {
     this.nodeStatus = nodeStatus;
     this.metadataStorageReports = Collections.emptyList();
     this.commandCounts = new HashMap<>();
+  }
+
+  @SuppressWarnings("parameternumber")
+  private DatanodeInfo(DatanodeDetails datanodeDetails, long lastHeartbeatTime,
+                       long lastStatsUpdatedTime, int failedVolumeCount,
+                       List<StorageReportProto> storageReports,
+                       List<MetadataStorageReportProto> metadataStorageReports,
+                       LayoutVersionProto lastKnownLayoutVersion,
+                       Map<SCMCommandProto.Type, Integer> commandCounts,
+                       NodeStatus nodeStatus) {
+    super(datanodeDetails);
+    this.lock = new ReentrantReadWriteLock();
+    this.lastHeartbeatTime = lastHeartbeatTime;
+    this.lastStatsUpdatedTime = lastStatsUpdatedTime;
+    this.failedVolumeCount = failedVolumeCount;
+    this.storageReports = storageReports;
+    this.metadataStorageReports = metadataStorageReports;
+    this.lastKnownLayoutVersion = lastKnownLayoutVersion;
+    this.commandCounts = commandCounts;
+    this.nodeStatus = nodeStatus;
   }
 
   /**
@@ -355,4 +378,72 @@ public class DatanodeInfo extends DatanodeDetails {
     return super.equals(obj);
   }
 
+  @Override
+  public ScmBlockLocationProtocolProtos.NodeType toProtobuf(int clientVersion) {
+    ScmBlockLocationProtocolProtos.DatanodeInfo.Builder datanodeInfo =
+        ScmBlockLocationProtocolProtos.DatanodeInfo.newBuilder()
+            .setLastHeartbeatTime(lastHeartbeatTime)
+            .setLastStatsUpdatedTime(lastStatsUpdatedTime)
+            .setFailedVolumeCount(failedVolumeCount)
+            .setLayoutVersionProto(lastKnownLayoutVersion)
+            .setNodeStatus(nodeStatus.toProtobuf());
+
+    for (StorageReportProto storageReport : storageReports) {
+      datanodeInfo.addStorageReportProto(storageReport);
+    }
+
+    for (MetadataStorageReportProto metadataStorageReport :
+        metadataStorageReports) {
+      datanodeInfo.addMetadataStorageReportProto(metadataStorageReport);
+    }
+
+    for (Map.Entry<SCMCommandProto.Type, Integer> entry :
+        commandCounts.entrySet()) {
+      ScmBlockLocationProtocolProtos.CommandCount commandCountProto =
+          ScmBlockLocationProtocolProtos.CommandCount.newBuilder()
+              .setCommand(entry.getKey())
+              .setCount(entry.getValue())
+              .build();
+      datanodeInfo.addCommandCount(commandCountProto);
+    }
+
+    ScmBlockLocationProtocolProtos.NodeType nodeType =
+        ScmBlockLocationProtocolProtos.NodeType.newBuilder()
+            .setDatanodeInfo(datanodeInfo).build();
+
+    return nodeType;
+  }
+
+  public static Node fromProtobuf(
+      ScmBlockLocationProtocolProtos.NodeType nodeType) {
+    return nodeType.hasDatanodeInfo()
+        ? DatanodeInfo.fromProtobuf(nodeType.getDatanodeInfo())
+        : null;
+  }
+
+  public static NodeImpl fromProtobuf(
+      ScmBlockLocationProtocolProtos.DatanodeInfo datanodeInfo) {
+    return new DatanodeInfo(
+        DatanodeDetails.getFromProtoBuf(datanodeInfo.getDatanodeDetails()),
+        datanodeInfo.getLastHeartbeatTime(),
+        datanodeInfo.getLastStatsUpdatedTime(),
+        datanodeInfo.getFailedVolumeCount(),
+        datanodeInfo.getStorageReportProtoList(),
+        datanodeInfo.getMetadataStorageReportProtoList(),
+        datanodeInfo.getLayoutVersionProto(),
+        DatanodeInfo.fromProtobuf(datanodeInfo.getCommandCountList()),
+        NodeStatus.fromProtobuf(datanodeInfo.getNodeStatus()));
+  }
+
+  public static Map<SCMCommandProto.Type, Integer> fromProtobuf(
+      List<ScmBlockLocationProtocolProtos.CommandCount> commandCountList) {
+    Map<SCMCommandProto.Type, Integer> commandCounts = new HashMap<>();
+    for (ScmBlockLocationProtocolProtos.CommandCount commandCountProto :
+        commandCountList) {
+      SCMCommandProto.Type commandType = commandCountProto.getCommand();
+      int count = commandCountProto.getCount();
+      commandCounts.put(commandType, count);
+    }
+    return commandCounts;
+  }
 }
