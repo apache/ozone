@@ -250,7 +250,7 @@ public class TestSCMBlockProtocolServer {
     System.out.println("client = " + client);
     datanodeDetails.stream().forEach(
         node -> System.out.println(node.toString()));
-    Assertions.assertTrue(datanodeDetails.size() == NODE_COUNT);
+    Assertions.assertEquals(NODE_COUNT, datanodeDetails.size());
 
     // illegal client 1
     client += "X";
@@ -258,14 +258,14 @@ public class TestSCMBlockProtocolServer {
     System.out.println("client = " + client);
     datanodeDetails.stream().forEach(
         node -> System.out.println(node.toString()));
-    Assertions.assertTrue(datanodeDetails.size() == NODE_COUNT);
+    Assertions.assertEquals(NODE_COUNT, datanodeDetails.size());
     // illegal client 2
     client = "/default-rack";
     datanodeDetails = server.sortDatanodes(nodes, client);
     System.out.println("client = " + client);
     datanodeDetails.stream().forEach(
         node -> System.out.println(node.toString()));
-    Assertions.assertTrue(datanodeDetails.size() == NODE_COUNT);
+    Assertions.assertEquals(NODE_COUNT, datanodeDetails.size());
 
     // unknown node to sort
     nodes.add(UUID.randomUUID().toString());
@@ -278,7 +278,7 @@ public class TestSCMBlockProtocolServer {
             .build();
     ScmBlockLocationProtocolProtos.SortDatanodesResponseProto resp =
         service.sortDatanodes(request, ClientVersion.CURRENT_VERSION);
-    Assertions.assertTrue(resp.getNodeList().size() == NODE_COUNT);
+    Assertions.assertEquals(NODE_COUNT, resp.getNodeList().size());
     System.out.println("client = " + client);
     resp.getNodeList().stream().forEach(
         node -> System.out.println(node.getNetworkName()));
@@ -295,7 +295,7 @@ public class TestSCMBlockProtocolServer {
         .build();
     resp = service.sortDatanodes(request, ClientVersion.CURRENT_VERSION);
     System.out.println("client = " + client);
-    Assertions.assertTrue(resp.getNodeList().size() == 0);
+    Assertions.assertEquals(0, resp.getNodeList().size());
     resp.getNodeList().stream().forEach(
         node -> System.out.println(node.getNetworkName()));
   }

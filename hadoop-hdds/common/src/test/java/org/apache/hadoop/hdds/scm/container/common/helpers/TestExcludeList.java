@@ -39,9 +39,9 @@ public class TestExcludeList {
         .setIpAddress("127.0.0.1").setHostName("localhost").addPort(
             DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 2001))
         .build());
-    Assertions.assertTrue(list.getDatanodes().size() == 1);
+    Assertions.assertEquals(1, list.getDatanodes().size());
     clock.fastForward(11);
-    Assertions.assertTrue(list.getDatanodes().size() == 0);
+    Assertions.assertEquals(0, list.getDatanodes().size());
     list.addDatanode(DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
         .setIpAddress("127.0.0.2").setHostName("localhost").addPort(
             DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 2001))
@@ -50,7 +50,7 @@ public class TestExcludeList {
         .setIpAddress("127.0.0.3").setHostName("localhost").addPort(
             DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 2001))
         .build());
-    Assertions.assertTrue(list.getDatanodes().size() == 2);
+    Assertions.assertEquals(2, list.getDatanodes().size());
   }
 
   @Test
@@ -60,8 +60,8 @@ public class TestExcludeList {
         .setIpAddress("127.0.0.1").setHostName("localhost").addPort(
             DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 2001))
         .build());
-    Assertions.assertTrue(list.getDatanodes().size() == 1);
+    Assertions.assertEquals(1, list.getDatanodes().size());
     clock.fastForward(1);
-    Assertions.assertTrue(list.getDatanodes().size() == 1);
+    Assertions.assertEquals(1, list.getDatanodes().size());
   }
 }
