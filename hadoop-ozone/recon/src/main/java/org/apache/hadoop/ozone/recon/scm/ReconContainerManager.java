@@ -45,10 +45,12 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
@@ -218,6 +220,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
 
   /**
    * Adds a new container to Recon's container manager.
+   *
    * @param containerWithPipeline containerInfo with pipeline info
    * @throws IOException on Error.
    */
@@ -227,22 +230,23 @@ public class ReconContainerManager extends ContainerManagerImpl {
     try {
       if (containerInfo.getState().equals(HddsProtos.LifeCycleState.OPEN)) {
         PipelineID pipelineID = containerWithPipeline.getPipeline().getId();
-        if (pipelineManager.containsPipeline(pipelineID)) {
-          getContainerStateManager().addContainer(containerInfo.getProtobuf());
-          pipelineManager.addContainerToPipeline(
-              containerWithPipeline.getPipeline().getId(),
-              containerInfo.containerID());
-          // update open container count on all datanodes on this pipeline
-          pipelineToOpenContainer.put(pipelineID,
-                    pipelineToOpenContainer.getOrDefault(pipelineID, 0) + 1);
-          LOG.info("Successfully added container {} to Recon.",
-              containerInfo.containerID());
-        } else {
-          // Get open container for a pipeline that Recon does not know
-          // about yet. Cannot update internal state until pipeline is synced.
-          LOG.warn("Pipeline {} not found. Cannot add container {}",
-                  pipelineID, containerInfo.containerID());
+        // Check if the pipeline is present in Recon
+        if (!pipelineManager.containsPipeline(pipelineID)) {
+          // Pipeline is not present, add it first.
+          LOG.info("Adding new pipeline {} from SCM.", pipelineID);
+          addPipeline(containerWithPipeline.getPipeline());
         }
+
+        getContainerStateManager().addContainer(containerInfo.getProtobuf());
+        pipelineManager.addContainerToPipeline(
+            containerWithPipeline.getPipeline().getId(),
+            containerInfo.containerID());
+        // update open container count on all datanodes on this pipeline
+        pipelineToOpenContainer.put(pipelineID,
+            pipelineToOpenContainer.getOrDefault(pipelineID, 0) + 1);
+        LOG.info("Successfully added container {} to Recon.",
+            containerInfo.containerID());
+
       } else {
         getContainerStateManager().addContainer(containerInfo.getProtobuf());
         LOG.info("Successfully added no open container {} to Recon.",
@@ -255,6 +259,26 @@ public class ReconContainerManager extends ContainerManagerImpl {
           containerInfo.getPipelineID(),
           ContainerID.valueOf(containerInfo.getContainerID()));
       throw ex;
+    }
+  }
+
+  /**
+   * Add a new pipeline to the pipeline metadata.
+   *
+   * @param pipeline pipeline
+   * @throws IOException
+   */
+  public void addPipeline(Pipeline pipeline)
+      throws IOException {
+    ReconPipelineManager reconPipelineManager =
+        (ReconPipelineManager) pipelineManager;
+
+    reconPipelineManager.acquireWriteLock();
+    try {
+      reconPipelineManager.getStateManager().addPipeline(
+          pipeline.getProtobufMessage(ClientVersion.CURRENT_VERSION));
+    } finally {
+      reconPipelineManager.releaseWriteLock();
     }
   }
 
