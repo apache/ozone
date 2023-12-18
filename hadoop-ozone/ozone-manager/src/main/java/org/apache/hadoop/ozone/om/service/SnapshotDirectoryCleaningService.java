@@ -293,13 +293,11 @@ public class SnapshotDirectoryCleaningService
     topLevelDir.setDirValue(omDeletedDirectoryInfo);
     stackNodes.push(topLevelDir);
 
-    try (
-        TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
             directoryIterator = snapDirTable.iterator(dbBucketKeyForDir)) {
 
       while (!stackNodes.isEmpty()) {
-        StackNode stackTop = stackNodes.pop();
-        String seekDirInDB;
+        StackNode stackTop = stackNodes.peek();
         // First process all the files in the current directory
         // and then do a DFS for directory.
         if (StringUtils.isEmpty(stackTop.getSubDirSeek())) {
@@ -314,46 +312,33 @@ public class SnapshotDirectoryCleaningService
               prevRenamedTable,
               previousToPrevKeyTable);
           // Format : /volId/bucketId/parentId/
-          seekDirInDB = currOmSnapshot.getMetadataManager()
+          String seekDirInDB = currOmSnapshot.getMetadataManager()
               .getOzonePathKey(volumeId, bucketInfo.getObjectID(),
                   stackTop.getDirValue().getObjectID(), "");
-          directoryIterator.seek(seekDirInDB);
+          stackTop.setSubDirSeek(seekDirInDB);
         } else {
-          // When a leaf node is processed, we need to come back in
-          // the call stack and process the next directories.
-          seekDirInDB = stackTop.getSubDirSeek();
-          directoryIterator.seek(seekDirInDB);
-          // We need to skip to the next sub-directory because we already
-          // processed the current sub-directory in the previous run.
+          // Adding \0 to seek the next greater element.
+          directoryIterator.seek(stackTop.getSubDirSeek() + "\0");
           if (directoryIterator.hasNext()) {
-            directoryIterator.next();
+
+            Table.KeyValue<String, OmDirectoryInfo> deletedSubDirInfo = directoryIterator.next();
+            String deletedSubDirKey = deletedSubDirInfo.getKey();
+            String prefixCheck = currOmSnapshot.getMetadataManager()
+                .getOzoneDeletePathDirKey(stackTop.getSubDirSeek());
+            // Exit if it is out of the sub dir prefix scope.
+            if (!deletedSubDirKey.startsWith(prefixCheck)) {
+              stackNodes.pop();
+            } else {
+              stackTop.setSubDirSeek(deletedSubDirKey);
+              StackNode nextSubDir = new StackNode();
+              nextSubDir.setDirKey(deletedSubDirInfo.getKey());
+              nextSubDir.setDirValue(deletedSubDirInfo.getValue());
+              stackNodes.push(nextSubDir);
+            }
           } else {
-            continue;
+            stackNodes.pop();
           }
         }
-
-        if (directoryIterator.hasNext()) {
-          Table.KeyValue<String, OmDirectoryInfo> deletedSubDirInfo =
-              directoryIterator.next();
-          String deletedSubDirKey = deletedSubDirInfo.getKey();
-
-          // Convert /volId/bucketId/parentId/fileName to
-          // /volId/bucketId/parentId/
-          String prefixCheck = currOmSnapshot.getMetadataManager()
-              .getOzoneDeletePathDirKey(seekDirInDB);
-          // Exit if it is out of the sub dir prefix scope.
-          if (!deletedSubDirKey.startsWith(prefixCheck)) {
-            // Add exit condition.
-            continue;
-          }
-          stackTop.setSubDirSeek(deletedSubDirKey);
-          stackNodes.add(stackTop);
-          StackNode nextSubDir = new StackNode();
-          nextSubDir.setDirKey(deletedSubDirInfo.getKey());
-          nextSubDir.setDirValue(deletedSubDirInfo.getValue());
-          stackNodes.add(nextSubDir);
-        }
-
       }
     }
   }

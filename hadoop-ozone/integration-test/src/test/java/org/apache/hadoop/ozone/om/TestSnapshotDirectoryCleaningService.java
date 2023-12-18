@@ -234,6 +234,7 @@ public class TestSnapshotDirectoryCleaningService {
         put("snap2", 5L);
         put("snap3", 0L);
       }};
+    Thread.sleep(500);
     try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
         iterator = snapshotInfoTable.iterator()) {
       while (iterator.hasNext()) {
