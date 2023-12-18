@@ -33,16 +33,18 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -111,6 +113,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   // conf/metadata entries which are received through notifyIndexUpdate.
   private ConcurrentMap<Long, Long> ratisTransactionMap =
       new ConcurrentSkipListMap<>();
+  // Dummy response to update ratis transaction to last applied map
+  private final OMClientResponse dummyResponse;
 
 
   public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer,
@@ -137,6 +141,14 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .setNameFormat(threadPrefix + "InstallSnapshotThread").build();
     this.installSnapshotExecutor =
         HadoopExecutors.newSingleThreadExecutor(installSnapshotThreadFactory);
+
+    // init dummy response
+    OMResponse response = OmResponseUtil.getDummySuccessResponse();
+    dummyResponse = new OMClientResponse(response) {
+      protected void addToDBBatch(
+          OMMetadataManager mgr, BatchOperation opr) throws IOException {
+      }
+    };
   }
 
   /**
@@ -190,12 +202,20 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     // transaction included in the snapshot. Hence, snaphsotInfo#index is not
     // updated here.
 
-    // We need to call updateLastApplied here because now in ratis when a
-    // node becomes leader, it is checking stateMachineIndex >=
-    // placeHolderIndex (when a node becomes leader, it writes a conf entry
-    // with some information like its peers and termIndex). So, calling
-    // updateLastApplied updates lastAppliedTermIndex.
-    computeAndUpdateLastAppliedIndex(index, currentTerm, null, false);
+    // We need update this transaction to lastAppliedTransaction here
+    // because now in ratis when a node becomes leader,
+    // it is checking stateMachineIndex >= placeHolderIndex
+    // (when a node becomes leader, it writes a conf entry
+    // with some information like its peers and termIndex).
+    // So added to double buffer so that transaction is updated
+    try {
+      ozoneManagerDoubleBuffer.acquireUnFlushedTransactions(1);
+    } catch (InterruptedException e) {
+      LOG.warn("acquireUnFlushedTransactions interrupted, ", e);
+      Thread.interrupted();
+    }
+    ratisTransactionMap.put(index, currentTerm);
+    ozoneManagerDoubleBuffer.add(dummyResponse, index);
   }
 
   /**
@@ -489,19 +509,24 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   @Override
   public long takeSnapshot() throws IOException {
-    LOG.info("Current Snapshot Index {}", getLastAppliedTermIndex());
-    TermIndex lastTermIndex = getLastAppliedTermIndex();
-    long lastAppliedIndex = lastTermIndex.getIndex();
-    snapshotInfo.updateTermIndex(lastTermIndex.getTerm(),
-        lastAppliedIndex);
-    TransactionInfo build = new TransactionInfo.Builder()
-        .setTransactionIndex(lastAppliedIndex)
-        .setCurrentTerm(lastTermIndex.getTerm()).build();
-    Table<String, TransactionInfo> txnInfoTable =
-        ozoneManager.getMetadataManager().getTransactionInfoTable();
-    txnInfoTable.put(TRANSACTION_INFO_KEY, build);
+    // when called from request prepare, there is a wait that
+    // double buffer is flushed. When called from db snapshot,
+    // need ensure flushed from double buffer
+    try {
+      awaitDoubleBufferFlush();
+    } catch (InterruptedException e) {
+      LOG.warn("double buffer wait is interrupted, ", e);
+      Thread.interrupted();
+    }
     ozoneManager.getMetadataManager().getStore().flushDB();
-    return lastAppliedIndex;
+    TransactionInfo transactionInfo = ozoneManager.getMetadataManager()
+        .getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
+    TermIndex lastTermIndex = getLastAppliedTermIndex();
+    LOG.info("Current Snapshot Index {} State machine Transaction {}",
+        transactionInfo, lastTermIndex);
+    snapshotInfo.updateTermIndex(transactionInfo.getTerm(),
+        transactionInfo.getTransactionIndex());
+    return transactionInfo.getTransactionIndex();
   }
 
   /**
@@ -640,29 +665,14 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       List<Long> flushedTrans = new ArrayList<>(flushedEpochs);
       Long appliedTerm = null;
       long appliedIndex = -1;
-      for (long i = getLastAppliedTermIndex().getIndex() + 1; ; i++) {
-        if (flushedTrans.contains(i)) {
-          appliedIndex = i;
-          final Long removed = applyTransactionMap.remove(i);
+      for (Long flushedIdx : flushedTrans) {
+        final Long removed = getTermIndexFromTransactionMap(flushedIdx);
+        if (null != removed) {
+          appliedIndex = flushedIdx;
           appliedTerm = removed;
-          flushedTrans.remove(i);
-        } else if (ratisTransactionMap.containsKey(i)) {
-          final Long removed = ratisTransactionMap.remove(i);
-          appliedTerm = removed;
-          appliedIndex = i;
         } else {
-          // Add remaining which are left in flushedEpochs to
-          // ratisTransactionMap to be considered further.
-          for (long epoch : flushedTrans) {
-            ratisTransactionMap.put(epoch, applyTransactionMap.remove(epoch));
-          }
-          if (LOG.isDebugEnabled()) {
-            if (!flushedTrans.isEmpty()) {
-              LOG.debug("ComputeAndUpdateLastAppliedIndex due to SM added " +
-                  "to map remaining {}", flushedTrans);
-            }
-          }
-          break;
+          LOG.warn("flushed index {} missing in transaction map," +
+                  " last flush index {}", flushedIdx, lastFlushedIndex);
         }
       }
       if (appliedTerm != null) {
@@ -672,23 +682,14 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
               getLastAppliedTermIndex());
         }
       }
-    } else {
-      if (getLastAppliedTermIndex().getIndex() + 1 == lastFlushedIndex) {
-        updateLastAppliedTermIndex(currentTerm, lastFlushedIndex);
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("ComputeAndUpdateLastAppliedIndex due to notifyIndex {}",
-              getLastAppliedTermIndex());
-        }
-      } else {
-        ratisTransactionMap.put(lastFlushedIndex, currentTerm);
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("ComputeAndUpdateLastAppliedIndex due to notifyIndex " +
-              "added to map. Passed Term {} index {}, where as lastApplied " +
-              "Index {}", currentTerm, lastFlushedIndex,
-              getLastAppliedTermIndex());
-        }
-      }
     }
+  }
+
+  private Long getTermIndexFromTransactionMap(Long index) {
+    if (applyTransactionMap.containsKey(index)) {
+      return applyTransactionMap.remove(index);
+    }
+    return ratisTransactionMap.remove(index);
   }
 
   public void loadSnapshotInfoFromDB() throws IOException {
