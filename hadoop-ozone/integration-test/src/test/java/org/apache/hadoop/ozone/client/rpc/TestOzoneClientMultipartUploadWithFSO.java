@@ -245,8 +245,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     // So, when a part is override partNames will still be same irrespective
     // of content in ozone s3. This will make S3 Mpu completeMPU pass when
     // comparing part names and large file uploads work using aws cp.
-    Assertions.assertEquals("Part names should be same", partName,
-        partNameNew);
+    Assertions.assertEquals(partName, partNameNew, "Part names should be same");
 
     // old part bytes written needs discard and have only
     // new part bytes in quota for this bucket
