@@ -588,12 +588,10 @@ public class KeyValueHandler extends Handler {
       responseData = blockManager.getBlock(kvContainer, blockID)
           .getProtoBufMessage();
 
-      BlockData blockData = BlockData.getFromProtoBuf(responseData);
-
-      chunkManager.finalizeWriteChunk(kvContainer, blockData);
+      chunkManager.finalizeWriteChunk(kvContainer, blockID);
       kvContainer.getContainerData()
-          .addToFinalizedBlockSet(blockData.getLocalID());
-      blockManager.finalizeBlock(kvContainer, blockData);
+          .addToFinalizedBlockSet(blockID.getLocalID());
+      blockManager.finalizeBlock(kvContainer, blockID);
 
       LOG.info("Block has been finalized {} ", blockID);
 
@@ -1205,15 +1203,6 @@ public class KeyValueHandler extends Handler {
                 .getContainerID() + " while in " + state + " state.", error);
       }
       container.close();
-
-      KeyValueContainerData containerData =
-          (KeyValueContainerData)container.getContainerData();
-      if (!containerData.getFinalizedBlockSet().isEmpty()) {
-        // delete from db and clear memory
-        containerData.clearFinalizedBlock();
-        blockManager.clearFinalizeBlock(container);
-      }
-
       ContainerLogger.logClosed(container.getContainerData());
       sendICR(container);
     } finally {

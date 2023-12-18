@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.io.nativeio.NativeIO;
@@ -76,6 +77,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.ERROR_IN_COMPACT_DB;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.ERROR_IN_DB_SYNC;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_CONTAINER_STATE;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
 
@@ -113,6 +115,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   private Set<Long> pendingPutBlockCache;
 
   private boolean bCheckChunksFilePath;
+
+  private static final String DB_NULL_ERR_MSG = "DB cannot be null here";
 
   public KeyValueContainer(KeyValueContainerData containerData,
       ConfigurationSource ozoneConfig) {
@@ -433,10 +437,33 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   @Override
   public void close() throws StorageContainerException {
+    clearFinalizeBlock();
     closeAndFlushIfNeeded(containerData::closeContainer);
     LOG.info("Container {} is closed with bcsId {}.",
         containerData.getContainerID(),
         containerData.getBlockCommitSequenceId());
+  }
+
+  private void clearFinalizeBlock() throws StorageContainerException {
+    if (!containerData.getFinalizedBlockSet().isEmpty()) {
+      // delete from db and clear memory
+      containerData.clearFinalizedBlock();
+      try (DBHandle db = BlockUtils.getDB(
+          containerData, config)) {
+        // Should never fail.
+        Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
+        // delete finalizeBlock
+        try (BatchOperation batch = db.getStore().getBatchHandler()
+            .initBatchOperation()) {
+          db.getStore().getFinalizeBlocksTable().deleteWithBatch(batch,
+              containerData.getFinalizeBlockKey());
+          db.getStore().getBatchHandler().commitBatchOperation(batch);
+        }
+      } catch (IOException ex) {
+        LOG.error("Error in deleting entry from Finalize Block table", ex);
+        throw new StorageContainerException(ex, IO_EXCEPTION);
+      }
+    }
   }
 
   @Override

@@ -216,15 +216,15 @@ public class BlockManagerImpl implements BlockManager {
   }
 
   @Override
-  public void finalizeBlock(Container container, BlockData data)
+  public void finalizeBlock(Container container, BlockID blockID)
       throws IOException {
-    Preconditions.checkNotNull(data, "BlockData cannot " +
+    Preconditions.checkNotNull(blockID, "BlockID cannot " +
         "be null for finalizeBlock operation.");
-    Preconditions.checkState(data.getContainerID() >= 0,
+    Preconditions.checkState(blockID.getContainerID() >= 0,
         "Container Id cannot be negative");
 
     KeyValueContainer kvContainer = (KeyValueContainer)container;
-    long localID = data.getLocalID();
+    long localID = blockID.getLocalID();
 
     kvContainer.removeFromPendingPutBlockCache(localID);
 
@@ -244,26 +244,6 @@ public class BlockManagerImpl implements BlockManager {
             kvContainer.getContainerData().getFinalizeBlockKey(),
             finalBlockList);
 
-        db.getStore().getBatchHandler().commitBatchOperation(batch);
-      }
-    }
-  }
-
-  @Override
-  public void clearFinalizeBlock(Container container)
-      throws IOException {
-    KeyValueContainer kvContainer = (KeyValueContainer)container;
-    try (DBHandle db = BlockUtils.getDB(
-        kvContainer.getContainerData(), config)) {
-      // Should never fail.
-      Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
-
-      // delete finalizeBlock
-      try (BatchOperation batch = db.getStore().getBatchHandler()
-          .initBatchOperation()) {
-
-        db.getStore().getFinalizeBlocksTable().deleteWithBatch(batch,
-            kvContainer.getContainerData().getFinalizeBlockKey());
         db.getStore().getBatchHandler().commitBatchOperation(batch);
       }
     }

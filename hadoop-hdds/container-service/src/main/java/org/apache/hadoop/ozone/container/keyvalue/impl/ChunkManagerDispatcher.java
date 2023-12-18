@@ -99,9 +99,8 @@ public class ChunkManagerDispatcher implements ChunkManager {
 
   @Override
   public void finalizeWriteChunk(KeyValueContainer kvContainer,
-      BlockData blockData) throws IOException {
-    selectHandler(kvContainer)
-        .finalizeWriteChunk(kvContainer, blockData);
+      BlockID blockId) throws IOException {
+    selectHandler(kvContainer).finalizeWriteChunk(kvContainer, blockId);
   }
 
   @Override

@@ -223,9 +223,9 @@ public class FilePerBlockStrategy implements ChunkManager {
 
   @Override
   public void finalizeWriteChunk(KeyValueContainer container,
-                                BlockData blockData) throws IOException {
+      BlockID blockId) throws IOException {
     synchronized (container) {
-      File chunkFile = getChunkFile(container, blockData.getBlockID(), null);
+      File chunkFile = getChunkFile(container, blockId, null);
       try {
         if (files.isOpen(chunkFile)) {
           files.close(chunkFile);

@@ -378,7 +378,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       return ctxt;
     }
     if (proto.getCmdType() == Type.PutBlock) {
-      TransactionContext ctxt = discardRequest(request,
+      TransactionContext ctxt = rejectRequest(request,
           proto.getContainerID(), proto.getPutBlock().getBlockData()
           .getBlockID().getLocalID());
       if (ctxt != null) {
@@ -386,7 +386,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       }
     } else if (proto.getCmdType() == Type.WriteChunk) {
       final WriteChunkRequestProto write = proto.getWriteChunk();
-      TransactionContext ctxt = discardRequest(request,
+      TransactionContext ctxt = rejectRequest(request,
           proto.getContainerID(), write.getBlockID().getLocalID());
       if (ctxt != null) {
         return ctxt;
@@ -430,7 +430,7 @@ public class ContainerStateMachine extends BaseStateMachine {
   }
 
   @Nullable
-  private TransactionContext discardRequest(RaftClientRequest request,
+  private TransactionContext rejectRequest(RaftClientRequest request,
               long containerId, long localId) {
     if (containerController.isFinalizedBlockExist(containerId, localId)) {
       TransactionContext ctxt = TransactionContext.newBuilder()

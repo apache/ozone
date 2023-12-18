@@ -166,7 +166,7 @@ public class ContainerController {
    * @return Container
    */
   public void addFinalizedBlock(final long containerId,
-                 final long localId) {
+      final long localId) {
     Container container = containerSet.getContainer(containerId);
     if (container != null) {
       getHandler(container).addFinalizedBlock(container, localId);
@@ -174,7 +174,7 @@ public class ContainerController {
   }
 
   public boolean isFinalizedBlockExist(final long containerId,
-              final long localId) {
+      final long localId) {
     Container container = containerSet.getContainer(containerId);
     if (container != null) {
       return getHandler(container).isFinalizedBlockExist(container, localId);
