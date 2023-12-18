@@ -113,7 +113,7 @@ public class TestFeaturesEndPoint {
     List<FeatureProvider.Feature> allDisabledFeatures =
         (List<FeatureProvider.Feature>) disabledFeatures.getEntity();
     Assertions.assertNotNull(allDisabledFeatures);
-    Assertions.assertTrue(allDisabledFeatures.size() == 0);
+    Assertions.assertEquals(0, allDisabledFeatures.size());
   }
 
   @Test
@@ -141,6 +141,6 @@ public class TestFeaturesEndPoint {
     List<FeatureProvider.Feature> allDisabledFeatures =
         (List<FeatureProvider.Feature>) disabledFeatures.getEntity();
     Assertions.assertNotNull(allDisabledFeatures);
-    Assertions.assertTrue(allDisabledFeatures.size() == 0);
+    Assertions.assertEquals(0, allDisabledFeatures.size());
   }
 }

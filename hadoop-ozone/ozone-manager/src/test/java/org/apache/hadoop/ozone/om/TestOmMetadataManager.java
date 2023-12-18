@@ -70,7 +70,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
@@ -282,8 +282,7 @@ public class TestOmMetadataManager {
     for (OmBucketInfo omBucketInfo : omBucketInfoList) {
       assertTrue(omBucketInfo.getBucketName().startsWith(
           prefixBucketNameWithOzoneOwner));
-      assertFalse(omBucketInfo.getBucketName().equals(
-          prefixBucketNameWithOzoneOwner + 10));
+      assertNotEquals(prefixBucketNameWithOzoneOwner + 10, omBucketInfo.getBucketName());
     }
 
 
@@ -426,8 +425,7 @@ public class TestOmMetadataManager {
     for (OmKeyInfo omKeyInfo : omKeyInfoList) {
       assertTrue(omKeyInfo.getKeyName().startsWith(
           prefixKeyA));
-      assertFalse(omKeyInfo.getBucketName().equals(
-          prefixKeyA + 38));
+      assertNotEquals(prefixKeyA + 38, omKeyInfo.getBucketName());
     }
 
 
