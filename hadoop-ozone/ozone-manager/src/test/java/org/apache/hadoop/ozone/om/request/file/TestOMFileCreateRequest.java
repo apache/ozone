@@ -144,8 +144,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     omFileCreateRequest = getOMFileCreateRequest(modifiedOmRequest);
 
     OMClientResponse omFileCreateResponse =
-        omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omFileCreateResponse.getOMResponse().getStatus());
@@ -198,8 +197,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
 
     omFileCreateRequest = getOMFileCreateRequest(modifiedOmRequest);
     OMClientResponse omFileCreateResponse =
-        omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
     Assertions.assertSame(omFileCreateResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
   }
@@ -217,8 +215,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     omFileCreateRequest = getOMFileCreateRequest(modifiedOmRequest);
 
     OMClientResponse omFileCreateResponse =
-        omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
     Assertions.assertEquals(VOLUME_NOT_FOUND,
         omFileCreateResponse.getOMResponse().getStatus());
   }
@@ -237,8 +234,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     omFileCreateRequest = getOMFileCreateRequest(modifiedOmRequest);
 
     OMClientResponse omFileCreateResponse =
-        omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
     Assertions.assertEquals(BUCKET_NOT_FOUND,
         omFileCreateResponse.getOMResponse().getStatus());
   }
@@ -395,8 +391,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
 
     omFileCreateRequest = getOMFileCreateRequest(modifiedOmRequest);
     OMClientResponse omFileCreateResponse =
-        omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omFileCreateResponse.getOMResponse().getStatus());
 
@@ -537,8 +532,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     omFileCreateRequest = getOMFileCreateRequest(modifiedOmRequest);
 
     OMClientResponse omFileCreateResponse =
-        omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     if (fail) {
       OzoneManagerProtocolProtos.Status respStatus =

@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketDeleteRequest;
@@ -80,7 +79,6 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
   private OzoneManager ozoneManager;
   private OMMetrics omMetrics;
   private AuditLogger auditLogger;
-  private OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper;
   private OMMetadataManager omMetadataManager;
   private OzoneManagerDoubleBuffer doubleBuffer;
   private final AtomicLong trxId = new AtomicLong(0);
@@ -117,7 +115,6 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
         .enableRatis(true)
         .setIndexToTerm((i) -> term)
         .build();
-    ozoneManagerDoubleBufferHelper = doubleBuffer::add;
   }
 
   @AfterEach
@@ -313,8 +310,10 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     OMBucketDeleteRequest omBucketDeleteRequest =
         new OMBucketDeleteRequest(omRequest);
 
-    return omBucketDeleteRequest.validateAndUpdateCache(ozoneManager,
-        transactionID, ozoneManagerDoubleBufferHelper);
+    OMClientResponse omClientResponse =
+        omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, transactionID);
+    doubleBuffer.add(omClientResponse, transactionID);
+    return omClientResponse;
   }
 
   /**
@@ -460,8 +459,10 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     OMVolumeCreateRequest omVolumeCreateRequest =
         new OMVolumeCreateRequest(omRequest);
 
-    return omVolumeCreateRequest.validateAndUpdateCache(ozoneManager,
-        transactionId, ozoneManagerDoubleBufferHelper);
+    OMClientResponse omClientResponse =
+        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, transactionId);
+    doubleBuffer.add(omClientResponse, transactionId);
+    return omClientResponse;
   }
 
   /**
@@ -480,10 +481,10 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     OMBucketCreateRequest omBucketCreateRequest =
         new OMBucketCreateRequest(omRequest);
 
-    return (OMBucketCreateResponse) omBucketCreateRequest
-        .validateAndUpdateCache(ozoneManager, transactionID,
-            ozoneManagerDoubleBufferHelper);
-
+    OMClientResponse omClientResponse =
+        omBucketCreateRequest.validateAndUpdateCache(ozoneManager, transactionID);
+    doubleBuffer.add(omClientResponse, transactionID);
+    return (OMBucketCreateResponse) omClientResponse;
   }
 
   /**
@@ -498,7 +499,5 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
         .setDeleteBucketResponse(DeleteBucketResponse.newBuilder().build())
         .build(), volumeName, bucketName);
   }
-
-
 }
 

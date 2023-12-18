@@ -82,8 +82,7 @@ public class TestOMBucketSetAclRequest extends TestBucketRequest {
     omBucketSetAclRequest.preExecute(ozoneManager);
 
     OMClientResponse omClientResponse = omBucketSetAclRequest
-        .validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 1);
     OMResponse omResponse = omClientResponse.getOMResponse();
     Assertions.assertNotNull(omResponse.getSetAclResponse());
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
@@ -114,8 +113,7 @@ public class TestOMBucketSetAclRequest extends TestBucketRequest {
     omBucketSetAclRequest.preExecute(ozoneManager);
 
     OMClientResponse omClientResponse = omBucketSetAclRequest
-        .validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 1);
     OMResponse omResponse = omClientResponse.getOMResponse();
     Assertions.assertNotNull(omResponse.getSetAclResponse());
     // The bucket is not created.

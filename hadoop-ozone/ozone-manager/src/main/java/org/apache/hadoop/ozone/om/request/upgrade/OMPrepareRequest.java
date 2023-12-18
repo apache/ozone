@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.om.request.upgrade;
 
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -61,8 +61,7 @@ public class OMPrepareRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(
-      OzoneManager ozoneManager, long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+      OzoneManager ozoneManager, long transactionLogIndex) {
 
     LOG.info("OM {} Received prepare request with log index {}",
         ozoneManager.getOMNodeId(), transactionLogIndex);
@@ -95,7 +94,9 @@ public class OMPrepareRequest extends OMClientRequest {
       // Add response to double buffer before clearing logs.
       // This guarantees the log index of this request will be the same as
       // the snapshot index in the prepared state.
-      ozoneManagerDoubleBufferHelper.add(response, transactionLogIndex);
+      OzoneManagerDoubleBuffer doubleBuffer =
+          ozoneManager.getOmRatisServer().getOmStateMachine().getOzoneManagerDoubleBuffer();
+      doubleBuffer.add(response, transactionLogIndex);
 
       OzoneManagerRatisServer omRatisServer = ozoneManager.getOmRatisServer();
       RaftServer.Division division =

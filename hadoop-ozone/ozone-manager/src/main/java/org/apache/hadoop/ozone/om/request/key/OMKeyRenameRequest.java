@@ -27,7 +27,6 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
@@ -111,7 +110,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+      long trxnLogIndex) {
 
     RenameKeyRequest renameKeyRequest = getOmRequest().getRenameKeyRequest();
     OzoneManagerProtocolProtos.KeyArgs keyArgs =
@@ -212,8 +211,6 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       omClientResponse = new OMKeyRenameResponse(createErrorOMResponse(
           omResponse, exception), getBucketLayout());
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-            omDoubleBufferHelper);
       if (acquiredLock) {
         mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));

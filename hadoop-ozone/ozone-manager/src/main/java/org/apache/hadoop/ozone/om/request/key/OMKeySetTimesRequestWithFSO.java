@@ -28,7 +28,6 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.key.OMKeySetTimesResponseWithFSO;
@@ -64,7 +63,7 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+      long trxnLogIndex) {
     OmKeyInfo omKeyInfo = null;
 
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse = onInit();
@@ -130,8 +129,6 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
       exception = ex;
       omClientResponse = onFailure(omResponse, exception);
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
       if (lockAcquired) {
         mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(BUCKET_LOCK, volume, bucket));

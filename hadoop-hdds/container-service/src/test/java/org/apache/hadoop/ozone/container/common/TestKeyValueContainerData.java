@@ -26,12 +26,11 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -39,29 +38,29 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * This class is used to test the KeyValueContainerData.
  */
-@RunWith(Parameterized.class)
 public class TestKeyValueContainerData {
 
   private static final long MAXSIZE = (long) StorageUnit.GB.toBytes(5);
 
-  private final ContainerLayoutVersion layout;
-  private final String schemaVersion;
-  private final OzoneConfiguration conf;
+  private ContainerLayoutVersion layout;
+  private String schemaVersion;
+  private OzoneConfiguration conf;
 
-  public TestKeyValueContainerData(ContainerTestVersionInfo versionInfo) {
+  private void initVersionInfo(ContainerTestVersionInfo versionInfo) {
     this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
     this.conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
+  private static Iterable<Object[]> versionInfo() {
     return ContainerTestVersionInfo.versionParameters();
   }
 
-  @Test
-  public void testKeyValueData() {
+  @ParameterizedTest
+  @MethodSource("versionInfo")
+  public void testKeyValueData(ContainerTestVersionInfo versionInfo) {
+    initVersionInfo(versionInfo);
     long containerId = 1L;
     ContainerProtos.ContainerType containerType = ContainerProtos
         .ContainerType.KeyValueContainer;

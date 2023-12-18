@@ -15,19 +15,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.fs;
 
-package org.apache.hadoop.ozone.om.ratis.utils;
+import org.apache.hadoop.ozone.om.helpers.TestOmKeyInfo;
 
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
-
-import java.util.concurrent.CompletableFuture;
-
-/**
- * Helper interface for OzoneManagerDoubleBuffer.
- *
- */
-public interface OzoneManagerDoubleBufferHelper {
-
-  CompletableFuture<Void> add(OMClientResponse response,
-      long transactionIndex);
+class TestOmKeyInfoWithHadoop2 extends TestOmKeyInfo {
+  // test OmKeyInfo (including proto conversion) with Hadoop 2 on the classpath
 }

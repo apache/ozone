@@ -79,8 +79,7 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
 
 
     OMClientResponse omClientResponse =
-        omVolumeSetOwnerRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeSetOwnerRequest.validateAndUpdateCache(ozoneManager, 1);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
@@ -138,8 +137,7 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
     omVolumeSetOwnerRequest.preExecute(ozoneManager);
 
     OMClientResponse omClientResponse =
-        omVolumeSetOwnerRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeSetOwnerRequest.validateAndUpdateCache(ozoneManager, 1);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
@@ -164,8 +162,7 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
     omVolumeSetOwnerRequest.preExecute(ozoneManager);
 
     OMClientResponse omClientResponse =
-        omVolumeSetOwnerRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeSetOwnerRequest.validateAndUpdateCache(ozoneManager, 1);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
@@ -192,7 +189,7 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
     // Execute the request
     setOwnerRequest.preExecute(ozoneManager);
     OMClientResponse omClientResponse = setOwnerRequest.validateAndUpdateCache(
-        ozoneManager, 1, ozoneManagerDoubleBufferHelper);
+        ozoneManager, 1);
     // Response status should be OK and success flag should be true.
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
@@ -201,7 +198,7 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
     // Execute the same request again but with higher index
     setOwnerRequest.preExecute(ozoneManager);
     omClientResponse = setOwnerRequest.validateAndUpdateCache(
-        ozoneManager, 2, ozoneManagerDoubleBufferHelper);
+        ozoneManager, 2);
     // Response status should be OK, but success flag should be false.
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());

@@ -82,7 +82,8 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
         .setBucketName(info.getBucketName()).setKeyName(info.getKeyName())
         .setReplicationConfig(replicationConfig).setDataSize(info.getDataSize())
         .setIsMultipartKey(isMultipart).setMultipartUploadID(uploadID)
-        .setMultipartUploadPartNumber(partNumber).build();
+        .setMultipartUploadPartNumber(partNumber)
+        .setSortDatanodesInPipeline(true).build();
     this.requestID = requestId;
     this.openID = openID;
     this.excludeList = createExcludeList();
