@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.jupiter.api.Assertions;
@@ -34,15 +36,32 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyArgs;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests OmKeyDelete request.
  */
 public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
 
-  @Test
-  public void testPreExecute() throws Exception {
-    doPreExecute(createDeleteKeyRequest());
+  @ParameterizedTest
+  @ValueSource(strings = {"keyName", "a/b/keyName",
+      "a/.snapshot/keyName", "a.snapshot/b/keyName"})
+  public void testPreExecute(String testKeyName) throws Exception {
+    doPreExecute(createDeleteKeyRequest(testKeyName));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {".snapshot/snapName", ".snapshot/snapName/keyName"})
+  public void testPreExecuteFailure(String testKeyName) {
+    OMKeyDeleteRequest deleteKeyRequest =
+        getOmKeyDeleteRequest(createDeleteKeyRequest(testKeyName));
+    OMException omException = Assertions.assertThrows(OMException.class,
+        () -> deleteKeyRequest.preExecute(ozoneManager));
+    Assertions.assertEquals(OmUtils.SNAPSHOT_DELETE_KEY_EXCEPTION_MESSAGE,
+        omException.getMessage());
+    Assertions.assertEquals(OMException.ResultCodes.INVALID_KEY_NAME,
+        omException.getResult());
   }
 
   @Test
@@ -154,8 +173,12 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
    * @return OMRequest
    */
   private OMRequest createDeleteKeyRequest() {
+    return createDeleteKeyRequest(keyName);
+  }
+
+  private OMRequest createDeleteKeyRequest(String testKeyName) {
     KeyArgs keyArgs = KeyArgs.newBuilder().setBucketName(bucketName)
-        .setVolumeName(volumeName).setKeyName(keyName).build();
+        .setVolumeName(volumeName).setKeyName(testKeyName).build();
 
     DeleteKeyRequest deleteKeyRequest =
         DeleteKeyRequest.newBuilder().setKeyArgs(keyArgs).build();

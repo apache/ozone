@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.shell.keys;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
@@ -58,6 +59,12 @@ public class DeleteKeyHandler extends KeyHandler {
     OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = vol.getBucket(bucketName);
     String keyName = address.getKeyName();
+
+    if (OmUtils.keyNameWithSnapshotReservedWord(keyName)) {
+      out().printf("Operation not permitted: %s %n",
+          OmUtils.SNAPSHOT_DELETE_KEY_EXCEPTION_MESSAGE);
+      return;
+    }
 
     if (bucket.getBucketLayout().isFileSystemOptimized()) {
       // Handle FSO delete key which supports trash also
