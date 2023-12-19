@@ -18,14 +18,17 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.InvalidPathException;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
@@ -53,6 +56,8 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -62,6 +67,7 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
@@ -84,18 +90,26 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.fs.CommonPathCapabilities.FS_ACLS;
 import static org.apache.hadoop.fs.CommonPathCapabilities.FS_CHECKSUMS;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
+import static org.apache.hadoop.fs.StorageStatistics.CommonStatisticNames.OP_CREATE;
+import static org.apache.hadoop.fs.StorageStatistics.CommonStatisticNames.OP_GET_FILE_STATUS;
+import static org.apache.hadoop.fs.StorageStatistics.CommonStatisticNames.OP_MKDIRS;
+import static org.apache.hadoop.fs.StorageStatistics.CommonStatisticNames.OP_OPEN;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.assertHasPathCapabilities;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
+import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
@@ -104,8 +118,10 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -127,6 +143,7 @@ abstract class AbstractOzoneFileSystemTest {
 
   private static final PathFilter EXCLUDE_TRASH =
       p -> !p.toUri().getPath().startsWith(TRASH_ROOT.toString());
+  private String fsRoot;
 
   AbstractOzoneFileSystemTest(boolean setDefaultFs, boolean enableOMRatis, BucketLayout layout) {
     enabledFileSystemPaths = setDefaultFs;
@@ -146,10 +163,12 @@ abstract class AbstractOzoneFileSystemTest {
   private OzoneManagerProtocol writeClient;
   private FileSystem fs;
   private OzoneFileSystem o3fs;
+  private OzoneFSStorageStatistics statistics;
   private OzoneBucket ozoneBucket;
   private String volumeName;
   private String bucketName;
   private Trash trash;
+  private OMMetrics omMetrics;
 
   @BeforeAll
   void init() throws Exception {
@@ -171,6 +190,7 @@ abstract class AbstractOzoneFileSystemTest {
             .setNumDatanodes(5)
             .build();
     cluster.waitForClusterToBeReady();
+    omMetrics = cluster.getOzoneManager().getMetrics();
 
     client = cluster.newClient();
     writeClient = client.getObjectStore()
@@ -180,17 +200,20 @@ abstract class AbstractOzoneFileSystemTest {
     volumeName = ozoneBucket.getVolumeName();
     bucketName = ozoneBucket.getName();
 
-    String rootPath = String.format("%s://%s.%s/",
-            OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);
+    fsRoot = String.format("%s://%s.%s/",
+        OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);
 
     // Set the fs.defaultFS and start the filesystem
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    conf.set(FS_DEFAULT_NAME_KEY, fsRoot);
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
 
     fs = FileSystem.get(conf);
     trash = new Trash(conf);
-    o3fs = (OzoneFileSystem) fs;
+    o3fs = assertInstanceOf(OzoneFileSystem.class, fs);
+    statistics = (OzoneFSStorageStatistics) o3fs.getOzoneFSOpsCountStatistics();
+    assertEquals(OzoneConsts.OZONE_URI_SCHEME, fs.getUri().getScheme());
+    assertEquals(OzoneConsts.OZONE_URI_SCHEME, statistics.getScheme());
   }
 
   @AfterAll
@@ -1207,7 +1230,7 @@ abstract class AbstractOzoneFileSystemTest {
     assertTrue(fs.rename(file1Source, file1Destin), "Renamed failed");
     assertTrue(fs.exists(file1Destin), "Renamed failed: /root/file1");
 
-    /**
+    /*
      * Reading several times, this is to verify that OmKeyInfo#keyName cached
      * entry is not modified. While reading back, OmKeyInfo#keyName will be
      * prepared and assigned to fullkeyPath name.
@@ -1427,7 +1450,7 @@ abstract class AbstractOzoneFileSystemTest {
 
     // Set the fs.defaultFS and start the filesystem
     Configuration conf = new OzoneConfiguration(cluster.getConf());
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    conf.set(FS_DEFAULT_NAME_KEY, rootPath);
     // Set the number of keys to be processed during batch operate.
     OzoneFileSystem o3FS = (OzoneFileSystem) FileSystem.get(conf);
 
@@ -1755,4 +1778,369 @@ abstract class AbstractOzoneFileSystemTest {
     GenericTestUtils.setLogLevel(log, Level.INFO);
     assertNotEquals(nonZeroLines, 0);
   }
+
+  @Test
+  public void testOzFsReadWrite() throws IOException {
+    assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
+
+    long currentTime = Time.now();
+    int stringLen = 20;
+    OMMetadataManager metadataManager = cluster.getOzoneManager()
+        .getMetadataManager();
+    String lev1dir = "l1dir";
+    Path lev1path = createPath("/" + lev1dir);
+    String lev1key = metadataManager.getOzoneDirKey(volumeName, bucketName,
+        o3fs.pathToKey(lev1path));
+    String lev2dir = "l2dir";
+    Path lev2path = createPath("/" + lev1dir + "/" + lev2dir);
+    String lev2key = metadataManager.getOzoneDirKey(volumeName, bucketName,
+        o3fs.pathToKey(lev2path));
+
+    String data = RandomStringUtils.randomAlphanumeric(stringLen);
+    String filePath = RandomStringUtils.randomAlphanumeric(5);
+
+    Path path = createPath("/" + lev1dir + "/" + lev2dir + "/" + filePath);
+    String fileKey = metadataManager.getOzoneDirKey(volumeName, bucketName,
+        o3fs.pathToKey(path));
+
+    // verify prefix directories and the file, do not already exist
+    assertNull(metadataManager.getKeyTable(getBucketLayout()).get(lev1key));
+    assertNull(metadataManager.getKeyTable(getBucketLayout()).get(lev2key));
+    assertNull(metadataManager.getKeyTable(getBucketLayout()).get(fileKey));
+
+    Map<String, Long> statsBefore = statistics.snapshot();
+    try (FSDataOutputStream stream = fs.create(path)) {
+      stream.writeBytes(data);
+    }
+
+    assertChange(statsBefore, statistics, OP_CREATE, 1);
+    assertChange(statsBefore, statistics, "objects_created", 1);
+
+    FileStatus status = fs.getFileStatus(path);
+
+    assertChange(statsBefore, statistics, OP_GET_FILE_STATUS, 1);
+    assertChange(statsBefore, statistics, "objects_query", 1);
+
+    // The timestamp of the newly created file should always be greater than
+    // the time when the test was started
+    assertTrue(status.getModificationTime() > currentTime);
+
+    assertFalse(status.isDirectory());
+    assertEquals(FsPermission.getFileDefault(), status.getPermission());
+    verifyOwnerGroup(status);
+
+    // verify prefix directories got created when creating the file.
+    assertEquals("l1dir/", metadataManager.getKeyTable(getBucketLayout()).get(lev1key).getKeyName());
+    assertEquals("l1dir/l2dir/", metadataManager.getKeyTable(getBucketLayout()).get(lev2key).getKeyName());
+    FileStatus lev1status = getDirectoryStat(lev1path);
+    assertNotNull(lev1status);
+    FileStatus lev2status = getDirectoryStat(lev2path);
+    assertNotNull(lev2status);
+
+    try (FSDataInputStream inputStream = fs.open(path)) {
+      byte[] buffer = new byte[stringLen];
+      // This read will not change the offset inside the file
+      int readBytes = inputStream.read(0, buffer, 0, buffer.length);
+      String out = new String(buffer, 0, buffer.length, UTF_8);
+      assertEquals(data, out);
+      assertEquals(readBytes, buffer.length);
+      assertEquals(0, inputStream.getPos());
+
+      // The following read will change the internal offset
+      readBytes = inputStream.read(buffer, 0, buffer.length);
+      assertEquals(data, out);
+      assertEquals(readBytes, buffer.length);
+      assertEquals(buffer.length, inputStream.getPos());
+    }
+
+    assertChange(statsBefore, statistics, OP_OPEN, 1);
+    assertChange(statsBefore, statistics, "objects_read", 1);
+  }
+
+  private static void assertChange(Map<String, Long> before, OzoneFSStorageStatistics after, String key, long delta) {
+    assertEquals(before.get(key) + delta, after.getLong(key));
+  }
+
+  @Test
+  public void testReplication() throws IOException {
+    assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
+
+    int stringLen = 20;
+    String data = RandomStringUtils.randomAlphanumeric(stringLen);
+    String filePath = RandomStringUtils.randomAlphanumeric(5);
+
+    Path pathIllegal = createPath("/" + filePath + "illegal");
+    try (FSDataOutputStream streamIllegal = fs.create(pathIllegal, (short)2)) {
+      streamIllegal.writeBytes(data);
+    }
+    assertEquals(3, fs.getFileStatus(pathIllegal).getReplication());
+
+    Path pathLegal = createPath("/" + filePath + "legal");
+    try (FSDataOutputStream streamLegal = fs.create(pathLegal, (short)1)) {
+      streamLegal.writeBytes(data);
+    }
+    assertEquals(1, fs.getFileStatus(pathLegal).getReplication());
+  }
+
+  private void verifyOwnerGroup(FileStatus fileStatus) {
+    String owner = getCurrentUser();
+    assertEquals(owner, fileStatus.getOwner());
+    assertEquals(owner, fileStatus.getGroup());
+  }
+
+
+  @Test
+  public void testDirectory() throws IOException {
+    assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
+
+    String leafName = RandomStringUtils.randomAlphanumeric(5);
+    OMMetadataManager metadataManager = cluster.getOzoneManager()
+        .getMetadataManager();
+
+    String lev1dir = "abc";
+    Path lev1path = createPath("/" + lev1dir);
+    String lev1key = metadataManager.getOzoneDirKey(volumeName, bucketName,
+        o3fs.pathToKey(lev1path));
+    String lev2dir = "def";
+    Path lev2path = createPath("/" + lev1dir + "/" + lev2dir);
+    String lev2key = metadataManager.getOzoneDirKey(volumeName, bucketName,
+        o3fs.pathToKey(lev2path));
+
+    Path leaf = createPath("/" + lev1dir + "/" + lev2dir + "/" + leafName);
+    String leafKey = metadataManager.getOzoneDirKey(volumeName, bucketName,
+        o3fs.pathToKey(leaf));
+
+    // verify prefix directories and the leaf, do not already exist
+    assertNull(metadataManager.getKeyTable(getBucketLayout()).get(lev1key));
+    assertNull(metadataManager.getKeyTable(getBucketLayout()).get(lev2key));
+    assertNull(metadataManager.getKeyTable(getBucketLayout()).get(leafKey));
+
+    assertTrue(fs.mkdirs(leaf));
+
+    // verify the leaf directory got created.
+    FileStatus leafstatus = getDirectoryStat(leaf);
+    assertNotNull(leafstatus);
+
+    // verify prefix directories got created when creating the leaf directory.
+    assertEquals("abc/", metadataManager
+        .getKeyTable(getBucketLayout())
+        .get(lev1key)
+        .getKeyName());
+    assertEquals("abc/def/", metadataManager
+        .getKeyTable(getBucketLayout())
+        .get(lev2key)
+        .getKeyName());
+    FileStatus lev1status = getDirectoryStat(lev1path);
+    assertNotNull(lev1status);
+    FileStatus lev2status = getDirectoryStat(lev2path);
+    assertNotNull(lev2status);
+
+    // check the root directory
+    FileStatus rootStatus = getDirectoryStat(createPath("/"));
+    assertNotNull(rootStatus);
+
+    // root directory listing should contain the lev1 prefix directory
+    FileStatus[] statusList = fs.listStatus(createPath("/"));
+    assertEquals(1, statusList.length);
+    assertEquals(lev1status, statusList[0]);
+  }
+
+  @Test
+  void testListStatus2() throws IOException {
+    List<Path> paths = new ArrayList<>();
+    String dirPath = RandomStringUtils.randomAlphanumeric(5);
+    Path path = createPath("/" + dirPath);
+    paths.add(path);
+
+    final Map<String, Long> initialStats = statistics.snapshot();
+    assertTrue(fs.mkdirs(path));
+    assertChange(initialStats, statistics, OP_MKDIRS, 1);
+
+    long omListStatus = omMetrics.getNumListStatus();
+    FileStatus[] statusList = fs.listStatus(createPath("/"));
+    assertEquals(1, statusList.length);
+    assertChange(initialStats, statistics, Statistic.OBJECTS_LIST.getSymbol(), 1);
+    assertEquals(++omListStatus, omMetrics.getNumListStatus());
+    assertEquals(fs.getFileStatus(path), statusList[0]);
+
+    dirPath = RandomStringUtils.randomAlphanumeric(5);
+    path = createPath("/" + dirPath);
+    paths.add(path);
+    assertTrue(fs.mkdirs(path));
+    assertChange(initialStats, statistics, OP_MKDIRS, 2);
+
+    statusList = fs.listStatus(createPath("/"));
+    assertEquals(2, statusList.length);
+    assertChange(initialStats, statistics, Statistic.OBJECTS_LIST.getSymbol(), 2);
+    assertEquals(++omListStatus, omMetrics.getNumListStatus());
+    for (Path p : paths) {
+      assertTrue(Arrays.asList(statusList).contains(fs.getFileStatus(p)));
+    }
+  }
+
+  @Test
+  void testOzoneManagerFileSystemInterface() throws IOException {
+    String dirPath = RandomStringUtils.randomAlphanumeric(5);
+
+    Path path = createPath("/" + dirPath);
+    assertTrue(fs.mkdirs(path));
+
+    long numFileStatus =
+        cluster.getOzoneManager().getMetrics().getNumGetFileStatus();
+    FileStatus status = fs.getFileStatus(path);
+
+    assertEquals(numFileStatus + 1,
+        cluster.getOzoneManager().getMetrics().getNumGetFileStatus());
+    assertTrue(status.isDirectory());
+    assertEquals(FsPermission.getDirDefault(), status.getPermission());
+    verifyOwnerGroup(status);
+
+    long currentTime = System.currentTimeMillis();
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(o3fs.pathToKey(path))
+        .build();
+    OzoneFileStatus omStatus =
+        cluster.getOzoneManager().getFileStatus(keyArgs);
+    //Another get file status here, incremented the counter.
+    assertEquals(numFileStatus + 2,
+        cluster.getOzoneManager().getMetrics().getNumGetFileStatus());
+    assertTrue(omStatus.isDirectory());
+
+    // For directories, the time returned is the current time when the dir key
+    // doesn't actually exist on server; if it exists, it will be a fixed value.
+    // In this case, the dir key exists.
+    assertEquals(0, omStatus.getKeyInfo().getDataSize());
+    assertTrue(omStatus.getKeyInfo().getModificationTime() <= currentTime);
+    assertEquals(new Path(omStatus.getPath()).getName(),
+        o3fs.pathToKey(path));
+  }
+
+  @Test
+  public void testOzoneManagerLocatedFileStatus() throws IOException {
+    String data = RandomStringUtils.randomAlphanumeric(20);
+    String filePath = RandomStringUtils.randomAlphanumeric(5);
+    Path path = createPath("/" + filePath);
+    try (FSDataOutputStream stream = fs.create(path)) {
+      stream.writeBytes(data);
+    }
+    FileStatus status = fs.getFileStatus(path);
+    assertTrue(status instanceof LocatedFileStatus);
+    LocatedFileStatus locatedFileStatus = (LocatedFileStatus) status;
+    assertTrue(locatedFileStatus.getBlockLocations().length >= 1);
+
+    for (BlockLocation blockLocation : locatedFileStatus.getBlockLocations()) {
+      assertTrue(blockLocation.getNames().length >= 1);
+      assertTrue(blockLocation.getHosts().length >= 1);
+    }
+  }
+
+  @Test
+  void testBlockOffsetsWithMultiBlockFile() throws Exception {
+    // naive assumption: MiniOzoneCluster will not have larger than ~1GB
+    // block size when running this test.
+    int blockSize = (int) fs.getConf().getStorageSize(
+        OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
+        OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT,
+        StorageUnit.BYTES
+    );
+    String data = RandomStringUtils.randomAlphanumeric(2 * blockSize + 837);
+    String filePath = RandomStringUtils.randomAlphanumeric(5);
+    Path path = createPath("/" + filePath);
+    try (FSDataOutputStream stream = fs.create(path)) {
+      stream.writeBytes(data);
+    }
+    FileStatus status = fs.getFileStatus(path);
+    assertTrue(status instanceof LocatedFileStatus);
+    LocatedFileStatus locatedFileStatus = (LocatedFileStatus) status;
+    BlockLocation[] blockLocations = locatedFileStatus.getBlockLocations();
+
+    assertEquals(0, blockLocations[0].getOffset());
+    assertEquals(blockSize, blockLocations[1].getOffset());
+    assertEquals(2 * blockSize, blockLocations[2].getOffset());
+    assertEquals(blockSize, blockLocations[0].getLength());
+    assertEquals(blockSize, blockLocations[1].getLength());
+    assertEquals(837, blockLocations[2].getLength());
+  }
+
+  @Test
+  void testPathToKey() {
+    assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
+
+    assertEquals("a/b/1", o3fs.pathToKey(new Path("/a/b/1")));
+
+    assertEquals("user/" + getCurrentUser() + "/key1/key2",
+        o3fs.pathToKey(new Path("key1/key2")));
+
+    assertEquals("key1/key2",
+        o3fs.pathToKey(new Path("o3fs://test1/key1/key2")));
+  }
+
+
+  /**
+   * Verify that FS throws exception when trying to access bucket with
+   * incompatible layout.
+   */
+  @Test
+  void testFileSystemWithObjectStoreLayout() throws IOException {
+    String obsVolume = UUID.randomUUID().toString();
+
+    try (OzoneClient client = cluster.newClient()) {
+      ObjectStore store = client.getObjectStore();
+
+      // Create volume and bucket
+      store.createVolume(obsVolume);
+      OzoneVolume volume = store.getVolume(obsVolume);
+      String obsBucket = UUID.randomUUID().toString();
+      // create bucket with OBJECT_STORE bucket layout (incompatible with fs)
+      volume.createBucket(obsBucket, BucketArgs.newBuilder()
+          .setBucketLayout(BucketLayout.OBJECT_STORE)
+          .build());
+
+      String obsRootPath = String.format("%s://%s.%s/",
+          OzoneConsts.OZONE_URI_SCHEME, obsBucket, obsVolume);
+
+      OzoneConfiguration config = new OzoneConfiguration(fs.getConf());
+      config.set(FS_DEFAULT_NAME_KEY, obsRootPath);
+
+      IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> FileSystem.get(config));
+      assertTrue(e.getMessage().contains("OBJECT_STORE, which does not support file system semantics"));
+    }
+  }
+
+  private String getCurrentUser() {
+    try {
+      return UserGroupInformation.getCurrentUser().getShortUserName();
+    } catch (IOException e) {
+      return OZONE_DEFAULT_USER;
+    }
+  }
+
+  private Path createPath(String relativePath) {
+    if (enabledFileSystemPaths) {
+      return new Path(fsRoot + (relativePath.startsWith("/") ? "" : "/") + relativePath);
+    } else {
+      return new Path(relativePath);
+    }
+  }
+
+  /**
+   * verify that a directory exists and is initialized correctly.
+   * @param path of the directory
+   * @return null indicates FILE_NOT_FOUND, else the FileStatus
+   */
+  private FileStatus getDirectoryStat(Path path) throws IOException {
+    FileStatus status = fs.getFileStatus(path);
+    assertTrue(status.isDirectory());
+    assertEquals(FsPermission.getDirDefault(), status.getPermission());
+    verifyOwnerGroup(status);
+    assertEquals(0, status.getLen());
+    return status;
+  }
+
+  private void assertCounter(long value, String key) {
+    assertEquals(value, statistics.getLong(key).longValue());
+  }
+
 }
