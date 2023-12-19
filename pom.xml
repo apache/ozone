@@ -18,7 +18,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.ozone</groupId>
   <artifactId>ozone-main</artifactId>
-  <version>1.4.0-SNAPSHOT</version>
+  <version>1.5.0-SNAPSHOT</version>
   <description>Apache Ozone Main</description>
   <name>Apache Ozone Main</name>
   <packaging>pom</packaging>
@@ -67,8 +67,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <!-- version for hdds/ozone components -->
     <hdds.version>${ozone.version}</hdds.version>
-    <ozone.version>1.4.0-SNAPSHOT</ozone.version>
-    <ozone.release>Hot Springs</ozone.release>
+    <ozone.version>1.5.0-SNAPSHOT</ozone.version>
+    <ozone.release>Indiana Dunes</ozone.release>
     <declared.hdds.version>${hdds.version}</declared.hdds.version>
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
 
@@ -130,7 +130,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <commons-text.version>1.10.0</commons-text.version>
     <commons-validator.version>1.6</commons-validator.version>
     <commons-fileupload.version>1.5</commons-fileupload.version>
-    <download-maven-plugin.version>1.6.8</download-maven-plugin.version>
+    <download-maven-plugin.version>1.7.1</download-maven-plugin.version>
 
     <test.build.dir>${project.build.directory}/test-dir</test.build.dir>
     <test.build.data>${test.build.dir}</test.build.data>
@@ -182,9 +182,9 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <slf4j.version>1.7.36</slf4j.version>
     <log4j2.version>2.17.1</log4j2.version>
     <disruptor.version>3.4.2</disruptor.version>
-    <reload4j.version>1.2.22</reload4j.version>
+    <reload4j.version>1.2.25</reload4j.version>
 
-    <kotlin.version>1.6.21</kotlin.version>
+    <kotlin.version>1.9.21</kotlin.version>
     <metainf-services.version>1.8</metainf-services.version>
     <picocli.version>4.7.5</picocli.version>
     <prometheus.version>0.7.0</prometheus.version>
@@ -203,8 +203,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <spotbugs.version>3.1.12</spotbugs.version>
     <dnsjava.version>2.1.7</dnsjava.version>
     <jakarta.activation.version>1.2.2</jakarta.activation.version>
-    <okhttp3.version>4.9.3</okhttp3.version>
-    <stax2.version>4.2.1</stax2.version>
+    <okhttp3.version>4.12.0</okhttp3.version>
+    <stax2.version>4.2.2</stax2.version>
     <jakarta.inject.version>2.6.1</jakarta.inject.version>
     <jakarta.annotation.version>1.3.5</jakarta.annotation.version>
     <joda.time.version>2.12.5</joda.time.version>
@@ -217,7 +217,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <objenesis.version>1.0</objenesis.version>
     <okhttp.version>2.7.5</okhttp.version>
-    <okio.version>3.4.0</okio.version>
+    <okio.version>3.6.0</okio.version>
     <mockito1-powermock.version>1.10.19</mockito1-powermock.version>
     <mockito2.version>3.5.9</mockito2.version>
     <hamcrest.version>1.3</hamcrest.version>
@@ -225,8 +225,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <powermock2.version>2.0.4</powermock2.version>
     <jmockit.version>1.24</jmockit.version>
     <junit4.version>4.13.1</junit4.version>
-    <junit.jupiter.version>5.8.2</junit.jupiter.version>
-    <junit.platform.version>1.8.2</junit.platform.version>
+    <junit5.version>5.10.1</junit5.version>
     <zookeeper.version>3.7.2</zookeeper.version>
 
     <!-- Maven protoc compiler -->
@@ -240,7 +239,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <io.grpc.version>1.58.0</io.grpc.version>
 
     <rocksdb.version>7.7.3</rocksdb.version>
-    <sqlite.version>3.41.2.2</sqlite.version>
+    <sqlite.version>3.44.1.0</sqlite.version>
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
 
     <!-- define the Java language version used by the compiler -->
@@ -266,13 +265,13 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-compiler-plugin.version>3.9.0</maven-compiler-plugin.version>
     <maven-install-plugin.version>3.1.1</maven-install-plugin.version>
     <maven-resources-plugin.version>3.1.0</maven-resources-plugin.version>
-    <maven-shade-plugin.version>3.4.1</maven-shade-plugin.version>
+    <maven-shade-plugin.version>3.5.1</maven-shade-plugin.version>
     <maven-jar-plugin.version>2.5</maven-jar-plugin.version>
     <maven-war-plugin.version>3.4.0</maven-war-plugin.version>
     <maven-source-plugin.version>3.3.0</maven-source-plugin.version>
     <maven-pdf-plugin.version>1.6.1</maven-pdf-plugin.version>
     <maven-remote-resources-plugin.version>1.5</maven-remote-resources-plugin.version>
-    <maven-enforcer-plugin.version>3.2.1</maven-enforcer-plugin.version>
+    <maven-enforcer-plugin.version>3.4.1</maven-enforcer-plugin.version>
     <maven-javadoc-plugin.version>3.0.1</maven-javadoc-plugin.version>
     <maven-assembly-plugin.version>3.6.0</maven-assembly-plugin.version>
     <apache-rat-plugin.version>0.12</apache-rat-plugin.version>
@@ -302,7 +301,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <aspectj.version>1.9.7</aspectj.version>
     <aspectj-plugin.version>1.14.0</aspectj-plugin.version>
-    <restrict-imports.enforcer.version>2.0.0</restrict-imports.enforcer.version>
+    <restrict-imports.enforcer.version>2.4.0</restrict-imports.enforcer.version>
     <awaitility.version>4.2.0</awaitility.version>
     <bzip2.version>1.0.8</bzip2.version>
     <zlib.version>1.2.13</zlib.version>
@@ -1181,40 +1180,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${javassist.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter-api</artifactId>
-        <version>${junit.jupiter.version}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter-migrationsupport</artifactId>
-        <version>${junit.jupiter.version}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter-engine</artifactId>
-        <version>${junit.jupiter.version}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter-params</artifactId>
-        <version>${junit.jupiter.version}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.junit.vintage</groupId>
-        <artifactId>junit-vintage-engine</artifactId>
-        <version>${junit.jupiter.version}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.junit.platform</groupId>
-        <artifactId>junit-platform-launcher</artifactId>
-        <version>${junit.platform.version}</version>
-        <scope>test</scope>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
+        <version>${junit5.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>commons-collections</groupId>
@@ -1387,13 +1357,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </dependency>
       <dependency>
         <groupId>org.jetbrains.kotlin</groupId>
-        <artifactId>kotlin-stdlib</artifactId>
+        <artifactId>kotlin-bom</artifactId>
         <version>${kotlin.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.jetbrains.kotlin</groupId>
-        <artifactId>kotlin-stdlib-common</artifactId>
-        <version>${kotlin.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>io.opentracing</groupId>
@@ -1850,11 +1817,14 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                 <rules>
                   <restrictImports>
                     <includeTestCode>true</includeTestCode>
+                    <parseFullCompilationUnit>true</parseFullCompilationUnit>
                     <reason>Use JUnit5</reason>
                     <bannedImports>
-                      <bannedImport>org.junit.*</bannedImport>
-                      <bannedImport>static org.junit.*.*</bannedImport>
+                      <bannedImport>org.junit.**</bannedImport>
                     </bannedImports>
+                    <allowedImports>
+                      <allowedImport>org.junit.jupiter.**</allowedImport>
+                    </allowedImports>
                   </restrictImports>
                 </rules>
               </configuration>
@@ -2008,10 +1978,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             <require.test.libhadoop>${require.test.libhadoop}</require.test.libhadoop>
           </systemPropertyVariables>
           <properties>
-            <property>
-              <name>listener</name>
-              <value>org.apache.ozone.test.TimedOutTestsListener</value>
-            </property>
+            <configurationParameters>
+              junit.platform.output.capture.stdout = true
+              junit.platform.output.capture.stderr = true
+            </configurationParameters>
           </properties>
           <includes>
             <include>**/Test*.java</include>

@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
@@ -207,6 +208,7 @@ public class RpcClient implements ClientProtocol {
   private final boolean topologyAwareReadEnabled;
   private final boolean checkKeyNameEnabled;
   private final OzoneClientConfig clientConfig;
+  private final ReplicationConfigValidator replicationConfigValidator;
   private final Cache<URI, KeyProvider> keyProviderCache;
   private final boolean getLatestVersionLocation;
   private final ByteBufferPool byteBufferPool;
@@ -230,6 +232,8 @@ public class RpcClient implements ClientProtocol {
     this.ugi = UserGroupInformation.getCurrentUser();
     // Get default acl rights for user and group.
     OzoneAclConfig aclConfig = this.conf.getObject(OzoneAclConfig.class);
+    replicationConfigValidator =
+        this.conf.getObject(ReplicationConfigValidator.class);
     this.userRights = aclConfig.getUserDefaultRights();
     this.groupRights = aclConfig.getGroupDefaultRights();
 
@@ -1343,9 +1347,7 @@ public class RpcClient implements ClientProtocol {
     }
 
     if (replicationConfig != null) {
-      ReplicationConfigValidator validator =
-              this.conf.getObject(ReplicationConfigValidator.class);
-      validator.validate(replicationConfig);
+      replicationConfigValidator.validate(replicationConfig);
     }
 
     OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
@@ -1854,7 +1856,7 @@ public class RpcClient implements ClientProtocol {
             .setMultipartUploadID(uploadID)
             .setIsMultipartKey(true)
             .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-            .setConfig(conf.getObject(OzoneClientConfig.class))
+            .setConfig(clientConfig)
             .setAtomicKeyCreation(isS3GRequest.get())
             .build();
     keyOutputStream
@@ -2269,7 +2271,7 @@ public class RpcClient implements ClientProtocol {
             .setOmClient(ozoneManagerClient)
             .setReplicationConfig(replicationConfig)
             .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-            .setConfig(conf.getObject(OzoneClientConfig.class))
+            .setConfig(clientConfig)
             .setAtomicKeyCreation(isS3GRequest.get())
             .build();
     keyOutputStream
@@ -2279,6 +2281,7 @@ public class RpcClient implements ClientProtocol {
         openKey, keyOutputStream, null);
     return new OzoneDataStreamOutput(out != null ? out : keyOutputStream);
   }
+
   private OzoneOutputStream createOutputStream(OpenKeySession openKey)
       throws IOException {
     KeyOutputStream keyOutputStream = createKeyOutputStream(openKey)
@@ -2336,6 +2339,8 @@ public class RpcClient implements ClientProtocol {
 
     ReplicationConfig replicationConfig =
         openKey.getKeyInfo().getReplicationConfig();
+    StreamBufferArgs streamBufferArgs = StreamBufferArgs.getDefaultStreamBufferArgs(
+        replicationConfig, clientConfig);
     if (replicationConfig.getReplicationType() ==
         HddsProtos.ReplicationType.EC) {
       builder = new ECKeyOutputStream.Builder()
@@ -2351,9 +2356,10 @@ public class RpcClient implements ClientProtocol {
         .setXceiverClientManager(xceiverClientManager)
         .setOmClient(ozoneManagerClient)
         .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
-        .setConfig(conf.getObject(OzoneClientConfig.class))
+        .setConfig(clientConfig)
         .setAtomicKeyCreation(isS3GRequest.get())
-        .setClientMetrics(clientMetrics);
+        .setClientMetrics(clientMetrics)
+        .setStreamBufferArgs(streamBufferArgs);
   }
 
   @Override

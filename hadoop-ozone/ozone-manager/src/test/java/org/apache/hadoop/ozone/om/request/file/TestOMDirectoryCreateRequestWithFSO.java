@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -77,11 +76,6 @@ public class TestOMDirectoryCreateRequestWithFSO {
   private OMMetrics omMetrics;
   private OMMetadataManager omMetadataManager;
   private AuditLogger auditLogger;
-  // Just setting ozoneManagerDoubleBuffer which does nothing.
-  private OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
-          ((response, transactionIndex) -> {
-            return null;
-          });
 
   @BeforeEach
   public void setup() throws Exception {
@@ -162,8 +156,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
             BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMClientResponse omClientResponse =
-            omDirCreateRequestFSO.validateAndUpdateCache(ozoneManager, 100L,
-                    ozoneManagerDoubleBufferHelper);
+        omDirCreateRequestFSO.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.OK);
@@ -203,8 +196,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
         new OMDirectoryCreateRequestWithFSO(modifiedOmReq,
             BucketLayout.FILE_SYSTEM_OPTIMIZED);
     OMClientResponse omClientResponse =
-        omDirCreateRequestFSO.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omDirCreateRequestFSO.validateAndUpdateCache(ozoneManager, 100L);
     Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
   }
@@ -230,8 +222,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
             BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMClientResponse omClientResponse =
-            omDirCreateRequestFSO.validateAndUpdateCache(ozoneManager, 100L,
-                    ozoneManagerDoubleBufferHelper);
+        omDirCreateRequestFSO.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(VOLUME_NOT_FOUND,
             omClientResponse.getOMResponse().getStatus());
@@ -262,8 +253,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
 
     OMClientResponse omClientResponse =
-            omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L,
-                    ozoneManagerDoubleBufferHelper);
+        omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND);
@@ -316,8 +306,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMClientResponse omClientResponse =
-            omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L,
-                    ozoneManagerDoubleBufferHelper);
+        omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.OK);
@@ -370,8 +359,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMClientResponse omClientResponse =
-            omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L,
-                    ozoneManagerDoubleBufferHelper);
+        omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.DIRECTORY_ALREADY_EXISTS);
@@ -450,8 +438,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMClientResponse omClientResponse =
-            omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L,
-                    ozoneManagerDoubleBufferHelper);
+        omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS);
@@ -529,8 +516,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMClientResponse omClientResponse =
-            omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L,
-                    ozoneManagerDoubleBufferHelper);
+        omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS,
@@ -576,8 +562,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     Assertions.assertEquals(0L, omMetrics.getNumKeys());
     OMClientResponse omClientResponse =
-            omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L,
-                    ozoneManagerDoubleBufferHelper);
+        omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
             omClientResponse.getOMResponse().getStatus());
@@ -611,8 +596,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     Assertions.assertEquals(0L, omMetrics.getNumKeys());
     OMClientResponse omClientResponse =
-            omDirCreateReqFSO.validateAndUpdateCache(ozoneManager,
-                    100L, ozoneManagerDoubleBufferHelper);
+        omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_KEY_NAME,
             omClientResponse.getOMResponse().getStatus());
@@ -651,8 +635,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     Assertions.assertEquals(0L, omMetrics.getNumKeys());
     OMClientResponse omClientResponse =
-            omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L,
-                    ozoneManagerDoubleBufferHelper);
+        omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
             omClientResponse.getOMResponse().getStatus());
@@ -703,8 +686,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     OMClientResponse omClientResponse =
-        omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omDirCreateReqFSO.validateAndUpdateCache(ozoneManager, 100L);
     Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.OK);
 

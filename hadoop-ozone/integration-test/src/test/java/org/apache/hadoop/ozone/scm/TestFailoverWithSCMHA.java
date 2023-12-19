@@ -42,8 +42,6 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,6 +55,10 @@ import java.util.concurrent.TimeoutException;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerBalancerConfigurationProto;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests failover with SCM HA setup.
@@ -113,10 +115,10 @@ public class TestFailoverWithSCMHA {
     scmClientConfig.setRetryCount(1);
     scmClientConfig.setRetryInterval(100);
     scmClientConfig.setMaxRetryTimeout(1500);
-    Assert.assertEquals(scmClientConfig.getRetryCount(), 15);
+    assertEquals(scmClientConfig.getRetryCount(), 15);
     conf.setFromObject(scmClientConfig);
     StorageContainerManager scm = getLeader(cluster);
-    Assert.assertNotNull(scm);
+    assertNotNull(scm);
     SCMBlockLocationFailoverProxyProvider failoverProxyProvider =
         new SCMBlockLocationFailoverProxyProvider(conf);
     failoverProxyProvider.changeCurrentProxy(scm.getSCMNodeId());
@@ -131,7 +133,7 @@ public class TestFailoverWithSCMHA {
         .createProxy(scmBlockLocationClient, ScmBlockLocationProtocol.class,
             conf);
     scmBlockLocationProtocol.getScmInfo();
-    Assert.assertTrue(logCapture.getOutput()
+    assertTrue(logCapture.getOutput()
         .contains("Performing failover to suggested leader"));
     scm = getLeader(cluster);
     SCMContainerLocationFailoverProxyProvider proxyProvider =
@@ -148,7 +150,7 @@ public class TestFailoverWithSCMHA {
 
     scmContainerClient.allocateContainer(HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE, "ozone");
-    Assert.assertTrue(logCapture.getOutput()
+    assertTrue(logCapture.getOutput()
         .contains("Performing failover to suggested leader"));
   }
 
@@ -159,10 +161,10 @@ public class TestFailoverWithSCMHA {
     scmClientConfig.setRetryCount(1);
     scmClientConfig.setRetryInterval(100);
     scmClientConfig.setMaxRetryTimeout(1500);
-    Assert.assertEquals(scmClientConfig.getRetryCount(), 15);
+    assertEquals(scmClientConfig.getRetryCount(), 15);
     conf.setFromObject(scmClientConfig);
     StorageContainerManager scm = getLeader(cluster);
-    Assert.assertNotNull(scm);
+    assertNotNull(scm);
 
     final ContainerID id =
         getContainer(HddsProtos.LifeCycleState.CLOSED).containerID();
@@ -190,19 +192,19 @@ public class TestFailoverWithSCMHA {
         .createProxy(scmBlockLocationClient, ScmBlockLocationProtocol.class,
             conf);
     scmBlockLocationProtocol.getScmInfo();
-    Assert.assertTrue(logCapture.getOutput()
+    assertTrue(logCapture.getOutput()
         .contains("Performing failover to suggested leader"));
     scm = getLeader(cluster);
-    Assert.assertNotNull(scm);
+    assertNotNull(scm);
 
     //switch to the new leader successfully, new leader should
     //get the same inflightMove
     Map<ContainerID, MoveDataNodePair> inflightMove =
         scm.getReplicationManager().getMoveScheduler().getInflightMove();
-    Assert.assertTrue(inflightMove.containsKey(id));
+    assertTrue(inflightMove.containsKey(id));
     MoveDataNodePair mp = inflightMove.get(id);
-    Assert.assertTrue(dn2.equals(mp.getTgt()));
-    Assert.assertTrue(dn1.equals(mp.getSrc()));
+    assertTrue(dn2.equals(mp.getTgt()));
+    assertTrue(dn1.equals(mp.getSrc()));
 
     //complete move in the new leader
     scm.getReplicationManager().getMoveScheduler()
@@ -223,17 +225,17 @@ public class TestFailoverWithSCMHA {
 
     scmContainerClient.allocateContainer(HddsProtos.ReplicationType.RATIS,
         HddsProtos.ReplicationFactor.ONE, "ozone");
-    Assert.assertTrue(logCapture.getOutput()
+    assertTrue(logCapture.getOutput()
         .contains("Performing failover to suggested leader"));
 
     //switch to the new leader successfully, new leader should
     //get the same inflightMove , which should not contains
     //that container.
     scm = getLeader(cluster);
-    Assert.assertNotNull(scm);
+    assertNotNull(scm);
     inflightMove = scm.getReplicationManager()
         .getMoveScheduler().getInflightMove();
-    Assert.assertFalse(inflightMove.containsKey(id));
+    assertFalse(inflightMove.containsKey(id));
   }
 
   /**
@@ -257,14 +259,14 @@ public class TestFailoverWithSCMHA {
         conf.getObject(SCMClientConfig.class);
     scmClientConfig.setRetryInterval(100);
     scmClientConfig.setMaxRetryTimeout(1500);
-    Assertions.assertEquals(15, scmClientConfig.getRetryCount());
+    assertEquals(15, scmClientConfig.getRetryCount());
     conf.setFromObject(scmClientConfig);
     StorageContainerManager leader = getLeader(cluster);
-    Assertions.assertNotNull(leader);
+    assertNotNull(leader);
 
     ScmClient scmClient = new ContainerOperationClient(conf);
     // assert that container balancer is not running right now
-    Assertions.assertFalse(scmClient.getContainerBalancerStatus());
+    assertFalse(scmClient.getContainerBalancerStatus());
     ContainerBalancerConfiguration balancerConf =
         conf.getObject(ContainerBalancerConfiguration.class);
     ContainerBalancer containerBalancer = leader.getContainerBalancer();
@@ -278,7 +280,7 @@ public class TestFailoverWithSCMHA {
     // assert that balancer has stopped since the cluster is already balanced
     GenericTestUtils.waitFor(() -> !containerBalancer.isBalancerRunning(),
         10, 500);
-    Assertions.assertFalse(containerBalancer.isBalancerRunning());
+    assertFalse(containerBalancer.isBalancerRunning());
 
     ByteString byteString =
         leader.getScmMetadataStore().getStatefulServiceConfigTable().get(
@@ -315,7 +317,7 @@ public class TestFailoverWithSCMHA {
               containerBalancer.getServiceName());
       ContainerBalancerConfigurationProto protobuf =
           ContainerBalancerConfigurationProto.parseFrom(byteString);
-      Assertions.assertFalse(protobuf.getShouldRun());
+      assertFalse(protobuf.getShouldRun());
     }
   }
 

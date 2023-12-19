@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.ECContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.RatisContainerReplicaCount;
@@ -151,6 +152,7 @@ public final class DatanodeAdminMonitorTestUtil {
    */
   public static void mockGetContainerReplicaCount(
       ReplicationManager repManager,
+      boolean underReplicated,
       HddsProtos.LifeCycleState containerState,
       HddsProtos.NodeOperationalState...replicaStates)
       throws ContainerNotFoundException {
@@ -160,6 +162,7 @@ public final class DatanodeAdminMonitorTestUtil {
         .thenAnswer(invocation ->
             generateReplicaCount((ContainerID)invocation.getArguments()[0],
                 containerState, replicaStates));
+    mockCheckContainerState(repManager, underReplicated);
   }
 
   /**
@@ -175,6 +178,7 @@ public final class DatanodeAdminMonitorTestUtil {
    */
   public static void mockGetContainerReplicaCountForEC(
       ReplicationManager repManager,
+      boolean underReplicated,
       HddsProtos.LifeCycleState containerState,
       ECReplicationConfig repConfig,
       Triple<HddsProtos.NodeOperationalState, DatanodeDetails,
@@ -186,6 +190,21 @@ public final class DatanodeAdminMonitorTestUtil {
         .thenAnswer(invocation ->
             generateECReplicaCount((ContainerID)invocation.getArguments()[0],
                 repConfig, containerState, replicaStates));
+    mockCheckContainerState(repManager, underReplicated);
+  }
+
+  private static void mockCheckContainerState(ReplicationManager repManager, boolean underReplicated)
+      throws ContainerNotFoundException {
+    Mockito.when(repManager.checkContainerStatus(Mockito.any(ContainerInfo.class),
+            Mockito.any(ReplicationManagerReport.class)))
+        .then(invocation -> {
+          ReplicationManagerReport report = invocation.getArgument(1);
+          if (underReplicated) {
+            report.increment(ReplicationManagerReport.HealthState.UNDER_REPLICATED);
+            return true;
+          }
+          return false;
+        });
   }
 
   /**

@@ -84,6 +84,7 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicasWithSameOrigin;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.getNoNodesTestPlacementPolicy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -518,7 +519,7 @@ public class TestReplicationManager {
 
     boolean result = replicationManager.checkContainerStatus(
         container, repReport);
-    assertEquals(false, result);
+    assertFalse(result);
   }
 
   @Test
@@ -546,7 +547,7 @@ public class TestReplicationManager {
         container, repReport);
     assertEquals(1, repReport.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(true, result);
+    assertTrue(result);
   }
 
   /**

@@ -156,8 +156,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     Assertions.assertNull(omKeyInfo);
 
     OMClientResponse omKeyCreateResponse =
-        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     checkResponse(modifiedOmRequest, omKeyCreateResponse, id, false,
         omKeyCreateRequest.getBucketLayout());
@@ -196,8 +195,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         getOMKeyCreateRequest(modifiedOmRequest);
 
     omKeyCreateResponse =
-        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 101L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 101L);
 
     checkResponse(modifiedOmRequest, omKeyCreateResponse, id, true,
         omKeyCreateRequest.getBucketLayout());
@@ -235,8 +233,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
             .setQuotaInNamespace(1));
 
     OMClientResponse omKeyCreateResponse =
-        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
     Assertions.assertSame(omKeyCreateResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
   }
@@ -317,8 +314,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     Assertions.assertNull(omKeyInfo);
 
     OMClientResponse omKeyCreateResponse =
-        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(
         OzoneManagerProtocolProtos.Status.NO_SUCH_MULTIPART_UPLOAD_ERROR,
@@ -360,8 +356,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     Assertions.assertNull(omKeyInfo);
 
     OMClientResponse omKeyCreateResponse =
-        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omKeyCreateResponse.getOMResponse().getStatus());
@@ -404,8 +399,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     Assertions.assertNull(omKeyInfo);
 
     OMClientResponse omKeyCreateResponse =
-        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
         omKeyCreateResponse.getOMResponse().getStatus());
@@ -452,8 +446,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     Assertions.assertNull(omKeyInfo);
 
     OMClientResponse omKeyCreateResponse =
-        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_PATH,
         omKeyCreateResponse.getOMResponse().getStatus());
@@ -761,8 +754,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     String openKey = getOpenKey(id);
 
     OMClientResponse omKeyCreateResponse =
-        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
     checkResponse(modifiedOmRequest, omKeyCreateResponse, id, false,
         omKeyCreateRequest.getBucketLayout());
 
@@ -830,8 +822,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
 
     OMClientResponse omClientResponse =
-        omKeyCreateRequest.validateAndUpdateCache(ozoneManager,
-            101L, ozoneManagerDoubleBufferHelper);
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 101L);
 
     Assertions.assertEquals(NOT_A_FILE,
         omClientResponse.getOMResponse().getStatus());
@@ -848,8 +839,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
 
     OMClientResponse omClientResponse =
-        omKeyCreateRequest.validateAndUpdateCache(ozoneManager,
-            101L, ozoneManagerDoubleBufferHelper);
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 101L);
 
     Assertions.assertEquals(OK, omClientResponse.getOMResponse().getStatus());
 

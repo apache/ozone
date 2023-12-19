@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -28,6 +29,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -526,7 +528,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
       // Check if there is a DB Inconsistent Marker in the metaDir. This
       // marker indicates that the DB is in an inconsistent state and hence
-      // the SCM process should be terminated.
+      // the OM process should be terminated.
       File markerFile = new File(metaDir, DB_TRANSIENT_MARKER);
       if (markerFile.exists()) {
         LOG.error("File {} marks that OM DB is in an inconsistent state.",
@@ -1364,66 +1366,26 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
               snapshotPrefix) ? snapshotPrefix : OM_KEY_PREFIX);
     }
 
-    TreeMap<String, SnapshotInfo> snapshotInfoMap = new TreeMap<>();
-
-    int count = appendSnapshotFromCacheToMap(
-        snapshotInfoMap, prefix, seek, maxListResult);
-    appendSnapshotFromDBToMap(
-        snapshotInfoMap, prefix, seek, count, maxListResult);
-
-    return new ArrayList<>(snapshotInfoMap.values());
-  }
-
-  private int appendSnapshotFromCacheToMap(
-      TreeMap snapshotInfoMap, String prefix,
-      String previous, int maxListResult) {
-    int count = 0;
-    Iterator<Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>>> iterator =
-        snapshotInfoTable.cacheIterator();
-    while (iterator.hasNext() && count < maxListResult) {
-      Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>> entry =
-          iterator.next();
-      String snapshotKey = entry.getKey().getCacheKey();
-      SnapshotInfo snapshotInfo = entry.getValue().getCacheValue();
-      if (snapshotInfo != null && snapshotKey.startsWith(prefix) &&
-          snapshotKey.compareTo(previous) > 0) {
-        snapshotInfoMap.put(snapshotKey, snapshotInfo);
-        count++;
-      }
-    }
-    return count;
-  }
-
-  private void appendSnapshotFromDBToMap(TreeMap snapshotInfoMap,
-                                         String prefix, String previous,
-                                         int count, int maxListResult)
-      throws IOException {
-    try (TableIterator<String, ? extends KeyValue<String, SnapshotInfo>>
-             snapshotIter = snapshotInfoTable.iterator()) {
-      KeyValue<String, SnapshotInfo> snapshotinfo;
-      snapshotIter.seek(previous);
-      while (snapshotIter.hasNext() && count < maxListResult) {
-        snapshotinfo = snapshotIter.next();
-        if (snapshotinfo != null &&
-            snapshotinfo.getKey().compareTo(previous) == 0) {
-          continue;
-        }
-        if (snapshotinfo != null && snapshotinfo.getKey().startsWith(prefix))  {
-          CacheValue<SnapshotInfo> cacheValue =
-              snapshotInfoTable.getCacheValue(
-                  new CacheKey<>(snapshotinfo.getKey()));
-          // There is always the latest data in the cache, so don't need to add
-          // earlier data from DB. We only add data from DB if there is no data
-          // in cache.
-          if (cacheValue == null) {
-            snapshotInfoMap.put(snapshotinfo.getKey(), snapshotinfo.getValue());
-            count++;
+    List<SnapshotInfo> snapshotInfos =  Lists.newArrayList();
+    try (ListIterator.MinHeapIterator snapshotIterator =
+        new ListIterator.MinHeapIterator(this, prefix, seek, volumeName,
+            bucketName, snapshotInfoTable)) {
+      try {
+        while (snapshotIterator.hasNext() && maxListResult > 0) {
+          SnapshotInfo snapshotInfo = (SnapshotInfo) snapshotIterator.next()
+              .getValue();
+          if (!snapshotInfo.getName().equals(prevSnapshot)) {
+            snapshotInfos.add(snapshotInfo);
+            maxListResult--;
           }
-        } else {
-          break;
         }
+      } catch (NoSuchElementException e) {
+        throw new IOException(e);
+      } catch (UncheckedIOException e) {
+        throw e.getCause();
       }
     }
+    return snapshotInfos;
   }
 
   @Override

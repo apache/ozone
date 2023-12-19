@@ -126,10 +126,6 @@
     <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" />
   </Match>
   <Match>
-    <Class name="org.apache.hadoop.fs.ozone.TestOzoneFileSystem"/>
-    <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" />
-  </Match>
-  <Match>
     <Class name="org.apache.hadoop.fs.ozone.TestOzoneFileSystemMissingParent"/>
     <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" />
   </Match>

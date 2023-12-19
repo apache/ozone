@@ -53,6 +53,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.mockito.ArgumentMatchers.anyObject;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -342,8 +343,7 @@ public class TestHddsSecureDatanodeInit {
     when(scmClient.getAllRootCaCertificates()).thenReturn(rootCaList);
     // check that new cert ID should not equal to current cert ID
     String certId = newCertHolder.getSerialNumber().toString();
-    Assertions.assertFalse(certId.equals(
-        client.getCertificate().getSerialNumber().toString()));
+    assertNotEquals(certId, client.getCertificate().getSerialNumber().toString());
 
     // start monitor task to renew key and cert
     client.startCertificateRenewerService();
@@ -382,12 +382,10 @@ public class TestHddsSecureDatanodeInit {
       String newCertId = client.getCertificate().getSerialNumber().toString();
       return newCertId.equals(certId2);
     }, 1000, CERT_LIFETIME * 1000);
-    Assertions.assertFalse(client.getPrivateKey().equals(privateKey1));
-    Assertions.assertFalse(client.getPublicKey().equals(publicKey1));
-    Assertions.assertFalse(client.getCACertificate().getSerialNumber()
-        .toString().equals(caCertId1));
-    Assertions.assertFalse(client.getRootCACertificate().getSerialNumber()
-        .toString().equals(rootCaCertId1));
+    assertNotEquals(privateKey1, client.getPrivateKey());
+    assertNotEquals(publicKey1, client.getPublicKey());
+    assertNotEquals(caCertId1, client.getCACertificate().getSerialNumber().toString());
+    assertNotEquals(rootCaCertId1, client.getRootCACertificate().getSerialNumber().toString());
   }
 
   /**
@@ -417,16 +415,14 @@ public class TestHddsSecureDatanodeInit {
 
     // check that new cert ID should not equal to current cert ID
     String certId = newCertHolder.getSerialNumber().toString();
-    Assertions.assertFalse(certId.equals(
-        client.getCertificate().getSerialNumber().toString()));
+    assertNotEquals(certId, client.getCertificate().getSerialNumber().toString());
 
     // start monitor task to renew key and cert
     client.startCertificateRenewerService();
 
     // certificate failed to renew, client still hold the old expired cert.
     Thread.sleep(CERT_LIFETIME * 1000);
-    Assertions.assertFalse(certId.equals(
-        client.getCertificate().getSerialNumber().toString()));
+    assertNotEquals(certId, client.getCertificate().getSerialNumber().toString());
     try {
       client.getCertificate().checkValidity();
     } catch (Exception e) {

@@ -55,7 +55,7 @@ grep '(' ${src} \
   | ( grep -i -v \
     -e "Apache ${L}" -e "Apache Software ${L}" -e "Apache v2" -e "Apache.2" \
     -e "Bouncy Castle ${L}" \
-    -e "(BSD)" -e "(The BSD ${L})" -e "(BSD.[23]" -e "\<BSD ${L} [23]" -e "\<[23]\>.Clause.\<BSD\>" \
+    -e "(BSD)" -e "(The BSD ${L})" -e "\<BSD.[23]" -e "\<BSD ${L} [23]" -e "\<[23]\>.Clause.\<BSD\>" \
     -e "(CDDL\>" -e ' CDDL '\
     -e "(EDL\>" -e "Eclipse Distribution ${L}" \
     -e "(EPL\>" -e "Eclipse Public ${L}" \

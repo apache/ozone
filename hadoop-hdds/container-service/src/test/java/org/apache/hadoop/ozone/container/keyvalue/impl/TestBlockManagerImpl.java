@@ -35,22 +35,17 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -58,11 +53,10 @@ import static org.mockito.Mockito.mock;
 /**
  * This class is used to test key related operations on the container.
  */
-@RunWith(Parameterized.class)
 public class TestBlockManagerImpl {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
   private OzoneConfiguration config;
   private String scmId = UUID.randomUUID().toString();
   private VolumeSet volumeSet;
@@ -75,27 +69,24 @@ public class TestBlockManagerImpl {
   private BlockID blockID;
   private BlockID blockID1;
 
-  private final ContainerLayoutVersion layout;
-  private final String schemaVersion;
+  private ContainerLayoutVersion layout;
+  private String schemaVersion;
 
-  public TestBlockManagerImpl(ContainerTestVersionInfo versionInfo) {
+  private void initTest(ContainerTestVersionInfo versionInfo)
+      throws Exception {
     this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
     this.config = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, config);
+    initilaze();
   }
 
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
-    return ContainerTestVersionInfo.versionParameters();
-  }
-
-  @Before
-  public void setUp() throws Exception {
+  private void initilaze() throws Exception {
     UUID datanodeId = UUID.randomUUID();
-    HddsVolume hddsVolume = new HddsVolume.Builder(folder.getRoot()
-        .getAbsolutePath()).conf(config).datanodeUuid(datanodeId
-        .toString()).build();
+    HddsVolume hddsVolume = new HddsVolume.Builder(folder.toString())
+        .conf(config)
+        .datanodeUuid(datanodeId.toString())
+        .build();
     StorageVolumeUtil.checkVolume(hddsVolume, scmId, scmId, config,
         null, null);
 
@@ -145,13 +136,15 @@ public class TestBlockManagerImpl {
 
   }
 
-  @After
+  @AfterEach
   public void cleanup() {
     BlockUtils.shutdownCache(config);
   }
 
-  @Test
-  public void testPutBlock() throws Exception {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testPutBlock(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    initTest(versionInfo);
     assertEquals(0, keyValueContainer.getContainerData().getBlockCount());
     //Put Block with bcsId != 0
     blockManager.putBlock(keyValueContainer, blockData1);
@@ -178,8 +171,10 @@ public class TestBlockManagerImpl {
 
   }
 
-  @Test
-  public void testPutAndGetBlock() throws Exception {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testPutAndGetBlock(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    initTest(versionInfo);
     assertEquals(0, keyValueContainer.getContainerData().getBlockCount());
     //Put Block
     blockManager.putBlock(keyValueContainer, blockData);
@@ -198,13 +193,15 @@ public class TestBlockManagerImpl {
 
   }
 
-  @Test
-  public void testListBlock() throws Exception {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testListBlock(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    initTest(versionInfo);
     blockManager.putBlock(keyValueContainer, blockData);
     List<BlockData> listBlockData = blockManager.listBlock(
         keyValueContainer, 1, 10);
     assertNotNull(listBlockData);
-    assertTrue(listBlockData.size() == 1);
+    assertEquals(1, listBlockData.size());
 
     for (long i = 2; i <= 10; i++) {
       blockID = new BlockID(1L, i);
@@ -223,6 +220,6 @@ public class TestBlockManagerImpl {
     listBlockData = blockManager.listBlock(
         keyValueContainer, 1, 10);
     assertNotNull(listBlockData);
-    assertTrue(listBlockData.size() == 10);
+    assertEquals(10, listBlockData.size());
   }
 }
