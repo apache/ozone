@@ -42,7 +42,7 @@ interface IDatanodeResponse {
   hostname: string;
   state: DatanodeState;
   opState: DatanodeOpState;
-  lastHeartbeat: number;
+  lastHeartbeat: string;
   storageReport: IStorageReport;
   pipelines: IPipeline[];
   containers: number;
@@ -182,7 +182,7 @@ const COLUMNS = [
     isVisible: true,
     sorter: (a: IDatanode, b: IDatanode) => a.lastHeartbeat - b.lastHeartbeat,
     render: (heartbeat: number) => {
-      return heartbeat > 0 ? moment(heartbeat).format('ll LTS') : 'NA';
+      return heartbeat > 0 ? getTimeDiffFromTimestamp(heartbeat) : 'NA';
     }
   },
   {
@@ -302,6 +302,26 @@ const defaultColumns: IOption[] = COLUMNS.map(column => ({
   label: column.key,
   value: column.key
 }));
+
+const getTimeDiffFromTimestamp = (timestamp: number): string => {
+  const timestampDate = new Date(timestamp);
+  const currentDate = new Date();
+
+  let elapsedTime = "";
+  let duration: moment.Duration = moment.duration(
+    moment(currentDate).diff(moment(timestampDate))
+  )
+
+  const durationKeys = ["seconds", "minutes", "hours", "days", "months", "years"]
+  durationKeys.forEach((k) => {
+    let time = duration["_data"][k]
+    if (time !== 0){
+      elapsedTime = time + `${k.substring(0, 1)} ` + elapsedTime
+    }
+  })
+
+  return elapsedTime.trim().length === 0 ? "Just now" : elapsedTime.trim() + " ago";
+}
 
 let cancelSignal: AbortController;
 
