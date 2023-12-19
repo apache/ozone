@@ -86,18 +86,22 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVA
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.hamcrest.core.Is.is;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.hamcrest.MatcherAssert.assertThat;
 
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.storage.FileInfo;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
-import static org.hamcrest.core.Is.is;
 
 import org.apache.ratis.statemachine.impl.StatemachineImplTestUtil;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.junit.Assert;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.fail;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -212,7 +216,7 @@ public class TestContainerStateMachineFailures {
         getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =
         groupOutputStream.getLocationInfoList();
-    Assert.assertEquals(1, locationInfoList.size());
+    assertEquals(1, locationInfoList.size());
 
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
 
@@ -268,7 +272,7 @@ public class TestContainerStateMachineFailures {
             (KeyOutputStream) key.getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =
             groupOutputStream.getLocationInfoList();
-    Assert.assertEquals(1, locationInfoList.size());
+    assertEquals(1, locationInfoList.size());
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
     HddsDatanodeService dn = TestHelper.getDatanodeService(omKeyLocationInfo,
             cluster);
@@ -287,7 +291,7 @@ public class TestContainerStateMachineFailures {
     long containerID = omKeyLocationInfo.getContainerID();
 
     // Make sure the container is marked unhealthy
-    Assert.assertTrue(
+    assertTrue(
             dn.getDatanodeStateMachine()
                     .getContainer().getContainerSet()
                     .getContainer(containerID)
@@ -305,7 +309,7 @@ public class TestContainerStateMachineFailures {
     cluster.restartHddsDatanode(dn.getDatanodeDetails(), false);
     ozoneContainer = cluster.getHddsDatanodes().get(index)
             .getDatanodeStateMachine().getContainer();
-    Assert.assertNull(ozoneContainer.getContainerSet().
+    assertNull(ozoneContainer.getContainerSet().
                     getContainer(containerID));
   }
 
@@ -323,7 +327,7 @@ public class TestContainerStateMachineFailures {
             .getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =
             groupOutputStream.getLocationInfoList();
-    Assert.assertEquals(1, locationInfoList.size());
+    assertEquals(1, locationInfoList.size());
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
     HddsDatanodeService dn = TestHelper.getDatanodeService(omKeyLocationInfo,
             cluster);
@@ -332,7 +336,7 @@ public class TestContainerStateMachineFailures {
                     .getContainer().getContainerSet()
                     .getContainer(omKeyLocationInfo.getContainerID())
                     .getContainerData();
-    Assert.assertTrue(containerData instanceof KeyValueContainerData);
+    assertTrue(containerData instanceof KeyValueContainerData);
     KeyValueContainerData keyValueContainerData =
             (KeyValueContainerData) containerData;
     // delete the container db file
@@ -348,7 +352,7 @@ public class TestContainerStateMachineFailures {
     long containerID = omKeyLocationInfo.getContainerID();
 
     // Make sure the container is marked unhealthy
-    Assert.assertTrue(
+    assertTrue(
             dn.getDatanodeStateMachine()
                     .getContainer().getContainerSet().getContainer(containerID)
                     .getContainerState()
@@ -388,7 +392,7 @@ public class TestContainerStateMachineFailures {
     request.setCloseContainer(
             ContainerProtos.CloseContainerRequestProto.getDefaultInstance());
     request.setDatanodeUuid(dnService.getDatanodeDetails().getUuidString());
-    Assert.assertEquals(ContainerProtos.Result.CONTAINER_UNHEALTHY,
+    assertEquals(ContainerProtos.Result.CONTAINER_UNHEALTHY,
             dispatcher.dispatch(request.build(), null)
                     .getResult());
   }
@@ -408,7 +412,7 @@ public class TestContainerStateMachineFailures {
             getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =
             groupOutputStream.getLocationInfoList();
-    Assert.assertEquals(1, locationInfoList.size());
+    assertEquals(1, locationInfoList.size());
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
     HddsDatanodeService dn = TestHelper.getDatanodeService(omKeyLocationInfo,
             cluster);
@@ -417,7 +421,7 @@ public class TestContainerStateMachineFailures {
                     .getContainer().getContainerSet()
                     .getContainer(omKeyLocationInfo.getContainerID())
                     .getContainerData();
-    Assert.assertTrue(containerData instanceof KeyValueContainerData);
+    assertTrue(containerData instanceof KeyValueContainerData);
     KeyValueContainerData keyValueContainerData =
             (KeyValueContainerData) containerData;
     key.close();
@@ -431,8 +435,8 @@ public class TestContainerStateMachineFailures {
     final Path parentPath = snapshot.getPath();
     // Since the snapshot threshold is set to 1, since there are
     // applyTransactions, we should see snapshots
-    Assert.assertTrue(parentPath.getParent().toFile().listFiles().length > 0);
-    Assert.assertNotNull(snapshot);
+    assertTrue(parentPath.getParent().toFile().listFiles().length > 0);
+    assertNotNull(snapshot);
     long containerID = omKeyLocationInfo.getContainerID();
     // delete the container db file
     FileUtil.fullyDelete(new File(keyValueContainerData.getContainerPath()));
@@ -452,14 +456,14 @@ public class TestContainerStateMachineFailures {
 
     try {
       xceiverClient.sendCommand(request.build());
-      Assert.fail("Expected exception not thrown");
+      fail("Expected exception not thrown");
     } catch (IOException e) {
       // Exception should be thrown
     } finally {
       xceiverClientManager.releaseClient(xceiverClient, false);
     }
     // Make sure the container is marked unhealthy
-    Assert.assertTrue(dn.getDatanodeStateMachine()
+    assertTrue(dn.getDatanodeStateMachine()
                     .getContainer().getContainerSet().getContainer(containerID)
                     .getContainerState()
                     == ContainerProtos.ContainerDataProto.State.UNHEALTHY);
@@ -467,16 +471,16 @@ public class TestContainerStateMachineFailures {
       // try to take a new snapshot, ideally it should just fail
       stateMachine.takeSnapshot();
     } catch (IOException ioe) {
-      Assert.assertTrue(ioe instanceof StateMachineException);
+      assertTrue(ioe instanceof StateMachineException);
     }
 
     if (snapshot.getPath().toFile().exists()) {
       // Make sure the latest snapshot is same as the previous one
       try {
         final FileInfo latestSnapshot = getSnapshotFileInfo(storage);
-        Assert.assertTrue(snapshot.getPath().equals(latestSnapshot.getPath()));
+        assertTrue(snapshot.getPath().equals(latestSnapshot.getPath()));
       } catch (Throwable e) {
-        Assert.assertFalse(snapshot.getPath().toFile().exists());
+        assertFalse(snapshot.getPath().toFile().exists());
       }
     }
     
@@ -500,7 +504,7 @@ public class TestContainerStateMachineFailures {
     KeyOutputStream groupOutputStream = (KeyOutputStream) key.getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =
             groupOutputStream.getLocationInfoList();
-    Assert.assertEquals(1, locationInfoList.size());
+    assertEquals(1, locationInfoList.size());
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
     HddsDatanodeService dn = TestHelper.getDatanodeService(omKeyLocationInfo,
             cluster);
@@ -508,7 +512,7 @@ public class TestContainerStateMachineFailures {
                     .getContainer().getContainerSet()
                     .getContainer(omKeyLocationInfo.getContainerID())
                     .getContainerData();
-    Assert.assertTrue(containerData instanceof KeyValueContainerData);
+    assertTrue(containerData instanceof KeyValueContainerData);
     key.close();
     ContainerStateMachine stateMachine =
             (ContainerStateMachine) TestHelper.getStateMachine(dn,
@@ -518,8 +522,8 @@ public class TestContainerStateMachineFailures {
     final FileInfo snapshot = getSnapshotFileInfo(storage);
     final Path parentPath = snapshot.getPath();
     stateMachine.takeSnapshot();
-    Assert.assertTrue(parentPath.getParent().toFile().listFiles().length > 0);
-    Assert.assertNotNull(snapshot);
+    assertTrue(parentPath.getParent().toFile().listFiles().length > 0);
+    assertNotNull(snapshot);
     long markIndex1 = StatemachineImplTestUtil.findLatestSnapshot(storage)
         .getIndex();
     long containerID = omKeyLocationInfo.getContainerID();
@@ -537,19 +541,19 @@ public class TestContainerStateMachineFailures {
     try {
       xceiverClient.sendCommand(request.build());
     } catch (IOException e) {
-      Assert.fail("Exception should not be thrown");
+      fail("Exception should not be thrown");
     }
-    Assert.assertTrue(
+    assertTrue(
             TestHelper.getDatanodeService(omKeyLocationInfo, cluster)
                     .getDatanodeStateMachine()
                     .getContainer().getContainerSet().getContainer(containerID)
                     .getContainerState()
                     == ContainerProtos.ContainerDataProto.State.CLOSED);
-    Assert.assertTrue(stateMachine.isStateMachineHealthy());
+    assertTrue(stateMachine.isStateMachineHealthy());
     try {
       stateMachine.takeSnapshot();
     } catch (IOException ioe) {
-      Assert.fail("Exception should not be thrown");
+      fail("Exception should not be thrown");
     } finally {
       xceiverClientManager.releaseClient(xceiverClient, false);
     }
@@ -566,7 +570,7 @@ public class TestContainerStateMachineFailures {
       }
     }), 1000, 30000);
     final FileInfo latestSnapshot = getSnapshotFileInfo(storage);
-    Assert.assertFalse(snapshot.getPath().equals(latestSnapshot.getPath()));
+    assertFalse(snapshot.getPath().equals(latestSnapshot.getPath()));
   }
 
   // The test injects multiple write chunk requests along with closed container
@@ -590,7 +594,7 @@ public class TestContainerStateMachineFailures {
             .getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =
             groupOutputStream.getLocationInfoList();
-    Assert.assertEquals(1, locationInfoList.size());
+    assertEquals(1, locationInfoList.size());
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
     HddsDatanodeService dn = TestHelper.getDatanodeService(omKeyLocationInfo,
             cluster);
@@ -599,7 +603,7 @@ public class TestContainerStateMachineFailures {
                     .getContainer().getContainerSet()
                     .getContainer(omKeyLocationInfo.getContainerID())
                     .getContainerData();
-    Assert.assertTrue(containerData instanceof KeyValueContainerData);
+    assertTrue(containerData instanceof KeyValueContainerData);
     key.close();
     ContainerStateMachine stateMachine =
             (ContainerStateMachine) TestHelper.getStateMachine(dn,
@@ -611,8 +615,8 @@ public class TestContainerStateMachineFailures {
     stateMachine.takeSnapshot();
     // Since the snapshot threshold is set to 1, since there are
     // applyTransactions, we should see snapshots
-    Assert.assertTrue(parentPath.getParent().toFile().listFiles().length > 0);
-    Assert.assertNotNull(snapshot);
+    assertTrue(parentPath.getParent().toFile().listFiles().length > 0);
+    assertNotNull(snapshot);
     long containerID = omKeyLocationInfo.getContainerID();
     Pipeline pipeline = cluster.getStorageContainerLocationClient()
             .getContainerWithPipeline(containerID).getPipeline();
@@ -653,10 +657,9 @@ public class TestContainerStateMachineFailures {
           failCount.incrementAndGet();
         }
         String message = e.getMessage();
-        Assert.assertFalse(message,
-            message.contains("hello"));
-        Assert.assertTrue(message,
-            message.contains(HddsUtils.REDACTED.toStringUtf8()));
+        assertFalse(message.contains("hello"), message);
+        assertTrue(message.contains(HddsUtils.REDACTED.toStringUtf8()),
+            message);
       }
     };
 
@@ -681,21 +684,21 @@ public class TestContainerStateMachineFailures {
       if (failCount.get() > 0) {
         fail("testWriteStateMachineDataIdempotencyWithClosedContainer failed");
       }
-      Assert.assertTrue(
+      assertTrue(
           TestHelper.getDatanodeService(omKeyLocationInfo, cluster)
               .getDatanodeStateMachine()
               .getContainer().getContainerSet().getContainer(containerID)
               .getContainerState()
               == ContainerProtos.ContainerDataProto.State.CLOSED);
-      Assert.assertTrue(stateMachine.isStateMachineHealthy());
+      assertTrue(stateMachine.isStateMachineHealthy());
       try {
         stateMachine.takeSnapshot();
       } catch (IOException ioe) {
-        Assert.fail("Exception should not be thrown");
+        fail("Exception should not be thrown");
       }
 
       final FileInfo latestSnapshot = getSnapshotFileInfo(storage);
-      Assert.assertFalse(snapshot.getPath().equals(latestSnapshot.getPath()));
+      assertFalse(snapshot.getPath().equals(latestSnapshot.getPath()));
 
       r2.run();
     } finally {
@@ -720,7 +723,7 @@ public class TestContainerStateMachineFailures {
         getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =
         groupOutputStream.getLocationInfoList();
-    Assert.assertEquals(1, locationInfoList.size());
+    assertEquals(1, locationInfoList.size());
 
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
 
@@ -733,7 +736,7 @@ public class TestContainerStateMachineFailures {
       key.close();
     } catch (Exception ioe) {
       // Should not fail..
-      Assert.fail("Exception " + ioe.getMessage());
+      fail("Exception " + ioe.getMessage());
     }
     validateData("ratis1", 2, "ratisratisratisratis");
   }
@@ -755,7 +758,7 @@ public class TestContainerStateMachineFailures {
         getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =
         groupOutputStream.getLocationInfoList();
-    Assert.assertEquals(1, locationInfoList.size());
+    assertEquals(1, locationInfoList.size());
 
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
 
@@ -768,7 +771,7 @@ public class TestContainerStateMachineFailures {
       key.close();
     } catch (Exception ioe) {
       // Should not fail..
-      Assert.fail("Exception " + ioe.getMessage());
+      fail("Exception " + ioe.getMessage());
     }
     validateData("ratis1", 2, "ratisratisratisratis");
   }
@@ -794,7 +797,7 @@ public class TestContainerStateMachineFailures {
           ContainerData containerData =
               container
                   .getContainerData();
-          Assert.assertTrue(containerData instanceof KeyValueContainerData);
+          assertTrue(containerData instanceof KeyValueContainerData);
           KeyValueContainerData keyValueContainerData =
               (KeyValueContainerData) containerData;
           FileUtil.fullyDelete(new File(keyValueContainerData.getChunksPath()));
@@ -817,7 +820,7 @@ public class TestContainerStateMachineFailures {
     try {
       keyInfo = cluster.getOzoneManager().lookupKey(omKeyArgs);
 
-      Assert.assertEquals(locationCount,
+      assertEquals(locationCount,
           keyInfo.getLatestVersionLocations().getLocationListCount());
       byte[] buffer = new byte[1024];
       try (OzoneInputStream o = objectStore.getVolume(volumeName)
@@ -828,9 +831,9 @@ public class TestContainerStateMachineFailures {
       String response = new String(buffer, 0,
           end,
           StandardCharsets.UTF_8);
-      Assert.assertEquals(payload, response);
+      assertEquals(payload, response);
     } catch (IOException e) {
-      Assert.fail("Exception not expected " + e.getMessage());
+      fail("Exception not expected " + e.getMessage());
     }
   }
 

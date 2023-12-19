@@ -46,7 +46,6 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.Test;
@@ -62,6 +61,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for Pipeline Closing.
@@ -126,8 +128,8 @@ public class TestPipelineClose {
         .getContainersInPipeline(ratisContainer.getPipeline().getId());
 
     ContainerID cId = ratisContainer.getContainerInfo().containerID();
-    Assert.assertEquals(1, set.size());
-    set.forEach(containerID -> Assert.assertEquals(containerID, cId));
+    assertEquals(1, set.size());
+    set.forEach(containerID -> assertEquals(containerID, cId));
 
     // Now close the container and it should not show up while fetching
     // containers by pipeline
@@ -138,13 +140,13 @@ public class TestPipelineClose {
 
     Set<ContainerID> setClosed = pipelineManager
         .getContainersInPipeline(ratisContainer.getPipeline().getId());
-    Assert.assertEquals(0, setClosed.size());
+    assertEquals(0, setClosed.size());
 
     pipelineManager.closePipeline(ratisContainer.getPipeline().getId());
     pipelineManager.deletePipeline(ratisContainer.getPipeline().getId());
     for (DatanodeDetails dn : ratisContainer.getPipeline().getNodes()) {
       // Assert that the pipeline has been removed from Node2PipelineMap as well
-      Assert.assertFalse(scm.getScmNodeManager().getPipelines(dn)
+      assertFalse(scm.getScmNodeManager().getPipelines(dn)
           .contains(ratisContainer.getPipeline().getId()));
     }
   }
@@ -154,7 +156,7 @@ public class TestPipelineClose {
       throws IOException, TimeoutException, InterruptedException {
     Set<ContainerID> setOpen = pipelineManager.getContainersInPipeline(
         ratisContainer.getPipeline().getId());
-    Assert.assertEquals(1, setOpen.size());
+    assertEquals(1, setOpen.size());
 
     pipelineManager
         .closePipeline(ratisContainer.getPipeline(), false);
@@ -230,7 +232,7 @@ public class TestPipelineClose {
     try {
       pipelineManager.getPipeline(openPipeline.getId());
     } catch (PipelineNotFoundException e) {
-      Assert.assertTrue("pipeline should exist", false);
+      assertTrue(false, "pipeline should exist");
     }
 
     DatanodeDetails datanodeDetails = openPipeline.getNodes().get(0);
@@ -277,8 +279,7 @@ public class TestPipelineClose {
       }
     }
 
-    Assert.assertTrue("SCM did not receive a Close action for the Pipeline",
-        found);
+    assertTrue(found, "SCM did not receive a Close action for the Pipeline");
     return found;
   }
 }
