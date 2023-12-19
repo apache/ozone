@@ -207,7 +207,6 @@ public class TestPipelineClose {
   }
 
   @Test
-  @Flaky("HDDS-5604")
   public void testPipelineCloseWithLogFailure()
       throws IOException, TimeoutException {
     EventQueue eventQ = (EventQueue) scm.getEventQueue();
@@ -244,12 +243,6 @@ public class TestPipelineClose {
      * This is expected to trigger an immediate pipeline actions report to SCM
      */
     xceiverRatis.handleNodeLogFailure(groupId, null);
-
-    // verify SCM receives a pipeline action report "immediately"
-    /*Mockito.verify(pipelineActionTest, Mockito.timeout(1500))
-        .onMessage(
-            actionCaptor.capture(),
-            Mockito.any(EventPublisher.class));*/
     Mockito.verify(pipelineActionTest, Mockito.timeout(1500).atLeastOnce())
         .onMessage(
             actionCaptor.capture(),
