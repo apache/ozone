@@ -17,13 +17,12 @@
  */
 
 import React from 'react';
-import Plot from 'react-plotly.js';
 import {Row, Col, Icon, Button, Input, Menu, Dropdown, Tooltip} from 'antd';
 import {DetailPanel} from 'components/rightDrawer/rightDrawer';
-import * as Plotly from 'plotly.js';
 import {byteToSize, showDataFetchError} from 'utils/common';
 import './diskUsage.less';
 import moment from 'moment';
+import { PieChartComponent } from 'components/chartComponent/pieChartComponent';
 import { AxiosGetHelper, cancelRequests } from 'utils/axiosRequestHelper';
 
 const DEFAULT_DISPLAY_LIMIT = 10;
@@ -563,26 +562,17 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
               </Row>
               <Row>
                 {(duResponse.size > 0) ?
-                  <div style={{height: 1000}}>
-                    <Plot
-                      data={plotData}
-                      layout={
-                        {
-                          width: 1200,
-                          height: 750,
-                          font: {
-                            family: 'Roboto, sans-serif',
-                            size: 15
-                          },
-                          showlegend: true,
-                          legend: {
-                            "x": 1.2,
-                            "xanchor": "right"
-                          },
-                          title: 'Disk Usage for ' + returnPath + ' (Total Size: ' + byteToSize(duResponse.size, 1) + ')'
-                        }
+                  <div style={{height: "90vh"}}>
+                    <PieChartComponent
+                      plotData={plotData}
+                      plotOnClickHandler={
+                        (duResponse.subPathCount === 0)
+                        ? undefined
+                        : e => this.clickPieSection(e, returnPath)
                       }
-                      onClick={(duResponse.subPathCount === 0) ? undefined : e => this.clickPieSection(e, returnPath)}/>
+                      title={
+                        'Disk Usage for ' + returnPath + ' (Total Size: ' + byteToSize(duResponse.size, 1) + ')'
+                      }/>
                   </div>
                     :
                   <div style={{height: 800}} className='metadatainformation'><br/>
