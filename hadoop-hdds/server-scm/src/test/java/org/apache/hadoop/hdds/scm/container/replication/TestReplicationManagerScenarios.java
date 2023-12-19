@@ -109,8 +109,6 @@ public class TestReplicationManagerScenarios {
   private SCMContext scmContext;
   private NodeManager nodeManager;
   private TestClock clock;
-  private ReplicationManagerReport repReport;
-  private ReplicationQueue repQueue;
 
   private static List<URI> getTestFiles() throws URISyntaxException {
     File[] fileList = (new File(TestReplicationManagerScenarios.class
@@ -215,8 +213,6 @@ public class TestReplicationManagerScenarios {
     Mockito.when(scmContext.isInSafeMode()).thenReturn(false);
     containerReplicaMap = new HashMap<>();
     containerInfoSet = new HashSet<>();
-    repReport = new ReplicationManagerReport();
-    repQueue = new ReplicationQueue();
     ORIGINS.clear();
     DATANODE_ALIASES.clear();
     NODE_STATUS_MAP.clear();
@@ -264,6 +260,8 @@ public class TestReplicationManagerScenarios {
   @ParameterizedTest
   @MethodSource("getTestScenarios")
   public void testAllScenarios(Scenario scenario) throws IOException {
+    ReplicationManagerReport repReport = new ReplicationManagerReport();
+    ReplicationQueue repQueue = new ReplicationQueue();
     ReplicationManager.ReplicationManagerConfiguration conf =
         new ReplicationManager.ReplicationManagerConfiguration();
     conf.setMaintenanceRemainingRedundancy(scenario.getEcMaintenanceRedundancy());
@@ -494,7 +492,9 @@ public class TestReplicationManagerScenarios {
    */
   public static class Expectation {
 
+    // The expected counts for each health state, as would be seen in the ReplicationManagerReport.
     private Map<ReplicationManagerReport.HealthState, Integer> stateCounts = new HashMap<>();
+    // The expected count for each queue after running the RM check phase.
     private int underReplicatedQueue = 0;
     private int overReplicatedQueue = 0;
 
@@ -622,22 +622,36 @@ public class TestReplicationManagerScenarios {
    * and provides getter for the replicas and expected results.
    */
   public static class Scenario {
+    // The test description
     private String description;
+    // The resource name of the test file this scenario was loaded from. NOTE - this does not come
+    // from the json definition,
     private String resourceName;
     private int ecMaintenanceRedundancy;
     private int ratisMaintenanceMinimum;
     private HddsProtos.LifeCycleState containerState = HddsProtos.LifeCycleState.CLOSED;
+    // Used bytes in the container under test.
     private long used = 10;
+    // Number of keys in the container under test.
     private long keys = 10;
+    // Container ID of the container under test.
     private long id = 1;
+    // Owner of the container under test.
     private String owner = "theowner";
+    // Sequence ID of the container under test.
     private int sequenceId = 0;
+    // Replication config for the container under test.
     private ReplicationConfig replicationConfig = RatisReplicationConfig
         .getInstance(HddsProtos.ReplicationFactor.THREE);
+    // Replicas for the container under test.
     private List<TestReplica> replicas = new ArrayList<>();
+    // Replicas pending add or delete for the container under test.
     private List<PendingReplica> pendingReplicas = new ArrayList<>();
+    // Object that defines the expected counts for each health state and queue.
     private Expectation expectation = new Expectation();
+    // Commands expected to be sent during the check phase of replication manager.
     private List<ExpectedCommands> checkCommands = new ArrayList<>();
+    // Commands expected to be sent when processing the under / over replicated queue
     private List<ExpectedCommands> commands = new ArrayList<>();
 
     public Scenario() {
