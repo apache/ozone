@@ -40,6 +40,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
+import org.apache.hadoop.fs.PathPermissionException;
 import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -545,13 +546,15 @@ public class BasicRootedOzoneClientAdapterImpl
       bucket.deleteDirectory(keyName, recursive);
       return true;
     } catch (OMException ome) {
-      LOG.error("delete key failed {}", ome.getMessage());
+      LOG.error("Delete key failed. {}", ome.getMessage());
       if (OMException.ResultCodes.DIRECTORY_NOT_EMPTY == ome.getResult()) {
         throw new PathIsNotEmptyDirectoryException(ome.getMessage());
+      } else if (OMException.ResultCodes.INVALID_KEY_NAME == ome.getResult()) {
+        throw new PathPermissionException(ome.getMessage());
       }
       return false;
     } catch (IOException ioe) {
-      LOG.error("delete key failed " + ioe.getMessage());
+      LOG.error("Delete key failed. {}", ioe.getMessage());
       return false;
     }
   }
