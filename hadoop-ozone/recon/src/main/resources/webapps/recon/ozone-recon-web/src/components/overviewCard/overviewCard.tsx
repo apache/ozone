@@ -95,7 +95,7 @@ class OverviewCard extends React.Component<IOverviewCardProps> {
 
   render() {
     let {icon, data, title, loading, hoverable, storageReport, linkToUrl, error} = this.props;
-    let meta = <Meta title={data} description={title}/>;
+    let meta = <Meta title={data} description={title} data-testid={`overview-${title}`}/>;
     const errorClass = error ? 'card-error' : '';
     if (storageReport) {
       meta = (
