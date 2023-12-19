@@ -78,7 +78,7 @@ public class TestContainerHealthStatus {
     assertFalse(status.isUnderReplicated());
     assertEquals(0, status.replicaDelta());
     assertFalse(status.isMissing());
-    assertEquals(false, status.isMisReplicated());
+    assertFalse(status.isMisReplicated());
     assertEquals(0, status.misReplicatedDelta());
 
     assertEquals(container, status.getContainer());
@@ -102,7 +102,7 @@ public class TestContainerHealthStatus {
     assertFalse(status.isUnderReplicated());
     assertEquals(0, status.replicaDelta());
     assertFalse(status.isMissing());
-    assertEquals(false, status.isMisReplicated());
+    assertFalse(status.isMisReplicated());
     assertEquals(0, status.misReplicatedDelta());
   }
 
@@ -117,7 +117,7 @@ public class TestContainerHealthStatus {
     assertFalse(status.isUnderReplicated());
     assertEquals(3, status.replicaDelta());
     assertTrue(status.isMissing());
-    assertEquals(false, status.isMisReplicated());
+    assertFalse(status.isMisReplicated());
     assertEquals(0, status.misReplicatedDelta());
   }
 
@@ -133,7 +133,7 @@ public class TestContainerHealthStatus {
     assertFalse(status.isOverReplicated());
     assertTrue(status.isUnderReplicated());
     assertEquals(2, status.replicaDelta());
-    assertEquals(false, status.isMisReplicated());
+    assertFalse(status.isMisReplicated());
     assertEquals(0, status.misReplicatedDelta());
   }
 
@@ -152,7 +152,7 @@ public class TestContainerHealthStatus {
     assertFalse(status.isUnderReplicated());
     assertTrue(status.isOverReplicated());
     assertEquals(-1, status.replicaDelta());
-    assertEquals(false, status.isMisReplicated());
+    assertFalse(status.isMisReplicated());
     assertEquals(0, status.misReplicatedDelta());
   }
 
