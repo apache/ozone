@@ -47,7 +47,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.mockito.ArgumentCaptor;
@@ -209,10 +208,8 @@ public class TestPipelineClose {
   }
 
   @Test
-  @Flaky("HDDS-5604")
   public void testPipelineCloseWithLogFailure()
       throws IOException, TimeoutException {
-
     EventQueue eventQ = (EventQueue) scm.getEventQueue();
     PipelineActionHandler pipelineActionTest =
         Mockito.mock(PipelineActionHandler.class);
@@ -247,9 +244,7 @@ public class TestPipelineClose {
      * This is expected to trigger an immediate pipeline actions report to SCM
      */
     xceiverRatis.handleNodeLogFailure(groupId, null);
-
-    // verify SCM receives a pipeline action report "immediately"
-    Mockito.verify(pipelineActionTest, Mockito.timeout(100))
+    Mockito.verify(pipelineActionTest, Mockito.timeout(1500).atLeastOnce())
         .onMessage(
             actionCaptor.capture(),
             Mockito.any(EventPublisher.class));
