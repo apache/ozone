@@ -710,13 +710,19 @@ public class ContainerStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public CompletableFuture<Message> query(Message request) {
+  public CompletableFuture<Message> query(Message message) {
     try {
       metrics.incNumQueryStateMachineOps();
-      final ContainerCommandRequestProto requestProto =
-          message2ContainerCommandRequestProto(request);
-      return CompletableFuture.completedFuture(
-          dispatchCommand(requestProto, null)::toByteString);
+      final ContainerCommandRequestProto request = message2ContainerCommandRequestProto(message);
+      final DispatcherContext context = DispatcherContext.getDispatcherContext(request.getCmdType());
+      try {
+        final ContainerCommandResponseProto response = dispatchCommand(request, context);
+        return CompletableFuture.completedFuture(response::toByteString);
+      } finally {
+        if (context != null) {
+          context.close();
+        }
+      }
     } catch (IOException e) {
       metrics.incNumQueryStateMachineFails();
       return completeExceptionally(e);

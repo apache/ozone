@@ -71,7 +71,7 @@ public class TestChunkUtils {
   private static final int MAPPED_BUFFER_THRESHOLD = 32 << 10;
   private static final Random RANDOM = new Random();
 
-  static ChunkBuffer readData(File file, long off, long len)
+  static ChunkBuffer readData(File file, long off, int len)
       throws StorageContainerException {
     LOG.info("off={}, len={}", off, len);
     return ChunkUtils.readData(len, BUFFER_CAPACITY, file, off, null,

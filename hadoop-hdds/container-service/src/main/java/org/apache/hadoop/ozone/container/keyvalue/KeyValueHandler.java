@@ -74,6 +74,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.Op;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -268,10 +269,9 @@ public class KeyValueHandler extends Handler {
     case CompactChunk:
       return handler.handleUnsupportedOp(request);
     case PutSmallFile:
-      return handler
-          .handlePutSmallFile(request, kvContainer, dispatcherContext);
+      return handler.handlePutSmallFile(request, kvContainer, dispatcherContext);
     case GetSmallFile:
-      return handler.handleGetSmallFile(request, kvContainer);
+      return handler.handleGetSmallFile(request, kvContainer, dispatcherContext);
     case GetCommittedBlockLength:
       return handler.handleGetCommittedBlockLength(request, kvContainer);
     default:
@@ -580,7 +580,7 @@ public class KeyValueHandler extends Handler {
     try {
       BlockID blockID = BlockID.getFromProtobuf(
           request.getGetBlock().getBlockID());
-      checkContainerIsHealthy(kvContainer, blockID, Type.GetBlock);
+      kvContainer.warnIfUnhealthyForRead(blockID, Type.GetBlock);
       responseData = blockManager.getBlock(kvContainer, blockID)
           .getProtoBufMessage();
       final long numBytes = responseData.getSerializedSize();
@@ -615,8 +615,7 @@ public class KeyValueHandler extends Handler {
     try {
       BlockID blockID = BlockID
           .getFromProtobuf(request.getGetCommittedBlockLength().getBlockID());
-      checkContainerIsHealthy(kvContainer, blockID,
-          Type.GetCommittedBlockLength);
+      kvContainer.warnIfUnhealthyForRead(blockID, Type.GetCommittedBlockLength);
       BlockUtils.verifyBCSId(kvContainer, blockID);
       blockLength = blockManager.getCommittedBlockLength(kvContainer, blockID);
     } catch (StorageContainerException ex) {
@@ -686,6 +685,7 @@ public class KeyValueHandler extends Handler {
   ContainerCommandResponseProto handleReadChunk(
       ContainerCommandRequestProto request, KeyValueContainer kvContainer,
       DispatcherContext dispatcherContext) {
+    DispatcherContext.assertOp(dispatcherContext, Op.HANDLE_READ_CHUNK);
 
     if (!request.hasReadChunk()) {
       if (LOG.isDebugEnabled()) {
@@ -703,11 +703,8 @@ public class KeyValueHandler extends Handler {
           .getChunkData());
       Preconditions.checkNotNull(chunkInfo);
 
-      checkContainerIsHealthy(kvContainer, blockID, Type.ReadChunk);
+      kvContainer.warnIfUnhealthyForRead(blockID, Type.ReadChunk);
       BlockUtils.verifyBCSId(kvContainer, blockID);
-      if (dispatcherContext == null) {
-        dispatcherContext = DispatcherContext.getHandleReadChunk();
-      }
 
       boolean isReadChunkV0 = getReadChunkVersion(request.getReadChunk())
           .equals(ContainerProtos.ReadChunkVersion.V0);
@@ -908,7 +905,9 @@ public class KeyValueHandler extends Handler {
    * ChunkManager to process the request.
    */
   ContainerCommandResponseProto handleGetSmallFile(
-      ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
+      ContainerCommandRequestProto request, KeyValueContainer kvContainer,
+      DispatcherContext dispatcherContext) {
+    DispatcherContext.assertOp(dispatcherContext, Op.HANDLE_GET_SMALL_FILE);
 
     if (!request.hasGetSmallFile()) {
       if (LOG.isDebugEnabled()) {
@@ -923,13 +922,11 @@ public class KeyValueHandler extends Handler {
     try {
       BlockID blockID = BlockID.getFromProtobuf(getSmallFileReq.getBlock()
           .getBlockID());
-      checkContainerIsHealthy(kvContainer, blockID, Type.GetSmallFile);
+      kvContainer.warnIfUnhealthyForRead(blockID, Type.GetSmallFile);
       BlockData responseData = blockManager.getBlock(kvContainer, blockID);
 
       ContainerProtos.ChunkInfo chunkInfoProto = null;
       List<ByteString> dataBuffers = new ArrayList<>();
-      final DispatcherContext dispatcherContext
-          = DispatcherContext.getHandleGetSmallFile();
       for (ContainerProtos.ChunkInfo chunk : responseData.getChunks()) {
         // if the block is committed, all chunks must have been committed.
         // Tmp chunk files won't exist here.

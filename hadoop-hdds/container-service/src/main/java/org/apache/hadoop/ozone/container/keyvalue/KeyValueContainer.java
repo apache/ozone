@@ -39,10 +39,12 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdfs.util.Canceler;
@@ -89,8 +91,7 @@ import org.slf4j.LoggerFactory;
  */
 public class KeyValueContainer implements Container<KeyValueContainerData> {
 
-  private static final Logger LOG =
-          LoggerFactory.getLogger(KeyValueContainer.class);
+  private static final Logger LOG = LoggerFactory.getLogger(KeyValueContainer.class);
 
   // Use a non-fair RW lock for better throughput, we may revisit this decision
   // if this causes fairness issues.
@@ -921,6 +922,17 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
           containerData.getContainerID(), INVALID_CONTAINER_STATE);
     }
     return state;
+  }
+
+  void warnIfUnhealthyForRead(BlockID blockID, Type cmd) {
+    Preconditions.checkArgument(HddsUtils.isReadOnly(cmd), "cmd %s is NOT readonly", cmd);
+
+    // readlock is NOT required since
+    // (1) containerData and containerID are final, and
+    // (2) getState() is synchronized.
+    if (containerData.getState() == ContainerDataProto.State.UNHEALTHY) {
+      LOG.warn("{} request {} for UNHEALTHY container {} replica", cmd, blockID, containerData.getContainerID());
+    }
   }
 
   /**

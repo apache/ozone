@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -244,10 +245,10 @@ public class TestKeyValueHandler {
     // Test Get Small File Request handling
     ContainerCommandRequestProto getSmallFileRequest =
         getDummyCommandRequestProto(ContainerProtos.Type.GetSmallFile);
-    KeyValueHandler
-        .dispatchRequest(handler, getSmallFileRequest, container, null);
+    KeyValueHandler.dispatchRequest(handler, getSmallFileRequest, container,
+        DispatcherContext.getHandleGetSmallFile());
     Mockito.verify(handler, times(1)).handleGetSmallFile(
-        any(ContainerCommandRequestProto.class), any());
+        any(ContainerCommandRequestProto.class), any(), any());
   }
 
   @Test

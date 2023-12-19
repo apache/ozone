@@ -258,8 +258,8 @@ public class TestHddsDispatcher {
       ContainerCommandRequestProto writeChunkRequest =
           getWriteChunkRequest(dd.getUuidString(), 1L, 1L);
       // send read chunk request and make sure container does not exist
-      ContainerCommandResponseProto response =
-          hddsDispatcher.dispatch(getReadChunkRequest(writeChunkRequest), null);
+      ContainerCommandResponseProto response = hddsDispatcher.dispatch(getReadChunkRequest(writeChunkRequest),
+          DispatcherContext.getHandleReadChunk());
       assertEquals(response.getResult(),
           ContainerProtos.Result.CONTAINER_NOT_FOUND);
       // send write chunk request without sending create container
@@ -267,8 +267,8 @@ public class TestHddsDispatcher {
       // container should be created as part of write chunk request
       assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
       // send read chunk request to read the chunk written above
-      response =
-          hddsDispatcher.dispatch(getReadChunkRequest(writeChunkRequest), null);
+      response = hddsDispatcher.dispatch(getReadChunkRequest(writeChunkRequest),
+          DispatcherContext.getHandleReadChunk());
       assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
       ByteString responseData = BufferUtils.concatByteStrings(
           response.getReadChunk().getDataBuffers().getBuffersList());
@@ -314,8 +314,8 @@ public class TestHddsDispatcher {
           getWriteChunkRequest(dd.getUuidString(), 1L, 1L);
 
       // send read chunk request and make sure container does not exist
-      ContainerCommandResponseProto response =
-          hddsDispatcher.dispatch(getReadChunkRequest(writeChunkRequest), null);
+      ContainerCommandResponseProto response = hddsDispatcher.dispatch(getReadChunkRequest(writeChunkRequest),
+          DispatcherContext.getHandleReadChunk());
       assertEquals(
           ContainerProtos.Result.CONTAINER_NOT_FOUND, response.getResult());
 
@@ -394,8 +394,8 @@ public class TestHddsDispatcher {
 
       assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
       // Send Read Chunk request for written chunk.
-      response =
-          hddsDispatcher.dispatch(getReadChunkRequest(writeChunkRequest), null);
+      response = hddsDispatcher.dispatch(getReadChunkRequest(writeChunkRequest),
+          DispatcherContext.getHandleReadChunk());
       assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
 
       ByteString responseData = BufferUtils.concatByteStrings(

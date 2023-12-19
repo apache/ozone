@@ -209,7 +209,7 @@ public class FilePerChunkStrategy implements ChunkManager {
       throws StorageContainerException {
 
     checkLayoutVersion(container);
-    limitReadSize(info.getLen());
+    final int len = limitReadSize(info.getLen());
 
     KeyValueContainer kvContainer = (KeyValueContainer) container;
     KeyValueContainerData containerData = kvContainer.getContainerData();
@@ -229,7 +229,6 @@ public class FilePerChunkStrategy implements ChunkManager {
       possibleFiles.add(finalChunkFile);
     }
 
-    final long len = info.getLen();
     int bufferCapacity = ChunkManager.getBufferCapacityForChunkRead(info,
         defaultReadBufferCapacity);
 
