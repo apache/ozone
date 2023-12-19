@@ -42,17 +42,4 @@ public final class OmResponseUtil {
         .setTraceID(request.getTraceID())
         .setSuccess(true);
   }
-
-  /**
-   * Get dummy response as success.
-   * @return OMResponse response
-   */
-  public static OMResponse getDummySuccessResponse() {
-    return OMResponse.newBuilder()
-        .setCmdType(OzoneManagerProtocolProtos.Type.UnknownCommand)
-        .setStatus(OzoneManagerProtocolProtos.Status.OK)
-        .setTraceID("0")
-        .setSuccess(true)
-        .build();
-  }
 }
