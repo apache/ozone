@@ -636,7 +636,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @param checkMap - if true check applyTransactionMap, ratisTransaction
    * Map and update lastAppliedTermIndex accordingly, else check
    * lastAppliedTermIndex and update it.
-   * @param flushedEpochs - list of ratis transactions flushed to DB.
    */
   private synchronized void computeAndUpdateLastAppliedIndex(
       long lastFlushedIndex, long currentTerm, List<Long> flushedEpochs,
@@ -688,8 +687,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         ratisTransactionMap.put(lastFlushedIndex, currentTerm);
         if (LOG.isDebugEnabled()) {
           LOG.debug("ComputeAndUpdateLastAppliedIndex due to notifyIndex " +
-                  "added to map. Passed Term {} index {}, where as lastApplied " +
-                  "Index {}", currentTerm, lastFlushedIndex,
+              "added to map. Passed Term {} index {}, where as lastApplied " +
+              "Index {}", currentTerm, lastFlushedIndex,
               getLastAppliedTermIndex());
         }
       }
