@@ -53,6 +53,7 @@ import org.mockito.Mockito;
 import org.apache.commons.lang3.StringUtils;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
@@ -566,24 +567,23 @@ public class TestSCMContainerPlacementRackAware {
   }
 
   @ParameterizedTest
-  @MethodSource("org.apache.hadoop.hdds.scm.node.NodeStatus#decommissionStates")
-  public void testReplicaOnNodeInDecommission(
-      HddsProtos.NodeOperationalState state) {
-    setup(6);
-    //    6 datanodes, 2 per rack.
-    //    /rack0/node0  -> used
-    //    /rack0/node1  -> used
-    //    /rack0/node2
-    //    /rack0/node3
-    //    /rack0/node4
-    //    /rack1/node5  -> used
+  @MethodSource("org.apache.hadoop.hdds.scm.node.NodeStatus#outOfServiceStates")
+  public void testOverReplicationAndOutOfServiceNodes(HddsProtos.NodeOperationalState state) {
+    setup(7);
+    //    7 datanodes, all nodes are used.
+    //    /rack0/node0  -> IN_SERVICE
+    //    /rack0/node1  -> IN_SERVICE
+    //    /rack0/node2  -> OFFLINE
+    //    /rack0/node3  -> OFFLINE
+    //    /rack0/node4  -> OFFLINE
+    //    /rack1/node5  -> IN_SERVICE
+    //    /rack1/node6  -> OFFLINE
+    datanodes.get(2).setPersistedOpState(state);
+    datanodes.get(3).setPersistedOpState(state);
+    datanodes.get(4).setPersistedOpState(state);
+    datanodes.get(6).setPersistedOpState(state);
+    List<DatanodeDetails> dns = new ArrayList<>(datanodes);
 
-    List<DatanodeDetails> dns = new ArrayList<>();
-    dns.add(datanodes.get(0));
-    dns.add(datanodes.get(1));
-    dns.add(datanodes.get(5));
-
-    // Placement policy is satisfied.
     ContainerPlacementStatus status = policy.validateContainerPlacement(dns, 3);
     assertTrue(status.isPolicySatisfied());
     assertEquals(2, status.actualPlacementCount());
@@ -591,35 +591,17 @@ public class TestSCMContainerPlacementRackAware {
     assertEquals(0, status.misReplicationCount());
     assertNull(status.misReplicatedReason());
 
-    // For RackAware there must be 2 replicas on 1 rack and
-    // 1 replica on another rack. If there are 3 replicas on 1 rack,
-    // then 1 of them will be considered mis-replicated.
-    // If 1 of the 3 replicas belongs to a decommissioned node there are
-    // 2 total available replicas and policy should be satisfied.
+    //    /rack0/node0  -> IN_SERVICE
+    //    /rack0/node1  -> IN_SERVICE
+    //    /rack0/node2  -> OFFLINE > IN_SERVICE
+    //    /rack0/node3  -> OFFLINE
+    //    /rack0/node4  -> OFFLINE
+    //    /rack1/node5  -> IN_SERVICE
+    //    /rack1/node6  -> OFFLINE > IN_SERVICE
+    datanodes.get(2).setPersistedOpState(IN_SERVICE);
+    datanodes.get(6).setPersistedOpState(IN_SERVICE);
+    dns = new ArrayList<>(datanodes);
 
-    dns = new ArrayList<>();
-    dns.add(datanodes.get(0));
-    dns.add(datanodes.get(1));
-    dns.add(datanodes.get(2));
-    dns.add(datanodes.get(5));
-
-    // All 4 nodes are IN_SERVICE, policy isn't satisfied.
-    status = policy.validateContainerPlacement(dns, 3);
-    assertFalse(status.isPolicySatisfied());
-    assertEquals(2, status.actualPlacementCount());
-    assertEquals(2, status.expectedPlacementCount());
-    assertEquals(1, status.misReplicationCount());
-    assertTrue(status.misReplicatedReason()
-                   .contains("number of replicas per rack are [1, 3]"));
-
-    dns = new ArrayList<>();
-    datanodes.get(0).setPersistedOpState(state);
-    dns.add(datanodes.get(0));
-    dns.add(datanodes.get(1));
-    dns.add(datanodes.get(2));
-    dns.add(datanodes.get(5));
-
-    // '/rack0/node0' is in decommission, policy is satisfied.
     status = policy.validateContainerPlacement(dns, 3);
     assertTrue(status.isPolicySatisfied());
     assertEquals(2, status.actualPlacementCount());

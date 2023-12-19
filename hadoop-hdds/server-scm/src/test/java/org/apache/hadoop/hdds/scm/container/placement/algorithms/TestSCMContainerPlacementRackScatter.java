@@ -58,6 +58,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY;
@@ -572,24 +573,24 @@ public class TestSCMContainerPlacementRackScatter {
   }
 
   @ParameterizedTest
-  @MethodSource("org.apache.hadoop.hdds.scm.node.NodeStatus#decommissionStates")
-  public void testReplicaOnOutNodeInDecommission(
-      HddsProtos.NodeOperationalState state) {
-    setup(6, 2);
-    //    6 datanodes, 2 per rack.
-    //    /rack0/node0  -> used
+  @MethodSource("org.apache.hadoop.hdds.scm.node.NodeStatus#outOfServiceStates")
+  public void testOverReplicationAndOutOfServiceNodes(HddsProtos.NodeOperationalState state) {
+    setup(9, 3);
+    //    9 datanodes, 3 per rack.
+    //    /rack0/node0  -> IN_SERVICE - used
     //    /rack0/node1
-    //    /rack1/node2  -> used
-    //    /rack1/node3
-    //    /rack2/node4  -> used
-    //    /rack2/node5
-
+    //    /rack0/node2
+    //    /rack1/node3  -> IN_SERVICE - used
+    //    /rack1/node4
+    //    /rack1/node5
+    //    /rack2/node6  -> IN_SERVICE - used
+    //    /rack2/node7
+    //    /rack2/node8
     List<DatanodeDetails> dns = new ArrayList<>();
     dns.add(datanodes.get(0));
-    dns.add(datanodes.get(2));
-    dns.add(datanodes.get(4));
+    dns.add(datanodes.get(3));
+    dns.add(datanodes.get(6));
 
-    // Placement policy is satisfied.
     ContainerPlacementStatus status = policy.validateContainerPlacement(dns, 3);
     assertTrue(status.isPolicySatisfied());
     assertEquals(3, status.actualPlacementCount());
@@ -597,33 +598,38 @@ public class TestSCMContainerPlacementRackScatter {
     assertEquals(0, status.misReplicationCount());
     assertNull(status.misReplicatedReason());
 
-    // If '/rack0/node0' enters decommissioning, a replica will be stored in
-    // '/rock0/node1'. Replica on '/rack0/node0' isn't available and shouldn't
-    // be considered mis-replicated. Placement policy should be satisfied.
-
-    dns = new ArrayList<>();
-    dns.add(datanodes.get(0));
+    //    /rack0/node0  -> IN_SERVICE - used
+    //    /rack0/node1  -> OFFLINE    - used
+    //    /rack0/node2
+    //    /rack1/node3  -> IN_SERVICE - used
+    //    /rack1/node4  -> OFFLINE    - used
+    //    /rack1/node5
+    //    /rack2/node6  -> IN_SERVICE - used
+    //    /rack2/node7
+    //    /rack2/node8
+    datanodes.get(1).setPersistedOpState(state);
+    datanodes.get(4).setPersistedOpState(state);
     dns.add(datanodes.get(1));
-    dns.add(datanodes.get(2));
     dns.add(datanodes.get(4));
 
-    // All 4 nodes are IN_SERVICE, policy isn't satisfied.
     status = policy.validateContainerPlacement(dns, 3);
-    assertFalse(status.isPolicySatisfied());
+    assertTrue(status.isPolicySatisfied());
     assertEquals(3, status.actualPlacementCount());
     assertEquals(3, status.expectedPlacementCount());
-    assertEquals(1, status.misReplicationCount());
-    assertTrue(status.misReplicatedReason()
-                   .contains("number of replicas per rack are [1, 1, 2]"));
+    assertEquals(0, status.misReplicationCount());
+    assertNull(status.misReplicatedReason());
 
-    dns = new ArrayList<>();
-    datanodes.get(0).setPersistedOpState(state);
-    dns.add(datanodes.get(0));
-    dns.add(datanodes.get(1));
+    //    /rack0/node0  -> IN_SERVICE - used
+    //    /rack0/node1  -> OFFLINE    - used
+    //    /rack0/node2  -> IN_SERVICE - used
+    //    /rack1/node3  -> IN_SERVICE - used
+    //    /rack1/node4  -> OFFLINE    - used
+    //    /rack1/node5
+    //    /rack2/node6  -> IN_SERVICE - used
+    //    /rack2/node7
+    //    /rack2/node8
     dns.add(datanodes.get(2));
-    dns.add(datanodes.get(4));
 
-    // '/rack0/node0' is in decommission, policy is satisfied.
     status = policy.validateContainerPlacement(dns, 3);
     assertTrue(status.isPolicySatisfied());
     assertEquals(3, status.actualPlacementCount());
