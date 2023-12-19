@@ -1956,11 +1956,11 @@ abstract class AbstractOzoneFileSystemTest {
     assertTrue(fs.mkdirs(path));
     assertChange(initialStats, statistics, OP_MKDIRS, 1);
 
-    long omListStatus = omMetrics.getNumListStatus();
+    final long initialListStatusCount = omMetrics.getNumListStatus();
     FileStatus[] statusList = fs.listStatus(createPath("/"));
     assertEquals(1, statusList.length);
     assertChange(initialStats, statistics, Statistic.OBJECTS_LIST.getSymbol(), 1);
-    assertEquals(++omListStatus, omMetrics.getNumListStatus());
+    assertEquals(initialListStatusCount + 1, omMetrics.getNumListStatus());
     assertEquals(fs.getFileStatus(path), statusList[0]);
 
     dirPath = RandomStringUtils.randomAlphanumeric(5);
@@ -1972,7 +1972,7 @@ abstract class AbstractOzoneFileSystemTest {
     statusList = fs.listStatus(createPath("/"));
     assertEquals(2, statusList.length);
     assertChange(initialStats, statistics, Statistic.OBJECTS_LIST.getSymbol(), 2);
-    assertEquals(++omListStatus, omMetrics.getNumListStatus());
+    assertEquals(initialListStatusCount + 2, omMetrics.getNumListStatus());
     for (Path p : paths) {
       assertTrue(Arrays.asList(statusList).contains(fs.getFileStatus(p)));
     }
