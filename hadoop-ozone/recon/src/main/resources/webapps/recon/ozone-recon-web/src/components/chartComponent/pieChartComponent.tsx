@@ -23,7 +23,8 @@ import * as Plotly from 'plotly.js';
 
 interface ChartState {
     windowWidth: number;
-    windowHeight: number; 
+    windowHeight: number;
+    labelLengthOverflow: boolean;
 }
 
 interface ChartProps{
@@ -40,7 +41,8 @@ export class PieChartComponent extends React.Component<ChartProps, ChartState> {
         super(props);
         this.state = {
             windowWidth: window.innerWidth,
-            windowHeight: window.innerHeight
+            windowHeight: window.innerHeight,
+            labelLengthOverflow: false
         };
     }
 
@@ -63,17 +65,16 @@ export class PieChartComponent extends React.Component<ChartProps, ChartState> {
 
     componentDidMount(): void {
         window.addEventListener('resize', this.updateWindowSize);
-        // this.props.plotData.forEach((data, idx) => {
-        //     if (data && Object.keys(data).length !== 0){
-        //         let wrappedLabels = data["labels"].map((label: string) => {
-        //             if (label.length < 50)
-        //                 return label
-        //             else
-        //                 return this.parseLabels(label, 50)
-        //         })
-        //         this.props.plotData[idx]["labels"] = wrappedLabels;
-        //     }
-        // })
+        this.props.plotData.forEach((data) => {
+            if (data && Object.keys(data).length !== 0){
+                if (data["labels"].some((label: string) =>{ return label.length > 35 })){
+                    this.setState({
+                        ...this.state,
+                        labelLengthOverflow: true
+                    })
+                }
+            }
+        });
     }
 
     componentWillUnmount(): void {
@@ -81,7 +82,7 @@ export class PieChartComponent extends React.Component<ChartProps, ChartState> {
     }
 
     render() {
-        const { windowHeight, windowWidth } = this.state;
+        const { windowHeight, windowWidth, labelLengthOverflow } = this.state;
         let layoutProps: Partial<Plotly.Legend> = 
         {
             width: windowWidth * 0.8,
@@ -103,8 +104,9 @@ export class PieChartComponent extends React.Component<ChartProps, ChartState> {
                 }
             },
             margin: {
-                l: windowWidth * 0.3
-            }
+                l: labelLengthOverflow ? windowWidth * 0.3 : 0
+            },
+            paper_bgcolor: "#FFFFFF"
         }
         if (windowWidth < 1200) {
             // We are now almost at tablet/small size screen
