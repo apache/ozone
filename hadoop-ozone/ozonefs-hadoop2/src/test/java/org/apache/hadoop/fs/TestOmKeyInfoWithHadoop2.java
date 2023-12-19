@@ -15,13 +15,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.utils;
+package org.apache.hadoop.fs;
 
+import org.apache.hadoop.ozone.om.helpers.TestOmKeyInfo;
 
-/**
- * Utility interface for function which throws exceptions.
- * Similar to {@link java.util.function.Function}.
- */
-public interface ThrowableFunction<T, R, E extends Throwable> {
-  R apply(T t) throws E;
+class TestOmKeyInfoWithHadoop2 extends TestOmKeyInfo {
+  // test OmKeyInfo (including proto conversion) with Hadoop 2 on the classpath
 }

@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -76,7 +75,7 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+      long trxnLogIndex) {
 
     AllocateBlockRequest allocateBlockRequest =
             getOmRequest().getAllocateBlockRequest();
@@ -185,8 +184,6 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       LOG.error("Allocate Block failed. Volume:{}, Bucket:{}, OpenKey:{}. " +
               "Exception:{}", volumeName, bucketName, openKeyName, exception);
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-              omDoubleBufferHelper);
       if (acquiredLock) {
         mergeOmLockDetails(
             omMetadataManager.getLock().releaseWriteLock(

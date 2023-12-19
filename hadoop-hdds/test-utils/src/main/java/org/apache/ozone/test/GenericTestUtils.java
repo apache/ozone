@@ -37,23 +37,22 @@ import org.apache.log4j.Layout;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
 import static org.apache.logging.log4j.util.StackLocatorUtil.getCallerClass;
-import static org.junit.Assert.assertTrue;
 
 /**
  * Provides some very generic helpers which might be used across the tests.
  */
 public abstract class GenericTestUtils {
-
   public static final String SYSPROP_TEST_DATA_DIR = "test.build.data";
   public static final String DEFAULT_TEST_DATA_DIR;
   public static final String DEFAULT_TEST_DATA_PATH = "target/test/data/";
@@ -151,15 +150,15 @@ public abstract class GenericTestUtils {
    * Assert that a given file exists.
    */
   public static void assertExists(File f) {
-    assertTrue("File " + f + " should exist", f.exists());
+    Assertions.assertTrue(f.exists(), "File " + f + " should exist");
   }
 
   /**
    * Assert that a given dir can be created or it already exists.
    */
   public static void assertDirCreation(File f) {
-    assertTrue("Could not create dir " + f + ", nor does it exist",
-        f.mkdirs() || f.exists());
+    Assertions.assertTrue(f.mkdirs() || f.exists(),
+        "Could not create dir " + f + ", nor does it exist");
   }
 
   public static void assertExceptionContains(String expectedText, Throwable t) {
@@ -168,7 +167,7 @@ public abstract class GenericTestUtils {
 
   public static void assertExceptionContains(String expectedText, Throwable t,
       String message) {
-    Assert.assertNotNull("Null Throwable", t);
+    Assertions.assertNotNull(t, "Null Throwable");
     String msg = t.toString();
     if (msg == null) {
       throw new AssertionError("Null Throwable.toString() value", t);
@@ -461,6 +460,39 @@ public abstract class GenericTestUtils {
     public void write(byte[] buf, int off, int len) {
       super.write(buf, off, len);
       other.write(buf, off, len);
+    }
+  }
+
+  /**
+   * Helper class to get free port avoiding randomness.
+   */
+  public static final class PortAllocator {
+
+    public static final String HOSTNAME = "localhost";
+    public static final String HOST_ADDRESS = "127.0.0.1";
+    public static final int MIN_PORT = 15000;
+    public static final int MAX_PORT = 32000;
+    public static final AtomicInteger NEXT_PORT = new AtomicInteger(MIN_PORT);
+
+    private PortAllocator() {
+      // no instances
+    }
+
+    public static synchronized int getFreePort() {
+      int port = NEXT_PORT.getAndIncrement();
+      if (port > MAX_PORT) {
+        NEXT_PORT.set(MIN_PORT);
+        port = NEXT_PORT.getAndIncrement();
+      }
+      return port;
+    }
+
+    public static String localhostWithFreePort() {
+      return HOST_ADDRESS + ":" + getFreePort();
+    }
+
+    public static String anyHostWithFreePort() {
+      return "0.0.0.0:" + getFreePort();
     }
   }
 

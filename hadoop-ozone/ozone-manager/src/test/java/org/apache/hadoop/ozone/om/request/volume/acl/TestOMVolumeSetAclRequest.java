@@ -92,8 +92,7 @@ public class TestOMVolumeSetAclRequest extends TestOMVolumeRequest {
     Assertions.assertNotNull(omVolumeArgs);
 
     OMClientResponse omClientResponse =
-        omVolumeSetAclRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeSetAclRequest.validateAndUpdateCache(ozoneManager, 1);
 
     OMResponse omResponse = omClientResponse.getOMResponse();
     Assertions.assertNotNull(omResponse.getSetAclResponse());
@@ -126,8 +125,7 @@ public class TestOMVolumeSetAclRequest extends TestOMVolumeRequest {
     omVolumeSetAclRequest.preExecute(ozoneManager);
 
     OMClientResponse omClientResponse =
-        omVolumeSetAclRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeSetAclRequest.validateAndUpdateCache(ozoneManager, 1);
 
     OMResponse omResponse = omClientResponse.getOMResponse();
     Assertions.assertNotNull(omResponse.getSetAclResponse());

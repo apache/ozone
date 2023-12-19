@@ -36,8 +36,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
-
 
 import java.nio.file.Path;
 
@@ -58,13 +56,6 @@ public class TestBucketRequest {
   protected OMMetrics omMetrics;
   protected OMMetadataManager omMetadataManager;
   protected AuditLogger auditLogger;
-
-  // Just setting ozoneManagerDoubleBuffer which does nothing.
-  protected OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
-      ((response, transactionIndex) -> {
-        return null;
-      });
-
 
   @BeforeEach
   public void setup() throws Exception {

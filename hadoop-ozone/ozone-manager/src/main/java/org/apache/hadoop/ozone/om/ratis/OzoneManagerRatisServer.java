@@ -661,6 +661,8 @@ public final class OzoneManagerRatisServer {
         logAppenderQueueNumElements);
     RaftServerConfigKeys.Log.Appender.setBufferByteLimit(properties,
         SizeInBytes.valueOf(logAppenderQueueByteLimit));
+    RaftServerConfigKeys.Log.setWriteBufferSize(properties,
+        SizeInBytes.valueOf(logAppenderQueueByteLimit + 8));
     RaftServerConfigKeys.Log.setPreallocatedSize(properties,
         SizeInBytes.valueOf(raftSegmentPreallocatedSize));
     RaftServerConfigKeys.Log.Appender.setInstallSnapshotEnabled(properties,

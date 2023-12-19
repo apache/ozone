@@ -18,10 +18,7 @@
 
 package org.apache.hadoop.util;
 
-import com.fasterxml.uuid.Generators;
-
 import java.security.SecureRandom;
-import java.util.UUID;
 
 /**
  * Helper methods to deal with random UUIDs.
@@ -35,8 +32,15 @@ public final class UUIDUtil {
   private static final ThreadLocal<SecureRandom> GENERATOR =
       ThreadLocal.withInitial(SecureRandom::new);
 
-  public static UUID randomUUID() {
-    return Generators.randomBasedGenerator(GENERATOR.get()).generate();
+  public static byte[] randomUUIDBytes() {
+    final byte[] bytes = new byte[16];
+    GENERATOR.get().nextBytes(bytes);
+    // See RFC 4122 section 4.4
+    bytes[6]  &= 0x0f;
+    bytes[6]  |= 0x40;
+    bytes[8]  &= 0x3f;
+    bytes[8]  |= 0x80;
+    return bytes;
   }
 
 }

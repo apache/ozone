@@ -29,18 +29,16 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.ozone.test.UnhealthyTest;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.experimental.categories.Category;
 import org.reflections.Reflections;
 
 /**
  * Test OmVersionFactory.
  */
-@Category(UnhealthyTest.class) @Unhealthy("Ignored since this is incompatible" +
+@Unhealthy("Ignored since this is incompatible" +
     " with HDDS-2939 work. Potentially revisit later.")
 public class TestOmVersionManagerRequestFactory {
 

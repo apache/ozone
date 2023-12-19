@@ -71,8 +71,7 @@ public class TestOMBucketDeleteRequest extends TestBucketRequest {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
 
-    omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, 1,
-        ozoneManagerDoubleBufferHelper);
+    omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, 1);
 
     Assertions.assertNull(omMetadataManager.getBucketTable().get(
         omMetadataManager.getBucketKey(volumeName, bucketName)));
@@ -91,8 +90,7 @@ public class TestOMBucketDeleteRequest extends TestBucketRequest {
 
 
     OMClientResponse omClientResponse =
-        omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, 1);
 
     Assertions.assertNull(omMetadataManager.getBucketTable().get(
         omMetadataManager.getBucketKey(volumeName, bucketName)));
@@ -134,8 +132,7 @@ public class TestOMBucketDeleteRequest extends TestBucketRequest {
 
     // Bucket delete request should fail since there are still incomplete MPUs
     OMClientResponse omClientResponse =
-        omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, 1L,
-            ozoneManagerDoubleBufferHelper);
+        omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, 1L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_EMPTY,
         omClientResponse.getOMResponse().getStatus());
@@ -151,8 +148,7 @@ public class TestOMBucketDeleteRequest extends TestBucketRequest {
 
     // Bucket delete request should succeed now
     omClientResponse =
-        omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, 3L,
-            ozoneManagerDoubleBufferHelper);
+        omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, 3L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
