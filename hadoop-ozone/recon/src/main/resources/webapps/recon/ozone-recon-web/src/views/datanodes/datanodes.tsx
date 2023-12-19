@@ -307,33 +307,20 @@ const getTimeDiffFromTimestamp = (timestamp: number): string => {
   const timestampDate = new Date(timestamp);
   const currentDate = new Date();
 
-  const totalSecondsDiff = Math.floor((currentDate.getTime() - timestampDate.getTime()) / 1000);
+  let elapsedTime = "";
+  let duration: moment.Duration = moment.duration(
+    moment(currentDate).diff(moment(timestampDate))
+  )
 
-  const years = Math.floor(totalSecondsDiff / (3600 * 24 * 365));
-  const days = Math.floor((totalSecondsDiff % (3600 * 24 * 365)) / (3600 * 24));
-  const hours = Math.floor((totalSecondsDiff % (3600 * 24)) / 3600);
-  const minutes = Math.floor((totalSecondsDiff % 3600) / 60);
-  const seconds = totalSecondsDiff % 60;
+  const durationKeys = ["seconds", "minutes", "hours", "days", "months", "years"]
+  durationKeys.forEach((k) => {
+    let time = duration["_data"][k]
+    if (time !== 0){
+      elapsedTime = time + `${k.substring(0, 1)} ` + elapsedTime
+    }
+  })
 
-  let timeStr = "";
-
-  if (years > 0) {
-    timeStr += years + "y ";
-  }
-  if (days > 0 || years > 0) {
-    timeStr += days + "d ";
-  }
-  if (hours > 0 || days > 0 || years > 0) {
-    timeStr += hours + "h ";
-  }
-  if (minutes > 0 || hours > 0 || days > 0 || years > 0) {
-    timeStr += minutes + "m ";
-  }
-  if (seconds > 0 || minutes > 0 || hours > 0 || days > 0 || years > 0) {
-    timeStr += seconds + "s ";
-  }
-
-  return timeStr.trim().length === 0 ? "Just now" : timeStr.trim() + " ago";
+  return elapsedTime.trim().length === 0 ? "Just now" : elapsedTime.trim() + " ago";
 }
 
 let cancelSignal: AbortController;
