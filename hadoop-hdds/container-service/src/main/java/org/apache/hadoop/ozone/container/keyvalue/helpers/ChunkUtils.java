@@ -47,7 +47,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
-import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.util.Time;
@@ -196,11 +195,16 @@ public final class ChunkUtils {
       return ChunkBuffer.wrap(Collections.emptyList());
     }
 
-    final ByteBuffer[] buffers = BufferUtils.assignByteBuffers(len,
-        bufferCapacity);
-    readData(file, off, len, c -> c.position(off).read(buffers), volume);
-    Arrays.stream(buffers).forEach(ByteBuffer::flip);
-    return ChunkBuffer.wrap(Arrays.asList(buffers));
+    final ChunkBuffer chunkBuffer = ChunkBuffer.preallocate(len, bufferCapacity);
+    try {
+      final ByteBuffer[] buffers = chunkBuffer.asByteBufferList().toArray(new ByteBuffer[0]);
+      readData(file, off, len, c -> c.position(off).read(buffers), volume);
+      Arrays.stream(buffers).forEach(ByteBuffer::flip);
+      return chunkBuffer;
+    } catch (Exception e) {
+      chunkBuffer.close();
+      throw e;
+    }
   }
 
   private static void readData(File file, long offset, long len,

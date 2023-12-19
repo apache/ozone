@@ -29,7 +29,11 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.hadoop.hdds.utils.MockGatheringChannel;
 
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.CodecTestUtil;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -40,6 +44,16 @@ import org.junit.jupiter.api.Timeout;
 public class TestChunkBuffer {
   private static int nextInt(int n) {
     return ThreadLocalRandom.current().nextInt(n);
+  }
+
+  @BeforeAll
+  public static void beforeAll() {
+    CodecBuffer.enableLeakDetection();
+  }
+
+  @AfterEach
+  public void after() throws Exception {
+    CodecTestUtil.gc();
   }
 
   @Test
@@ -55,7 +69,9 @@ public class TestChunkBuffer {
   private static void runTestImplWithByteBuffer(int n) {
     final byte[] expected = new byte[n];
     ThreadLocalRandom.current().nextBytes(expected);
-    runTestImpl(expected, 0, ChunkBuffer.allocate(n));
+    try (ChunkBuffer c = ChunkBuffer.allocate(n)) {
+      runTestImpl(expected, 0, c);
+    }
   }
 
   @Test
@@ -74,8 +90,9 @@ public class TestChunkBuffer {
   private static void runTestIncrementalChunkBuffer(int increment, int n) {
     final byte[] expected = new byte[n];
     ThreadLocalRandom.current().nextBytes(expected);
-    runTestImpl(expected, increment,
-        new IncrementalChunkBuffer(n, increment, false));
+    try (ChunkBuffer buffer = new IncrementalChunkBuffer(n, increment, false)) {
+      runTestImpl(expected, increment, buffer);
+    }
   }
 
   @Test

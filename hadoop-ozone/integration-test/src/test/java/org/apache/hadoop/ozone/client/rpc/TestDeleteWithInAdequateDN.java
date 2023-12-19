@@ -39,6 +39,8 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.CodecTestUtil;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -68,6 +70,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+
+import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Assume;
@@ -91,11 +95,10 @@ public class TestDeleteWithInAdequateDN {
 
   /**
    * Create a MiniDFSCluster for testing.
-   *
-   * @throws IOException
    */
   @BeforeClass
   public static void init() throws Exception {
+    CodecBuffer.enableLeakDetection();
     conf = new OzoneConfiguration();
     path = GenericTestUtils
         .getTempPath(TestContainerStateMachineFailures.class.getSimpleName());
@@ -168,6 +171,11 @@ public class TestDeleteWithInAdequateDN {
     bucketName = volumeName;
     objectStore.createVolume(volumeName);
     objectStore.getVolume(volumeName).createBucket(bucketName);
+  }
+
+  @After
+  public void after() throws Exception {
+    CodecTestUtil.gc();
   }
 
   /**
@@ -282,9 +290,9 @@ public class TestDeleteWithInAdequateDN {
     // deleteBlock handler is invoked
     try {
       for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
-        keyValueHandler.getChunkManager()
-            .readChunk(container, blockID, ChunkInfo.getFromProtoBuf(chunkInfo),
-                null);
+        final ChunkInfo i = ChunkInfo.getFromProtoBuf(chunkInfo);
+        keyValueHandler.getChunkManager().readChunk(
+            container, blockID, i, null).close();
       }
     } catch (IOException ioe) {
       Assert.fail("Exception should not be thrown.");
@@ -314,8 +322,9 @@ public class TestDeleteWithInAdequateDN {
       // make sure the chunk is now deleted on the all dns
       try {
         for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
-          keyValueHandler.getChunkManager().readChunk(container, blockID,
-              ChunkInfo.getFromProtoBuf(chunkInfo), null);
+          final ChunkInfo i = ChunkInfo.getFromProtoBuf(chunkInfo);
+          keyValueHandler.getChunkManager().readChunk(
+              container, blockID, i, null).close();
         }
         Assert.fail("Expected exception is not thrown");
       } catch (IOException ioe) {

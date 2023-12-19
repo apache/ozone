@@ -32,8 +32,6 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeIOStats;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 
-import java.nio.ByteBuffer;
-
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.limitReadSize;
 
 /**
@@ -76,7 +74,7 @@ public class ChunkManagerDummyImpl implements ChunkManager {
 
     limitReadSize(info.getLen());
     // stats are handled in ChunkManagerImpl
-    return ChunkBuffer.wrap(ByteBuffer.allocate((int) info.getLen()));
+    return ChunkBuffer.allocate(Math.toIntExact(info.getLen()));
   }
 
   @Override

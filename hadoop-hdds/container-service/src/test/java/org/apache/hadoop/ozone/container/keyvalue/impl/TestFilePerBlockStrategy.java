@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.junit.jupiter.api.Test;
 
-import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getChunk;
@@ -96,12 +95,11 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     // Request to read the whole data in a single go.
     ChunkInfo largeChunk = getChunk(blockID.getLocalID(), 0, 0,
         datalen * chunkCount);
-    ChunkBuffer chunk =
-        subject.readChunk(container, blockID, largeChunk,
-            null);
-    ByteBuffer newdata = chunk.toByteString().asReadOnlyByteBuffer();
     MessageDigest newSha = MessageDigest.getInstance(OzoneConsts.FILE_HASH);
-    newSha.update(newdata);
+    try (ChunkBuffer chunk = subject.readChunk(
+        container, blockID, largeChunk, null)) {
+      chunk.asByteBufferList().forEach(newSha::update);
+    }
     assertEquals(Hex.encodeHexString(oldSha.digest()),
         Hex.encodeHexString(newSha.digest()));
   }
@@ -123,18 +121,23 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     ChunkManager subject = createTestSubject();
     subject.writeChunk(container, blockID, info, data, WRITE_STAGE);
 
-    ChunkBuffer readData = subject.readChunk(container, blockID, info, null);
     // data will be ChunkBufferImplWithByteBuffer and readData will return
     // ChunkBufferImplWithByteBufferList. Hence, convert both ByteStrings
     // before comparing.
-    assertEquals(data.rewind().toByteString(),
-        readData.rewind().toByteString());
+    try (ChunkBuffer readData = subject.readChunk(
+        container, blockID, info, null)) {
+      assertEquals(data.rewind().toByteString(),
+          readData.rewind().toByteString());
+    }
 
     ChunkInfo info2 = getChunk(blockID.getLocalID(), 0, start, length);
-    ChunkBuffer readData2 = subject.readChunk(container, blockID, info2, null);
-    assertEquals(length, info2.getLen());
-    assertEquals(data.rewind().toByteString().substring(start, start + length),
-        readData2.rewind().toByteString());
+    try (ChunkBuffer readData2 = subject.readChunk(
+        container, blockID, info2, null)) {
+      assertEquals(length, info2.getLen());
+      assertEquals(
+          data.rewind().toByteString().substring(start, start + length),
+          readData2.rewind().toByteString());
+    }
   }
 
   @Override

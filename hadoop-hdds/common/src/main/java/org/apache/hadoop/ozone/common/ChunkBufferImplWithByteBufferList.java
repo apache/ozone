@@ -23,7 +23,9 @@ import com.google.common.collect.ImmutableList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 
 import java.io.IOException;
 import java.nio.BufferOverflowException;
@@ -45,15 +47,21 @@ public class ChunkBufferImplWithByteBufferList implements ChunkBuffer {
 
   /** Buffer list backing the ChunkBuffer. */
   private final List<ByteBuffer> buffers;
+  private final UncheckedAutoCloseable underlying;
   private final int limit;
 
   private int limitPrecedingCurrent;
   private int currentIndex;
 
   ChunkBufferImplWithByteBufferList(List<ByteBuffer> buffers) {
+    this(buffers, null);
+  }
+
+  ChunkBufferImplWithByteBufferList(List<ByteBuffer> buffers, UncheckedAutoCloseable underlying) {
     Objects.requireNonNull(buffers, "buffers == null");
     this.buffers = !buffers.isEmpty() ? ImmutableList.copyOf(buffers) :
         EMPTY_BUFFER;
+    this.underlying = underlying;
     this.limit = buffers.stream().mapToInt(ByteBuffer::limit).sum();
 
     findCurrent();
@@ -209,6 +217,13 @@ public class ChunkBufferImplWithByteBufferList implements ChunkBuffer {
   @Override
   public List<ByteBuffer> asByteBufferList() {
     return buffers;
+  }
+
+  @Override
+  public void close() {
+    if (underlying != null) {
+      underlying.close();
+    }
   }
 
   @Override

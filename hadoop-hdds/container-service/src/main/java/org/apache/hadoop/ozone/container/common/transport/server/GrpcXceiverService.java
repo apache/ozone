@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.ratis.grpc.util.ZeroCopyMessageMarshaller;
 import org.apache.ratis.thirdparty.com.google.protobuf.MessageLite;
 import org.apache.ratis.thirdparty.io.grpc.MethodDescriptor;
@@ -107,9 +108,20 @@ public class GrpcXceiverService extends
 
       @Override
       public void onNext(ContainerCommandRequestProto request) {
+        final DispatcherContext context;
+        switch (request.getCmdType()) {
+        case ReadChunk:
+          context = DispatcherContext.getHandleReadChunk();
+          break;
+        case GetSmallFile:
+          context = DispatcherContext.getHandleGetSmallFile();
+          break;
+        default:
+          context = null;
+        }
+
         try {
-          ContainerCommandResponseProto resp =
-              dispatcher.dispatch(request, null);
+          final ContainerCommandResponseProto resp = dispatcher.dispatch(request, context);
           responseObserver.onNext(resp);
         } catch (Throwable e) {
           LOG.error("Got exception when processing"
@@ -120,6 +132,9 @@ public class GrpcXceiverService extends
           InputStream popStream = zeroCopyMessageMarshaller.popStream(request);
           if (popStream != null) {
             IOUtils.close(LOG, popStream);
+          }
+          if (context != null) {
+            context.close();
           }
         }
       }

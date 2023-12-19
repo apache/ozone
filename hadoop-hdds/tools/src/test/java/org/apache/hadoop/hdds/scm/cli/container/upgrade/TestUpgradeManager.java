@@ -23,6 +23,8 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.CodecTestUtil;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
@@ -47,6 +49,7 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinitio
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -143,9 +146,15 @@ public class TestUpgradeManager {
     chunkManager = new FilePerBlockStrategy(true, blockManager, null);
   }
 
+  @BeforeAll
+  public static void beforeClass() {
+    CodecBuffer.enableLeakDetection();
+  }
+
   @AfterEach
-  public void after() throws IOException {
+  public void after() throws Exception {
     FileUtils.deleteDirectory(testRoot);
+    CodecTestUtil.gc();
   }
 
   @Test
@@ -200,23 +209,24 @@ public class TestUpgradeManager {
   private void putChunksInBlock(int numOfChunksPerBlock, int i,
                                 List<ContainerProtos.ChunkInfo> chunks,
                                 KeyValueContainer container, BlockID blockID) {
-    long chunkLength = 100;
+    final int chunkLength = 100;
     try {
       for (int k = 0; k < numOfChunksPerBlock; k++) {
         final String chunkName = String.format("%d_chunk_%d_block_%d",
             blockID.getContainerBlockID().getLocalID(), k, i);
-        final long offset = k * chunkLength;
+        final long offset = k * (long)chunkLength;
         ContainerProtos.ChunkInfo info =
             ContainerProtos.ChunkInfo.newBuilder().setChunkName(chunkName)
                 .setLen(chunkLength).setOffset(offset)
                 .setChecksumData(Checksum.getNoChecksumDataProto()).build();
         chunks.add(info);
         ChunkInfo chunkInfo = new ChunkInfo(chunkName, offset, chunkLength);
-        final ChunkBuffer chunkData = ChunkBuffer.allocate((int) chunkLength);
-        chunkManager
-            .writeChunk(container, blockID, chunkInfo, chunkData, WRITE_STAGE);
-        chunkManager
-            .writeChunk(container, blockID, chunkInfo, chunkData, COMMIT_STAGE);
+        try (ChunkBuffer chunkData = ChunkBuffer.allocate(chunkLength)) {
+          chunkManager.writeChunk(container, blockID, chunkInfo, chunkData,
+              WRITE_STAGE);
+          chunkManager.writeChunk(container, blockID, chunkInfo, chunkData,
+              COMMIT_STAGE);
+        }
       }
     } catch (IOException ex) {
       LOG.warn("Putting chunks in blocks was not successful for BlockID: "

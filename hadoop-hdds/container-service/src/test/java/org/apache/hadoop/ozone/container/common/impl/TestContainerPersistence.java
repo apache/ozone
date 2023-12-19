@@ -41,6 +41,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumTy
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.CodecTestUtil;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -138,6 +140,7 @@ public class TestContainerPersistence {
 
   @BeforeAll
   public static void init() {
+    CodecBuffer.enableLeakDetection();
     conf = new OzoneConfiguration();
     hddsPath = GenericTestUtils
         .getTempPath(TestContainerPersistence.class.getSimpleName());
@@ -174,7 +177,7 @@ public class TestContainerPersistence {
   }
 
   @AfterEach
-  public void cleanupDir() throws IOException {
+  public void cleanupDir() throws Exception {
     // Cleanup cache
     BlockUtils.shutdownCache(conf);
 
@@ -187,6 +190,7 @@ public class TestContainerPersistence {
       StorageLocation location = StorageLocation.parse(dir);
       FileUtils.deleteDirectory(new File(location.getNormalizedUri()));
     }
+    CodecTestUtil.gc();
   }
 
   private long getTestContainerID() {
@@ -676,10 +680,11 @@ public class TestContainerPersistence {
     // Read chunk via ReadChunk call.
     for (int x = 0; x < chunkCount; x++) {
       ChunkInfo info = chunks.get(x);
-      final ChunkBuffer data = chunkManager.readChunk(container, blockID, info,
-          DispatcherContext.getHandleReadChunk());
-      ChecksumData checksumData = checksum.computeChecksum(data);
-      assertEquals(info.getChecksumData(), checksumData);
+      try (ChunkBuffer data = chunkManager.readChunk(
+          container, blockID, info, DispatcherContext.getHandleReadChunk())) {
+        final ChecksumData checksumData = checksum.computeChecksum(data);
+        assertEquals(info.getChecksumData(), checksumData);
+      }
     }
   }
 

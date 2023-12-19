@@ -23,6 +23,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.CodecTestUtil;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -30,8 +32,10 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -66,6 +70,12 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
   @BeforeEach
   public void init() {
     mockIcrSender = Mockito.mock(IncrementalReportSender.class);
+    CodecBuffer.enableLeakDetection();
+  }
+
+  @AfterEach
+  public void check() throws Exception {
+    CodecTestUtil.gc();
   }
 
   @Test
@@ -110,12 +120,14 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     KeyValueContainer container = getMockUnhealthyContainer();
     KeyValueHandler handler = getDummyHandler();
 
-    ContainerProtos.ContainerCommandResponseProto response =
-        handler.handleReadChunk(
-            getDummyCommandRequestProto(
-                ContainerProtos.Type.ReadChunk),
-            container, null);
-    assertEquals(UNKNOWN_BCSID, response.getResult());
+    try (DispatcherContext ctx = DispatcherContext.getHandleReadChunk()) {
+      ContainerProtos.ContainerCommandResponseProto response =
+          handler.handleReadChunk(
+              getDummyCommandRequestProto(
+                  ContainerProtos.Type.ReadChunk),
+              container, ctx);
+      assertEquals(UNKNOWN_BCSID, response.getResult());
+    }
   }
 
   @Test
@@ -123,12 +135,14 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     KeyValueContainer container = getMockUnhealthyContainer();
     KeyValueHandler handler = getDummyHandler();
 
-    ContainerProtos.ContainerCommandResponseProto response =
-        handler.handleGetSmallFile(
-            getDummyCommandRequestProto(
-                ContainerProtos.Type.GetSmallFile),
-            container);
-    assertEquals(UNKNOWN_BCSID, response.getResult());
+    try (DispatcherContext ctx = DispatcherContext.getHandleGetSmallFile()) {
+      ContainerProtos.ContainerCommandResponseProto response =
+          handler.handleGetSmallFile(
+              getDummyCommandRequestProto(
+                  ContainerProtos.Type.GetSmallFile),
+              container, ctx);
+      assertEquals(UNKNOWN_BCSID, response.getResult());
+    }
   }
 
   @Test
