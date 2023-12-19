@@ -368,8 +368,8 @@ public class TestReconWithOzoneManager {
         OmDeltaRequest.name(),
         "lastUpdatedSeqNumber");
     assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
-    assertEquals(17, omLatestSeqNumber);
-    assertEquals(17, reconLatestSeqNumber);
+    assertEquals(18, omLatestSeqNumber);
+    assertEquals(18, reconLatestSeqNumber);
     impl.syncDataFromOM();
     assertTrue(omServiceProviderImplLogs.getOutput()
         .contains("isDBUpdateSuccess: true"));
