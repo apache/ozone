@@ -348,17 +348,17 @@ class TestOzoneManagerDoubleBuffer {
 
       S3SecretCache cache = secretManager.cache();
       // Check if all the three secrets are cached.
-      Assertions.assertTrue(cache.get(userPrincipalId1) != null);
-      Assertions.assertTrue(cache.get(userPrincipalId2) != null);
-      Assertions.assertTrue(cache.get(userPrincipalId3) != null);
+      Assertions.assertNotNull(cache.get(userPrincipalId1));
+      Assertions.assertNotNull(cache.get(userPrincipalId2));
+      Assertions.assertNotNull(cache.get(userPrincipalId3));
 
       // Flush the current buffer.
       doubleBuffer.flushCurrentBuffer();
 
       // Check if all the three secrets are cleared from the cache.
-      Assertions.assertTrue(cache.get(userPrincipalId3) == null);
-      Assertions.assertTrue(cache.get(userPrincipalId2) == null);
-      Assertions.assertTrue(cache.get(userPrincipalId1) == null);
+      Assertions.assertNull(cache.get(userPrincipalId3));
+      Assertions.assertNull(cache.get(userPrincipalId2));
+      Assertions.assertNull(cache.get(userPrincipalId1));
     } finally {
       // cleanup metrics
       OzoneManagerDoubleBufferMetrics metrics =

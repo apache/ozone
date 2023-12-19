@@ -65,8 +65,12 @@ import org.apache.ozone.test.tag.Flaky;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -183,43 +187,42 @@ public class TestWatchForCommit {
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
             .getBytes(UTF_8);
     key.write(data1);
-    Assertions.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
+    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream keyOutputStream = (KeyOutputStream)key.getOutputStream();
 
     OutputStream stream = keyOutputStream.getStreamEntries().get(0)
         .getOutputStream();
-    Assertions.assertTrue(stream instanceof BlockOutputStream);
+    assertTrue(stream instanceof BlockOutputStream);
     RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
     // we have just written data more than flush Size(2 chunks), at this time
     // buffer pool will have 3 buffers allocated worth of chunk size
-    Assertions.assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertEquals(4, blockOutputStream.getBufferPool().getSize());
     // writtenDataLength as well flushedDataLength will be updated here
-    Assertions.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
-    Assertions.assertEquals(maxFlushSize,
+    assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
+    assertEquals(maxFlushSize,
         blockOutputStream.getTotalDataFlushedLength());
     // since data equals to maxBufferSize is written, this will be a blocking
     // call and hence will wait for atleast flushSize worth of data to get
     // acked by all servers right here
-    Assertions.assertTrue(blockOutputStream.getTotalAckDataLength() >= flushSize);
+    assertTrue(blockOutputStream.getTotalAckDataLength() >= flushSize);
     // watchForCommit will clean up atleast one entry from the map where each
     // entry corresponds to flushSize worth of data
-    Assertions.assertTrue(
+    assertTrue(
         blockOutputStream.getCommitIndex2flushedDataMap().size() <= 1);
     // Now do a flush. This will flush the data and update the flush length and
     // the map.
     key.flush();
     // Since the data in the buffer is already flushed, flush here will have
     // no impact on the counters and data structures
-    Assertions.assertEquals(4, blockOutputStream.getBufferPool().getSize());
-    Assertions.assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
-    Assertions.assertEquals(dataLength,
-        blockOutputStream.getTotalDataFlushedLength());
+    assertEquals(4, blockOutputStream.getBufferPool().getSize());
+    assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
+    assertEquals(dataLength, blockOutputStream.getTotalDataFlushedLength());
     // flush will make sure one more entry gets updated in the map
-    Assertions.assertTrue(
+    assertTrue(
         blockOutputStream.getCommitIndex2flushedDataMap().size() <= 2);
     XceiverClientRatis raftClient =
         (XceiverClientRatis) blockOutputStream.getXceiverClient();
-    Assertions.assertEquals(3, raftClient.getCommitInfoMap().size());
+    assertEquals(3, raftClient.getCommitInfoMap().size());
     Pipeline pipeline = raftClient.getPipeline();
     cluster.shutdownHddsDatanode(pipeline.getNodes().get(0));
     cluster.shutdownHddsDatanode(pipeline.getNodes().get(1));
@@ -234,16 +237,13 @@ public class TestWatchForCommit {
     // and one flush for partial chunk
     key.flush();
     // Make sure the retryCount is reset after the exception is handled
-    Assertions.assertEquals(0, keyOutputStream.getRetryCount());
+    assertEquals(0, keyOutputStream.getRetryCount());
     // now close the stream, It will update the ack length after watchForCommit
     key.close();
-    Assertions
-        .assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
+    assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
     // make sure the bufferPool is empty
-    Assertions
-        .assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
-    Assertions.assertTrue(
-        blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
+    assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
+    assertTrue(blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
     validateData(keyName, data1);
   }
 
@@ -257,9 +257,8 @@ public class TestWatchForCommit {
               HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
       XceiverClientSpi xceiverClient = clientManager
           .acquireClient(container1.getPipeline());
-      Assertions.assertEquals(1, xceiverClient.getRefcount());
-      Assertions.assertEquals(container1.getPipeline(),
-          xceiverClient.getPipeline());
+      assertEquals(1, xceiverClient.getRefcount());
+      assertEquals(container1.getPipeline(), xceiverClient.getPipeline());
       Pipeline pipeline = xceiverClient.getPipeline();
       TestHelper.createPipelineOnDatanode(pipeline, cluster);
       XceiverClientReply reply = xceiverClient.sendCommandAsync(
@@ -280,19 +279,18 @@ public class TestWatchForCommit {
         // The basic idea here is just to test if its throws an exception.
         xceiverClient
             .watchForCommit(index + new Random().nextInt(100) + 10);
-        Assertions.fail("expected exception not thrown");
+        fail("expected exception not thrown");
       } catch (Exception e) {
-        Assertions.assertTrue(e instanceof ExecutionException);
+        assertTrue(e instanceof ExecutionException);
         // since the timeout value is quite long, the watch request will either
         // fail with NotReplicated exceptio, RetryFailureException or
         // RuntimeException
-        Assertions.assertFalse(HddsClientUtils
+        assertFalse(HddsClientUtils
             .checkForException(e) instanceof TimeoutException);
         // client should not attempt to watch with
         // MAJORITY_COMMITTED replication level, except the grpc IO issue
         if (!logCapturer.getOutput().contains("Connection refused")) {
-          Assertions.assertFalse(
-              e.getMessage().contains("Watch-MAJORITY_COMMITTED"));
+          assertFalse(e.getMessage().contains("Watch-MAJORITY_COMMITTED"));
         }
       }
       clientManager.releaseClient(xceiverClient, false);
@@ -310,9 +308,8 @@ public class TestWatchForCommit {
               HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
       XceiverClientSpi xceiverClient = clientManager
           .acquireClient(container1.getPipeline());
-      Assertions.assertEquals(1, xceiverClient.getRefcount());
-      Assertions.assertEquals(container1.getPipeline(),
-          xceiverClient.getPipeline());
+      assertEquals(1, xceiverClient.getRefcount());
+      assertEquals(container1.getPipeline(), xceiverClient.getPipeline());
       Pipeline pipeline = xceiverClient.getPipeline();
       TestHelper.createPipelineOnDatanode(pipeline, cluster);
       XceiverClientRatis ratisClient = (XceiverClientRatis) xceiverClient;
@@ -321,7 +318,7 @@ public class TestWatchForCommit {
               container1.getContainerInfo().getContainerID(),
               xceiverClient.getPipeline()));
       reply.getResponse().get();
-      Assertions.assertEquals(3, ratisClient.getCommitInfoMap().size());
+      assertEquals(3, ratisClient.getCommitInfoMap().size());
       List<DatanodeDetails> nodesInPipeline = pipeline.getNodes();
       for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
         // shutdown the ratis follower
@@ -338,12 +335,12 @@ public class TestWatchForCommit {
       xceiverClient.watchForCommit(reply.getLogIndex());
 
       // commitInfo Map will be reduced to 2 here
-      Assertions.assertEquals(2, ratisClient.getCommitInfoMap().size());
+      assertEquals(2, ratisClient.getCommitInfoMap().size());
       clientManager.releaseClient(xceiverClient, false);
       String output = logCapturer.getOutput();
-      Assertions.assertTrue(output.contains("3 way commit failed"));
-      Assertions.assertTrue(output.contains("TimeoutException"));
-      Assertions.assertTrue(output.contains("Committed by majority"));
+      assertTrue(output.contains("3 way commit failed"));
+      assertTrue(output.contains("TimeoutException"));
+      assertTrue(output.contains("Committed by majority"));
     }
     logCapturer.stopCapturing();
   }
@@ -356,9 +353,8 @@ public class TestWatchForCommit {
               HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
       XceiverClientSpi xceiverClient = clientManager
           .acquireClient(container1.getPipeline());
-      Assertions.assertEquals(1, xceiverClient.getRefcount());
-      Assertions.assertEquals(container1.getPipeline(),
-          xceiverClient.getPipeline());
+      assertEquals(1, xceiverClient.getRefcount());
+      assertEquals(container1.getPipeline(), xceiverClient.getPipeline());
       Pipeline pipeline = xceiverClient.getPipeline();
       XceiverClientRatis ratisClient = (XceiverClientRatis) xceiverClient;
       long containerId = container1.getContainerInfo().getContainerID();
@@ -366,7 +362,7 @@ public class TestWatchForCommit {
           ContainerTestHelper.getCreateContainerRequest(containerId,
               xceiverClient.getPipeline()));
       reply.getResponse().get();
-      Assertions.assertEquals(3, ratisClient.getCommitInfoMap().size());
+      assertEquals(3, ratisClient.getCommitInfoMap().size());
       List<Pipeline> pipelineList = new ArrayList<>();
       pipelineList.add(pipeline);
       TestHelper.waitForPipelineClose(pipelineList, cluster);
@@ -377,9 +373,9 @@ public class TestWatchForCommit {
         xceiverClient
             .watchForCommit(reply.getLogIndex() +
                 new Random().nextInt(100) + 10);
-        Assertions.fail("Expected exception not thrown");
+        fail("Expected exception not thrown");
       } catch (Exception e) {
-        Assertions.assertTrue(HddsClientUtils
+        assertTrue(HddsClientUtils
             .checkForException(e) instanceof GroupMismatchException);
       }
       clientManager.releaseClient(xceiverClient, false);
@@ -387,7 +383,7 @@ public class TestWatchForCommit {
   }
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
-                                      long size) throws Exception {
+      long size) throws Exception {
     return TestHelper
         .createKey(keyName, type, size, objectStore, volumeName, bucketName);
   }

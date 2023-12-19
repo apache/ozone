@@ -77,10 +77,8 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -114,6 +112,10 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.newWriteChunkRequestBuilder;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class tests container commands on EC containers.
@@ -382,8 +384,8 @@ public class TestContainerCommandsEC {
           .filter(bd -> bd.getBlockID().getLocalID() == localID)
           .count();
 
-      Assert.assertEquals(0L, count);
-      Assert.assertEquals(0, response.getBlockDataList().size());
+      assertEquals(0L, count);
+      assertEquals(0, response.getBlockDataList().size());
     }
   }
 
@@ -410,25 +412,24 @@ public class TestContainerCommandsEC {
               .map(expectedChunksFunc::apply).sum();
       if (minNumExpectedBlocks == 0) {
         final int j = i;
-        Throwable t = Assertions.assertThrows(StorageContainerException.class,
+        Throwable t = assertThrows(StorageContainerException.class,
             () -> ContainerProtocolCalls
                 .listBlock(clients.get(j), containerID, null,
                     minNumExpectedBlocks + 1, containerToken));
-        Assertions
-            .assertEquals("ContainerID " + containerID + " does not exist",
+        assertEquals("ContainerID " + containerID + " does not exist",
                 t.getMessage());
         continue;
       }
       ListBlockResponseProto response = ContainerProtocolCalls
           .listBlock(clients.get(i), containerID, null, Integer.MAX_VALUE,
               containerToken);
-      Assertions.assertTrue(
+      assertTrue(
           minNumExpectedBlocks <= response.getBlockDataList().stream().filter(
               k -> k.getChunksCount() > 0 && k.getChunks(0).getLen() > 0)
               .collect(Collectors.toList()).size(),
           "blocks count should be same or more than min expected" +
               " blocks count on DN " + i);
-      Assertions.assertTrue(
+      assertTrue(
           minNumExpectedChunks <= response.getBlockDataList().stream()
               .mapToInt(BlockData::getChunksCount).sum(),
           "chunks count should be same or more than min expected" +
@@ -492,10 +493,10 @@ public class TestContainerCommandsEC {
         ContainerProtos.ReadContainerResponseProto readContainerResponseProto =
             ContainerProtocolCalls.readContainer(dnClient,
                 container.containerID().getProtobuf().getId(), encodedToken);
-        Assert.assertEquals(ContainerProtos.ContainerDataProto.State.RECOVERING,
+        assertEquals(ContainerProtos.ContainerDataProto.State.RECOVERING,
             readContainerResponseProto.getContainerData().getState());
         // Container at SCM should be still in closed state.
-        Assert.assertEquals(HddsProtos.LifeCycleState.CLOSED,
+        assertEquals(HddsProtos.LifeCycleState.CLOSED,
             scm.getContainerManager().getContainerStateManager()
                 .getContainer(container.containerID()).getState());
         // close container call
@@ -505,7 +506,7 @@ public class TestContainerCommandsEC {
         readContainerResponseProto = ContainerProtocolCalls
             .readContainer(dnClient,
                 container.containerID().getProtobuf().getId(), encodedToken);
-        Assert.assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
+        assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
             readContainerResponseProto.getContainerData().getState());
         ContainerProtos.ReadChunkResponseProto readChunkResponseProto =
             ContainerProtocolCalls.readChunk(dnClient,
@@ -514,10 +515,10 @@ public class TestContainerCommandsEC {
         ByteBuffer[] readOnlyByteBuffersArray = BufferUtils
             .getReadOnlyByteBuffersArray(
                 readChunkResponseProto.getDataBuffers().getBuffersList());
-        Assert.assertEquals(readOnlyByteBuffersArray[0].limit(), data.length);
+        assertEquals(readOnlyByteBuffersArray[0].limit(), data.length);
         byte[] readBuff = new byte[readOnlyByteBuffersArray[0].limit()];
         readOnlyByteBuffersArray[0].get(readBuff, 0, readBuff.length);
-        Assert.assertArrayEquals(data, readBuff);
+        assertArrayEquals(data, readBuff);
       } finally {
         xceiverClientManager.releaseClient(dnClient, false);
       }
@@ -563,7 +564,7 @@ public class TestContainerCommandsEC {
         cluster.restartHddsDatanode(targetDN, true);
 
         // Recovering container state after DN restart should be UNHEALTHY.
-        Assert.assertEquals(ContainerProtos.ContainerDataProto.State.UNHEALTHY,
+        assertEquals(ContainerProtos.ContainerDataProto.State.UNHEALTHY,
             cluster.getHddsDatanode(targetDN)
                 .getDatanodeStateMachine()
                 .getContainer()
@@ -590,7 +591,7 @@ public class TestContainerCommandsEC {
         try {
           dnClient.sendCommand(writeChunkRequest);
         } catch (StorageContainerException e) {
-          Assert.assertEquals(CONTAINER_UNHEALTHY, e.getResult());
+          assertEquals(CONTAINER_UNHEALTHY, e.getResult());
         }
 
       } finally {
@@ -635,7 +636,7 @@ public class TestContainerCommandsEC {
   @Test
   public void testECReconstructionCoordinatorWithMissingIndexes135() {
     InsufficientLocationsException exception =
-        Assert.assertThrows(InsufficientLocationsException.class, () -> {
+        assertThrows(InsufficientLocationsException.class, () -> {
           testECReconstructionCoordinator(ImmutableList.of(1, 3, 5), 3);
         });
 
@@ -643,7 +644,7 @@ public class TestContainerCommandsEC {
         "There are insufficient datanodes to read the EC block";
     String actualMessage = exception.getMessage();
 
-    Assert.assertEquals(expectedMessage, actualMessage);
+    assertEquals(expectedMessage, actualMessage);
   }
 
   private void testECReconstructionCoordinator(List<Integer> missingIndexes,
@@ -707,7 +708,7 @@ public class TestContainerCommandsEC {
         }
       }
 
-      Assert.assertEquals(missingIndexes.size(), targetNodes.size());
+      assertEquals(missingIndexes.size(), targetNodes.size());
 
       List<org.apache.hadoop.ozone.container.common.helpers.BlockData[]>
           blockDataArrList = new ArrayList<>();
@@ -766,7 +767,7 @@ public class TestContainerCommandsEC {
                   .listBlock(conID, newTargetPipeline.getFirstNode(),
                       (ECReplicationConfig) newTargetPipeline
                           .getReplicationConfig(), cToken);
-          Assert.assertEquals(blockDataArrList.get(i).length,
+          assertEquals(blockDataArrList.get(i).length,
               reconstructedBlockData.length);
           checkBlockData(blockDataArrList.get(i), reconstructedBlockData);
           XceiverClientSpi client = xceiverClientManager.acquireClient(
@@ -776,14 +777,14 @@ public class TestContainerCommandsEC {
                 ContainerProtocolCalls.readContainer(
                     client, conID,
                     cToken.encodeToUrlString());
-            Assert.assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
+            assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
                 readContainerResponse.getContainerData().getState());
           } finally {
             xceiverClientManager.releaseClient(client, false);
           }
           i++;
         }
-        Assertions.assertEquals(metrics.getReconstructionTotal(), 1L);
+        assertEquals(1L, metrics.getReconstructionTotal());
       }
     }
   }
@@ -796,7 +797,7 @@ public class TestContainerCommandsEC {
     try (OzoneOutputStream out = bucket.createKey(keyString, 4096,
         new ECReplicationConfig(3, 2, EcCodec.RS, EC_CHUNK_SIZE),
         new HashMap<>())) {
-      Assert.assertTrue(out.getOutputStream() instanceof KeyOutputStream);
+      assertTrue(out.getOutputStream() instanceof KeyOutputStream);
       for (int i = 0; i < numChunks; i++) {
         out.write(inputChunks[i]);
       }
@@ -856,7 +857,7 @@ public class TestContainerCommandsEC {
         MockDatanodeDetails.randomDatanodeDetails();
     targetNodeMap.put(3, invalidTargetNode);
 
-    Assert.assertThrows(IOException.class, () -> {
+    assertThrows(IOException.class, () -> {
       try (ECReconstructionCoordinator coordinator =
                new ECReconstructionCoordinator(config, certClient,
                    secretKeyClient,
@@ -868,14 +869,14 @@ public class TestContainerCommandsEC {
     });
     final DatanodeDetails targetDNToCheckContainerCLeaned = goodTargetNode;
     StorageContainerException ex =
-        Assert.assertThrows(StorageContainerException.class, () -> {
+        assertThrows(StorageContainerException.class, () -> {
           try (ECContainerOperationClient client =
               new ECContainerOperationClient(config, certClient)) {
             client.listBlock(conID, targetDNToCheckContainerCLeaned,
                 new ECReplicationConfig(3, 2), cToken);
           }
         });
-    Assert.assertEquals("ContainerID 1 does not exist", ex.getMessage());
+    assertEquals("ContainerID 1 does not exist", ex.getMessage());
   }
 
   private void closeContainer(long conID)
@@ -905,7 +906,7 @@ public class TestContainerCommandsEC {
           // let's ignore the empty chunks
           continue;
         }
-        Assert.assertEquals(chunkInfo, newBlockDataChunks.get(j));
+        assertEquals(chunkInfo, newBlockDataChunks.get(j));
       }
     }
   }
@@ -963,10 +964,10 @@ public class TestContainerCommandsEC {
                     .stream()
                     .map(ContainerInfo::containerID)
                     .collect(Collectors.toList());
-    Assertions.assertEquals(1, containerIDs.size());
+    assertEquals(1, containerIDs.size());
     containerID = containerIDs.get(0).getId();
     List<Pipeline> pipelines = scm.getPipelineManager().getPipelines(repConfig);
-    Assertions.assertEquals(1, pipelines.size());
+    assertEquals(1, pipelines.size());
     pipeline = pipelines.get(0);
     datanodeDetails = pipeline.getNodes();
 

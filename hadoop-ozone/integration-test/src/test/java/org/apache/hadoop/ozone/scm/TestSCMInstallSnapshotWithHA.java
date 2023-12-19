@@ -48,11 +48,13 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.server.protocol.TermIndex;
 
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.ratis.util.LifeCycle;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -123,7 +125,7 @@ public class TestSCMInstallSnapshotWithHA {
   public void testInstallSnapshot() throws Exception {
     // Get the leader SCM
     StorageContainerManager leaderSCM = getLeader(cluster);
-    Assert.assertNotNull(leaderSCM);
+    assertNotNull(leaderSCM);
     // Find the inactive SCM
     String followerId = getInactiveSCM(cluster).getSCMNodeId();
 
@@ -155,7 +157,7 @@ public class TestSCMInstallSnapshotWithHA {
     // made while it was inactive.
     SCMMetadataStore followerMetaStore = followerSCM.getScmMetadataStore();
     for (ContainerInfo containerInfo : containers) {
-      Assert.assertNotNull(followerMetaStore.getContainerTable()
+      assertNotNull(followerMetaStore.getContainerTable()
           .get(containerInfo.containerID()));
     }
   }
@@ -206,12 +208,11 @@ public class TestSCMInstallSnapshotWithHA {
     }
 
     String errorMsg = "Reloading old state of SCM";
-    Assert.assertTrue(logCapture.getOutput().contains(errorMsg));
-    Assert.assertNull(" installed checkpoint even though checkpoint " +
-        "logIndex is less than it's lastAppliedIndex", newTermIndex);
-    Assert.assertEquals(followerTermIndex,
-        followerSM.getLastAppliedTermIndex());
-    Assert.assertFalse(followerSM.getLifeCycleState().isPausingOrPaused());
+    assertTrue(logCapture.getOutput().contains(errorMsg));
+    assertNull(newTermIndex, " installed checkpoint even though checkpoint " +
+        "logIndex is less than it's lastAppliedIndex");
+    assertEquals(followerTermIndex, followerSM.getLastAppliedTermIndex());
+    assertFalse(followerSM.getLifeCycleState().isPausingOrPaused());
   }
 
   @Test
@@ -235,7 +236,7 @@ public class TestSCMInstallSnapshotWithHA {
         .getTrxnInfoFromCheckpoint(conf, leaderCheckpointLocation,
             new SCMDBDefinition());
 
-    Assert.assertNotNull(leaderCheckpointLocation);
+    assertNotNull(leaderCheckpointLocation);
     // Take a backup of the current DB
     String dbBackupName =
         "SCM_CHECKPOINT_BACKUP" + termIndex.getIndex() + "_" + System
@@ -272,17 +273,16 @@ public class TestSCMInstallSnapshotWithHA {
     scmhaManager.installCheckpoint(leaderCheckpointLocation,
         leaderCheckpointTrxnInfo);
 
-    Assert.assertTrue(logCapture.getOutput()
+    assertTrue(logCapture.getOutput()
         .contains("Failed to reload SCM state and instantiate services."));
     final LifeCycle.State s = followerSM.getLifeCycleState();
-    Assert.assertTrue("Unexpected lifeCycle state: " + s,
-        s == LifeCycle.State.NEW || s.isPausingOrPaused());
+    assertTrue(s == LifeCycle.State.NEW || s.isPausingOrPaused(), "Unexpected lifeCycle state: " + s);
 
     // Verify correct reloading
     followerSM.setInstallingSnapshotData(
         new RocksDBCheckpoint(checkpointBackup.toPath()), null);
     followerSM.reinitialize();
-    Assert.assertEquals(followerSM.getLastAppliedTermIndex(),
+    assertEquals(followerSM.getLastAppliedTermIndex(),
         leaderCheckpointTrxnInfo.getTermIndex());
   }
 

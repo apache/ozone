@@ -78,9 +78,9 @@ public class CommandStatusReportPublisher extends
       // If status is still pending then don't remove it from map as
       // CommandHandler will change its status when it works on this command.
       if (!cmdStatus.getStatus().equals(Status.PENDING)) {
-        builder.addCmdStatus(cmdStatus.getProtoBufMessage());
         map.remove(key);
       }
+      builder.addCmdStatus(cmdStatus.getProtoBufMessage());
     });
     return builder.getCmdStatusCount() > 0 ? builder.build() : null;
   }

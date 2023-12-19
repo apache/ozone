@@ -59,7 +59,6 @@ import org.apache.hadoop.util.DiskChecker;
 import org.assertj.core.api.Fail;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
-import org.junit.Assume;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
@@ -97,6 +96,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -823,8 +823,7 @@ public class TestKeyValueContainer {
   public void testAutoCompactionSmallSstFile(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
-    Assume.assumeTrue(
-        isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3));
+    assumeTrue(isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3));
     // Create a new HDDS volume
     String volumeDirPath =
         Files.createDirectory(folder.resolve("volumeDir")).toFile()
