@@ -17,6 +17,7 @@
 package org.apache.hadoop.ozone.om.ratis;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -47,6 +48,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -60,6 +62,7 @@ public class TestOzoneManagerStateMachine {
 
   private OzoneManagerStateMachine ozoneManagerStateMachine;
   private OzoneManagerPrepareState prepareState;
+  private OMMetadataManager omMetadataManager;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -74,7 +77,7 @@ public class TestOzoneManagerStateMachine {
     conf.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         tempDir.toAbsolutePath().toString());
 
-    OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(conf,
+    omMetadataManager = new OmMetadataManagerImpl(conf,
         ozoneManager);
 
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
@@ -143,6 +146,29 @@ public class TestOzoneManagerStateMachine {
         ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
 
 
+  }
+
+  @Test
+  public void testSnapshotAppliedTransaction() throws Exception {
+    // update last applied index to 3
+    ozoneManagerStateMachine.notifyTermIndexUpdated(0, 1);
+    ozoneManagerStateMachine.notifyTermIndexUpdated(0, 2);
+    ozoneManagerStateMachine.notifyTermIndexUpdated(0, 3);
+
+    // update transaction info to higher value 10 (as db update,
+    // but not updated lastAppliedTransaction)
+    omMetadataManager.getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
+        new TransactionInfo.Builder()
+        .setTransactionIndex(10)
+        .setCurrentTerm(0)
+        .build());
+
+    // verify snapshot is given priority to transaction info from db
+    // as those transaction is already applied
+    long idx = ozoneManagerStateMachine.takeSnapshot();
+    Assertions.assertEquals(3,
+        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
+    Assertions.assertEquals(idx, 10);
   }
 
 
