@@ -46,7 +46,6 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -202,7 +201,7 @@ public class TestBlockManagerImpl {
     List<BlockData> listBlockData = blockManager.listBlock(
         keyValueContainer, 1, 10);
     assertNotNull(listBlockData);
-    assertTrue(listBlockData.size() == 1);
+    assertEquals(1, listBlockData.size());
 
     for (long i = 2; i <= 10; i++) {
       blockID = new BlockID(1L, i);
@@ -221,6 +220,6 @@ public class TestBlockManagerImpl {
     listBlockData = blockManager.listBlock(
         keyValueContainer, 1, 10);
     assertNotNull(listBlockData);
-    assertTrue(listBlockData.size() == 10);
+    assertEquals(10, listBlockData.size());
   }
 }
