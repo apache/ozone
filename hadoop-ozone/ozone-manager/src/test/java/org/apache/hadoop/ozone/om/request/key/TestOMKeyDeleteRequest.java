@@ -57,7 +57,6 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
         getOmKeyDeleteRequest(createDeleteKeyRequest(testKeyName));
     OMException omException = Assertions.assertThrows(OMException.class,
         () -> deleteKeyRequest.preExecute(ozoneManager));
-    System.out.println(omException.getMessage());
     Assertions.assertEquals(expectedExceptionMessage, omException.getMessage());
     Assertions.assertEquals(OMException.ResultCodes.INVALID_KEY_NAME, omException.getResult());
   }
