@@ -133,6 +133,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -992,11 +993,13 @@ public class TestStorageContainerManager {
     for (int i = 0; i < 1; ++i) {
       queues.add(new ContainerReportQueue());
     }
-
+    Semaphore semaphore = new Semaphore(2);
+    semaphore.acquire(2);
     ContainerReportHandler containerReportHandler =
         Mockito.mock(ContainerReportHandler.class);
     Mockito.doAnswer((inv) -> {
-      Thread.currentThread().sleep(1500);
+      Thread.currentThread().sleep(1000);
+      semaphore.release(1);
       return null;
     }).when(containerReportHandler).onMessage(Mockito.any(),
         Mockito.eq(eventQueue));
@@ -1024,15 +1027,17 @@ public class TestStorageContainerManager {
     ContainerReportFromDatanode dndata1
         = new ContainerReportFromDatanode(dn, report);
     eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata1);
+
     dn = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
         .build();
     ContainerReportFromDatanode dndata2
         = new ContainerReportFromDatanode(dn, report);
     eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata2);
-    Thread.currentThread().sleep(3000);
+    semaphore.acquire(2);
     Assert.assertTrue(containerReportExecutors.longWaitInQueueEvents() >= 1);
     Assert.assertTrue(containerReportExecutors.longTimeExecutionEvents() >= 1);
     containerReportExecutors.close();
+    semaphore.release(2);
   }
 
   @Test
