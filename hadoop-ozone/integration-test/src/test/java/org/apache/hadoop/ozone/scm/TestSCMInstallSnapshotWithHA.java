@@ -211,8 +211,7 @@ public class TestSCMInstallSnapshotWithHA {
     assertTrue(logCapture.getOutput().contains(errorMsg));
     assertNull(newTermIndex, " installed checkpoint even though checkpoint " +
         "logIndex is less than it's lastAppliedIndex");
-    assertEquals(followerTermIndex,
-        followerSM.getLastAppliedTermIndex());
+    assertEquals(followerTermIndex, followerSM.getLastAppliedTermIndex());
     assertFalse(followerSM.getLifeCycleState().isPausingOrPaused());
   }
 
@@ -277,8 +276,7 @@ public class TestSCMInstallSnapshotWithHA {
     assertTrue(logCapture.getOutput()
         .contains("Failed to reload SCM state and instantiate services."));
     final LifeCycle.State s = followerSM.getLifeCycleState();
-    assertTrue(s == LifeCycle.State.NEW || s.isPausingOrPaused(),
-        "Unexpected lifeCycle state: " + s);
+    assertTrue(s == LifeCycle.State.NEW || s.isPausingOrPaused(), "Unexpected lifeCycle state: " + s);
 
     // Verify correct reloading
     followerSM.setInstallingSnapshotData(
