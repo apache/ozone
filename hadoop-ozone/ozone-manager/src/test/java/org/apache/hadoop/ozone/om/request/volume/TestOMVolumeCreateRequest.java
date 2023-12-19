@@ -75,8 +75,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
 
     try {
       OMClientResponse omClientResponse =
-          omVolumeCreateRequest.validateAndUpdateCache(ozoneManager,
-              txLogIndex, ozoneManagerDoubleBufferHelper);
+          omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, txLogIndex);
       Assertions.assertTrue(omClientResponse instanceof OMVolumeCreateResponse);
       OMVolumeCreateResponse respone =
           (OMVolumeCreateResponse) omClientResponse;
@@ -118,8 +117,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     long expectedObjId = ozoneManager.getObjectIdFromTxId(txLogIndex);
 
     OMClientResponse omClientResponse =
-        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, txLogIndex,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, txLogIndex);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
@@ -169,8 +167,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     omVolumeCreateRequest = new OMVolumeCreateRequest(modifiedRequest);
 
     omClientResponse =
-        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, 2L,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, 2L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
@@ -199,8 +196,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     omVolumeCreateRequest = new OMVolumeCreateRequest(modifiedRequest);
 
     OMClientResponse omClientResponse =
-        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, 1);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
@@ -264,8 +260,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     omVolumeCreateRequest = new OMVolumeCreateRequest(modifiedRequest);
     long txLogIndex = 1;
     OMClientResponse omClientResponse =
-        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, txLogIndex,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, txLogIndex);
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
 

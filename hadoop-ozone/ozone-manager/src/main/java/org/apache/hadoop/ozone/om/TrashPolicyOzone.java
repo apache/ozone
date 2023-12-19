@@ -80,6 +80,8 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
 
   private OzoneManager om;
 
+  private OzoneConfiguration ozoneConfiguration;
+
   public TrashPolicyOzone() {
   }
 
@@ -110,6 +112,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
           + "Changing to default value 0", deletionInterval);
       this.deletionInterval = 0;
     }
+    ozoneConfiguration = OzoneConfiguration.of(this.configuration);
   }
 
   TrashPolicyOzone(FileSystem fs, Configuration conf, OzoneManager om) {
@@ -152,8 +155,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
       Path trashPath;
       Path baseTrashPath;
       if (fs.getUri().getScheme().equals(OzoneConsts.OZONE_OFS_URI_SCHEME)) {
-        OFSPath ofsPath = new OFSPath(path,
-            OzoneConfiguration.of(configuration));
+        OFSPath ofsPath = new OFSPath(path, ozoneConfiguration);
         // trimming volume and bucket in order to be compatible with o3fs
         // Also including volume and bucket name in the path is redundant as
         // the key is already in a particular volume and bucket.
@@ -228,8 +230,7 @@ public class TrashPolicyOzone extends TrashPolicyDefault {
     // Check to see if bucket is path item to be deleted.
     // Cannot moveToTrash if bucket is deleted,
     // return error for this condition
-    OFSPath ofsPath = new OFSPath(key.substring(1),
-        OzoneConfiguration.of(configuration));
+    OFSPath ofsPath = new OFSPath(key.substring(1), ozoneConfiguration);
     if (path.isRoot() || ofsPath.isBucket()) {
       throw new IOException("Recursive rm of bucket "
           + path.toString() + " not permitted");

@@ -59,7 +59,7 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.ratis.grpc.server.GrpcLogAppender;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -145,7 +145,7 @@ public class TestContainerStateMachineFailureOnRead {
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipelines(RatisReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.THREE));
-    Assert.assertEquals(1, pipelines.size());
+    Assertions.assertEquals(1, pipelines.size());
     Pipeline ratisPipeline = pipelines.iterator().next();
 
     Optional<HddsDatanodeService> dnToStop =
@@ -159,7 +159,7 @@ public class TestContainerStateMachineFailureOnRead {
               }
             }).findFirst();
 
-    Assert.assertTrue(dnToStop.isPresent());
+    Assertions.assertTrue(dnToStop.isPresent());
     cluster.shutdownHddsDatanode(dnToStop.get().getDatanodeDetails());
     // Verify healthy pipeline before creating key
     try (XceiverClientRatis xceiverClientRatis =
@@ -182,7 +182,7 @@ public class TestContainerStateMachineFailureOnRead {
 
     List<OmKeyLocationInfo> locationInfoList =
         groupOutputStream.getLocationInfoList();
-    Assert.assertEquals(1, locationInfoList.size());
+    Assertions.assertEquals(1, locationInfoList.size());
     omKeyLocationInfo = locationInfoList.get(0);
     key.close();
     groupOutputStream.close();
@@ -197,7 +197,7 @@ public class TestContainerStateMachineFailureOnRead {
           }
         }).findFirst();
 
-    Assert.assertTrue(leaderDn.isPresent());
+    Assertions.assertTrue(leaderDn.isPresent());
     // delete the container dir from leader
     FileUtil.fullyDelete(new File(
         leaderDn.get().getDatanodeStateMachine()
@@ -214,10 +214,8 @@ public class TestContainerStateMachineFailureOnRead {
     try {
       Pipeline pipeline = cluster.getStorageContainerManager()
           .getPipelineManager().getPipeline(pipelines.get(0).getId());
-      Assert.assertEquals("Pipeline " + pipeline.getId()
-              + "should be in CLOSED state",
-          Pipeline.PipelineState.CLOSED,
-          pipeline.getPipelineState());
+      Assertions.assertEquals(Pipeline.PipelineState.CLOSED, pipeline.getPipelineState(),
+          "Pipeline " + pipeline.getId() + "should be in CLOSED state");
     } catch (PipelineNotFoundException e) {
       // do nothing
     }

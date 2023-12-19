@@ -23,6 +23,7 @@ import java.util.UUID;
 
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.jupiter.api.Assertions;
@@ -66,6 +67,21 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
   }
 
   @Test
+  public void preExecuteBucketCrossesMaxLimit() throws Exception {
+    ozoneManager.getConfiguration().setInt(
+        OMConfigKeys.OZONE_OM_MAX_BUCKET, 1);
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OMBucketCreateRequest omBucketCreateRequest = doPreExecute(volumeName,
+        bucketName);
+    doValidateAndUpdateCache(volumeName, bucketName,
+        omBucketCreateRequest.getOmRequest());
+    OMException omException = assertThrows(OMException.class,
+        () -> doPreExecute("volume2", "test2"));
+    assertEquals("Cannot create more than 1 buckets", omException.getMessage());
+  }
+
+  @Test
   public void testValidateAndUpdateCache() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -98,8 +114,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     Assertions.assertNull(omMetadataManager.getBucketTable().get(bucketKey));
 
     OMClientResponse omClientResponse =
-        omBucketCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omBucketCreateRequest.validateAndUpdateCache(ozoneManager, 1);
 
     OMResponse omResponse = omClientResponse.getOMResponse();
     Assertions.assertNotNull(omResponse.getCreateBucketResponse());
@@ -124,8 +139,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
 
     // Try create same bucket again
     OMClientResponse omClientResponse =
-        omBucketCreateRequest.validateAndUpdateCache(ozoneManager, 2,
-            ozoneManagerDoubleBufferHelper);
+        omBucketCreateRequest.validateAndUpdateCache(ozoneManager, 2);
 
     OMResponse omResponse = omClientResponse.getOMResponse();
     Assertions.assertNotNull(omResponse.getCreateBucketResponse());
@@ -208,7 +222,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     OMBucketCreateRequest testRequest =
         new OMBucketCreateRequest(modifiedRequest);
     OMClientResponse resp = testRequest.validateAndUpdateCache(
-        ozoneManager, 1, ozoneManagerDoubleBufferHelper);
+        ozoneManager, 1);
 
     Assertions.assertEquals(resp.getOMResponse().getStatus().toString(),
         OMException.ResultCodes.QUOTA_EXCEEDED.toString());
@@ -232,7 +246,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     OMBucketCreateRequest testRequest =
         new OMBucketCreateRequest(modifiedRequest);
     OMClientResponse resp = testRequest.validateAndUpdateCache(
-        ozoneManager, 1, ozoneManagerDoubleBufferHelper);
+        ozoneManager, 1);
 
     Assertions.assertEquals(resp.getOMResponse().getStatus().toString(),
         OMException.ResultCodes.QUOTA_ERROR.toString());
@@ -325,8 +339,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
 
 
     OMClientResponse omClientResponse =
-        omBucketCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omBucketCreateRequest.validateAndUpdateCache(ozoneManager, 1);
 
     // As now after validateAndUpdateCache it should add entry to cache, get
     // should return non null value.

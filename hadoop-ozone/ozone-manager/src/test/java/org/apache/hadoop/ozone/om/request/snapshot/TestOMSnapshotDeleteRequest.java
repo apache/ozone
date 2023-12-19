@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
@@ -83,10 +82,6 @@ public class TestOMSnapshotDeleteRequest {
   private String volumeName;
   private String bucketName;
   private String snapshotName;
-
-  // Just setting ozoneManagerDoubleBuffer which does nothing.
-  private final OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
-      ((response, transactionIndex) -> null);
 
   @BeforeEach
   public void setup() throws Exception {
@@ -203,8 +198,7 @@ public class TestOMSnapshotDeleteRequest {
 
     // Trigger validateAndUpdateCache
     OMClientResponse omClientResponse =
-        omSnapshotDeleteRequest.validateAndUpdateCache(ozoneManager, 2L,
-            ozoneManagerDoubleBufferHelper);
+        omSnapshotDeleteRequest.validateAndUpdateCache(ozoneManager, 2L);
 
     OMResponse omResponse = omClientResponse.getOMResponse();
     assertNotNull(omResponse);
@@ -240,8 +234,7 @@ public class TestOMSnapshotDeleteRequest {
 
     // Trigger delete snapshot validateAndUpdateCache
     OMClientResponse omClientResponse =
-        omSnapshotDeleteRequest.validateAndUpdateCache(ozoneManager, 1L,
-            ozoneManagerDoubleBufferHelper);
+        omSnapshotDeleteRequest.validateAndUpdateCache(ozoneManager, 1L);
 
     OMResponse omResponse = omClientResponse.getOMResponse();
     assertNotNull(omResponse.getDeleteSnapshotResponse());
@@ -268,8 +261,7 @@ public class TestOMSnapshotDeleteRequest {
     assertNull(omMetadataManager.getSnapshotInfoTable().get(key));
 
     // Create snapshot entry
-    omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1L,
-        ozoneManagerDoubleBufferHelper);
+    omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1L);
     SnapshotInfo snapshotInfo =
         omMetadataManager.getSnapshotInfoTable().get(key);
     assertNotNull(snapshotInfo);
@@ -282,8 +274,7 @@ public class TestOMSnapshotDeleteRequest {
 
     // Delete snapshot entry
     OMClientResponse omClientResponse =
-        omSnapshotDeleteRequest.validateAndUpdateCache(ozoneManager, 2L,
-            ozoneManagerDoubleBufferHelper);
+        omSnapshotDeleteRequest.validateAndUpdateCache(ozoneManager, 2L);
     // Response should be successful
     OMResponse omResponse = omClientResponse.getOMResponse();
     assertNotNull(omResponse);
@@ -302,8 +293,7 @@ public class TestOMSnapshotDeleteRequest {
     omRequest2 = deleteSnapshotRequest(volumeName, bucketName, snapshotName);
     omSnapshotDeleteRequest = doPreExecute(omRequest2);
     omClientResponse =
-        omSnapshotDeleteRequest.validateAndUpdateCache(ozoneManager, 3L,
-            ozoneManagerDoubleBufferHelper);
+        omSnapshotDeleteRequest.validateAndUpdateCache(ozoneManager, 3L);
 
     omResponse = omClientResponse.getOMResponse();
     assertNotNull(omResponse);

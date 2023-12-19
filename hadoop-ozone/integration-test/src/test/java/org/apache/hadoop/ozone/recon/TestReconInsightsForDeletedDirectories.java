@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
-import org.junit.Assert;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.AfterAll;
@@ -60,12 +59,9 @@ import java.util.concurrent.TimeoutException;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
-
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
-
-import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -136,7 +132,7 @@ public class TestReconInsightsForDeletedDirectories {
         fs.delete(fileStatus.getPath(), true);
       }
     } catch (IOException ex) {
-      fail("Failed to cleanup files.");
+      Assertions.fail("Failed to cleanup files.");
     }
   }
 
@@ -205,18 +201,18 @@ public class TestReconInsightsForDeletedDirectories {
     }
 
     if (directoryObjectId == null) {
-      fail("directoryObjectId is null. Test case cannot proceed.");
+      Assertions.fail("directoryObjectId is null. Test case cannot proceed.");
+    } else {
+      // Retrieve Namespace Summary for dir1 from Recon.
+      ReconNamespaceSummaryManagerImpl namespaceSummaryManager =
+          (ReconNamespaceSummaryManagerImpl) cluster.getReconServer()
+              .getReconNamespaceSummaryManager();
+      NSSummary summary =
+          namespaceSummaryManager.getNSSummary(directoryObjectId);
+      // Assert that the directory dir1 has 10 sub-files and size of 1000 bytes.
+      Assertions.assertEquals(10, summary.getNumOfFiles());
+      Assertions.assertEquals(10, summary.getSizeOfFiles());
     }
-
-    // Retrieve Namespace Summary for dir1 from Recon.
-    ReconNamespaceSummaryManagerImpl namespaceSummaryManager =
-        (ReconNamespaceSummaryManagerImpl) cluster.getReconServer()
-            .getReconNamespaceSummaryManager();
-    NSSummary summary =
-        namespaceSummaryManager.getNSSummary(directoryObjectId);
-    // Assert that the directory dir1 has 10 sub-files and size of 1000 bytes.
-    Assert.assertEquals(10, summary.getNumOfFiles());
-    Assert.assertEquals(10, summary.getSizeOfFiles());
 
     // Delete the entire directory dir1.
     fs.delete(dir1, true);
@@ -242,7 +238,7 @@ public class TestReconInsightsForDeletedDirectories {
     KeyInsightInfoResponse entity =
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
     // Assert the size of deleted directory is 10.
-    Assert.assertEquals(10, entity.getUnreplicatedDataSize());
+    Assertions.assertEquals(10, entity.getUnreplicatedDataSize());
 
     // Cleanup the tables.
     cleanupTables();
@@ -331,7 +327,7 @@ public class TestReconInsightsForDeletedDirectories {
     KeyInsightInfoResponse entity =
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
     // Assert the size of deleted directory is 3.
-    Assert.assertEquals(3, entity.getUnreplicatedDataSize());
+    Assertions.assertEquals(3, entity.getUnreplicatedDataSize());
 
     // Cleanup the tables.
     cleanupTables();
@@ -393,7 +389,7 @@ public class TestReconInsightsForDeletedDirectories {
     KeyInsightInfoResponse entity =
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
     // Assert the size of deleted directory is 100.
-    Assert.assertEquals(100, entity.getUnreplicatedDataSize());
+    Assertions.assertEquals(100, entity.getUnreplicatedDataSize());
 
     // Cleanup the tables.
     cleanupTables();
@@ -475,7 +471,7 @@ public class TestReconInsightsForDeletedDirectories {
       LOG.info("{} actual row count={}, expectedCount={}", table.getName(),
           count, expectedCount);
     } catch (IOException ex) {
-      fail("Test failed with: " + ex);
+      Assertions.fail("Test failed with: " + ex);
     }
     return count == expectedCount;
   }

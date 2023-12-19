@@ -43,7 +43,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 
 import java.io.File;
@@ -91,7 +90,6 @@ public class TestWritableECContainerProvider {
   private Map<ContainerID, ContainerInfo> containers;
   private WritableECContainerProviderConfig providerConf;
 
-  @Parameterized.Parameters
   public static Collection<PipelineChoosePolicy> policies() {
     Collection<PipelineChoosePolicy> policies = new ArrayList<>();
     policies.add(new RandomPipelineChoosePolicy());

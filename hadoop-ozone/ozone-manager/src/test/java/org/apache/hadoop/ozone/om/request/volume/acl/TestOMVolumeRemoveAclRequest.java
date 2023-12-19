@@ -76,8 +76,7 @@ public class TestOMVolumeRemoveAclRequest extends TestOMVolumeRequest {
         new OMVolumeAddAclRequest(addAclRequest);
     omVolumeAddAclRequest.preExecute(ozoneManager);
     OMClientResponse omClientAddResponse =
-        omVolumeAddAclRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeAddAclRequest.validateAndUpdateCache(ozoneManager, 1);
     OMResponse omAddAclResponse = omClientAddResponse.getOMResponse();
     Assertions.assertNotNull(omAddAclResponse.getAddAclResponse());
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
@@ -101,8 +100,7 @@ public class TestOMVolumeRemoveAclRequest extends TestOMVolumeRequest {
     Assertions.assertEquals(acl, aclsBeforeRemove.get(0));
 
     OMClientResponse omClientRemoveResponse =
-        omVolumeRemoveAclRequest.validateAndUpdateCache(ozoneManager, 2,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeRemoveAclRequest.validateAndUpdateCache(ozoneManager, 2);
 
     OMResponse omRemoveAclResponse = omClientRemoveResponse.getOMResponse();
     Assertions.assertNotNull(omRemoveAclResponse.getRemoveAclResponse());
@@ -129,8 +127,7 @@ public class TestOMVolumeRemoveAclRequest extends TestOMVolumeRequest {
     omVolumeRemoveAclRequest.preExecute(ozoneManager);
 
     OMClientResponse omClientResponse =
-        omVolumeRemoveAclRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeRemoveAclRequest.validateAndUpdateCache(ozoneManager, 1);
 
     OMResponse omResponse = omClientResponse.getOMResponse();
     Assertions.assertNotNull(omResponse.getRemoveAclResponse());

@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.om.S3SecretManagerImpl;
 import org.apache.hadoop.ozone.om.S3SecretCache;
 import org.apache.hadoop.ozone.om.S3SecretLockedManager;
 import org.apache.hadoop.ozone.om.ratis.metrics.OzoneManagerDoubleBufferMetrics;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.s3.security.S3GetSecretRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
@@ -82,9 +81,6 @@ class TestOzoneManagerDoubleBuffer {
   private OzoneManager ozoneManager;
   private OmMetadataManagerImpl omMetadataManager;
   private S3SecretLockedManager secretManager;
-  // Set ozoneManagerDoubleBuffer to do nothing.
-  private final OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
-      ((response, transactionIndex) -> null);
   private CreateSnapshotResponse snapshotResponse1 =
       mock(CreateSnapshotResponse.class);
   private CreateSnapshotResponse snapshotResponse2 =
@@ -352,17 +348,17 @@ class TestOzoneManagerDoubleBuffer {
 
       S3SecretCache cache = secretManager.cache();
       // Check if all the three secrets are cached.
-      Assertions.assertTrue(cache.get(userPrincipalId1) != null);
-      Assertions.assertTrue(cache.get(userPrincipalId2) != null);
-      Assertions.assertTrue(cache.get(userPrincipalId3) != null);
+      Assertions.assertNotNull(cache.get(userPrincipalId1));
+      Assertions.assertNotNull(cache.get(userPrincipalId2));
+      Assertions.assertNotNull(cache.get(userPrincipalId3));
 
       // Flush the current buffer.
       doubleBuffer.flushCurrentBuffer();
 
       // Check if all the three secrets are cleared from the cache.
-      Assertions.assertTrue(cache.get(userPrincipalId3) == null);
-      Assertions.assertTrue(cache.get(userPrincipalId2) == null);
-      Assertions.assertTrue(cache.get(userPrincipalId1) == null);
+      Assertions.assertNull(cache.get(userPrincipalId3));
+      Assertions.assertNull(cache.get(userPrincipalId2));
+      Assertions.assertNull(cache.get(userPrincipalId1));
     } finally {
       // cleanup metrics
       OzoneManagerDoubleBufferMetrics metrics =
@@ -389,8 +385,7 @@ class TestOzoneManagerDoubleBuffer {
 
     // Run validateAndUpdateCache
     OMClientResponse omClientResponse =
-        s3GetSecretRequest.validateAndUpdateCache(ozoneManager,
-            txLogIndex, ozoneManagerDoubleBufferHelper);
+        s3GetSecretRequest.validateAndUpdateCache(ozoneManager, txLogIndex);
     doubleBuffer.add(omClientResponse, txLogIndex);
   }
 

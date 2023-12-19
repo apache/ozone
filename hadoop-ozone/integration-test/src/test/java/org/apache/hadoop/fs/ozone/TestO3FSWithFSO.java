@@ -15,13 +15,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.utils;
+package org.apache.hadoop.fs.ozone;
 
+import org.junit.jupiter.api.TestInstance;
 
-/**
- * Utility interface for function which throws exceptions.
- * Similar to {@link java.util.function.Function}.
- */
-public interface ThrowableFunction<T, R, E extends Throwable> {
-  R apply(T t) throws E;
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class TestO3FSWithFSO extends AbstractOzoneFileSystemTestWithFSO {
+  TestO3FSWithFSO() {
+    super(false);
+  }
 }

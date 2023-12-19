@@ -176,8 +176,7 @@ public class TestPermissionCheck {
     MultiDeleteResponse response =
         bucketEndpoint.multiDelete("BucketName", "keyName", request);
     assertEquals(1, response.getErrors().size());
-    assertTrue(
-        response.getErrors().get(0).getCode().equals("PermissionDenied"));
+    assertEquals("PermissionDenied", response.getErrors().get(0).getCode());
   }
 
   @Test

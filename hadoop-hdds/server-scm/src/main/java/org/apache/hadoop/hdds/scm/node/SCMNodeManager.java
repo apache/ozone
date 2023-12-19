@@ -83,7 +83,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -128,6 +130,8 @@ public class SCMNodeManager implements NodeManager {
   private final HDDSLayoutVersionManager scmLayoutVersionManager;
   private final EventPublisher scmNodeEventPublisher;
   private final SCMContext scmContext;
+  private final Map<SCMCommandProto.Type,
+      BiConsumer<DatanodeDetails, SCMCommand<?>>> sendCommandNotifyMap;
 
   /**
    * Lock used to synchronize some operation in Node manager to ensure a
@@ -136,6 +140,7 @@ public class SCMNodeManager implements NodeManager {
   private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
   private final String opeState = "OPSTATE";
   private final String comState = "COMSTATE";
+  private final String lastHeartbeat = "LASTHEARTBEAT";
   /**
    * Constructs SCM machine Manager.
    */
@@ -179,6 +184,13 @@ public class SCMNodeManager implements NodeManager {
     String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
     this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
     this.scmContext = scmContext;
+    this.sendCommandNotifyMap = new HashMap<>();
+  }
+
+  @Override
+  public void registerSendCommandNotify(SCMCommandProto.Type type,
+      BiConsumer<DatanodeDetails, SCMCommand<?>> scmCommand) {
+    this.sendCommandNotifyMap.put(type, scmCommand);
   }
 
   private void registerMXBean() {
@@ -521,6 +533,15 @@ public class SCMNodeManager implements NodeManager {
           commandQueue.getDatanodeCommandSummary(datanodeDetails.getUuid());
       List<SCMCommand> commands =
           commandQueue.getCommand(datanodeDetails.getUuid());
+
+      // Update the SCMCommand of deleteBlocksCommand Status
+      for (SCMCommand<?> command : commands) {
+        if (sendCommandNotifyMap.get(command.getType()) != null) {
+          sendCommandNotifyMap.get(command.getType())
+              .accept(datanodeDetails, command);
+        }
+      }
+
       if (queueReport != null) {
         processNodeCommandQueueReport(datanodeDetails, queueReport, summary);
       }
@@ -1061,13 +1082,16 @@ public class SCMNodeManager implements NodeManager {
       DatanodeDetails.Port httpsPort = dni.getPort(HTTPS);
       String opstate = "";
       String healthState = "";
+      String heartbeatTimeDiff = "";
       if (dni.getNodeStatus() != null) {
         opstate = dni.getNodeStatus().getOperationalState().toString();
         healthState = dni.getNodeStatus().getHealth().toString();
+        heartbeatTimeDiff = getLastHeartbeatTimeDiff(dni.getLastHeartbeatTime());
       }
       Map<String, String> map = new HashMap<>();
       map.put(opeState, opstate);
       map.put(comState, healthState);
+      map.put(lastHeartbeat, heartbeatTimeDiff);
       if (httpPort != null) {
         map.put(httpPort.getName().toString(), httpPort.getValue().toString());
       }
@@ -1078,6 +1102,48 @@ public class SCMNodeManager implements NodeManager {
       nodes.put(hostName, map);
     }
     return nodes;
+  }
+
+  /**
+   * Based on the current time and the last heartbeat, calculate the time difference
+   * and get a string of the relative value. E.g. "2s ago", "1m 2s ago", etc.
+   *
+   * @return string with the relative value of the time diff.
+   */
+  public String getLastHeartbeatTimeDiff(long lastHeartbeatTime) {
+    long currentTime = Time.monotonicNow();
+    long timeDiff = currentTime - lastHeartbeatTime;
+
+    // Time is in ms. Calculate total time in seconds.
+    long seconds = TimeUnit.MILLISECONDS.toSeconds(timeDiff);
+    // Calculate days, convert the number back to seconds and subtract it from seconds.
+    long days = TimeUnit.SECONDS.toDays(seconds);
+    seconds -= TimeUnit.DAYS.toSeconds(days);
+    // Calculate hours, convert the number back to seconds and subtract it from seconds.
+    long hours = TimeUnit.SECONDS.toHours(seconds);
+    seconds -= TimeUnit.HOURS.toSeconds(hours);
+    // Calculate minutes, convert the number back to seconds and subtract it from seconds.
+    long minutes = TimeUnit.SECONDS.toMinutes(seconds);
+    seconds -= TimeUnit.MINUTES.toSeconds(minutes);
+
+    StringBuilder stringBuilder = new StringBuilder();
+    if (days > 0) {
+      stringBuilder.append(days).append("d ");
+    }
+    if (hours > 0) {
+      stringBuilder.append(hours).append("h ");
+    }
+    if (minutes > 0) {
+      stringBuilder.append(minutes).append("m ");
+    }
+    if (seconds > 0) {
+      stringBuilder.append(seconds).append("s ");
+    }
+    String str = stringBuilder.length() == 0 ? "Just now" : "ago";
+
+    stringBuilder.append(str);
+
+    return stringBuilder.toString();
   }
 
   private enum UsageMetrics {

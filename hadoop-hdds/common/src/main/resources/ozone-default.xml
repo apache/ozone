@@ -98,10 +98,17 @@
   </property>
   <property>
     <name>dfs.container.ratis.statemachinedata.sync.retries</name>
-    <value>-1</value>
+    <value/>
     <tag>OZONE, DEBUG, CONTAINER, RATIS</tag>
     <description>Number of times the WriteStateMachineData op will be tried
-      before failing, if this value is -1, then this retries indefinitely.
+      before failing. If the value is not configured, it will default
+      to (hdds.ratis.rpc.slowness.timeout / dfs.container.ratis.statemachinedata.sync.timeout),
+      which means that the WriteStatMachineData will be retried for every sync timeout until
+      the configured slowness timeout is hit, after which the StateMachine will close down the pipeline.
+
+      If this value is set to -1, then this retries indefinitely. This might not be desirable
+      since if due to persistent failure the WriteStateMachineData op was not able to complete
+      for a long time, this might block the Ratis write pipeline.
     </description>
   </property>
   <property>
@@ -829,7 +836,7 @@
   </property>
   <property>
     <name>ozone.chunk.read.buffer.default.size</name>
-    <value>64KB</value>
+    <value>1MB</value>
     <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
     <description>
       The default read buffer size during read chunk operations when checksum
@@ -838,6 +845,14 @@
       For chunk data with checksum, the read buffer size will be the
       same as the number of bytes per checksum
       (ozone.client.bytes.per.checksum) corresponding to the chunk.
+    </description>
+  </property>
+  <property>
+    <name>ozone.chunk.read.mapped.buffer.threshold</name>
+    <value>32KB</value>
+    <tag>OZONE, SCM, CONTAINER, PERFORMANCE</tag>
+    <description>
+      The default read threshold to use memory mapped buffers.
     </description>
   </property>
   <property>
@@ -4174,6 +4189,15 @@
   </property>
 
   <property>
+    <name>ozone.om.snapshot.load.native.lib</name>
+    <value>true</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Load native library for performing optimized snapshot diff.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.snapshot.sst_dumptool.buffer.size</name>
     <value>8KB</value>
     <tag>OZONE, OM</tag>
@@ -4254,6 +4278,14 @@
     <tag>OZONE, DATANODE</tag>
     <description>
       Specify if zero-copy should be enabled for EC GRPC protocol.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.max.buckets</name>
+    <value>100000</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      maximum number of buckets across all volumes.
     </description>
   </property>
 </configuration>
