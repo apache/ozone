@@ -71,7 +71,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -101,14 +100,14 @@ public class ECReconstructionCoordinator implements Closeable {
       LoggerFactory.getLogger(ECReconstructionCoordinator.class);
 
   private static final int EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE = 3;
-  private static final int EC_RECONSTRUCT_STRIPE_WRITE_POOL_MIN_SIZE = 3;
+  private static final int EC_RECONSTRUCT_STRIPE_WRITE_POOL_MIN_SIZE = 5;
 
   private final ECContainerOperationClient containerOperationClient;
 
   private final ByteBufferPool byteBufferPool;
 
   private final ExecutorService ecReconstructReadExecutor;
-  private final ExecutorService ecReconstructWriteExecutor;
+  private volatile ExecutorService ecReconstructWriteExecutor;
   private final BlockInputStreamFactory blockInputStreamFactory;
   private final TokenHelper tokenHelper;
   private final ECReconstructionMetrics metrics;
@@ -124,9 +123,6 @@ public class ECReconstructionCoordinator implements Closeable {
     this.containerOperationClient = new ECContainerOperationClient(conf,
         certificateClient);
     this.byteBufferPool = new ElasticByteBufferPool();
-    ThreadFactory threadFactory = new ThreadFactoryBuilder()
-        .setNameFormat(threadNamePrefix + "ec-reconstruct-reader-TID-%d")
-        .build();
     this.ecReconstructReadExecutor =
         new ThreadPoolExecutor(EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE,
             conf.getObject(OzoneClientConfig.class)
@@ -134,7 +130,9 @@ public class ECReconstructionCoordinator implements Closeable {
             60,
             TimeUnit.SECONDS,
             new SynchronousQueue<>(),
-            threadFactory,
+            new ThreadFactoryBuilder()
+                .setNameFormat(threadNamePrefix + "ec-reconstruct-reader-TID-%d")
+                .build(),
             new ThreadPoolExecutor.CallerRunsPolicy());
     this.ecReconstructWriteExecutor =
         new ThreadPoolExecutor(EC_RECONSTRUCT_STRIPE_WRITE_POOL_MIN_SIZE,
@@ -143,7 +141,9 @@ public class ECReconstructionCoordinator implements Closeable {
             60,
             TimeUnit.SECONDS,
             new SynchronousQueue<>(),
-            threadFactory,
+            new ThreadFactoryBuilder()
+                .setNameFormat(threadNamePrefix + "ec-reconstruct-write-TID-%d")
+                .build(),
             new ThreadPoolExecutor.CallerRunsPolicy());
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, () -> ecReconstructReadExecutor);
@@ -471,6 +471,10 @@ public class ECReconstructionCoordinator implements Closeable {
   public void close() throws IOException {
     if (containerOperationClient != null) {
       containerOperationClient.close();
+    }
+    if (ecReconstructWriteExecutor != null) {
+      ecReconstructWriteExecutor.shutdownNow();
+      ecReconstructWriteExecutor = null;
     }
   }
 
