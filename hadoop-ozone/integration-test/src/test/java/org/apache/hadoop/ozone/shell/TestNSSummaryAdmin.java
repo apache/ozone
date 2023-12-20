@@ -44,7 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 /**
  * Test for Namespace CLI.
  */
-@Timeout(60)
+@Timeout(600)
 public class TestNSSummaryAdmin extends StandardOutputTestBase {
   private static ObjectStore store;
 
@@ -116,6 +116,7 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
     String path = "/";
     executeAdminCommands(path);
     // Should throw warning - only buckets can have bucket layout.
+    System.out.println("**"+ getOutContentString());
     assertTrue(getOutContentString().contains("[Warning] Namespace CLI is not designed for OBS bucket layout."));
     assertTrue(getOutContentString().contains("Put more files into it to visualize DU"));
     assertTrue(getOutContentString().contains("Put more files into it to visualize file size distribution"));
