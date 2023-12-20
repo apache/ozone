@@ -45,6 +45,7 @@ public class TestRocksObjectLeakDetector {
 
     // Allocate and not close.
     allocate(supplier, false);
+    System.gc();
     assertEquals(managedObjects + 2, ManagedRocksObjectMetrics.INSTANCE.totalManagedObjects());
     assertEquals(leakObjects + 1, ManagedRocksObjectMetrics.INSTANCE.totalLeakObjects());
   }
