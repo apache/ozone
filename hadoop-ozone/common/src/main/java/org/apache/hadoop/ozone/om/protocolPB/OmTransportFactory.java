@@ -48,7 +48,7 @@ public interface OmTransportFactory {
   static OmTransportFactory createFactory(ConfigurationSource conf)
       throws IOException {
     try {
-      // if configured transport implementation is found via ServiceLoader, use it.
+      // if a transport implementation is found via ServiceLoader, use it.
       ServiceLoader<OmTransportFactory> transportFactoryServiceLoader = ServiceLoader.load(OmTransportFactory.class);
       Iterator<OmTransportFactory> iterator = transportFactoryServiceLoader.iterator();
       if (iterator.hasNext()) {
@@ -57,7 +57,7 @@ public interface OmTransportFactory {
         return next;
       }
 
-      // Otherwise, load the transport implementation specified by configuration
+      // Otherwise, load the transport implementation specified by configuration.
       String transportClassName = conf.get(OZONE_OM_TRANSPORT_CLASS, OZONE_OM_TRANSPORT_CLASS_DEFAULT);
       LOG.info("Loading OM transport implementation {} as specified by configuration.", transportClassName);
       return OmTransportFactory.class.getClassLoader()
