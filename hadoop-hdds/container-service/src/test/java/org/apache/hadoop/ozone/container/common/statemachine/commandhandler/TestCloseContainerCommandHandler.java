@@ -35,8 +35,6 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -77,10 +75,6 @@ public class TestCloseContainerCommandHandler {
     init();
   }
 
-  private static Iterable<Object[]> layoutVersion() {
-    return ContainerLayoutTestInfo.containerLayoutParameters();
-  }
-
   private void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     context = ContainerTestUtils.getMockContext(randomDatanodeDetails(), conf);
@@ -109,8 +103,7 @@ public class TestCloseContainerCommandHandler {
         .thenReturn(false);
   }
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void closeContainerWithPipeline(ContainerLayoutVersion layout)
       throws Exception {
     initLayoutVerison(layout);
@@ -125,8 +118,7 @@ public class TestCloseContainerCommandHandler {
         .quasiCloseContainer(eq(container), any());
   }
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void closeContainerWithoutPipeline(ContainerLayoutVersion layout)
       throws Exception {
     initLayoutVerison(layout);
@@ -144,8 +136,7 @@ public class TestCloseContainerCommandHandler {
         .quasiCloseContainer(eq(container), any());
   }
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void closeContainerWithForceFlagSet(ContainerLayoutVersion layout)
       throws Exception {
     initLayoutVerison(layout);
@@ -159,8 +150,7 @@ public class TestCloseContainerCommandHandler {
     verify(containerHandler).closeContainer(container);
   }
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void forceCloseQuasiClosedContainer(ContainerLayoutVersion layout)
       throws Exception {
     initLayoutVerison(layout);
@@ -177,8 +167,7 @@ public class TestCloseContainerCommandHandler {
         .closeContainer(container);
   }
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void forceCloseOpenContainer(ContainerLayoutVersion layout)
       throws Exception {
     initLayoutVerison(layout);
@@ -194,8 +183,7 @@ public class TestCloseContainerCommandHandler {
         .closeContainer(container);
   }
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void forceCloseOpenContainerWithPipeline(ContainerLayoutVersion layout)
       throws Exception {
     initLayoutVerison(layout);
@@ -213,8 +201,7 @@ public class TestCloseContainerCommandHandler {
         .closeContainer(container);
   }
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void closeAlreadyClosedContainer(ContainerLayoutVersion layout)
       throws Exception {
     initLayoutVerison(layout);
@@ -238,8 +225,7 @@ public class TestCloseContainerCommandHandler {
         .submitRequest(any(), any());
   }
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void closeNonExistenceContainer(ContainerLayoutVersion layout)
       throws Exception {
     initLayoutVerison(layout);
@@ -253,8 +239,7 @@ public class TestCloseContainerCommandHandler {
     }
   }
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void closeMissingContainer(ContainerLayoutVersion layout)
       throws Exception {
     initLayoutVerison(layout);
