@@ -53,6 +53,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT;
+import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.TOTAL_KEYS;
 import static org.apache.hadoop.ozone.recon.ReconConstants.TOTAL_USED_BYTES;
 
@@ -132,7 +133,21 @@ public class ContainerHealthTask extends ReconScmTask {
               " process {} existing database records.",
           Time.monotonicNow() - start, existingCount);
       start = Time.monotonicNow();
-      final List<ContainerInfo> containers = containerManager.getContainers();
+      checkAndProcessContainers(unhealthyContainerStateStatsMap, start,
+          currentTime);
+      processedContainers.clear();
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  private void checkAndProcessContainers(
+      Map<UnHealthyContainerStates, Map<String, Long>>
+          unhealthyContainerStateStatsMap, long start, long currentTime) {
+    ContainerID startID = ContainerID.valueOf(0);
+    List<ContainerInfo> containers = containerManager.getContainers(startID,
+        Integer.parseInt(DEFAULT_FETCH_COUNT));
+    while (!containers.isEmpty()) {
       containers.stream()
           .filter(c -> !processedContainers.contains(c))
           .forEach(c -> processContainer(c, currentTime,
@@ -142,9 +157,11 @@ public class ContainerHealthTask extends ReconScmTask {
               " processing {} containers.", Time.monotonicNow() - start,
           containers.size());
       logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
-      processedContainers.clear();
-    } finally {
-      lock.writeLock().unlock();
+      startID = ContainerID.valueOf(
+          containers.get(containers.size() - 1).getContainerID());
+      containers.clear();
+      containers = containerManager.getContainers(startID,
+          Integer.parseInt(DEFAULT_FETCH_COUNT));
     }
   }
 
@@ -280,7 +297,7 @@ public class ContainerHealthTask extends ReconScmTask {
   private void processContainer(ContainerInfo container, long currentTime,
                                 Map<UnHealthyContainerStates,
                                     Map<String, Long>>
-                                      unhealthyContainerStateStatsMap) {
+                                    unhealthyContainerStateStatsMap) {
     try {
       Set<ContainerReplica> containerReplicas =
           containerManager.getContainerReplicas(container.containerID());
@@ -437,7 +454,7 @@ public class ContainerHealthTask extends ReconScmTask {
 
       if (container.isUnderReplicated()
           && !recordForStateExists.contains(
-              UnHealthyContainerStates.UNDER_REPLICATED.toString())) {
+          UnHealthyContainerStates.UNDER_REPLICATED.toString())) {
         records.add(recordForState(
             container, UnHealthyContainerStates.UNDER_REPLICATED, time));
         populateContainerStats(container,
@@ -447,7 +464,7 @@ public class ContainerHealthTask extends ReconScmTask {
 
       if (container.isOverReplicated()
           && !recordForStateExists.contains(
-              UnHealthyContainerStates.OVER_REPLICATED.toString())) {
+          UnHealthyContainerStates.OVER_REPLICATED.toString())) {
         records.add(recordForState(
             container, UnHealthyContainerStates.OVER_REPLICATED, time));
         populateContainerStats(container,
@@ -457,7 +474,7 @@ public class ContainerHealthTask extends ReconScmTask {
 
       if (container.isMisReplicated()
           && !recordForStateExists.contains(
-              UnHealthyContainerStates.MIS_REPLICATED.toString())) {
+          UnHealthyContainerStates.MIS_REPLICATED.toString())) {
         records.add(recordForState(
             container, UnHealthyContainerStates.MIS_REPLICATED, time));
         populateContainerStats(container,

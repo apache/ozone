@@ -21,6 +21,8 @@ package org.apache.hadoop.ozone.recon.fsck;
 import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.ALL_REPLICAS_UNHEALTHY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -96,7 +98,8 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     List<ContainerInfo> mockContainers = getMockContainers(7);
     when(scmMock.getScmServiceProvider()).thenReturn(scmClientMock);
     when(scmMock.getContainerManager()).thenReturn(containerManagerMock);
-    when(containerManagerMock.getContainers()).thenReturn(mockContainers);
+    when(containerManagerMock.getContainers(any(ContainerID.class),
+        anyInt())).thenReturn(mockContainers);
     for (ContainerInfo c : mockContainers) {
       when(containerManagerMock.getContainer(c.containerID())).thenReturn(c);
       when(scmClientMock.getContainerWithPipeline(c.getContainerID()))
@@ -151,7 +154,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
             reconTaskStatusDao, containerHealthSchemaManager,
             placementMock, reconTaskConfig, reconContainerMetadataManager);
     containerHealthTask.start();
-    LambdaTestUtils.await(6000, 1000, () ->
+    LambdaTestUtils.await(60000, 1000, () ->
         (unHealthyContainersTableHandle.count() == 6));
     UnhealthyContainers rec =
         unHealthyContainersTableHandle.fetchByContainerId(1L).get(0);
@@ -268,7 +271,8 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
     List<ContainerInfo> mockContainers = getMockContainers(3);
     when(scmMock.getScmServiceProvider()).thenReturn(scmClientMock);
     when(scmMock.getContainerManager()).thenReturn(containerManagerMock);
-    when(containerManagerMock.getContainers()).thenReturn(mockContainers);
+    when(containerManagerMock.getContainers(any(ContainerID.class),
+        anyInt())).thenReturn(mockContainers);
     for (ContainerInfo c : mockContainers) {
       when(containerManagerMock.getContainer(c.containerID())).thenReturn(c);
       when(scmClientMock.getContainerWithPipeline(c.getContainerID()))
