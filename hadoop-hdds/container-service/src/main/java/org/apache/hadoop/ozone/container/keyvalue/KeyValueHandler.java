@@ -591,7 +591,8 @@ public class KeyValueHandler extends Handler {
       chunkManager.finalizeWriteChunk(kvContainer, blockID);
       kvContainer.getContainerData()
           .addToFinalizedBlockSet(blockID.getLocalID());
-      blockManager.finalizeBlock(kvContainer, blockID);
+      blockManager.finalizeBlock(kvContainer,
+          BlockData.getFromProtoBuf(responseData));
 
       LOG.info("Block has been finalized {} ", blockID);
 

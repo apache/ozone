@@ -23,6 +23,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -34,7 +35,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.common.helpers.FinalizeBlockList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
@@ -370,14 +370,17 @@ public final class KeyValueContainerUtil {
   private static void populateContainerFinalizeBlock(
       KeyValueContainerData kvContainerData, DatanodeStore store)
       throws IOException {
-    Table<String, FinalizeBlockList> finalizeBlocksTable =
-        store.getFinalizeBlocksTable();
+    List<Long> lstLocalId = new ArrayList<>();
 
-    FinalizeBlockList finalizeBlockList =
-        finalizeBlocksTable.get(kvContainerData.getFinalizeBlockKey());
-
-    if (finalizeBlockList != null) {
-      kvContainerData.addAllToFinalizedBlockSet(finalizeBlockList.asList());
+    try (BlockIterator<BlockData> iter =
+            store.getFinalizeBlockIterator(kvContainerData.getContainerID(),
+            kvContainerData.getContainerPrefixFilter())) {
+      while (iter.hasNext()) {
+        lstLocalId.add(iter.nextBlock().getLocalID());
+      }
+    }
+    if (!lstLocalId.isEmpty()) {
+      kvContainerData.addAllToFinalizedBlockSet(lstLocalId);
     }
   }
 

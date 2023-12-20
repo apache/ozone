@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
-import org.apache.hadoop.ozone.container.common.helpers.FinalizeBlockList;
 
 import java.io.File;
 
@@ -75,6 +74,6 @@ public abstract class AbstractDatanodeDBDefinition implements DBDefinition {
   public abstract DBColumnFamilyDefinition<String, ChunkInfoList>
       getDeletedBlocksColumnFamily();
 
-  public abstract DBColumnFamilyDefinition<String, FinalizeBlockList>
+  public abstract DBColumnFamilyDefinition<String, BlockData>
       getFinalizeBlocksColumnFamily();
 }

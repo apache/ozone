@@ -413,13 +413,14 @@ public class KeyValueContainerData extends ContainerData {
     return formatKey(DELETING_KEY_PREFIX);
   }
 
-  public String getFinalizeBlockKey() {
-    return formatKey("");
-  }
-
   public KeyPrefixFilter getUnprefixedKeyFilter() {
     String schemaPrefix = containerPrefix();
     return new KeyPrefixFilter().addFilter(schemaPrefix + "#", true);
+  }
+
+  public KeyPrefixFilter getContainerPrefixFilter() {
+    String schemaPrefix = containerPrefix();
+    return new KeyPrefixFilter().addFilter(schemaPrefix, false);
   }
 
   public KeyPrefixFilter getDeletingBlockKeyFilter() {

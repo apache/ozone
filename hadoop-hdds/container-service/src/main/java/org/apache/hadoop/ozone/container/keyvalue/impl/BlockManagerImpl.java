@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.helpers.FinalizeBlockList;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
@@ -42,6 +41,7 @@ import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BCSID_MISMATCH;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -216,15 +216,15 @@ public class BlockManagerImpl implements BlockManager {
   }
 
   @Override
-  public void finalizeBlock(Container container, BlockID blockID)
+  public void finalizeBlock(Container container, BlockData blockData)
       throws IOException {
-    Preconditions.checkNotNull(blockID, "BlockID cannot " +
+    Preconditions.checkNotNull(blockData, "blockData cannot " +
         "be null for finalizeBlock operation.");
-    Preconditions.checkState(blockID.getContainerID() >= 0,
+    Preconditions.checkState(blockData.getContainerID() >= 0,
         "Container Id cannot be negative");
 
     KeyValueContainer kvContainer = (KeyValueContainer)container;
-    long localID = blockID.getLocalID();
+    long localID = blockData.getLocalID();
 
     kvContainer.removeFromPendingPutBlockCache(localID);
 
@@ -236,14 +236,8 @@ public class BlockManagerImpl implements BlockManager {
       // persist finalizeBlock
       try (BatchOperation batch = db.getStore().getBatchHandler()
           .initBatchOperation()) {
-
-        FinalizeBlockList finalBlockList = new FinalizeBlockList(
-            new ArrayList<>(
-                kvContainer.getContainerData().getFinalizedBlockSet()));
         db.getStore().getFinalizeBlocksTable().putWithBatch(batch,
-            kvContainer.getContainerData().getFinalizeBlockKey(),
-            finalBlockList);
-
+            kvContainer.getContainerData().getBlockKey(localID), blockData);
         db.getStore().getBatchHandler().commitBatchOperation(batch);
       }
     }

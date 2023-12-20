@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
-import org.apache.hadoop.ozone.container.common.helpers.FinalizeBlockList;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
 
@@ -93,14 +92,14 @@ public class DatanodeSchemaThreeDBDefinition
           DeletedBlocksTransaction.class,
           Proto2Codec.get(DeletedBlocksTransaction.class));
 
-  public static final DBColumnFamilyDefinition<String, FinalizeBlockList>
+  public static final DBColumnFamilyDefinition<String, BlockData>
       FINALIZE_BLOCKS =
       new DBColumnFamilyDefinition<>(
           "finalize_blocks",
           String.class,
           FixedLengthStringCodec.get(),
-          FinalizeBlockList.class,
-          FinalizeBlockList.getCodec());
+          BlockData.class,
+          BlockData.getCodec());
 
   private static String separator = "";
 
@@ -165,7 +164,7 @@ public class DatanodeSchemaThreeDBDefinition
   }
 
   @Override
-  public DBColumnFamilyDefinition<String, FinalizeBlockList>
+  public DBColumnFamilyDefinition<String, BlockData>
       getFinalizeBlocksColumnFamily() {
     return FINALIZE_BLOCKS;
   }

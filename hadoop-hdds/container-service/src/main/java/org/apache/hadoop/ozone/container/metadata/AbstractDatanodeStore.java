@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
-import org.apache.hadoop.ozone.container.common.helpers.FinalizeBlockList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
@@ -68,7 +67,9 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   private Table<String, ChunkInfoList> deletedBlocksTable;
 
-  private Table<String, FinalizeBlockList>  finalizeBlocksTable;
+  private Table<String, BlockData>  finalizeBlocksTable;
+
+  private Table<String, BlockData> finalizeBlockDataTableWithIterator;
 
   static final Logger LOG =
       LoggerFactory.getLogger(AbstractDatanodeStore.class);
@@ -178,8 +179,11 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       checkTableStatus(deletedBlocksTable, deletedBlocksTable.getName());
 
       if (dbDef.getFinalizeBlocksColumnFamily() != null) {
+        finalizeBlockDataTableWithIterator =
+            dbDef.getFinalizeBlocksColumnFamily().getTable(this.store);
+
         finalizeBlocksTable = new DatanodeTable<>(
-            dbDef.getFinalizeBlocksColumnFamily().getTable(this.store));
+            finalizeBlockDataTableWithIterator);
         checkTableStatus(finalizeBlocksTable, finalizeBlocksTable.getName());
       }
     }
@@ -219,7 +223,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @Override
-  public Table<String, FinalizeBlockList> getFinalizeBlocksTable() {
+  public Table<String, BlockData> getFinalizeBlocksTable() {
     return finalizeBlocksTable;
   }
 
@@ -235,6 +239,13 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       KeyPrefixFilter filter) throws IOException {
     return new KeyValueBlockIterator(containerID,
             blockDataTableWithIterator.iterator(), filter);
+  }
+
+  @Override
+  public BlockIterator<BlockData> getFinalizeBlockIterator(long containerID,
+      KeyPrefixFilter filter) throws IOException {
+    return new KeyValueBlockIterator(containerID,
+             finalizeBlockDataTableWithIterator.iterator(), filter);
   }
 
   @Override

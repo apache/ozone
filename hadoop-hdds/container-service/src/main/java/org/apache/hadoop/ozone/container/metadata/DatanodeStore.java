@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
-import org.apache.hadoop.ozone.container.common.helpers.FinalizeBlockList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 
 import java.io.Closeable;
@@ -78,7 +77,12 @@ public interface DatanodeStore extends Closeable {
    */
   Table<String, ChunkInfoList> getDeletedBlocksTable();
 
-  Table<String, FinalizeBlockList> getFinalizeBlocksTable();
+  /**
+   * A Table that keeps finalize blocks requested from client.
+   *
+   * @return Table
+   */
+  Table<String, BlockData> getFinalizeBlocksTable();
 
   /**
    * Helper to create and write batch transactions.
@@ -95,6 +99,9 @@ public interface DatanodeStore extends Closeable {
       throws IOException;
 
   BlockIterator<BlockData> getBlockIterator(long containerID,
+      KeyPrefixFilter filter) throws IOException;
+
+  BlockIterator<BlockData> getFinalizeBlockIterator(long containerID,
       KeyPrefixFilter filter) throws IOException;
 
   /**

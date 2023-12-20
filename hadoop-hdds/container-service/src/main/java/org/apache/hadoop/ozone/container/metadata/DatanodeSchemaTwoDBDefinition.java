@@ -28,7 +28,6 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
-import org.apache.hadoop.ozone.container.common.helpers.FinalizeBlockList;
 
 import java.util.Map;
 
@@ -117,7 +116,7 @@ public class DatanodeSchemaTwoDBDefinition
   }
 
   @Override
-  public DBColumnFamilyDefinition<String, FinalizeBlockList>
+  public DBColumnFamilyDefinition<String, BlockData>
       getFinalizeBlocksColumnFamily() {
     return null;
   }

@@ -80,6 +80,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IO_EXCEPTION;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
+import static org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -452,11 +453,12 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
           containerData, config)) {
         // Should never fail.
         Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
-        // delete finalizeBlock
+
+        String prefix = getContainerKeyPrefix(containerData.getContainerID());
         try (BatchOperation batch = db.getStore().getBatchHandler()
             .initBatchOperation()) {
-          db.getStore().getFinalizeBlocksTable().deleteWithBatch(batch,
-              containerData.getFinalizeBlockKey());
+          db.getStore().getFinalizeBlocksTable()
+            .deleteBatchWithPrefix(batch, prefix);
           db.getStore().getBatchHandler().commitBatchOperation(batch);
         }
       } catch (IOException ex) {
