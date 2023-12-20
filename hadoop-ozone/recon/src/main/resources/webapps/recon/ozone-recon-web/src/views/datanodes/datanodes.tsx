@@ -73,6 +73,7 @@ interface IDatanode {
   storageUsed: number;
   storageTotal: number;
   storageRemaining: number;
+  storageCommitted: number;
   pipelines: IPipeline[];
   containers: number;
   openContainers: number;
@@ -177,7 +178,7 @@ const COLUMNS = [
     render: (text: string, record: IDatanode) => (
       <StorageBar
         total={record.storageTotal} used={record.storageUsed}
-        remaining={record.storageRemaining} />
+        remaining={record.storageRemaining} committed={record.storageCommitted}/>
     )
   },
   {
@@ -363,6 +364,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
           storageUsed: datanode.storageReport.used,
           storageTotal: datanode.storageReport.capacity,
           storageRemaining: datanode.storageReport.remaining,
+          storageCommitted: datanode.storageReport.committed,
           pipelines: datanode.pipelines,
           containers: datanode.containers,
           openContainers: datanode.openContainers,
