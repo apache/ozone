@@ -380,7 +380,8 @@ public class TestReconWithOzoneManager {
   }
 
   private long getReconTaskAttributeFromJson(String taskStatusResponse,
-                                             String taskName, String entityAttribute) {
+                                             String taskName,
+                                             String entityAttribute) {
     ArrayList<LinkedTreeMap> taskStatusList = new Gson()
         .fromJson(taskStatusResponse, ArrayList.class);
     Optional<LinkedTreeMap> taskEntity =
@@ -389,7 +390,7 @@ public class TestReconWithOzoneManager {
             .filter(task -> task.get("taskName").equals(taskName))
             .findFirst();
     assertTrue(taskEntity.isPresent());
-    return (long)(double) taskEntity.get().get(entityAttribute);
+    return (long) (double) taskEntity.get().get(entityAttribute);
   }
 
   /**
