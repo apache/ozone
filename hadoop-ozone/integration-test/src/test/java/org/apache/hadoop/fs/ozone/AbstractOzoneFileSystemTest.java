@@ -101,6 +101,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -392,8 +393,8 @@ abstract class AbstractOzoneFileSystemTest {
     // Creating a child should not add parent keys to the bucket
     try {
       getKey(parent, true);
-    } catch (IOException ex) {
-      assertKeyNotFoundException(ex);
+    } catch (OMException ome) {
+      assertEquals(KEY_NOT_FOUND, ome.getResult());
     }
 
     // List status on the parent should show the child file
@@ -412,8 +413,8 @@ abstract class AbstractOzoneFileSystemTest {
     // Creating a child should not add parent keys to the bucket
     try {
       getKey(parent, true);
-    } catch (IOException ex) {
-      assertKeyNotFoundException(ex);
+    } catch (OMException ome) {
+      assertEquals(KEY_NOT_FOUND, ome.getResult());
     }
 
     // Delete the child key
@@ -1355,10 +1356,6 @@ abstract class AbstractOzoneFileSystemTest {
         .getBucket(bucketName).getKey(key);
   }
 
-  private void assertKeyNotFoundException(IOException ex) {
-    GenericTestUtils.assertExceptionContains("KEY_NOT_FOUND", ex);
-  }
-
   @Test
   public void testGetDirectoryModificationTime()
       throws IOException, InterruptedException {
@@ -1585,14 +1582,11 @@ abstract class AbstractOzoneFileSystemTest {
       paths.add(keyName + OM_KEY_PREFIX + p.getName());
     }
 
-    // unknown keyname
-    try {
-      new OzonePrefixPathImpl(getVolumeName(), getBucketName(), "invalidKey",
-          cluster.getOzoneManager().getKeyManager());
-      fail("Non-existent key name!");
-    } catch (OMException ome) {
-      assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ome.getResult());
-    }
+    // unknown keyName
+    OMException ome = assertThrows(OMException.class,
+        () -> new OzonePrefixPathImpl(getVolumeName(), getBucketName(), "invalidKey",
+            cluster.getOzoneManager().getKeyManager()));
+    assertEquals(KEY_NOT_FOUND, ome.getResult());
 
     OzonePrefixPathImpl ozonePrefixPath =
         new OzonePrefixPathImpl(getVolumeName(), getBucketName(), keyName,

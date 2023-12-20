@@ -90,8 +90,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
-import static org.apache.ozone.test.GenericTestUtils.assertExceptionContains;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -101,8 +101,7 @@ import static org.junit.Assert.assertTrue;
  */
 @InterfaceAudience.Private
 public final class TestBlockTokens {
-  private static final Logger LOG = LoggerFactory
-      .getLogger(TestBlockTokens.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TestBlockTokens.class);
   private static final String TEST_VOLUME = "testvolume";
   private static final String TEST_BUCKET = "testbucket";
   private static final String TEST_FILE = "testfile";
@@ -207,8 +206,7 @@ public final class TestBlockTokens {
     StorageContainerException ex = assertThrows(StorageContainerException.class,
         () -> readDataWithoutRetry(keyInfo));
     assertEquals(BLOCK_TOKEN_VERIFICATION_FAILED, ex.getResult());
-    assertExceptionContains(
-        "Token can't be verified due to expired secret key", ex);
+    assertThat(ex).hasMessageContaining("Token can't be verified due to expired secret key");
   }
 
   @Test
@@ -254,7 +252,7 @@ public final class TestBlockTokens {
         assertThrows(StorageContainerException.class,
             () -> readDataWithoutRetry(keyInfo));
     assertEquals(BLOCK_TOKEN_VERIFICATION_FAILED, ex.getResult());
-    assertExceptionContains("Can't find the signing secret key", ex);
+    assertThat(ex).hasMessageContaining("Can't find the signing secret key");
   }
 
   @Test
@@ -277,7 +275,7 @@ public final class TestBlockTokens {
         assertThrows(StorageContainerException.class,
             () -> readDataWithoutRetry(keyInfo));
     assertEquals(BLOCK_TOKEN_VERIFICATION_FAILED, ex.getResult());
-    assertExceptionContains("Invalid token for user", ex);
+    assertThat(ex).hasMessageContaining("Invalid token for user");
   }
 
   private UUID extractSecretKeyId(OmKeyInfo keyInfo) throws IOException {

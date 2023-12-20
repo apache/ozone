@@ -76,6 +76,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.apache.ozone.test.JUnit5AwareTimeout;
@@ -350,8 +351,8 @@ public class TestRootedOzoneFileSystem {
     // Creating a child should not add parent keys to the bucket
     try {
       getKey(parent, true);
-    } catch (IOException ex) {
-      assertKeyNotFoundException(ex);
+    } catch (OMException ome) {
+      Assertions.assertEquals(KEY_NOT_FOUND, ome.getResult());
     }
 
     // List status on the parent should show the child file
@@ -421,9 +422,10 @@ public class TestRootedOzoneFileSystem {
     // Creating a child should not add parent keys to the bucket
     try {
       getKey(parent, true);
-    } catch (IOException ex) {
-      assertKeyNotFoundException(ex);
+    } catch (OMException ome) {
+      Assertions.assertEquals(KEY_NOT_FOUND, ome.getResult());
     }
+
 
     // Delete the child key
     assertTrue(fs.delete(child, false));
@@ -969,10 +971,6 @@ public class TestRootedOzoneFileSystem {
     String keyInBucket = ofsPath.getKeyName();
     return client.getObjectStore().getVolume(volumeName)
         .getBucket(bucketName).getKey(keyInBucket);
-  }
-
-  private void assertKeyNotFoundException(IOException ex) {
-    GenericTestUtils.assertExceptionContains("KEY_NOT_FOUND", ex);
   }
 
   /**

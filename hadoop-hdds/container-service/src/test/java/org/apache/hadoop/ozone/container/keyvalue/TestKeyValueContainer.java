@@ -25,8 +25,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
-import org.apache.hadoop.hdds.scm.container.common.helpers
-    .StorageContainerException;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -43,8 +42,7 @@ import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume
-    .RoundRobinVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -92,9 +90,11 @@ import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConf
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.apache.ratis.util.Preconditions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -540,20 +540,14 @@ public class TestKeyValueContainer {
   }
 
   @ContainerTestVersionInfo.ContainerTest
-  public void testDuplicateContainer(ContainerTestVersionInfo versionInfo)
-      throws Exception {
+  public void testDuplicateContainer(ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
-    try {
-      // Create Container.
-      keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
-      keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
-      fail("testDuplicateContainer failed");
-    } catch (StorageContainerException ex) {
-      GenericTestUtils.assertExceptionContains("ContainerFile already " +
-          "exists", ex);
-      assertEquals(ContainerProtos.Result.CONTAINER_ALREADY_EXISTS, ex
-          .getResult());
-    }
+
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+    StorageContainerException exception = assertThrows(StorageContainerException.class, () ->
+        keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId));
+    assertEquals(ContainerProtos.Result.CONTAINER_ALREADY_EXISTS, exception.getResult());
+    assertThat(exception).hasMessage("Container creation failed because ContainerFile already exists");
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -563,14 +557,11 @@ public class TestKeyValueContainer {
     Mockito.reset(volumeChoosingPolicy);
     Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenThrow(DiskChecker.DiskOutOfSpaceException.class);
-    try {
-      keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
-      fail("testDiskFullExceptionCreateContainer failed");
-    } catch (StorageContainerException ex) {
-      GenericTestUtils.assertExceptionContains("disk out of space",
-          ex);
-      assertEquals(ContainerProtos.Result.DISK_OUT_OF_SPACE, ex.getResult());
-    }
+
+    StorageContainerException exception = assertThrows(StorageContainerException.class, () ->
+        keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId));
+    assertEquals(ContainerProtos.Result.DISK_OUT_OF_SPACE, exception.getResult());
+    assertThat(exception).hasMessage("Container creation failed, due to disk out of space");
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -669,20 +660,20 @@ public class TestKeyValueContainer {
   public void testUpdateContainerUnsupportedRequest(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
-    try {
-      closeContainer();
+
+    closeContainer();
+
+    StorageContainerException exception = assertThrows(StorageContainerException.class, () -> {
       keyValueContainer = new KeyValueContainer(keyValueContainerData, CONF);
       keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
       Map<String, String> metadata = new HashMap<>();
       metadata.put(OzoneConsts.VOLUME, OzoneConsts.OZONE);
       keyValueContainer.update(metadata, false);
-      fail("testUpdateContainerUnsupportedRequest failed");
-    } catch (StorageContainerException ex) {
-      GenericTestUtils.assertExceptionContains("Updating a closed container " +
-          "without force option is not allowed", ex);
-      assertEquals(ContainerProtos.Result.UNSUPPORTED_REQUEST, ex
-          .getResult());
-    }
+    });
+
+    assertEquals(ContainerProtos.Result.UNSUPPORTED_REQUEST, exception.getResult());
+    assertThat(exception)
+        .hasMessageStartingWith("Updating a closed container without force option is not allowed. ContainerID: ");
   }
 
 
