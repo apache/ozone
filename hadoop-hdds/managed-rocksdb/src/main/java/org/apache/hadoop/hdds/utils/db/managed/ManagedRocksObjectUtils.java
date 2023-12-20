@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.utils.db.managed;
 
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.resource.LeakDetector;
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
 import org.rocksdb.RocksDB;
@@ -41,6 +42,9 @@ public final class ManagedRocksObjectUtils {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(ManagedRocksObjectUtils.class);
+
+  static final LeakDetector LEAK_DETECTOR = new LeakDetector("ManagedRocksObject");
+
   private static final Duration POLL_DELAY_DURATION = Duration.ZERO;
   private static final Duration POLL_INTERVAL_DURATION = Duration.ofMillis(100);
 

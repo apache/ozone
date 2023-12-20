@@ -18,23 +18,26 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.hadoop.hdds.resource.Leakable;
 import org.rocksdb.Slice;
 
 import javax.annotation.Nullable;
 
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.LEAK_DETECTOR;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.formatStackTrace;
 
 /**
  * Managed Slice.
  */
-public class ManagedSlice extends Slice {
+public class ManagedSlice extends Slice implements Leakable {
 
   @Nullable
   private final StackTraceElement[] elements;
 
-  public ManagedSlice(byte[] var1) {
-    super(var1);
+  public ManagedSlice(byte[] data) {
+    super(data);
     this.elements = ManagedRocksObjectUtils.getStackTrace();
+    LEAK_DETECTOR.watch(this);
   }
 
   @Override
@@ -43,12 +46,11 @@ public class ManagedSlice extends Slice {
   }
 
   @Override
-  protected void finalize() throws Throwable {
+  public void check() {
     ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
     if (isOwningHandle()) {
       ManagedRocksObjectUtils.reportLeak(this, formatStackTrace(elements));
     }
-    super.finalize();
   }
 
 }

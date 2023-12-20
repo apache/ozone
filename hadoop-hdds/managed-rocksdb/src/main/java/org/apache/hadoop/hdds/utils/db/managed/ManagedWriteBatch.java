@@ -18,10 +18,12 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.hadoop.hdds.resource.Leakable;
 import org.rocksdb.WriteBatch;
 
 import javax.annotation.Nullable;
 
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.LEAK_DETECTOR;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.assertClosed;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.formatStackTrace;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.getStackTrace;
@@ -29,22 +31,22 @@ import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.ge
 /**
  * Managed WriteBatch.
  */
-public class ManagedWriteBatch extends WriteBatch {
+public class ManagedWriteBatch extends WriteBatch implements Leakable {
 
   @Nullable
   private final StackTraceElement[] elements = getStackTrace();
 
   public ManagedWriteBatch() {
-    super();
+    LEAK_DETECTOR.watch(this);
   }
 
   public ManagedWriteBatch(byte[] data) {
     super(data);
+    LEAK_DETECTOR.watch(this);
   }
 
   @Override
-  protected void finalize() throws Throwable {
+  public void check() {
     assertClosed(this, formatStackTrace(elements));
-    super.finalize();
   }
 }

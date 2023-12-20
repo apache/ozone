@@ -18,10 +18,12 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.hadoop.hdds.resource.Leakable;
 import org.rocksdb.FlushOptions;
 
 import javax.annotation.Nullable;
 
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.LEAK_DETECTOR;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.assertClosed;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.formatStackTrace;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.getStackTrace;
@@ -29,14 +31,15 @@ import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.ge
 /**
  * Managed FlushOptions.
  */
-public class ManagedFlushOptions extends FlushOptions {
-
+public class ManagedFlushOptions extends FlushOptions implements Leakable {
+  public ManagedFlushOptions() {
+    LEAK_DETECTOR.watch(this);
+  }
   @Nullable
   private final StackTraceElement[] elements = getStackTrace();
 
   @Override
-  protected void finalize() throws Throwable {
+  public void check() {
     assertClosed(this, formatStackTrace(elements));
-    super.finalize();
   }
 }
