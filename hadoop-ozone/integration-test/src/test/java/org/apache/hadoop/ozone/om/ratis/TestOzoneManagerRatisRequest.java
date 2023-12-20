@@ -39,7 +39,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 
@@ -65,7 +64,7 @@ public class TestOzoneManagerRatisRequest {
   public void testRequestWithNonExistentBucket() throws Exception {
     ozoneManager = Mockito.mock(OzoneManager.class);
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        Files.createTempDirectory(folder, "om").toString());
+        folder.resolve("om").toAbsolutePath().toString());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
@@ -106,7 +105,7 @@ public class TestOzoneManagerRatisRequest {
 
     ozoneManager = Mockito.mock(OzoneManager.class);
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        Files.createTempDirectory(folder, "om").toString());
+        folder.resolve("om").toAbsolutePath().toString());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);

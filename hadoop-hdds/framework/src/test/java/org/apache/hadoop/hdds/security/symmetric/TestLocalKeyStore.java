@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.security.symmetric;
 import com.google.common.collect.ImmutableList;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -53,17 +54,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Test cases for {@link LocalSecretKeyStore}.
  */
-public class TestLocalKeyStore {
+class TestLocalKeyStore {
   private SecretKeyStore secretKeyStore;
   private Path testSecretFile;
 
+  @TempDir
+  private Path tempDir;
+
   @BeforeEach
-  private void setup() throws Exception {
-    testSecretFile = Files.createTempFile("key-strore-test", ".json");
+  void setup() throws IOException {
+    testSecretFile = Files.createFile(tempDir.resolve("key-store-test.json"));
     secretKeyStore = new LocalSecretKeyStore(testSecretFile);
   }
 
-  public static Stream<Arguments> saveAndLoadTestCases() throws Exception {
+  static Stream<Arguments> saveAndLoadTestCases() throws Exception {
     return Stream.of(
         // empty
         Arguments.of(ImmutableList.of()),
@@ -81,7 +85,7 @@ public class TestLocalKeyStore {
 
   @ParameterizedTest
   @MethodSource("saveAndLoadTestCases")
-  public void testSaveAndLoad(List<ManagedSecretKey> keys) throws IOException {
+  void testSaveAndLoad(List<ManagedSecretKey> keys) throws IOException {
     secretKeyStore.save(keys);
 
     // Ensure the intended file exists and is readable and writeable to
@@ -100,7 +104,7 @@ public class TestLocalKeyStore {
    * Verifies that secret keys are overwritten by subsequent writes.
    */
   @Test
-  public void testOverwrite() throws Exception {
+  void testOverwrite() throws Exception {
     List<ManagedSecretKey> initialKeys =
         newArrayList(generateKey("HmacSHA256"));
     secretKeyStore.save(initialKeys);
@@ -123,7 +127,7 @@ public class TestLocalKeyStore {
    * test fails, instead, analyse the backward-compatibility of the change.
    */
   @Test
-  public void testLoadExistingFile() throws Exception {
+  void testLoadExistingFile() throws Exception {
     // copy test file content to the backing file.
     String testJson = "[\n" +
         "  {\n" +

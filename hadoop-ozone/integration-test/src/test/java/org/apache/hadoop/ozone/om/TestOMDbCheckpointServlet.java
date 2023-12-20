@@ -29,6 +29,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -67,7 +68,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.security.UserGroupInformation;
 
-import org.apache.commons.io.FileUtils;
 
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME;
@@ -140,9 +140,10 @@ public class TestOMDbCheckpointServlet {
   private Path compactionDirPath;
   private DBCheckpoint dbCheckpoint;
   private String method;
-  private File folder;
+  @TempDir
+  private Path folder;
   private static final String FABRICATED_FILE_NAME = "fabricatedFile.sst";
-  private FileOutputStream fileOutputStream;
+
   /**
    * Create a MiniDFSCluster for testing.
    * <p>
@@ -151,16 +152,15 @@ public class TestOMDbCheckpointServlet {
    * @throws Exception
    */
   @BeforeEach
-  public void init(@TempDir File tempDir) throws Exception {
-    folder = tempDir;
+  void init() throws Exception {
     conf = new OzoneConfiguration();
 
-    tempFile = File.createTempFile("temp_" + System
-        .currentTimeMillis(), ".tar");
-
-    fileOutputStream = new FileOutputStream(tempFile);
+    final Path tempPath = folder.resolve("temp.tar");
+    tempFile = tempPath.toFile();
 
     servletOutputStream = new ServletOutputStream() {
+      private final OutputStream fileOutputStream = Files.newOutputStream(tempPath);
+
       @Override
       public boolean isReady() {
         return true;
@@ -168,6 +168,12 @@ public class TestOMDbCheckpointServlet {
 
       @Override
       public void setWriteListener(WriteListener writeListener) {
+      }
+
+      @Override
+      public void close() throws IOException {
+        fileOutputStream.close();
+        super.close();
       }
 
       @Override
@@ -185,7 +191,6 @@ public class TestOMDbCheckpointServlet {
     if (cluster != null) {
       cluster.shutdown();
     }
-    FileUtils.deleteQuietly(tempFile);
   }
 
   private void setupCluster() throws Exception {
@@ -458,7 +463,7 @@ public class TestOMDbCheckpointServlet {
     dbCheckpoint = realCheckpoint.get();
 
     // Untar the file into a temp folder to be examined.
-    String testDirName = folder.getAbsolutePath();
+    String testDirName = folder.resolve("testDir").toString();
     int testDirLength = testDirName.length() + 1;
     String newDbDirName = testDirName + OM_KEY_PREFIX + OM_DB_NAME;
     int newDbDirLength = newDbDirName.length() + 1;
@@ -556,14 +561,14 @@ public class TestOMDbCheckpointServlet {
         .thenReturn(null);
 
     // Get the tarball.
-    Path tmpdir = Files.createTempDirectory("bootstrapData");
+    Path tmpdir = folder.resolve("bootstrapData");
     try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
       omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
           fileOutputStream, new ArrayList<>(), new ArrayList<>(), tmpdir);
     }
 
     // Untar the file into a temp folder to be examined.
-    String testDirName = folder.getAbsolutePath();
+    String testDirName = folder.resolve("testDir").toString();
     int testDirLength = testDirName.length() + 1;
     FileUtil.unTar(tempFile, new File(testDirName));
 
@@ -603,14 +608,14 @@ public class TestOMDbCheckpointServlet {
         .thenReturn(null);
 
     // Get the tarball.
-    Path tmpdir = Files.createTempDirectory("bootstrapData");
+    Path tmpdir = folder.resolve("bootstrapData");
     try (FileOutputStream fileOutputStream = new FileOutputStream(tempFile)) {
       omDbCheckpointServletMock.writeDbDataToStream(dbCheckpoint, requestMock,
           fileOutputStream, toExcludeList, excludedList, tmpdir);
     }
 
     // Untar the file into a temp folder to be examined.
-    String testDirName = folder.getAbsolutePath();
+    String testDirName = folder.resolve("testDir").toString();
     int testDirLength = testDirName.length() + 1;
     FileUtil.unTar(tempFile, new File(testDirName));
 
