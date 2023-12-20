@@ -226,6 +226,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
    */
   public void addNewContainer(ContainerWithPipeline containerWithPipeline)
       throws IOException {
+    ReconPipelineManager reconPipelineManager = (ReconPipelineManager) pipelineManager;
     ContainerInfo containerInfo = containerWithPipeline.getContainerInfo();
     try {
       if (containerInfo.getState().equals(HddsProtos.LifeCycleState.OPEN)) {
@@ -234,7 +235,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
         if (!pipelineManager.containsPipeline(pipelineID)) {
           // Pipeline is not present, add it first.
           LOG.info("Adding new pipeline {} from SCM.", pipelineID);
-          addPipeline(containerWithPipeline.getPipeline());
+          reconPipelineManager.addPipeline(containerWithPipeline.getPipeline());
         }
 
         getContainerStateManager().addContainer(containerInfo.getProtobuf());
@@ -259,26 +260,6 @@ public class ReconContainerManager extends ContainerManagerImpl {
           containerInfo.getPipelineID(),
           ContainerID.valueOf(containerInfo.getContainerID()));
       throw ex;
-    }
-  }
-
-  /**
-   * Add a new pipeline to the pipeline metadata.
-   *
-   * @param pipeline pipeline
-   * @throws IOException
-   */
-  public void addPipeline(Pipeline pipeline)
-      throws IOException {
-    ReconPipelineManager reconPipelineManager =
-        (ReconPipelineManager) pipelineManager;
-
-    reconPipelineManager.acquireWriteLock();
-    try {
-      reconPipelineManager.getStateManager().addPipeline(
-          pipeline.getProtobufMessage(ClientVersion.CURRENT_VERSION));
-    } finally {
-      reconPipelineManager.releaseWriteLock();
     }
   }
 
