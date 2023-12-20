@@ -202,7 +202,7 @@ public class TestOMRatisSnapshots {
   @ValueSource(ints = {100})
   // tried up to 1000 snapshots and this test works, but some of the
   //  timeouts have to be increased.
-  public void testInstallSnapshot(int numSnapshotsToCreate) throws Exception {
+  void testInstallSnapshot(int numSnapshotsToCreate, @TempDir Path tempDir) throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
         .getFailoverProxyProvider(objectStore.getClientProxy())
@@ -221,7 +221,7 @@ public class TestOMRatisSnapshots {
     FaultInjector faultInjector =
         new SnapshotMaxSizeInjector(leaderOM,
             followerOM.getOmSnapshotProvider().getSnapshotDir(),
-            sstSetList);
+            sstSetList, tempDir);
     followerOM.getOmSnapshotProvider().setInjector(faultInjector);
 
     // Create some snapshots, each with new keys
@@ -1186,11 +1186,11 @@ public class TestOMRatisSnapshots {
     private final List<Set<String>> sstSetList;
     private final Path tempDir;
     SnapshotMaxSizeInjector(OzoneManager om, File snapshotDir,
-                            List<Set<String>> sstSetList) throws IOException {
+                            List<Set<String>> sstSetList, Path tempDir) {
       this.om = om;
       this.snapshotDir = snapshotDir;
       this.sstSetList = sstSetList;
-      this.tempDir = Files.createTempDirectory("tmpDirPrefix");
+      this.tempDir = tempDir;
       init();
     }
 

@@ -930,8 +930,7 @@ public class TestPipelineManagerImpl {
     
     ContainerInfo c = provider.getContainer(1, repConfig,
         owner, new ExcludeList());
-    Assertions.assertTrue(c.equals(container),
-        "Expected container was returned");
+    Assertions.assertEquals(c, container, "Expected container was returned");
 
     // Confirm that waitOnePipelineReady was called on allocated pipelines
     ArgumentCaptor<Collection<PipelineID>> captor =

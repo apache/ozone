@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -60,7 +59,6 @@ import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -118,8 +116,8 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
 
     // Write data into a key
     try (OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes(UTF_8).length, ReplicationType.RATIS,
-        THREE, new HashMap<>())) {
+        value.getBytes(UTF_8).length, ReplicationConfig.fromTypeAndFactor(
+            ReplicationType.RATIS, THREE), new HashMap<>())) {
       out.write(value.getBytes(UTF_8));
     }
 
@@ -133,7 +131,7 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] b = new byte[value.getBytes(UTF_8).length];
       is.read(b);
-      assertTrue(Arrays.equals(b, value.getBytes(UTF_8)));
+      assertArrayEquals(b, value.getBytes(UTF_8));
     } catch (OzoneChecksumException e) {
       fail("Read key should succeed");
     }
@@ -142,7 +140,7 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] b = new byte[value.getBytes(UTF_8).length];
       is.read(b);
-      assertTrue(Arrays.equals(b, value.getBytes(UTF_8)));
+      assertArrayEquals(b, value.getBytes(UTF_8));
     } catch (OzoneChecksumException e) {
       fail("Read file should succeed");
     }
@@ -157,7 +155,7 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
       try (OzoneInputStream is = newBucket.readKey(keyName)) {
         byte[] b = new byte[value.getBytes(UTF_8).length];
         is.read(b);
-        assertTrue(Arrays.equals(b, value.getBytes(UTF_8)));
+        assertArrayEquals(b, value.getBytes(UTF_8));
       } catch (OzoneChecksumException e) {
         fail("Read key should succeed");
       }
@@ -166,7 +164,7 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
       try (OzoneInputStream is = newBucket.readFile(keyName)) {
         byte[] b = new byte[value.getBytes(UTF_8).length];
         is.read(b);
-        assertTrue(Arrays.equals(b, value.getBytes(UTF_8)));
+        assertArrayEquals(b, value.getBytes(UTF_8));
       } catch (OzoneChecksumException e) {
         fail("Read file should succeed");
       }

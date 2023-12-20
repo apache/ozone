@@ -92,6 +92,7 @@ import org.junit.jupiter.api.Assertions;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
@@ -614,7 +615,7 @@ public class TestContainerPersistence {
         .getVolume().getCommittedBytes();
     commitDecrement = commitBytesBefore - commitBytesAfter;
     // did we decrement commit bytes by the amount of data we wrote?
-    Assertions.assertTrue(commitDecrement == info.getLen());
+    assertEquals(commitDecrement, info.getLen());
     return info;
 
   }
@@ -810,7 +811,7 @@ public class TestContainerPersistence {
           getBlock(container, blockID1);
       Assertions.fail("Expected exception not thrown");
     } catch (StorageContainerException sce) {
-      Assertions.assertTrue(sce.getResult() == UNKNOWN_BCSID);
+      assertSame(UNKNOWN_BCSID, sce.getResult());
     }
 
     try {
@@ -821,7 +822,7 @@ public class TestContainerPersistence {
           getBlock(container, blockID1);
       Assertions.fail("Expected exception not thrown");
     } catch (StorageContainerException sce) {
-      Assertions.assertTrue(sce.getResult() == BCSID_MISMATCH);
+      assertSame(BCSID_MISMATCH, sce.getResult());
     }
     readBlockData = blockManager.
         getBlock(container, blockData.getBlockID());
