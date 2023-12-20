@@ -116,7 +116,6 @@ public class TestNSSummaryAdmin extends StandardOutputTestBase {
     String path = "/";
     executeAdminCommands(path);
     // Should throw warning - only buckets can have bucket layout.
-    System.out.println("**"+ getOutContentString());
     assertTrue(getOutContentString().contains("[Warning] Namespace CLI is not designed for OBS bucket layout."));
     assertTrue(getOutContentString().contains("Put more files into it to visualize DU"));
     assertTrue(getOutContentString().contains("Put more files into it to visualize file size distribution"));
