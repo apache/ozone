@@ -28,6 +28,9 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LOOP_LIMIT;
 import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmDeltaRequest;
 import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmSnapshotRequest;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.slf4j.event.Level.INFO;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -63,34 +66,27 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
 
 import com.google.gson.Gson;
 import com.google.gson.internal.LinkedTreeMap;
-import org.junit.Rule;
-import org.junit.rules.Timeout;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Test Ozone Recon.
  */
+@Timeout(300)
 public class TestReconWithOzoneManager {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
   private static OMMetadataManager metadataManager;
   private static CloseableHttpClient httpClient;
-  private static String containerKeyServiceURL;
   private static String taskStatusURL;
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     int socketTimeout = (int) conf.getTimeDuration(
@@ -133,8 +129,6 @@ public class TestReconWithOzoneManager {
     InetSocketAddress address =
         cluster.getReconServer().getHttpServer().getHttpAddress();
     String reconHTTPAddress = address.getHostName() + ":" + address.getPort();
-    containerKeyServiceURL = "http://" + reconHTTPAddress +
-        "/api/v1/containers";
     taskStatusURL = "http://" + reconHTTPAddress + "/api/v1/task/status";
 
     // initialize HTTPClient
@@ -144,7 +138,7 @@ public class TestReconWithOzoneManager {
         .build();
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -190,8 +184,8 @@ public class TestReconWithOzoneManager {
         metadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
 
     // verify if OM has /vol0/bucket0/key0
-    Assert.assertEquals("vol0", keyInfo1.getVolumeName());
-    Assert.assertEquals("bucket0", keyInfo1.getBucketName());
+    assertEquals("vol0", keyInfo1.getVolumeName());
+    assertEquals("bucket0", keyInfo1.getBucketName());
 
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
         cluster.getReconServer().getOzoneManagerServiceProvider();
@@ -209,8 +203,8 @@ public class TestReconWithOzoneManager {
         "lastUpdatedSeqNumber");
 
     // verify sequence number after full snapshot
-    Assert.assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
-    Assert.assertEquals(0, metrics.getSequenceNumberLag().value());
+    assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
+    assertEquals(0, metrics.getSequenceNumberLag().value());
 
     //add 4 keys to check for delta updates
     addKeys(1, 5);
@@ -227,8 +221,8 @@ public class TestReconWithOzoneManager {
         taskStatusResponse, OmDeltaRequest.name(), "lastUpdatedSeqNumber");
 
     //verify sequence number after Delta Updates
-    Assert.assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
-    Assert.assertEquals(0, metrics.getSequenceNumberLag().value());
+    assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
+    assertEquals(0, metrics.getSequenceNumberLag().value());
 
     long beforeRestartSnapShotTimeStamp = getReconTaskAttributeFromJson(
         taskStatusResponse,
@@ -263,12 +257,134 @@ public class TestReconWithOzoneManager {
             "lastUpdatedTimestamp");
 
     // verify only Delta updates were added to recon after restart.
-    Assert.assertEquals(beforeRestartSnapShotTimeStamp,
+    assertEquals(beforeRestartSnapShotTimeStamp,
         afterRestartSnapShotTimeStamp);
 
     //verify sequence number after Delta Updates
-    Assert.assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
-    Assert.assertEquals(0, metrics.getSequenceNumberLag().value());
+    assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
+    assertEquals(0, metrics.getSequenceNumberLag().value());
+  }
+
+  // This test simulates the mis-match in sequence number between Recon OM
+  // snapshot DB and OzoneManager OM active DB. Recon sync with OM DB every
+  // 5-10 mins based on configured interval and if Recon OM snapshot DB
+  // has higher sequence number than OM active DB last sequence number,
+  // then OM DB updates call since last sequence number will fail as OM DB
+  // will not know about that sequence number which is not yet written to
+  // OM Rocks DB. In such case OM sets the 'isDBUpdateSuccess' flag as false.
+  // And Recon should fall back on full snapshot and recover itself.
+  @Test
+  public void testOmDBSyncWithSeqNumberMismatch() throws Exception {
+    GenericTestUtils.LogCapturer
+        logs = GenericTestUtils.LogCapturer.captureLogs(RDBStore.getLogger());
+    GenericTestUtils.setLogLevel(RDBStore.getLogger(), INFO);
+
+    GenericTestUtils.LogCapturer
+        omServiceProviderImplLogs = GenericTestUtils.LogCapturer.captureLogs(
+        OzoneManagerServiceProviderImpl.getLogger());
+    GenericTestUtils.setLogLevel(OzoneManagerServiceProviderImpl.getLogger(),
+        INFO);
+
+    // add a vol, bucket and key
+    addKeys(10, 15);
+
+    // check if OM metadata has vol10/bucket10/key10 info
+    String ozoneKey = metadataManager.getOzoneKey(
+        "vol10", "bucket10", "key10");
+    OmKeyInfo keyInfo1 =
+        metadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+
+    // verify if OM has /vol10/bucket10/key10
+    assertEquals("vol10", keyInfo1.getVolumeName());
+    assertEquals("bucket10", keyInfo1.getBucketName());
+
+    OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
+        cluster.getReconServer().getOzoneManagerServiceProvider();
+    impl.syncDataFromOM();
+    OzoneManagerSyncMetrics metrics = impl.getMetrics();
+
+    // HTTP call to /api/task/status
+    long omLatestSeqNumber = ((RDBStore) metadataManager.getStore())
+        .getDb().getLatestSequenceNumber();
+
+    String taskStatusResponse = makeHttpCall(taskStatusURL);
+    long reconLatestSeqNumber = getReconTaskAttributeFromJson(
+        taskStatusResponse,
+        OmDeltaRequest.name(),
+        "lastUpdatedSeqNumber");
+
+    // verify sequence number after incremental delta snapshot
+    assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
+    assertEquals(0, metrics.getSequenceNumberLag().value());
+
+    OMMetadataManager reconMetadataManagerInstance =
+        cluster.getReconServer().getOzoneManagerServiceProvider()
+            .getOMMetadataManagerInstance();
+
+    String volume = "vol15";
+    String bucket = "bucket15";
+    String key = "key15";
+    String omKey = reconMetadataManagerInstance.getOzoneKey(volume,
+        bucket, key);
+
+    // Write additional key in new volume and new bucket in Recon OM snapshot
+    // DB to increase the last sequence number by 1 in comparison to OM
+    // active DB, this simulates the mis-match between 2 DBs before triggering
+    // syncDataFromOM call.
+    reconMetadataManagerInstance.getKeyTable(getBucketLayout()).put(omKey,
+        new OmKeyInfo.Builder()
+            .setBucketName(bucket)
+            .setVolumeName(volume)
+            .setKeyName(key)
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.ONE))
+            .setOmKeyLocationInfos(
+                Collections.singletonList(getOmKeyLocationInfoGroup()))
+            .build());
+
+    reconLatestSeqNumber =
+        ((RDBStore) reconMetadataManagerInstance.getStore()).getDb()
+            .getLatestSequenceNumber();
+    assertEquals(omLatestSeqNumber + 1, reconLatestSeqNumber);
+
+    // This OM DB sync call will eventually fail and throw exception at OM
+    // cluster's getDBUpdates(since lastSequenceNumber) API as expected and
+    // will return 'isDBUpdateSuccess' flag as false which will force Recon
+    // to fallback on full snapshot. Full snapshot sync should normalize the
+    // OM active DB lastSequence number and Recon's OM snapshot DB lastSequence
+    // number.
+    impl.syncDataFromOM();
+    assertTrue(logs.getOutput()
+        .contains("Requested sequence not yet written in the db"));
+    assertTrue(logs.getOutput()
+        .contains("Returned DBUpdates isDBUpdateSuccess: false"));
+    reconLatestSeqNumber =
+        ((RDBStore) reconMetadataManagerInstance.getStore()).getDb()
+            .getLatestSequenceNumber();
+    assertEquals(0, metrics.getSequenceNumberLag().value());
+    assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
+    reconLatestSeqNumber = getReconTaskAttributeFromJson(
+        taskStatusResponse,
+        OmDeltaRequest.name(),
+        "lastUpdatedSeqNumber");
+    assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
+    assertEquals(17, omLatestSeqNumber);
+    assertEquals(17, reconLatestSeqNumber);
+    impl.syncDataFromOM();
+    assertTrue(omServiceProviderImplLogs.getOutput()
+        .contains("isDBUpdateSuccess: true"));
+  }
+
+  private static OmKeyLocationInfoGroup getOmKeyLocationInfoGroup() {
+    Pipeline pipeline = HddsTestUtils.getRandomPipeline();
+    List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
+    BlockID blockID = new BlockID(15, 1);
+    OmKeyLocationInfo omKeyLocationInfo1 = getOmKeyLocationInfo(blockID,
+        pipeline);
+    omKeyLocationInfoList.add(omKeyLocationInfo1);
+    OmKeyLocationInfoGroup omKeyLocationInfoGroup = new
+        OmKeyLocationInfoGroup(0, omKeyLocationInfoList);
+    return omKeyLocationInfoGroup;
   }
 
   private long getReconTaskAttributeFromJson(String taskStatusResponse,
@@ -280,7 +396,7 @@ public class TestReconWithOzoneManager {
             .stream()
             .filter(task -> task.get("taskName").equals(taskName))
             .findFirst();
-    Assert.assertTrue(taskEntity.isPresent());
+    assertTrue(taskEntity.isPresent());
     return (long)(double) taskEntity.get().get(entityAttribute);
   }
 

@@ -36,13 +36,10 @@ import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.event.Level;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
@@ -50,30 +47,23 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVA
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CLOSE_CONTAINER;
 import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer.runTestOzoneContainerViaDataNode;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Recon's passive SCM integration tests.
  */
+@Timeout(180)
 public class TestReconAsPassiveScm {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
-
-  private MiniOzoneCluster cluster = null;
+  private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
 
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
-
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(HDDS_CONTAINER_REPORT_INTERVAL, "5s");
@@ -84,7 +74,7 @@ public class TestReconAsPassiveScm {
     GenericTestUtils.setLogLevel(ReconNodeManager.LOG, Level.DEBUG);
   }
 
-  @After
+  @AfterEach
   public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -108,7 +98,7 @@ public class TestReconAsPassiveScm {
       try {
         assertNotNull(reconPipelineManager.getPipeline(p.getId()));
       } catch (PipelineNotFoundException e) {
-        Assert.fail();
+        fail();
       }
     });
 
@@ -190,7 +180,8 @@ public class TestReconAsPassiveScm {
         .filter(p -> !p.getId().equals(containerInfo.getPipelineID()))
         .findFirst();
     assertTrue(pipelineToClose.isPresent());
-    scmPipelineManager.closePipeline(pipelineToClose.get(), false);
+    scmPipelineManager.closePipeline(pipelineToClose.get().getId());
+    scmPipelineManager.deletePipeline(pipelineToClose.get().getId());
 
     // Start Recon
     cluster.startRecon();

@@ -372,30 +372,6 @@ public class TestSstFilteringService {
     managerProtocol.commitKey(keyArg, session.getId());
   }
 
-  @Test
-  public void testFilterFunction() {
-    assertTrue(SstFilteringService.FILTER_FUNCTION.apply(
-        "/vol1/bucket1/key1",
-        "/vol1/bucket1/key1",
-        "/vol1/bucket1/"));
-    assertTrue(SstFilteringService.FILTER_FUNCTION.apply(
-        "/vol1/bucket1/key1",
-        "/vol1/bucket5/key1",
-        "/vol1/bucket3/"));
-    assertFalse(SstFilteringService.FILTER_FUNCTION.apply(
-        "/vol1/bucket1/key1",
-        "/vol1/bucket4/key9",
-        "/vol1/bucket5/"));
-    assertFalse(SstFilteringService.FILTER_FUNCTION.apply(
-        "/vol1/bucket1/key1",
-        "/vol1/bucket1/key1",
-        "/vol1/bucket2/"));
-    assertFalse(SstFilteringService.FILTER_FUNCTION.apply(
-        "/vol1/bucket1/key1",
-        "/vol1/bucket1/key1",
-        "/vol1/bucket/"));
-  }
-
   /**
    * Test to verify the data integrity after SST filtering service runs.
    * This test creates 150 keys randomly in one of the three buckets. It also

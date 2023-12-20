@@ -932,7 +932,7 @@ public class ContainerBalancerTask implements Runnable {
       return 0;
     }
     SCMNodeStat aggregatedStats = new SCMNodeStat(
-        0, 0, 0);
+        0, 0, 0, 0, 0);
     for (DatanodeUsageInfo node : nodes) {
       aggregatedStats.add(node.getScmNodeStat());
     }

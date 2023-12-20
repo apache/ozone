@@ -25,8 +25,8 @@ import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -50,7 +50,7 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
 
     OMRequest modifiedRequest = omVolumeSetQuotaRequest.preExecute(
         ozoneManager);
-    Assert.assertNotEquals(modifiedRequest, originalRequest);
+    Assertions.assertNotEquals(modifiedRequest, originalRequest);
   }
 
 
@@ -79,19 +79,18 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
 
 
     OMClientResponse omClientResponse =
-        omVolumeSetOwnerRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeSetOwnerRequest.validateAndUpdateCache(ozoneManager, 1);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
-    Assert.assertNotNull(omResponse.getSetVolumePropertyResponse());
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    Assertions.assertNotNull(omResponse.getSetVolumePropertyResponse());
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omResponse.getStatus());
 
 
     String fromDBOwner = omMetadataManager
         .getVolumeTable().get(volumeKey).getOwnerName();
-    Assert.assertEquals(newOwner, fromDBOwner);
+    Assertions.assertEquals(newOwner, fromDBOwner);
 
     // modificationTime should be greater than creationTime.
     long creationTime = omMetadataManager.getVolumeTable()
@@ -103,21 +102,21 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
     // millisecond - since there is no time-consuming operation between
     // OMRequestTestUtils.addVolumeToDB (sets creationTime) and
     // preExecute (sets modificationTime).
-    Assert.assertTrue(modificationTime >= creationTime);
+    Assertions.assertTrue(modificationTime >= creationTime);
 
     OzoneManagerStorageProtos.PersistedUserVolumeInfo newOwnerVolumeList =
         omMetadataManager.getUserTable().get(newOwnerKey);
 
-    Assert.assertNotNull(newOwnerVolumeList);
-    Assert.assertEquals(volumeName,
+    Assertions.assertNotNull(newOwnerVolumeList);
+    Assertions.assertEquals(volumeName,
         newOwnerVolumeList.getVolumeNamesList().get(0));
 
     OzoneManagerStorageProtos.PersistedUserVolumeInfo oldOwnerVolumeList =
         omMetadataManager.getUserTable().get(
             omMetadataManager.getUserKey(ownerKey));
 
-    Assert.assertNotNull(oldOwnerVolumeList);
-    Assert.assertTrue(oldOwnerVolumeList.getVolumeNamesList().size() == 0);
+    Assertions.assertNotNull(oldOwnerVolumeList);
+    Assertions.assertEquals(0, oldOwnerVolumeList.getVolumeNamesList().size());
 
   }
 
@@ -138,13 +137,12 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
     omVolumeSetOwnerRequest.preExecute(ozoneManager);
 
     OMClientResponse omClientResponse =
-        omVolumeSetOwnerRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeSetOwnerRequest.validateAndUpdateCache(ozoneManager, 1);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
-    Assert.assertNotNull(omResponse.getCreateVolumeResponse());
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
+    Assertions.assertNotNull(omResponse.getCreateVolumeResponse());
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omResponse.getStatus());
 
   }
@@ -164,13 +162,12 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
     omVolumeSetOwnerRequest.preExecute(ozoneManager);
 
     OMClientResponse omClientResponse =
-        omVolumeSetOwnerRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeSetOwnerRequest.validateAndUpdateCache(ozoneManager, 1);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
-    Assert.assertNotNull(omResponse.getCreateVolumeResponse());
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST,
+    Assertions.assertNotNull(omResponse.getCreateVolumeResponse());
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST,
         omResponse.getStatus());
   }
 
@@ -192,31 +189,31 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
     // Execute the request
     setOwnerRequest.preExecute(ozoneManager);
     OMClientResponse omClientResponse = setOwnerRequest.validateAndUpdateCache(
-        ozoneManager, 1, ozoneManagerDoubleBufferHelper);
+        ozoneManager, 1);
     // Response status should be OK and success flag should be true.
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
-    Assert.assertTrue(omClientResponse.getOMResponse().getSuccess());
+    Assertions.assertTrue(omClientResponse.getOMResponse().getSuccess());
 
     // Execute the same request again but with higher index
     setOwnerRequest.preExecute(ozoneManager);
     omClientResponse = setOwnerRequest.validateAndUpdateCache(
-        ozoneManager, 2, ozoneManagerDoubleBufferHelper);
+        ozoneManager, 2);
     // Response status should be OK, but success flag should be false.
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
-    Assert.assertFalse(omClientResponse.getOMResponse().getSuccess());
+    Assertions.assertFalse(omClientResponse.getOMResponse().getSuccess());
 
     // Check volume names list
     OzoneManagerStorageProtos.PersistedUserVolumeInfo userVolumeInfo =
         omMetadataManager.getUserTable().get(newOwner);
-    Assert.assertNotNull(userVolumeInfo);
+    Assertions.assertNotNull(userVolumeInfo);
     List<String> volumeNamesList = userVolumeInfo.getVolumeNamesList();
-    Assert.assertEquals(1, volumeNamesList.size());
+    Assertions.assertEquals(1, volumeNamesList.size());
 
     Set<String> volumeNamesSet = new HashSet<>(volumeNamesList);
     // If the set size isn't equal to list size, there are duplicates
     // in the list (which was the bug before the fix).
-    Assert.assertEquals(volumeNamesList.size(), volumeNamesSet.size());
+    Assertions.assertEquals(volumeNamesList.size(), volumeNamesSet.size());
   }
 }

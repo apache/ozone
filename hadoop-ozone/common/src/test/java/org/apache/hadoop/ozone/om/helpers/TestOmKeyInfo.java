@@ -32,8 +32,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo.Builder;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.util.Time;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -59,11 +59,11 @@ public class TestOmKeyInfo {
     OmKeyInfo keyAfterSerialization = OmKeyInfo.getFromProtobuf(
         key.getProtobuf(ClientVersion.CURRENT_VERSION));
 
-    Assert.assertEquals(key, keyAfterSerialization);
+    Assertions.assertEquals(key, keyAfterSerialization);
 
-    Assert.assertFalse(key.isHsync());
+    Assertions.assertFalse(key.isHsync());
     key.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID, "clientid");
-    Assert.assertTrue(key.isHsync());
+    Assertions.assertTrue(key.isHsync());
   }
 
   @Test
@@ -74,37 +74,39 @@ public class TestOmKeyInfo {
         key.getProtobuf(ClientVersion.CURRENT_VERSION);
 
     // No EC Config
-    Assert.assertFalse(omKeyProto.hasEcReplicationConfig());
-    Assert.assertEquals(THREE, omKeyProto.getFactor());
-    Assert.assertEquals(RATIS, omKeyProto.getType());
+    Assertions.assertFalse(omKeyProto.hasEcReplicationConfig());
+    Assertions.assertEquals(THREE, omKeyProto.getFactor());
+    Assertions.assertEquals(RATIS, omKeyProto.getType());
 
     // Reconstruct object from Proto
     OmKeyInfo recovered = OmKeyInfo.getFromProtobuf(omKeyProto);
-    Assert.assertEquals(RATIS,
+    Assertions.assertEquals(RATIS,
         recovered.getReplicationConfig().getReplicationType());
-    Assert.assertTrue(
+    Assertions.assertTrue(
         recovered.getReplicationConfig() instanceof RatisReplicationConfig);
 
     // EC Config
     key = createOmKeyInfo(new ECReplicationConfig(3, 2));
-    Assert.assertFalse(key.isHsync());
+    Assertions.assertFalse(key.isHsync());
     omKeyProto = key.getProtobuf(ClientVersion.CURRENT_VERSION);
 
-    Assert.assertEquals(3, omKeyProto.getEcReplicationConfig().getData());
-    Assert.assertEquals(2, omKeyProto.getEcReplicationConfig().getParity());
-    Assert.assertFalse(omKeyProto.hasFactor());
-    Assert.assertEquals(EC, omKeyProto.getType());
+    Assertions.assertEquals(3,
+        omKeyProto.getEcReplicationConfig().getData());
+    Assertions.assertEquals(2,
+        omKeyProto.getEcReplicationConfig().getParity());
+    Assertions.assertFalse(omKeyProto.hasFactor());
+    Assertions.assertEquals(EC, omKeyProto.getType());
 
     // Reconstruct object from Proto
     recovered = OmKeyInfo.getFromProtobuf(omKeyProto);
-    Assert.assertEquals(EC,
+    Assertions.assertEquals(EC,
         recovered.getReplicationConfig().getReplicationType());
-    Assert.assertTrue(
+    Assertions.assertTrue(
         recovered.getReplicationConfig() instanceof ECReplicationConfig);
     ECReplicationConfig config =
         (ECReplicationConfig) recovered.getReplicationConfig();
-    Assert.assertEquals(3, config.getData());
-    Assert.assertEquals(2, config.getParity());
+    Assertions.assertEquals(3, config.getData());
+    Assertions.assertEquals(2, config.getParity());
   }
 
   private OmKeyInfo createOmKeyInfo(ReplicationConfig replicationConfig) {
@@ -151,10 +153,10 @@ public class TestOmKeyInfo {
 
     // OmKeyLocationInfoGroup has now implemented equals() method.
     // assertEquals should work now.
-    Assert.assertEquals(key, cloneKey);
+    Assertions.assertEquals(key, cloneKey);
 
     // Check each version content here.
-    Assert.assertEquals(key.getKeyLocationVersions().size(),
+    Assertions.assertEquals(key.getKeyLocationVersions().size(),
         cloneKey.getKeyLocationVersions().size());
 
     // Check blocks for each version.
@@ -162,16 +164,16 @@ public class TestOmKeyInfo {
       OmKeyLocationInfoGroup orig = key.getKeyLocationVersions().get(i);
       OmKeyLocationInfoGroup clone = key.getKeyLocationVersions().get(i);
 
-      Assert.assertEquals(orig.isMultipartKey(), clone.isMultipartKey());
-      Assert.assertEquals(orig.getVersion(), clone.getVersion());
+      Assertions.assertEquals(orig.isMultipartKey(), clone.isMultipartKey());
+      Assertions.assertEquals(orig.getVersion(), clone.getVersion());
 
-      Assert.assertEquals(orig.getLocationList().size(),
+      Assertions.assertEquals(orig.getLocationList().size(),
           clone.getLocationList().size());
 
       for (int j = 0; j < orig.getLocationList().size(); j++) {
         OmKeyLocationInfo origLocationInfo = orig.getLocationList().get(j);
         OmKeyLocationInfo cloneLocationInfo = clone.getLocationList().get(j);
-        Assert.assertEquals(origLocationInfo, cloneLocationInfo);
+        Assertions.assertEquals(origLocationInfo, cloneLocationInfo);
       }
     }
 
@@ -180,23 +182,23 @@ public class TestOmKeyInfo {
         IAccessAuthorizer.ACLType.WRITE, ACCESS)));
 
     // Change acls and check.
-    Assert.assertNotEquals(key, cloneKey);
+    Assertions.assertNotEquals(key, cloneKey);
 
-    Assert.assertNotEquals(key.getAcls(), cloneKey.getAcls());
+    Assertions.assertNotEquals(key.getAcls(), cloneKey.getAcls());
 
     // clone now again
     cloneKey = key.copyObject();
 
-    Assert.assertEquals(key.getAcls(), cloneKey.getAcls());
+    Assertions.assertEquals(key.getAcls(), cloneKey.getAcls());
   }
 
 
   private OmKeyLocationInfoGroup createOmKeyLocationInfoGroup(boolean isMPU) {
     List<OmKeyLocationInfo> omKeyLocationInfos = new ArrayList<>();
-    omKeyLocationInfos.add(getOmKeyLocationInfo(new BlockID(100L, 101L),
-        getPipeline()));
-    omKeyLocationInfos.add(getOmKeyLocationInfo(new BlockID(101L, 100L),
-        getPipeline()));
+    omKeyLocationInfos.add(getOmKeyLocationInfo(new BlockID(
+        100L, 101L), getPipeline()));
+    omKeyLocationInfos.add(getOmKeyLocationInfo(new BlockID(
+        101L, 100L), getPipeline()));
     return new OmKeyLocationInfoGroup(0, omKeyLocationInfos, isMPU);
 
   }
@@ -212,7 +214,7 @@ public class TestOmKeyInfo {
   }
 
   OmKeyLocationInfo getOmKeyLocationInfo(BlockID blockID,
-      Pipeline pipeline) {
+                                         Pipeline pipeline) {
     return new OmKeyLocationInfo.Builder()
         .setBlockID(blockID)
         .setPipeline(pipeline)

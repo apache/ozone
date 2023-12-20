@@ -143,7 +143,9 @@ enum Type {
   PrintCompactionLogDag = 125;
   ListKeysLight = 126;
   AbortExpiredMultiPartUploads = 127;
-
+  SetSnapshotProperty = 128;
+  ListStatusLight = 129;
+  GetSnapshotInfo = 130;
 }
 
 enum SafeMode {
@@ -277,6 +279,8 @@ message OMRequest {
   optional PrintCompactionLogDagRequest     PrintCompactionLogDagRequest   = 125;
 
   optional MultipartUploadsExpiredAbortRequest multipartUploadsExpiredAbortRequest = 126;
+  optional SetSnapshotPropertyRequest       SetSnapshotPropertyRequest     = 127;
+  optional SnapshotInfoRequest              SnapshotInfoRequest            = 128;
 }
 
 message OMResponse {
@@ -395,6 +399,10 @@ message OMResponse {
   optional PrintCompactionLogDagResponse     PrintCompactionLogDagResponse = 125;
   optional ListKeysLightResponse             listKeysLightResponse         = 126;
   optional MultipartUploadsExpiredAbortResponse multipartUploadsExpiredAbortResponse = 127;
+  optional SetSnapshotPropertyResponse       SetSnapshotPropertyResponse   = 128;
+  optional ListStatusLightResponse           listStatusLightResponse       = 129;
+  optional SnapshotInfoResponse              SnapshotInfoResponse          = 130;
+  optional OMLockDetailsProto                omLockDetails                 = 131;
 }
 
 enum Status {
@@ -505,6 +513,7 @@ enum Status {
     TENANT_NOT_EMPTY = 85;
 
     FEATURE_NOT_ENABLED = 86;
+
     INVALID_SNAPSHOT_ERROR = 87;
 
     CONTAINS_SNAPSHOT = 88;
@@ -513,6 +522,10 @@ enum Status {
     UNAUTHORIZED = 91;
 
     S3_SECRET_ALREADY_EXISTS = 92;
+    
+    INVALID_PATH = 93;
+
+    TOO_MANY_BUCKETS = 94;
 }
 
 /**
@@ -804,12 +817,11 @@ message PrefixInfo {
 
 /**
  * SnapshotStatus - snapshot states.
- * Snapshot in one of : active, deleted, or reclaimed state
+ * Snapshot in one of : active or deleted state
  */
 enum SnapshotStatusProto {
   SNAPSHOT_ACTIVE = 1;
   SNAPSHOT_DELETED = 2;
-  SNAPSHOT_RECLAIMED = 3;
 }
 
 /**
@@ -1124,12 +1136,24 @@ message OzoneFileStatusProto {
 
 }
 
+message OzoneFileStatusProtoLight {
+    optional string volumeName = 1;
+    optional string bucketName = 2;
+    optional BasicKeyInfo basicKeyInfo = 3;
+    optional uint64 blockSize = 4;
+    optional bool isDirectory = 5;
+}
+
 message GetFileStatusRequest {
     required KeyArgs keyArgs = 1;
 }
 
 message GetFileStatusResponse {
     required OzoneFileStatusProto status = 1;
+}
+
+message GetFileStatusLightResponse {
+    required OzoneFileStatusProtoLight status = 1;
 }
 
 message CreateDirectoryRequest {
@@ -1175,6 +1199,10 @@ message ListStatusRequest {
 
 message ListStatusResponse {
     repeated OzoneFileStatusProto statuses = 1;
+}
+
+message ListStatusLightResponse {
+    repeated OzoneFileStatusProtoLight statuses = 1;
 }
 
 message CreateKeyRequest {
@@ -1837,6 +1865,12 @@ message DeleteSnapshotRequest {
   optional uint64 deletionTime = 4;
 }
 
+message SnapshotInfoRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string snapshotName = 3;
+}
+
 message PrintCompactionLogDagRequest {
   optional string fileNamePrefix = 1;
   optional string graphType = 2;
@@ -1858,6 +1892,16 @@ message SnapshotMoveKeyInfos {
 message SnapshotPurgeRequest {
   repeated string snapshotDBKeys = 1;
   repeated string updatedSnapshotDBKey = 2;
+}
+
+message SetSnapshotPropertyRequest {
+  optional SnapshotProperty snapshotProperty = 1;
+}
+
+message SnapshotProperty {
+  optional string snapshotKey = 1;
+  optional uint64 exclusiveSize = 2;
+  optional uint64 exclusiveReplicatedSize = 3;
 }
 
 message DeleteTenantRequest {
@@ -1933,6 +1977,10 @@ message DeleteSnapshotResponse {
 
 }
 
+message SnapshotInfoResponse {
+  optional SnapshotInfo snapshotInfo = 1;
+}
+
 message PrintCompactionLogDagResponse {
   optional string message = 1;
 }
@@ -1942,6 +1990,10 @@ message SnapshotMoveDeletedKeysResponse {
 }
 
 message SnapshotPurgeResponse {
+
+}
+
+message SetSnapshotPropertyResponse {
 
 }
 
@@ -2038,6 +2090,13 @@ message SetSafeModeRequest {
 
 message SetSafeModeResponse {
   optional bool response = 1;
+}
+
+message OMLockDetailsProto {
+  optional bool isLockAcquired = 1;
+  optional uint64 waitLockNanos    = 2;
+  optional uint64 readLockNanos    = 3;
+  optional uint64 writeLockNanos   = 4;
 }
 
 /**

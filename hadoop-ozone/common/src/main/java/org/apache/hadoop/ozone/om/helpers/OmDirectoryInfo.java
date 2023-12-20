@@ -23,7 +23,7 @@ import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DirectoryInfo;
 
 import java.util.BitSet;
 import java.util.HashMap;
@@ -40,7 +40,7 @@ import java.util.Objects;
 public class OmDirectoryInfo extends WithParentObjectId
     implements CopyObject<OmDirectoryInfo> {
   private static final Codec<OmDirectoryInfo> CODEC = new DelegatedCodec<>(
-      Proto2Codec.get(OzoneManagerProtocolProtos.DirectoryInfo.class),
+      Proto2Codec.get(DirectoryInfo.getDefaultInstance()),
       OmDirectoryInfo::getFromProtobuf,
       OmDirectoryInfo::getProtobuf);
 
@@ -191,9 +191,9 @@ public class OmDirectoryInfo extends WithParentObjectId
   /**
    * Creates DirectoryInfo protobuf from OmDirectoryInfo.
    */
-  public OzoneManagerProtocolProtos.DirectoryInfo getProtobuf() {
-    OzoneManagerProtocolProtos.DirectoryInfo.Builder pib =
-            OzoneManagerProtocolProtos.DirectoryInfo.newBuilder().setName(name)
+  public DirectoryInfo getProtobuf() {
+    final DirectoryInfo.Builder pib =
+            DirectoryInfo.newBuilder().setName(name)
                     .setCreationTime(creationTime)
                     .setModificationTime(modificationTime)
                     .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
@@ -211,8 +211,7 @@ public class OmDirectoryInfo extends WithParentObjectId
    * @param dirInfo
    * @return instance of OmDirectoryInfo
    */
-  public static OmDirectoryInfo getFromProtobuf(
-          OzoneManagerProtocolProtos.DirectoryInfo dirInfo) {
+  public static OmDirectoryInfo getFromProtobuf(DirectoryInfo dirInfo) {
     OmDirectoryInfo.Builder opib = OmDirectoryInfo.newBuilder()
             .setName(dirInfo.getName())
             .setCreationTime(dirInfo.getCreationTime())

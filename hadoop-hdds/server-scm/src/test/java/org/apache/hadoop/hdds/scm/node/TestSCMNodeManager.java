@@ -77,9 +77,9 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.test.PathUtils;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -236,6 +236,38 @@ public class TestSCMNodeManager {
       Thread.sleep(4 * 1000);
       assertEquals(nodeManager.getAllNodes().size(), registeredNodes,
           "Heartbeat thread should have picked up the scheduled heartbeats.");
+    }
+  }
+
+  @Test
+  public void testGetLastHeartbeatTimeDiff() throws Exception {
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      String timeNow = nodeManager.getLastHeartbeatTimeDiff(Time.monotonicNow());
+      assertEquals("Just now", timeNow);
+
+      String time1s = nodeManager.getLastHeartbeatTimeDiff(Time.monotonicNow() - 10000);
+      assertEquals("10s ago", time1s);
+
+      String time1m = nodeManager.getLastHeartbeatTimeDiff(Time.monotonicNow() - 60000);
+      assertEquals("1m ago", time1m);
+
+      String time1m10s = nodeManager.getLastHeartbeatTimeDiff(Time.monotonicNow() - 70000);
+      assertEquals("1m 10s ago", time1m10s);
+
+      // 1h 1m 10s
+      // 10000ms = 10s
+      // 60000ms = 1m
+      // 60000ms * 60 = 3600000ms = 1h
+      String time1h1m10s = nodeManager.getLastHeartbeatTimeDiff(Time.monotonicNow() - 3670000);
+      assertEquals("1h 1m 10s ago", time1h1m10s);
+
+      // 1d 1h 1m 10s
+      // 10000ms = 10s
+      // 60000ms = 1m
+      // 60000ms * 60 = 3600000ms = 1h
+      // 3600000ms * 24 = 86400000ms = 1d
+      String time1d1h1m10s = nodeManager.getLastHeartbeatTimeDiff(Time.monotonicNow() - 90070000);
+      assertEquals("1d 1h 1m 10s ago", time1d1h1m10s);
     }
   }
 
@@ -955,16 +987,17 @@ public class TestSCMNodeManager {
 
   @Test
   public void testProcessCommandQueueReport()
-      throws IOException, NodeNotFoundException {
+      throws IOException, NodeNotFoundException, AuthenticationException {
     OzoneConfiguration conf = new OzoneConfiguration();
     SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
     when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
     EventPublisher eventPublisher = mock(EventPublisher.class);
     HDDSLayoutVersionManager lvm  =
         new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
+    createNodeManager(getConf());
     SCMNodeManager nodeManager  = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
-        SCMContext.emptyContext(), lvm);
+        scmContext, lvm);
     LayoutVersionProto layoutInfo = toLayoutVersionProto(
         lvm.getMetadataLayoutVersion(), lvm.getSoftwareLayoutVersion());
 
@@ -1073,14 +1106,14 @@ public class TestSCMNodeManager {
     nodeManager.onMessage(
         new CommandForDatanode<>(datanode1, createPipelineCommand), null);
 
-    Assert.assertEquals(2, nodeManager.getCommandQueueCount(
+    assertEquals(2, nodeManager.getCommandQueueCount(
         datanode1, SCMCommandProto.Type.closeContainerCommand));
-    Assert.assertEquals(1, nodeManager.getCommandQueueCount(
+    assertEquals(1, nodeManager.getCommandQueueCount(
         datanode1, SCMCommandProto.Type.createPipelineCommand));
-    Assert.assertEquals(0, nodeManager.getCommandQueueCount(
+    assertEquals(0, nodeManager.getCommandQueueCount(
         datanode1, SCMCommandProto.Type.closePipelineCommand));
 
-    Assert.assertEquals(0, nodeManager.getCommandQueueCount(
+    assertEquals(0, nodeManager.getCommandQueueCount(
         datanode2, SCMCommandProto.Type.closeContainerCommand));
   }
 
@@ -1795,26 +1828,6 @@ public class TestSCMNodeManager {
   }
 
   /**
-   * Test add node into network topology during node register. Datanode
-   * uses Ip address to resolve network location.
-   */
-  @Test
-  public void testScmRegisterNodeWithIpAddress()
-      throws IOException, InterruptedException, AuthenticationException {
-    testScmRegisterNodeWithNetworkTopology(false);
-  }
-
-  /**
-   * Test add node into network topology during node register. Datanode
-   * uses hostname to resolve network location.
-   */
-  @Test
-  public void testScmRegisterNodeWithHostname()
-      throws IOException, InterruptedException, AuthenticationException {
-    testScmRegisterNodeWithNetworkTopology(true);
-  }
-
-  /**
    * Test add node into a 4-layer network topology during node register.
    */
   @Test
@@ -1859,11 +1872,15 @@ public class TestSCMNodeManager {
     }
   }
 
-  private void testScmRegisterNodeWithNetworkTopology(boolean useHostname)
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testScmRegisterNodeWithNetworkTopology(boolean useHostname)
       throws IOException, InterruptedException, AuthenticationException {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
         MILLISECONDS);
+    conf.setBoolean(DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
+        useHostname);
 
     // create table mapping file
     String[] hostNames = {"host1", "host2", "host3", "host4"};
@@ -1875,9 +1892,7 @@ public class TestSCMNodeManager {
     conf.set(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
         "org.apache.hadoop.net.TableMapping");
     conf.set(NET_TOPOLOGY_TABLE_MAPPING_FILE_KEY, mapFile);
-    if (useHostname) {
-      conf.set(DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME, "true");
-    }
+
     final int nodeCount = hostNames.length;
     // use default IP address to resolve node
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
@@ -1899,13 +1914,11 @@ public class TestSCMNodeManager {
           assertEquals("/rack1", node.getNetworkLocation()));
 
       // test get node
-      if (useHostname) {
-        Arrays.stream(hostNames).forEach(hostname -> assertNotEquals(0,
-            nodeManager.getNodesByAddress(hostname).size()));
-      } else {
-        Arrays.stream(ipAddress).forEach(ip -> assertNotEquals(0,
-            nodeManager.getNodesByAddress(ip).size()));
-      }
+      Arrays.stream(hostNames).forEach(hostname -> assertNotEquals(0,
+          nodeManager.getNodesByAddress(hostname).size()));
+
+      Arrays.stream(ipAddress).forEach(ip -> assertNotEquals(0,
+          nodeManager.getNodesByAddress(ip).size()));
     }
   }
 
@@ -1998,15 +2011,14 @@ public class TestSCMNodeManager {
       }
       // test get node
       assertEquals(0, nodeManager.getNodesByAddress(null).size());
-      if (useHostname) {
-        assertEquals(2, nodeManager.getNodesByAddress("host1").size());
-        assertEquals(1, nodeManager.getNodesByAddress("host2").size());
-        assertEquals(0, nodeManager.getNodesByAddress("unknown").size());
-      } else {
-        assertEquals(2, nodeManager.getNodesByAddress("1.2.3.4").size());
-        assertEquals(1, nodeManager.getNodesByAddress("2.3.4.5").size());
-        assertEquals(0, nodeManager.getNodesByAddress("1.9.8.7").size());
-      }
+
+      assertEquals(2, nodeManager.getNodesByAddress("host1").size());
+      assertEquals(1, nodeManager.getNodesByAddress("host2").size());
+      assertEquals(0, nodeManager.getNodesByAddress("unknown").size());
+
+      assertEquals(2, nodeManager.getNodesByAddress("1.2.3.4").size());
+      assertEquals(1, nodeManager.getNodesByAddress("2.3.4.5").size());
+      assertEquals(0, nodeManager.getNodesByAddress("1.9.8.7").size());
     }
   }
 

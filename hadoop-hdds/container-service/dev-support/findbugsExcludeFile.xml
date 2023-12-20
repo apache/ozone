@@ -87,10 +87,10 @@
   </Match>
   <Match>
     <Class name="org.apache.hadoop.ozone.container.ozoneimpl.TestBackgroundContainerDataScanner"/>
-    <Bug pattern="RU_INVOKE_RUN" />
+    <Bug pattern="RU_INVOKE_RUN, RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT" />
   </Match>
   <Match>
     <Class name="org.apache.hadoop.ozone.container.ozoneimpl.TestBackgroundContainerMetadataScanner"/>
-    <Bug pattern="RU_INVOKE_RUN" />
+    <Bug pattern="RU_INVOKE_RUN, RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT" />
   </Match>
 </FindBugsFilter>

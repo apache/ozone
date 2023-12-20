@@ -40,7 +40,7 @@ execute_robot_test scm1.org kinit.robot
 wait_for_execute_command scm1.org 30 "jps | grep StorageContainerManagerStarter | sed 's/StorageContainerManagerStarter//' | xargs  | xargs -I {} jstack {} | grep 'RootCARotationManager-Active'"
 
 # wait and verify root CA is rotated
-wait_for_execute_command scm1.org 240 "ozone admin cert info 2"
+wait_for_root_certificate scm1.org 240 2
 
 # transfer leader to scm2.org
 execute_robot_test scm1.org scmha/scm-leader-transfer.robot
@@ -54,21 +54,25 @@ execute_commands_in_container scm1.org "ozone sh volume create /r-v1 && ozone sh
 execute_robot_test scm1.org admincli/pipeline.robot
 
 # wait for next root CA rotation
-wait_for_execute_command scm1.org 240 "ozone admin cert info 3"
+wait_for_root_certificate scm1.org 240 3
 
 # bootstrap new SCM4 and verify certificate
 docker-compose up -d scm4.org
 wait_for_port scm4.org 9894 120
 execute_robot_test scm4.org kinit.robot
 wait_for_execute_command scm4.org 120 "ozone admin scm roles | grep scm4.org"
-wait_for_execute_command scm4.org 30 "ozone admin cert list --role=scm | grep scm4.org"
+wait_for_execute_command scm4.org 30 "ozone admin cert list --role=scm -c 100| grep scm4.org"
 
 # wait for next root CA rotation
-wait_for_execute_command scm4.org 240 "ozone admin cert info 4"
+wait_for_root_certificate scm4.org 240 4
 
-wait_for_execute_command om1 30 "find /data/metadata/om/certs/ROOTCA-4.crt"
-wait_for_execute_command om2 30 "find /data/metadata/om/certs/ROOTCA-4.crt"
-wait_for_execute_command om3 30 "find /data/metadata/om/certs/ROOTCA-4.crt"
+execute_robot_test om1 kinit.robot
+execute_robot_test om2 kinit.robot
+execute_robot_test om3 kinit.robot
+check_root_ca_file_cmd="ozone admin cert list --role=scm -c 100 | grep -v 'scm-sub' | grep 'scm'  | cut -d ' ' -f 1 | sort | tail -n 1 | xargs -I {} echo /data/metadata/om/certs/ROOTCA-{}.crt | xargs find"
+wait_for_execute_command om1 30 $check_root_ca_file_cmd
+wait_for_execute_command om2 30 $check_root_ca_file_cmd
+wait_for_execute_command om3 30 $check_root_ca_file_cmd
 execute_robot_test scm4.org -v PREFIX:"rootca2" certrotation/root-ca-rotation-client-checks.robot
 
 #transfer leader to scm4.org
@@ -84,10 +88,10 @@ execute_robot_test scm3.org kinit.robot
 execute_robot_test scm4.org  -v "TARGET_SCM:scm3.org" scmha/scm-leader-transfer.robot
 
 # wait for next root CA rotation
-wait_for_execute_command scm3.org 240 "ozone admin cert info 5"
+wait_for_root_certificate scm3.org 240 5
 
-#decomission scm1.org
-execute_robot_test scm3.org scmha/scm-decommission.robot
+#decomission scm3.org
+execute_robot_test scm1.org scmha/scm-decommission.robot
 
 # check the metrics
 execute_robot_test scm2.org scmha/root-ca-rotation.robot

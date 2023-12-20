@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
@@ -115,7 +114,7 @@ public class OMKeyAddAclRequest extends OMKeyAclRequest {
 
   @Override
   void onComplete(Result result, boolean operationResult,
-      IOException exception, long trxnLogIndex, AuditLogger auditLogger,
+      Exception exception, long trxnLogIndex, AuditLogger auditLogger,
       Map<String, String> auditMap) {
     switch (result) {
     case SUCCESS:
@@ -150,10 +149,9 @@ public class OMKeyAddAclRequest extends OMKeyAclRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+      long trxnLogIndex) {
     ozoneManager.getMetrics().incNumAddAcl();
-    return super.validateAndUpdateCache(ozoneManager, trxnLogIndex,
-        omDoubleBufferHelper);
+    return super.validateAndUpdateCache(ozoneManager, trxnLogIndex);
   }
 
   /**

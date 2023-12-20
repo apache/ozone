@@ -503,23 +503,25 @@ public final class OMRequestTestUtils {
   /**
    * Add snapshot entry to DB.
    */
-  public static void addSnapshotToTable(
+  public static SnapshotInfo addSnapshotToTable(
       String volumeName, String bucketName, String snapshotName,
       OMMetadataManager omMetadataManager) throws IOException {
     SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName,
         bucketName, snapshotName, UUID.randomUUID(), Time.now());
     addSnapshotToTable(false, 0L, snapshotInfo, omMetadataManager);
+    return snapshotInfo;
   }
 
   /**
    * Add snapshot entry to snapshot table cache.
    */
-  public static void addSnapshotToTableCache(
+  public static SnapshotInfo addSnapshotToTableCache(
       String volumeName, String bucketName, String snapshotName,
       OMMetadataManager omMetadataManager) throws IOException {
     SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName, bucketName,
         snapshotName, UUID.randomUUID(), Time.now());
     addSnapshotToTable(true, 0L, snapshotInfo, omMetadataManager);
+    return snapshotInfo;
   }
 
   /**
@@ -1605,4 +1607,20 @@ public final class OMRequestTestUtils {
         .thenReturn(validator);
     doCallRealMethod().when(ozoneManager).validateReplicationConfig(any());
   }
+
+  public static OMRequest createRequestWithS3Credentials(String accessId,
+                                                         String signature,
+                                                         String stringToSign) {
+    return OMRequest.newBuilder()
+        .setS3Authentication(
+            OzoneManagerProtocolProtos.S3Authentication.newBuilder()
+                .setAccessId(accessId)
+                .setSignature(signature)
+                .setStringToSign(stringToSign)
+                .build())
+        .setCmdType(Type.CommitKey)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+  }
+
 }

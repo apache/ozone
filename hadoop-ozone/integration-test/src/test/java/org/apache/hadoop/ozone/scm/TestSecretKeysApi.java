@@ -40,7 +40,9 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,7 +91,7 @@ public final class TestSecretKeysApi {
       .getLogger(TestSecretKeysApi.class);
 
   @Rule
-  public Timeout timeout = Timeout.seconds(500);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(500));
 
   private MiniKdc miniKdc;
   private OzoneConfiguration conf;
@@ -244,6 +246,8 @@ public final class TestSecretKeysApi {
     ManagedSecretKey nonExisting = secretKeyProtocol.getSecretKey(
         UUID.randomUUID());
     assertNull(nonExisting);
+
+    testSecretKeyAuthorization();
   }
 
   /**
@@ -299,12 +303,7 @@ public final class TestSecretKeysApi {
     }
   }
 
-  @Test
-  public void testSecretKeyAuthorization() throws Exception {
-    enableBlockToken();
-    conf.setBoolean(HADOOP_SECURITY_AUTHORIZATION, true);
-    startCluster(1);
-
+  private void testSecretKeyAuthorization() throws Exception {
     // When HADOOP_SECURITY_AUTHORIZATION is enabled, SecretKey protocol
     // is only available for Datanode and OM, any other authenticated user
     // can't access the protocol.

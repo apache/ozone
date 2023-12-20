@@ -33,7 +33,9 @@ import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import picocli.CommandLine;
 
 /**
@@ -45,7 +47,7 @@ public class TestFreonWithDatanodeFastRestart {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
@@ -119,7 +121,7 @@ public class TestFreonWithDatanodeFastRestart {
     cmd.execute("--num-of-volumes", "1",
         "--num-of-buckets", "1",
         "--num-of-keys", "1",
-        "--key-size", "20971520",
+        "--key-size", "20MB",
         "--factor", "THREE",
         "--type", "RATIS",
         "--validate-writes"

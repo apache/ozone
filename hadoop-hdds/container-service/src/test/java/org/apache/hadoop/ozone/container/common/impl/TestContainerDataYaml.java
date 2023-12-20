@@ -29,12 +29,8 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.junit.Assert;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 
 import java.io.File;
 import java.io.IOException;
@@ -43,15 +39,15 @@ import java.time.Instant;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 
 /**
  * This class tests create/read .container files.
  */
-@RunWith(Parameterized.class)
 public class TestContainerDataYaml {
 
   private long testContainerID = 1234;
@@ -64,16 +60,11 @@ public class TestContainerDataYaml {
   private static final String VOLUME_OWNER = "hdfs";
   private static final String CONTAINER_DB_TYPE = "RocksDB";
 
-  private final ContainerLayoutVersion layout;
+  private ContainerLayoutVersion layoutVersion;
   private OzoneConfiguration conf = new OzoneConfiguration();
-    
-  public TestContainerDataYaml(ContainerLayoutVersion layout) {
-    this.layout = layout;
-  }
 
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
-    return ContainerLayoutTestInfo.containerLayoutParameters();
+  private void setLayoutVersion(ContainerLayoutVersion layoutVersion) {
+    this.layoutVersion = layoutVersion;
   }
 
   /**
@@ -87,7 +78,7 @@ public class TestContainerDataYaml {
     String containerPath = containerID + ".container";
 
     KeyValueContainerData keyValueContainerData = new KeyValueContainerData(
-        containerID, layout, MAXSIZE,
+        containerID, layoutVersion, MAXSIZE,
         UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
     keyValueContainerData.setContainerDBType(CONTAINER_DB_TYPE);
@@ -114,8 +105,10 @@ public class TestContainerDataYaml {
     FileUtil.fullyDelete(new File(testRoot));
   }
 
-  @Test
-  public void testCreateContainerFile() throws IOException {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testCreateContainerFile(ContainerLayoutVersion layout)
+      throws IOException {
+    setLayoutVersion(layout);
     long containerID = testContainerID++;
 
     File containerFile = createContainerFile(containerID, 7);
@@ -174,13 +167,15 @@ public class TestContainerDataYaml {
     assertEquals(MAXSIZE, kvData.getMaxSize());
     assertTrue(kvData.lastDataScanTime().isPresent());
     assertEquals(SCAN_TIME.toEpochMilli(),
-                 kvData.lastDataScanTime().get().toEpochMilli());
+        kvData.lastDataScanTime().get().toEpochMilli());
     assertEquals(SCAN_TIME.toEpochMilli(),
-                 kvData.getDataScanTimestamp().longValue());
+        kvData.getDataScanTimestamp().longValue());
   }
 
-  @Test
-  public void testCreateContainerFileWithoutReplicaIndex() throws IOException {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testCreateContainerFileWithoutReplicaIndex(
+      ContainerLayoutVersion layout) throws IOException {
+    setLayoutVersion(layout);
     long containerID = testContainerID++;
 
     File containerFile = createContainerFile(containerID, 0);
@@ -188,14 +183,16 @@ public class TestContainerDataYaml {
     final String content =
         FileUtils.readFileToString(containerFile, Charset.defaultCharset());
 
-    Assert.assertFalse("ReplicaIndex shouldn't be persisted if zero",
-        content.contains("replicaIndex"));
+    assertFalse(content.contains("replicaIndex"),
+        "ReplicaIndex shouldn't be persisted if zero");
     cleanup();
   }
 
 
-  @Test
-  public void testIncorrectContainerFile() throws IOException {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testIncorrectContainerFile(ContainerLayoutVersion layout)
+      throws IOException {
+    setLayoutVersion(layout);
     try {
       String containerFile = "incorrect.container";
       //Get file from resources folder
@@ -210,9 +207,10 @@ public class TestContainerDataYaml {
   }
 
 
-  @Test
-  public void testCheckBackWardCompatibilityOfContainerFile() throws
-      IOException {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testCheckBackWardCompatibilityOfContainerFile(
+      ContainerLayoutVersion layout) {
+    setLayoutVersion(layout);
     // This test is for if we upgrade, and then .container files added by new
     // server will have new fields added to .container file, after a while we
     // decided to rollback. Then older ozone can read .container files
@@ -250,8 +248,10 @@ public class TestContainerDataYaml {
   /**
    * Test to verify {@link ContainerUtils#verifyChecksum(ContainerData)}.
    */
-  @Test
-  public void testChecksumInContainerFile() throws IOException {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testChecksumInContainerFile(ContainerLayoutVersion layout)
+      throws IOException {
+    setLayoutVersion(layout);
     long containerID = testContainerID++;
 
     File containerFile = createContainerFile(containerID, 0);
@@ -267,8 +267,10 @@ public class TestContainerDataYaml {
   /**
    * Test to verify {@link ContainerUtils#verifyChecksum(ContainerData)}.
    */
-  @Test
-  public void testChecksumInContainerFileWithReplicaIndex() throws IOException {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testChecksumInContainerFileWithReplicaIndex(
+      ContainerLayoutVersion layout) throws IOException {
+    setLayoutVersion(layout);
     long containerID = testContainerID++;
 
     File containerFile = createContainerFile(containerID, 10);
@@ -292,8 +294,9 @@ public class TestContainerDataYaml {
   /**
    * Test to verify incorrect checksum is detected.
    */
-  @Test
-  public void testIncorrectChecksum() {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testIncorrectChecksum(ContainerLayoutVersion layout) {
+    setLayoutVersion(layout);
     try {
       KeyValueContainerData kvData = getKeyValueContainerData();
       ContainerUtils.verifyChecksum(kvData, conf);
@@ -307,11 +310,13 @@ public class TestContainerDataYaml {
   /**
    * Test to verify disabled checksum with incorrect checksum.
    */
-  @Test
-  public void testDisabledChecksum() throws IOException {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testDisabledChecksum(ContainerLayoutVersion layout)
+      throws IOException {
+    setLayoutVersion(layout);
     KeyValueContainerData kvData = getKeyValueContainerData();
     conf.setBoolean(HddsConfigKeys.
-                    HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED, false);
+        HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED, false);
     ContainerUtils.verifyChecksum(kvData, conf);
   }
 }

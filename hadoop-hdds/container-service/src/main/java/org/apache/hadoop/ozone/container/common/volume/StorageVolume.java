@@ -50,6 +50,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion.getLatestVersion;
+import static org.apache.hadoop.ozone.container.common.volume.VolumeUsage.PrecomputedVolumeSpace;
+
 
 /**
  * StorageVolume represents a generic Volume in datanode, could be
@@ -452,6 +454,16 @@ public abstract class StorageVolume
   public long getAvailable() {
     return volumeInfo.map(VolumeInfo::getAvailable).orElse(0L);
 
+  }
+
+  public long getAvailable(PrecomputedVolumeSpace precomputedVolumeSpace) {
+    return volumeInfo.map(info -> info.getAvailable(precomputedVolumeSpace))
+        .orElse(0L);
+  }
+
+  public PrecomputedVolumeSpace getPrecomputedVolumeSpace() {
+    return volumeInfo.map(VolumeInfo::getPrecomputedVolumeSpace)
+        .orElse(new PrecomputedVolumeSpace(0L, 0L));
   }
 
   public long getUsedSpace() {

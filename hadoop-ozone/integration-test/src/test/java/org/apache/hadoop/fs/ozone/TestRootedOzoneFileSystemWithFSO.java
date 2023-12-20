@@ -24,9 +24,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 
-import org.junit.Assert;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -57,63 +55,22 @@ public class TestRootedOzoneFileSystemWithFSO
   @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(
-        new Object[]{true, true, false},
-        new Object[]{true, false, false}
+        new Object[]{true, true, false, false},
+        new Object[]{true, false, false, false},
+        new Object[]{true, true, false, true},
+        new Object[]{true, false, false, true}
     );
   }
 
   public TestRootedOzoneFileSystemWithFSO(boolean setDefaultFs,
-      boolean enableOMRatis, boolean enableAcl) {
-    super(setDefaultFs, enableOMRatis, enableAcl);
+      boolean enableOMRatis, boolean isAclEnabled, boolean noFlush) {
+    super(setDefaultFs, enableOMRatis, isAclEnabled, noFlush);
   }
 
   @BeforeClass
   public static void init()
       throws IOException, InterruptedException, TimeoutException {
     setIsBucketFSOptimized(true);
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testTempMount() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testOzoneFsServiceLoader() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testCreateWithInvalidPaths() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testDeleteEmptyVolume() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  @Override
-  @Test
-  @Ignore("HDDS-2939")
-  public void testMkdirNonExistentVolume() {
-    // ignore as this is not relevant to PREFIX layout changes
-  }
-
-  /**
-   * OFS: Test recursive listStatus on root and volume.
-   */
-  @Override
-  @Ignore("TODO:HDDS-4360")
-  public void testListStatusRootAndVolumeRecursive() throws IOException {
   }
 
   /**
@@ -241,10 +198,10 @@ public class TestRootedOzoneFileSystemWithFSO
      */
 
     long prevDeletes = getOMMetrics().getNumKeyDeletes();
-    Assert.assertTrue(getFs().delete(bucketPath2, true));
-    Assert.assertTrue(getFs().delete(volumePath1, false));
+    assertTrue(getFs().delete(bucketPath2, true));
+    assertTrue(getFs().delete(volumePath1, false));
     long deletes = getOMMetrics().getNumKeyDeletes();
-    Assert.assertTrue(deletes == prevDeletes + 1);
+    assertTrue(deletes == prevDeletes + 1);
   }
 
   /**

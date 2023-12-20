@@ -82,9 +82,11 @@ public class OpenKeyCleanupService extends BackgroundService {
   private final AtomicBoolean suspended;
 
   public OpenKeyCleanupService(long interval, TimeUnit unit, long timeout,
-      OzoneManager ozoneManager, ConfigurationSource conf) {
+                               OzoneManager ozoneManager,
+                               ConfigurationSource conf) {
     super("OpenKeyCleanupService", interval, unit,
-        OPEN_KEY_DELETING_CORE_POOL_SIZE, timeout);
+        OPEN_KEY_DELETING_CORE_POOL_SIZE, timeout,
+        ozoneManager.getThreadNamePrefix());
     this.ozoneManager = ozoneManager;
     this.keyManager = ozoneManager.getKeyManager();
 
@@ -218,7 +220,7 @@ public class OpenKeyCleanupService extends BackgroundService {
 
       if (LOG.isDebugEnabled()) {
         LOG.debug("Number of expired open keys submitted for deletion: {},"
-            + " for commit: {}, elapsed time: {}ms",
+                + " for commit: {}, elapsed time: {}ms",
             numOpenKeys, numHsyncKeys, Time.monotonicNow() - startTime);
       }
       final int numKeys = numOpenKeys + numHsyncKeys;

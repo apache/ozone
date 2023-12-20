@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -32,7 +33,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.key.OMKeySetTimesResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -131,12 +131,12 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
    * @return OMClientResponse
    */
   protected OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException exception) {
+      Exception exception) {
     return new OMKeySetTimesResponse(createErrorOMResponse(
         omResponse, exception), getBucketLayout());
   }
 
-  protected void onComplete(Result result, IOException exception,
+  protected void onComplete(Result result, Exception exception,
       AuditLogger auditLogger, Map<String, String> auditMap) {
     switch (result) {
     case SUCCESS:
@@ -171,13 +171,13 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+      long trxnLogIndex) {
     ozoneManager.getMetrics().incNumSetTime();
     OmKeyInfo omKeyInfo;
 
     OMResponse.Builder omResponse = onInit();
     OMClientResponse omClientResponse = null;
-    IOException exception = null;
+    Exception exception = null;
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean lockAcquired = false;
@@ -200,8 +200,10 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
             volume, bucket, key);
       }
-      lockAcquired = omMetadataManager.getLock().acquireWriteLock(
-          BUCKET_LOCK, volume, bucket);
+      mergeOmLockDetails(
+          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume,
+              bucket));
+      lockAcquired = getOmLockDetails().isLockAcquired();
 
       String dbKey = omMetadataManager.getOzoneKey(volume, bucket, key);
       omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
@@ -222,16 +224,18 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
 
       omClientResponse = onSuccess(omResponse, omKeyInfo, operationResult);
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
-      omClientResponse = onFailure(omResponse, ex);
+      omClientResponse = onFailure(omResponse, exception);
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
       if (lockAcquired) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volume,
-            bucket);
+        mergeOmLockDetails(
+            omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volume,
+                bucket));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

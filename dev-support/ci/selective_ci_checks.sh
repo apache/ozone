@@ -588,8 +588,8 @@ fi
 
 
 get_changed_files
-run_all_tests_if_environment_files_changed
 check_if_tests_are_needed_at_all
+run_all_tests_if_environment_files_changed
 
 get_count_all_files
 get_count_compose_files

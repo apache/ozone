@@ -17,11 +17,13 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
+import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufAllocator;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufInputStream;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBufOutputStream;
+import org.apache.ratis.thirdparty.io.netty.buffer.EmptyByteBuf;
 import org.apache.ratis.thirdparty.io.netty.buffer.PooledByteBufAllocator;
 import org.apache.ratis.thirdparty.io.netty.buffer.Unpooled;
 import org.apache.ratis.util.MemoizedSupplier;
@@ -37,7 +39,7 @@ import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
+import java.util.function.BiFunction;
 import java.util.function.IntFunction;
 import java.util.function.ToIntFunction;
 
@@ -53,22 +55,26 @@ public class CodecBuffer implements AutoCloseable {
 
   /** To create {@link CodecBuffer} instances. */
   private static class Factory {
-    private static volatile Function<ByteBuf, CodecBuffer> constructor
+    private static volatile BiFunction<ByteBuf, Object, CodecBuffer> constructor
         = CodecBuffer::new;
-    static void set(Function<ByteBuf, CodecBuffer> f) {
+    static void set(BiFunction<ByteBuf, Object, CodecBuffer> f) {
       constructor = f;
       LOG.info("Successfully set constructor to " + f);
     }
 
     static CodecBuffer newCodecBuffer(ByteBuf buf) {
-      return constructor.apply(buf);
+      return newCodecBuffer(buf, null);
+    }
+
+    static CodecBuffer newCodecBuffer(ByteBuf buf, Object wrapped) {
+      return constructor.apply(buf, wrapped);
     }
   }
 
   /** To detect buffer leak. */
   private static class LeakDetector {
-    static CodecBuffer newCodecBuffer(ByteBuf buf) {
-      return new CodecBuffer(buf) {
+    static CodecBuffer newCodecBuffer(ByteBuf buf, Object wrapped) {
+      return new CodecBuffer(buf, wrapped) {
         @Override
         protected void finalize() {
           detectLeaks();
@@ -126,6 +132,51 @@ public class CodecBuffer implements AutoCloseable {
       ? POOL.heapBuffer(c, c)   // allocate exact size
       : POOL.heapBuffer(-c);    // allocate a resizable buffer
 
+  private static final CodecBuffer EMPTY_BUFFER = new CodecBuffer(
+      new EmptyByteBuf(POOL), null);
+
+  public static CodecBuffer getEmptyBuffer() {
+    return EMPTY_BUFFER;
+  }
+
+  /** To allocate {@link CodecBuffer} objects. */
+  public interface Allocator extends IntFunction<CodecBuffer> {
+    Allocator DIRECT = new Allocator() {
+      @Override
+      public CodecBuffer apply(int capacity) {
+        return allocate(capacity, POOL_DIRECT);
+      }
+
+      @Override
+      public boolean isDirect() {
+        return true;
+      }
+    };
+
+    static Allocator getDirect() {
+      return DIRECT;
+    }
+
+    Allocator HEAP = new Allocator() {
+      @Override
+      public CodecBuffer apply(int capacity) {
+        return allocate(capacity, POOL_HEAP);
+      }
+
+      @Override
+      public boolean isDirect() {
+        return false;
+      }
+    };
+
+    static Allocator getHeap() {
+      return HEAP;
+    }
+
+    /** Does this object allocate direct buffers? */
+    boolean isDirect();
+  }
+
   private final StackTraceElement[] elements;
 
   /**
@@ -162,7 +213,13 @@ public class CodecBuffer implements AutoCloseable {
 
   /** Wrap the given array. */
   public static CodecBuffer wrap(byte[] array) {
-    return Factory.newCodecBuffer(Unpooled.wrappedBuffer(array));
+    return Factory.newCodecBuffer(Unpooled.wrappedBuffer(array), array);
+  }
+
+  /** Wrap the given {@link ByteString}. */
+  public static CodecBuffer wrap(ByteString bytes) {
+    return Factory.newCodecBuffer(
+        Unpooled.wrappedBuffer(bytes.asReadOnlyByteBuffer()), bytes);
   }
 
   private static final AtomicInteger LEAK_COUNT = new AtomicInteger();
@@ -176,12 +233,26 @@ public class CodecBuffer implements AutoCloseable {
   }
 
   private final ByteBuf buf;
+  private final Object wrapped;
   private final CompletableFuture<Void> released = new CompletableFuture<>();
 
-  private CodecBuffer(ByteBuf buf) {
+  private CodecBuffer(ByteBuf buf, Object wrapped) {
     this.buf = buf;
+    this.wrapped = wrapped;
     this.elements = getStackTrace(LOG);
     assertRefCnt(1);
+  }
+
+  public boolean isDirect() {
+    return buf.isDirect();
+  }
+
+  /**
+   * @return the wrapped object if this buffer is created by wrapping it;
+   *         otherwise, return null.
+   */
+  public Object getWrapped() {
+    return wrapped;
   }
 
   private void assertRefCnt(int expected) {
@@ -222,7 +293,10 @@ public class CodecBuffer implements AutoCloseable {
   /** Release this buffer and return it back to the pool. */
   public void release() {
     final boolean set = released.complete(null);
-    Preconditions.assertTrue(set, () -> "Already released: " + this);
+    if (!set) {
+      // Allow a zero capacity buffer to be released multiple times.
+      Preconditions.assertSame(0, buf.capacity(), "capacity");
+    }
     if (buf.release()) {
       assertRefCnt(0);
     } else {
@@ -305,7 +379,8 @@ public class CodecBuffer implements AutoCloseable {
    */
   public CodecBuffer putShort(short n) {
     assertRefCnt(1);
-    buf.writeShort(n);
+    final ByteBuf returned = buf.writeShort(n);
+    Preconditions.assertSame(buf, returned, "buf");
     return this;
   }
 
@@ -316,7 +391,8 @@ public class CodecBuffer implements AutoCloseable {
    */
   public CodecBuffer putInt(int n) {
     assertRefCnt(1);
-    buf.writeInt(n);
+    final ByteBuf returned = buf.writeInt(n);
+    Preconditions.assertSame(buf, returned, "buf");
     return this;
   }
 
@@ -327,7 +403,8 @@ public class CodecBuffer implements AutoCloseable {
    */
   public CodecBuffer putLong(long n) {
     assertRefCnt(1);
-    buf.writeLong(n);
+    final ByteBuf returned = buf.writeLong(n);
+    Preconditions.assertSame(buf, returned, "buf");
     return this;
   }
 
@@ -338,7 +415,8 @@ public class CodecBuffer implements AutoCloseable {
    */
   public CodecBuffer put(byte val) {
     assertRefCnt(1);
-    buf.writeByte(val);
+    final ByteBuf returned = buf.writeByte(val);
+    Preconditions.assertSame(buf, returned, "buf");
     return this;
   }
 
@@ -375,7 +453,8 @@ public class CodecBuffer implements AutoCloseable {
     final int w = buf.writerIndex();
     final ByteBuffer buffer = buf.nioBuffer(w, buf.writableBytes());
     final int size = source.applyAsInt(buffer);
-    buf.setIndex(buf.readerIndex(), w + size);
+    final ByteBuf returned = buf.setIndex(buf.readerIndex(), w + size);
+    Preconditions.assertSame(buf, returned, "buf");
     return this;
   }
 
@@ -396,7 +475,8 @@ public class CodecBuffer implements AutoCloseable {
     try (ByteBufOutputStream out = new ByteBufOutputStream(buf)) {
       size = source.apply(out);
     }
-    buf.setIndex(buf.readerIndex(), w + size);
+    final ByteBuf returned = buf.setIndex(buf.readerIndex(), w + size);
+    Preconditions.assertSame(buf, returned, "buf");
     return this;
   }
 
@@ -423,7 +503,8 @@ public class CodecBuffer implements AutoCloseable {
     if (size != null) {
       Preconditions.assertTrue(size >= 0, () -> "size = " + size + " < 0");
       if (size > 0 && size <= writable) {
-        buf.setIndex(buf.readerIndex(), i + size);
+        final ByteBuf returned = buf.setIndex(buf.readerIndex(), i + size);
+        Preconditions.assertSame(buf, returned, "buf");
       }
     }
     return size;

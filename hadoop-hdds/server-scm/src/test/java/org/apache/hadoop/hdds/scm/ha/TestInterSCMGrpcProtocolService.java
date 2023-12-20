@@ -31,9 +31,8 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 
 import javax.net.ssl.KeyManager;
@@ -73,7 +72,7 @@ import static org.mockito.Mockito.when;
  *
  * @see <a href="https://issues.apache.org/jira/browse/HDDS-8901">HDDS-8901</a>
  */
-public class TestInterSCMGrpcProtocolService {
+class TestInterSCMGrpcProtocolService {
 
   private static final String CP_FILE_NAME = "cpFile";
   private static final String CP_CONTENTS = "Hello world!";
@@ -86,11 +85,11 @@ public class TestInterSCMGrpcProtocolService {
   private X509KeyManager clientKeyManager;
   private X509TrustManager clientTrustManager;
 
-  @Rule
-  public TemporaryFolder temp = new TemporaryFolder();
+  @TempDir
+  private Path temp;
 
   @Test
-  public void testMTLSOnInterScmGrpcProtocolServiceAccess() throws Exception {
+  void testMTLSOnInterScmGrpcProtocolServiceAccess() throws Exception {
     int port = new Random().nextInt(1000) + 45000;
     OzoneConfiguration conf = setupConfiguration(port);
     SCMCertificateClient
@@ -101,7 +100,8 @@ public class TestInterSCMGrpcProtocolService {
 
     InterSCMGrpcClient client =
         new InterSCMGrpcClient("localhost", port, conf, scmCertClient);
-    CompletableFuture<Path> res = client.download(temp.newFile().toPath());
+    Path tempFile = temp.resolve(CP_FILE_NAME);
+    CompletableFuture<Path> res = client.download(tempFile);
     Path downloaded = res.get();
 
     verifyServiceUsedItsCertAndValidatedClientCert();
@@ -182,7 +182,7 @@ public class TestInterSCMGrpcProtocolService {
   }
 
   private DBCheckpoint checkPoint() throws IOException {
-    Path checkPointLocation = temp.newFolder().toPath();
+    Path checkPointLocation = Files.createDirectory(temp.resolve("cpDir"));
     Path cpFile = Paths.get(checkPointLocation.toString(), CP_FILE_NAME);
     Files.write(cpFile, CP_CONTENTS.getBytes(UTF_8));
     DBCheckpoint checkpoint = mock(DBCheckpoint.class);

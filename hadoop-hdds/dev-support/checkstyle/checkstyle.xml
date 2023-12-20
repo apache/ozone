@@ -73,6 +73,8 @@
 
     <module name="LineLength">
         <property name="fileExtensions" value="java"/>
+        <property name="max" value="120"/>
+        <property name="ignorePattern" value="^package.*|^import.*|a href|href|http://|https://|ftp://"/>
     </module>
     <module name="TreeWalker">
 
@@ -208,5 +210,11 @@
 
         <module name="ModifierOrder"/>
 
+        <module name="Regexp">
+            <property name="format" value="@Test\(.*timeout|=\s*Timeout\.|=\s*new Timeout\("/>
+            <property name="illegalPattern" value="true"/>
+            <property name="message" value="Please use JUnit5AwareTimeout, see HDDS-9361"/>
+        </module>
     </module>
+
 </module>

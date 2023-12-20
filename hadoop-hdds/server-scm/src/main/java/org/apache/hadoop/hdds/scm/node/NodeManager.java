@@ -47,6 +47,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.Collection;
+import java.util.function.BiConsumer;
 
 /**
  * A node manager supports a simple interface for managing a datanode.
@@ -88,6 +89,18 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       PipelineReportsProto pipelineReportsProto) {
     return register(datanodeDetails, nodeReport, pipelineReportsProto,
         defaultLayoutVersionProto());
+  }
+
+  /**
+   * Register a SendCommandNotify handler for a specific type of SCMCommand.
+   * @param type The type of the SCMCommand.
+   * @param scmCommand A BiConsumer that takes a DatanodeDetails and a
+   *                   SCMCommand object and performs the necessary actions.
+   * @return whatever the regular register command returns with default
+   * layout version passed in.
+   */
+  default void registerSendCommandNotify(SCMCommandProto.Type type,
+      BiConsumer<DatanodeDetails, SCMCommand<?>> scmCommand) {
   }
 
   /**
@@ -379,6 +392,14 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @return the given datanode, or empty list if none found
    */
   List<DatanodeDetails> getNodesByAddress(String address);
+
+  /**
+   * For the given node, retried the last heartbeat time.
+   * @param datanodeDetails DatanodeDetails of the node.
+   * @return The last heartbeat time in milliseconds or -1 if the node does not
+   *         existing in the nodeManager.
+   */
+  long getLastHeartbeat(DatanodeDetails datanodeDetails);
 
   /**
    * Get cluster map as in network topology for this node manager.

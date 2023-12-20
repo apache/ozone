@@ -120,7 +120,7 @@ public class TestDatanodeStateMachine {
     conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR, path);
     executorService = HadoopExecutors.newCachedThreadPool(
         new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("Test Data Node State Machine Thread - %d").build());
+            .setNameFormat("TestDataNodeStateMachineThread-%d").build());
   }
 
   @AfterEach

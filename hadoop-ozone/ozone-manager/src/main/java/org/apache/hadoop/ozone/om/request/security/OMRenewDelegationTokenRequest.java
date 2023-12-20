@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.security;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Map;
 
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -30,7 +31,6 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.security.OMRenewDelegationTokenResponse;
@@ -127,8 +127,7 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+      long transactionLogIndex) {
 
     UpdateRenewDelegationTokenRequest updateRenewDelegationTokenRequest =
         getOmRequest().getUpdatedRenewDelegationTokenRequest();
@@ -149,7 +148,7 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-    IOException exception = null;
+    Exception exception = null;
 
     try {
 
@@ -174,15 +173,12 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
               omResponse.setRenewDelegationTokenResponse(
                   updateRenewDelegationTokenRequest
                       .getRenewDelegationTokenResponse()).build());
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       LOG.error("Error in Updating Renew DelegationToken {}",
           ozoneTokenIdentifierToken, ex);
       exception = ex;
       omClientResponse = new OMRenewDelegationTokenResponse(null, -1L,
-          createErrorOMResponse(omResponse, ex));
-    } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
+          createErrorOMResponse(omResponse, exception));
     }
 
     auditLog(auditLogger,

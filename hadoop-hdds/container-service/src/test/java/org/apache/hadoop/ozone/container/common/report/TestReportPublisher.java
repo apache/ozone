@@ -109,7 +109,7 @@ public class TestReportPublisher {
     ScheduledExecutorService executorService = HadoopExecutors
         .newScheduledThreadPool(1,
             new ThreadFactoryBuilder().setDaemon(true)
-                .setNameFormat("Unit test ReportManager Thread - %d").build());
+                .setNameFormat("TestReportManagerThread-%d").build());
     publisher.init(dummyContext, executorService);
     Thread.sleep(150);
     Assertions.assertEquals(1,
@@ -131,7 +131,7 @@ public class TestReportPublisher {
     ScheduledExecutorService executorService = HadoopExecutors
         .newScheduledThreadPool(1,
             new ThreadFactoryBuilder().setDaemon(true)
-                .setNameFormat("Unit test ReportManager Thread - %d").build());
+                .setNameFormat("TestReportManagerThread-%d").build());
     publisher.init(dummyContext, executorService);
     Thread.sleep(150);
     executorService.shutdown();
@@ -155,7 +155,7 @@ public class TestReportPublisher {
     ScheduledExecutorService executorService = HadoopExecutors
         .newScheduledThreadPool(1,
             new ThreadFactoryBuilder().setDaemon(true)
-                .setNameFormat("Unit test ReportManager Thread - %d").build());
+                .setNameFormat("TestReportManagerThread-%d").build());
     publisher.init(dummyContext, executorService);
     Assertions.assertNull(
         ((CommandStatusReportPublisher) publisher).getReport());
@@ -173,8 +173,8 @@ public class TestReportPublisher {
         .build();
     cmdStatusMap.put(obj1.getCmdId(), obj1);
     cmdStatusMap.put(obj2.getCmdId(), obj2);
-    // We are not sending the commands whose status is PENDING.
-    Assertions.assertEquals(1,
+    // We will sending the commands whose status is PENDING and EXECUTED
+    Assertions.assertEquals(2,
         ((CommandStatusReportPublisher) publisher).getReport()
             .getCmdStatusCount(),
         "Should publish report with 2 status objects");
@@ -200,7 +200,7 @@ public class TestReportPublisher {
     ScheduledExecutorService executorService = HadoopExecutors
         .newScheduledThreadPool(1,
             new ThreadFactoryBuilder().setDaemon(true)
-                .setNameFormat("Unit test ReportManager Thread - %d").build());
+                .setNameFormat("TestReportManagerThread-%d").build());
     publisher.init(dummyContext, executorService);
     Message report =
         ((CRLStatusReportPublisher) publisher).getReport();

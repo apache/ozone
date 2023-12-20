@@ -21,7 +21,6 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
@@ -29,7 +28,6 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
@@ -72,6 +70,7 @@ import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.util.ExitUtils;
+import org.awaitility.Awaitility;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -102,7 +101,6 @@ import org.rocksdb.RocksIterator;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -137,6 +135,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THR
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE;
@@ -171,12 +171,14 @@ import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -204,6 +206,8 @@ public class TestSnapshotDiffManager {
   private final OMMetrics omMetrics = OMMetrics.create();
   @TempDir
   private File dbDir;
+  @TempDir
+  private File snapDiffDir;
   @Mock
   private RocksDBCheckpointDiffer differ;
   @Mock
@@ -347,6 +351,9 @@ public class TestSnapshotDiffManager {
             OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE_DEFAULT,
             StorageUnit.BYTES))
         .thenReturn(FileUtils.ONE_KB_BI.doubleValue());
+    when(configuration.getBoolean(OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB,
+        OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT))
+        .thenReturn(OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT);
 
     for (int i = 0; i < jobStatuses.size(); i++) {
       when(snapshotInfoTable.get(getTableKey(VOLUME_NAME, BUCKET_NAME,
@@ -425,7 +432,7 @@ public class TestSnapshotDiffManager {
     UUID snap1 = UUID.randomUUID();
     UUID snap2 = UUID.randomUUID();
 
-    String diffDir = Files.createTempDirectory("snapdiff_dir").toString();
+    String diffDir = snapDiffDir.getAbsolutePath();
     Set<String> randomStrings = IntStream.range(0, numberOfFiles)
         .mapToObj(i -> RandomStringUtils.randomAlphabetic(10))
         .collect(Collectors.toSet());
@@ -520,8 +527,7 @@ public class TestSnapshotDiffManager {
           toSnapshotInfo,
           false,
           Collections.emptyMap(),
-          Files.createTempDirectory("snapdiff_dir").toAbsolutePath()
-              .toString());
+          snapDiffDir.getAbsolutePath());
       assertEquals(deltaStrings, deltaFiles);
     }
   }
@@ -585,8 +591,7 @@ public class TestSnapshotDiffManager {
           toSnapshotInfo,
           false,
           Collections.emptyMap(),
-          Files.createTempDirectory("snapdiff_dir").toAbsolutePath()
-              .toString());
+          snapDiffDir.getAbsolutePath());
       assertEquals(deltaStrings, deltaFiles);
 
       rcFromSnapshot.close();
@@ -629,8 +634,6 @@ public class TestSnapshotDiffManager {
    * In the case of reading tombstones old Snapshot Persistent map should have
    * object Ids in the range 50-100 & should be empty otherwise
    */
-  @SuppressFBWarnings({"DLS_DEAD_LOCAL_STORE",
-      "RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT"})
   @ParameterizedTest
   @CsvSource({"false," + OmMetadataManagerImpl.DIRECTORY_TABLE,
       "true," + OmMetadataManagerImpl.DIRECTORY_TABLE,
@@ -640,7 +643,7 @@ public class TestSnapshotDiffManager {
       "true," + OmMetadataManagerImpl.KEY_TABLE})
   public void testObjectIdMapWithTombstoneEntries(boolean nativeLibraryLoaded,
                                                   String snapshotTableName)
-      throws NativeLibraryNotLoadedException, IOException, RocksDBException {
+      throws IOException, RocksDBException {
     Set<String> keysIncludingTombstones = IntStream.range(0, 100)
         .boxed().map(i -> (i + 100) + "/key" + i).collect(Collectors.toSet());
     // Mocking SST file with keys in SST file excluding tombstones
@@ -893,7 +896,7 @@ public class TestSnapshotDiffManager {
    * objectId Map of diff keys to be checked with their corresponding key names.
    */
   @ParameterizedTest
-  @CsvSource({"0,10,1000", "1,10,8", "1000,1000,10", "-1,1000,10000",
+  @CsvSource({"0,10,1000", "1,10,8", "10,1000,10", "-1,1000,10000",
       "1,0,1000", "1,-1,1000"})
   public void testCreatePageResponse(int startIdx,
                                      int pageSize,
@@ -933,7 +936,7 @@ public class TestSnapshotDiffManager {
         codecRegistry.asRawData(snapshotDiffJob2));
 
     if (pageSize <= 0 || startIdx < 0) {
-      Assertions.assertThrows(IllegalArgumentException.class,
+      Assertions.assertThrows(IOException.class,
           () -> snapshotDiffManager.createPageResponse(snapshotDiffJob, "vol",
               "buck", "fs", "ts", startIdx, pageSize));
       return;
@@ -1309,7 +1312,15 @@ public class TestSnapshotDiffManager {
     spy.loadJobsOnStartUp();
 
     // Wait for sometime to make sure that job finishes.
-    Thread.sleep(1000L);
+    Awaitility.await()
+        .atMost(10, TimeUnit.SECONDS)
+        .untilAsserted(() -> {
+          verify(spy, atLeast(1))
+              .generateSnapshotDiffReport(anyString(), anyString(),
+                  eq(VOLUME_NAME), eq(BUCKET_NAME), eq(snapshotInfo.getName()),
+                  eq(snapshotInfoList.get(1).getName()), eq(false),
+                  eq(false));
+        });
 
     SnapshotDiffJob snapDiffJob = getSnapshotDiffJobFromDb(snapshotInfo,
         snapshotInfoList.get(1));

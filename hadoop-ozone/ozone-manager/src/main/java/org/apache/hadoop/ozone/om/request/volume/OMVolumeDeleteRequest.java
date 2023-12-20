@@ -19,9 +19,9 @@
 package org.apache.hadoop.ozone.om.request.volume;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 import org.slf4j.Logger;
@@ -65,8 +65,7 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+      long transactionLogIndex) {
 
     DeleteVolumeRequest deleteVolumeRequest =
         getOmRequest().getDeleteVolumeRequest();
@@ -83,7 +82,7 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean acquiredUserLock = false;
     boolean acquiredVolumeLock = false;
-    IOException exception = null;
+    Exception exception = null;
     String owner = null;
     OMClientResponse omClientResponse = null;
     try {
@@ -94,8 +93,9 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
             null, null);
       }
 
-      acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
-          VOLUME_LOCK, volume);
+      mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
+          VOLUME_LOCK, volume));
+      acquiredVolumeLock = getOmLockDetails().isLockAcquired();
 
       OmVolumeArgs omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
 
@@ -110,8 +110,9 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
       }
 
       owner = omVolumeArgs.getOwnerName();
-      acquiredUserLock = omMetadataManager.getLock().acquireWriteLock(USER_LOCK,
-          owner);
+      mergeOmLockDetails(
+          omMetadataManager.getLock().acquireWriteLock(USER_LOCK, owner));
+      acquiredUserLock = getOmLockDetails().isLockAcquired();
 
       String dbUserKey = omMetadataManager.getUserKey(owner);
       String dbVolumeKey = omMetadataManager.getVolumeKey(volume);
@@ -140,18 +141,21 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
       omClientResponse = new OMVolumeDeleteResponse(omResponse.build(),
           volume, owner, newVolumeList);
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new OMVolumeDeleteResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
       if (acquiredUserLock) {
-        omMetadataManager.getLock().releaseWriteLock(USER_LOCK, owner);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(USER_LOCK, owner));
       }
       if (acquiredVolumeLock) {
-        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volume);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(VOLUME_LOCK, volume));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

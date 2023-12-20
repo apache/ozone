@@ -38,8 +38,8 @@ import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.jetbrains.annotations.NotNull;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests {@link OMKeyPurgeRequest} and {@link OMKeyPurgeResponse}.
@@ -170,7 +170,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     OMRequest modifiedOmRequest = omKeyPurgeRequest.preExecute(ozoneManager);
 
     // Will not be equal, as UserInfo will be set.
-    Assert.assertNotEquals(originalOmRequest, modifiedOmRequest);
+    Assertions.assertNotEquals(originalOmRequest, modifiedOmRequest);
 
     return modifiedOmRequest;
   }
@@ -192,15 +192,14 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     OMDirectoriesPurgeRequestWithFSO omKeyPurgeRequest =
         new OMDirectoriesPurgeRequestWithFSO(preExecutedRequest);
 
-    Assert.assertEquals(1000L * deletedKeyNames.size(),
+    Assertions.assertEquals(1000L * deletedKeyNames.size(),
         omBucketInfo.getUsedBytes());
     OMDirectoriesPurgeResponseWithFSO omClientResponse
         = (OMDirectoriesPurgeResponseWithFSO) omKeyPurgeRequest
-        .validateAndUpdateCache(ozoneManager, 100L,
-        ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 100L);
     omBucketInfo = omMetadataManager.getBucketTable().get(
         bucketKey);
-    Assert.assertEquals(0L * deletedKeyNames.size(),
+    Assertions.assertEquals(0L * deletedKeyNames.size(),
         omBucketInfo.getUsedBytes());
 
     performBatchOperationCommit(omClientResponse);
@@ -244,18 +243,19 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     // prevalidate bucket
     omBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
     final long bucketExpectedUsedBytes = bucketInitialUsedBytes + 1000L;
-    Assert.assertEquals(bucketExpectedUsedBytes, omBucketInfo.getUsedBytes());
+    Assertions.assertEquals(bucketExpectedUsedBytes,
+        omBucketInfo.getUsedBytes());
     
     // perform delete
     OMDirectoriesPurgeResponseWithFSO omClientResponse
         = (OMDirectoriesPurgeResponseWithFSO) omKeyPurgeRequest
-        .validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 100L);
     
     // validate bucket info, no change expected
     omBucketInfo = omMetadataManager.getBucketTable().get(
         bucketKey);
-    Assert.assertEquals(bucketExpectedUsedBytes, omBucketInfo.getUsedBytes());
+    Assertions.assertEquals(bucketExpectedUsedBytes,
+        omBucketInfo.getUsedBytes());
 
     performBatchOperationCommit(omClientResponse);
 
@@ -282,7 +282,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     for (OmKeyInfo deletedKey : deletedKeyInfos) {
       String keyName = omMetadataManager.getOzoneKey(deletedKey.getVolumeName(),
           deletedKey.getBucketName(), deletedKey.getKeyName());
-      Assert.assertTrue(omMetadataManager.getDeletedTable().isExist(
+      Assertions.assertTrue(omMetadataManager.getDeletedTable().isExist(
           keyName));
       deletedKeyNames.add(keyName);
     }
@@ -292,7 +292,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
   private void validateDeletedKeys(
       List<String> deletedKeyNames) throws IOException {
     for (String deletedKey : deletedKeyNames) {
-      Assert.assertTrue(omMetadataManager.getDeletedTable().isExist(
+      Assertions.assertTrue(omMetadataManager.getDeletedTable().isExist(
           deletedKey));
     }
   }

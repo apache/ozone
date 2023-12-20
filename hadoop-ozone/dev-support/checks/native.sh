@@ -19,4 +19,6 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 CHECK=native
 
-source "${DIR}/junit.sh" -Pnative -Drocks_tools_native "$@"
+source "${DIR}/junit.sh" -Pnative -Drocks_tools_native \
+  -DexcludedGroups="unhealthy | org.apache.ozone.test.UnhealthyTest" \
+  "$@"

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.common;
 
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -33,14 +34,16 @@ import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.api.types.VolumeObjectDBInfo;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.junit.Assert;
 
 import javax.ws.rs.core.Response;
 
+import java.net.InetSocketAddress;
 import java.util.Collections;
 import java.util.HashMap;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * This is a utility class for common code for test cases.
@@ -82,22 +85,21 @@ public class CommonUtils {
     Response rootResponse = nsSummaryEndpoint.getBasicInfo(ROOT_PATH);
     NamespaceSummaryResponse rootResponseObj =
         (NamespaceSummaryResponse) rootResponse.getEntity();
-    Assert.assertEquals(EntityType.ROOT, rootResponseObj.getEntityType());
-    Assert.assertEquals(2, rootResponseObj.getCountStats().getNumVolume());
-    Assert.assertEquals(4, rootResponseObj.getCountStats().getNumBucket());
-    Assert.assertEquals(5, rootResponseObj.getCountStats().getNumTotalDir());
-    Assert.assertEquals(10, rootResponseObj.getCountStats().getNumTotalKey());
-    Assert.assertEquals(IAccessAuthorizer.ACLIdentityType.USER,
+    assertEquals(EntityType.ROOT, rootResponseObj.getEntityType());
+    assertEquals(2, rootResponseObj.getCountStats().getNumVolume());
+    assertEquals(4, rootResponseObj.getCountStats().getNumBucket());
+    assertEquals(5, rootResponseObj.getCountStats().getNumTotalDir());
+    assertEquals(10, rootResponseObj.getCountStats().getNumTotalKey());
+    assertEquals("USER",
         rootResponseObj.getObjectDBInfo().getAcls().get(0).getType());
-    Assert.assertEquals(IAccessAuthorizer.ACLType.WRITE.toString(),
-        rootResponseObj.getObjectDBInfo().getAcls().get(0)
-            .getAclList().get(0).toString());
-    Assert.assertEquals(username,
+    assertEquals("WRITE", rootResponseObj.getObjectDBInfo().getAcls().get(0)
+            .getAclList().get(0));
+    assertEquals(username,
         rootResponseObj.getObjectDBInfo().getAcls().get(0).getName());
-    Assert.assertEquals("value",
+    assertEquals("value",
         rootResponseObj.getObjectDBInfo().getMetadata().get("key"));
-    Assert.assertEquals(ACCESS,
-        rootResponseObj.getObjectDBInfo().getAcls().get(0).getAclScope());
+    assertEquals("ACCESS",
+        rootResponseObj.getObjectDBInfo().getAcls().get(0).getScope());
   }
 
   public void testNSSummaryBasicInfoVolume(
@@ -105,26 +107,18 @@ public class CommonUtils {
     Response volResponse = nsSummaryEndpoint.getBasicInfo(VOL_PATH);
     NamespaceSummaryResponse volResponseObj =
         (NamespaceSummaryResponse) volResponse.getEntity();
-    Assert.assertEquals(EntityType.VOLUME,
+    assertEquals(EntityType.VOLUME,
         volResponseObj.getEntityType());
-    Assert.assertEquals(2,
-        volResponseObj.getCountStats().getNumBucket());
-    Assert.assertEquals(4,
-        volResponseObj.getCountStats().getNumTotalDir());
-    Assert.assertEquals(6,
-        volResponseObj.getCountStats().getNumTotalKey());
-    Assert.assertEquals("TestUser",
-        ((VolumeObjectDBInfo) volResponseObj.
+    assertEquals(2, volResponseObj.getCountStats().getNumBucket());
+    assertEquals(4, volResponseObj.getCountStats().getNumTotalDir());
+    assertEquals(6, volResponseObj.getCountStats().getNumTotalKey());
+    assertEquals("TestUser", ((VolumeObjectDBInfo) volResponseObj.
             getObjectDBInfo()).getAdmin());
-    Assert.assertEquals("TestUser",
-        ((VolumeObjectDBInfo) volResponseObj.
+    assertEquals("TestUser", ((VolumeObjectDBInfo) volResponseObj.
             getObjectDBInfo()).getOwner());
-    Assert.assertEquals("vol",
-        volResponseObj.getObjectDBInfo().getName());
-    Assert.assertEquals(2097152,
-        volResponseObj.getObjectDBInfo().getQuotaInBytes());
-    Assert.assertEquals(-1,
-        volResponseObj.getObjectDBInfo().getQuotaInNamespace());
+    assertEquals("vol", volResponseObj.getObjectDBInfo().getName());
+    assertEquals(2097152, volResponseObj.getObjectDBInfo().getQuotaInBytes());
+    assertEquals(-1, volResponseObj.getObjectDBInfo().getQuotaInNamespace());
   }
 
   public void testNSSummaryBasicInfoBucketOne(BucketLayout bucketLayout,
@@ -133,18 +127,18 @@ public class CommonUtils {
         nsSummaryEndpoint.getBasicInfo(BUCKET_ONE_PATH);
     NamespaceSummaryResponse bucketOneObj =
         (NamespaceSummaryResponse) bucketOneResponse.getEntity();
-    Assert.assertEquals(EntityType.BUCKET, bucketOneObj.getEntityType());
-    Assert.assertEquals(4, bucketOneObj.getCountStats().getNumTotalDir());
-    Assert.assertEquals(4, bucketOneObj.getCountStats().getNumTotalKey());
-    Assert.assertEquals("vol",
+    assertEquals(EntityType.BUCKET, bucketOneObj.getEntityType());
+    assertEquals(4, bucketOneObj.getCountStats().getNumTotalDir());
+    assertEquals(4, bucketOneObj.getCountStats().getNumTotalKey());
+    assertEquals("vol",
         ((BucketObjectDBInfo) bucketOneObj.getObjectDBInfo()).getVolumeName());
-    Assert.assertEquals(StorageType.DISK,
+    assertEquals(StorageType.DISK,
         ((BucketObjectDBInfo)
             bucketOneObj.getObjectDBInfo()).getStorageType());
-    Assert.assertEquals(bucketLayout,
+    assertEquals(bucketLayout,
         ((BucketObjectDBInfo)
             bucketOneObj.getObjectDBInfo()).getBucketLayout());
-    Assert.assertEquals("bucket1",
+    assertEquals("bucket1",
         ((BucketObjectDBInfo) bucketOneObj.getObjectDBInfo()).getName());
   }
 
@@ -155,18 +149,18 @@ public class CommonUtils {
         nsSummaryEndpoint.getBasicInfo(BUCKET_TWO_PATH);
     NamespaceSummaryResponse bucketTwoObj =
         (NamespaceSummaryResponse) bucketTwoResponse.getEntity();
-    Assert.assertEquals(EntityType.BUCKET, bucketTwoObj.getEntityType());
-    Assert.assertEquals(0, bucketTwoObj.getCountStats().getNumTotalDir());
-    Assert.assertEquals(2, bucketTwoObj.getCountStats().getNumTotalKey());
-    Assert.assertEquals("vol",
+    assertEquals(EntityType.BUCKET, bucketTwoObj.getEntityType());
+    assertEquals(0, bucketTwoObj.getCountStats().getNumTotalDir());
+    assertEquals(2, bucketTwoObj.getCountStats().getNumTotalKey());
+    assertEquals("vol",
         ((BucketObjectDBInfo) bucketTwoObj.getObjectDBInfo()).getVolumeName());
-    Assert.assertEquals(StorageType.DISK,
+    assertEquals(StorageType.DISK,
         ((BucketObjectDBInfo)
             bucketTwoObj.getObjectDBInfo()).getStorageType());
-    Assert.assertEquals(bucketLayout,
+    assertEquals(bucketLayout,
         ((BucketObjectDBInfo)
             bucketTwoObj.getObjectDBInfo()).getBucketLayout());
-    Assert.assertEquals("bucket2",
+    assertEquals("bucket2",
         ((BucketObjectDBInfo) bucketTwoObj.getObjectDBInfo()).getName());
   }
 
@@ -175,21 +169,14 @@ public class CommonUtils {
     Response dirOneResponse = nsSummaryEndpoint.getBasicInfo(DIR_ONE_PATH);
     NamespaceSummaryResponse dirOneObj =
         (NamespaceSummaryResponse) dirOneResponse.getEntity();
-    Assert.assertEquals(EntityType.DIRECTORY, dirOneObj.getEntityType());
-    Assert.assertEquals(3,
-        dirOneObj.getCountStats().getNumTotalDir());
-    Assert.assertEquals(3,
-        dirOneObj.getCountStats().getNumTotalKey());
-    Assert.assertEquals("dir1",
-        dirOneObj.getObjectDBInfo().getName());
-    Assert.assertEquals(0,
-        dirOneObj.getObjectDBInfo().getMetadata().size());
-    Assert.assertEquals(0,
-        dirOneObj.getObjectDBInfo().getQuotaInBytes());
-    Assert.assertEquals(0,
-        dirOneObj.getObjectDBInfo().getQuotaInNamespace());
-    Assert.assertEquals(0,
-        dirOneObj.getObjectDBInfo().getUsedNamespace());
+    assertEquals(EntityType.DIRECTORY, dirOneObj.getEntityType());
+    assertEquals(3, dirOneObj.getCountStats().getNumTotalDir());
+    assertEquals(3, dirOneObj.getCountStats().getNumTotalKey());
+    assertEquals("dir1", dirOneObj.getObjectDBInfo().getName());
+    assertEquals(0, dirOneObj.getObjectDBInfo().getMetadata().size());
+    assertEquals(0, dirOneObj.getObjectDBInfo().getQuotaInBytes());
+    assertEquals(0, dirOneObj.getObjectDBInfo().getQuotaInNamespace());
+    assertEquals(0, dirOneObj.getObjectDBInfo().getUsedNamespace());
   }
 
   public void testNSSummaryBasicInfoNoPath(
@@ -198,10 +185,9 @@ public class CommonUtils {
         .getBasicInfo(INVALID_PATH);
     NamespaceSummaryResponse invalidObj =
         (NamespaceSummaryResponse) invalidResponse.getEntity();
-    Assert.assertEquals(ResponseStatus.PATH_NOT_FOUND,
-        invalidObj.getStatus());
-    Assert.assertEquals(null, invalidObj.getCountStats());
-    Assert.assertEquals(null, invalidObj.getObjectDBInfo());
+    assertEquals(ResponseStatus.PATH_NOT_FOUND, invalidObj.getStatus());
+    assertNull(invalidObj.getCountStats());
+    assertNull(invalidObj.getObjectDBInfo());
   }
 
   public void testNSSummaryBasicInfoKey(
@@ -209,17 +195,25 @@ public class CommonUtils {
     Response keyResponse = nsSummaryEndpoint.getBasicInfo(KEY_PATH);
     NamespaceSummaryResponse keyResObj =
         (NamespaceSummaryResponse) keyResponse.getEntity();
-    Assert.assertEquals(EntityType.KEY, keyResObj.getEntityType());
-    Assert.assertEquals("vol",
+    assertEquals(EntityType.KEY, keyResObj.getEntityType());
+    assertEquals("vol",
         ((KeyObjectDBInfo) keyResObj.getObjectDBInfo()).getVolumeName());
-    Assert.assertEquals("bucket2",
+    assertEquals("bucket2",
         ((KeyObjectDBInfo) keyResObj.getObjectDBInfo()).getBucketName());
-    Assert.assertEquals("file4",
+    assertEquals("file4",
         ((KeyObjectDBInfo) keyResObj.getObjectDBInfo()).getKeyName());
-    Assert.assertEquals(2049,
+    assertEquals(2049,
         ((KeyObjectDBInfo) keyResObj.getObjectDBInfo()).getDataSize());
-    Assert.assertEquals(HddsProtos.ReplicationType.STAND_ALONE,
+    assertEquals(HddsProtos.ReplicationType.STAND_ALONE,
         ((KeyObjectDBInfo) keyResObj.getObjectDBInfo()).
             getReplicationConfig().getReplicationType());
+  }
+
+  public SCMNodeDetails getReconNodeDetails() {
+    SCMNodeDetails.Builder builder = new SCMNodeDetails.Builder();
+    builder.setSCMNodeId("Recon");
+    builder.setDatanodeProtocolServerAddress(
+        InetSocketAddress.createUnresolved("127.0.0.1", 9888));
+    return builder.build();
   }
 }

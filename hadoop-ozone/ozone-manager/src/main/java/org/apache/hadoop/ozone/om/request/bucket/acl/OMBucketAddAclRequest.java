@@ -27,7 +27,6 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -112,7 +111,7 @@ public class OMBucketAddAclRequest extends OMBucketAclRequest {
   }
 
   @Override
-  void onComplete(boolean operationResult, IOException exception,
+  void onComplete(boolean operationResult, Exception exception,
       OMMetrics omMetrics, AuditLogger auditLogger,
       Map<String, String> auditMap) {
     auditLog(auditLogger, buildAuditMessage(OMAction.ADD_ACL, auditMap,
@@ -134,11 +133,9 @@ public class OMBucketAddAclRequest extends OMBucketAclRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(
-      OzoneManager ozoneManager, long trxnLogIndex,
-      OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+      OzoneManager ozoneManager, long trxnLogIndex) {
     ozoneManager.getMetrics().incNumAddAcl();
-    return super.validateAndUpdateCache(ozoneManager, trxnLogIndex,
-        omDoubleBufferHelper);
+    return super.validateAndUpdateCache(ozoneManager, trxnLogIndex);
   }
 }
 

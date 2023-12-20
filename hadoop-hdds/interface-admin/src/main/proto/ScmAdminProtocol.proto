@@ -302,7 +302,12 @@ message SCMCloseContainerRequestProto {
 }
 
 message SCMCloseContainerResponseProto {
-  // Empty response
+  enum Status {
+    OK = 1;
+    CONTAINER_ALREADY_CLOSED = 2;
+    CONTAINER_ALREADY_CLOSING = 3;
+  }
+  optional Status status = 1;
 }
 
 /*

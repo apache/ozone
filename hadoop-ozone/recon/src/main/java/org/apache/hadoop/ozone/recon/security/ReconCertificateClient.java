@@ -21,7 +21,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CommonCertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.client.DefaultCertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageConfig;
@@ -41,7 +41,7 @@ import static org.apache.hadoop.hdds.security.x509.exception.CertificateExceptio
 /**
  * Certificate client for Recon.
  */
-public class ReconCertificateClient  extends CommonCertificateClient {
+public class ReconCertificateClient  extends DefaultCertificateClient {
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconCertificateClient.class);
 
@@ -56,7 +56,7 @@ public class ReconCertificateClient  extends CommonCertificateClient {
       Consumer<String> saveCertIdCallback,
       Runnable shutdownCallback) {
     super(config, scmSecurityClient, LOG, storage.getReconCertSerialId(),
-        COMPONENT_NAME, saveCertIdCallback, shutdownCallback);
+        COMPONENT_NAME, "", saveCertIdCallback, shutdownCallback);
     this.clusterID = storage.getClusterID();
     this.reconID = storage.getReconId();
   }

@@ -36,11 +36,11 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
@@ -58,8 +58,9 @@ import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
-import org.mockito.Mockito;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * Test for metrics published by storage containers.
@@ -70,7 +71,7 @@ public class TestContainerMetrics {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   @Test
   public void testContainerMetrics() throws Exception {
@@ -97,12 +98,8 @@ public class TestContainerMetrics {
           datanodeDetails.getUuidString(), conf,
           null, StorageVolume.VolumeType.DATA_VOLUME, null);
       ContainerSet containerSet = new ContainerSet(1000);
-      DatanodeStateMachine stateMachine = Mockito.mock(
-          DatanodeStateMachine.class);
-      StateContext context = Mockito.mock(StateContext.class);
-      Mockito.when(stateMachine.getDatanodeDetails())
-          .thenReturn(datanodeDetails);
-      Mockito.when(context.getParent()).thenReturn(stateMachine);
+      StateContext context = ContainerTestUtils.getMockContext(
+          datanodeDetails, conf);
       ContainerMetrics metrics = ContainerMetrics.create(conf);
       Map<ContainerProtos.ContainerType, Handler> handlers = Maps.newHashMap();
       for (ContainerProtos.ContainerType containerType :

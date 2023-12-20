@@ -30,9 +30,6 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 
 import java.io.IOException;
@@ -46,34 +43,30 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.stream.LongStream;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Class used to test ContainerSet operations.
  */
-@RunWith(Parameterized.class)
 public class TestContainerSet {
 
   private static final int FIRST_ID = 2;
 
-  private final ContainerLayoutVersion layout;
+  private ContainerLayoutVersion layoutVersion;
 
-  public TestContainerSet(ContainerLayoutVersion layout) {
-    this.layout = layout;
+  private void setLayoutVersion(ContainerLayoutVersion layoutVersion) {
+    this.layoutVersion = layoutVersion;
   }
 
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
-    return ContainerLayoutTestInfo.containerLayoutParameters();
-  }
-
-  @Test
-  public void testAddGetRemoveContainer() throws StorageContainerException {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testAddGetRemoveContainer(ContainerLayoutVersion layout)
+      throws StorageContainerException {
+    setLayoutVersion(layout);
     ContainerSet containerSet = new ContainerSet(1000);
     long containerId = 100L;
     ContainerProtos.ContainerDataProto.State state = ContainerProtos
@@ -112,8 +105,10 @@ public class TestContainerSet {
     assertFalse(containerSet.removeContainer(1000L));
   }
 
-  @Test
-  public void testIteratorsAndCount() throws StorageContainerException {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testIteratorsAndCount(ContainerLayoutVersion layout)
+      throws StorageContainerException {
+    setLayoutVersion(layout);
 
     ContainerSet containerSet = createContainerSet();
 
@@ -156,8 +151,10 @@ public class TestContainerSet {
 
   }
 
-  @Test
-  public void testIteratorPerVolume() throws StorageContainerException {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testIteratorPerVolume(ContainerLayoutVersion layout)
+      throws StorageContainerException {
+    setLayoutVersion(layout);
     HddsVolume vol1 = Mockito.mock(HddsVolume.class);
     Mockito.when(vol1.getStorageID()).thenReturn("uuid-1");
     HddsVolume vol2 = Mockito.mock(HddsVolume.class);
@@ -199,8 +196,10 @@ public class TestContainerSet {
     assertEquals(5, count2);
   }
 
-  @Test
-  public void iteratorIsOrderedByScanTime() throws StorageContainerException {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void iteratorIsOrderedByScanTime(ContainerLayoutVersion layout)
+      throws StorageContainerException {
+    setLayoutVersion(layout);
     HddsVolume vol = Mockito.mock(HddsVolume.class);
     Mockito.when(vol.getStorageID()).thenReturn("uuid-1");
     Random random = new Random();
@@ -250,8 +249,10 @@ public class TestContainerSet {
     assertEquals(containerCount, containersToBeScanned);
   }
 
-  @Test
-  public void testGetContainerReport() throws IOException {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testGetContainerReport(ContainerLayoutVersion layout)
+      throws IOException {
+    setLayoutVersion(layout);
 
     ContainerSet containerSet = createContainerSet();
 
@@ -261,10 +262,10 @@ public class TestContainerSet {
     assertEquals(10, containerReportsRequestProto.getReportsList().size());
   }
 
-
-
-  @Test
-  public void testListContainer() throws StorageContainerException {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testListContainer(ContainerLayoutVersion layout)
+      throws StorageContainerException {
+    setLayoutVersion(layout);
     ContainerSet containerSet = createContainerSet();
     int count = 5;
     int startId = FIRST_ID + 3;
@@ -275,8 +276,10 @@ public class TestContainerSet {
     assertContainerIds(startId, count, result);
   }
 
-  @Test
-  public void testListContainerFromFirstKey() throws StorageContainerException {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testListContainerFromFirstKey(ContainerLayoutVersion layout)
+      throws StorageContainerException {
+    setLayoutVersion(layout);
     ContainerSet containerSet = createContainerSet();
     int count = 6;
     List<ContainerData> result = new ArrayList<>(count);
@@ -301,7 +304,7 @@ public class TestContainerSet {
     ContainerSet containerSet = new ContainerSet(1000);
     for (int i = FIRST_ID; i < FIRST_ID + 10; i++) {
       KeyValueContainerData kvData = new KeyValueContainerData(i,
-          layout,
+          layoutVersion,
           (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
           UUID.randomUUID().toString());
       if (i % 2 == 0) {

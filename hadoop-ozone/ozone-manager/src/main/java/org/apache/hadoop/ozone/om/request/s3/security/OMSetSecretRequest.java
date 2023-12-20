@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -101,8 +100,7 @@ public class OMSetSecretRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-         long transactionLogIndex,
-         OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+         long transactionLogIndex) {
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
@@ -124,7 +122,8 @@ public class OMSetSecretRequest extends OMClientRequest {
               LOG.debug("Updating S3SecretTable cache entry");
               // Update S3SecretTable cache entry in this case
               newS3SecretValue = new S3SecretValue(accessId, secretKey);
-
+              // Set the transactionLogIndex to be used for updating.
+              newS3SecretValue.setTransactionLogIndex(transactionLogIndex);
               s3SecretManager
                   .updateCache(accessId, newS3SecretValue);
             } else {
@@ -148,9 +147,6 @@ public class OMSetSecretRequest extends OMClientRequest {
       exception = ex;
       omClientResponse = new OMSetSecretResponse(
           createErrorOMResponse(omResponse, ex));
-    } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
     }
 
     final Map<String, String> auditMap = new HashMap<>();

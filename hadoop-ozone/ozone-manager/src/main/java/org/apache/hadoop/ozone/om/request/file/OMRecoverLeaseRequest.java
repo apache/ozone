@@ -29,7 +29,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -51,6 +50,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Iterator;
@@ -107,8 +107,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+      long transactionLogIndex) {
     RecoverLeaseRequest recoverLeaseRequest = getOmRequest()
         .getRecoverLeaseRequest();
     Preconditions.checkNotNull(recoverLeaseRequest);
@@ -123,7 +122,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
 
     omMetadataManager = ozoneManager.getMetadataManager();
     OMClientResponse omClientResponse = null;
-    IOException exception = null;
+    Exception exception = null;
     // increment metric
     OMMetrics omMetrics = ozoneManager.getMetrics();
 
@@ -134,9 +133,10 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
           IAccessAuthorizer.ACLType.WRITE, OzoneObj.ResourceType.KEY);
 
       // acquire lock
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          volumeName, bucketName);
-
+      mergeOmLockDetails(
+          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
+              volumeName, bucketName));
+      acquiredLock = getOmLockDetails().isLockAcquired();
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
       String openKeyEntryName = doWork(ozoneManager, transactionLogIndex);
@@ -155,20 +155,22 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       omMetrics.incNumRecoverLease();
       LOG.debug("Key recovered. Volume:{}, Bucket:{}, Key:{}", volumeName,
           bucketName, keyName);
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       LOG.error("Fail for recovering lease. Volume:{}, Bucket:{}, Key:{}",
           volumeName, bucketName, keyName, ex);
       exception = ex;
       omMetrics.incNumRecoverLeaseFails();
       omResponse.setCmdType(RecoverLease);
       omClientResponse = new OMRecoverLeaseResponse(
-          createErrorOMResponse(omResponse, ex), getBucketLayout());
+          createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(
+            omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK,
+                volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

@@ -39,13 +39,10 @@ import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoo
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.runners.Parameterized;
 import org.mockito.Mockito;
 
 import java.io.File;
@@ -62,6 +59,8 @@ import java.util.Set;
 
 import static org.apache.hadoop.hdds.conf.StorageUnit.BYTES;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
+import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -91,7 +90,6 @@ public class TestWritableECContainerProvider {
   private Map<ContainerID, ContainerInfo> containers;
   private WritableECContainerProviderConfig providerConf;
 
-  @Parameterized.Parameters
   public static Collection<PipelineChoosePolicy> policies() {
     Collection<PipelineChoosePolicy> policies = new ArrayList<>();
     policies.add(new RandomPipelineChoosePolicy());
@@ -311,12 +309,10 @@ public class TestWritableECContainerProvider {
     };
     provider = createSubject(policy);
 
-    try {
-      provider.getContainer(1, repConfig, OWNER, new ExcludeList());
-      Assert.fail();
-    } catch (IOException ex) {
-      GenericTestUtils.assertExceptionContains("Cannot create pipelines", ex);
-    }
+    IOException ioException = assertThrows(IOException.class,
+        () -> provider.getContainer(1, repConfig, OWNER, new ExcludeList()));
+    assertThat(ioException.getMessage(),
+        containsString("Cannot create pipelines"));
   }
 
   @ParameterizedTest
@@ -342,20 +338,16 @@ public class TestWritableECContainerProvider {
     };
     provider = createSubject(policy);
 
-    try {
-      provider.getContainer(1, repConfig, OWNER, new ExcludeList());
-      Assert.fail();
-    } catch (IOException ex) {
-      GenericTestUtils.assertExceptionContains("Cannot create pipelines", ex);
-    }
+    IOException ioException = assertThrows(IOException.class,
+        () -> provider.getContainer(1, repConfig, OWNER, new ExcludeList()));
+    assertThat(ioException.getMessage(),
+        containsString("Cannot create pipelines"));
 
     for (int i = 0; i < 5; i++) {
-      try {
-        provider.getContainer(1, repConfig, OWNER, new ExcludeList());
-        Assert.fail();
-      } catch (IOException ex) {
-        GenericTestUtils.assertExceptionContains("Cannot create pipelines", ex);
-      }
+      ioException = assertThrows(IOException.class,
+          () -> provider.getContainer(1, repConfig, OWNER, new ExcludeList()));
+      assertThat(ioException.getMessage(),
+          containsString("Cannot create pipelines"));
     }
   }
 

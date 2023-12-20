@@ -17,17 +17,22 @@
  */
 package org.apache.hadoop.hdds.scm.ha;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.ScmRatisServerConfig;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.ha.ConfUtils;
-import org.junit.Assert;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.conf.RaftProperties;
+import org.apache.ratis.server.RaftServerConfigKeys;
+import org.apache.ratis.util.TimeDuration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -60,7 +65,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVIC
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test for SCM HA-related configuration.
@@ -202,6 +209,18 @@ class TestSCMHAConfiguration {
         scmServiceId, "scm1"), 9999));
 
 
+    final ScmRatisServerConfig scmRatisConfig = conf.getObject(
+        ScmRatisServerConfig.class);
+    assertEquals(0, scmRatisConfig.getLogAppenderWaitTimeMin(),
+        "getLogAppenderWaitTimeMin");
+
+    final File testDir = GenericTestUtils.getRandomizedTestDir();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getPath());
+
+    final RaftProperties p = RatisUtil.newRaftProperties(conf);
+    final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);
+    assertEquals(TimeDuration.ZERO, t,
+        RaftServerConfigKeys.Log.Appender.WAIT_TIME_MIN_KEY);
   }
 
 
@@ -284,21 +303,21 @@ class TestSCMHAConfiguration {
 
   @Test
   public void testRatisEnabledDefaultConfigWithoutInitializedSCM()
-      throws IOException, NoSuchFieldException, IllegalAccessException {
+      throws IOException {
     SCMStorageConfig scmStorageConfig = Mockito.mock(SCMStorageConfig.class);
     Mockito.when(scmStorageConfig.getState())
         .thenReturn(Storage.StorageState.NOT_INITIALIZED);
     SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
-    Assert.assertEquals(SCMHAUtils.isSCMHAEnabled(conf),
+    assertEquals(SCMHAUtils.isSCMHAEnabled(conf),
         ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT);
     DefaultConfigManager.clearDefaultConfigs();
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, false);
     SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
-    Assert.assertEquals(SCMHAUtils.isSCMHAEnabled(conf), false);
+    assertFalse(SCMHAUtils.isSCMHAEnabled(conf));
     DefaultConfigManager.clearDefaultConfigs();
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
-    Assert.assertEquals(SCMHAUtils.isSCMHAEnabled(conf), true);
+    assertTrue(SCMHAUtils.isSCMHAEnabled(conf));
   }
 
   @Test
@@ -310,11 +329,11 @@ class TestSCMHAConfiguration {
     Mockito.when(scmStorageConfig.isSCMHAEnabled()).thenReturn(false);
     DefaultConfigManager.clearDefaultConfigs();
     SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
-    Assert.assertEquals(SCMHAUtils.isSCMHAEnabled(conf),
+    assertEquals(SCMHAUtils.isSCMHAEnabled(conf),
         scmStorageConfig.isSCMHAEnabled());
     Mockito.when(scmStorageConfig.isSCMHAEnabled()).thenReturn(false);
     DefaultConfigManager.clearDefaultConfigs();
-    Assert.assertEquals(SCMHAUtils.isSCMHAEnabled(conf), true);
+    assertTrue(SCMHAUtils.isSCMHAEnabled(conf));
   }
 
   @ParameterizedTest

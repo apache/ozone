@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -49,6 +48,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -152,8 +152,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(
-      OzoneManager ozoneManager, long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+      OzoneManager ozoneManager, long transactionLogIndex) {
 
     final OMMultiTenantManager multiTenantManager =
         ozoneManager.getMultiTenantManager();
@@ -174,7 +173,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
     final String tenantId = request.getTenantId();
 
     boolean acquiredVolumeLock = false;
-    IOException exception = null;
+    Exception exception = null;
 
     String userPrincipal = null;
 
@@ -184,9 +183,10 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
       volumeName = ozoneManager.getMultiTenantManager()
           .getTenantVolumeName(tenantId);
 
-      acquiredVolumeLock =
-          omMetadataManager.getLock().acquireWriteLock(VOLUME_LOCK, volumeName);
-
+      mergeOmLockDetails(
+          omMetadataManager.getLock().acquireWriteLock(VOLUME_LOCK,
+              volumeName));
+      acquiredVolumeLock = getOmLockDetails().isLockAcquired();
       // Remove accessId from principalToAccessIdsTable
       OmDBAccessIdInfo omDBAccessIdInfo =
           omMetadataManager.getTenantAccessIdTable().get(accessId);
@@ -223,20 +223,23 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
           omResponse.build(), accessId, userPrincipal, principalInfo,
           s3SecretManager);
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       // Prepare omClientResponse
       omClientResponse = new OMTenantRevokeUserAccessIdResponse(
-          createErrorOMResponse(omResponse, ex));
+          createErrorOMResponse(omResponse, exception));
     } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
       if (acquiredVolumeLock) {
         Preconditions.checkNotNull(volumeName);
-        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
+        mergeOmLockDetails(
+            omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK,
+                volumeName));
       }
       // Release authorizer write lock
       multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest();
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
+      }
     }
 
     // Audit

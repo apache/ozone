@@ -423,7 +423,7 @@ public class TestSCMContainerPlacementRackAware {
       policy.chooseDatanodes(null, null, nodeNum, STORAGE_CAPACITY + 0, 15);
       fail("Storage requested exceeds capacity, this call should fail");
     } catch (Exception e) {
-      assertTrue(e.getClass().getSimpleName().equals("SCMException"));
+      assertEquals("SCMException", e.getClass().getSimpleName());
     }
 
     // get metrics
@@ -796,5 +796,44 @@ public class TestSCMContainerPlacementRackAware {
     Assertions.assertTrue(successCount >= 1, "Not enough success count");
     Assertions.assertTrue(tryCount >= 1, "Not enough try count");
     Assertions.assertEquals(0, compromiseCount);
+  }
+
+  @Test
+  public void chooseNodeWithUsedAndFavouredNodesMultipleRack()
+      throws SCMException {
+    int datanodeCount = 12;
+    setup(datanodeCount);
+    int nodeNum = 1;
+    List<DatanodeDetails> usedNodes = new ArrayList<>();
+    List<DatanodeDetails> favouredNodes = new ArrayList<>();
+
+    // 2 replica
+    usedNodes.add(datanodes.get(0));
+    usedNodes.add(datanodes.get(1));
+    // 1 favoured node
+    favouredNodes.add(datanodes.get(2));
+
+    List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(usedNodes,
+        null, favouredNodes, nodeNum, 0, 5);
+
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    // Favoured node should not be returned,
+    // Returned node should be on the different rack than the favoured node.
+    Assertions.assertFalse(cluster.isSameParent(
+        favouredNodes.get(0), datanodeDetails.get(0)));
+
+    favouredNodes.clear();
+    // 1 favoured node
+    favouredNodes.add(datanodes.get(6));
+
+    datanodeDetails = policy.chooseDatanodes(usedNodes,
+        null, favouredNodes, nodeNum, 0, 5);
+
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+
+    // Favoured node should be returned,
+    // as favoured node is in the different rack as used nodes.
+    Assertions.assertSame(favouredNodes.get(0).getUuid(), datanodeDetails.get(0).getUuid());
+
   }
 }

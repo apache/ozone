@@ -24,7 +24,6 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -44,6 +43,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -129,8 +129,7 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+      long transactionLogIndex) {
 
     UpdateGetDelegationTokenRequest updateGetDelegationTokenRequest =
         getOmRequest().getUpdateGetDelegationTokenRequest();
@@ -147,9 +146,6 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
       omClientResponse = new OMGetDelegationTokenResponse(null, -1L,
           omResponse.setGetDelegationTokenResponse(
               GetDelegationTokenResponseProto.newBuilder()).build());
-      omClientResponse.setFlushFuture(
-          ozoneManagerDoubleBufferHelper.add(omClientResponse,
-              transactionLogIndex));
       return omClientResponse;
     }
 
@@ -165,7 +161,7 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
-    IOException exception = null;
+    Exception exception = null;
 
     try {
       OzoneTokenIdentifier ozoneTokenIdentifier = OzoneTokenIdentifier.
@@ -191,15 +187,12 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
               omResponse.setGetDelegationTokenResponse(
                   updateGetDelegationTokenRequest
                       .getGetDelegationTokenResponse()).build());
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       LOG.error("Error in Updating DelegationToken {}",
           ozoneTokenIdentifierToken, ex);
       exception = ex;
       omClientResponse = new OMGetDelegationTokenResponse(null, -1L,
-          createErrorOMResponse(omResponse, ex));
-    } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
+          createErrorOMResponse(omResponse, exception));
     }
 
     auditLog(auditLogger,

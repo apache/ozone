@@ -24,8 +24,8 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 
@@ -49,7 +49,7 @@ public class TestOmVolumeArgs {
 
     OmVolumeArgs cloneVolumeArgs = omVolumeArgs.copyObject();
 
-    Assert.assertEquals(omVolumeArgs, cloneVolumeArgs);
+    Assertions.assertEquals(omVolumeArgs, cloneVolumeArgs);
 
     // add user acl to write.
     omVolumeArgs.addAcl(new OzoneAcl(
@@ -57,7 +57,7 @@ public class TestOmVolumeArgs {
         IAccessAuthorizer.ACLType.WRITE, ACCESS));
 
     // Now check clone acl
-    Assert.assertNotEquals(cloneVolumeArgs.getAcls().get(0),
+    Assertions.assertNotEquals(cloneVolumeArgs.getAcls().get(0),
         omVolumeArgs.getAcls().get(0));
 
     // Set user acl to Write_ACL.
@@ -65,14 +65,14 @@ public class TestOmVolumeArgs {
         IAccessAuthorizer.ACLIdentityType.USER, "user1",
         IAccessAuthorizer.ACLType.WRITE_ACL, ACCESS)));
 
-    Assert.assertNotEquals(cloneVolumeArgs.getAcls().get(0),
+    Assertions.assertNotEquals(cloneVolumeArgs.getAcls().get(0),
         omVolumeArgs.getAcls().get(0));
 
     // Now clone and check. It should have same as original acl.
     cloneVolumeArgs = (OmVolumeArgs) omVolumeArgs.copyObject();
 
-    Assert.assertEquals(omVolumeArgs, cloneVolumeArgs);
-    Assert.assertEquals(cloneVolumeArgs.getAcls().get(0),
+    Assertions.assertEquals(omVolumeArgs, cloneVolumeArgs);
+    Assertions.assertEquals(cloneVolumeArgs.getAcls().get(0),
         omVolumeArgs.getAcls().get(0));
 
     omVolumeArgs.removeAcl(new OzoneAcl(
@@ -80,8 +80,8 @@ public class TestOmVolumeArgs {
         IAccessAuthorizer.ACLType.WRITE_ACL, ACCESS));
 
     // Removing acl, in original omVolumeArgs it should have no acls.
-    Assert.assertEquals(0, omVolumeArgs.getAcls().size());
-    Assert.assertEquals(1, cloneVolumeArgs.getAcls().size());
+    Assertions.assertEquals(0, omVolumeArgs.getAcls().size());
+    Assertions.assertEquals(1, cloneVolumeArgs.getAcls().size());
 
   }
 }

@@ -20,14 +20,18 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>hdds</artifactId>
-    <version>1.4.0-SNAPSHOT</version>
+    <version>1.5.0-SNAPSHOT</version>
   </parent>
   <artifactId>hdds-server-framework</artifactId>
-  <version>1.4.0-SNAPSHOT</version>
+  <version>1.5.0-SNAPSHOT</version>
   <description>Apache Ozone Distributed Data Store Server Framework
   </description>
   <name>Apache Ozone HDDS Server Framework</name>
   <packaging>jar</packaging>
+
+  <properties>
+    <allow.junit4>false</allow.junit4>
+  </properties>
 
   <dependencies>
     <dependency>
@@ -113,12 +117,18 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <artifactId>slf4j-reload4j</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>io.dropwizard.metrics</groupId>
-          <artifactId>metrics-core</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>org.bouncycastle</groupId>
           <artifactId>bcprov-jdk15on</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <artifactId>ratis-metrics-dropwizard3</artifactId>
+      <groupId>org.apache.ratis</groupId>
+      <exclusions>
+        <exclusion>
+          <groupId>io.dropwizard.metrics</groupId>
+          <artifactId>metrics-core</artifactId>
         </exclusion>
       </exclusions>
     </dependency>
@@ -163,11 +173,7 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-params</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.github.spotbugs</groupId>
-      <artifactId>spotbugs-annotations</artifactId>
-      <scope>compile</scope>
+      <scope>test</scope>
     </dependency>
 
     <dependency>

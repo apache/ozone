@@ -20,14 +20,17 @@ package org.apache.hadoop.ozone.container.server;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
@@ -43,42 +46,39 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerGrpc;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ozone.test.GenericTestUtils;
-
 import com.google.common.collect.Maps;
-import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-
-import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.rpc.RpcType;
-import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
 import org.apache.ratis.util.function.CheckedBiConsumer;
 import org.apache.ratis.util.function.CheckedBiFunction;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.apache.ozone.test.tag.Slow;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
-import static org.mockito.Mockito.mock;
+
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
 
 /**
  * Test Containers.
  */
-@Slow
 public class TestContainerServer {
   static final String TEST_DIR = GenericTestUtils.getTestDir("dfs")
       .getAbsolutePath() + File.separator;
@@ -89,8 +89,9 @@ public class TestContainerServer {
   public static void setup() {
     DefaultMetricsSystem.setMiniClusterMode(true);
     CONF.set(HddsConfigKeys.HDDS_METADATA_DIR_NAME, TEST_DIR);
+    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     caClient = new DNCertificateClient(new SecurityConfig(CONF), null,
-        null, null, null, null);
+        dn, null, null, null);
   }
 
   @AfterAll
@@ -169,7 +170,7 @@ public class TestContainerServer {
           ContainerTestHelper
               .getCreateContainerRequest(
                   ContainerTestHelper.getTestContainerID(), pipeline);
-      Assert.assertNotNull(request.getTraceID());
+      Assertions.assertNotNull(request.getTraceID());
 
       client.sendCommand(request);
     } finally {
@@ -180,65 +181,47 @@ public class TestContainerServer {
     }
   }
 
-  @Unhealthy("Fails with StatusRuntimeException: UNKNOWN")
+  private static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
+                                                 OzoneConfiguration conf)
+      throws IOException {
+    ContainerSet containerSet = new ContainerSet(1000);
+    conf.set(HDDS_DATANODE_DIR_KEY,
+        Paths.get(TEST_DIR, "dfs", "data", "hdds",
+            RandomStringUtils.randomAlphabetic(4)).toString());
+    conf.set(OZONE_METADATA_DIRS, TEST_DIR);
+    VolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
+    StateContext context = ContainerTestUtils.getMockContext(dd, conf);
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    Map<ContainerProtos.ContainerType, Handler> handlers = Maps.newHashMap();
+    for (ContainerProtos.ContainerType containerType :
+        ContainerProtos.ContainerType.values()) {
+      handlers.put(containerType,
+          Handler.getHandlerForContainerType(containerType, conf,
+              dd.getUuid().toString(),
+              containerSet, volumeSet, metrics,
+              c -> {
+              }));
+    }
+    HddsDispatcher hddsDispatcher = new HddsDispatcher(
+        conf, containerSet, volumeSet, handlers, context, metrics, null);
+    hddsDispatcher.setClusterId(scmId.toString());
+    return hddsDispatcher;
+  }
+
   @Test
   public void testClientServerWithContainerDispatcher() throws Exception {
-    XceiverServerGrpc server = null;
-    XceiverClientGrpc client = null;
-    UUID scmId = UUID.randomUUID();
-    try {
-      Pipeline pipeline = MockPipeline.createSingleNodePipeline();
-      OzoneConfiguration conf = new OzoneConfiguration();
-      conf.setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
-          pipeline.getFirstNode()
-              .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue());
-
-      ContainerSet containerSet = new ContainerSet(1000);
-      VolumeSet volumeSet = mock(MutableVolumeSet.class);
-      ContainerMetrics metrics = ContainerMetrics.create(conf);
-      Map<ContainerProtos.ContainerType, Handler> handlers = Maps.newHashMap();
-      DatanodeDetails datanodeDetails = randomDatanodeDetails();
-      DatanodeStateMachine stateMachine = Mockito.mock(
-          DatanodeStateMachine.class);
-      StateContext context = Mockito.mock(StateContext.class);
-      Mockito.when(stateMachine.getDatanodeDetails())
-          .thenReturn(datanodeDetails);
-      Mockito.when(context.getParent()).thenReturn(stateMachine);
-
-
-      for (ContainerProtos.ContainerType containerType :
-          ContainerProtos.ContainerType.values()) {
-        handlers.put(containerType,
-            Handler.getHandlerForContainerType(containerType, conf,
-                context.getParent().getDatanodeDetails().getUuidString(),
-                containerSet, volumeSet, metrics,
-                c -> { }));
-      }
-      HddsDispatcher dispatcher = new HddsDispatcher(
-          conf, containerSet, volumeSet, handlers, context, metrics, null);
-      dispatcher.setClusterId(scmId.toString());
-      dispatcher.init();
-
-      server = new XceiverServerGrpc(datanodeDetails, conf, dispatcher,
-          caClient);
-      client = new XceiverClientGrpc(pipeline, conf);
-
-      server.start();
-      client.connect();
-
-      ContainerCommandRequestProto request =
-          ContainerTestHelper.getCreateContainerRequest(
-              ContainerTestHelper.getTestContainerID(), pipeline);
-      ContainerCommandResponseProto response = client.sendCommand(request);
-      Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
-    } finally {
-      if (client != null) {
-        client.close();
-      }
-      if (server != null) {
-        server.stop();
-      }
-    }
+    DatanodeDetails dd = MockDatanodeDetails.randomDatanodeDetails();
+    HddsDispatcher hddsDispatcher = createDispatcher(dd,
+        UUID.randomUUID(), CONF);
+    runTestClientServer(1, (pipeline, conf) -> conf
+            .setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
+                pipeline.getFirstNode()
+                    .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue()),
+        XceiverClientGrpc::new,
+        (dn, conf) -> new XceiverServerGrpc(dd, conf,
+            hddsDispatcher, caClient), (dn, p) -> {
+        });
   }
 
   private static class TestContainerDispatcher implements ContainerDispatcher {

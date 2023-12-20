@@ -40,8 +40,14 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.web.utils.OzoneUtils;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
@@ -49,18 +55,10 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER_RANGE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_MODIFIED_SINCE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_IF_UNMODIFIED_SINCE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
-
-import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.apache.hadoop.ozone.web.utils.OzoneUtils;
-import org.junit.Assert;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.mockito.Mockito;
-
-import static org.junit.Assert.fail;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Class to test Multipart upload where parts are created with copy header.
@@ -82,7 +80,7 @@ public class TestMultipartUploadWithCopy {
   private static final String UNPARSABLE_TIME_STR = "Unparsable time string";
   private static final String ERROR_CODE =
       S3ErrorTable.PRECOND_FAILED.getCode();
-  @BeforeClass
+  @BeforeAll
   public static void setUp() throws Exception {
     CLIENT.getObjectStore().createS3Bucket(OzoneConsts.S3_BUCKET);
 
@@ -170,7 +168,7 @@ public class TestMultipartUploadWithCopy {
     try (InputStream is = bucket.readKey(KEY)) {
       String keyContent = new Scanner(is, UTF_8.name())
           .useDelimiter("\\A").next();
-      Assert.assertEquals(
+      assertEquals(
           content + EXISTING_KEY_CONTENT + EXISTING_KEY_CONTENT.substring(0, 4),
           keyContent);
     }
@@ -383,6 +381,28 @@ public class TestMultipartUploadWithCopy {
     part.setPartNumber(partNumber);
 
     return part;
+  }
+
+  @Test
+  public void testUploadWithRangeCopyContentLength()
+      throws IOException, OS3Exception {
+    // The contentLength specified when creating the Key should be the same as
+    // the Content-Length, the key Commit will compare the Content-Length with
+    // the actual length of the data written.
+
+    String uploadID = initiateMultipartUpload(KEY);
+    ByteArrayInputStream body = new ByteArrayInputStream("".getBytes(UTF_8));
+    Map<String, String> additionalHeaders = new HashMap<>();
+    additionalHeaders.put(COPY_SOURCE_HEADER,
+        OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY);
+    additionalHeaders.put(COPY_SOURCE_HEADER_RANGE, "bytes=0-3");
+    setHeaders(additionalHeaders);
+    REST.put(OzoneConsts.S3_BUCKET, KEY, 0, 1, uploadID, body);
+    OzoneMultipartUploadPartListParts parts =
+        CLIENT.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET)
+        .listParts(KEY, uploadID, 0, 100);
+    assertEquals(1, parts.getPartInfoList().size());
+    assertEquals(4, parts.getPartInfoList().get(0).getSize());
   }
 
   private void completeMultipartUpload(String key,

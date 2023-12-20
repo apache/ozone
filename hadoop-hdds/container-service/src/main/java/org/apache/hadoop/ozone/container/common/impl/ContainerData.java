@@ -166,7 +166,7 @@ public abstract class ContainerData {
     this(source.getContainerType(), source.getContainerID(),
         source.getLayoutVersion(), source.getMaxSize(),
         source.getOriginPipelineId(), source.getOriginNodeId());
-    replicaIndex = source.replicaIndex;
+    replicaIndex = source.getReplicaIndex();
   }
 
   /**
