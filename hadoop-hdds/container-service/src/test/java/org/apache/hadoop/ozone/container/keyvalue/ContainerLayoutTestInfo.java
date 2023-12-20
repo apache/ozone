@@ -33,7 +33,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -122,19 +121,13 @@ public enum ContainerLayoutTestInfo {
     assertEquals(count, files.length);
   }
 
-  public static Iterable<Object[]> containerLayoutParameters() {
-    return ContainerLayoutVersion.getAllVersions().stream()
-        .map(each -> new Object[] {each})
-        .collect(toList());
-  }
-
   /**
    * Composite annotation for tests parameterized with {@link  ContainerLayoutTestInfo}.
    */
   @Target(ElementType.METHOD)
   @Retention(RetentionPolicy.RUNTIME)
   @ParameterizedTest
-  @MethodSource("org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo#containerLayoutParameters")
+  @MethodSource("org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion#getAllVersions")
   public @interface ContainerTest {
     // composite annotation
   }
