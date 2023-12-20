@@ -44,7 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 /**
  * Test for Namespace CLI.
  */
-@Timeout(600)
+@Timeout(60)
 public class TestNSSummaryAdmin extends StandardOutputTestBase {
   private static ObjectStore store;
 
