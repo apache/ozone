@@ -30,8 +30,6 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 import java.io.IOException;
@@ -65,12 +63,7 @@ public class TestContainerSet {
     this.layoutVersion = layoutVersion;
   }
 
-  private static Iterable<Object[]> layoutVersion() {
-    return ContainerLayoutTestInfo.containerLayoutParameters();
-  }
-
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testAddGetRemoveContainer(ContainerLayoutVersion layout)
       throws StorageContainerException {
     setLayoutVersion(layout);
@@ -112,8 +105,7 @@ public class TestContainerSet {
     assertFalse(containerSet.removeContainer(1000L));
   }
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testIteratorsAndCount(ContainerLayoutVersion layout)
       throws StorageContainerException {
     setLayoutVersion(layout);
@@ -159,8 +151,7 @@ public class TestContainerSet {
 
   }
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testIteratorPerVolume(ContainerLayoutVersion layout)
       throws StorageContainerException {
     setLayoutVersion(layout);
@@ -205,8 +196,7 @@ public class TestContainerSet {
     assertEquals(5, count2);
   }
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void iteratorIsOrderedByScanTime(ContainerLayoutVersion layout)
       throws StorageContainerException {
     setLayoutVersion(layout);
@@ -259,8 +249,7 @@ public class TestContainerSet {
     assertEquals(containerCount, containersToBeScanned);
   }
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testGetContainerReport(ContainerLayoutVersion layout)
       throws IOException {
     setLayoutVersion(layout);
@@ -273,9 +262,7 @@ public class TestContainerSet {
     assertEquals(10, containerReportsRequestProto.getReportsList().size());
   }
 
-
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testListContainer(ContainerLayoutVersion layout)
       throws StorageContainerException {
     setLayoutVersion(layout);
@@ -289,8 +276,7 @@ public class TestContainerSet {
     assertContainerIds(startId, count, result);
   }
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testListContainerFromFirstKey(ContainerLayoutVersion layout)
       throws StorageContainerException {
     setLayoutVersion(layout);

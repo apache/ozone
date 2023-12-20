@@ -29,11 +29,8 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.junit.jupiter.api.Assertions;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.File;
 import java.io.IOException;
@@ -43,6 +40,7 @@ import java.util.UUID;
 
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -67,10 +65,6 @@ public class TestContainerDataYaml {
 
   private void setLayoutVersion(ContainerLayoutVersion layoutVersion) {
     this.layoutVersion = layoutVersion;
-  }
-
-  private static Iterable<Object[]> layoutVersion() {
-    return ContainerLayoutTestInfo.containerLayoutParameters();
   }
 
   /**
@@ -111,8 +105,7 @@ public class TestContainerDataYaml {
     FileUtil.fullyDelete(new File(testRoot));
   }
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testCreateContainerFile(ContainerLayoutVersion layout)
       throws IOException {
     setLayoutVersion(layout);
@@ -179,8 +172,7 @@ public class TestContainerDataYaml {
         kvData.getDataScanTimestamp().longValue());
   }
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testCreateContainerFileWithoutReplicaIndex(
       ContainerLayoutVersion layout) throws IOException {
     setLayoutVersion(layout);
@@ -191,14 +183,13 @@ public class TestContainerDataYaml {
     final String content =
         FileUtils.readFileToString(containerFile, Charset.defaultCharset());
 
-    Assertions.assertFalse(content.contains("replicaIndex"),
+    assertFalse(content.contains("replicaIndex"),
         "ReplicaIndex shouldn't be persisted if zero");
     cleanup();
   }
 
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testIncorrectContainerFile(ContainerLayoutVersion layout)
       throws IOException {
     setLayoutVersion(layout);
@@ -216,8 +207,7 @@ public class TestContainerDataYaml {
   }
 
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testCheckBackWardCompatibilityOfContainerFile(
       ContainerLayoutVersion layout) {
     setLayoutVersion(layout);
@@ -258,8 +248,7 @@ public class TestContainerDataYaml {
   /**
    * Test to verify {@link ContainerUtils#verifyChecksum(ContainerData)}.
    */
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testChecksumInContainerFile(ContainerLayoutVersion layout)
       throws IOException {
     setLayoutVersion(layout);
@@ -278,8 +267,7 @@ public class TestContainerDataYaml {
   /**
    * Test to verify {@link ContainerUtils#verifyChecksum(ContainerData)}.
    */
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testChecksumInContainerFileWithReplicaIndex(
       ContainerLayoutVersion layout) throws IOException {
     setLayoutVersion(layout);
@@ -306,8 +294,7 @@ public class TestContainerDataYaml {
   /**
    * Test to verify incorrect checksum is detected.
    */
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testIncorrectChecksum(ContainerLayoutVersion layout) {
     setLayoutVersion(layout);
     try {
@@ -323,8 +310,7 @@ public class TestContainerDataYaml {
   /**
    * Test to verify disabled checksum with incorrect checksum.
    */
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testDisabledChecksum(ContainerLayoutVersion layout)
       throws IOException {
     setLayoutVersion(layout);

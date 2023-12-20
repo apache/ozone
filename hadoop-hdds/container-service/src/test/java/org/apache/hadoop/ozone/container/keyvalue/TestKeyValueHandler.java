@@ -58,17 +58,15 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSIN
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
-
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.ArgumentMatchers.any;
 
 import org.mockito.Mockito;
 
@@ -92,10 +90,6 @@ public class TestKeyValueHandler {
 
   private HddsDispatcher dispatcher;
   private KeyValueHandler handler;
-
-  private static Iterable<Object[]> layoutVersion() {
-    return ContainerLayoutTestInfo.containerLayoutParameters();
-  }
 
   @BeforeEach
   public void setup() throws StorageContainerException {
@@ -309,9 +303,7 @@ public class TestKeyValueHandler {
         .build();
   }
 
-
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testCloseInvalidContainer(ContainerLayoutVersion layoutVersion)
       throws IOException {
     long containerID = 1234L;
@@ -387,17 +379,17 @@ public class TestKeyValueHandler {
           createContainerRequest(datanodeId, containerID);
 
       kvHandler.handleCreateContainer(createContainer, null);
-      Assertions.assertEquals(1, icrReceived.get());
-      Assertions.assertNotNull(containerSet.getContainer(containerID));
+      assertEquals(1, icrReceived.get());
+      assertNotNull(containerSet.getContainer(containerID));
 
       kvHandler.deleteContainer(containerSet.getContainer(containerID), true);
-      Assertions.assertEquals(2, icrReceived.get());
-      Assertions.assertNull(containerSet.getContainer(containerID));
+      assertEquals(2, icrReceived.get());
+      assertNull(containerSet.getContainer(containerID));
 
       File[] deletedContainers =
           hddsVolume.getDeletedContainerDir().listFiles();
       assertNotNull(deletedContainers);
-      Assertions.assertEquals(0, deletedContainers.length);
+      assertEquals(0, deletedContainers.length);
 
       // Case 2 : failed move of container dir to tmp location should trigger
       // a volume scan
@@ -409,9 +401,9 @@ public class TestKeyValueHandler {
 
       kvHandler.handleCreateContainer(createContainer2, null);
 
-      Assertions.assertEquals(3, icrReceived.get());
+      assertEquals(3, icrReceived.get());
       Container<?> container = containerSet.getContainer(container2ID);
-      Assertions.assertNotNull(container);
+      assertNotNull(container);
       File deletedContainerDir = hddsVolume.getDeletedContainerDir();
       // to simulate failed move
       File dummyDir = new File(DUMMY_PATH);
@@ -419,8 +411,7 @@ public class TestKeyValueHandler {
       try {
         kvHandler.deleteContainer(container, true);
       } catch (StorageContainerException sce) {
-        Assertions.assertTrue(
-            sce.getMessage().contains("Failed to move container"));
+        assertTrue(sce.getMessage().contains("Failed to move container"));
       }
       Mockito.verify(volumeSet).checkVolumeAsync(hddsVolume);
       // cleanup
@@ -436,7 +427,7 @@ public class TestKeyValueHandler {
       String expectedLog =
           "Delete container issued on containerID 2 which is " +
               "in a failed volume";
-      Assertions.assertTrue(kvHandlerLogs.getOutput().contains(expectedLog));
+      assertTrue(kvHandlerLogs.getOutput().contains(expectedLog));
     } finally {
       FileUtils.deleteDirectory(new File(testDir));
     }

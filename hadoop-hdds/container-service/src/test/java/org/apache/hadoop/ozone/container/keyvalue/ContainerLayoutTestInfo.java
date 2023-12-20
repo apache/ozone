@@ -24,8 +24,14 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerBlockStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerChunkStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.File;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA;
@@ -120,5 +126,16 @@ public enum ContainerLayoutTestInfo {
     return ContainerLayoutVersion.getAllVersions().stream()
         .map(each -> new Object[] {each})
         .collect(toList());
+  }
+
+  /**
+   * Composite annotation for tests parameterized with {@link  ContainerLayoutTestInfo}.
+   */
+  @Target(ElementType.METHOD)
+  @Retention(RetentionPolicy.RUNTIME)
+  @ParameterizedTest
+  @MethodSource("org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo#containerLayoutParameters")
+  public @interface ContainerTest {
+    // composite annotation
   }
 }
