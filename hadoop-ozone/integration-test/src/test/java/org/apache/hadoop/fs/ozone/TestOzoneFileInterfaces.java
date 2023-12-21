@@ -72,6 +72,8 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.junit.Before;
 import org.junit.Rule;
@@ -259,12 +261,9 @@ public class TestOzoneFileInterfaces {
         o3fs.pathToKey(path));
 
     // verify prefix directories and the file, do not already exist
-    assertTrue(
-        metadataManager.getKeyTable(getBucketLayout()).get(lev1key) == null);
-    assertTrue(
-        metadataManager.getKeyTable(getBucketLayout()).get(lev2key) == null);
-    assertTrue(
-        metadataManager.getKeyTable(getBucketLayout()).get(fileKey) == null);
+    assertNull(metadataManager.getKeyTable(getBucketLayout()).get(lev1key));
+    assertNull(metadataManager.getKeyTable(getBucketLayout()).get(lev2key));
+    assertNull(metadataManager.getKeyTable(getBucketLayout()).get(fileKey));
 
     try (FSDataOutputStream stream = fs.create(path)) {
       stream.writeBytes(data);
@@ -376,19 +375,16 @@ public class TestOzoneFileInterfaces {
         o3fs.pathToKey(leaf));
 
     // verify prefix directories and the leaf, do not already exist
-    assertTrue(
-        metadataManager.getKeyTable(getBucketLayout()).get(lev1key) == null);
-    assertTrue(
-        metadataManager.getKeyTable(getBucketLayout()).get(lev2key) == null);
-    assertTrue(
-        metadataManager.getKeyTable(getBucketLayout()).get(leafKey) == null);
+    assertNull(metadataManager.getKeyTable(getBucketLayout()).get(lev1key));
+    assertNull(metadataManager.getKeyTable(getBucketLayout()).get(lev2key));
+    assertNull(metadataManager.getKeyTable(getBucketLayout()).get(leafKey));
 
     assertTrue("Makedirs returned with false for the path " + leaf,
         fs.mkdirs(leaf));
 
     // verify the leaf directory got created.
     leafstatus = getDirectoryStat(leaf);
-    assertTrue(leafstatus != null);
+    assertNotNull(leafstatus);
 
     FileStatus lev1status;
     FileStatus lev2status;
@@ -409,7 +405,7 @@ public class TestOzoneFileInterfaces {
 
     // check the root directory
     rootstatus = getDirectoryStat(createPath("/"));
-    assertTrue(rootstatus != null);
+    assertNotNull(rootstatus);
 
     // root directory listing should contain the lev1 prefix directory
     FileStatus[] statusList = fs.listStatus(createPath("/"));

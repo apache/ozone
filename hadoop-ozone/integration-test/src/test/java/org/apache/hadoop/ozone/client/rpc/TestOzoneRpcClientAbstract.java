@@ -634,7 +634,7 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName, builder.build());
     OzoneBucket bucket = volume.getBucket(bucketName);
     assertEquals(bucketName, bucket.getName());
-    assertEquals(true, bucket.getVersioning());
+    assertTrue(bucket.getVersioning());
   }
 
   @Test
@@ -708,7 +708,7 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName, builder.build());
     OzoneBucket bucket = volume.getBucket(bucketName);
     assertEquals(bucketName, bucket.getName());
-    assertEquals(true, bucket.getVersioning());
+    assertTrue(bucket.getVersioning());
     assertEquals(StorageType.SSD, bucket.getStorageType());
     assertTrue(bucket.getAcls().contains(userAcl));
     assertEquals(repConfig, bucket.getReplicationConfig());
@@ -812,7 +812,7 @@ public abstract class TestOzoneRpcClientAbstract {
     bucket.setVersioning(true);
     OzoneBucket newBucket = volume.getBucket(bucketName);
     assertEquals(bucketName, newBucket.getName());
-    assertEquals(true, newBucket.getVersioning());
+    assertTrue(newBucket.getVersioning());
   }
 
   @Test
@@ -830,7 +830,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     OzoneBucket newBucket = volume.getBucket(bucketName);
     assertEquals(bucketName, newBucket.getName());
-    assertEquals(true, newBucket.getVersioning());
+    assertTrue(newBucket.getVersioning());
 
     List<OzoneAcl> aclsAfterSet = newBucket.getAcls();
     assertEquals(currentAcls, aclsAfterSet);
@@ -3796,7 +3796,7 @@ public abstract class TestOzoneRpcClientAbstract {
     assertTrue(latestVersionLocations.isMultipartKey());
     latestVersionLocations.getBlocksLatestVersionOnly()
         .forEach(omKeyLocationInfo ->
-            assertTrue(omKeyLocationInfo.getPartNumber() != -1));
+            assertNotEquals(omKeyLocationInfo.getPartNumber(), -1));
   }
 
   private String initiateMultipartUpload(OzoneBucket bucket, String keyName,
@@ -3996,7 +3996,7 @@ public abstract class TestOzoneRpcClientAbstract {
     assertEquals("true", key.getMetadata().get(OzoneConsts.GDPR_FLAG));
     assertEquals("AES",
         key.getMetadata().get(OzoneConsts.GDPR_ALGORITHM));
-    assertTrue(key.getMetadata().get(OzoneConsts.GDPR_SECRET) != null);
+    assertNotNull(key.getMetadata().get(OzoneConsts.GDPR_SECRET));
 
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       assertInputStreamContent(text, is);
