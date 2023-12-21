@@ -44,6 +44,7 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension.EncryptedKeyVersion;
 import org.apache.hadoop.fs.FileEncryptionInfo;
+import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -1869,8 +1870,12 @@ public class KeyManagerImpl implements KeyManager {
   private List<DatanodeDetails> getClientNodesByAddress(String clientMachine,
       List<DatanodeDetails> nodes) {
     List<DatanodeDetails> matchingNodes = new ArrayList<>();
+    boolean useHostname = ozoneManager.getConfiguration().getBoolean(
+        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
+        DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
     for (DatanodeDetails node : nodes) {
-      if (node.getIpAddress().equals(clientMachine)) {
+      if ((useHostname ? node.getHostName() : node.getIpAddress()).equals(
+          clientMachine)) {
         matchingNodes.add(node);
       }
     }
