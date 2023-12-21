@@ -52,11 +52,11 @@ public class TestLeakDetector {
     }
   }
 
-  private static class MyResource implements AutoCloseable {
+  private static final class MyResource implements AutoCloseable {
     private final LeakTracker leakTracker;
 
     private MyResource(final AtomicInteger leaks) {
-      leakTracker = LEAK_DETECTOR.track(this, () -> leaks.incrementAndGet());;
+      leakTracker = LEAK_DETECTOR.track(this, () -> leaks.incrementAndGet());
     }
 
     @Override
