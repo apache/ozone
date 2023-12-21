@@ -497,14 +497,14 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       LOG.warn("double buffer wait is interrupted, ", e);
       Thread.interrupted();
     }
-    ozoneManager.getMetadataManager().getStore().flushDB();
     TransactionInfo transactionInfo = ozoneManager.getMetadataManager()
         .getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
     TermIndex lastTermIndex = getLastAppliedTermIndex();
-    LOG.info("Current Snapshot Index {} State machine Transaction {}",
+    LOG.info("Current Snapshot Index {} lastAppliedTermIndex {}",
         transactionInfo, lastTermIndex);
     snapshotInfo.updateTermIndex(transactionInfo.getTerm(),
         transactionInfo.getTransactionIndex());
+    ozoneManager.getMetadataManager().getStore().flushDB();
     return transactionInfo.getTransactionIndex();
   }
 
