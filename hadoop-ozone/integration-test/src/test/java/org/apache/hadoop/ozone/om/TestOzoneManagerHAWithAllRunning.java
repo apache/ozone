@@ -73,6 +73,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentity
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.apache.ratis.metrics.RatisMetrics.RATIS_APPLICATION_NAME_METRICS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -439,7 +440,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
     MBeanInfo mBeanInfo = mBeanServer.getMBeanInfo(oname);
     assertNotNull(mBeanInfo);
     Object flushCount = mBeanServer.getAttribute(oname, "Count");
-    assertTrue((long) flushCount >= 0);
+    assertThat((long) flushCount).isGreaterThanOrEqualTo(0);
   }
 
   @Test
@@ -500,8 +501,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
 
     assertTrue(raftClientReply.isSuccess());
 
-    assertTrue(logCapturer.getOutput().contains("created volume:"
-        + volumeName));
+    assertThat(logCapturer.getOutput()).contains("created volume:" + volumeName);
 
     logCapturer.clearOutput();
 
@@ -546,9 +546,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
     // As second time with same client id and call id, this request should
     // be executed by ratis server as we are sending this request after cache
     // expiry duration.
-    assertTrue(logCapturer.getOutput().contains(
-        "Volume creation failed"));
-
+    assertThat(logCapturer.getOutput()).contains("Volume creation failed");
   }
 
   @Test
@@ -743,7 +741,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
     OzoneObj srcObj = buildBucketObj(srcBucket);
     // As by default create will add some default acls in RpcClient.
     List<OzoneAcl> acls = getObjectStore().getAcl(linkObj);
-    Assertions.assertTrue(acls.size() > 0);
+    assertThat(acls.size()).isGreaterThan(0);
     // Remove an existing acl.
     boolean removeAcl = getObjectStore().removeAcl(linkObj, acls.get(0));
     Assertions.assertTrue(removeAcl);
@@ -756,7 +754,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
     OzoneObj srcObj2 = buildBucketObj(srcBucket2);
     // As by default create will add some default acls in RpcClient.
     List<OzoneAcl> acls2 = getObjectStore().getAcl(srcObj2);
-    Assertions.assertTrue(acls2.size() > 0);
+    assertThat(acls2.size()).isGreaterThan(0);
     // Remove an existing acl.
     boolean removeAcl2 = getObjectStore().removeAcl(srcObj2, acls.get(0));
     Assertions.assertTrue(removeAcl2);
@@ -918,7 +916,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
         OzoneObj.ResourceType.PREFIX.name())) {
       List<OzoneAcl> acls = objectStore.getAcl(ozoneObj);
 
-      Assertions.assertTrue(acls.size() > 0);
+      assertThat(acls.size()).isGreaterThan(0);
     }
 
     OzoneAcl modifiedUserAcl = new OzoneAcl(USER, remoteUserName,
@@ -988,7 +986,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
     // As by default create will add some default acls in RpcClient.
     List<OzoneAcl> acls = objectStore.getAcl(ozoneObj);
 
-    Assertions.assertTrue(acls.size() > 0);
+    assertThat(acls.size()).isGreaterThan(0);
 
     // Remove an existing acl.
     boolean removeAcl = objectStore.removeAcl(ozoneObj, acls.get(0));
@@ -1066,10 +1064,9 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
     long smLastAppliedIndex =
         ozoneManager.getOmRatisServer().getLastAppliedTermIndex().getIndex();
     long ratisSnapshotIndex = ozoneManager.getRatisSnapshotIndex();
-    assertTrue(smLastAppliedIndex >= ratisSnapshotIndex,
-        "LastAppliedIndex on OM State Machine ("
-            + smLastAppliedIndex + ") is less than the saved snapshot index("
-            + ratisSnapshotIndex + ").");
+    assertThat(smLastAppliedIndex).withFailMessage("LastAppliedIndex on OM State Machine ("
+        + smLastAppliedIndex + ") is less than the saved snapshot index("
+        + ratisSnapshotIndex + ").").isGreaterThanOrEqualTo(ratisSnapshotIndex);
 
     // Add more transactions to Ratis to trigger another snapshot
     while (appliedLogIndex <= (smLastAppliedIndex + getSnapshotThreshold())) {
@@ -1091,9 +1088,9 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
 
     // The new snapshot index must be greater than the previous snapshot index
     long ratisSnapshotIndexNew = ozoneManager.getRatisSnapshotIndex();
-    assertTrue(ratisSnapshotIndexNew > ratisSnapshotIndex,
+    assertThat(ratisSnapshotIndexNew).withFailMessage(
         "Latest snapshot index must be greater than previous " +
-            "snapshot indices");
+        "snapshot indices").isGreaterThan(ratisSnapshotIndex);
 
   }
 }
