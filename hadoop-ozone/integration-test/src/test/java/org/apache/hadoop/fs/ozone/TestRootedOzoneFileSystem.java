@@ -1919,9 +1919,9 @@ public class TestRootedOzoneFileSystem {
       ContractTestUtils.touch(fs, childFolderFile);
     }
 
-    assertTrue(fs.listStatus(grandparent).length == 1);
-    assertTrue(fs.listStatus(parent).length == 9);
-    assertTrue(fs.listStatus(childFolder).length == 8);
+    assertEquals(1, fs.listStatus(grandparent).length);
+    assertEquals(9, fs.listStatus(parent).length);
+    assertEquals(8, fs.listStatus(childFolder).length);
 
     Boolean successResult = fs.delete(grandparent, true);
     assertTrue(successResult);

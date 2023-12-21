@@ -201,7 +201,7 @@ public class TestRootedOzoneFileSystemWithFSO
     assertTrue(getFs().delete(bucketPath2, true));
     assertTrue(getFs().delete(volumePath1, false));
     long deletes = getOMMetrics().getNumKeyDeletes();
-    assertTrue(deletes == prevDeletes + 1);
+    assertEquals(prevDeletes + 1, deletes);
   }
 
   /**
