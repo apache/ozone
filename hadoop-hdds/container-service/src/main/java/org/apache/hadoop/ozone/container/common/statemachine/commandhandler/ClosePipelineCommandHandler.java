@@ -114,7 +114,7 @@ public class ClosePipelineCommandHandler implements CommandHandler {
             final Collection<RaftPeer> peers = ratisServer.getRaftPeersInPipeline(pipelineID);
             final boolean shouldDeleteRatisLogDirectory = ratisServer.getShouldDeleteRatisLogDirectory();
             peers.stream()
-                .filter(peer -> peer.getId() != ratisServer.getServer().getId())
+                .filter(peer -> !peer.getId().equals(ratisServer.getServer().getId()))
                 .forEach(peer -> {
                   try (RaftClient client = newRaftClient.apply(peer, ozoneContainer.getTlsClientConfig())) {
                     client.getGroupManagementApi(peer.getId())
