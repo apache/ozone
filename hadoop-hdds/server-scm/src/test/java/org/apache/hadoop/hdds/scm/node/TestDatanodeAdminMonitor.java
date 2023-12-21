@@ -539,7 +539,7 @@ public class TestDatanodeAdminMonitor {
     long afterTime = System.currentTimeMillis();
 
     assertEquals(1, monitor.getTrackedNodeCount());
-    long monitoredTime = monitor.getSingleTrackedNode(dn1.getHostName())
+    long monitoredTime = monitor.getSingleTrackedNode(dn1.getIpAddress())
         .getStartTime();
     assertTrue(monitoredTime >= beforeTime);
     assertTrue(monitoredTime <= afterTime);
@@ -558,7 +558,7 @@ public class TestDatanodeAdminMonitor {
     monitor.startMonitoring(dn1);
     monitor.run();
     assertEquals(1, monitor.getTrackedNodeCount());
-    DatanodeDetails node = getFirstTrackedNode();
+    DatanodeDetails node = getFirstTrackedNode().getDatanodeDetails();
     assertTrue(nodeManager.getNodeStatus(dn1).isInMaintenance());
 
     // Running the monitor again causes the node to remain in maintenance
@@ -588,7 +588,7 @@ public class TestDatanodeAdminMonitor {
     // Add the node to the monitor
     monitor.startMonitoring(dn1);
     monitor.run();
-    DatanodeDetails node = getFirstTrackedNode();
+    DatanodeDetails node = getFirstTrackedNode().getDatanodeDetails();
     assertEquals(1, monitor.getTrackedNodeCount());
     assertTrue(nodeManager.getNodeStatus(dn1).isEnteringMaintenance());
 
@@ -625,7 +625,7 @@ public class TestDatanodeAdminMonitor {
     monitor.startMonitoring(dn1);
     monitor.run();
     assertEquals(1, monitor.getTrackedNodeCount());
-    DatanodeDetails node = getFirstTrackedNode();
+    DatanodeDetails node = getFirstTrackedNode().getDatanodeDetails();
     assertTrue(nodeManager.getNodeStatus(dn1).isEnteringMaintenance());
 
     nodeManager.setNodeOperationalState(node,
@@ -704,10 +704,9 @@ public class TestDatanodeAdminMonitor {
    * the monitor.
    * @return DatanodeAdminNodeDetails for the first tracked node found.
    */
-  private DatanodeDetails getFirstTrackedNode() {
+  private DatanodeAdminMonitorImpl.TrackedNode getFirstTrackedNode() {
     return
-        monitor.getTrackedNodes().toArray(
-            new DatanodeAdminMonitorImpl.TrackedNode[0])[0]
-            .getDatanodeDetails();
+        monitor.getTrackedNodes().toArray(new
+            DatanodeAdminMonitorImpl.TrackedNode[0])[0];
   }
 }

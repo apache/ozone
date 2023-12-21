@@ -43,6 +43,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -78,7 +79,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   private ReplicationManager replicationManager;
   private Queue<DatanodeDetails> pendingNodes = new ArrayDeque();
   private Queue<DatanodeDetails> cancelledNodes = new ArrayDeque();
-  private Map<String, TrackedNode> trackedNodes = new HashMap<>();
+  private Set<TrackedNode> trackedNodes = new HashSet<>();
   private NodeDecommissionMetrics metrics;
   private long pipelinesWaitingToClose = 0;
   private long sufficientlyReplicatedContainers = 0;
@@ -97,8 +98,9 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
     private long startTime = 0L;
 
-    public TrackedNode(DatanodeDetails datanodeDetails) {
+    public TrackedNode(DatanodeDetails datanodeDetails, long startTime) {
       this.datanodeDetails = datanodeDetails;
+      this.startTime = startTime;
     }
 
     @Override
@@ -118,10 +120,6 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
     public long getStartTime() {
       return startTime;
-    }
-
-    public void setStartTime(long startTime) {
-      this.startTime = startTime;
     }
   }
 
@@ -185,8 +183,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
    */
   @Override
   public synchronized Set<TrackedNode> getTrackedNodes() {
-    return Collections.unmodifiableSet(new HashSet<>(trackedNodes
-        .values()));
+    return Collections.unmodifiableSet(trackedNodes);
   }
 
   /**
@@ -196,8 +193,15 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
    * @return An unmodifiable set of the tracked nodes.
    */
   @VisibleForTesting
-  public synchronized TrackedNode getSingleTrackedNode(String host) {
-    return trackedNodes.get(host);
+  public synchronized TrackedNode getSingleTrackedNode(String ip) {
+    Iterator<TrackedNode> iterator = trackedNodes.iterator();
+    while (iterator.hasNext()) {
+      TrackedNode trackedNode = iterator.next();
+      if (trackedNode.getDatanodeDetails().getIpAddress().equals(ip)) {
+        return trackedNode;
+      }
+    }
+    return null;
   }
 
   /**
@@ -288,21 +292,24 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
   private void processTransitioningNodes() {
     resetContainerMetrics();
-    for (Map.Entry<String, TrackedNode> entry : trackedNodes.entrySet()) {
-      DatanodeDetails dn = entry.getValue().getDatanodeDetails();
+    Iterator<TrackedNode> iterator = trackedNodes.iterator();
+
+    while (iterator.hasNext()) {
+      TrackedNode trackedNode = iterator.next();
+      DatanodeDetails dn = trackedNode.getDatanodeDetails();
       try {
         NodeStatus status = getNodeStatus(dn);
 
         if (!shouldContinueWorkflow(dn, status)) {
           abortWorkflow(dn);
-          trackedNodes.remove(dn.getHostName());
+          iterator.remove();
           continue;
         }
 
         if (status.isMaintenance()) {
           if (status.operationalStateExpired()) {
             completeMaintenance(dn);
-            trackedNodes.remove(dn.getHostName());
+            iterator.remove();
             continue;
           }
         }
@@ -323,10 +330,10 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
                   "continue. The node will be put back to IN_SERVICE and " +
                   "handled as a dead node", dn);
               putNodeBackInService(dn);
-              trackedNodes.remove(dn.getHostName());
+              iterator.remove();
             } else if (status.isDecommissioning()) {
               completeDecommission(dn);
-              trackedNodes.remove(dn.getHostName());
+              iterator.remove();
             } else if (status.isEnteringMaintenance()) {
               putIntoMaintenance(dn);
             }
@@ -337,7 +344,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
         LOG.error("An unexpected error occurred processing datanode {}. " +
             "Aborting the admin workflow", dn, e);
         abortWorkflow(dn);
-        trackedNodes.remove(dn.getHostName());
+        iterator.remove();
       }
     }
   }
@@ -511,13 +518,12 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
   private void startTrackingNode(DatanodeDetails dn) {
     eventQueue.fireEvent(SCMEvents.START_ADMIN_ON_NODE, dn);
-    TrackedNode trackedNode = new TrackedNode(dn);
-    trackedNode.setStartTime(System.currentTimeMillis());
-    trackedNodes.put(dn.getHostName(), trackedNode);
+    TrackedNode trackedNode = new TrackedNode(dn, System.currentTimeMillis());
+    trackedNodes.add(trackedNode);
   }
 
   private void stopTrackingNode(DatanodeDetails dn) {
-    trackedNodes.remove(dn.getHostName());
+    trackedNodes.remove(new TrackedNode(dn, 0L));
   }
 
   /**
