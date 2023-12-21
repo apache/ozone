@@ -70,6 +70,7 @@ import org.apache.ratis.statemachine.impl.BaseStateMachine;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.ExitUtils;
+import org.apache.ratis.util.IOUtils;
 import org.apache.ratis.util.LifeCycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -488,24 +489,24 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   @Override
   public long takeSnapshot() throws IOException {
-    // when called from request prepare, there is a wait that
-    // double buffer is flushed. When called from db snapshot,
-    // need ensure flushed from double buffer
     try {
       awaitDoubleBufferFlush();
     } catch (InterruptedException e) {
       LOG.warn("double buffer wait is interrupted, ", e);
-      Thread.interrupted();
+      throw IOUtils.toInterruptedIOException("takeSnapshot is interrupted", e);
     }
+    ozoneManager.getMetadataManager().getStore().flushDB();
     TransactionInfo transactionInfo = ozoneManager.getMetadataManager()
         .getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
     TermIndex lastTermIndex = getLastAppliedTermIndex();
-    LOG.info("Current Snapshot Index {} lastAppliedTermIndex {}",
+    LOG.info("Current Transaction Index {} lastAppliedTermIndex {}",
         transactionInfo, lastTermIndex);
-    snapshotInfo.updateTermIndex(transactionInfo.getTerm(),
-        transactionInfo.getTransactionIndex());
-    ozoneManager.getMetadataManager().getStore().flushDB();
-    return transactionInfo.getTransactionIndex();
+    // update with lastAppliedTermIndex as snapshot have dependency with
+    // ratis commit index as triggered during notifyTermIndexUpdated after
+    // apply transaction. Can not use TRANSACTION_INFO_KEY from db
+    snapshotInfo.updateTermIndex(lastTermIndex.getTerm(),
+        lastTermIndex.getIndex());
+    return lastTermIndex.getIndex();
   }
 
   /**
