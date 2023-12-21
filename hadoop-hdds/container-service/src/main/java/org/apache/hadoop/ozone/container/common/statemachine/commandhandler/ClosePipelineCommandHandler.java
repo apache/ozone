@@ -123,7 +123,7 @@ public class ClosePipelineCommandHandler implements CommandHandler {
                     // ignore silently since this means that the group has been closed by earlier close pipeline
                     // command in another datanode
                   } catch (IOException ioe) {
-                    LOG.warn("Remove group failed for peer {}", peer.getId(), ioe);
+                    LOG.warn("Failed to remove group {} for peer {}", raftGroupId, peer.getId(), ioe);
                   }
                 });
           }
