@@ -143,7 +143,7 @@ public class TestOmBlockVersioning {
     List<OmKeyLocationInfo> locationInfoList =
         openKey.getKeyInfo().getLatestVersionLocations()
             .getBlocksLatestVersionOnly();
-    assertEquals(locationInfoList.size(), 1);
+    assertEquals(1, locationInfoList.size());
     locationInfoList.add(locationInfo);
     keyArgs.setLocationInfoList(locationInfoList);
     writeClient.commitKey(keyArgs, openKey.getId());

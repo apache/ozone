@@ -3796,7 +3796,7 @@ public abstract class TestOzoneRpcClientAbstract {
     assertTrue(latestVersionLocations.isMultipartKey());
     latestVersionLocations.getBlocksLatestVersionOnly()
         .forEach(omKeyLocationInfo ->
-            assertNotEquals(omKeyLocationInfo.getPartNumber(), -1));
+            assertNotEquals(-1, omKeyLocationInfo.getPartNumber()));
   }
 
   private String initiateMultipartUpload(OzoneBucket bucket, String keyName,
