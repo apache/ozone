@@ -16,23 +16,35 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler.SchemaHandler;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
+import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -41,6 +53,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .DeleteBlockTransactionResult;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -51,6 +64,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import static java.util.Collections.emptyList;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.BLOCK_DELETE_COMMAND_WORKER_INTERVAL;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler.DeleteBlockTransactionExecutionResult;
@@ -69,7 +83,8 @@ import static org.mockito.Mockito.when;
  */
 @Timeout(300)
 public class TestDeleteBlocksCommandHandler {
-
+  @TempDir
+  private Path folder;
   private OzoneConfiguration conf;
   private ContainerLayoutVersion layout;
   private OzoneContainer ozoneContainer;
@@ -275,6 +290,43 @@ public class TestDeleteBlocksCommandHandler {
     DeleteBlocksCommandHandler.DeleteCmdWorker deleteCmdWorker =
         commandHandler.new DeleteCmdWorker(4000);
     Assertions.assertEquals(deleteCmdWorker.getInterval(), 4000);
+  }
+
+  @Test
+  public void testDeleteBlockCommandHandleWhenDeleteCommandQueuesFull()
+      throws IOException {
+    int blockDeleteQueueLimit = 5;
+    // Setting up the test environment
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS, folder.toString());
+    DatanodeDetails datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeConfiguration dnConf =
+        configuration.getObject(DatanodeConfiguration.class);
+    OzoneContainer container = ContainerTestUtils.getOzoneContainer(datanodeDetails, configuration);
+    DatanodeStateMachine stateMachine = Mockito.mock(DatanodeStateMachine.class);
+    Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
+    StateContext context = new StateContext(configuration,
+        Mockito.mock(DatanodeStateMachine.DatanodeStates.class),
+        stateMachine, "");
+
+    // Set Queue limit
+    dnConf.setBlockDeleteQueueLimit(blockDeleteQueueLimit);
+    handler = new DeleteBlocksCommandHandler(
+        container, configuration, dnConf, "");
+
+    // Check if the command status is as expected: PENDING when queue is not full, FAILED when queue is full
+    for (int i = 0; i < blockDeleteQueueLimit + 2; i++) {
+      DeleteBlocksCommand deleteBlocksCommand = new DeleteBlocksCommand(emptyList());
+      context.addCommand(deleteBlocksCommand);
+      handler.handle(deleteBlocksCommand, container, context, Mockito.mock(SCMConnectionManager.class));
+      CommandStatus cmdStatus = context.getCmdStatus(deleteBlocksCommand.getId());
+      if (i < blockDeleteQueueLimit) {
+        Assertions.assertEquals(cmdStatus.getStatus(), Status.PENDING);
+      } else {
+        Assertions.assertEquals(cmdStatus.getStatus(), Status.FAILED);
+        Assertions.assertEquals(cmdStatus.getProtoBufMessage().getBlockDeletionAck().getResultsCount(), 0);
+      }
+    }
   }
 
   private DeletedBlocksTransaction createDeletedBlocksTransaction(long txID,
