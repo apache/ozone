@@ -163,12 +163,12 @@ public class TestOzoneManagerStateMachine {
         .setCurrentTerm(0)
         .build());
 
-    // verify snapshot is given priority to transaction info from db
-    // as those transaction is already applied
+    // verify snapshot is given priority to transaction from ratis
+    // as snapshot make use of ratis commit index verification internally
     long idx = ozoneManagerStateMachine.takeSnapshot();
     Assertions.assertEquals(3,
         ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
-    Assertions.assertEquals(idx, 10);
+    Assertions.assertEquals(idx, 3);
   }
 
 
