@@ -337,7 +337,7 @@ public abstract class TestOzoneManagerHA {
         // ConnectException. Otherwise, we would get a RemoteException from the
         // last running OM as it would fail to get a quorum.
         if (e instanceof RemoteException) {
-          assertThat(e).hasMessageContaining("OMNotLeaderException");
+          assertThat(e).hasMessageContaining("Could not determine the leader node.");
         } else if (e instanceof ConnectException) {
           assertThat(e).hasMessageContaining("Connection refused");
         } else {
