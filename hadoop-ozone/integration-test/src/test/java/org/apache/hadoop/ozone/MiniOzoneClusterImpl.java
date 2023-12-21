@@ -448,8 +448,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   public void shutdown() {
     try {
       LOG.info("Shutting down the Mini Ozone Cluster");
-      // Explicit gc to trigger leak detection.
-      System.gc();
+      CodecTestUtil.gc();
       IOUtils.closeQuietly(clients);
       final File baseDir = new File(getBaseDir());
       stop();
@@ -457,7 +456,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       ContainerCache.getInstance(conf).shutdownCache();
       DefaultMetricsSystem.shutdown();
       ManagedRocksObjectMetrics.INSTANCE.assertNoLeaks();
-      CodecTestUtil.gc();
     } catch (Exception e) {
       LOG.error("Exception while shutting down the cluster.", e);
     }
