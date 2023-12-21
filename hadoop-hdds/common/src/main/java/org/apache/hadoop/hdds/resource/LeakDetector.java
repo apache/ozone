@@ -94,8 +94,9 @@ public class LeakDetector implements Runnable {
 
   public LeakTracker track(Object leakable, Runnable reportLeak) {
     // A rate filter can be put here to only track a subset of all objects, e.g. 5%, 10%,
-    // if we have proofs that leak tracking impacts performance.
-    // For now, it looks simple and effective enough.
+    // if we have proofs that leak tracking impacts performance, or a single LeakDetector
+    // thread can't keep up with the pace of object allocation.
+    // For now, it looks effective enough and let keep it simple.
     LeakTracker tracker = new LeakTracker(leakable, queue, allLeaks, reportLeak);
     allLeaks.add(tracker);
     return tracker;

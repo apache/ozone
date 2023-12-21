@@ -448,6 +448,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   public void shutdown() {
     try {
       LOG.info("Shutting down the Mini Ozone Cluster");
+      // Explicit gc to trigger leak detection.
       System.gc();
       IOUtils.closeQuietly(clients);
       final File baseDir = new File(getBaseDir());
