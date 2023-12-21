@@ -18,14 +18,12 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.resource.LeakDetector;
 import org.apache.hadoop.hdds.resource.LeakTracker;
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
 import org.rocksdb.RocksDB;
-import org.rocksdb.RocksObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
