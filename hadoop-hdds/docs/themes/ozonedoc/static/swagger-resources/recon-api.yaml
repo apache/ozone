@@ -1433,6 +1433,9 @@ components:
             remaining:
               type: number
               example: 1080410456064
+            committed:
+              type: number
+              example: 1080410456
         containers:
           type: integer
           example: 26
@@ -1480,6 +1483,9 @@ components:
                   remaining:
                     type: number
                     example: 270071111680
+                  committed:
+                    type: number
+                    example: 27007111
               pipelines:
                 type: array
                 items:
