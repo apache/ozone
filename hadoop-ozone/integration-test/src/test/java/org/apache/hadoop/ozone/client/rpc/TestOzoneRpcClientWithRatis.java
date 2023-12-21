@@ -55,7 +55,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
 import org.apache.hadoop.ozone.om.ratis.metrics.OzoneManagerStateMachineMetrics;
 import org.apache.ozone.test.GenericTestUtils;
-import org.assertj.core.api.Fail;
+import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -67,8 +67,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.fail;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -394,7 +392,7 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
         ready.await();
       } catch (InterruptedException e) {
         e.printStackTrace();
-        assertTrue(Fail.fail("resume interrupted"));
+        assertTrue(fail("resume interrupted"));
       }
       wait.countDown();
     }
