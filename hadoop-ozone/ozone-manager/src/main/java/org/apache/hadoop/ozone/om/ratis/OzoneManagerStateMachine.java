@@ -637,31 +637,24 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       long lastFlushedIndex, long currentTerm, List<Long> flushedEpochs,
       boolean checkMap) {
     if (checkMap) {
+      // called from db flush, update lastApplied index from flushed index
       List<Long> flushedTrans = new ArrayList<>(flushedEpochs);
       Long appliedTerm = null;
       long appliedIndex = -1;
-      for (long i = getLastAppliedTermIndex().getIndex() + 1; ; i++) {
-        if (flushedTrans.contains(i)) {
+      for (long i : flushedTrans) {
+        if (applyTransactionMap.containsKey(i)) {
           appliedIndex = i;
-          final Long removed = applyTransactionMap.remove(i);
-          appliedTerm = removed;
-          flushedTrans.remove(i);
-        } else if (ratisTransactionMap.containsKey(i)) {
-          final Long removed = ratisTransactionMap.remove(i);
-          appliedTerm = removed;
+          appliedTerm = applyTransactionMap.remove(i);
+        }
+      }
+      // check if ratis transaction notified in sequence to update
+      // as notified before db flush for conf changes and other ratis
+      // internal used indexes
+      for (long i = lastFlushedIndex + 1; ; i++) {
+        if (ratisTransactionMap.containsKey(i)) {
           appliedIndex = i;
+          appliedTerm = ratisTransactionMap.remove(i);
         } else {
-          // Add remaining which are left in flushedEpochs to
-          // ratisTransactionMap to be considered further.
-          for (long epoch : flushedTrans) {
-            ratisTransactionMap.put(epoch, applyTransactionMap.remove(epoch));
-          }
-          if (LOG.isDebugEnabled()) {
-            if (!flushedTrans.isEmpty()) {
-              LOG.debug("ComputeAndUpdateLastAppliedIndex due to SM added " +
-                  "to map remaining {}", flushedTrans);
-            }
-          }
           break;
         }
       }
@@ -672,6 +665,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
               getLastAppliedTermIndex());
         }
       }
+      // cleanup extra entries and release double buffer transaction
+      cleanupTransactionMap(lastFlushedIndex);
     } else {
       if (getLastAppliedTermIndex().getIndex() + 1 == lastFlushedIndex) {
         updateLastAppliedTermIndex(currentTerm, lastFlushedIndex);
@@ -689,6 +684,21 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         }
       }
     }
+  }
+
+  private void cleanupTransactionMap(long lastFlushedIndex) {
+    long missingIdxCnt = applyTransactionMap.entrySet().stream().filter(
+        entry -> entry.getKey() <= lastFlushedIndex).count();
+    if (missingIdxCnt > 0) {
+      LOG.info("Missing index count {}, might be failed operation" +
+          " last flush index {}", missingIdxCnt, lastFlushedIndex);
+      applyTransactionMap.entrySet().removeIf(
+          entry -> entry.getKey() <= lastFlushedIndex);
+      ozoneManagerDoubleBuffer.releaseUnFlushedTransactions(
+          (int) missingIdxCnt);
+    }
+    ratisTransactionMap.entrySet().removeIf(
+        entry -> entry.getKey() <= lastFlushedIndex);
   }
 
   public void loadSnapshotInfoFromDB() throws IOException {
