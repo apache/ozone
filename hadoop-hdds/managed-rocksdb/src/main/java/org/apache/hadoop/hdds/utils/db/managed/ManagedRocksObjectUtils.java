@@ -67,7 +67,6 @@ public final class ManagedRocksObjectUtils {
     LOG.warn(warning);
   }
 
-
   static @Nullable StackTraceElement[] getStackTrace() {
     return HddsUtils.getStackTrace(LOG);
   }

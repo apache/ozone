@@ -19,7 +19,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 /**
  * Test managed rocks object leak detection.
  * This test creates garbage that will fail other tests and is intended for manual run only.
- * It is flaky as well because of depending on background processes and environment.
+ * It is also flaky because of depending on background processes and environment (other background tasks
+ * can create extra managed rocks objects and thus fails the counter assertions).
  */
 @Unhealthy
 public class TestRocksObjectLeakDetector {

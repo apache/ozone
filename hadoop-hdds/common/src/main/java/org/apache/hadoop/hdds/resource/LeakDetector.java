@@ -35,13 +35,11 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <pre> {@code
  * class MyResource implements AutoClosable {
- *   private final LeakTracker leakTracker;
- *   public MyResource() {
- *     leakTracker = MyResourceLeakDetector.LEAK_DETECTOR.track(this, () -> {
- *       // report leaks, don't refer to the original object (MyResource) here.
- *       System.out.println("MyResource is not closed before being discarded.");
- *     });
- *   }
+ *   private final LeakTracker MyResourceLeakDetector.LEAK_DETECTOR.track(this, () -> {
+ *      // report leaks, don't refer to the original object (MyResource) here.
+ *      System.out.println("MyResource is not closed before being discarded.");
+ *   });
+ *
  *   @Override
  *   public void close() {
  *     // proper resources closure cleanup...
@@ -49,6 +47,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *     leakTracker.close();
  *   }
  * }
+ *
  * class MyResourceLeakDetector {
  *    public static final LeakDetector LEAK_DETECTOR = new LeakDetector("MyResource");
  * }

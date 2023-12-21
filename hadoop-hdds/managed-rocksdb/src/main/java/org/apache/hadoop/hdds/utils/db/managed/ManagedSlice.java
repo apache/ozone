@@ -23,6 +23,7 @@ import org.rocksdb.Slice;
 
 import javax.annotation.Nullable;
 
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.getStackTrace;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
@@ -30,7 +31,7 @@ import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.tr
  */
 public class ManagedSlice extends Slice {
   @Nullable
-  private final StackTraceElement[] elements = ManagedRocksObjectUtils.getStackTrace();
+  private final StackTraceElement[] elements = getStackTrace();
   private final LeakTracker leakTracker = track(this, elements);
 
   public ManagedSlice(byte[] data) {
@@ -45,8 +46,8 @@ public class ManagedSlice extends Slice {
   @Override
   protected void disposeInternal() {
     super.disposeInternal();
-    // RocksMutableObject.close is final and can't be decorated.
-    // So, we decorate disposeInternal instead.
+    // RocksMutableObject.close is final thus can't be decorated.
+    // So, we decorate disposeInternal instead to track closure.
     leakTracker.close();
   }
 }
