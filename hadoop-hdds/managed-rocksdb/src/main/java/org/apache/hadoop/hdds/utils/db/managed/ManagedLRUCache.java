@@ -18,30 +18,29 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import org.apache.hadoop.hdds.resource.Leakable;
+import org.apache.hadoop.hdds.resource.LeakTracker;
 import org.rocksdb.LRUCache;
 
 import javax.annotation.Nullable;
 
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.LEAK_DETECTOR;
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.assertClosed;
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.formatStackTrace;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.getStackTrace;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * Managed LRUCache.
  */
-public class ManagedLRUCache extends LRUCache implements Leakable {
+public class ManagedLRUCache extends LRUCache {
   @Nullable
   private final StackTraceElement[] elements = getStackTrace();
+  private final LeakTracker leakTracker = track(this, elements);
 
   public ManagedLRUCache(long capacity) {
     super(capacity);
-    LEAK_DETECTOR.watch(this);
   }
 
   @Override
-  public void check() {
-    assertClosed(this, formatStackTrace(elements));
+  public void close() {
+    super.close();
+    leakTracker.close();
   }
 }

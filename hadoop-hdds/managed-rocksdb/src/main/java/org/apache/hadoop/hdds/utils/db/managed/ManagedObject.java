@@ -18,28 +18,26 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import org.apache.hadoop.hdds.resource.Leakable;
+import org.apache.hadoop.hdds.resource.LeakTracker;
 import org.rocksdb.RocksObject;
 
 import javax.annotation.Nullable;
 
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.LEAK_DETECTOR;
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.formatStackTrace;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.getStackTrace;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * General template for a managed RocksObject.
  * @param <T>
  */
-class ManagedObject<T extends RocksObject> implements AutoCloseable, Leakable {
+class ManagedObject<T extends RocksObject> implements AutoCloseable {
   private final T original;
-
   @Nullable
-  private final StackTraceElement[] elements;
+  private final StackTraceElement[] elements = getStackTrace();
+  private final LeakTracker leakTracker = track(this, elements);
 
   ManagedObject(T original) {
     this.original = original;
-    this.elements = ManagedRocksObjectUtils.getStackTrace();
-    LEAK_DETECTOR.watch(this);
   }
 
   public T get() {
@@ -49,15 +47,6 @@ class ManagedObject<T extends RocksObject> implements AutoCloseable, Leakable {
   @Override
   public void close() {
     original.close();
+    leakTracker.close();
   }
-
-  @Override
-  public void check() {
-    ManagedRocksObjectUtils.assertClosed(this);
-  }
-
-  public String getStackTrace() {
-    return formatStackTrace(elements);
-  }
-
 }

@@ -18,26 +18,23 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import org.apache.hadoop.hdds.resource.Leakable;
+import org.apache.hadoop.hdds.resource.LeakTracker;
 import org.rocksdb.Slice;
 
 import javax.annotation.Nullable;
 
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.LEAK_DETECTOR;
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.formatStackTrace;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * Managed Slice.
  */
-public class ManagedSlice extends Slice implements Leakable {
-
+public class ManagedSlice extends Slice {
   @Nullable
-  private final StackTraceElement[] elements;
+  private final StackTraceElement[] elements = ManagedRocksObjectUtils.getStackTrace();
+  private final LeakTracker leakTracker = track(this, elements);
 
   public ManagedSlice(byte[] data) {
     super(data);
-    this.elements = ManagedRocksObjectUtils.getStackTrace();
-    LEAK_DETECTOR.watch(this);
   }
 
   @Override
@@ -46,11 +43,10 @@ public class ManagedSlice extends Slice implements Leakable {
   }
 
   @Override
-  public void check() {
-    ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
-    if (isOwningHandle()) {
-      ManagedRocksObjectUtils.reportLeak(this, formatStackTrace(elements));
-    }
+  protected void disposeInternal() {
+    super.disposeInternal();
+    // RocksMutableObject.close is final and can't be decorated.
+    // So, we decorate disposeInternal instead.
+    leakTracker.close();
   }
-
 }

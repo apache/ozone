@@ -18,20 +18,33 @@
  */
 package org.apache.hadoop.hdds.resource;
 
+import java.lang.ref.ReferenceQueue;
+import java.lang.ref.WeakReference;
+import java.util.Set;
+
 /**
- * Interface for a leakable resource. This interface should be implemented by the resource to monitor itself.
- *
- * Creating proxy objects, e.g. using lambda, like below does not work because we expect the resource object
- * itself is monitored, not the immediate proxy object.
- * <pre> {@code
- * LEAK_DETECTOR.watch(() -> { assertClose(resource) });
- * }</pre>
+ * A token to track resource closure.
  *
  * @see LeakDetector
  */
-public interface Leakable {
+public class LeakTracker extends WeakReference<Object> {
+  private final Set<LeakTracker> allLeaks;
+  private final Runnable leakReporter;
+  LeakTracker(Object referent, ReferenceQueue<? super Object> referenceQueue,
+      Set<LeakTracker> allLeaks, Runnable leakReporter) {
+    super(referent, referenceQueue);
+    this.allLeaks = allLeaks;
+    this.leakReporter = leakReporter;
+  }
+
   /**
-   * Perform assertions to verify proper resource closure. This is invoked after the resource object is GCed.
+   * Called by the track resource when it closes.
    */
-  void check();
+  public void close() {
+    allLeaks.remove(this);
+  }
+
+  void reportLeak() {
+    leakReporter.run();
+  }
 }

@@ -1,33 +1,63 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ *  with the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
 package org.apache.hadoop.hdds.resource;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.ref.ReferenceQueue;
-import java.lang.ref.WeakReference;
+import java.util.Collections;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Simple general resource leak detector using {@link ReferenceQueue} to observe resource object life-cycle
- * and perform assertions to verify proper resource closure after they are GCed.
+ * Simple general resource leak detector using {@link ReferenceQueue} and {@link java.lang.ref.WeakReference} to observe
+ * resource object life-cycle and assert proper resource closure before they are GCed.
+ *
+ * <p>
+ * Example usage:
  *
  * <pre> {@code
- * class MyResource implements Leakable {
+ * class MyResource implements AutoClosable {
+ *   private final LeakTracker leakTracker;
  *   public MyResource() {
- *     ResourceLeakDetector.LEAK_DETECTOR.watch(this);
+ *     leakTracker = MyResourceLeakDetector.LEAK_DETECTOR.track(this, () -> {
+ *       // report leaks, don't refer to the original object (MyResource) here.
+ *       System.out.println("MyResource is not closed before being discarded.");
+ *     });
  *   }
- *   public void check() {
- *     // assertions to verify this resource closure.
+ *   @Override
+ *   public void close() {
+ *     // proper resources closure cleanup...
+ *     // inform tracker this object is closed properly.
+ *     leakTracker.close();
  *   }
  * }
- * class ResourceLeakDetector {
- *    public final LeakDetector LEAK_DETECTOR = new LeakDetector("MyResource");
+ * class MyResourceLeakDetector {
+ *    public static final LeakDetector LEAK_DETECTOR = new LeakDetector("MyResource");
  * }
  * }</pre>
- * @see Leakable
  */
 public class LeakDetector implements Runnable {
   public static final Logger LOG = LoggerFactory.getLogger(LeakDetector.class);
-  private final ReferenceQueue<Leakable> queue = new ReferenceQueue<>();
+  private final ReferenceQueue<Object> queue = new ReferenceQueue<>();
+  private final Set<LeakTracker> allLeaks = Collections.newSetFromMap(new ConcurrentHashMap<>());
   private final String name;
 
   public LeakDetector(String name) {
@@ -39,6 +69,7 @@ public class LeakDetector implements Runnable {
     Thread t = new Thread(this);
     t.setName(LeakDetector.class.getSimpleName() + "-" + name);
     t.setDaemon(true);
+    LOG.info("Starting leak detector thread {}.", name);
     t.start();
   }
 
@@ -46,13 +77,14 @@ public class LeakDetector implements Runnable {
   public void run() {
     while (true) {
       try {
-        WeakReference<Leakable> ref = (WeakReference<Leakable>) queue.remove();
-        Leakable leakable = ref.get();
-        if (leakable != null) {
-          leakable.check();
+        LeakTracker tracker = (LeakTracker) queue.remove();
+        // Original resource already been GCed, if tracker is not closed yet,
+        // report a leak.
+        if (allLeaks.remove(tracker)) {
+          tracker.reportLeak();
         }
       } catch (InterruptedException e) {
-        LOG.warn("Thread interrupted, exiting.");
+        LOG.warn("Thread interrupted, exiting.", e);
         break;
       }
     }
@@ -60,8 +92,12 @@ public class LeakDetector implements Runnable {
     LOG.warn("Existing leak detector {}.", name);
   }
 
-  public void watch(Leakable leakable) {
-    // Intentionally ignored.
-    WeakReference ignored = new WeakReference(leakable, queue);
+  public LeakTracker track(Object leakable, Runnable reportLeak) {
+    // A rate filter can be put here to only track a subset of all objects, e.g. 5%, 10%,
+    // if we have proofs that leak tracking impacts performance.
+    // For now, it looks simple and effective enough.
+    LeakTracker tracker = new LeakTracker(leakable, queue, allLeaks, reportLeak);
+    allLeaks.add(tracker);
+    return tracker;
   }
 }

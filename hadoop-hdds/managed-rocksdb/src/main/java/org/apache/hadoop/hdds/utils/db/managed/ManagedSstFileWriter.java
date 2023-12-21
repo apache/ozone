@@ -18,34 +18,32 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import org.apache.hadoop.hdds.resource.Leakable;
+import org.apache.hadoop.hdds.resource.LeakTracker;
 import org.rocksdb.EnvOptions;
 import org.rocksdb.Options;
 import org.rocksdb.SstFileWriter;
 
 import javax.annotation.Nullable;
 
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.LEAK_DETECTOR;
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.assertClosed;
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.formatStackTrace;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.getStackTrace;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * Managed SstFileWriter.
  */
-public class ManagedSstFileWriter extends SstFileWriter implements Leakable {
-
+public class ManagedSstFileWriter extends SstFileWriter {
   @Nullable
   private final StackTraceElement[] elements = getStackTrace();
+  private final LeakTracker leakTracker = track(this, elements);
 
   public ManagedSstFileWriter(EnvOptions envOptions,
                               Options options) {
     super(envOptions, options);
-    LEAK_DETECTOR.watch(this);
   }
 
   @Override
-  public void check() {
-    assertClosed(this, formatStackTrace(elements));
+  public void close() {
+    super.close();
+    leakTracker.close();
   }
 }
