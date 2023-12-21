@@ -42,7 +42,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  *   @Override
  *   public void close() {
- *     // proper resources closure cleanup...
+ *     // proper resources cleanup...
  *     // inform tracker this object is closed properly.
  *     leakTracker.close();
  *   }
