@@ -213,9 +213,10 @@ public class TestOzoneManagerStateMachine {
 
     ozoneManagerStateMachine.updateLastAppliedIndex(flushedEpochs);
 
+    // it will update index to 4, giving priority to flushed epochs
     Assertions.assertEquals(0L,
         ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(2L,
+    Assertions.assertEquals(4L,
         ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
 
 
