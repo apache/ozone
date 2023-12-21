@@ -182,9 +182,8 @@ public class TestSCMInstallSnapshotWithHA {
     SCMStateMachine followerSM =
         followerSCM.getScmHAManager().getRatisServer().getSCMStateMachine();
     followerSCM.getScmMetadataStore().getTransactionInfoTable().
-        put(OzoneConsts.TRANSACTION_INFO_KEY, TransactionInfo.builder()
-        .setCurrentTerm(lastTermIndex.getTerm())
-            .setTransactionIndex(lastTermIndex.getIndex() + 100).build());
+        put(OzoneConsts.TRANSACTION_INFO_KEY,
+            TransactionInfo.valueOf(lastTermIndex.getTerm(), lastTermIndex.getIndex() + 100));
     // Advance the follower
     followerSM.notifyTermIndexUpdated(lastTermIndex.getTerm(),
         lastTermIndex.getIndex() + 100);

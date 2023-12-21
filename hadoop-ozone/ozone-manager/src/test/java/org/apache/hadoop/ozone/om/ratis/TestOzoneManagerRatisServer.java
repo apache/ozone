@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.security.OMCertificateClient;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
@@ -125,8 +124,7 @@ public class TestOzoneManagerRatisServer {
         ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     initialTermIndex = TermIndex.valueOf(0, 0);
-    RatisSnapshotInfo omRatisSnapshotInfo = new RatisSnapshotInfo();
-    when(ozoneManager.getSnapshotInfo()).thenReturn(omRatisSnapshotInfo);
+    when(ozoneManager.getTransactionInfo()).thenReturn(TransactionInfo.DEFAULT_VALUE);
     when(ozoneManager.getConfiguration()).thenReturn(conf);
     secConfig = new SecurityConfig(conf);
     HddsProtos.OzoneManagerDetailsProto omInfo =
@@ -170,10 +168,7 @@ public class TestOzoneManagerRatisServer {
         snapshotInfo.getTerm(), snapshotInfo.getIndex() + 100);
 
     omMetadataManager.getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
-        new TransactionInfo.Builder()
-            .setCurrentTerm(snapshotInfo.getTerm())
-            .setTransactionIndex(snapshotInfo.getIndex() + 100)
-            .build());
+        TransactionInfo.valueOf(newSnapshotIndex));
 
     // Start new Ratis server. It should pick up and load the new SnapshotInfo
     omRatisServer = OzoneManagerRatisServer.newOMRatisServer(conf, ozoneManager,
