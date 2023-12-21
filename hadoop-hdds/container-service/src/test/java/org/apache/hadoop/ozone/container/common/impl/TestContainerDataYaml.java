@@ -194,12 +194,11 @@ public class TestContainerDataYaml {
     setLayoutVersion(layout);
     String containerFile = "incorrect.container";
 
-    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-      // Get file from resource folder
-      ClassLoader classLoader = getClass().getClassLoader();
-      File file = new File(classLoader.getResource(containerFile).getFile());
-      ContainerDataYaml.readContainerFile(file);
-    });
+    // Get file from resource folder
+    ClassLoader classLoader = getClass().getClassLoader();
+    File file = new File(classLoader.getResource(containerFile).getFile());
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> ContainerDataYaml.readContainerFile(file));
 
     assertThat(exception).hasMessageContaining("No enum constant");
   }

@@ -844,7 +844,7 @@ final class TestSecureOzoneCluster {
           () -> omClientNonAdmin.getS3Secret("HADOOP/JOHN"));
       assertSame(USER_MISMATCH, omException.getResult());
       omException = assertThrows(OMException.class,
-          () -> omClientNonAdmin.getS3Secret("HADOOP/DOE"));
+          () -> omClientNonAdmin.revokeS3Secret("HADOOP/DOE"));
       assertSame(USER_MISMATCH, omException.getResult());
 
     } finally {

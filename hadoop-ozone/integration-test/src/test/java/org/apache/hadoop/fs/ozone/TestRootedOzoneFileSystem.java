@@ -76,7 +76,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.apache.ozone.test.JUnit5AwareTimeout;
@@ -352,7 +351,7 @@ public class TestRootedOzoneFileSystem {
     try {
       getKey(parent, true);
     } catch (OMException ome) {
-      Assertions.assertEquals(KEY_NOT_FOUND, ome.getResult());
+      assertEquals(KEY_NOT_FOUND, ome.getResult());
     }
 
     // List status on the parent should show the child file
@@ -423,7 +422,7 @@ public class TestRootedOzoneFileSystem {
     try {
       getKey(parent, true);
     } catch (OMException ome) {
-      Assertions.assertEquals(KEY_NOT_FOUND, ome.getResult());
+      assertEquals(KEY_NOT_FOUND, ome.getResult());
     }
 
 
