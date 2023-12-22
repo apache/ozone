@@ -49,7 +49,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * from cblock clients.
  */
 @Timeout(value = 300, unit = TimeUnit.SECONDS)
- 
 public class TestContainerOperations {
   private static ScmClient storageClient;
   private static MiniOzoneCluster cluster;

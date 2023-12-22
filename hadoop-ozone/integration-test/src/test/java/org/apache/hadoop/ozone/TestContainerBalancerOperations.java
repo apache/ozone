@@ -42,14 +42,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * This class tests container balancer operations
  * from cblock clients.
  */
-
-/**
- * Set a timeout for each test.
- */
 @Timeout(value = 300, unit = TimeUnit.MILLISECONDS)
-
 public class TestContainerBalancerOperations {
-
 
   private static ScmClient containerBalancerClient;
   private static MiniOzoneCluster cluster;

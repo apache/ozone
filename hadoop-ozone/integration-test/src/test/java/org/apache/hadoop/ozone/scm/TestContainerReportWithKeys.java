@@ -54,11 +54,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 /**
  * This class tests container report with DN container state info.
  */
-/**
- * Set a timeout for each test.
- */
 @Timeout(value = 300, unit = TimeUnit.SECONDS)
-
 public class TestContainerReportWithKeys {
   private static final Logger LOG = LoggerFactory.getLogger(
       TestContainerReportWithKeys.class);

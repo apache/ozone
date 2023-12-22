@@ -97,9 +97,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Integration test to verify block tokens in a secure cluster.
  */
 @InterfaceAudience.Private
-
 @Timeout(value = 180, unit = TimeUnit.SECONDS)
-
 public final class TestBlockTokens {
   private static final Logger LOG = LoggerFactory.getLogger(TestBlockTokens.class);
   private static final String TEST_VOLUME = "testvolume";

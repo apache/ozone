@@ -73,14 +73,9 @@ import org.junit.jupiter.api.Timeout;
 /**
  * Class to test CommitWatcher functionality.
  */
-
 @Timeout(value = 300, unit = TimeUnit.SECONDS)
-
 public class TestCommitWatcher {
 
-  /**
-    * Set a timeout for each test.
-    */
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
   private OzoneClient client;

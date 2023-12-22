@@ -59,11 +59,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * Test cases for ContainerMapper.
  */
-/**
- * Set a timeout for each test.
- */
 @Timeout(value = 300, unit = TimeUnit.SECONDS)
-
 public class TestContainerMapper {
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient ozClient = null;

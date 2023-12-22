@@ -85,7 +85,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 
 @Timeout(value = 500, unit = TimeUnit.SECONDS)
-
 @InterfaceAudience.Private
 public final class TestSecretKeysApi {
   private static final Logger LOG = LoggerFactory

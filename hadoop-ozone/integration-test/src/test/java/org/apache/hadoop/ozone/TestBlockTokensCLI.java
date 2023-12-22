@@ -81,9 +81,7 @@ import org.junit.jupiter.api.Assertions;
  * secure cluster.
  */
 @InterfaceAudience.Private
-
 @Timeout(value = 180, unit = TimeUnit.SECONDS)
-
 public final class TestBlockTokensCLI {
   private static final Logger LOG = LoggerFactory
       .getLogger(TestBlockTokensCLI.class);

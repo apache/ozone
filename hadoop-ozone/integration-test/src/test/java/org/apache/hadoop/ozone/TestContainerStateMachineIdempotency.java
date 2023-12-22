@@ -50,12 +50,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 /**
  * Tests the idempotent operations in ContainerStateMachine.
  */
-
-/**
- * Set a timeout for each test.
- */
 @Timeout(value = 300, unit = TimeUnit.SECONDS)
-
 public class TestContainerStateMachineIdempotency {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration ozoneConfig;
