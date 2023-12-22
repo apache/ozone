@@ -53,13 +53,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * Test cases for LeaseRecoverer.
  */
+@Timeout(value = 120000, unit = TimeUnit.MILLISECONDS)
 public class TestLeaseRecoverer {
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
   private static OzoneBucket fsoOzoneBucket;
   private static OzoneClient client;
-
-  @Timeout(value = 120000, unit = TimeUnit.MILLISECONDS)
 
   /**
    * Create a MiniDFSCluster for testing.

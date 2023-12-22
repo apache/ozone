@@ -39,6 +39,7 @@ import org.junit.jupiter.api.Assertions;
 /**
  * This class tests MiniOzoneHAClusterImpl.
  */
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
 public class TestMiniOzoneOMHACluster {
 
   private MiniOzoneHAClusterImpl cluster = null;
@@ -47,8 +48,6 @@ public class TestMiniOzoneOMHACluster {
   private String scmId;
   private String omServiceId;
   private int numOfOMs = 3;
-
-  @Timeout(value = 300, unit = TimeUnit.SECONDS)
 
   /**
    * Create a MiniOzoneHAClusterImpl for testing.
