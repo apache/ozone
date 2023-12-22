@@ -72,15 +72,12 @@ import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -128,64 +125,44 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.REA
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.DELETE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import static org.junit.Assume.assumeFalse;
-import static org.junit.Assume.assumeTrue;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Ozone file system tests that are not covered by contract tests.
  * TODO: Refactor this and TestOzoneFileSystem to reduce duplication.
  */
-@RunWith(Parameterized.class)
-public class TestRootedOzoneFileSystem {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+abstract class AbstractRootedOzoneFileSystemTest {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(TestRootedOzoneFileSystem.class);
+      LoggerFactory.getLogger(AbstractRootedOzoneFileSystemTest.class);
 
   private static final float TRASH_INTERVAL = 0.05f; // 3 seconds
-  private static OzoneClient client;
+  private OzoneClient client;
 
-  @Parameterized.Parameters
-  public static Collection<Object[]> data() {
-    return Arrays.asList(
-        new Object[]{true, true, true, false},
-        new Object[]{true, true, false, false},
-        new Object[]{true, false, false, false},
-        new Object[]{false, true, false, false},
-        new Object[]{false, false, false, false},
-        new Object[]{true, true, false, true},
-        new Object[]{false, false, false, true}
-    );
-  }
-
-  public TestRootedOzoneFileSystem(boolean setDefaultFs,
+  AbstractRootedOzoneFileSystemTest(BucketLayout bucketLayout, boolean setDefaultFs,
       boolean enableOMRatis, boolean isAclEnabled, boolean noFlush) {
-    // Ignored. Actual init done in initParam().
-    // This empty constructor is still required to avoid argument exception.
-  }
-
-  @Parameterized.BeforeParam
-  public static void initParam(boolean setDefaultFs, boolean enableOMRatis,
-      boolean isAclEnabled, boolean noFlush)
-      throws IOException, InterruptedException, TimeoutException {
     // Initialize the cluster before EACH set of parameters
+    this.bucketLayout = bucketLayout;
     enabledFileSystemPaths = setDefaultFs;
     omRatisEnabled = enableOMRatis;
     enableAcl = isAclEnabled;
     useOnlyCache = noFlush;
-    initClusterAndEnv();
+    isBucketFSOptimized = bucketLayout.isFileSystemOptimized();
   }
 
-  @Parameterized.AfterParam
-  public static void teardownParam() {
+  @AfterAll
+  void shutdown() {
     IOUtils.closeQuietly(client);
     // Tear down the cluster after EACH set of parameters
     if (cluster != null) {
@@ -194,7 +171,7 @@ public class TestRootedOzoneFileSystem {
     IOUtils.closeQuietly(fs, userOfs);
   }
 
-  @Before
+  @BeforeEach
   public void createVolumeAndBucket() throws IOException {
     // create a volume and a bucket to be used by RootedOzoneFileSystem (OFS)
     OzoneBucket bucket =
@@ -205,66 +182,61 @@ public class TestRootedOzoneFileSystem {
     bucketPath = new Path(volumePath, bucketName);
   }
 
-  @After
+  @AfterEach
   public void cleanup() throws IOException {
     fs.delete(bucketPath, true);
     fs.delete(volumePath, false);
   }
 
-  public static FileSystem getFs() {
+  public FileSystem getFs() {
     return fs;
   }
 
-  public static Path getBucketPath() {
+  public Path getBucketPath() {
     return bucketPath;
   }
 
-  @Rule
-  public TestRule globalTimeout = new JUnit5AwareTimeout(Timeout.seconds(300));
+  private final boolean enabledFileSystemPaths;
+  private final boolean omRatisEnabled;
+  private final boolean isBucketFSOptimized;
+  private final boolean enableAcl;
 
-  private static boolean enabledFileSystemPaths;
-  private static boolean omRatisEnabled;
-  private static boolean isBucketFSOptimized = false;
-  private static boolean enableAcl;
+  private final boolean useOnlyCache;
 
-  private static boolean useOnlyCache;
+  private OzoneConfiguration conf;
+  private MiniOzoneCluster cluster;
+  private FileSystem fs;
+  private RootedOzoneFileSystem ofs;
+  private ObjectStore objectStore;
+  private BasicRootedOzoneClientAdapterImpl adapter;
+  private Trash trash;
 
-  private static OzoneConfiguration conf;
-  private static MiniOzoneCluster cluster = null;
-  private static FileSystem fs;
-  private static RootedOzoneFileSystem ofs;
-  private static ObjectStore objectStore;
-  private static BasicRootedOzoneClientAdapterImpl adapter;
-  private static Trash trash;
-
-  private static String volumeName;
-  private static Path volumePath;
-  private static String bucketName;
+  private String volumeName;
+  private Path volumePath;
+  private String bucketName;
   // Store path commonly used by tests that test functionality within a bucket
-  private static Path bucketPath;
-  private static String rootPath;
-  private static BucketLayout bucketLayout;
+  private Path bucketPath;
+  private String rootPath;
+  private final BucketLayout bucketLayout;
 
   private static final String USER1 = "regularuser1";
   private static final UserGroupInformation UGI_USER1 = UserGroupInformation
       .createUserForTesting(USER1,  new String[] {"usergroup"});
   // Non-privileged OFS instance
-  private static RootedOzoneFileSystem userOfs;
+  private RootedOzoneFileSystem userOfs;
 
-  public static void initClusterAndEnv() throws IOException,
-      InterruptedException, TimeoutException {
+  @BeforeAll
+  void initClusterAndEnv() throws IOException, InterruptedException, TimeoutException {
     conf = new OzoneConfiguration();
     conf.setFloat(OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
     conf.setFloat(FS_TRASH_INTERVAL_KEY, TRASH_INTERVAL);
     conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, TRASH_INTERVAL / 2);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
-    if (isBucketFSOptimized) {
-      bucketLayout = BucketLayout.FILE_SYSTEM_OPTIMIZED;
+    if (bucketLayout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
       conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
           bucketLayout.name());
     } else {
-      bucketLayout = BucketLayout.LEGACY;
       conf.set(OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT,
           OzoneConfigKeys.OZONE_BUCKET_LAYOUT_LEGACY);
       conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
@@ -320,10 +292,6 @@ public class TestRootedOzoneFileSystem {
     return cluster.getOzoneManager().getMetrics();
   }
 
-  protected static void setIsBucketFSOptimized(boolean isBucketFSO) {
-    isBucketFSOptimized = isBucketFSO;
-  }
-
   @Test
   public void testOzoneFsServiceLoader() throws IOException {
     assumeFalse(isBucketFSOptimized);
@@ -331,8 +299,7 @@ public class TestRootedOzoneFileSystem {
     OzoneConfiguration confTestLoader = new OzoneConfiguration();
     // fs.ofs.impl should be loaded from META-INF, no need to explicitly set it
     assertEquals(FileSystem.getFileSystemClass(
-        OzoneConsts.OZONE_OFS_URI_SCHEME, confTestLoader),
-        RootedOzoneFileSystem.class);
+        OzoneConsts.OZONE_OFS_URI_SCHEME, confTestLoader), RootedOzoneFileSystem.class);
   }
 
   @Test
@@ -355,12 +322,8 @@ public class TestRootedOzoneFileSystem {
     }
 
     // List status on the parent should show the child file
-    assertEquals(
-        "List status of parent should include the 1 child file",
-        1L, fs.listStatus(parent).length);
-    assertTrue(
-        "Parent directory does not appear to be a directory",
-        fs.getFileStatus(parent).isDirectory());
+    assertEquals(1L, fs.listStatus(parent).length, "List status of parent should include the 1 child file");
+    assertTrue(fs.getFileStatus(parent).isDirectory(), "Parent directory does not appear to be a directory");
 
     // Cleanup
     fs.delete(grandparent, true);
@@ -398,8 +361,7 @@ public class TestRootedOzoneFileSystem {
       }
       FileStatus fileStatus = fs.getFileStatus(parent);
       assertEquals((size == dirs.size() - 1 &&
-           !bucketLayout.isFileSystemOptimized()) || size == dirs.size(),
-           fileStatus.isErasureCoded());
+           !bucketLayout.isFileSystemOptimized()) || size == dirs.size(), fileStatus.isErasureCoded());
     }
 
   }
@@ -408,8 +370,8 @@ public class TestRootedOzoneFileSystem {
   public void testDeleteCreatesFakeParentDir() throws Exception {
     // TODO: Request for comment.
     //  If possible, improve this to test when FS Path is enabled.
-    assumeTrue("FS Path is enabled. Skipping this test as it is not " +
-            "tuned for FS Path yet", !enabledFileSystemPaths);
+    assumeTrue(!enabledFileSystemPaths, "FS Path is enabled. Skipping this test as it is not " +
+            "tuned for FS Path yet");
 
     Path grandparent = new Path(bucketPath,
         "testDeleteCreatesFakeParentDir");
@@ -447,23 +409,19 @@ public class TestRootedOzoneFileSystem {
     Path file2 = new Path(parent, "key2");
 
     FileStatus[] fileStatuses = ofs.listStatus(bucketPath);
-    assertEquals("Should be empty", 0, fileStatuses.length);
+    assertEquals(0, fileStatuses.length, "Should be empty");
 
     ContractTestUtils.touch(fs, file1);
     ContractTestUtils.touch(fs, file2);
 
     fileStatuses = ofs.listStatus(bucketPath);
-    assertEquals("Should have created parent",
-        1, fileStatuses.length);
-    assertEquals("Parent path doesn't match",
-        fileStatuses[0].getPath().toUri().getPath(), parent.toString());
+    assertEquals(1, fileStatuses.length, "Should have created parent");
+    assertEquals(fileStatuses[0].getPath().toUri().getPath(), parent.toString(), "Parent path doesn't match");
 
     // ListStatus on a directory should return all subdirs along with
     // files, even if there exists a file and sub-dir with the same name.
     fileStatuses = ofs.listStatus(parent);
-    assertEquals(
-        "FileStatus did not return all children of the directory",
-        2, fileStatuses.length);
+    assertEquals(2, fileStatuses.length, "FileStatus did not return all children of the directory");
 
     // ListStatus should return only the immediate children of a directory.
     Path file3 = new Path(parent, "dir1/key3");
@@ -471,10 +429,9 @@ public class TestRootedOzoneFileSystem {
     ContractTestUtils.touch(fs, file3);
     ContractTestUtils.touch(fs, file4);
     fileStatuses = ofs.listStatus(parent);
-    assertEquals(
-        "FileStatus did not return all children of" +
-            " the directory : Got " + Arrays.toString(
-            fileStatuses), 3, fileStatuses.length);
+    assertEquals(3, fileStatuses.length, "FileStatus did not return all children of" +
+        " the directory : Got " + Arrays.toString(
+        fileStatuses));
 
     // Cleanup
     fs.delete(parent, true);
@@ -499,8 +456,7 @@ public class TestRootedOzoneFileSystem {
       while (it.hasNext()) {
         FileStatus fileStatus = it.next();
         assertNotNull(fileStatus);
-        assertEquals("Parent path doesn't match",
-            fileStatus.getPath().toUri().getPath(), parent.toString());
+        assertEquals(fileStatus.getPath().toUri().getPath(), parent.toString(), "Parent path doesn't match");
       }
       // Iterator on a directory should return all subdirs along with
       // files.
@@ -511,9 +467,7 @@ public class TestRootedOzoneFileSystem {
         FileStatus fileStatus = it.next();
         assertNotNull(fileStatus);
       }
-      assertEquals(
-          "Iterator did not return all the file status",
-          2, iCount);
+      assertEquals(2, iCount, "Iterator did not return all the file status");
       // Iterator should return file status for only the
       // immediate children of a directory.
       Path file3 = new Path(parent, "dir1/key3");
@@ -527,8 +481,8 @@ public class TestRootedOzoneFileSystem {
         FileStatus fileStatus = it.next();
         assertNotNull(fileStatus);
       }
-      assertEquals("Iterator did not return file status " +
-          "of all the children of the directory", 3, iCount);
+      assertEquals(3, iCount, "Iterator did not return file status " +
+          "of all the children of the directory");
     } finally {
       // Cleanup
       fs.delete(parent, true);
@@ -561,9 +515,7 @@ public class TestRootedOzoneFileSystem {
         assertNotNull(fileStatus);
         assertNotEquals(fileStatus, dir12.toString());
       }
-      assertEquals(
-              "FileStatus should return only the immediate children",
-              2, iCount);
+      assertEquals(2, iCount, "FileStatus should return only the immediate children");
 
     } finally {
       // cleanup
@@ -579,8 +531,7 @@ public class TestRootedOzoneFileSystem {
       ofs.listStatusIterator(path);
       fail("Should have thrown OMException");
     } catch (OMException omEx) {
-      assertEquals("Volume test is not found",
-          OMException.ResultCodes.VOLUME_NOT_FOUND, omEx.getResult());
+      assertEquals(VOLUME_NOT_FOUND, omEx.getResult(), "Volume test is not found");
     }
   }
 
@@ -630,15 +581,12 @@ public class TestRootedOzoneFileSystem {
         // Verify that the two children of /dir1
         // returned by listStatusIterator operation
         // are /dir1/dir11 and /dir1/dir12.
-        assertTrue(
+        assertTrue(fileStatus.getPath().toUri().getPath().
+            equals(dir11.toString()) ||
             fileStatus.getPath().toUri().getPath().
-                equals(dir11.toString()) ||
-                fileStatus.getPath().toUri().getPath().
-                    equals(dir12.toString()));
+                equals(dir12.toString()));
       }
-      assertEquals(
-          "Iterator should return only the immediate children",
-          2, iCount);
+      assertEquals(2, iCount, "Iterator should return only the immediate children");
     } finally {
       // Cleanup
       fs.delete(dir2, true);
@@ -666,8 +614,7 @@ public class TestRootedOzoneFileSystem {
       }
     }
     if (retriesLeft <= 0) {
-      fail(
-          "Failed to generate random volume name that doesn't exist already.");
+      fail("Failed to generate random volume name that doesn't exist already.");
     }
     return name;
   }
@@ -679,8 +626,8 @@ public class TestRootedOzoneFileSystem {
   public void testMkdirOnNonExistentVolumeBucketDir() throws Exception {
     // TODO: Request for comment.
     //  If possible, improve this to test when FS Path is enabled.
-    assumeTrue("FS Path is enabled. Skipping this test as it is not " +
-            "tuned for FS Path yet", !enabledFileSystemPaths);
+    assumeTrue(!enabledFileSystemPaths, "FS Path is enabled. Skipping this test as it is not " +
+            "tuned for FS Path yet");
 
     String volumeNameLocal = getRandomNonExistVolumeName();
     String bucketNameLocal = "bucket-" + RandomStringUtils.randomNumeric(5);
@@ -701,14 +648,11 @@ public class TestRootedOzoneFileSystem {
 
     // Verify that directories are created.
     FileStatus[] fileStatuses = ofs.listStatus(root);
-    assertEquals(
-        fileStatuses[0].getPath().toUri().getPath(), dir1.toString());
-    assertEquals(
-        fileStatuses[1].getPath().toUri().getPath(), dir2.toString());
+    assertEquals(fileStatuses[0].getPath().toUri().getPath(), dir1.toString());
+    assertEquals(fileStatuses[1].getPath().toUri().getPath(), dir2.toString());
 
     fileStatuses = ofs.listStatus(dir1);
-    assertEquals(
-        fileStatuses[0].getPath().toUri().getPath(), dir12.toString());
+    assertEquals(fileStatuses[0].getPath().toUri().getPath(), dir12.toString());
     fileStatuses = ofs.listStatus(dir12);
     assertEquals(fileStatuses.length, 0);
     fileStatuses = ofs.listStatus(dir2);
@@ -786,8 +730,7 @@ public class TestRootedOzoneFileSystem {
     assertNotNull(fileStatus);
     assertEquals(new Path(rootPath), fileStatus.getPath());
     assertTrue(fileStatus.isDirectory());
-    assertEquals(FsPermission.getDirDefault(),
-        fileStatus.getPermission());
+    assertEquals(FsPermission.getDirDefault(), fileStatus.getPermission());
   }
 
   /**
@@ -807,9 +750,7 @@ public class TestRootedOzoneFileSystem {
       // exist) and dir2 only. dir12 is not an immediate child of root and
       // hence should not be listed.
       FileStatus[] fileStatuses = ofs.listStatus(root);
-      assertEquals(
-          "FileStatus should return only the immediate children",
-          2, fileStatuses.length);
+      assertEquals(2, fileStatuses.length, "FileStatus should return only the immediate children");
 
       // Verify that dir12 is not included in the result of the listStatus on
       // root
@@ -840,9 +781,7 @@ public class TestRootedOzoneFileSystem {
       }
 
       FileStatus[] fileStatuses = ofs.listStatus(root);
-      assertEquals(
-          "Total directories listed do not match the existing directories",
-          numDirs, fileStatuses.length);
+      assertEquals(numDirs, fileStatuses.length, "Total directories listed do not match the existing directories");
 
       for (int i = 0; i < numDirs; i++) {
         assertTrue(paths.contains(fileStatuses[i].getPath().getName()));
@@ -882,9 +821,7 @@ public class TestRootedOzoneFileSystem {
     fs.mkdirs(dir2);
 
     FileStatus[] fileStatuses = ofs.listStatus(dir1);
-    assertEquals(
-        "FileStatus should return only the immediate children",
-        2, fileStatuses.length);
+    assertEquals(2, fileStatuses.length, "FileStatus should return only the immediate children");
 
     // Verify that the two children of /dir1 returned by listStatus operation
     // are /dir1/dir11 and /dir1/dir12.
@@ -918,11 +855,10 @@ public class TestRootedOzoneFileSystem {
     // after rename listStatus for interimPath should succeed and
     // interimPath should have no children
     FileStatus[] statuses = fs.listStatus(interimPath);
-    assertNotNull("liststatus returns a null array", statuses);
-    assertEquals("Statuses array is not empty", 0, statuses.length);
+    assertNotNull(statuses, "liststatus returns a null array");
+    assertEquals(0, statuses.length, "Statuses array is not empty");
     FileStatus fileStatus = fs.getFileStatus(interimPath);
-    assertEquals("FileStatus does not point to interimPath",
-        interimPath.getName(), fileStatus.getPath().getName());
+    assertEquals(interimPath.getName(), fileStatus.getPath().getName(), "FileStatus does not point to interimPath");
 
     // Cleanup
     fs.delete(target, true);
@@ -949,8 +885,7 @@ public class TestRootedOzoneFileSystem {
     Path leafInTargetInAnotherBucket = new Path(bucket2, "leaf");
     try {
       fs.rename(leafInsideInterimPath, leafInTargetInAnotherBucket);
-      fail(
-          "Should have thrown exception when renaming to a different bucket");
+      fail("Should have thrown exception when renaming to a different bucket");
     } catch (IOException ignored) {
       // Test passed. Exception thrown as expected.
     }
@@ -1142,10 +1077,8 @@ public class TestRootedOzoneFileSystem {
       FileStatus statusFromFS = statusesFromFS.get(i);
       assertEquals(statusFromAdapter.getPath(), statusFromFS.getPath());
       assertEquals(statusFromAdapter.getLen(), statusFromFS.getLen());
-      assertEquals(statusFromAdapter.isDirectory(),
-          statusFromFS.isDirectory());
-      assertEquals(statusFromAdapter.getModificationTime(),
-          statusFromFS.getModificationTime());
+      assertEquals(statusFromAdapter.isDirectory(), statusFromFS.isDirectory());
+      assertEquals(statusFromAdapter.getModificationTime(), statusFromFS.getModificationTime());
     }
   }
 
@@ -1203,8 +1136,8 @@ public class TestRootedOzoneFileSystem {
   public void testListStatusRootAndVolumeContinuation() throws IOException {
     // TODO: Request for comment.
     //  If possible, improve this to test when FS Path is enabled.
-    assumeTrue("FS Path is enabled. Skipping this test as it is not " +
-            "tuned for FS Path yet", !enabledFileSystemPaths);
+    assumeTrue(!enabledFileSystemPaths, "FS Path is enabled. Skipping this test as it is not " +
+            "tuned for FS Path yet");
 
     Path[] paths = new Path[5];
     for (int i = 0; i < paths.length; i++) {
@@ -1239,8 +1172,7 @@ public class TestRootedOzoneFileSystem {
         false, nextStartPath, 3);
     // Note: at the time of writing this test, OmMetadataManagerImpl#listVolumes
     //  excludes startVolume (startPath) from the result. Might change.
-    assertEquals(fileStatusesOver.length,
-        fileStatusesLimit1.length + fileStatusesLimit2.length);
+    assertEquals(fileStatusesOver.length, fileStatusesLimit1.length + fileStatusesLimit2.length);
 
     // Cleanup
     for (Path path : paths) {
@@ -1341,13 +1273,11 @@ public class TestRootedOzoneFileSystem {
     // Verify dir1 creation
     FileStatus[] fileStatuses = fs.listStatus(new Path("/tmp/"));
     assertEquals(1, fileStatuses.length);
-    assertEquals(
-        "/tmp/dir1", fileStatuses[0].getPath().toUri().getPath());
+    assertEquals("/tmp/dir1", fileStatuses[0].getPath().toUri().getPath());
     // Verify file1 creation
     FileStatus[] fileStatusesInDir1 = fs.listStatus(dir1);
     assertEquals(1, fileStatusesInDir1.length);
-    assertEquals("/tmp/dir1/file1",
-        fileStatusesInDir1[0].getPath().toUri().getPath());
+    assertEquals("/tmp/dir1/file1", fileStatusesInDir1[0].getPath().toUri().getPath());
 
     // Cleanup
     userOfs.delete(dir1, true);
@@ -1424,13 +1354,11 @@ public class TestRootedOzoneFileSystem {
     // Verify dir1 creation
     FileStatus[] fileStatuses = fs.listStatus(new Path("/tmp/"));
     assertEquals(1, fileStatuses.length);
-    assertEquals(
-        "/tmp/dir1", fileStatuses[0].getPath().toUri().getPath());
+    assertEquals("/tmp/dir1", fileStatuses[0].getPath().toUri().getPath());
     // Verify file1 creation
     FileStatus[] fileStatusesInDir1 = fs.listStatus(dir1);
     assertEquals(1, fileStatusesInDir1.length);
-    assertEquals("/tmp/dir1/file1",
-        fileStatusesInDir1[0].getPath().toUri().getPath());
+    assertEquals("/tmp/dir1/file1", fileStatusesInDir1[0].getPath().toUri().getPath());
 
     // Cleanup
     fs.delete(dir1, true);
@@ -1483,8 +1411,7 @@ public class TestRootedOzoneFileSystem {
     // Delete empty volume non-recursively
     assertTrue(fs.delete(volumePath1, false));
     // Verify the volume is deleted
-    assertFalse(volumeStr1 + " should have been deleted!",
-        volumeExist(volumeStr1));
+    assertFalse(volumeExist(volumeStr1), volumeStr1 + " should have been deleted!");
   }
 
   @Test
@@ -2095,10 +2022,10 @@ public class TestRootedOzoneFileSystem {
       getFs().mkdirs(dirPath);
 
       ContractTestUtils.touch(getFs(), file1Source);
-      assertTrue("Renamed failed", getFs().rename(file1Source, file1Destin));
-      assertTrue("Renamed failed: /dir/file1", getFs().exists(file1Destin));
+      assertTrue(getFs().rename(file1Source, file1Destin), "Renamed failed");
+      assertTrue(getFs().exists(file1Destin), "Renamed failed: /dir/file1");
       FileStatus[] fStatus = getFs().listStatus(dirPath);
-      assertEquals("Renamed failed", 1, fStatus.length);
+      assertEquals(1, fStatus.length, "Renamed failed");
     } finally {
       // clean up
       fs.delete(dirPath, true);
@@ -2120,9 +2047,9 @@ public class TestRootedOzoneFileSystem {
     ContractTestUtils.touch(getFs(), file1Destin);
     Path abcRootPath = new Path(getBucketPath() + "/a/b/c");
     getFs().mkdirs(abcRootPath);
-    assertTrue("Renamed failed", getFs().rename(file1Destin, abcRootPath));
-    assertTrue("Renamed filed: /a/b/c/file1", getFs().exists(new Path(
-        abcRootPath, "file1")));
+    assertTrue(getFs().rename(file1Destin, abcRootPath), "Renamed failed");
+    assertTrue(getFs().exists(new Path(
+        abcRootPath, "file1")), "Renamed filed: /a/b/c/file1");
     getFs().delete(getBucketPath(), true);
   }
 
@@ -2148,18 +2075,16 @@ public class TestRootedOzoneFileSystem {
       ContractTestUtils.touch(getFs(), file1Source);
 
       // rename source directory to its parent directory(destination).
-      assertTrue("Rename failed", getFs().rename(dir2SourcePath, destRootPath));
+      assertTrue(getFs().rename(dir2SourcePath, destRootPath), "Rename failed");
       final Path expectedPathAfterRename =
           new Path(getBucketPath() + root + "/dir2");
-      assertTrue("Rename failed",
-          getFs().exists(expectedPathAfterRename));
+      assertTrue(getFs().exists(expectedPathAfterRename), "Rename failed");
 
       // rename source file to its parent directory(destination).
-      assertTrue("Rename failed", getFs().rename(file1Source, destRootPath));
+      assertTrue(getFs().rename(file1Source, destRootPath), "Rename failed");
       final Path expectedFilePathAfterRename =
           new Path(getBucketPath() + root + "/file2");
-      assertTrue("Rename failed",
-          getFs().exists(expectedFilePathAfterRename));
+      assertTrue(getFs().exists(expectedFilePathAfterRename), "Rename failed");
     } finally {
       // clean up
       fs.delete(file1Source, true);
@@ -2247,8 +2172,7 @@ public class TestRootedOzoneFileSystem {
     final OzoneBucket bucket100 = TestDataUtil
         .createVolumeAndBucket(client, vol, buck,
             omBucketArgs);
-    assertEquals(ReplicationType.STAND_ALONE.name(),
-        bucket100.getReplicationConfig().getReplicationType().name());
+    assertEquals(ReplicationType.STAND_ALONE.name(), bucket100.getReplicationConfig().getReplicationType().name());
 
     // Bucket has default STAND_ALONE and client has default RATIS.
     // In this case, it should not inherit from bucket
@@ -2259,8 +2183,7 @@ public class TestRootedOzoneFileSystem {
     OFSPath ofsPath = new OFSPath(vol + "/" + buck + "/test", conf);
     final OzoneBucket bucket = adapter.getBucket(ofsPath, false);
     final OzoneKeyDetails key = bucket.getKey(ofsPath.getKeyName());
-    assertEquals(key.getReplicationConfig().getReplicationType().name(),
-        ReplicationType.RATIS.name());
+    assertEquals(key.getReplicationConfig().getReplicationType().name(), ReplicationType.RATIS.name());
   }
 
   @Test
@@ -2278,8 +2201,7 @@ public class TestRootedOzoneFileSystem {
     final OzoneBucket bucket101 = TestDataUtil
         .createVolumeAndBucket(client, vol, buck,
             omBucketArgs);
-    assertEquals(ReplicationType.EC.name(),
-        bucket101.getReplicationConfig().getReplicationType().name());
+    assertEquals(ReplicationType.EC.name(), bucket101.getReplicationConfig().getReplicationType().name());
     // Bucket has default EC and client has default RATIS.
     // In this case, it should inherit from bucket
     try (OzoneFSOutputStream file = adapter
@@ -2289,8 +2211,7 @@ public class TestRootedOzoneFileSystem {
     OFSPath ofsPath = new OFSPath(vol + "/" + buck + "/test", conf);
     final OzoneBucket bucket = adapter.getBucket(ofsPath, false);
     final OzoneKeyDetails key = bucket.getKey(ofsPath.getKeyName());
-    assertEquals(ReplicationType.EC.name(),
-        key.getReplicationConfig().getReplicationType().name());
+    assertEquals(ReplicationType.EC.name(), key.getReplicationConfig().getReplicationType().name());
   }
 
   @Test
@@ -2377,8 +2298,8 @@ public class TestRootedOzoneFileSystem {
 
   public void testNonPrivilegedUserMkdirCreateBucket() throws IOException {
     // This test is only meaningful when ACL is enabled
-    assumeTrue("ACL is not enabled. Skipping this test as it requires " +
-            "ACL to be enabled to be meaningful.", enableAcl);
+    assumeTrue(enableAcl, "ACL is not enabled. Skipping this test as it requires " +
+            "ACL to be enabled to be meaningful.");
 
     // Sanity check
     assertTrue(cluster.getOzoneManager().getAclsEnabled());
@@ -2498,16 +2419,10 @@ public class TestRootedOzoneFileSystem {
     SnapshotDiffReport diff =
         ofs.getSnapshotDiffReport(bucketPath1, fromSnap, toSnap);
     assertEquals(2, diff.getDiffList().size());
-    assertEquals(SnapshotDiffReport.DiffType.CREATE,
-        diff.getDiffList().get(0).getType());
-    assertEquals(SnapshotDiffReport.DiffType.CREATE,
-        diff.getDiffList().get(1).getType());
-    assertArrayEquals(
-        "key1".getBytes(StandardCharsets.UTF_8),
-        diff.getDiffList().get(0).getSourcePath());
-    assertArrayEquals(
-        "key2".getBytes(StandardCharsets.UTF_8),
-        diff.getDiffList().get(1).getSourcePath());
+    assertEquals(SnapshotDiffReport.DiffType.CREATE, diff.getDiffList().get(0).getType());
+    assertEquals(SnapshotDiffReport.DiffType.CREATE, diff.getDiffList().get(1).getType());
+    assertArrayEquals("key1".getBytes(StandardCharsets.UTF_8), diff.getDiffList().get(0).getSourcePath());
+    assertArrayEquals("key2".getBytes(StandardCharsets.UTF_8), diff.getDiffList().get(1).getSourcePath());
 
     // test whether snapdiff returns aggregated response as
     // page size is 4.
