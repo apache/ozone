@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -37,6 +38,7 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -65,6 +67,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests FinalizeBlock.
@@ -280,6 +283,68 @@ public class TestFinalizeBlock {
         cluster.getHddsDatanodes().get(0),
         containerId.getId()).getContainerData())
         .getFinalizedBlockSet().size() == 0);
+  }
+
+  @Test
+  public void testRejectPutAndWriteChunkAfterFinalizeBlock()
+      throws IOException {
+    String keyName = UUID.randomUUID().toString();
+    // create key
+    createKey(keyName);
+
+    ContainerID containerId = cluster.getStorageContainerManager()
+        .getContainerManager().getContainers().get(0).containerID();
+
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
+        .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
+        .build();
+    List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList =
+        cluster.getOzoneManager().lookupKey(keyArgs).getKeyLocationVersions();
+
+    ContainerInfo container = cluster.getStorageContainerManager()
+        .getContainerManager().getContainer(containerId);
+    Pipeline pipeline = cluster.getStorageContainerManager()
+        .getPipelineManager().getPipeline(container.getPipelineID());
+
+    XceiverClientManager xceiverClientManager = new XceiverClientManager(conf);
+    XceiverClientSpi xceiverClient =
+        xceiverClientManager.acquireClient(pipeline);
+
+    // Before finalize block WRITE chunk on the same block should pass through
+    ContainerProtos.ContainerCommandRequestProto request =
+        ContainerTestHelper.getWriteChunkRequest(pipeline, (
+            new BlockID(containerId.getId(), omKeyLocationInfoGroupList.get(0)
+            .getLocationList().get(0).getLocalID())), 100);
+    xceiverClient.sendCommand(request);
+
+    // Before finalize block PUT block on the same block should pass through
+    request = ContainerTestHelper.getPutBlockRequest(request);
+    xceiverClient.sendCommand(request);
+
+    // Now Finalize Block
+    request = getFinalizeBlockRequest(omKeyLocationInfoGroupList, container);
+    xceiverClient.sendCommand(request);
+
+    // Try doing WRITE chunk on the already finalized block
+    request = ContainerTestHelper.getWriteChunkRequest(pipeline, (
+        new BlockID(containerId.getId(), omKeyLocationInfoGroupList.get(0)
+            .getLocationList().get(0).getLocalID())), 100);
+
+    try {
+      xceiverClient.sendCommand(request);
+    } catch (IOException e) {
+      assertTrue(e.getCause().getMessage()
+          .contains("Block already finalized"));
+    }
+
+    // Try doing PUT block on the already finalized block
+    request = ContainerTestHelper.getPutBlockRequest(request);
+    try {
+      xceiverClient.sendCommand(request);
+    } catch (IOException e) {
+      assertTrue(e.getCause().getMessage()
+          .contains("Block already finalized"));
+    }
   }
 
   @NotNull
