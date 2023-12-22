@@ -850,7 +850,7 @@ public class TestKeyManagerImpl {
         "/d=default-drack/127.0.0.1");
     assertThat(keyPipeline.getNodes())
         .containsAll(key4.getLatestVersionLocations()
-              .getLocationList().get(0).getPipeline().getNodesInOrder());
+            .getLocationList().get(0).getPipeline().getNodesInOrder());
   }
 
   @NotNull
