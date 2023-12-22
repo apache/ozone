@@ -35,7 +35,6 @@ import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.util.Random;
 
@@ -50,8 +49,8 @@ public class TestHttpServer2Metrics {
 
   @BeforeEach
   public void setup() {
-    threadPool = Mockito.mock(QueuedThreadPool.class);
-    metricsCollector = Mockito.mock(MetricsCollector.class);
+    threadPool = mock(QueuedThreadPool.class);
+    metricsCollector = mock(MetricsCollector.class);
     recorder = mock(MetricsRecordBuilder.class);
   }
 
@@ -65,10 +64,10 @@ public class TestHttpServer2Metrics {
     int threadQueueWaitingTaskCount = random.nextInt();
     String name = "s3g";
 
-    Mockito.when(threadPool.getThreads()).thenReturn(threadCount);
-    Mockito.when(threadPool.getMaxThreads()).thenReturn(maxThreadCount);
-    Mockito.when(threadPool.getIdleThreads()).thenReturn(idleThreadCount);
-    Mockito.when(threadPool.getQueueSize())
+    when(threadPool.getThreads()).thenReturn(threadCount);
+    when(threadPool.getMaxThreads()).thenReturn(maxThreadCount);
+    when(threadPool.getIdleThreads()).thenReturn(idleThreadCount);
+    when(threadPool.getQueueSize())
             .thenReturn(threadQueueWaitingTaskCount);
     when(recorder.addGauge(any(MetricsInfo.class), anyInt()))
         .thenReturn(recorder);

@@ -27,7 +27,6 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -120,7 +119,7 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
 
     Instant past = Instant.now().minus(Duration.ofHours(1));
     ManagedSecretKey expiredSecretKey = new ManagedSecretKey(UUID.randomUUID(),
-        past, past, Mockito.mock(SecretKey.class));
+        past, past, mock(SecretKey.class));
 
     when(secretKeyClient.getSecretKey(SECRET_KEY_ID))
         .thenReturn(expiredSecretKey);
@@ -181,7 +180,7 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
       throws IOException {
     SecretKeyVerifierClient secretKeyClient =
         mock(SecretKeyVerifierClient.class);
-    ManagedSecretKey validSecretKey = Mockito.mock(ManagedSecretKey.class);
+    ManagedSecretKey validSecretKey = mock(ManagedSecretKey.class);
     when(secretKeyClient.getSecretKey(SECRET_KEY_ID))
         .thenReturn(validSecretKey);
     when(validSecretKey.isValidSignature((TokenIdentifier) any(), any()))
@@ -259,7 +258,7 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
 
     MockTokenManager() {
       super(TimeUnit.HOURS.toMillis(1),
-          Mockito.mock(SecretKeySignerClient.class));
+          mock(SecretKeySignerClient.class));
     }
 
     @Override

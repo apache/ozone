@@ -31,10 +31,10 @@ import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.metrics.SegmentedRaftLogMetrics;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.ratis.server.metrics.SegmentedRaftLogMetrics.RAFT_LOG_SYNC_TIME;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Test RatisDropwizardRexporter.
@@ -73,7 +73,7 @@ public class TestRatisDropwizardExports {
 
     System.out.println(writer);
 
-    Assertions.assertFalse(writer.toString()
+    assertFalse(writer.toString()
             .contains("ratis_core_ratis_log_worker_instance_syncTime"),
         "Instance name is not moved to be a tag");
   }
