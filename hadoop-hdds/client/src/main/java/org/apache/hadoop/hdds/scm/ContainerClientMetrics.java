@@ -57,6 +57,9 @@ public final class ContainerClientMetrics {
   private MutableQuantiles[] getCommittedBlockLengthLatency;
   private MutableQuantiles[] readChunkLatency;
   private MutableQuantiles[] getSmallFileLatency;
+  private MutableQuantiles[] hsyncLatency;
+  private MutableQuantiles[] omHsyncLatency;
+  private MutableQuantiles[] datanodeHsyncLatency;
   private final Map<PipelineID, MutableCounterLong> writeChunkCallsByPipeline;
   private final Map<PipelineID, MutableCounterLong> writeChunkBytesByPipeline;
   private final Map<UUID, MutableCounterLong> writeChunksCallsByLeaders;
@@ -96,6 +99,9 @@ public final class ContainerClientMetrics {
     getCommittedBlockLengthLatency = new MutableQuantiles[3];
     readChunkLatency = new MutableQuantiles[3];
     getSmallFileLatency = new MutableQuantiles[3];
+    hsyncLatency = new MutableQuantiles[3];
+    omHsyncLatency = new MutableQuantiles[3];
+    datanodeHsyncLatency = new MutableQuantiles[3];
     int[] intervals = {60, 300, 900};
     for (int i = 0; i < intervals.length; i++) {
       int interval = intervals[i];
@@ -118,6 +124,18 @@ public final class ContainerClientMetrics {
       getSmallFileLatency[i] = registry
           .newQuantiles("getSmallFileLatency" + interval
                   + "s", "GetSmallFile latency in microseconds", "ops",
+              "latency", interval);
+      hsyncLatency[i] = registry
+          .newQuantiles("hsyncLatency" + interval
+                  + "s", "client hsync latency in microseconds", "ops",
+              "latency", interval);
+      omHsyncLatency[i] = registry
+          .newQuantiles("omHsyncLatency" + interval
+                  + "s", "client hsync latency to OM in microseconds", "ops",
+              "latency", interval);
+      datanodeHsyncLatency[i] = registry
+          .newQuantiles("dnHsyncLatency" + interval
+                  + "s", "client hsync latency to DN in microseconds", "ops",
               "latency", interval);
     }
   }
@@ -155,10 +173,26 @@ public final class ContainerClientMetrics {
     }
   }
 
+  public void addHsyncLatency(long hsyncLatencyTime) {
+    for (MutableQuantiles q : hsyncLatency) {
+      if (q != null) {
+        q.add(hsyncLatencyTime);
+      }
+    }
+  }
+
   public void addGetBlockLatency(long latency) {
     for (MutableQuantiles q : getBlockLatency) {
       if (q != null) {
         q.add(latency);
+      }
+    }
+  }
+
+  public void addOMHsyncLatency(long hsyncLatencyTime) {
+    for (MutableQuantiles q : omHsyncLatency) {
+      if (q != null) {
+        q.add(hsyncLatencyTime);
       }
     }
   }
@@ -183,6 +217,14 @@ public final class ContainerClientMetrics {
     for (MutableQuantiles q : getSmallFileLatency) {
       if (q != null) {
         q.add(latency);
+      }
+    }
+  }
+
+  public void addDataNodeHsyncLatency(long hsyncLatencyTime) {
+    for (MutableQuantiles q : datanodeHsyncLatency) {
+      if (q != null) {
+        q.add(hsyncLatencyTime);
       }
     }
   }
