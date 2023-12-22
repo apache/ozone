@@ -296,8 +296,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
               .stream()
               .anyMatch((vol) -> vol.getName().equals(volumeName)));
         } catch (ExecutionException ex) {
-          Throwable cause = ex.getCause();
-          OMException cause = assertInstanceOf(OMException.class, cause);
+          OMException cause = assertInstanceOf(OMException.class, ex.getCause());
           assertEquals(NOT_SUPPORTED_OPERATION_WHEN_PREPARED, cause.getResult());
         }
       }
