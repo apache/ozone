@@ -339,7 +339,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       includeFso: true,
       includeNonFso: false,
       prevClickable: false,
-      pageDisplayCount: 0
+      pageDisplayCount: 1
     };
   }
 
@@ -391,7 +391,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   handleExistsAtChange = (e: any) => {
     console.log("handleExistsAtChange", e.key);
     this.setState({
-      pageDisplayCount: 0
+      pageDisplayCount: 1
     }, () => {
       if (e.key === 'OM') {
         mismatchPrevKeyList = [0];
@@ -446,7 +446,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   handlefsoNonfsoMenuChange = (e: any) => {
     console.log("Non FSO handle", e.key);
     this.setState({
-      pageDisplayCount: 0
+      pageDisplayCount: 1
     }, () => {
       if (e.key === 'fso') {
         openPrevKeyList = [""];
@@ -809,7 +809,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       includeFso: true,
       includeNonFso: false,
       DEFAULT_LIMIT: 10,
-      pageDisplayCount: 0
+      pageDisplayCount: 1
 
     }, () => {
       if (activeKey === '2') {
@@ -881,11 +881,11 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
 
   itemRender = (_: any, type: string, originalElement: any) => {
     if (type === 'prev') {
-      return <div>{this.state.prevClickable && this.state.pageDisplayCount ? <Link to="/Om" onClick={this.fetchPreviousRecords}> {'<< '} &nbsp;&nbsp;{this.state.pageDisplayCount}
-        </Link> : <Link to="/Om" style={{ pointerEvents: 'none' }}>No Records</Link>}</div>;
+      return <div>{this.state.prevClickable && this.state.pageDisplayCount ? <Link to="/Om" onClick={this.fetchPreviousRecords}> {'<< '} 
+        </Link> : <Link to="/Om" style={{ pointerEvents: 'none', color:"rgba(0,0,0,0.3)" }}>No Records</Link>}</div>;
     }
     if (type === 'next') {
-      return <div> {this.state.nextClickable ? <Link to="/Om" onClick={this.fetchNextRecords}> {'   >>'} </Link> : <Link to="/Om" style={{ pointerEvents: 'none' }}>No More Further Records</Link>}</div>;
+      return <div> {this.state.nextClickable ? <Link to="/Om" onClick={this.fetchNextRecords}> {this.state.pageDisplayCount}&nbsp;&nbsp;{'   >>'} </Link> : <Link to="/Om" style={{ pointerEvents: 'none' }}>No More Further Records</Link>}</div>;
     }
     return originalElement;
   };
