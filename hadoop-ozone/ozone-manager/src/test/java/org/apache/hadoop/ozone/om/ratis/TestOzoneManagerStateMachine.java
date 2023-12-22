@@ -93,26 +93,25 @@ public class TestOzoneManagerStateMachine {
 
   @Test
   public void testLastAppliedIndex() {
-
-    // Happy scenario.
-
     // Conf/metadata transaction.
     ozoneManagerStateMachine.notifyTermIndexUpdated(0, 1);
+    List<Long> flushedEpochs = new ArrayList<>();
+    flushedEpochs.add(1L);
+    ozoneManagerStateMachine.updateLastAppliedIndex(flushedEpochs);
     Assertions.assertEquals(0,
         ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
     Assertions.assertEquals(1,
         ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
 
-    List<Long> flushedEpochs = new ArrayList<>();
 
     // Add some apply transactions.
     ozoneManagerStateMachine.addApplyTransactionTermIndex(0, 2);
     ozoneManagerStateMachine.addApplyTransactionTermIndex(0, 3);
 
+    // call update last applied index
+    flushedEpochs.clear();
     flushedEpochs.add(2L);
     flushedEpochs.add(3L);
-
-    // call update last applied index
     ozoneManagerStateMachine.updateLastAppliedIndex(flushedEpochs);
 
     Assertions.assertEquals(0,
@@ -122,7 +121,9 @@ public class TestOzoneManagerStateMachine {
 
     // Conf/metadata transaction.
     ozoneManagerStateMachine.notifyTermIndexUpdated(0L, 4L);
-
+    flushedEpochs.clear();
+    flushedEpochs.add(4L);
+    ozoneManagerStateMachine.updateLastAppliedIndex(flushedEpochs);
     Assertions.assertEquals(0L,
         ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
     Assertions.assertEquals(4L,
@@ -141,60 +142,7 @@ public class TestOzoneManagerStateMachine {
         ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
     Assertions.assertEquals(6L,
         ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
-
-
   }
-
-
-  @Test
-  public void testApplyTransactionsUpdateLastAppliedIndexCalledLate() {
-    // Now try a scenario where 1,2,3 transactions are in applyTransactionMap
-    // and updateLastAppliedIndex is not called for them, and before that
-    // notifyTermIndexUpdated is called with transaction 4. And see now at the
-    // end when updateLastAppliedIndex is called with epochs we have
-    // lastAppliedIndex as 4 or not.
-
-    // Conf/metadata transaction.
-    ozoneManagerStateMachine.notifyTermIndexUpdated(0, 1);
-    Assertions.assertEquals(0,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(1,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
-
-
-
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 2L);
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 3L);
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 4L);
-
-
-
-    // Conf/metadata transaction.
-    ozoneManagerStateMachine.notifyTermIndexUpdated(0L, 5L);
-
-  // Still it should be zero, as for 2,3,4 updateLastAppliedIndex is not yet
-    // called so the lastAppliedIndex will be at older value.
-    Assertions.assertEquals(0L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(1L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
-
-    List<Long> flushedEpochs = new ArrayList<>();
-
-
-    flushedEpochs.add(2L);
-    flushedEpochs.add(3L);
-    flushedEpochs.add(4L);
-
-    ozoneManagerStateMachine.updateLastAppliedIndex(flushedEpochs);
-
-    Assertions.assertEquals(0L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(5L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
-
-  }
-
 
   @Test
   public void testLastAppliedIndexWithMultipleExecutors() {
@@ -205,21 +153,15 @@ public class TestOzoneManagerStateMachine {
     ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 4L);
 
     List<Long> flushedEpochs = new ArrayList<>();
-
-
     flushedEpochs.add(1L);
     flushedEpochs.add(2L);
     flushedEpochs.add(4L);
-
     ozoneManagerStateMachine.updateLastAppliedIndex(flushedEpochs);
 
     Assertions.assertEquals(0L,
         ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(2L,
+    Assertions.assertEquals(4L,
         ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
-
-
-
 
     // 2nd flush batch
     ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 3L);
@@ -230,7 +172,6 @@ public class TestOzoneManagerStateMachine {
     flushedEpochs.add(3L);
     flushedEpochs.add(5L);
     flushedEpochs.add(6L);
-
     ozoneManagerStateMachine.updateLastAppliedIndex(flushedEpochs);
 
     Assertions.assertEquals(0L,

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.ratis;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -116,6 +117,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
         .setmaxUnFlushedTransactionCount(100000)
         .enableRatis(true)
         .setIndexToTerm((i) -> term)
+        .setNextIndexes(() -> Collections.emptyList())
         .build();
     ozoneManagerDoubleBufferHelper = doubleBuffer::add;
   }

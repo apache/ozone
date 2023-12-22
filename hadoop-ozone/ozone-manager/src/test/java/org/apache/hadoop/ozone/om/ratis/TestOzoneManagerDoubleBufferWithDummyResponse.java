@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.ratis;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -85,6 +86,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
         .setmaxUnFlushedTransactionCount(10000)
         .enableRatis(true)
         .setIndexToTerm((val) -> term)
+        .setNextIndexes(() -> Collections.emptyList())
         .build();
   }
 

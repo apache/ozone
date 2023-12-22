@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -149,6 +150,7 @@ class TestOzoneManagerDoubleBuffer {
         .setmaxUnFlushedTransactionCount(1000)
         .enableRatis(true)
         .setIndexToTerm((i) -> 1L)
+        .setNextIndexes(() -> Collections.emptyList())
         .setFlushNotifier(spyFlushNotifier)
         .build();
 
