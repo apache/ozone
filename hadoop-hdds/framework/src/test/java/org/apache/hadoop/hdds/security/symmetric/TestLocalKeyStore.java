@@ -50,7 +50,6 @@ import static java.nio.file.attribute.PosixFilePermission.OWNER_READ;
 import static java.nio.file.attribute.PosixFilePermission.OWNER_WRITE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.params.provider.Arguments.of;
 
 /**
  * Test cases for {@link LocalSecretKeyStore}.
@@ -71,13 +70,13 @@ class TestLocalKeyStore {
   static Stream<Arguments> saveAndLoadTestCases() throws Exception {
     return Stream.of(
         // empty
-        of(ImmutableList.of()),
+        Arguments.of(ImmutableList.of()),
         // single secret keys.
-        of(newArrayList(
+        Arguments.of(newArrayList(
             generateKey("HmacSHA256")
         )),
         // multiple secret keys.
-        of(newArrayList(
+        Arguments.of(newArrayList(
             generateKey("HmacSHA1"),
             generateKey("HmacSHA256")
         ))
