@@ -89,6 +89,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_F
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -201,7 +202,7 @@ public final class TestBlockTokens {
     StorageContainerException ex = assertThrows(StorageContainerException.class,
         () -> readDataWithoutRetry(keyInfo));
     assertEquals(BLOCK_TOKEN_VERIFICATION_FAILED, ex.getResult());
-    assertTrue(ex.getMessage().contains("Token can't be verified due to expired secret key"));
+    assertThat(ex).hasMessageContaining("Token can't be verified due to expired secret key");
   }
 
   @Test
@@ -247,7 +248,7 @@ public final class TestBlockTokens {
         assertThrows(StorageContainerException.class,
             () -> readDataWithoutRetry(keyInfo));
     assertEquals(BLOCK_TOKEN_VERIFICATION_FAILED, ex.getResult());
-    assertTrue(ex.getMessage().contains("Can't find the signing secret key"));
+    assertThat(ex).hasMessageContaining("Can't find the signing secret key");
   }
 
   @Test
@@ -270,7 +271,7 @@ public final class TestBlockTokens {
         assertThrows(StorageContainerException.class,
             () -> readDataWithoutRetry(keyInfo));
     assertEquals(BLOCK_TOKEN_VERIFICATION_FAILED, ex.getResult());
-    assertTrue(ex.getMessage().contains("Invalid token for user"));
+    assertThat(ex).hasMessageContaining("Invalid token for user");
   }
 
   private UUID extractSecretKeyId(OmKeyInfo keyInfo) throws IOException {
