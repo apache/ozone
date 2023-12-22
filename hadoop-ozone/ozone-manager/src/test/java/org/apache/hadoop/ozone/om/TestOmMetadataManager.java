@@ -97,24 +97,19 @@ public class TestOmMetadataManager {
   @Test
   public void testTransactionTable() throws Exception {
     omMetadataManager.getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
-        new TransactionInfo.Builder().setCurrentTerm(1)
-            .setTransactionIndex(100).build());
+        TransactionInfo.valueOf(1, 100));
 
     omMetadataManager.getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
-        new TransactionInfo.Builder().setCurrentTerm(2)
-            .setTransactionIndex(200).build());
+        TransactionInfo.valueOf(2, 200));
 
     omMetadataManager.getTransactionInfoTable().put(TRANSACTION_INFO_KEY,
-        new TransactionInfo.Builder().setCurrentTerm(3)
-            .setTransactionIndex(250).build());
+        TransactionInfo.valueOf(3, 250));
 
     TransactionInfo transactionInfo =
         omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
 
     assertEquals(3, transactionInfo.getTerm());
     assertEquals(250, transactionInfo.getTransactionIndex());
-
-
   }
 
   @Test
