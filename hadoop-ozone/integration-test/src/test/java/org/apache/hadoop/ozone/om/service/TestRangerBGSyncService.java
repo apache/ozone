@@ -59,7 +59,6 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -188,7 +187,7 @@ public class TestRangerBGSyncService {
 
     omMetrics = OMMetrics.create();
     conf.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        Files.createTempDirectory(folder.toAbsolutePath(), "om").toString());
+        folder.resolve("om").toAbsolutePath().toString());
     // No need to conf.set(OzoneConfigKeys.OZONE_ADMINISTRATORS, ...) here
     //  as we did the trick earlier with mockito.
     omMetadataManager = new OmMetadataManagerImpl(conf, ozoneManager);

@@ -30,4 +30,5 @@ export interface IStorageReport {
   capacity: number;
   used: number;
   remaining: number;
+  committed: number;
 }

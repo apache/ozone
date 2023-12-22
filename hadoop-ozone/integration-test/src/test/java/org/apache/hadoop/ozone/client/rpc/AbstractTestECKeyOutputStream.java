@@ -47,10 +47,10 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -132,7 +132,7 @@ abstract class AbstractTestECKeyOutputStream {
     initInputChunks();
   }
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     init(false);
   }
@@ -140,7 +140,7 @@ abstract class AbstractTestECKeyOutputStream {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -152,9 +152,9 @@ abstract class AbstractTestECKeyOutputStream {
   public void testCreateKeyWithECReplicationConfig() throws Exception {
     try (OzoneOutputStream key = TestHelper
         .createKey(keyString, new ECReplicationConfig(3, 2,
-              ECReplicationConfig.EcCodec.RS, chunkSize), inputSize,
+                ECReplicationConfig.EcCodec.RS, chunkSize), inputSize,
             objectStore, volumeName, bucketName)) {
-      Assert.assertTrue(key.getOutputStream() instanceof ECKeyOutputStream);
+      Assertions.assertTrue(key.getOutputStream() instanceof ECKeyOutputStream);
     }
   }
 
@@ -163,9 +163,9 @@ abstract class AbstractTestECKeyOutputStream {
     OzoneVolume volume = objectStore.getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     try (OzoneOutputStream out = bucket.createKey("myKey", inputSize)) {
-      Assert.assertTrue(out.getOutputStream() instanceof KeyOutputStream);
-      for (int i = 0; i < inputChunks.length; i++) {
-        out.write(inputChunks[i]);
+      Assertions.assertTrue(out.getOutputStream() instanceof KeyOutputStream);
+      for (byte[] inputChunk : inputChunks) {
+        out.write(inputChunk);
       }
     }
   }
@@ -184,17 +184,17 @@ abstract class AbstractTestECKeyOutputStream {
     OzoneBucket bucket = volume.getBucket(myBucket);
 
     try (OzoneOutputStream out = bucket.createKey(keyString, inputSize)) {
-      Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
-      for (int i = 0; i < inputChunks.length; i++) {
-        out.write(inputChunks[i]);
+      Assertions.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
+      for (byte[] inputChunk : inputChunks) {
+        out.write(inputChunk);
       }
     }
     byte[] buf = new byte[chunkSize];
     try (OzoneInputStream in = bucket.readKey(keyString)) {
-      for (int i = 0; i < inputChunks.length; i++) {
+      for (byte[] inputChunk : inputChunks) {
         int read = in.read(buf, 0, chunkSize);
-        Assert.assertEquals(chunkSize, read);
-        Assert.assertTrue(Arrays.equals(buf, inputChunks[i]));
+        Assertions.assertEquals(chunkSize, read);
+        Assertions.assertArrayEquals(buf, inputChunk);
       }
     }
   }
@@ -236,16 +236,16 @@ abstract class AbstractTestECKeyOutputStream {
   }
 
   private void createKeyAndCheckReplicationConfig(String keyName,
-      OzoneBucket bucket, ReplicationConfig replicationConfig)
+                                                  OzoneBucket bucket, ReplicationConfig replicationConfig)
       throws IOException {
     try (OzoneOutputStream out = bucket
         .createKey(keyName, inputSize, replicationConfig, new HashMap<>())) {
-      for (int i = 0; i < inputChunks.length; i++) {
-        out.write(inputChunks[i]);
+      for (byte[] inputChunk : inputChunks) {
+        out.write(inputChunk);
       }
     }
     OzoneKeyDetails key = bucket.getKey(keyName);
-    Assert.assertEquals(replicationConfig, key.getReplicationConfig());
+    Assertions.assertEquals(replicationConfig, key.getReplicationConfig());
   }
 
   @Test
@@ -255,9 +255,9 @@ abstract class AbstractTestECKeyOutputStream {
         "testCreateRatisKeyAndWithECBucketDefaults", 2000,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
         new HashMap<>())) {
-      Assert.assertTrue(out.getOutputStream() instanceof KeyOutputStream);
-      for (int i = 0; i < inputChunks.length; i++) {
-        out.write(inputChunks[i]);
+      Assertions.assertTrue(out.getOutputStream() instanceof KeyOutputStream);
+      for (byte[] inputChunk : inputChunks) {
+        out.write(inputChunk);
       }
     }
   }
@@ -288,14 +288,14 @@ abstract class AbstractTestECKeyOutputStream {
   }
 
   private void testMultipleChunksInSingleWriteOp(int offset,
-                                                int bufferChunks, int numChunks)
-          throws IOException {
+                                                 int bufferChunks, int numChunks)
+      throws IOException {
     byte[] inputData = getInputBytes(offset, bufferChunks, numChunks);
     final OzoneBucket bucket = getOzoneBucket();
     String keyName =
-            String.format("testMultipleChunksInSingleWriteOpOffset" +
-                    "%dBufferChunks%dNumChunks", offset, bufferChunks,
-                    numChunks);
+        String.format("testMultipleChunksInSingleWriteOpOffset" +
+                "%dBufferChunks%dNumChunks", offset, bufferChunks,
+            numChunks);
     try (OzoneOutputStream out = bucket.createKey(keyName, 4096,
         new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,
             chunkSize), new HashMap<>())) {
@@ -303,7 +303,7 @@ abstract class AbstractTestECKeyOutputStream {
     }
 
     validateContent(offset, numChunks * chunkSize, inputData, bucket,
-            bucket.getKey(keyName));
+        bucket.getKey(keyName));
   }
 
   private void testMultipleChunksInSingleWriteOp(int numChunks)
@@ -344,7 +344,7 @@ abstract class AbstractTestECKeyOutputStream {
             .getNumberOfKeys() == 1) && (containerOperationClient
             .getContainerReplicas(currentKeyContainerID).size() == 5);
       } catch (IOException exception) {
-        Assert.fail("Unexpected exception " + exception);
+        Assertions.fail("Unexpected exception " + exception);
         return false;
       }
     }, 100, 10000);
@@ -358,12 +358,12 @@ abstract class AbstractTestECKeyOutputStream {
 
   private void validateContent(int offset, int length, byte[] inputData,
                                OzoneBucket bucket,
-      OzoneKey key) throws IOException {
+                               OzoneKey key) throws IOException {
     try (OzoneInputStream is = bucket.readKey(key.getName())) {
       byte[] fileContent = new byte[length];
-      Assert.assertEquals(length, is.read(fileContent));
-      Assert.assertEquals(new String(Arrays.copyOfRange(inputData, offset,
-                      offset + length), UTF_8),
+      Assertions.assertEquals(length, is.read(fileContent));
+      Assertions.assertEquals(new String(Arrays.copyOfRange(inputData, offset,
+              offset + length), UTF_8),
           new String(fileContent, UTF_8));
     }
   }
@@ -423,7 +423,7 @@ abstract class AbstractTestECKeyOutputStream {
 
         // Check the second blockGroup pipeline to make sure that the failed
         // node is not selected.
-        Assert.assertFalse(ecOut.getStreamEntries()
+        Assertions.assertFalse(ecOut.getStreamEntries()
             .get(1).getPipeline().getNodes().contains(nodeToKill));
       }
 
@@ -432,8 +432,8 @@ abstract class AbstractTestECKeyOutputStream {
         // data comes back.
         for (int i = 0; i < 2; i++) {
           byte[] fileContent = new byte[inputData.length];
-          Assert.assertEquals(inputData.length, is.read(fileContent));
-          Assert.assertEquals(new String(inputData, UTF_8),
+          Assertions.assertEquals(inputData.length, is.read(fileContent));
+          Assertions.assertEquals(new String(inputData, UTF_8),
               new String(fileContent, UTF_8));
         }
       }

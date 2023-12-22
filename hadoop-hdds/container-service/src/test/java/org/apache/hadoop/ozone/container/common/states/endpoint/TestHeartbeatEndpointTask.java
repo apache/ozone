@@ -134,7 +134,7 @@ public class TestHeartbeatEndpointTask {
     Assertions.assertTrue(heartbeat.hasDatanodeDetails());
     Assertions.assertFalse(heartbeat.hasNodeReport());
     Assertions.assertFalse(heartbeat.hasContainerReport());
-    Assertions.assertTrue(heartbeat.getCommandStatusReportsCount() == 0);
+    Assertions.assertEquals(0, heartbeat.getCommandStatusReportsCount());
     Assertions.assertFalse(heartbeat.hasContainerActions());
     OptionalLong termInDatanode = context.getTermOfLeaderSCM();
     Assertions.assertTrue(termInDatanode.isPresent());
@@ -169,7 +169,7 @@ public class TestHeartbeatEndpointTask {
     Assertions.assertTrue(heartbeat.hasDatanodeDetails());
     Assertions.assertTrue(heartbeat.hasNodeReport());
     Assertions.assertFalse(heartbeat.hasContainerReport());
-    Assertions.assertTrue(heartbeat.getCommandStatusReportsCount() == 0);
+    Assertions.assertEquals(0, heartbeat.getCommandStatusReportsCount());
     Assertions.assertFalse(heartbeat.hasContainerActions());
   }
 
@@ -201,7 +201,7 @@ public class TestHeartbeatEndpointTask {
     Assertions.assertTrue(heartbeat.hasDatanodeDetails());
     Assertions.assertFalse(heartbeat.hasNodeReport());
     Assertions.assertTrue(heartbeat.hasContainerReport());
-    Assertions.assertTrue(heartbeat.getCommandStatusReportsCount() == 0);
+    Assertions.assertEquals(0, heartbeat.getCommandStatusReportsCount());
     Assertions.assertFalse(heartbeat.hasContainerActions());
   }
 
@@ -266,7 +266,7 @@ public class TestHeartbeatEndpointTask {
     Assertions.assertTrue(heartbeat.hasDatanodeDetails());
     Assertions.assertFalse(heartbeat.hasNodeReport());
     Assertions.assertFalse(heartbeat.hasContainerReport());
-    Assertions.assertTrue(heartbeat.getCommandStatusReportsCount() == 0);
+    Assertions.assertEquals(0, heartbeat.getCommandStatusReportsCount());
     Assertions.assertTrue(heartbeat.hasContainerActions());
   }
 

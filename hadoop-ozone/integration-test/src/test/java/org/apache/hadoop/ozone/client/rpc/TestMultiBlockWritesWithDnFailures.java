@@ -42,20 +42,16 @@ import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-
-import org.junit.Rule;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
@@ -64,14 +60,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 /**
  * Tests MultiBlock Writes with Dn failures by Ozone Client.
  */
+@Timeout(300)
 public class TestMultiBlockWritesWithDnFailures {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
-
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
   private OzoneClient client;
@@ -137,7 +127,7 @@ public class TestMultiBlockWritesWithDnFailures {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -156,12 +146,12 @@ public class TestMultiBlockWritesWithDnFailures {
     key.write(data.getBytes(UTF_8));
 
     // get the name of a valid container
-    Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
+    Assertions.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream groupOutputStream =
         (KeyOutputStream) key.getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =
         groupOutputStream.getLocationInfoList();
-    Assert.assertTrue(locationInfoList.size() == 2);
+    Assertions.assertEquals(2, locationInfoList.size());
     long containerId = locationInfoList.get(1).getContainerID();
     ContainerInfo container = cluster.getStorageContainerManager()
         .getContainerManager()
@@ -185,7 +175,7 @@ public class TestMultiBlockWritesWithDnFailures {
         .setKeyName(keyName)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
-    Assert.assertEquals(2 * data.getBytes(UTF_8).length, keyInfo.getDataSize());
+    Assertions.assertEquals(2 * data.getBytes(UTF_8).length, keyInfo.getDataSize());
     validateData(keyName, data.concat(data).getBytes(UTF_8));
   }
 
@@ -201,14 +191,14 @@ public class TestMultiBlockWritesWithDnFailures {
     key.write(data.getBytes(UTF_8));
 
     // get the name of a valid container
-    Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
+    Assertions.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream keyOutputStream =
         (KeyOutputStream) key.getOutputStream();
     List<BlockOutputStreamEntry> streamEntryList =
         keyOutputStream.getStreamEntries();
 
     // Assert that 6 block will be preallocated
-    Assert.assertEquals(6, streamEntryList.size());
+    Assertions.assertEquals(6, streamEntryList.size());
     key.write(data.getBytes(UTF_8));
     key.flush();
     long containerId = streamEntryList.get(0).getBlockID().getContainerID();
@@ -237,13 +227,13 @@ public class TestMultiBlockWritesWithDnFailures {
         .setKeyName(keyName)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
-    Assert.assertEquals(4 * data.getBytes(UTF_8).length, keyInfo.getDataSize());
+    Assertions.assertEquals(4 * data.getBytes(UTF_8).length, keyInfo.getDataSize());
     validateData(keyName,
         data.concat(data).concat(data).concat(data).getBytes(UTF_8));
   }
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
-      long size) throws Exception {
+                                      long size) throws Exception {
     return TestHelper
         .createKey(keyName, type, size, objectStore, volumeName, bucketName);
   }

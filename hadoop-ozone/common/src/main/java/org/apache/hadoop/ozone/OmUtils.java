@@ -629,15 +629,36 @@ public final class OmUtils {
         if (keyName.substring(OM_SNAPSHOT_INDICATOR.length())
             .startsWith(OM_KEY_PREFIX)) {
           throw new OMException(
-              "Cannot create key under path reserved for "
-                  + "snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
+              "Cannot create key under path reserved for snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
               OMException.ResultCodes.INVALID_KEY_NAME);
         }
       } else {
-        // We checked for startsWith OM_SNAPSHOT_INDICATOR and the length is
+        // We checked for startsWith OM_SNAPSHOT_INDICATOR, and the length is
         // the same, so it must be equal OM_SNAPSHOT_INDICATOR.
-        throw new OMException(
-            "Cannot create key with reserved name: " + OM_SNAPSHOT_INDICATOR,
+        throw new OMException("Cannot create key with reserved name: " + OM_SNAPSHOT_INDICATOR,
+            OMException.ResultCodes.INVALID_KEY_NAME);
+      }
+    }
+  }
+
+  /**
+   * Verify if key name contains snapshot reserved word.
+   * This is similar to verifyKeyNameWithSnapshotReservedWord. The only difference is exception message.
+   */
+  public static void verifyKeyNameWithSnapshotReservedWordForDeletion(String keyName)  throws OMException {
+    if (keyName != null &&
+        keyName.startsWith(OM_SNAPSHOT_INDICATOR)) {
+      if (keyName.length() > OM_SNAPSHOT_INDICATOR.length()) {
+        if (keyName.substring(OM_SNAPSHOT_INDICATOR.length())
+            .startsWith(OM_KEY_PREFIX)) {
+          throw new OMException(
+              "Cannot delete key under path reserved for snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
+              OMException.ResultCodes.INVALID_KEY_NAME);
+        }
+      } else {
+        // We checked for startsWith OM_SNAPSHOT_INDICATOR, and the length is
+        // the same, so it must be equal OM_SNAPSHOT_INDICATOR.
+        throw new OMException("Cannot delete key with reserved name: " + OM_SNAPSHOT_INDICATOR,
             OMException.ResultCodes.INVALID_KEY_NAME);
       }
     }
