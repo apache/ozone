@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -124,6 +125,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
           .enableRatis(isRatisEnabled)
           .enableTracing(TracingUtil.isTracingEnabled(
               ozoneManager.getConfiguration()))
+          .setNextIndexes(() -> Collections.emptyList())
           .build();
       handler = new OzoneManagerRequestHandler(impl, ozoneManagerDoubleBuffer);
     }
