@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.rules.ExpectedException;
 
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -48,8 +47,6 @@ public class TestMiniOzoneOMHACluster {
   private String scmId;
   private String omServiceId;
   private int numOfOMs = 3;
-
-  private ExpectedException exception = ExpectedException.none();
 
   @Timeout(value = 300, unit = TimeUnit.SECONDS)
 

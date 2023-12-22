@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.junit.rules.ExpectedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.junit.jupiter.api.AfterAll;
@@ -67,8 +66,6 @@ public class TestContainerReportWithKeys {
   private static OzoneClient client;
   private static OzoneConfiguration conf;
   private static StorageContainerManager scm;
-
-  private ExpectedException exception = ExpectedException.none();
 
   /**
    * Create a MiniDFSCluster for testing.
