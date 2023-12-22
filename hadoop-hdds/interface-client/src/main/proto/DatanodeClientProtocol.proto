@@ -389,10 +389,6 @@ message  ListBlockResponseProto {
   repeated BlockData blockData = 1;
 }
 
-message FinalizeBlockList {
-  repeated int64 localID = 1;
-}
-
 // Chunk Operations
 
 message ChunkInfo {

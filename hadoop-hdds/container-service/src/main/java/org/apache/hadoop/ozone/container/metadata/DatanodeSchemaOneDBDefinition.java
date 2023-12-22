@@ -113,7 +113,7 @@ public class DatanodeSchemaOneDBDefinition
   }
 
   @Override
-  public DBColumnFamilyDefinition<String, BlockData>
+  public DBColumnFamilyDefinition<String, Long>
       getFinalizeBlocksColumnFamily() {
     return null;
   }

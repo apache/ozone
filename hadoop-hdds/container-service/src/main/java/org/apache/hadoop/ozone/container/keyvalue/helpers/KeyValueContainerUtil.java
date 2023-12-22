@@ -23,7 +23,6 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -367,20 +366,21 @@ public final class KeyValueContainerUtil {
     ContainerInspectorUtil.process(kvContainerData, store);
   }
 
+  /**
+   * Loads finalizeBlockLocalIds for container in memory.
+   * @param kvContainerData - KeyValueContainerData
+   * @param store - DatanodeStore
+   * @throws IOException
+   */
   private static void populateContainerFinalizeBlock(
       KeyValueContainerData kvContainerData, DatanodeStore store)
       throws IOException {
-    List<Long> lstLocalId = new ArrayList<>();
-
-    try (BlockIterator<BlockData> iter =
+    try (BlockIterator<Long> iter =
             store.getFinalizeBlockIterator(kvContainerData.getContainerID(),
-            kvContainerData.getContainerPrefixFilter())) {
+            kvContainerData.getUnprefixedKeyFilter())) {
       while (iter.hasNext()) {
-        lstLocalId.add(iter.nextBlock().getLocalID());
+        kvContainerData.addToFinalizedBlockSet(iter.nextBlock());
       }
-    }
-    if (!lstLocalId.isEmpty()) {
-      kvContainerData.addAllToFinalizedBlockSet(lstLocalId);
     }
   }
 

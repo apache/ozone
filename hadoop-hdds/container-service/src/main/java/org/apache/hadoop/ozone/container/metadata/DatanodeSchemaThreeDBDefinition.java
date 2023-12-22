@@ -92,14 +92,14 @@ public class DatanodeSchemaThreeDBDefinition
           DeletedBlocksTransaction.class,
           Proto2Codec.get(DeletedBlocksTransaction.class));
 
-  public static final DBColumnFamilyDefinition<String, BlockData>
+  public static final DBColumnFamilyDefinition<String, Long>
       FINALIZE_BLOCKS =
       new DBColumnFamilyDefinition<>(
           "finalize_blocks",
           String.class,
           FixedLengthStringCodec.get(),
-          BlockData.class,
-          BlockData.getCodec());
+          Long.class,
+          LongCodec.get());
 
   private static String separator = "";
 
@@ -164,7 +164,7 @@ public class DatanodeSchemaThreeDBDefinition
   }
 
   @Override
-  public DBColumnFamilyDefinition<String, BlockData>
+  public DBColumnFamilyDefinition<String, Long>
       getFinalizeBlocksColumnFamily() {
     return FINALIZE_BLOCKS;
   }

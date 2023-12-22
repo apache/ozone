@@ -282,14 +282,10 @@ public class KeyValueContainerData extends ContainerData {
   }
 
   /**
-   * Add the given localID of a block to the pendingPutBlockCache.
+   * Add the given localID of a block to the finalizedBlockSet.
    */
   public void addToFinalizedBlockSet(long localID) {
     finalizedBlockSet.add(localID);
-  }
-
-  public void addAllToFinalizedBlockSet(List<Long> lstBlocks) {
-    finalizedBlockSet.addAll(lstBlocks);
   }
 
   public Set<Long> getFinalizedBlockSet() {
@@ -416,11 +412,6 @@ public class KeyValueContainerData extends ContainerData {
   public KeyPrefixFilter getUnprefixedKeyFilter() {
     String schemaPrefix = containerPrefix();
     return new KeyPrefixFilter().addFilter(schemaPrefix + "#", true);
-  }
-
-  public KeyPrefixFilter getContainerPrefixFilter() {
-    String schemaPrefix = containerPrefix();
-    return new KeyPrefixFilter().addFilter(schemaPrefix, false);
   }
 
   public KeyPrefixFilter getDeletingBlockKeyFilter() {

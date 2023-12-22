@@ -67,9 +67,9 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   private Table<String, ChunkInfoList> deletedBlocksTable;
 
-  private Table<String, BlockData>  finalizeBlocksTable;
+  private Table<String, Long>  finalizeBlocksTable;
 
-  private Table<String, BlockData> finalizeBlockDataTableWithIterator;
+  private Table<String, Long> finalizeBlockDataTableWithIterator;
 
   static final Logger LOG =
       LoggerFactory.getLogger(AbstractDatanodeStore.class);
@@ -223,7 +223,7 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @Override
-  public Table<String, BlockData> getFinalizeBlocksTable() {
+  public Table<String, Long> getFinalizeBlocksTable() {
     return finalizeBlocksTable;
   }
 
@@ -242,9 +242,9 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   }
 
   @Override
-  public BlockIterator<BlockData> getFinalizeBlockIterator(long containerID,
+  public BlockIterator<Long> getFinalizeBlockIterator(long containerID,
       KeyPrefixFilter filter) throws IOException {
-    return new KeyValueBlockIterator(containerID,
+    return new KeyValueBlockLocalIdIterator(containerID,
              finalizeBlockDataTableWithIterator.iterator(), filter);
   }
 
@@ -403,6 +403,96 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
     @Override
     public void close() throws IOException {
       blockIterator.close();
+    }
+  }
+
+  /**
+   * Block localId Iterator for KeyValue Container.
+   * This Block localId iterator returns localIds
+   * which match with the {@link MetadataKeyFilters.KeyPrefixFilter}. If no
+   * filter is specified, then default filter used is
+   * {@link MetadataKeyFilters#getUnprefixedKeyFilter()}
+   */
+  @InterfaceAudience.Public
+  public static class KeyValueBlockLocalIdIterator implements
+      BlockIterator<Long>, Closeable {
+
+    private static final Logger LOG = LoggerFactory.getLogger(
+        KeyValueBlockLocalIdIterator.class);
+
+    private final TableIterator<String, ? extends Table.KeyValue<String,
+        Long>> blockLocalIdIterator;
+    private final KeyPrefixFilter localIdFilter;
+    private Long nextLocalId;
+    private final long containerID;
+
+    /**
+     * KeyValueBlockLocalIdIterator to iterate block localIds in a container.
+     * @param iterator - The iterator to apply the blockLocalId filter to.
+     * @param filter - BlockLocalId filter to be applied for block localIds.
+     */
+    KeyValueBlockLocalIdIterator(long containerID,
+        TableIterator<String, ? extends Table.KeyValue<String, Long>>
+        iterator, KeyPrefixFilter filter) {
+      this.containerID = containerID;
+      this.blockLocalIdIterator = iterator;
+      this.localIdFilter = filter;
+    }
+
+    /**
+     * This method returns blocks matching with the filter.
+     * @return next block local Id or null if no more block localIds
+     * @throws IOException
+     */
+    @Override
+    public Long nextBlock() throws IOException, NoSuchElementException {
+      if (nextLocalId != null) {
+        Long currentLocalId = nextLocalId;
+        nextLocalId = null;
+        return currentLocalId;
+      }
+      if (hasNext()) {
+        return nextBlock();
+      }
+      throw new NoSuchElementException("Block Local ID Iterator " +
+          "reached end for ContainerID " + containerID);
+    }
+
+    @Override
+    public boolean hasNext() throws IOException {
+      if (nextLocalId != null) {
+        return true;
+      }
+      while (blockLocalIdIterator.hasNext()) {
+        Table.KeyValue<String, Long> keyValue = blockLocalIdIterator.next();
+        byte[] keyBytes = StringUtils.string2Bytes(keyValue.getKey());
+        if (localIdFilter.filterKey(null, keyBytes, null)) {
+          nextLocalId = keyValue.getValue();
+          if (LOG.isTraceEnabled()) {
+            LOG.trace("Block matching with filter found: LocalID is : " +
+                "{} for containerID {}", nextLocalId, containerID);
+          }
+          return true;
+        }
+      }
+      return false;
+    }
+
+    @Override
+    public void seekToFirst() {
+      nextLocalId = null;
+      blockLocalIdIterator.seekToFirst();
+    }
+
+    @Override
+    public void seekToLast() {
+      nextLocalId = null;
+      blockLocalIdIterator.seekToLast();
+    }
+
+    @Override
+    public void close() throws IOException {
+      blockLocalIdIterator.close();
     }
   }
 }

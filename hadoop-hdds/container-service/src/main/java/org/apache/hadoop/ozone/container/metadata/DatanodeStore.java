@@ -82,7 +82,7 @@ public interface DatanodeStore extends Closeable {
    *
    * @return Table
    */
-  Table<String, BlockData> getFinalizeBlocksTable();
+  Table<String, Long> getFinalizeBlocksTable();
 
   /**
    * Helper to create and write batch transactions.
@@ -101,7 +101,7 @@ public interface DatanodeStore extends Closeable {
   BlockIterator<BlockData> getBlockIterator(long containerID,
       KeyPrefixFilter filter) throws IOException;
 
-  BlockIterator<BlockData> getFinalizeBlockIterator(long containerID,
+  BlockIterator<Long> getFinalizeBlockIterator(long containerID,
       KeyPrefixFilter filter) throws IOException;
 
   /**

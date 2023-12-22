@@ -116,7 +116,7 @@ public class DatanodeSchemaTwoDBDefinition
   }
 
   @Override
-  public DBColumnFamilyDefinition<String, BlockData>
+  public DBColumnFamilyDefinition<String, Long>
       getFinalizeBlocksColumnFamily() {
     return null;
   }
