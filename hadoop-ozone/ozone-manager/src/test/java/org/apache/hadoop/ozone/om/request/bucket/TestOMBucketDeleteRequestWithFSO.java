@@ -54,8 +54,7 @@ public class TestOMBucketDeleteRequestWithFSO
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
-    omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, 1,
-        ozoneManagerDoubleBufferHelper);
+    omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, 1);
 
     Assertions.assertNull(omMetadataManager.getBucketTable().get(
         omMetadataManager.getBucketKey(volumeName, bucketName)));

@@ -76,7 +76,7 @@ public final class OzonePBHelper {
         setIdentifier(getByteString(token.getIdentifier())).
         setPassword(getByteString(token.getPassword())).
         setKindBytes(getFixedByteString(token.getKind())).
-        setServiceBytes(getFixedByteString(token.getService()));
+        setServiceBytes(getByteString(token.getService().getBytes()));
     return builder.build();
   }
 }

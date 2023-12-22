@@ -131,6 +131,8 @@ import java.util.Optional;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.errorPipelineAlreadyExists;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.success;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto.Status.CONTAINER_ALREADY_CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto.Status.CONTAINER_ALREADY_CLOSING;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.GetContainer;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.GetContainerWithPipeline;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.GetContainerWithPipelineBatch;
@@ -867,7 +869,21 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public SCMCloseContainerResponseProto closeContainer(
       SCMCloseContainerRequestProto request)
       throws IOException {
-    impl.closeContainer(request.getContainerID());
+    try {
+      impl.closeContainer(request.getContainerID());
+    } catch (SCMException exception) {
+      if (exception.getResult()
+          .equals(SCMException.ResultCodes.CONTAINER_ALREADY_CLOSED)) {
+        return SCMCloseContainerResponseProto.newBuilder()
+            .setStatus(CONTAINER_ALREADY_CLOSED).build();
+      }
+      if (exception.getResult()
+          .equals(SCMException.ResultCodes.CONTAINER_ALREADY_CLOSING)) {
+        return SCMCloseContainerResponseProto.newBuilder()
+            .setStatus(CONTAINER_ALREADY_CLOSING).build();
+      }
+      throw exception;
+    }
     return SCMCloseContainerResponseProto.newBuilder().build();
   }
 

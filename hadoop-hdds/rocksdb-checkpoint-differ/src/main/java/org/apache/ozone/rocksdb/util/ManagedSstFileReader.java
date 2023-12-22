@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
 import org.apache.hadoop.util.ClosableIterator;
-import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpIterator;
@@ -167,7 +166,7 @@ public class ManagedSstFileReader {
 
           @Override
           protected ClosableIterator<String> getKeyIteratorForFile(String file)
-              throws NativeLibraryNotLoadedException, IOException {
+              throws IOException {
             return new ManagedSSTDumpIterator<String>(sstDumpTool, file,
                 options, lowerBoundSlice, upperBoundSlice) {
               @Override
@@ -239,7 +238,7 @@ public class ManagedSstFileReader {
     protected abstract void init();
 
     protected abstract ClosableIterator<T> getKeyIteratorForFile(String file)
-        throws RocksDBException, NativeLibraryNotLoadedException,
+        throws RocksDBException,
         IOException;
 
     @Override
@@ -251,8 +250,7 @@ public class ManagedSstFileReader {
             return true;
           }
         } while (moveToNextFile());
-      } catch (IOException | RocksDBException |
-               NativeLibraryNotLoadedException e) {
+      } catch (IOException | RocksDBException e) {
         // TODO: [Snapshot] This exception has to be handled by the caller.
         //  We have to do better exception handling.
         throw new RuntimeException(e);
@@ -277,8 +275,7 @@ public class ManagedSstFileReader {
       }
     }
 
-    private boolean moveToNextFile() throws IOException, RocksDBException,
-        NativeLibraryNotLoadedException {
+    private boolean moveToNextFile() throws IOException, RocksDBException {
       if (fileNameIterator.hasNext()) {
         closeCurrentFile();
         currentFile = fileNameIterator.next();

@@ -140,9 +140,8 @@ public class TestContainerReportWithKeys {
     Set<ContainerReplica> replicas =
         scm.getContainerManager().getContainerReplicas(
             ContainerID.valueOf(keyInfo.getContainerID()));
-    Assert.assertTrue(replicas.size() == 1);
-    replicas.stream().forEach(rp ->
-        Assert.assertTrue(rp.getDatanodeDetails().getParent() != null));
+    Assert.assertEquals(1, replicas.size());
+    replicas.stream().forEach(rp -> Assert.assertNotNull(rp.getDatanodeDetails().getParent()));
 
     LOG.info("SCM Container Info keyCount: {} usedBytes: {}",
         cinfo.getNumberOfKeys(), cinfo.getUsedBytes());

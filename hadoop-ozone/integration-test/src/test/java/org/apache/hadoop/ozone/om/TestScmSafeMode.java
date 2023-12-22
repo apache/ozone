@@ -272,7 +272,7 @@ public class TestScmSafeMode {
     scm = cluster.getStorageContainerManager();
     assertTrue(scm.isInSafeMode());
     assertFalse(logCapturer.getOutput().contains("SCM exiting safe mode."));
-    assertTrue(scm.getCurrentContainerThreshold() == 0);
+    assertEquals(0, scm.getCurrentContainerThreshold());
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
       dn.start();
     }

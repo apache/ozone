@@ -68,8 +68,7 @@ public class TestS3MultipartUploadCommitPartRequest
             getS3InitiateMultipartUploadReq(initiateMPURequest);
 
     OMClientResponse omClientResponse =
-        s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager,
-        1L, ozoneManagerDoubleBufferHelper);
+        s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager, 1L);
 
     long clientID = Time.now();
     String multipartUploadID = omClientResponse.getOMResponse()
@@ -85,8 +84,7 @@ public class TestS3MultipartUploadCommitPartRequest
     addKeyToOpenKeyTable(volumeName, bucketName, keyName, clientID);
 
     omClientResponse =
-        s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager,
-        2L, ozoneManagerDoubleBufferHelper);
+        s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager, 2L);
 
 
     Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
@@ -141,9 +139,7 @@ public class TestS3MultipartUploadCommitPartRequest
     addKeyToOpenKeyTable(volumeName, bucketName, keyName, clientID);
 
     OMClientResponse omClientResponse =
-        s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager,
-            2L, ozoneManagerDoubleBufferHelper);
-
+        s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager, 2L);
 
     Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.NO_SUCH_MULTIPART_UPLOAD_ERROR);
@@ -180,8 +176,7 @@ public class TestS3MultipartUploadCommitPartRequest
 
 
     OMClientResponse omClientResponse =
-        s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager,
-            2L, ozoneManagerDoubleBufferHelper);
+        s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager, 2L);
 
     if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
       Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
@@ -217,8 +212,7 @@ public class TestS3MultipartUploadCommitPartRequest
 
 
     OMClientResponse omClientResponse =
-        s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager,
-            2L, ozoneManagerDoubleBufferHelper);
+        s3MultipartUploadCommitPartRequest.validateAndUpdateCache(ozoneManager, 2L);
 
     Assertions.assertSame(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND);

@@ -33,61 +33,40 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.After;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Ozone file system tests that are not covered by contract tests,
  * - prefix layout.
  *
  */
-@RunWith(Parameterized.class)
-public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
-
-  @Parameterized.Parameters
-  public static Collection<Object[]> data() {
-    return Arrays.asList(
-            new Object[]{true, true},
-            new Object[]{true, false});
-  }
-
-  @BeforeClass
-  public static void init() {
-    setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED);
-  }
-
-  public TestOzoneFileSystemWithFSO(boolean setDefaultFs,
-      boolean enableOMRatis) {
-    super(setDefaultFs, enableOMRatis);
-  }
-
-  @After
-  @Override
-  public void cleanup() {
-    super.cleanup();
-  }
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSystemTest {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(TestOzoneFileSystemWithFSO.class);
+      LoggerFactory.getLogger(AbstractOzoneFileSystemTestWithFSO.class);
+
+  AbstractOzoneFileSystemTestWithFSO(boolean enableOMRatis) {
+    super(true, enableOMRatis, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+  }
 
   @Test
   public void testListStatusWithoutRecursiveSearch() throws Exception {
@@ -103,32 +82,27 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     Path key1 = new Path("/key1");
     try (FSDataOutputStream outputStream = getFs().create(key1,
             false)) {
-      assertNotNull("Should be able to create file: key1",
-              outputStream);
+      assertNotNull(outputStream, "Should be able to create file: key1");
     }
     Path d1 = new Path("/d1");
     Path dir1Key1 = new Path(d1, "key1");
     try (FSDataOutputStream outputStream = getFs().create(dir1Key1, false)) {
-      assertNotNull("Should be able to create file: " + dir1Key1,
-              outputStream);
+      assertNotNull(outputStream, "Should be able to create file: " + dir1Key1);
     }
     Path d2 = new Path("/d2");
     Path dir2Key1 = new Path(d2, "key1");
     try (FSDataOutputStream outputStream = getFs().create(dir2Key1, false)) {
-      assertNotNull("Should be able to create file: " + dir2Key1,
-              outputStream);
+      assertNotNull(outputStream, "Should be able to create file: " + dir2Key1);
     }
     Path dir1Dir2 = new Path("/d1/d2/");
     Path dir1Dir2Key1 = new Path(dir1Dir2, "key1");
     try (FSDataOutputStream outputStream = getFs().create(dir1Dir2Key1,
             false)) {
-      assertNotNull("Should be able to create file: " + dir1Dir2Key1,
-              outputStream);
+      assertNotNull(outputStream, "Should be able to create file: " + dir1Dir2Key1);
     }
     Path d1Key2 = new Path(d1, "key2");
     try (FSDataOutputStream outputStream = getFs().create(d1Key2, false)) {
-      assertNotNull("Should be able to create file: " + d1Key2,
-              outputStream);
+      assertNotNull(outputStream, "Should be able to create file: " + d1Key2);
     }
 
     Path dir1Dir3 = new Path("/d1/d3/");
@@ -142,8 +116,7 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
 
     // Root Directory
     FileStatus[] fileStatusList = getFs().listStatus(new Path("/"));
-    assertEquals("FileStatus should return files and directories",
-            3, fileStatusList.length);
+    assertEquals(3, fileStatusList.length, "FileStatus should return files and directories");
     ArrayList<String> expectedPaths = new ArrayList<>();
     expectedPaths.add("o3fs://" + bucketName + "." + volumeName + "/d1");
     expectedPaths.add("o3fs://" + bucketName + "." + volumeName + "/d2");
@@ -151,13 +124,11 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     for (FileStatus fileStatus : fileStatusList) {
       expectedPaths.remove(fileStatus.getPath().toString());
     }
-    assertEquals("Failed to return the filestatus[]" + expectedPaths,
-            0, expectedPaths.size());
+    assertEquals(0, expectedPaths.size(), "Failed to return the filestatus[]" + expectedPaths);
 
     // level-1 sub-dirs
     fileStatusList = getFs().listStatus(new Path("/d1"));
-    assertEquals("FileStatus should return files and directories",
-            5, fileStatusList.length);
+    assertEquals(5, fileStatusList.length, "FileStatus should return files and directories");
     expectedPaths = new ArrayList<>();
     expectedPaths.add("o3fs://" + bucketName + "." + volumeName + "/d1/d2");
     expectedPaths.add("o3fs://" + bucketName + "." + volumeName + "/d1/d3");
@@ -167,34 +138,29 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     for (FileStatus fileStatus : fileStatusList) {
       expectedPaths.remove(fileStatus.getPath().toString());
     }
-    assertEquals("Failed to return the filestatus[]" + expectedPaths,
-            0, expectedPaths.size());
+    assertEquals(0, expectedPaths.size(), "Failed to return the filestatus[]" + expectedPaths);
 
     // level-2 sub-dirs
     fileStatusList = getFs().listStatus(new Path("/d1/d2"));
-    assertEquals("FileStatus should return files and directories",
-            1, fileStatusList.length);
+    assertEquals(1, fileStatusList.length, "FileStatus should return files and directories");
     expectedPaths = new ArrayList<>();
     expectedPaths.add("o3fs://" + bucketName + "." + volumeName + "/d1/d2/" +
             "key1");
     for (FileStatus fileStatus : fileStatusList) {
       expectedPaths.remove(fileStatus.getPath().toString());
     }
-    assertEquals("Failed to return the filestatus[]" + expectedPaths,
-            0, expectedPaths.size());
+    assertEquals(0, expectedPaths.size(), "Failed to return the filestatus[]" + expectedPaths);
 
     // level-2 key2
     fileStatusList = getFs().listStatus(new Path("/d1/d2/key1"));
-    assertEquals("FileStatus should return files and directories",
-            1, fileStatusList.length);
+    assertEquals(1, fileStatusList.length, "FileStatus should return files and directories");
     expectedPaths = new ArrayList<>();
     expectedPaths.add("o3fs://" + bucketName + "." + volumeName + "/d1/d2/" +
             "key1");
     for (FileStatus fileStatus : fileStatusList) {
       expectedPaths.remove(fileStatus.getPath().toString());
     }
-    assertEquals("Failed to return the filestatus[]" + expectedPaths,
-            0, expectedPaths.size());
+    assertEquals(0, expectedPaths.size(), "Failed to return the filestatus[]" + expectedPaths);
 
     // invalid root key
     try {
@@ -223,24 +189,21 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     Path dir1Dir1Dir2Key1 = new Path("/d1/d1/d2/key1");
     try (FSDataOutputStream outputStream = getFs().create(dir1Dir1Dir2Key1,
             false)) {
-      assertNotNull("Should be able to create file: " + dir1Dir1Dir2Key1,
-              outputStream);
+      assertNotNull(outputStream, "Should be able to create file: " + dir1Dir1Dir2Key1);
     }
     Path key1 = new Path("/key1");
     try (FSDataOutputStream outputStream = getFs().create(key1, false)) {
-      assertNotNull("Should be able to create file: " + key1,
-              outputStream);
+      assertNotNull(outputStream, "Should be able to create file: " + key1);
     }
     Path key2 = new Path("/key2");
     try (FSDataOutputStream outputStream = getFs().create(key2, false)) {
-      assertNotNull("Should be able to create file: key2",
-              outputStream);
+      assertNotNull(outputStream, "Should be able to create file: key2");
     }
     Path dir1Dir2Dir1Dir2Key1 = new Path("/d1/d2/d1/d2/key1");
     try (FSDataOutputStream outputStream = getFs().create(dir1Dir2Dir1Dir2Key1,
             false)) {
-      assertNotNull("Should be able to create file: "
-              + dir1Dir2Dir1Dir2Key1, outputStream);
+      assertNotNull(outputStream, "Should be able to create file: "
+              + dir1Dir2Dir1Dir2Key1);
     }
     RemoteIterator<LocatedFileStatus> fileStatusItr = getFs().listFiles(
             new Path("/"), true);
@@ -257,10 +220,8 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
       expectedPaths.remove(status.getPath().toString());
       actualCount++;
     }
-    assertEquals("Failed to get all the files: " + expectedPaths,
-            expectedFilesCount, actualCount);
-    assertEquals("Failed to get all the files: " + expectedPaths, 0,
-            expectedPaths.size());
+    assertEquals(expectedFilesCount, actualCount, "Failed to get all the files: " + expectedPaths);
+    assertEquals(0, expectedPaths.size(), "Failed to get all the files: " + expectedPaths);
 
     // Recursive=false
     fileStatusItr = getFs().listFiles(new Path("/"), false);
@@ -274,10 +235,8 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
       expectedPaths.remove(status.getPath().toString());
       actualCount++;
     }
-    assertEquals("Failed to get all the files: " + expectedPaths, 0,
-            expectedPaths.size());
-    assertEquals("Failed to get all the files: " + expectedPaths,
-            expectedFilesCount, actualCount);
+    assertEquals(0, expectedPaths.size(), "Failed to get all the files: " + expectedPaths);
+    assertEquals(expectedFilesCount, actualCount, "Failed to get all the files: " + expectedPaths);
   }
 
   /**
@@ -296,7 +255,7 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     final Path sourceRoot = new Path(getFs().getUri().toString() + root);
     LOG.info("Rename op-> source:{} to destin:{}", sourceRoot, subDir1);
     //  rename should fail and return false
-    Assert.assertFalse(getFs().rename(sourceRoot, subDir1));
+    assertFalse(getFs().rename(sourceRoot, subDir1));
   }
 
   /**
@@ -316,13 +275,13 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
             + root + "/b/c");
 
     // rename should fail and return false
-    Assert.assertFalse(getFs().rename(dir2SourcePath, destinPath));
+    assertFalse(getFs().rename(dir2SourcePath, destinPath));
     // (b) parent of dst is a file. /root_dir/file1/c
     Path filePath = new Path(getFs().getUri().toString() + root + "/file1");
     ContractTestUtils.touch(getFs(), filePath);
     Path newDestinPath = new Path(filePath, "c");
     // rename should fail and return false
-    Assert.assertFalse(getFs().rename(dir2SourcePath, newDestinPath));
+    assertFalse(getFs().rename(dir2SourcePath, newDestinPath));
   }
 
   @Test
@@ -432,8 +391,7 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     // reset metrics
     long numKeys = getCluster().getOzoneManager().getMetrics().getNumKeys();
     getCluster().getOzoneManager().getMetrics().decNumKeys(numKeys);
-    Assert.assertEquals(0,
-        getCluster().getOzoneManager().getMetrics().getNumKeys());
+    assertEquals(0, getCluster().getOzoneManager().getMetrics().getNumKeys());
 
     // Op 1. create dir -> /d1/d2/d3/d4/
     // Op 2. create dir -> /d1/d2/d3/d4/d5
@@ -445,7 +403,7 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
         getCluster().getOzoneManager().getMetadataManager();
     OmBucketInfo omBucketInfo = omMgr.getBucketTable()
         .get(omMgr.getBucketKey(getVolumeName(), getBucketName()));
-    Assert.assertNotNull("Failed to find bucketInfo", omBucketInfo);
+    assertNotNull(omBucketInfo, "Failed to find bucketInfo");
 
     final long volumeId = omMgr.getVolumeId(getVolumeName());
     final long bucketId = omMgr.getBucketId(getVolumeName(), getBucketName());
@@ -463,8 +421,7 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
         verifyDirKey(volumeId, bucketId, d3ObjectID,
                 "d4", "/d1/d2/d3/d4", dirKeys, omMgr);
 
-    Assert.assertEquals("Wrong OM numKeys metrics", 4,
-        getCluster().getOzoneManager().getMetrics().getNumKeys());
+    assertEquals(4, getCluster().getOzoneManager().getMetrics().getNumKeys(), "Wrong OM numKeys metrics");
 
     // create sub-dirs under same parent
     Path subDir5 = new Path("/d1/d2/d3/d4/d5");
@@ -477,15 +434,14 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     long d6ObjectID =
         verifyDirKey(volumeId, bucketId, d4ObjectID,
                 "d6", "/d1/d2/d3/d4/d6", dirKeys, omMgr);
-    Assert.assertTrue(
-        "Wrong objectIds for sub-dirs[" + d5ObjectID + "/d5, " + d6ObjectID
-            + "/d6] of same parent!", d5ObjectID != d6ObjectID);
+    assertTrue(d5ObjectID != d6ObjectID, "Wrong objectIds for sub-dirs[" + d5ObjectID + "/d5, " + d6ObjectID
+        + "/d6] of same parent!");
 
-    Assert.assertEquals("Wrong OM numKeys metrics", 6,
-        getCluster().getOzoneManager().getMetrics().getNumKeys());
+    assertEquals(6, getCluster().getOzoneManager().getMetrics().getNumKeys(), "Wrong OM numKeys metrics");
   }
 
   @Test
+  @Order(1)
   public void testCreateFile() throws Exception {
     // Op 1. create dir -> /d1/d2/d3/d4/
     Path parent = new Path("/d1/d2/");
@@ -497,7 +453,7 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
         getCluster().getOzoneManager().getMetadataManager();
     OmBucketInfo omBucketInfo = omMgr.getBucketTable()
         .get(omMgr.getBucketKey(getVolumeName(), getBucketName()));
-    Assert.assertNotNull("Failed to find bucketInfo", omBucketInfo);
+    assertNotNull(omBucketInfo, "Failed to find bucketInfo");
 
     ArrayList<String> dirKeys = new ArrayList<>();
 
@@ -517,7 +473,7 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
     outputStream.close();
 
     OmKeyInfo omKeyInfo = omMgr.getKeyTable(getBucketLayout()).get(openFileKey);
-    Assert.assertNotNull("Invalid Key!", omKeyInfo);
+    assertNotNull(omKeyInfo, "Invalid Key!");
     verifyOMFileInfoFormat(omKeyInfo, file.getName(), d2ObjectID);
 
     // wait for DB updates
@@ -526,7 +482,7 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
         return omMgr.getOpenKeyTable(getBucketLayout()).isEmpty();
       } catch (IOException e) {
         LOG.error("DB failure!", e);
-        Assert.fail("DB failure!");
+        fail("DB failure!");
         return false;
       }
     }, 1000, 120000);
@@ -572,11 +528,10 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
 
   private void verifyOMFileInfoFormat(OmKeyInfo omKeyInfo, String fileName,
       long parentID) {
-    Assert.assertEquals("Wrong keyName", fileName, omKeyInfo.getKeyName());
-    Assert.assertEquals("Wrong parentID", parentID,
-        omKeyInfo.getParentObjectID());
+    assertEquals(fileName, omKeyInfo.getKeyName(), "Wrong keyName");
+    assertEquals(parentID, omKeyInfo.getParentObjectID(), "Wrong parentID");
     String dbKey = parentID + OzoneConsts.OM_KEY_PREFIX + fileName;
-    Assert.assertEquals("Wrong path format", dbKey, omKeyInfo.getPath());
+    assertEquals(dbKey, omKeyInfo.getPath(), "Wrong path format");
   }
 
   long verifyDirKey(long volumeId, long bucketId, long parentId,
@@ -587,21 +542,13 @@ public class TestOzoneFileSystemWithFSO extends TestOzoneFileSystem {
             parentId + "/" + dirKey;
     dirKeys.add(dbKey);
     OmDirectoryInfo dirInfo = omMgr.getDirectoryTable().get(dbKey);
-    Assert.assertNotNull("Failed to find " + absolutePath +
-        " using dbKey: " + dbKey, dirInfo);
-    Assert.assertEquals("Parent Id mismatches", parentId,
-        dirInfo.getParentObjectID());
-    Assert.assertEquals("Mismatches directory name", dirKey,
-        dirInfo.getName());
-    Assert.assertTrue("Mismatches directory creation time param",
-        dirInfo.getCreationTime() > 0);
-    Assert.assertEquals("Mismatches directory modification time param",
-        dirInfo.getCreationTime(), dirInfo.getModificationTime());
+    assertNotNull(dirInfo, "Failed to find " + absolutePath +
+        " using dbKey: " + dbKey);
+    assertEquals(parentId, dirInfo.getParentObjectID(), "Parent Id mismatches");
+    assertEquals(dirKey, dirInfo.getName(), "Mismatches directory name");
+    assertTrue(dirInfo.getCreationTime() > 0, "Mismatches directory creation time param");
+    assertEquals(dirInfo.getCreationTime(), dirInfo.getModificationTime());
     return dirInfo.getObjectID();
   }
 
-  @Override
-  public BucketLayout getBucketLayout() {
-    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
-  }
 }

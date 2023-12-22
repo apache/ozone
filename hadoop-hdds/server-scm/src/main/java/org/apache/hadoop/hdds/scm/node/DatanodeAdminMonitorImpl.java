@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -85,7 +86,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   private long sufficientlyReplicatedContainers = 0;
   private long trackedDecomMaintenance = 0;
   private long trackedRecommission = 0;
-  private long unhealthyContainers = 0;
+  private long unClosedContainers = 0;
   private long underReplicatedContainers = 0;
 
   /**
@@ -253,7 +254,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
   synchronized void setMetricsToGauge() {
     synchronized (metrics) {
-      metrics.setContainersUnhealthyTotal(unhealthyContainers);
+      metrics.setContainersUnClosedTotal(unClosedContainers);
       metrics.setRecommissionNodesTotal(trackedRecommission);
       metrics.setDecommissioningMaintenanceNodesTotal(
           trackedDecomMaintenance);
@@ -269,7 +270,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   void resetContainerMetrics() {
     pipelinesWaitingToClose = 0;
     sufficientlyReplicatedContainers = 0;
-    unhealthyContainers = 0;
+    unClosedContainers = 0;
     underReplicatedContainers = 0;
   }
 
@@ -400,9 +401,9 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     int sufficientlyReplicated = 0;
     int deleting = 0;
     int underReplicated = 0;
-    int unhealthy = 0;
+    int unclosed = 0;
     List<ContainerID> underReplicatedIDs = new ArrayList<>();
-    List<ContainerID> unhealthyIDs = new ArrayList<>();
+    List<ContainerID> unClosedIDs = new ArrayList<>();
     Set<ContainerID> containers =
         nodeManager.getContainers(dn.getDatanodeDetails());
     for (ContainerID cid : containers) {
@@ -420,72 +421,71 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
           continue;
         }
 
-        if (replicaSet.isSufficientlyReplicatedForOffline(dn.datanodeDetails,
-            nodeManager)) {
+        boolean isHealthy = replicaSet.isHealthyEnoughForOffline();
+        if (!isHealthy) {
+          if (LOG.isDebugEnabled()) {
+            unClosedIDs.add(cid);
+          }
+          if (unclosed < containerDetailsLoggingLimit
+              || LOG.isDebugEnabled()) {
+            LOG.info("Unclosed Container {} {}; {}", cid, replicaSet, replicaDetails(replicaSet.getReplicas()));
+          }
+          unclosed++;
+          continue;
+        }
+
+        // If we get here, the container is closed or quasi-closed and all the replicas match that
+        // state, except for any which are unhealthy. As the container is closed, we can check
+        // if it is sufficiently replicated using replicationManager, but this only works if the
+        // legacy RM is not enabled.
+        boolean legacyEnabled = conf.getBoolean("hdds.scm.replication.enable" +
+            ".legacy", false);
+        boolean replicatedOK;
+        if (legacyEnabled) {
+          replicatedOK = replicaSet.isSufficientlyReplicatedForOffline(dn, nodeManager);
+        } else {
+          ReplicationManagerReport report = new ReplicationManagerReport();
+          replicationManager.checkContainerStatus(replicaSet.getContainer(), report);
+          replicatedOK = report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED) == 0;
+        }
+
+        if (replicatedOK) {
           sufficientlyReplicated++;
         } else {
           if (LOG.isDebugEnabled()) {
             underReplicatedIDs.add(cid);
           }
-          if (underReplicated < containerDetailsLoggingLimit
-              || LOG.isDebugEnabled()) {
-            LOG.info("Under Replicated Container {} {}; {}",
-                cid, replicaSet, replicaDetails(replicaSet.getReplicas()));
+          if (underReplicated < containerDetailsLoggingLimit || LOG.isDebugEnabled()) {
+            LOG.info("Under Replicated Container {} {}; {}", cid, replicaSet, replicaDetails(replicaSet.getReplicas()));
           }
           underReplicated++;
         }
-
-        boolean isHealthy;
-        /*
-        If LegacyReplicationManager is enabled, then use the
-        isHealthyEnoughForOffline API. ReplicationManager doesn't support this
-        API yet.
-         */
-        boolean legacyEnabled = conf.getBoolean("hdds.scm.replication.enable" +
-            ".legacy", false);
-        if (legacyEnabled) {
-          isHealthy = replicaSet.isHealthyEnoughForOffline();
-        } else {
-          isHealthy = replicaSet.isHealthy();
-        }
-        if (!isHealthy) {
-          if (LOG.isDebugEnabled()) {
-            unhealthyIDs.add(cid);
-          }
-          if (unhealthy < containerDetailsLoggingLimit
-              || LOG.isDebugEnabled()) {
-            LOG.info("Unhealthy Container {} {}; {}",
-                cid, replicaSet, replicaDetails(replicaSet.getReplicas()));
-          }
-          unhealthy++;
-        }
       } catch (ContainerNotFoundException e) {
-        LOG.warn("ContainerID {} present in node list for {} but not found " +
-            "in containerManager", cid, dn);
+        LOG.warn("ContainerID {} present in node list for {} but not found in containerManager", cid, dn);
       }
     }
     LOG.info("{} has {} sufficientlyReplicated, {} deleting, {} " +
-            "underReplicated and {} unhealthy containers",
-        dn, sufficientlyReplicated, deleting, underReplicated, unhealthy);
+            "underReplicated and {} unclosed containers",
+        dn, sufficientlyReplicated, deleting, underReplicated, unclosed);
     containerStateByHost.put(dn.getDatanodeDetails().getHostName(),
         new ContainerStateInWorkflow(dn.getDatanodeDetails().getHostName(),
             sufficientlyReplicated,
             underReplicated,
-            unhealthy,
+            unclosed,
             0L, dn.getStartTime()));
     sufficientlyReplicatedContainers += sufficientlyReplicated;
     underReplicatedContainers += underReplicated;
-    unhealthyContainers += unhealthy;
+    unClosedContainers += unclosed;
     if (LOG.isDebugEnabled() && underReplicatedIDs.size() < 10000 &&
-        unhealthyIDs.size() < 10000) {
-      LOG.debug("{} has {} underReplicated [{}] and {} unhealthy [{}] " +
+        unClosedIDs.size() < 10000) {
+      LOG.debug("{} has {} underReplicated [{}] and {} unclosed [{}] " +
               "containers", dn, underReplicated,
           underReplicatedIDs.stream().map(
               Object::toString).collect(Collectors.joining(", ")),
-          unhealthy, unhealthyIDs.stream().map(
+          unclosed, unClosedIDs.stream().map(
               Object::toString).collect(Collectors.joining(", ")));
     }
-    return underReplicated == 0 && unhealthy == 0;
+    return underReplicated == 0 && unclosed == 0;
   }
 
   private String replicaDetails(Collection<ContainerReplica> replicas) {

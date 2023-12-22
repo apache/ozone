@@ -45,18 +45,13 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Random;
 import java.util.UUID;
 import java.util.HashMap;
@@ -65,20 +60,16 @@ import java.util.ArrayList;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.DISK_OUT_OF_SPACE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * This class is used to test OzoneContainer.
  */
-@RunWith(Parameterized.class)
 public class TestOzoneContainer {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestOzoneContainer.class);
-
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   private OzoneConfiguration conf;
   private String clusterId = UUID.randomUUID().toString();
@@ -88,37 +79,30 @@ public class TestOzoneContainer {
   private KeyValueContainer keyValueContainer;
   private final DatanodeDetails datanodeDetails = createDatanodeDetails();
   private HashMap<String, Long> commitSpaceMap; //RootDir -> committed space
-  private final int numTestContainers = 10;
 
-  private final ContainerLayoutVersion layout;
-  private final String schemaVersion;
+  private ContainerLayoutVersion layout;
+  private String schemaVersion;
 
-  public TestOzoneContainer(ContainerTestVersionInfo versionInfo) {
+  private void initTest(ContainerTestVersionInfo versionInfo) throws Exception {
     this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
     this.conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
+    setup();
   }
 
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
-    return ContainerTestVersionInfo.versionParameters();
-  }
-
-  @Before
-  public void setUp() throws Exception {
-    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, folder.getRoot()
-        .getAbsolutePath());
+  private void setup() throws Exception {
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, folder.toString());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        folder.newFolder().getAbsolutePath());
-    commitSpaceMap = new HashMap<String, Long>();
+        Files.createDirectory(folder.resolve("MetadataDir")).toString());
+    commitSpaceMap = new HashMap<>();
     volumeSet = new MutableVolumeSet(datanodeDetails.getUuidString(),
         clusterId, conf, null, StorageVolume.VolumeType.DATA_VOLUME, null);
     createDbInstancesForTestIfNeeded(volumeSet, clusterId, clusterId, conf);
     volumeChoosingPolicy = new RoundRobinVolumeChoosingPolicy();
   }
 
-  @After
+  @AfterEach
   public void cleanUp() {
     BlockUtils.shutdownCache(conf);
 
@@ -128,9 +112,10 @@ public class TestOzoneContainer {
     }
   }
 
-  @Test
-  public void testBuildContainerMap() throws Exception {
-
+  @ContainerTestVersionInfo.ContainerTest
+  public void testBuildContainerMap(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    initTest(versionInfo);
     // Format the volumes
     List<HddsVolume> volumes =
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList());
@@ -140,6 +125,7 @@ public class TestOzoneContainer {
     }
 
     // Add containers to disk
+    int numTestContainers = 10;
     for (int i = 0; i < numTestContainers; i++) {
       long freeBytes = 0;
       long volCommitBytes;
@@ -174,18 +160,20 @@ public class TestOzoneContainer {
     verifyCommittedSpace(ozoneContainer);
   }
 
-  @Test
-  public void testBuildNodeReport() throws Exception {
-    String path = folder.getRoot()
-            .getAbsolutePath();
+  @ContainerTestVersionInfo.ContainerTest
+  public void testBuildNodeReport(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    initTest(versionInfo);
+    String path = folder.toString();
     conf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
-            String.join(",",
+        String.join(",",
             path + "/ratis1", path + "/ratis2", path + "ratis3"));
 
     File[] dbPaths = new File[3];
     StringBuilder dbDirString = new StringBuilder();
     for (int i = 0; i < 3; i++) {
-      dbPaths[i] = folder.newFolder();
+      dbPaths[i] =
+          Files.createDirectory(folder.resolve(Integer.toString(i))).toFile();
       dbDirString.append(dbPaths[i]).append(",");
     }
     conf.set(OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR,
@@ -193,29 +181,32 @@ public class TestOzoneContainer {
     ContainerTestUtils.enableSchemaV3(conf);
     OzoneContainer ozoneContainer = ContainerTestUtils
         .getOzoneContainer(datanodeDetails, conf);
-    Assert.assertEquals(volumeSet.getVolumesList().size(),
-            ozoneContainer.getNodeReport().getStorageReportList().size());
-    Assert.assertEquals(3,
-            ozoneContainer.getNodeReport().getMetadataStorageReportList()
-                    .size());
-    Assert.assertEquals(3,
-            ozoneContainer.getNodeReport().getDbStorageReportList().size());
+    Assertions.assertEquals(volumeSet.getVolumesList().size(),
+        ozoneContainer.getNodeReport().getStorageReportList().size());
+    Assertions.assertEquals(3,
+        ozoneContainer.getNodeReport().getMetadataStorageReportList()
+            .size());
+    Assertions.assertEquals(3,
+        ozoneContainer.getNodeReport().getDbStorageReportList().size());
   }
 
-  @Test
-  public void testBuildNodeReportWithDefaultRatisLogDir() throws Exception {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testBuildNodeReportWithDefaultRatisLogDir(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    initTest(versionInfo);
     OzoneContainer ozoneContainer = ContainerTestUtils
         .getOzoneContainer(datanodeDetails, conf);
-    Assert.assertEquals(volumeSet.getVolumesList().size(),
-            ozoneContainer.getNodeReport().getStorageReportList().size());
-    Assert.assertEquals(1,
-            ozoneContainer.getNodeReport().getMetadataStorageReportList()
-                    .size());
+    Assertions.assertEquals(volumeSet.getVolumesList().size(),
+        ozoneContainer.getNodeReport().getStorageReportList().size());
+    Assertions.assertEquals(1,
+        ozoneContainer.getNodeReport().getMetadataStorageReportList()
+            .size());
   }
 
-
-  @Test
-  public void testContainerCreateDiskFull() throws Exception {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testContainerCreateDiskFull(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    initTest(versionInfo);
     long containerSize = (long) StorageUnit.MB.toBytes(100);
 
     List<HddsVolume> volumes =
@@ -250,8 +241,8 @@ public class TestOzoneContainer {
       String key = getVolumeKey(dnVol);
       long expectedCommit = commitSpaceMap.get(key).longValue();
       long volumeCommitted = dnVol.getCommittedBytes();
-      assertEquals("Volume committed space not initialized correctly",
-          expectedCommit, volumeCommitted);
+      assertEquals(expectedCommit, volumeCommitted,
+          "Volume committed space not initialized correctly");
     }
   }
 
