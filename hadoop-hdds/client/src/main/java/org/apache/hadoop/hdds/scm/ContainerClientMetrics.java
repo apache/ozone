@@ -94,15 +94,15 @@ public final class ContainerClientMetrics {
       int interval = intervals[i];
       hsyncLatency[i] = registry
           .newQuantiles("hsyncLatency" + interval
-                  + "s", "client hsync latency in millisecond", "ops",
+                  + "s", "client hsync latency in microseconds", "ops",
               "latency", interval);
       omHsyncLatency[i] = registry
           .newQuantiles("omHsyncLatency" + interval
-                  + "s", "client hsync latency to OM in millisecond", "ops",
+                  + "s", "client hsync latency to OM in microseconds", "ops",
               "latency", interval);
       datanodeHsyncLatency[i] = registry
           .newQuantiles("dnHsyncLatency" + interval
-                  + "s", "client hsync latency to DN in millisecond", "ops",
+                  + "s", "client hsync latency to DN in microseconds", "ops",
               "latency", interval);
     }
   }

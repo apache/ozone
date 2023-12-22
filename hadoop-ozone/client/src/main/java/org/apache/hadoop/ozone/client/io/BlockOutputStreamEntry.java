@@ -161,10 +161,10 @@ public class BlockOutputStreamEntry extends OutputStream {
             out.getClass() + " is not " + Syncable.class.getSimpleName());
       }
 
-      long start = Time.monotonicNow();
+      long start = Time.monotonicNowNanos();
       ((Syncable)out).hsync();
-      long datanodeHsyncLatency = Time.monotonicNow() - start;
-      clientMetrics.addDataNodeHsyncLatency(datanodeHsyncLatency);
+      long datanodeHsyncLatency = Time.monotonicNowNanos() - start;
+      clientMetrics.addDataNodeHsyncLatency(datanodeHsyncLatency/1000);
     }
   }
 

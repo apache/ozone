@@ -458,15 +458,15 @@ public class KeyOutputStream extends OutputStream
     checkNotClosed();
     final long hsyncPos = writeOffset;
 
-    long start = Time.monotonicNow();
+    long start = Time.monotonicNowNanos();
     handleFlushOrClose(StreamAction.HSYNC);
 
     Preconditions.checkState(offset >= hsyncPos,
         "offset = %s < hsyncPos = %s", offset, hsyncPos);
     blockOutputStreamEntryPool.hsyncKey(hsyncPos);
 
-    long datanodeHsyncLatency = Time.monotonicNow() - start;
-    clientMetrics.addDataNodeHsyncLatency(datanodeHsyncLatency);
+    long hsyncLatency = Time.monotonicNowNanos() - start;
+    clientMetrics.addHsyncLatency(hsyncLatency/1000);
   }
 
   /**
