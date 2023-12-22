@@ -92,6 +92,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationResponse;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationResponse.Status;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SingleNodeQueryResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SingleNodeQueryRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesRequestProto;
@@ -459,6 +461,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setNodeQueryResponse(queryNode(request.getNodeQueryRequest(),
                 request.getVersion()))
+            .build();
+      case SingleNodeQuery:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setSingleNodeQueryResponse(querySingleNode(request
+                .getSingleNodeQueryRequest()))
             .build();
       case CloseContainer:
         return ScmContainerLocationResponse.newBuilder()
@@ -863,6 +872,16 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         request.getScope(), request.getPoolName(), clientVersion);
     return NodeQueryResponseProto.newBuilder()
         .addAllDatanodes(datanodes)
+        .build();
+  }
+
+  public SingleNodeQueryResponseProto querySingleNode(
+      SingleNodeQueryRequestProto request)
+      throws IOException {
+
+    HddsProtos.Node datanode = impl.querySingleNode(request.getUuid());
+    return SingleNodeQueryResponseProto.newBuilder()
+        .setDatanode(datanode)
         .build();
   }
 

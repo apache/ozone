@@ -613,6 +613,29 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
+  public HddsProtos.Node querySingleNode(String uuid)
+      throws IOException {
+    HddsProtos.Node result = null;
+    for (DatanodeDetails node : scm.getScmNodeManager().getAllNodes()) {
+      try {
+        if (node.getUuid().toString().equals(uuid)) {
+          NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
+          result = HddsProtos.Node.newBuilder()
+              .setNodeID(node.getProtoBufMessage())
+              .addNodeStates(ns.getHealth())
+              .addNodeOperationalStates(ns.getOperationalState())
+              .build();
+          break;
+        }
+      } catch (NodeNotFoundException e) {
+        throw new IOException(
+            "An unexpected error occurred querying the NodeStatus", e);
+      }
+    }
+    return result;
+  }
+
+  @Override
   public List<DatanodeAdminError> decommissionNodes(List<String> nodes)
       throws IOException {
     try {

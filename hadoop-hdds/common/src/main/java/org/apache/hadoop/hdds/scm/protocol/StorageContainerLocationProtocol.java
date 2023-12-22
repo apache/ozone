@@ -232,6 +232,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
       HddsProtos.NodeState state, HddsProtos.QueryScope queryScope,
       String poolName, int clientVersion) throws IOException;
 
+  HddsProtos.Node querySingleNode(String uuid) throws IOException;
+
   List<DatanodeAdminError> decommissionNodes(List<String> nodes)
       throws IOException;
 

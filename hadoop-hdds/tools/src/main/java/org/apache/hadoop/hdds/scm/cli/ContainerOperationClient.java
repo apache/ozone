@@ -226,6 +226,11 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
+  public HddsProtos.Node querySingleNode(String uuid) throws IOException {
+    return storageContainerLocationClient.querySingleNode(uuid);
+  }
+
+  @Override
   public List<DatanodeAdminError> decommissionNodes(List<String> hosts)
       throws IOException {
     return storageContainerLocationClient.decommissionNodes(hosts);

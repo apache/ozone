@@ -89,6 +89,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SingleNodeQueryRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SingleNodeQueryResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerRequestProto;
@@ -484,6 +486,18 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         builder1 -> builder1.setNodeQueryRequest(request))
         .getNodeQueryResponse();
     return response.getDatanodesList();
+  }
+
+  @Override
+  public HddsProtos.Node querySingleNode(String uuid) throws IOException {
+    SingleNodeQueryRequestProto request = SingleNodeQueryRequestProto.newBuilder()
+        .setUuid(uuid)
+        .build();
+    SingleNodeQueryResponseProto response =
+        submitRequest(Type.SingleNodeQuery,
+            builder -> builder.setSingleNodeQueryRequest(request))
+            .getSingleNodeQueryResponse();
+    return response.getDatanode();
   }
 
   /**

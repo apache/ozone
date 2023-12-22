@@ -195,6 +195,14 @@ public interface ScmClient extends Closeable {
       String poolName) throws IOException;
 
   /**
+   * Returns a node with the given UUID.
+   * @param uuid - datanode uuid string
+   * @return A nodes that matches the requested UUID.
+   * @throws IOException
+   */
+  HddsProtos.Node querySingleNode(String uuid) throws IOException;
+
+  /**
    * Allows a list of hosts to be decommissioned. The hosts are identified
    * by their hostname and optionally port in the format foo.com:port.
    * @param hosts A list of hostnames, optionally with port

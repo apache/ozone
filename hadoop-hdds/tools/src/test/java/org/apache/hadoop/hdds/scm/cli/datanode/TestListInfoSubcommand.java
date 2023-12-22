@@ -33,6 +33,7 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.mockito.Mockito;
+import picocli.CommandLine;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -99,6 +100,32 @@ public class TestListInfoSubcommand {
     p = Pattern.compile(".+HEALTHY.+STALE.+DEAD.+HEALTHY_READONLY.+",
         Pattern.DOTALL);
 
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
+  }
+
+  @Test
+  public void testDataNodeByUuidOutput()
+      throws Exception {
+    List<HddsProtos.Node> nodes = getNodeDetails();
+
+    ScmClient scmClient = mock(ScmClient.class);
+    Mockito.when(scmClient.querySingleNode(any()))
+        .thenAnswer(invocation -> nodes.get(0));
+    Mockito.when(scmClient.listPipelines())
+        .thenReturn(new ArrayList<>());
+
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--id", nodes.get(0).getNodeID().getUuid());
+    cmd.execute(scmClient);
+
+    Pattern p = Pattern.compile(
+        "^Operational State:\\s+IN_SERVICE$", Pattern.MULTILINE);
+    Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
+
+    p = Pattern.compile(nodes.get(0).getNodeID().getUuid().toString(),
+        Pattern.MULTILINE);
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
   }
