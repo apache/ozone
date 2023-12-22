@@ -169,8 +169,8 @@ public class SnapshotCache implements ReferenceCountedCallback {
     // does not exist, and increment the reference count on the instance.
     ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot =
         dbMap.compute(key, (k, v) -> {
-          LOG.info("Loading snapshot. Table key: {}", k);
           if (v == null) {
+            LOG.info("Loading snapshot. Table key: {}", k);
             try {
               v = new ReferenceCounted<>(cacheLoader.load(k), false, this);
             } catch (OMException omEx) {
@@ -317,7 +317,7 @@ public class SnapshotCache implements ReferenceCountedCallback {
       Preconditions.checkState(rcOmSnapshot == result,
           "Cache map entry removal failure. The cache is in an inconsistent "
               + "state. Expected OmSnapshot instance: " + rcOmSnapshot
-              + ", actual: " + result);
+              + ", actual: " + result + " for key: " + key);
 
       pendingEvictionList.remove(result);
 
