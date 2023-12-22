@@ -30,7 +30,7 @@ import java.util.Set;
 public class LeakTracker extends WeakReference<Object> {
   private final Set<LeakTracker> allLeaks;
   private final Runnable leakReporter;
-  LeakTracker(Object referent, ReferenceQueue<? super Object> referenceQueue,
+  LeakTracker(Object referent, ReferenceQueue<Object> referenceQueue,
       Set<LeakTracker> allLeaks, Runnable leakReporter) {
     super(referent, referenceQueue);
     this.allLeaks = allLeaks;

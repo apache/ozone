@@ -87,7 +87,7 @@ public class LeakDetector implements Runnable {
       }
     }
 
-    LOG.warn("Existing leak detector {}.", name);
+    LOG.warn("Exiting leak detector {}.", name);
   }
 
   public LeakTracker track(Object leakable, Runnable reportLeak) {
