@@ -66,6 +66,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -336,12 +337,11 @@ public abstract class TestOzoneManagerHA {
         // ConnectException. Otherwise, we would get a RemoteException from the
         // last running OM as it would fail to get a quorum.
         if (e instanceof RemoteException) {
-          GenericTestUtils.assertExceptionContains("OMNotLeaderException", e);
+          assertThat(e).hasMessageContaining("is not the leader");
         } else if (e instanceof ConnectException) {
-          GenericTestUtils.assertExceptionContains("Connection refused", e);
+          assertThat(e).hasMessageContaining("Connection refused");
         } else {
-          GenericTestUtils.assertExceptionContains(
-              "Could not determine or connect to OM Leader", e);
+          assertThat(e).hasMessageContaining("Could not determine or connect to OM Leader");
         }
       } else {
         throw e;
@@ -445,12 +445,11 @@ public abstract class TestOzoneManagerHA {
         // ConnectException. Otherwise, we would get a RemoteException from the
         // last running OM as it would fail to get a quorum.
         if (e instanceof RemoteException) {
-          GenericTestUtils.assertExceptionContains("OMNotLeaderException", e);
+          assertThat(e).hasMessageContaining("is not the leader");
         } else if (e instanceof ConnectException) {
-          GenericTestUtils.assertExceptionContains("Connection refused", e);
+          assertThat(e).hasMessageContaining("Connection refused");
         } else {
-          GenericTestUtils.assertExceptionContains(
-              "Could not determine or connect to OM Leader", e);
+          assertThat(e).hasMessageContaining("Could not determine or connect to OM Leader");
         }
       } else {
         throw e;
