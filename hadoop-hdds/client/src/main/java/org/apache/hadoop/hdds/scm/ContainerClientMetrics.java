@@ -23,10 +23,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.metrics2.lib.Interns;
-import org.apache.hadoop.metrics2.lib.MetricsRegistry;
-import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.*;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 import java.util.Map;
@@ -51,6 +48,10 @@ public final class ContainerClientMetrics {
   private MutableCounterLong totalWriteChunkCalls;
   @Metric
   private MutableCounterLong totalWriteChunkBytes;
+
+  private MutableQuantiles[] hsyncLatency;
+  private MutableQuantiles[] omHsyncLatency;
+  private MutableQuantiles[] datanodeHsyncLatency;
   private final Map<PipelineID, MutableCounterLong> writeChunkCallsByPipeline;
   private final Map<PipelineID, MutableCounterLong> writeChunkBytesByPipeline;
   private final Map<UUID, MutableCounterLong> writeChunksCallsByLeaders;
@@ -84,6 +85,26 @@ public final class ContainerClientMetrics {
     writeChunkCallsByPipeline = new ConcurrentHashMap<>();
     writeChunkBytesByPipeline = new ConcurrentHashMap<>();
     writeChunksCallsByLeaders = new ConcurrentHashMap<>();
+
+    hsyncLatency = new MutableQuantiles[3];
+    omHsyncLatency = new MutableQuantiles[3];
+    datanodeHsyncLatency = new MutableQuantiles[3];
+    int[] intervals = {60, 300, 900};
+    for (int i = 0; i < intervals.length; i++) {
+      int interval = intervals[i];
+      hsyncLatency[i] = registry
+          .newQuantiles("hsyncLatency" + interval
+                  + "s", "client hsync latency in millisecond", "ops",
+              "latency", interval);
+      omHsyncLatency[i] = registry
+          .newQuantiles("omHsyncLatency" + interval
+                  + "s", "client hsync latency to OM in millisecond", "ops",
+              "latency", interval);
+      datanodeHsyncLatency[i] = registry
+          .newQuantiles("dnHsyncLatency" + interval
+                  + "s", "client hsync latency to DN in millisecond", "ops",
+              "latency", interval);
+    }
   }
 
   public void recordWriteChunk(Pipeline pipeline, long chunkSizeBytes) {
@@ -111,7 +132,32 @@ public final class ContainerClientMetrics {
     totalWriteChunkBytes.incr(chunkSizeBytes);
   }
 
-  MutableCounterLong getTotalWriteChunkBytes() {
+  public void addHsyncLatency(long hsyncLatencyTime) {
+    for (MutableQuantiles q : hsyncLatency) {
+      if (q != null) {
+        q.add(hsyncLatencyTime);
+      }
+    }
+  }
+
+  public void addOMHsyncLatency(long hsyncLatencyTime) {
+    for (MutableQuantiles q : omHsyncLatency) {
+      if (q != null) {
+        q.add(hsyncLatencyTime);
+      }
+    }
+  }
+
+  public void addDataNodeHsyncLatency(long hsyncLatencyTime) {
+    for (MutableQuantiles q : datanodeHsyncLatency) {
+      if (q != null) {
+        q.add(hsyncLatencyTime);
+      }
+    }
+  }
+
+  @VisibleForTesting
+  public MutableCounterLong getTotalWriteChunkBytes() {
     return totalWriteChunkBytes;
   }
 
