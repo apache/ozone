@@ -38,7 +38,7 @@ public class LeakTracker extends WeakReference<Object> {
   }
 
   /**
-   * Called by the tracked resource closing.
+   * Called by the tracked resource when closing.
    */
   public void close() {
     allLeaks.remove(this);

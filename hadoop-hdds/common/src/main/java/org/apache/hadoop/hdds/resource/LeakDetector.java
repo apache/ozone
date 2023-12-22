@@ -27,15 +27,17 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Simple general resource leak detector using {@link ReferenceQueue} and {@link java.lang.ref.WeakReference} to observe
- * resource object life-cycle and assert proper resource closure before they are GCed.
+ * Simple general resource leak detector using {@link ReferenceQueue} and {@link java.lang.ref.WeakReference} to
+ * observe resource object life-cycle and assert proper resource closure before they are GCed.
  *
  * <p>
  * Example usage:
  *
  * <pre> {@code
  * class MyResource implements AutoClosable {
- *   private final LeakTracker MyResourceLeakDetector.LEAK_DETECTOR.track(this, () -> {
+ *   static final LeakDetector LEAK_DETECTOR = new LeakDetector("MyResource");
+ *
+ *   private final LeakTracker leakTracker = LEAK_DETECTOR.track(this, () -> {
  *      // report leaks, don't refer to the original object (MyResource) here.
  *      System.out.println("MyResource is not closed before being discarded.");
  *   });
@@ -43,14 +45,11 @@ import java.util.concurrent.ConcurrentHashMap;
  *   @Override
  *   public void close() {
  *     // proper resources cleanup...
- *     // inform tracker this object is closed properly.
+ *     // inform tracker that this object is closed properly.
  *     leakTracker.close();
  *   }
  * }
  *
- * class MyResourceLeakDetector {
- *    public static final LeakDetector LEAK_DETECTOR = new LeakDetector("MyResource");
- * }
  * }</pre>
  */
 public class LeakDetector implements Runnable {
