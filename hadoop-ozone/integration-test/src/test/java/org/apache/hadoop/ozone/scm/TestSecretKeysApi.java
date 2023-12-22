@@ -37,13 +37,10 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.util.ExitUtils;
 import org.jetbrains.annotations.NotNull;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,6 +50,7 @@ import java.net.InetAddress;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
@@ -77,23 +75,21 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration test to verify symmetric SecretKeys APIs in a secure cluster.
  */
+
+@Timeout(value = 500, unit = TimeUnit.SECONDS)
 @InterfaceAudience.Private
 public final class TestSecretKeysApi {
   private static final Logger LOG = LoggerFactory
       .getLogger(TestSecretKeysApi.class);
-
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(500));
-
   private MiniKdc miniKdc;
   private OzoneConfiguration conf;
   private File workDir;
@@ -106,7 +102,7 @@ public final class TestSecretKeysApi {
   private String scmId;
   private MiniOzoneHAClusterImpl cluster;
 
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
@@ -123,7 +119,7 @@ public final class TestSecretKeysApi {
     createCredentialsInKDC();
   }
 
-  @After
+  @AfterEach
   public void stop() {
     miniKdc.stop();
     if (cluster != null) {
