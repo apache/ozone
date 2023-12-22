@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.jetbrains.annotations.NotNull;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -144,29 +145,12 @@ public class TestFinalizeBlock {
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipeline(container.getPipelineID());
 
-
-    final ContainerProtos.ContainerCommandRequestProto.Builder builder =
-        ContainerProtos.ContainerCommandRequestProto.newBuilder()
-            .setCmdType(ContainerProtos.Type.FinalizeBlock)
-            .setContainerID(container.getContainerID())
-            .setDatanodeUuid(cluster.getHddsDatanodes()
-            .get(0).getDatanodeDetails().getUuidString());
-
-    final ContainerProtos.DatanodeBlockID blockId =
-        ContainerProtos.DatanodeBlockID.newBuilder()
-            .setContainerID(container.getContainerID()).setLocalID(
-             omKeyLocationInfoGroupList.get(0)
-            .getLocationList().get(0).getLocalID())
-            .setBlockCommitSequenceId(0).build();
-
-    builder.setFinalizeBlock(ContainerProtos.FinalizeBlockRequestProto
-        .newBuilder().setBlockID(blockId).build());
+    final ContainerProtos.ContainerCommandRequestProto request =
+        getFinalizeBlockRequest(omKeyLocationInfoGroupList, container);
 
     XceiverClientManager xceiverClientManager = new XceiverClientManager(conf);
     XceiverClientSpi xceiverClient =
         xceiverClientManager.acquireClient(pipeline);
-
-    ContainerProtos.ContainerCommandRequestProto request = builder.build();
     ContainerProtos.ContainerCommandResponseProto response =
         xceiverClient.sendCommand(request);
 
@@ -202,28 +186,12 @@ public class TestFinalizeBlock {
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipeline(container.getPipelineID());
 
-    final ContainerProtos.ContainerCommandRequestProto.Builder builder =
-        ContainerProtos.ContainerCommandRequestProto.newBuilder()
-            .setCmdType(ContainerProtos.Type.FinalizeBlock)
-            .setContainerID(container.getContainerID())
-            .setDatanodeUuid(cluster.getHddsDatanodes()
-             .get(0).getDatanodeDetails().getUuidString());
-
-    final ContainerProtos.DatanodeBlockID blockId =
-        ContainerProtos.DatanodeBlockID.newBuilder()
-            .setContainerID(container.getContainerID()).setLocalID(
-            omKeyLocationInfoGroupList.get(0)
-            .getLocationList().get(0).getLocalID())
-            .setBlockCommitSequenceId(0).build();
-
-    builder.setFinalizeBlock(ContainerProtos.FinalizeBlockRequestProto
-        .newBuilder().setBlockID(blockId).build());
+    final ContainerProtos.ContainerCommandRequestProto request =
+        getFinalizeBlockRequest(omKeyLocationInfoGroupList, container);
 
     XceiverClientManager xceiverClientManager = new XceiverClientManager(conf);
     XceiverClientSpi xceiverClient =
         xceiverClientManager.acquireClient(pipeline);
-
-    ContainerProtos.ContainerCommandRequestProto request = builder.build();
     ContainerProtos.ContainerCommandResponseProto response =
         xceiverClient.sendCommand(request);
 
@@ -270,28 +238,12 @@ public class TestFinalizeBlock {
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipeline(container.getPipelineID());
 
-
-    final ContainerProtos.ContainerCommandRequestProto.Builder builder =
-        ContainerProtos.ContainerCommandRequestProto.newBuilder()
-            .setCmdType(ContainerProtos.Type.FinalizeBlock)
-            .setContainerID(container.getContainerID())
-            .setDatanodeUuid(cluster.getHddsDatanodes()
-            .get(0).getDatanodeDetails().getUuidString());
-
-    final ContainerProtos.DatanodeBlockID blockId =
-        ContainerProtos.DatanodeBlockID.newBuilder()
-            .setContainerID(container.getContainerID()).setLocalID(
-                omKeyLocationInfoGroupList.get(0)
-            .getLocationList().get(0).getLocalID())
-            .setBlockCommitSequenceId(0).build();
-
-    builder.setFinalizeBlock(ContainerProtos.FinalizeBlockRequestProto
-        .newBuilder().setBlockID(blockId).build());
+    final ContainerProtos.ContainerCommandRequestProto request =
+        getFinalizeBlockRequest(omKeyLocationInfoGroupList, container);
 
     XceiverClientManager xceiverClientManager = new XceiverClientManager(conf);
     XceiverClientSpi xceiverClient =
         xceiverClientManager.acquireClient(pipeline);
-    ContainerProtos.ContainerCommandRequestProto request = builder.build();
 
     ContainerProtos.ContainerCommandResponseProto response =
         xceiverClient.sendCommand(request);
@@ -328,6 +280,29 @@ public class TestFinalizeBlock {
         cluster.getHddsDatanodes().get(0),
         containerId.getId()).getContainerData())
         .getFinalizedBlockSet().size() == 0);
+  }
+
+  @NotNull
+  private ContainerProtos.ContainerCommandRequestProto getFinalizeBlockRequest(
+      List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList,
+      ContainerInfo container) {
+    final ContainerProtos.ContainerCommandRequestProto.Builder builder =
+        ContainerProtos.ContainerCommandRequestProto.newBuilder()
+            .setCmdType(ContainerProtos.Type.FinalizeBlock)
+            .setContainerID(container.getContainerID())
+            .setDatanodeUuid(cluster.getHddsDatanodes()
+            .get(0).getDatanodeDetails().getUuidString());
+
+    final ContainerProtos.DatanodeBlockID blockId =
+        ContainerProtos.DatanodeBlockID.newBuilder()
+            .setContainerID(container.getContainerID()).setLocalID(
+                omKeyLocationInfoGroupList.get(0)
+            .getLocationList().get(0).getLocalID())
+            .setBlockCommitSequenceId(0).build();
+
+    builder.setFinalizeBlock(ContainerProtos.FinalizeBlockRequestProto
+        .newBuilder().setBlockID(blockId).build());
+    return builder.build();
   }
 
   /**
