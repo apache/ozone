@@ -23,7 +23,6 @@ import java.util.UUID;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeCreateResponse;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -34,6 +33,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
@@ -77,15 +77,11 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
       OMClientResponse omClientResponse =
           omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, txLogIndex);
       Assertions.assertTrue(omClientResponse instanceof OMVolumeCreateResponse);
-      OMVolumeCreateResponse respone =
-          (OMVolumeCreateResponse) omClientResponse;
-      Assertions.assertEquals(expectedObjId, respone.getOmVolumeArgs()
-          .getObjectID());
-      Assertions.assertEquals(txLogIndex,
-          respone.getOmVolumeArgs().getUpdateID());
+      OMVolumeCreateResponse response = (OMVolumeCreateResponse) omClientResponse;
+      Assertions.assertEquals(expectedObjId, response.getOmVolumeArgs().getObjectID());
+      Assertions.assertEquals(txLogIndex, response.getOmVolumeArgs().getUpdateID());
     } catch (IllegalArgumentException ex) {
-      GenericTestUtils.assertExceptionContains("should be greater than zero",
-          ex);
+      assertThat(ex).hasMessage("should be greater than zero");
     }
   }
 
