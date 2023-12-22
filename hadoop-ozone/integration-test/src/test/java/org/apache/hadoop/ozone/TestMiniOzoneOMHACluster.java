@@ -21,10 +21,8 @@ package org.apache.hadoop.ozone;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.*;
 import org.junit.rules.ExpectedException;
 
-import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -32,6 +30,12 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.Assertions;
 
 /**
  * This class tests MiniOzoneHAClusterImpl.
@@ -45,7 +49,7 @@ public class TestMiniOzoneOMHACluster {
   private String omServiceId;
   private int numOfOMs = 3;
 
-  public ExpectedException exception = ExpectedException.none();
+  private ExpectedException exception = ExpectedException.none();
 
   @Timeout(value = 300, unit = TimeUnit.SECONDS)
 
