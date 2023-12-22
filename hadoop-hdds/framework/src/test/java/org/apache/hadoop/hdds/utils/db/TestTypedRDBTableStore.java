@@ -29,6 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -52,7 +54,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
@@ -255,8 +256,8 @@ public class TestTypedRDBTableStore {
 
   @Test
   public void testIteratorOnException() throws Exception {
-    RDBTable rdbTable = Mockito.mock(RDBTable.class);
-    Mockito.when(rdbTable.iterator((CodecBuffer) null))
+    RDBTable rdbTable = mock(RDBTable.class);
+    when(rdbTable.iterator((CodecBuffer) null))
         .thenThrow(new IOException());
     try (Table<String, String> testTable = new TypedTable<>(rdbTable,
         codecRegistry, String.class, String.class)) {
