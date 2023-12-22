@@ -848,8 +848,9 @@ public class TestKeyManagerImpl {
     // lookup key, random node as client
     OmKeyInfo key4 = keyManager.lookupKey(keyArgs, resolvedBucket(),
         "/d=default-drack/127.0.0.1");
-    assertThat(keyPipeline.getNodes()).containsAll(key4.getLatestVersionLocations()
-            .getLocationList().get(0).getPipeline().getNodesInOrder());
+    assertThat(keyPipeline.getNodes())
+        .containsAll(key4.getLatestVersionLocations()
+              .getLocationList().get(0).getPipeline().getNodesInOrder());
   }
 
   @NotNull

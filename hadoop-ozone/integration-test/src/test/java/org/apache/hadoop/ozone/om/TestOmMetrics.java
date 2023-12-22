@@ -324,8 +324,7 @@ public class TestOmMetrics {
       writeClient.commitKey(keyArgs, keySession.getId());
     } catch (Exception e) {
       //Expected Failure in preExecute due to not enough datanode
-      assertThat(e.getMessage()).withFailMessage(e.getMessage())
-          .contains("No enough datanodes to choose");
+      assertThat(e.getMessage()).contains("No enough datanodes to choose");
     }
 
     omMetrics = getMetrics("OMMetrics");

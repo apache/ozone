@@ -44,7 +44,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -387,7 +386,8 @@ public class TestOzoneManagerConfiguration {
       fail("Should have failed to start the cluster!");
     } catch (OzoneIllegalArgumentException e) {
       // Expect error message
-      assertThat(e.getMessage()).contains("List of OM Node ID's should be specified");
+      assertTrue(e.getMessage().contains(
+          "List of OM Node ID's should be specified"));
     }
   }
 
@@ -416,7 +416,8 @@ public class TestOzoneManagerConfiguration {
       fail("Should have failed to start the cluster!");
     } catch (OzoneIllegalArgumentException e) {
       // Expect error message
-      assertThat(e.getMessage()).contains("OM RPC Address should be set for all node");
+      assertTrue(e.getMessage().contains(
+          "OM RPC Address should be set for all node"));
     }
   }
 

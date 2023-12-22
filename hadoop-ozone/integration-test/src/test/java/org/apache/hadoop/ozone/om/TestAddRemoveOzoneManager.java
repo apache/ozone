@@ -132,10 +132,9 @@ public class TestAddRemoveOzoneManager {
           + " not present in Peer list of OM " + om.getOMNodeId());
       assertTrue(om.getOmRatisServer().doesPeerExist(nodeId), "New OM node " + nodeId
           + " not present in Peer list of OM " + om.getOMNodeId() + " RatisServer");
-      assertThat(
-          om.getOmRatisServer().getCurrentPeersFromRaftConf())
-              .withFailMessage("New OM node " + nodeId + " not present in " + "OM "
-              + om.getOMNodeId() + "RatisServer's RaftConf").contains(nodeId);
+      assertThat(om.getOmRatisServer().getCurrentPeersFromRaftConf())
+          .withFailMessage("New OM node " + nodeId + " not present in " + om.getOMNodeId() + "'s RaftConf")
+          .contains(nodeId);
     }
 
     OzoneManager newOM = cluster.getOzoneManager(nodeId);
@@ -199,8 +198,9 @@ public class TestAddRemoveOzoneManager {
     GenericTestUtils.waitFor(() -> cluster.getOMLeader() != null, 500, 30000);
     OzoneManager omLeader = cluster.getOMLeader();
 
-    assertThat(newOMNodeIds).withFailMessage("New Bootstrapped OM not elected Leader even though" +
-        " other OMs are down").contains(omLeader.getOMNodeId());
+    assertThat(newOMNodeIds)
+        .withFailMessage("New Bootstrapped OM not elected Leader even though" + " other OMs are down")
+        .contains(omLeader.getOMNodeId());
 
     // Perform some read and write operations with new OM leader
     IOUtils.closeQuietly(client);
