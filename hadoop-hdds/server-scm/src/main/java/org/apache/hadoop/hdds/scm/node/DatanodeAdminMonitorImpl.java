@@ -442,7 +442,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
             ".legacy", false);
         boolean replicatedOK;
         if (legacyEnabled) {
-          replicatedOK = replicaSet.isSufficientlyReplicatedForOffline(dn, nodeManager);
+          replicatedOK = replicaSet.isSufficientlyReplicatedForOffline(dn.getDatanodeDetails(), nodeManager);
         } else {
           ReplicationManagerReport report = new ReplicationManagerReport();
           replicationManager.checkContainerStatus(replicaSet.getContainer(), report);

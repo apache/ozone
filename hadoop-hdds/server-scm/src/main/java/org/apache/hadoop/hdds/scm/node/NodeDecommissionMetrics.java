@@ -92,13 +92,10 @@ public final class NodeDecommissionMetrics implements MetricsSource {
             + "for host in decommissioning and "
             + "maintenance mode");
 
-    private static final MetricsInfo HOST_UNCLOSED_CONTAINERS = Interns.info(
-        "UnclosedContainersDN",
-        "Number of containers not fully closed for host in decommissioning "
-            + "and maintenance mode");
+    private static final MetricsInfo HOST_UNCLOSED_CONTAINERS = Interns.info("UnclosedContainersDN",
+        "Number of containers not fully closed for host in decommissioning and maintenance mode");
 
-    private static final MetricsInfo HOST_START_TIME = Interns.info(
-        "StartTimeDN",
+    private static final MetricsInfo HOST_START_TIME = Interns.info("StartTimeDN",
         "Time at which decommissioning was started");
 
 
