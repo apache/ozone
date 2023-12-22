@@ -140,7 +140,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     try {
       deleteCommandQueues.add(cmd);
     } catch (IllegalStateException e) {
-      String dnId = context.getParent().getDatanodeDetails().getUuid().toString();
+      String dnId = context.getParent().getDatanodeDetails().getUuidString();
       Consumer<CommandStatus> updateFailure = (cmdStatus) -> {
         cmdStatus.markAsFailed();
         ContainerBlocksDeletionACKProto emptyACK =
