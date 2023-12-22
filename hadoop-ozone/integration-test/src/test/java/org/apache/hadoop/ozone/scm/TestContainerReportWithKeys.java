@@ -37,14 +37,8 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.*;
 import org.junit.rules.ExpectedException;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
 import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,19 +46,19 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * This class tests container report with DN container state info.
  */
-public class TestContainerReportWithKeys {
+/**
+ * Set a timeout for each test.
+ */
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
 
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
+public class TestContainerReportWithKeys {
   private static final Logger LOG = LoggerFactory.getLogger(
       TestContainerReportWithKeys.class);
   private static MiniOzoneCluster cluster = null;
@@ -72,7 +66,6 @@ public class TestContainerReportWithKeys {
   private static OzoneConfiguration conf;
   private static StorageContainerManager scm;
 
-  @Rule
   public ExpectedException exception = ExpectedException.none();
 
   /**
@@ -82,7 +75,7 @@ public class TestContainerReportWithKeys {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     cluster = MiniOzoneCluster.newBuilder(conf).build();
@@ -94,7 +87,7 @@ public class TestContainerReportWithKeys {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -140,8 +133,9 @@ public class TestContainerReportWithKeys {
     Set<ContainerReplica> replicas =
         scm.getContainerManager().getContainerReplicas(
             ContainerID.valueOf(keyInfo.getContainerID()));
-    Assert.assertEquals(1, replicas.size());
-    replicas.stream().forEach(rp -> Assert.assertNotNull(rp.getDatanodeDetails().getParent()));
+    Assertions.assertEquals(1, replicas.size());
+    replicas.stream().forEach(rp ->
+        Assertions.assertNotNull(rp.getDatanodeDetails().getParent()));
 
     LOG.info("SCM Container Info keyCount: {} usedBytes: {}",
         cinfo.getNumberOfKeys(), cinfo.getUsedBytes());

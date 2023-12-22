@@ -37,9 +37,11 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.FileUtils;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -48,28 +50,21 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-
-import org.junit.Rule;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test cases for ContainerMapper.
  */
+/**
+ * Set a timeout for each test.
+ */
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
 
 public class TestContainerMapper {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
-
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient ozClient = null;
   private static ObjectStore store = null;
@@ -84,7 +79,7 @@ public class TestContainerMapper {
   private static String dbPath;
 
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     dbPath = GenericTestUtils.getRandomizedTempPath();
@@ -144,7 +139,7 @@ public class TestContainerMapper {
     return chars;
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdown() throws IOException {
     IOUtils.closeQuietly(ozClient);
     cluster.shutdown();
