@@ -317,11 +317,12 @@ public class TestCommitWatcher {
           // can itself get AlreadyClosedException from the Ratis Server
           // and the write may fail with RaftRetryFailureException
           Throwable t = HddsClientUtils.checkForException(ioe);
-          assertTrue(t instanceof RaftRetryFailureException ||
-                            t instanceof TimeoutIOException ||
-                            t instanceof AlreadyClosedException ||
-                            t instanceof NotReplicatedException,
-                  "Unexpected exception: " + t.getClass());
+          assertTrue(
+              t instanceof RaftRetryFailureException ||
+                  t instanceof TimeoutIOException ||
+                  t instanceof AlreadyClosedException ||
+                  t instanceof NotReplicatedException,
+              "Unexpected exception: " + t.getClass());
         }
         if (ratisClient.getReplicatedMinCommitIndex() < replies.get(1)
             .getLogIndex()) {
