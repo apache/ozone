@@ -37,10 +37,6 @@
     <Bug pattern="RR_NOT_CHECKED" />
   </Match>
   <Match>
-    <Class name="org.apache.hadoop.fs.ozone.TestOzoneFileInterfaces"/>
-    <Bug pattern="DLS_DEAD_LOCAL_STORE" />
-  </Match>
-  <Match>
     <Class name="org.apache.hadoop.hdds.scm.container.TestContainerStateManagerIntegration"/>
     <Bug pattern="DLS_DEAD_LOCAL_STORE" />
   </Match>
