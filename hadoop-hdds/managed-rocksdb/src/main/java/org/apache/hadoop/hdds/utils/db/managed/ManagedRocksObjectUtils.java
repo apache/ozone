@@ -71,7 +71,7 @@ public final class ManagedRocksObjectUtils {
   }
 
   static String formatStackTrace(@Nullable StackTraceElement[] elements) {
-    return HddsUtils.formatStackTrace(elements, 3);
+    return HddsUtils.formatStackTrace(elements, 4);
   }
 
   /**
