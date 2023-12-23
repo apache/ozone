@@ -253,14 +253,14 @@ public class TestBlocksEndPoint {
     containerStateBlockInfoListMap =
         (Map<String, List<ContainerBlocksInfoWrapper>>)
             blocksPendingDeletion.getEntity();
-    Assertions.assertTrue(containerStateBlockInfoListMap.size() == 0);
+    Assertions.assertEquals(0, containerStateBlockInfoListMap.size());
 
     blocksPendingDeletion =
         blocksEndPoint.getBlocksPendingDeletion(1, 4);
     containerStateBlockInfoListMap =
         (Map<String, List<ContainerBlocksInfoWrapper>>)
             blocksPendingDeletion.getEntity();
-    Assertions.assertTrue(containerStateBlockInfoListMap.size() == 0);
+    Assertions.assertEquals(0, containerStateBlockInfoListMap.size());
   }
 
   protected ContainerWithPipeline getTestContainer(

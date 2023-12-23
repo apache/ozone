@@ -49,7 +49,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.grpc.server.GrpcLogAppender;
 import org.apache.ratis.server.leader.FollowerInfo;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -58,6 +57,12 @@ import org.slf4j.event.Level;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHA.createKey;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test for OM bootstrap process.
@@ -123,14 +128,13 @@ public class TestAddRemoveOzoneManager {
     // Check that new peer exists in all OMs peers list and also in their Ratis
     // server's peer list
     for (OzoneManager om : cluster.getOzoneManagersList()) {
-      Assert.assertTrue("New OM node " + nodeId + " not present in Peer list " +
-          "of OM " + om.getOMNodeId(), om.doesPeerExist(nodeId));
-      Assert.assertTrue("New OM node " + nodeId + " not present in Peer list " +
-              "of OM " + om.getOMNodeId() + " RatisServer",
-          om.getOmRatisServer().doesPeerExist(nodeId));
-      Assert.assertTrue("New OM node " + nodeId + " not present in " +
-              "OM " + om.getOMNodeId() + "RatisServer's RaftConf",
-          om.getOmRatisServer().getCurrentPeersFromRaftConf().contains(nodeId));
+      assertTrue(om.doesPeerExist(nodeId), "New OM node " + nodeId
+          + " not present in Peer list of OM " + om.getOMNodeId());
+      assertTrue(om.getOmRatisServer().doesPeerExist(nodeId), "New OM node " + nodeId
+          + " not present in Peer list of OM " + om.getOMNodeId() + " RatisServer");
+      assertThat(om.getOmRatisServer().getCurrentPeersFromRaftConf())
+          .withFailMessage("New OM node " + nodeId + " not present in " + om.getOMNodeId() + "'s RaftConf")
+          .contains(nodeId);
     }
 
     OzoneManager newOM = cluster.getOzoneManager(nodeId);
@@ -140,8 +144,8 @@ public class TestAddRemoveOzoneManager {
 
     // Check Ratis Dir for log files
     File[] logFiles = getRatisLogFiles(newOM);
-    Assert.assertTrue("There are no ratis logs in new OM ",
-        logFiles.length > 0);
+    assertThat(logFiles.length).withFailMessage("There are no ratis logs in new OM ")
+        .isGreaterThan(0);
   }
 
   private File[] getRatisLogFiles(OzoneManager om) {
@@ -194,8 +198,9 @@ public class TestAddRemoveOzoneManager {
     GenericTestUtils.waitFor(() -> cluster.getOMLeader() != null, 500, 30000);
     OzoneManager omLeader = cluster.getOMLeader();
 
-    Assert.assertTrue("New Bootstrapped OM not elected Leader even though " +
-        "other OMs are down", newOMNodeIds.contains(omLeader.getOMNodeId()));
+    assertThat(newOMNodeIds)
+        .withFailMessage("New Bootstrapped OM not elected Leader even though" + " other OMs are down")
+        .contains(omLeader.getOMNodeId());
 
     // Perform some read and write operations with new OM leader
     IOUtils.closeQuietly(client);
@@ -206,7 +211,7 @@ public class TestAddRemoveOzoneManager {
     OzoneBucket bucket = volume.getBucket(BUCKET_NAME);
     String key = createKey(bucket);
 
-    Assert.assertNotNull(bucket.getKey(key));
+    assertNotNull(bucket.getKey(key));
   }
 
   /**
@@ -236,17 +241,17 @@ public class TestAddRemoveOzoneManager {
     String newNodeId = "omNode-bootstrap-1";
     try {
       cluster.bootstrapOzoneManager(newNodeId, false, false);
-      Assert.fail("Bootstrap should have failed as configs are not updated on" +
+      fail("Bootstrap should have failed as configs are not updated on" +
           " all OMs.");
     } catch (Exception e) {
-      Assert.assertEquals(OmUtils.getOMAddressListPrintString(
+      assertEquals(OmUtils.getOMAddressListPrintString(
           Lists.newArrayList(existingOM.getNodeDetails())) + " do not have or" +
           " have incorrect information of the bootstrapping OM. Update their " +
           "ozone-site.xml before proceeding.", e.getMessage());
-      Assert.assertTrue(omLog.getOutput().contains("Remote OM config check " +
-          "failed on OM " + existingOMNodeId));
-      Assert.assertTrue(miniOzoneClusterLog.getOutput().contains(newNodeId +
-          " - System Exit"));
+      assertThat(omLog.getOutput()).contains("Remote OM config check " +
+          "failed on OM " + existingOMNodeId);
+      assertThat(miniOzoneClusterLog.getOutput()).contains(newNodeId +
+          " - System Exit");
     }
 
     /***************************************************************************
@@ -264,14 +269,14 @@ public class TestAddRemoveOzoneManager {
     try {
       cluster.bootstrapOzoneManager(newNodeId, false, true);
     } catch (IOException e) {
-      Assert.assertTrue(omLog.getOutput().contains("Couldn't add OM " +
-          newNodeId + " to peer list."));
-      Assert.assertTrue(miniOzoneClusterLog.getOutput().contains(
+      assertThat(omLog.getOutput()).contains("Couldn't add OM " +
+          newNodeId + " to peer list.");
+      assertThat(miniOzoneClusterLog.getOutput()).contains(
           existingOMNodeId + " - System Exit: There is no OM configuration " +
-              "for node ID " + newNodeId + " in ozone-site.xml."));
+              "for node ID " + newNodeId + " in ozone-site.xml.");
 
       // Verify that the existing OM has stopped.
-      Assert.assertFalse(cluster.getOzoneManager(existingOMNodeId).isRunning());
+      assertFalse(cluster.getOzoneManager(existingOMNodeId).isRunning());
     }
   }
 
@@ -310,19 +315,19 @@ public class TestAddRemoveOzoneManager {
     String newNodeId = "omNode-bootstrap-1";
     try {
       cluster.bootstrapOzoneManager(newNodeId, true, false);
-      Assert.fail("Bootstrap should have failed as configs are not updated on" +
+      fail("Bootstrap should have failed as configs are not updated on" +
           " all OMs.");
     } catch (IOException e) {
-      Assert.assertEquals(OmUtils.getOMAddressListPrintString(
+      assertEquals(OmUtils.getOMAddressListPrintString(
           Lists.newArrayList(downOM.getNodeDetails())) + " do not have or " +
           "have incorrect information of the bootstrapping OM. Update their " +
           "ozone-site.xml before proceeding.", e.getMessage());
-      Assert.assertTrue(omLog.getOutput().contains("Remote OM " + downOMNodeId +
-          " configuration returned null"));
-      Assert.assertTrue(omLog.getOutput().contains("Remote OM config check " +
-          "failed on OM " + downOMNodeId));
-      Assert.assertTrue(miniOzoneClusterLog.getOutput().contains(newNodeId +
-          " - System Exit"));
+      assertThat(omLog.getOutput()).contains("Remote OM " + downOMNodeId +
+          " configuration returned null");
+      assertThat(omLog.getOutput()).contains("Remote OM config check " +
+          "failed on OM " + downOMNodeId);
+      assertThat(miniOzoneClusterLog.getOutput()).contains(newNodeId +
+          " - System Exit");
     }
 
     /***************************************************************************
@@ -338,7 +343,7 @@ public class TestAddRemoveOzoneManager {
     OzoneManager newOM = cluster.getOzoneManager(newNodeId);
 
     // Verify that the newly bootstrapped OM is running
-    Assert.assertTrue(newOM.isRunning());
+    assertTrue(newOM.isRunning());
   }
 
   /**
@@ -375,7 +380,7 @@ public class TestAddRemoveOzoneManager {
     OzoneBucket bucket = volume.getBucket(BUCKET_NAME);
     String key = createKey(bucket);
 
-    Assert.assertNotNull(bucket.getKey(key));
+    assertNotNull(bucket.getKey(key));
 
   }
 

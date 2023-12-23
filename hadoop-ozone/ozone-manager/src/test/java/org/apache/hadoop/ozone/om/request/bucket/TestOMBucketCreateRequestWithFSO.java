@@ -144,8 +144,7 @@ public class TestOMBucketCreateRequestWithFSO
 
 
     OMClientResponse omClientResponse =
-        omBucketCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omBucketCreateRequest.validateAndUpdateCache(ozoneManager, 1);
 
     // As now after validateAndUpdateCache it should add entry to cache, get
     // should return non null value.

@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeyTestUtil;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -35,6 +34,7 @@ import java.util.EnumSet;
 
 import static java.time.Duration.ofDays;
 import static java.time.Instant.now;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -93,8 +93,8 @@ public class TestOzoneBlockTokenIdentifier {
     decodedTokenId.readFields(new DataInputStream(
         new ByteArrayInputStream(decodedToken.getIdentifier())));
 
-    Assertions.assertEquals(tokenId, decodedTokenId);
-    Assertions.assertEquals(maxLength, decodedTokenId.getMaxLength());
+    assertEquals(tokenId, decodedTokenId);
+    assertEquals(maxLength, decodedTokenId.getMaxLength());
 
     // Verify a decoded signed Token
     assertTrue(secretKey.isValidSignature(decodedTokenId,

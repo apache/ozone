@@ -23,7 +23,6 @@ import java.util.UUID;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeCreateResponse;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -34,6 +33,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
@@ -75,18 +75,13 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
 
     try {
       OMClientResponse omClientResponse =
-          omVolumeCreateRequest.validateAndUpdateCache(ozoneManager,
-              txLogIndex, ozoneManagerDoubleBufferHelper);
+          omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, txLogIndex);
       Assertions.assertTrue(omClientResponse instanceof OMVolumeCreateResponse);
-      OMVolumeCreateResponse respone =
-          (OMVolumeCreateResponse) omClientResponse;
-      Assertions.assertEquals(expectedObjId, respone.getOmVolumeArgs()
-          .getObjectID());
-      Assertions.assertEquals(txLogIndex,
-          respone.getOmVolumeArgs().getUpdateID());
+      OMVolumeCreateResponse response = (OMVolumeCreateResponse) omClientResponse;
+      Assertions.assertEquals(expectedObjId, response.getOmVolumeArgs().getObjectID());
+      Assertions.assertEquals(txLogIndex, response.getOmVolumeArgs().getUpdateID());
     } catch (IllegalArgumentException ex) {
-      GenericTestUtils.assertExceptionContains("should be greater than zero",
-          ex);
+      assertThat(ex).hasMessage("should be greater than zero");
     }
   }
 
@@ -118,8 +113,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     long expectedObjId = ozoneManager.getObjectIdFromTxId(txLogIndex);
 
     OMClientResponse omClientResponse =
-        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, txLogIndex,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, txLogIndex);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
@@ -169,8 +163,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     omVolumeCreateRequest = new OMVolumeCreateRequest(modifiedRequest);
 
     omClientResponse =
-        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, 2L,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, 2L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
@@ -199,8 +192,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     omVolumeCreateRequest = new OMVolumeCreateRequest(modifiedRequest);
 
     OMClientResponse omClientResponse =
-        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, 1);
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
@@ -264,8 +256,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     omVolumeCreateRequest = new OMVolumeCreateRequest(modifiedRequest);
     long txLogIndex = 1;
     OMClientResponse omClientResponse =
-        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, txLogIndex,
-            ozoneManagerDoubleBufferHelper);
+        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, txLogIndex);
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
 

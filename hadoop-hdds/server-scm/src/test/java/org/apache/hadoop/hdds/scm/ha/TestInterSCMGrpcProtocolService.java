@@ -72,7 +72,7 @@ import static org.mockito.Mockito.when;
  *
  * @see <a href="https://issues.apache.org/jira/browse/HDDS-8901">HDDS-8901</a>
  */
-public class TestInterSCMGrpcProtocolService {
+class TestInterSCMGrpcProtocolService {
 
   private static final String CP_FILE_NAME = "cpFile";
   private static final String CP_CONTENTS = "Hello world!";
@@ -89,7 +89,7 @@ public class TestInterSCMGrpcProtocolService {
   private Path temp;
 
   @Test
-  public void testMTLSOnInterScmGrpcProtocolServiceAccess() throws Exception {
+  void testMTLSOnInterScmGrpcProtocolServiceAccess() throws Exception {
     int port = new Random().nextInt(1000) + 45000;
     OzoneConfiguration conf = setupConfiguration(port);
     SCMCertificateClient
@@ -100,7 +100,7 @@ public class TestInterSCMGrpcProtocolService {
 
     InterSCMGrpcClient client =
         new InterSCMGrpcClient("localhost", port, conf, scmCertClient);
-    Path tempFile = Files.createTempFile(temp, CP_FILE_NAME, "");
+    Path tempFile = temp.resolve(CP_FILE_NAME);
     CompletableFuture<Path> res = client.download(tempFile);
     Path downloaded = res.get();
 
@@ -182,7 +182,7 @@ public class TestInterSCMGrpcProtocolService {
   }
 
   private DBCheckpoint checkPoint() throws IOException {
-    Path checkPointLocation = Files.createTempDirectory(temp, "cpDir");
+    Path checkPointLocation = Files.createDirectory(temp.resolve("cpDir"));
     Path cpFile = Paths.get(checkPointLocation.toString(), CP_FILE_NAME);
     Files.write(cpFile, CP_CONTENTS.getBytes(UTF_8));
     DBCheckpoint checkpoint = mock(DBCheckpoint.class);

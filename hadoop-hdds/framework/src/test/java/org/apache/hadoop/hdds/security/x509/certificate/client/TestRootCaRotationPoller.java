@@ -26,11 +26,9 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertific
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 import java.security.KeyPair;
@@ -46,6 +44,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.when;
 
 /**
  * Test for Root Ca Rotation polling mechanism on client side.
@@ -81,7 +83,7 @@ public class TestRootCaRotationPoller {
         knownCerts, scmSecurityClient, "");
     //When the scm returns the same set of root ca certificates, and they poll
     //for them
-    Mockito.when(scmSecurityClient.getAllRootCaCertificates())
+    when(scmSecurityClient.getAllRootCaCertificates())
         .thenReturn(certsFromScm);
     CompletableFuture<Void> processingResult = new CompletableFuture<>();
     AtomicBoolean isProcessed = new AtomicBoolean(false);
@@ -95,7 +97,7 @@ public class TestRootCaRotationPoller {
     poller.pollRootCas();
     //Then the certificates are not processed. Note that we can't invoke
     // processingResult.join before as it never gets completed
-    Assertions.assertThrows(TimeoutException.class, () ->
+    assertThrows(TimeoutException.class, () ->
         GenericTestUtils.waitFor(isProcessed::get, 50, 5000));
   }
 
@@ -115,7 +117,7 @@ public class TestRootCaRotationPoller {
     RootCaRotationPoller poller = new RootCaRotationPoller(secConf,
         knownCerts, scmSecurityClient, "");
     //when the scm returns the unknown certificate to the poller
-    Mockito.when(scmSecurityClient.getAllRootCaCertificates())
+    when(scmSecurityClient.getAllRootCaCertificates())
         .thenReturn(certsFromScm);
     CompletableFuture<Void> processingResult = new CompletableFuture<>();
     AtomicBoolean isProcessed = new AtomicBoolean(false);
@@ -129,7 +131,7 @@ public class TestRootCaRotationPoller {
     poller.pollRootCas();
     processingResult.join();
     //The root ca processors are invoked
-    Assertions.assertTrue(isProcessed.get());
+    assertTrue(isProcessed.get());
   }
 
   @Test
@@ -147,7 +149,7 @@ public class TestRootCaRotationPoller {
     certsFromScm.add(CertificateCodec.getPEMEncodedString(newRootCa));
     RootCaRotationPoller poller = new RootCaRotationPoller(secConf,
         knownCerts, scmSecurityClient, "");
-    Mockito.when(scmSecurityClient.getAllRootCaCertificates())
+    when(scmSecurityClient.getAllRootCaCertificates())
         .thenReturn(certsFromScm);
     CompletableFuture<Void> processingResult = new CompletableFuture<>();
     //When encountering an error for the first run:
@@ -157,7 +159,7 @@ public class TestRootCaRotationPoller {
           if (runNumber.getAndIncrement() < 2) {
             poller.setCertificateRenewalError();
           }
-          Assertions.assertEquals(certificates.size(), 2);
+          assertEquals(certificates.size(), 2);
           processingResult.complete(null);
           return processingResult;
         }
@@ -165,11 +167,11 @@ public class TestRootCaRotationPoller {
     //Then the first run encounters an error
     poller.pollRootCas();
     processingResult.join();
-    Assertions.assertTrue(logCapturer.getOutput().contains(
+    assertTrue(logCapturer.getOutput().contains(
         "There was a caught exception when trying to sign the certificate"));
     //And then the second clean run is successful.
     poller.pollRootCas();
-    Assertions.assertTrue(logCapturer.getOutput().contains(
+    assertTrue(logCapturer.getOutput().contains(
         "Certificate processing was successful."));
   }
 

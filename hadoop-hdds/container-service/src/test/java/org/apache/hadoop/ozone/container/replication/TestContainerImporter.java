@@ -44,7 +44,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -56,6 +56,9 @@ import static org.mockito.Mockito.when;
  * Test for {@link ContainerImporter}.
  */
 class TestContainerImporter {
+
+  @TempDir
+  private File tempDir;
 
   private OzoneConfiguration conf;
 
@@ -136,13 +139,11 @@ class TestContainerImporter {
 
   private File containerTarFile(
       long containerId, ContainerData containerData) throws IOException {
-    TemporaryFolder tempFolder = new TemporaryFolder();
-    tempFolder.create();
-    File yamlFile = tempFolder.newFile("container.yaml");
+    File yamlFile = new File(tempDir, "container.yaml");
     ContainerDataYaml.createContainerFile(
         ContainerProtos.ContainerType.KeyValueContainer, containerData,
         yamlFile);
-    File tarFile = tempFolder.newFile(
+    File tarFile = new File(tempDir,
         ContainerUtils.getContainerTarName(containerId));
     try (FileOutputStream output = new FileOutputStream(tarFile)) {
       TarArchiveOutputStream archive = new TarArchiveOutputStream(output);

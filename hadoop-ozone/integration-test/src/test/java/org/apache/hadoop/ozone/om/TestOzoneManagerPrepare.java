@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 import java.io.File;
 import java.io.IOException;
@@ -295,11 +296,8 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
               .stream()
               .anyMatch((vol) -> vol.getName().equals(volumeName)));
         } catch (ExecutionException ex) {
-          Throwable cause = ex.getCause();
-          assertTrue(cause instanceof OMException);
-          assertEquals(
-              NOT_SUPPORTED_OPERATION_WHEN_PREPARED,
-              ((OMException) cause).getResult());
+          OMException cause = assertInstanceOf(OMException.class, ex.getCause());
+          assertEquals(NOT_SUPPORTED_OPERATION_WHEN_PREPARED, cause.getResult());
         }
       }
     }

@@ -70,12 +70,10 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
         getS3InitiateMultipartUploadReq(modifiedRequest);
 
     OMClientResponse omClientResponse =
-            s3InitiateMultipartUploadReqFSO.validateAndUpdateCache(
-                    ozoneManager, 100L,
-                    ozoneManagerDoubleBufferHelper);
+        s3InitiateMultipartUploadReqFSO.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
-            omClientResponse.getOMResponse().getStatus());
+        omClientResponse.getOMResponse().getStatus());
 
     long parentID = verifyDirectoriesInDB(dirs, volumeId, bucketId);
 
@@ -199,8 +197,7 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
 
     OMClientResponse omClientResponse =
         s3InitiateMultipartUploadReqFSO.validateAndUpdateCache(
-            ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+            ozoneManager, 100L);
 
     // create file with acls inherited from parent DEFAULT acls
     long parentID = verifyDirectoriesInDB(dirs, volumeId, bucketId);
