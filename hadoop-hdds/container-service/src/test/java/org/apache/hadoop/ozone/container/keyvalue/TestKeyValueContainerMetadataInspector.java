@@ -36,8 +36,6 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.log4j.PatternLayout;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -58,11 +56,10 @@ public class TestKeyValueContainerMetadataInspector
     extends TestKeyValueContainerIntegrityChecks {
   private static final long CONTAINER_ID = 102;
 
-  @ParameterizedTest
-  @MethodSource("data")
+  @ContainerTestVersionInfo.ContainerTest
   public void testRunDisabled(ContainerTestVersionInfo versionInfo)
       throws Exception {
-    setUp(versionInfo);
+    initTestData(versionInfo);
     // Create incorrect container.
     KeyValueContainer container = createClosedContainer(3);
     KeyValueContainerData containerData = container.getContainerData();
@@ -84,11 +81,10 @@ public class TestKeyValueContainerMetadataInspector
     assertNull(runInspectorAndGetReport(containerData));
   }
 
-  @ParameterizedTest
-  @MethodSource("data")
+  @ContainerTestVersionInfo.ContainerTest
   public void testSystemPropertyAndReadOnly(
       ContainerTestVersionInfo versionInfo) throws Exception {
-    setUp(versionInfo);
+    initTestData(versionInfo);
     System.clearProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY);
     ContainerInspector inspector = new KeyValueContainerMetadataInspector();
     assertFalse(inspector.load());
@@ -119,11 +115,10 @@ public class TestKeyValueContainerMetadataInspector
     System.clearProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY);
   }
 
-  @ParameterizedTest
-  @MethodSource("data")
+  @ContainerTestVersionInfo.ContainerTest
   public void testIncorrectTotalsNoData(ContainerTestVersionInfo versionInfo)
       throws Exception {
-    setUp(versionInfo);
+    initTestData(versionInfo);
     int createBlocks = 0;
     int setBlocks = -3;
     int setBytes = -2;
@@ -134,11 +129,10 @@ public class TestKeyValueContainerMetadataInspector
         createBlocks, setBlocks, setBytes, 0, 0);
   }
 
-  @ParameterizedTest
-  @MethodSource("data")
+  @ContainerTestVersionInfo.ContainerTest
   public void testIncorrectTotalsWithData(ContainerTestVersionInfo versionInfo)
       throws Exception {
-    setUp(versionInfo);
+    initTestData(versionInfo);
     int createBlocks = 3;
     int setBlocks = 4;
     int setBytes = -2;
@@ -150,12 +144,10 @@ public class TestKeyValueContainerMetadataInspector
         createBlocks, setBlocks, setBytes, 0, 0);
   }
 
-  @ParameterizedTest
-  @MethodSource("data")
+  @ContainerTestVersionInfo.ContainerTest
   public void testCorrectTotalsNoData(ContainerTestVersionInfo versionInfo)
       throws Exception {
-    setUp(versionInfo);
-
+    initTestData(versionInfo);
     int createBlocks = 0;
     int setBytes = 0;
 
@@ -165,11 +157,10 @@ public class TestKeyValueContainerMetadataInspector
     inspectThenRepairOnCorrectContainer(container.getContainerData());
   }
 
-  @ParameterizedTest
-  @MethodSource("data")
+  @ContainerTestVersionInfo.ContainerTest
   public void testCorrectTotalsWithData(ContainerTestVersionInfo versionInfo)
       throws Exception {
-    setUp(versionInfo);
+    initTestData(versionInfo);
     int createBlocks = 3;
     int setBytes = CHUNK_LEN * CHUNKS_PER_BLOCK * createBlocks;
 
@@ -208,11 +199,10 @@ public class TestKeyValueContainerMetadataInspector
   static final DeletedBlocksTransactionGeneratorForTesting GENERATOR
       = new DeletedBlocksTransactionGeneratorForTesting();
 
-  @ParameterizedTest
-  @MethodSource("data")
+  @ContainerTestVersionInfo.ContainerTest
   public void testCorrectDeleteWithTransaction(
       ContainerTestVersionInfo versionInfo) throws Exception {
-    setUp(versionInfo);
+    initTestData(versionInfo);
     final int createBlocks = 4;
     final int setBytes = CHUNK_LEN * CHUNKS_PER_BLOCK * createBlocks;
     final int deleteCount = 10;
@@ -232,11 +222,10 @@ public class TestKeyValueContainerMetadataInspector
     inspectThenRepairOnCorrectContainer(container.getContainerData());
   }
 
-  @ParameterizedTest
-  @MethodSource("data")
+  @ContainerTestVersionInfo.ContainerTest
   public void testIncorrectDeleteWithTransaction(
       ContainerTestVersionInfo versionInfo) throws Exception {
-    setUp(versionInfo);
+    initTestData(versionInfo);
     final int createBlocks = 4;
     final int setBytes = CHUNK_LEN * CHUNKS_PER_BLOCK * createBlocks;
     final int deleteCount = 10;
@@ -257,11 +246,10 @@ public class TestKeyValueContainerMetadataInspector
         deleteCount, numDeletedLocalIds);
   }
 
-  @ParameterizedTest
-  @MethodSource("data")
+  @ContainerTestVersionInfo.ContainerTest
   public void testIncorrectDeleteWithoutTransaction(
       ContainerTestVersionInfo versionInfo) throws Exception {
-    setUp(versionInfo);
+    initTestData(versionInfo);
     final int createBlocks = 4;
     final int setBytes = CHUNK_LEN * CHUNKS_PER_BLOCK * createBlocks;
     final int deleteCount = 10;

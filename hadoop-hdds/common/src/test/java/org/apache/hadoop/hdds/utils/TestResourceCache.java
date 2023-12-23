@@ -49,7 +49,7 @@ public class TestResourceCache {
     // put to cache with removing old element "6" as eviction FIFO
     resourceCache.put(1, "a");
     Assertions.assertNull(resourceCache.get(6));
-    Assertions.assertTrue(count.get() == 1);
+    Assertions.assertEquals(1, count.get());
 
     // add 5 should be success with no removal
     resourceCache.put(5, "a");
@@ -58,7 +58,7 @@ public class TestResourceCache {
     // remove and check queue
     resourceCache.remove(4);
     Assertions.assertNull(resourceCache.get(4));
-    Assertions.assertTrue(count.get() == 1);
+    Assertions.assertEquals(1, count.get());
   }
 
   @Test

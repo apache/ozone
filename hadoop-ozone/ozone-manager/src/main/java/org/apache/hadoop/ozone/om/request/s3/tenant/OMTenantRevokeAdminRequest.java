@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -142,8 +141,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
   @Override
   @SuppressWarnings("checkstyle:methodlength")
   public OMClientResponse validateAndUpdateCache(
-      OzoneManager ozoneManager, long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+      OzoneManager ozoneManager, long transactionLogIndex) {
 
     final OMMultiTenantManager multiTenantManager =
         ozoneManager.getMultiTenantManager();
@@ -214,8 +212,6 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
       omClientResponse = new OMTenantRevokeAdminResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
       if (acquiredVolumeLock) {
         Preconditions.checkNotNull(volumeName);
         mergeOmLockDetails(

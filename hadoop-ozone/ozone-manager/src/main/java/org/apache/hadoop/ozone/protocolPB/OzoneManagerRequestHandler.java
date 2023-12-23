@@ -156,6 +156,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.hadoop.util.Preconditions;
 import org.apache.hadoop.util.ProtobufUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -392,8 +393,17 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
     return captureLatencyNs(
         impl.getPerfMetrics().getValidateAndUpdateCacneLatencyNs(),
-        () -> omClientRequest.validateAndUpdateCache(getOzoneManager(),
-            transactionLogIndex, ozoneManagerDoubleBuffer::add));
+        () -> {
+          OMClientResponse omClientResponse =
+              omClientRequest.validateAndUpdateCache(getOzoneManager(), transactionLogIndex);
+          Preconditions.checkNotNull(omClientResponse,
+              "omClientResponse returned by validateAndUpdateCache cannot be null");
+          if (omRequest.getCmdType() != Type.Prepare) {
+            omClientResponse.setFlushFuture(
+                ozoneManagerDoubleBuffer.add(omClientResponse, transactionLogIndex));
+          }
+          return omClientResponse;
+        });
   }
 
   @Override

@@ -46,11 +46,9 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType;
-import org.apache.ozone.test.UnhealthyTest;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.junit.experimental.categories.Category;
 
 /**
  * Test OM layout version management.
@@ -106,7 +104,6 @@ public class TestOMVersionManager {
   }
 
   @Test
-  @Category(UnhealthyTest.class)
   @Unhealthy("Since there is no longer a need to enforce the getRequestType " +
       "method in OM request classes, disabling the " +
       "test. Potentially revisit later.")

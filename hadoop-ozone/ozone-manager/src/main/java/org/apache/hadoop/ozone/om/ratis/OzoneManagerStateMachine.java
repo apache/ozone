@@ -34,7 +34,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
@@ -95,7 +94,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private RequestHandler handler;
   private RaftGroupId raftGroupId;
   private OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
-  private final RatisSnapshotInfo snapshotInfo;
   private final ExecutorService executorService;
   private final ExecutorService installSnapshotExecutor;
   private final boolean isTracingEnabled;
@@ -119,7 +117,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     this.isTracingEnabled = isTracingEnabled;
     this.ozoneManager = omRatisServer.getOzoneManager();
 
-    this.snapshotInfo = ozoneManager.getSnapshotInfo();
     loadSnapshotInfoFromDB();
     this.threadPrefix = ozoneManager.getThreadNamePrefix();
 
@@ -163,6 +160,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
   @Override
   public SnapshotInfo getLatestSnapshot() {
+    final SnapshotInfo snapshotInfo = ozoneManager.getTransactionInfo().toSnapshotInfo();
     LOG.debug("Latest Snapshot Info {}", snapshotInfo);
     return snapshotInfo;
   }
@@ -697,21 +695,19 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         TransactionInfo.readTransactionInfo(
             ozoneManager.getMetadataManager());
     if (transactionInfo != null) {
-      setLastAppliedTermIndex(TermIndex.valueOf(
-          transactionInfo.getTerm(),
-          transactionInfo.getTransactionIndex()));
-      snapshotInfo.updateTermIndex(transactionInfo.getTerm(),
-          transactionInfo.getTransactionIndex());
+      final TermIndex ti =  transactionInfo.getTermIndex();
+      setLastAppliedTermIndex(ti);
+      ozoneManager.setTransactionInfo(transactionInfo);
+      LOG.info("LastAppliedIndex is set from TransactionInfo from OM DB as {}", ti);
+    } else {
+      LOG.info("TransactionInfo not found in OM DB.");
     }
-    LOG.info("LastAppliedIndex is set from TransactionInfo from OM DB as {}",
-        getLastAppliedTermIndex());
   }
 
   /**
    * Submits read request to OM and returns the response Message.
    * @param request OMRequest
    * @return response from OM
-   * @throws ServiceException
    */
   private Message queryCommand(OMRequest request) {
     OMResponse response = handler.handleReadRequest(request);

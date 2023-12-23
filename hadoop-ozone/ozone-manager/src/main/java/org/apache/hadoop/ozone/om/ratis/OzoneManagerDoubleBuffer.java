@@ -385,11 +385,7 @@ public final class OzoneManagerDoubleBuffer {
       addToBatchTransactionInfoWithTrace(lastTraceId,
           lastRatisTransactionIndex,
           () -> omMetadataManager.getTransactionInfoTable().putWithBatch(
-              batchOperation, TRANSACTION_INFO_KEY,
-              new TransactionInfo.Builder()
-                  .setTransactionIndex(lastRatisTransactionIndex)
-                  .setCurrentTerm(term)
-                  .build()));
+              batchOperation, TRANSACTION_INFO_KEY, TransactionInfo.valueOf(term, lastRatisTransactionIndex)));
 
       long startTime = Time.monotonicNow();
       flushBatchWithTrace(lastTraceId, buffer.size(),

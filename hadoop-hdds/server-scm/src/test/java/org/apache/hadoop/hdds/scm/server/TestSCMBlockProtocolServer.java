@@ -53,7 +53,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.platform.commons.util.Preconditions;
 import org.mockito.Mockito;
 
 import java.io.File;
@@ -71,6 +70,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NO
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_LEVEL;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Test class for @{@link SCMBlockProtocolServer}.
@@ -93,7 +93,7 @@ public class TestSCMBlockProtocolServer {
     private final List<DatanodeDetails> datanodes;
 
     BlockManagerStub(List<DatanodeDetails> datanodes) {
-      Preconditions.notNull(datanodes, "Datanodes cannot be null");
+      assertNotNull(datanodes, "Datanodes cannot be null");
       this.datanodes = datanodes;
     }
 
@@ -250,7 +250,7 @@ public class TestSCMBlockProtocolServer {
     System.out.println("client = " + client);
     datanodeDetails.stream().forEach(
         node -> System.out.println(node.toString()));
-    Assertions.assertTrue(datanodeDetails.size() == NODE_COUNT);
+    Assertions.assertEquals(NODE_COUNT, datanodeDetails.size());
 
     // illegal client 1
     client += "X";
@@ -258,14 +258,14 @@ public class TestSCMBlockProtocolServer {
     System.out.println("client = " + client);
     datanodeDetails.stream().forEach(
         node -> System.out.println(node.toString()));
-    Assertions.assertTrue(datanodeDetails.size() == NODE_COUNT);
+    Assertions.assertEquals(NODE_COUNT, datanodeDetails.size());
     // illegal client 2
     client = "/default-rack";
     datanodeDetails = server.sortDatanodes(nodes, client);
     System.out.println("client = " + client);
     datanodeDetails.stream().forEach(
         node -> System.out.println(node.toString()));
-    Assertions.assertTrue(datanodeDetails.size() == NODE_COUNT);
+    Assertions.assertEquals(NODE_COUNT, datanodeDetails.size());
 
     // unknown node to sort
     nodes.add(UUID.randomUUID().toString());
@@ -278,7 +278,7 @@ public class TestSCMBlockProtocolServer {
             .build();
     ScmBlockLocationProtocolProtos.SortDatanodesResponseProto resp =
         service.sortDatanodes(request, ClientVersion.CURRENT_VERSION);
-    Assertions.assertTrue(resp.getNodeList().size() == NODE_COUNT);
+    Assertions.assertEquals(NODE_COUNT, resp.getNodeList().size());
     System.out.println("client = " + client);
     resp.getNodeList().stream().forEach(
         node -> System.out.println(node.getNetworkName()));
@@ -295,7 +295,7 @@ public class TestSCMBlockProtocolServer {
         .build();
     resp = service.sortDatanodes(request, ClientVersion.CURRENT_VERSION);
     System.out.println("client = " + client);
-    Assertions.assertTrue(resp.getNodeList().size() == 0);
+    Assertions.assertEquals(0, resp.getNodeList().size());
     resp.getNodeList().stream().forEach(
         node -> System.out.println(node.getNetworkName()));
   }

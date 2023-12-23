@@ -103,8 +103,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     Assertions.assertNull(omKeyInfo);
 
     OMClientResponse omClientResponse =
-        omKeyCommitRequest.validateAndUpdateCache(ozoneManager,
-            100L, ozoneManagerDoubleBufferHelper);
+        omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
@@ -171,8 +170,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     Assertions.assertNull(omKeyInfo);
 
     OMClientResponse omClientResponse =
-        omKeyCommitRequest.validateAndUpdateCache(ozoneManager,
-        100L, ozoneManagerDoubleBufferHelper);
+        omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
@@ -249,8 +247,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     Assertions.assertNull(omKeyInfo);
 
     OMClientResponse omClientResponse =
-        omKeyCommitRequest.validateAndUpdateCache(ozoneManager,
-            100L, ozoneManagerDoubleBufferHelper);
+        omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
@@ -376,8 +373,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     String ozoneKey = getOzonePathKey();
     
     OMClientResponse omClientResponse =
-        omKeyCommitRequest.validateAndUpdateCache(ozoneManager,
-            100L, ozoneManagerDoubleBufferHelper);
+        omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
 
@@ -431,8 +427,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     Assertions.assertNull(omKeyInfo);
 
     OMClientResponse omClientResponse =
-        omKeyCommitRequest.validateAndUpdateCache(ozoneManager,
-            100L, ozoneManagerDoubleBufferHelper);
+        omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
@@ -466,8 +461,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     Assertions.assertNull(omKeyInfo);
 
     OMClientResponse omClientResponse =
-        omKeyCommitRequest.validateAndUpdateCache(ozoneManager,
-            100L, ozoneManagerDoubleBufferHelper);
+        omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
@@ -510,8 +504,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     addKeyToOpenKeyTable(allocatedLocationList);
 
     OMClientResponse omClientResponse =
-        omKeyCommitRequest.validateAndUpdateCache(ozoneManager,
-            100L, ozoneManagerDoubleBufferHelper);
+        omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED,
         omClientResponse.getOMResponse().getStatus());
@@ -544,8 +537,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     Assertions.assertNull(omKeyInfo);
 
     OMClientResponse omClientResponse =
-        omKeyCommitRequest.validateAndUpdateCache(ozoneManager,
-            100L, ozoneManagerDoubleBufferHelper);
+        omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
@@ -591,8 +583,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     addKeyToOpenKeyTable(allocatedLocationList);
 
     OMClientResponse omClientResponse =
-            omKeyCommitRequest.validateAndUpdateCache(ozoneManager,
-                    102L, ozoneManagerDoubleBufferHelper);
+        omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 102L);
 
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
             omClientResponse.getOMResponse().getStatus());

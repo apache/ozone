@@ -39,7 +39,7 @@ public class TestReconCodecs {
 
     Codec<ContainerKeyPrefix> codec = ContainerKeyPrefixCodec.get();
     byte[] persistedFormat = codec.toPersistedFormat(containerKeyPrefix);
-    Assertions.assertTrue(persistedFormat != null);
+    Assertions.assertNotNull(persistedFormat);
     ContainerKeyPrefix fromPersistedFormat =
         codec.fromPersistedFormat(persistedFormat);
     Assertions.assertEquals(containerKeyPrefix, fromPersistedFormat);
@@ -50,7 +50,7 @@ public class TestReconCodecs {
     Integer i = 1000;
     Codec<Integer> codec = IntegerCodec.get();
     byte[] persistedFormat = codec.toPersistedFormat(i);
-    Assertions.assertTrue(persistedFormat != null);
+    Assertions.assertNotNull(persistedFormat);
     Integer fromPersistedFormat =
         codec.fromPersistedFormat(persistedFormat);
     Assertions.assertEquals(i, fromPersistedFormat);

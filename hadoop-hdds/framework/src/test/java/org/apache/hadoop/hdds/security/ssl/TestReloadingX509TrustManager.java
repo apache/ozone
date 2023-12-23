@@ -21,13 +21,13 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.security.cert.X509Certificate;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.arrayContaining;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItemInArray;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -53,8 +53,7 @@ public class TestReloadingX509TrustManager {
         (ReloadingX509TrustManager) caClient.getServerKeyStoresFactory()
             .getTrustManagers()[0];
     X509Certificate cert1 = caClient.getRootCACertificate();
-    assertThat(tm.getAcceptedIssuers(),
-        Matchers.arrayContaining(cert1));
+    assertThat(tm.getAcceptedIssuers(), arrayContaining(cert1));
 
     caClient.renewRootCA();
     caClient.renewKey();

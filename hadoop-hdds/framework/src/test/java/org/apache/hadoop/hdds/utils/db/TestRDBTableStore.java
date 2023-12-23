@@ -562,8 +562,7 @@ public class TestRDBTableStore {
         int keyCount = 0;
         while (iter.hasNext()) {
           // iterator should only meet keys with samplePrefix
-          assertArrayEquals(
-              Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH), samplePrefix);
+          assertArrayEquals(samplePrefix, Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH));
           keyCount++;
         }
 
@@ -573,8 +572,7 @@ public class TestRDBTableStore {
         // iterator should be able to seekToFirst
         iter.seekToFirst();
         assertTrue(iter.hasNext());
-        assertArrayEquals(Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH),
-            samplePrefix);
+        assertArrayEquals(samplePrefix, Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH));
       }
     }
   }
@@ -708,9 +706,7 @@ public class TestRDBTableStore {
         int keyCount = 0;
         while (iter.hasNext()) {
           // check prefix
-          assertTrue(Arrays.equals(
-              Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH),
-              samplePrefix));
+          assertArrayEquals(Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH), samplePrefix);
           keyCount++;
         }
 
@@ -751,9 +747,7 @@ public class TestRDBTableStore {
         int keyCount = 0;
         while (iter.hasNext()) {
           // check prefix
-          assertTrue(Arrays.equals(
-              Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH),
-              samplePrefix));
+          assertArrayEquals(Arrays.copyOf(iter.next().getKey(), PREFIX_LENGTH), samplePrefix);
           keyCount++;
         }
 
