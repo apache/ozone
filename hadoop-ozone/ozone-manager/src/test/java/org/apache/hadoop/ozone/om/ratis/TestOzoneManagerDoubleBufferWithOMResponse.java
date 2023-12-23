@@ -309,7 +309,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     OMBucketDeleteRequest omBucketDeleteRequest =
         new OMBucketDeleteRequest(omRequest);
 
-    final TransactionInfo transactionInfo = TransactionInfo.valueOf(transactionID);
+    final TransactionInfo transactionInfo = TransactionInfo.valueOf(term, transactionID);
     OMClientResponse omClientResponse = omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, transactionInfo);
     doubleBuffer.add(omClientResponse, transactionInfo);
     return omClientResponse;
@@ -480,7 +480,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     OMBucketCreateRequest omBucketCreateRequest =
         new OMBucketCreateRequest(omRequest);
 
-    final TransactionInfo transactionInfo = TransactionInfo.valueOf(transactionID);
+    final TransactionInfo transactionInfo = TransactionInfo.valueOf(term, transactionID);
     OMClientResponse omClientResponse = omBucketCreateRequest.validateAndUpdateCache(ozoneManager, transactionInfo);
     doubleBuffer.add(omClientResponse, transactionInfo);
     return (OMBucketCreateResponse) omClientResponse;
