@@ -21,18 +21,13 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import org.apache.hadoop.hdds.resource.LeakTracker;
 import org.rocksdb.EnvOptions;
 
-import javax.annotation.Nullable;
-
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.getStackTrace;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * Managed EnvOptions.
  */
 public class ManagedEnvOptions extends EnvOptions {
-  @Nullable
-  private final StackTraceElement[] elements = getStackTrace();
-  private final LeakTracker leakTracker = track(this, elements);
+  private final LeakTracker leakTracker = track(this);
 
   @Override
   public void close() {

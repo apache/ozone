@@ -49,9 +49,10 @@ public final class ManagedRocksObjectUtils {
 
   private static final LeakDetector LEAK_DETECTOR = new LeakDetector("ManagedRocksObject");
 
-  static LeakTracker track(AutoCloseable object, @Nullable StackTraceElement[] stackTrace) {
+  static LeakTracker track(AutoCloseable object) {
     ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
     final String name = object.getClass().getSimpleName();
+    final StackTraceElement[] stackTrace = getStackTrace();
     return LEAK_DETECTOR.track(object, () -> reportLeak(name, formatStackTrace(stackTrace)));
   }
 
@@ -65,7 +66,7 @@ public final class ManagedRocksObjectUtils {
     LOG.warn(warning);
   }
 
-  static @Nullable StackTraceElement[] getStackTrace() {
+  private static @Nullable StackTraceElement[] getStackTrace() {
     return HddsUtils.getStackTrace(LOG);
   }
 

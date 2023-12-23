@@ -23,18 +23,13 @@ import org.rocksdb.EnvOptions;
 import org.rocksdb.Options;
 import org.rocksdb.SstFileWriter;
 
-import javax.annotation.Nullable;
-
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.getStackTrace;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * Managed SstFileWriter.
  */
 public class ManagedSstFileWriter extends SstFileWriter {
-  @Nullable
-  private final StackTraceElement[] elements = getStackTrace();
-  private final LeakTracker leakTracker = track(this, elements);
+  private final LeakTracker leakTracker = track(this);
 
   public ManagedSstFileWriter(EnvOptions envOptions,
                               Options options) {

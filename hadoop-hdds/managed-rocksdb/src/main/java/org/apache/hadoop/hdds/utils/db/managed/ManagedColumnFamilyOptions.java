@@ -22,24 +22,18 @@ import org.apache.hadoop.hdds.resource.LeakTracker;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.TableFormatConfig;
 
-import javax.annotation.Nullable;
-
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.getStackTrace;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * Managed ColumnFamilyOptions.
  */
 public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
-  @Nullable
-  private final StackTraceElement[] elements = getStackTrace();
-
   /**
    * Indicate if this ColumnFamilyOptions is intentionally used across RockDB
    * instances.
    */
   private boolean reused = false;
-  private final LeakTracker leakTracker = track(this, elements);
+  private final LeakTracker leakTracker = track(this);
 
   public ManagedColumnFamilyOptions() {
   }

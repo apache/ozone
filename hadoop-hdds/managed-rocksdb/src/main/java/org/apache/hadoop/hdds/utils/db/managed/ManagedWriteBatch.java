@@ -21,18 +21,13 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import org.apache.hadoop.hdds.resource.LeakTracker;
 import org.rocksdb.WriteBatch;
 
-import javax.annotation.Nullable;
-
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.getStackTrace;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * Managed WriteBatch.
  */
 public class ManagedWriteBatch extends WriteBatch {
-  @Nullable
-  private final StackTraceElement[] elements = getStackTrace();
-  private final LeakTracker leakTracker = track(this, elements);
+  private final LeakTracker leakTracker = track(this);
 
   public ManagedWriteBatch() {
   }

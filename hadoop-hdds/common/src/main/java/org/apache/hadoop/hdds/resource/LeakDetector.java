@@ -52,7 +52,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * }</pre>
  */
-public class LeakDetector implements Runnable {
+public class LeakDetector {
   public static final Logger LOG = LoggerFactory.getLogger(LeakDetector.class);
   private final ReferenceQueue<Object> queue = new ReferenceQueue<>();
   private final Set<LeakTracker> allLeaks = Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -64,15 +64,14 @@ public class LeakDetector implements Runnable {
   }
 
   private void start() {
-    Thread t = new Thread(this);
+    Thread t = new Thread(this::run);
     t.setName(LeakDetector.class.getSimpleName() + "-" + name);
     t.setDaemon(true);
     LOG.info("Starting leak detector thread {}.", name);
     t.start();
   }
 
-  @Override
-  public void run() {
+  private void run() {
     while (true) {
       try {
         LeakTracker tracker = (LeakTracker) queue.remove();

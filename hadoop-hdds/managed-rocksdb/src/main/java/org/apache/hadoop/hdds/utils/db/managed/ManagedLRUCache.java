@@ -21,18 +21,13 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import org.apache.hadoop.hdds.resource.LeakTracker;
 import org.rocksdb.LRUCache;
 
-import javax.annotation.Nullable;
-
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.getStackTrace;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * Managed LRUCache.
  */
 public class ManagedLRUCache extends LRUCache {
-  @Nullable
-  private final StackTraceElement[] elements = getStackTrace();
-  private final LeakTracker leakTracker = track(this, elements);
+  private final LeakTracker leakTracker = track(this);
 
   public ManagedLRUCache(long capacity) {
     super(capacity);

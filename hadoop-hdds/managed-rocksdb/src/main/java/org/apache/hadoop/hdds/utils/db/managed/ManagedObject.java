@@ -21,9 +21,6 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import org.apache.hadoop.hdds.resource.LeakTracker;
 import org.rocksdb.RocksObject;
 
-import javax.annotation.Nullable;
-
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.getStackTrace;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
@@ -32,9 +29,7 @@ import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.tr
  */
 class ManagedObject<T extends RocksObject> implements AutoCloseable {
   private final T original;
-  @Nullable
-  private final StackTraceElement[] elements = getStackTrace();
-  private final LeakTracker leakTracker = track(this, elements);
+  private final LeakTracker leakTracker = track(this);
 
   ManagedObject(T original) {
     this.original = original;
