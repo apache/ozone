@@ -626,6 +626,9 @@ public final class OzoneManagerDoubleBuffer {
       } catch (InterruptedException e) {
         LOG.debug("Interrupted while waiting for daemon to exit.", e);
       }
+      // notify both buffer so that if buffer is stopped, await do not block
+      flushNotifier.notifyFlush();
+      flushNotifier.notifyFlush();
     } else {
       LOG.info("OMDoubleBuffer flush thread is not running.");
     }
@@ -752,7 +755,9 @@ public final class OzoneManagerDoubleBuffer {
   }
 
   public void awaitFlush() throws InterruptedException {
-    flushNotifier.await();
+    if (isRunning.get()) {
+      flushNotifier.await();
+    }
   }
 
   static class FlushNotifier {
