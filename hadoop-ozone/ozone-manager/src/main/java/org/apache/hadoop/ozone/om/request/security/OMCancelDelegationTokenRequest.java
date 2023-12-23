@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.security;
 
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -84,8 +85,8 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TransactionInfo transactionInfo) {
+    final long transactionLogIndex = transactionInfo.getTransactionIndex();
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     Token<OzoneTokenIdentifier> token = getToken();

@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Map;
 
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -126,8 +127,7 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TransactionInfo transactionInfo) {
 
     UpdateRenewDelegationTokenRequest updateRenewDelegationTokenRequest =
         getOmRequest().getUpdatedRenewDelegationTokenRequest();
@@ -166,7 +166,7 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
       // Update Cache.
       omMetadataManager.getDelegationTokenTable().addCacheEntry(
           new CacheKey<>(ozoneTokenIdentifier),
-          CacheValue.get(transactionLogIndex, renewTime));
+          CacheValue.get(transactionInfo.getTransactionIndex(), renewTime));
 
       omClientResponse =
           new OMRenewDelegationTokenResponse(ozoneTokenIdentifier, renewTime,

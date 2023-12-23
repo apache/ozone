@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -80,8 +81,8 @@ public class OMKeysRenameRequest extends OMKeyRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TransactionInfo transactionInfo) {
+    final long trxnLogIndex = transactionInfo.getTransactionIndex();
 
     RenameKeysRequest renameKeysRequest = getOmRequest().getRenameKeysRequest();
     RenameKeysArgs renameKeysArgs = renameKeysRequest.getRenameKeysArgs();

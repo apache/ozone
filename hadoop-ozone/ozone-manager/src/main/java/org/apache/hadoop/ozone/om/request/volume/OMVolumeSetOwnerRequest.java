@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.volume;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -75,8 +76,8 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TransactionInfo transactionInfo) {
+    final long transactionLogIndex = transactionInfo.getTransactionIndex();
     SetVolumePropertyRequest setVolumePropertyRequest =
         getOmRequest().getSetVolumePropertyRequest();
     Preconditions.checkNotNull(setVolumePropertyRequest);

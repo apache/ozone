@@ -23,6 +23,7 @@ import java.nio.file.InvalidPathException;
 import java.util.Map;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -109,8 +110,8 @@ public class OMKeyRenameRequest extends OMKeyRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TransactionInfo transactionInfo) {
+    final long trxnLogIndex = transactionInfo.getTransactionIndex();
 
     RenameKeyRequest renameKeyRequest = getOmRequest().getRenameKeyRequest();
     OzoneManagerProtocolProtos.KeyArgs keyArgs =

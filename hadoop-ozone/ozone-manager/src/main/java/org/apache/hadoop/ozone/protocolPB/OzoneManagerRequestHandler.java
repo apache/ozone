@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipReques
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.common.PayloadUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -387,20 +388,19 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @Override
-  public OMClientResponse handleWriteRequest(OMRequest omRequest,
-      long transactionLogIndex) throws IOException {
+  public OMClientResponse handleWriteRequest(OMRequest omRequest, TransactionInfo transactionInfo) throws IOException {
     OMClientRequest omClientRequest =
         OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
     return captureLatencyNs(
         impl.getPerfMetrics().getValidateAndUpdateCacneLatencyNs(),
         () -> {
           OMClientResponse omClientResponse =
-              omClientRequest.validateAndUpdateCache(getOzoneManager(), transactionLogIndex);
+              omClientRequest.validateAndUpdateCache(getOzoneManager(), transactionInfo);
           Preconditions.checkNotNull(omClientResponse,
               "omClientResponse returned by validateAndUpdateCache cannot be null");
           if (omRequest.getCmdType() != Type.Prepare) {
             omClientResponse.setFlushFuture(
-                ozoneManagerDoubleBuffer.add(omClientResponse, transactionLogIndex));
+                ozoneManagerDoubleBuffer.add(omClientResponse, transactionInfo));
           }
           return omClientResponse;
         });

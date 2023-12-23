@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.request.key;
 
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -59,8 +60,8 @@ public class OMOpenKeysDeleteRequest extends OMKeyRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TransactionInfo transactionInfo) {
+    final long trxnLogIndex = transactionInfo.getTransactionIndex();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumOpenKeyDeleteRequests();

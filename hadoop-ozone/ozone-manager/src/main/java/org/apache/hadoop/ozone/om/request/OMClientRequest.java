@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -135,8 +136,13 @@ public abstract class OMClientRequest implements RequestAuditor {
    *
    * @return the response that will be returned to the client.
    */
-  public abstract OMClientResponse validateAndUpdateCache(
-      OzoneManager ozoneManager, long transactionLogIndex);
+  public abstract OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TransactionInfo transactionInfo);
+
+  /** For testing only. */
+  @VisibleForTesting
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, long transactionLogIndex) {
+    return validateAndUpdateCache(ozoneManager, TransactionInfo.valueOf(transactionLogIndex));
+  }
 
   @VisibleForTesting
   public OMRequest getOmRequest() {

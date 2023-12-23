@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.volume.acl;
 
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -65,8 +66,8 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TransactionInfo transactionInfo) {
+    final long trxnLogIndex = transactionInfo.getTransactionIndex();
     // protobuf guarantees volume and acls are non-null.
     String volume = getVolumeName();
     List<OzoneAcl> ozoneAcls = getAcls();

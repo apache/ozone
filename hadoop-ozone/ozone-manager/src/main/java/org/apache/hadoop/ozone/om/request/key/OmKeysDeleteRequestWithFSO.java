@@ -30,8 +30,6 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeysDeleteResponseWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
@@ -44,19 +42,10 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
  */
 public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OmKeysDeleteRequestWithFSO.class);
-
   public OmKeysDeleteRequestWithFSO(
       OzoneManagerProtocolProtos.OMRequest omRequest,
       BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
-  }
-
-  @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex) {
-    return super.validateAndUpdateCache(ozoneManager, trxnLogIndex);
   }
 
   @Override

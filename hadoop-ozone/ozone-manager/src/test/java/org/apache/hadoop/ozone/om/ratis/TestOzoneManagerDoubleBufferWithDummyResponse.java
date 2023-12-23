@@ -84,7 +84,6 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
         .setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
         .setmaxUnFlushedTransactionCount(10000)
         .enableRatis(true)
-        .setIndexToTerm((val) -> term)
         .build();
   }
 
@@ -113,7 +112,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
 
     for (int i = 0; i < bucketCount; i++) {
       doubleBuffer.add(createDummyBucketResponse(volumeName),
-          trxId.incrementAndGet());
+          TransactionInfo.valueOf(trxId.incrementAndGet()));
     }
     waitFor(() -> metrics.getTotalNumOfFlushedTransactions() == bucketCount,
         100, 60000);

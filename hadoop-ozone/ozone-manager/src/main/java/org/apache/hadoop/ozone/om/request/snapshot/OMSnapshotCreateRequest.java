@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.snapshot;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -123,8 +124,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
   }
   
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TransactionInfo transactionInfo) {
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumSnapshotCreates();
@@ -183,8 +183,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       //  pre-replicated key size counter in OmBucketInfo.
       snapshotInfo.setReferencedSize(estimateBucketDataSize(omBucketInfo));
 
-      addSnapshotInfoToSnapshotChainAndCache(omMetadataManager,
-          transactionLogIndex);
+      addSnapshotInfoToSnapshotChainAndCache(omMetadataManager, transactionInfo.getTransactionIndex());
 
       omResponse.setCreateSnapshotResponse(
           CreateSnapshotResponse.newBuilder()

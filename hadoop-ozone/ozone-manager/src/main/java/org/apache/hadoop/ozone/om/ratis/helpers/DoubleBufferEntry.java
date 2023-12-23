@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.ratis.helpers;
 
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 
 /**
@@ -26,16 +27,16 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
  */
 public class DoubleBufferEntry<Response extends OMClientResponse> {
 
-  private long trxLogIndex;
+  private TransactionInfo transactionInfo;
   private Response response;
 
-  public DoubleBufferEntry(long trxLogIndex, Response response) {
-    this.trxLogIndex = trxLogIndex;
+  public DoubleBufferEntry(TransactionInfo transactionInfo, Response response) {
+    this.transactionInfo = transactionInfo;
     this.response = response;
   }
 
-  public long getTrxLogIndex() {
-    return trxLogIndex;
+  public TransactionInfo getTransactionInfo() {
+    return transactionInfo;
   }
 
   public Response getResponse() {

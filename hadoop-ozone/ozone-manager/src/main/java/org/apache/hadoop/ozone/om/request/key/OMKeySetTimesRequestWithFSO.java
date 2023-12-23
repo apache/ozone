@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.request.key;
 
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -62,8 +63,8 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TransactionInfo transactionInfo) {
+    final long trxnLogIndex = transactionInfo.getTransactionIndex();
     OmKeyInfo omKeyInfo = null;
 
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse = onInit();

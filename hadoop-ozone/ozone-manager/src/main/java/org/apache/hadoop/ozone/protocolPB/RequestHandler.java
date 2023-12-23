@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.protocolPB;
 
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -53,12 +54,12 @@ public interface RequestHandler {
    * OzoneManagerStateMachine applyTransaction method. In non-HA this will be
    * called from {@link OzoneManagerProtocolServerSideTranslatorPB} for write
    * requests.
+   *
    * @param omRequest
-   * @param transactionLogIndex - ratis transaction log index
+   * @param transactionInfo - ratis transaction log (term, index)
    * @return OMClientResponse
    */
-  OMClientResponse handleWriteRequest(OMRequest omRequest,
-      long transactionLogIndex) throws IOException;
+  OMClientResponse handleWriteRequest(OMRequest omRequest, TransactionInfo transactionInfo) throws IOException;
 
   /**
    * Update the OzoneManagerDoubleBuffer. This will be called when

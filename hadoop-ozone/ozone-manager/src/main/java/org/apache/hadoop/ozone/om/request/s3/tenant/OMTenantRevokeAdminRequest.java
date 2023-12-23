@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.request.s3.tenant;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -140,8 +141,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
 
   @Override
   @SuppressWarnings("checkstyle:methodlength")
-  public OMClientResponse validateAndUpdateCache(
-      OzoneManager ozoneManager, long transactionLogIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TransactionInfo transactionInfo) {
 
     final OMMultiTenantManager multiTenantManager =
         ozoneManager.getMultiTenantManager();
@@ -195,7 +195,7 @@ public class OMTenantRevokeAdminRequest extends OMClientRequest {
               .build();
       omMetadataManager.getTenantAccessIdTable().addCacheEntry(
           new CacheKey<>(accessId),
-          CacheValue.get(transactionLogIndex, newOmDBAccessIdInfo));
+          CacheValue.get(transactionInfo.getTransactionIndex(), newOmDBAccessIdInfo));
 
       // Update tenant cache
       multiTenantManager.getCacheOp().revokeTenantAdmin(accessId);

@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -98,8 +99,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TransactionInfo transactionInfo) {
+    final long trxnLogIndex = transactionInfo.getTransactionIndex();
     MultipartCommitUploadPartRequest multipartCommitUploadPartRequest =
         getOmRequest().getCommitMultiPartUploadRequest();
 

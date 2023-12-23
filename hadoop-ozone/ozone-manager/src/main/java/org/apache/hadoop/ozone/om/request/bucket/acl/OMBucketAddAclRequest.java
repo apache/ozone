@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.google.common.collect.Lists;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -132,10 +133,9 @@ public class OMBucketAddAclRequest extends OMBucketAclRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(
-      OzoneManager ozoneManager, long trxnLogIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TransactionInfo transactionInfo) {
     ozoneManager.getMetrics().incNumAddAcl();
-    return super.validateAndUpdateCache(ozoneManager, trxnLogIndex);
+    return super.validateAndUpdateCache(ozoneManager, transactionInfo);
   }
 }
 

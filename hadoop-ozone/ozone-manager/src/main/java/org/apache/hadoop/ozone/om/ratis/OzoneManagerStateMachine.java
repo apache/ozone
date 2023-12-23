@@ -325,7 +325,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       final OMRequest request = context != null ? (OMRequest) context
           : OMRatisHelper.convertByteStringToOMRequest(
           trx.getStateMachineLogEntry().getLogData());
-      long trxLogIndex = trx.getLogEntry().getIndex();
+      final TransactionInfo transactionInfo = TransactionInfo.valueOf(TermIndex.valueOf(trx.getLogEntry()));
+      final long trxLogIndex = transactionInfo.getTransactionIndex();
       // In the current approach we have one single global thread executor.
       // with single thread. Right now this is being done for correctness, as
       // applyTransaction will be run on multiple OM's we want to execute the
@@ -365,7 +366,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       ozoneManagerDoubleBuffer.acquireUnFlushedTransactions(1);
 
       CompletableFuture<OMResponse> future = CompletableFuture.supplyAsync(
-          () -> runCommand(request, trxLogIndex), executorService);
+          () -> runCommand(request, transactionInfo), executorService);
       future.thenApply(omResponse -> {
         if (!omResponse.getSuccess()) {
           // When INTERNAL_ERROR or METADATA_ERROR it is considered as
@@ -470,7 +471,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .setOmMetadataManager(ozoneManager.getMetadataManager())
         .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
         .setmaxUnFlushedTransactionCount(maxUnflushedTransactionSize)
-        .setIndexToTerm(this::getTermForIndex).setThreadPrefix(threadPrefix)
+        .setThreadPrefix(threadPrefix)
         .setS3SecretManager(ozoneManager.getS3SecretManager())
         .enableRatis(true)
         .enableTracing(isTracingEnabled)
@@ -570,10 +571,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @return response from OM
    * @throws ServiceException
    */
-  private OMResponse runCommand(OMRequest request, long trxLogIndex) {
+  private OMResponse runCommand(OMRequest request, TransactionInfo transactionInfo) {
     try {
-      OMClientResponse omClientResponse =
-          handler.handleWriteRequest(request, trxLogIndex);
+      OMClientResponse omClientResponse = handler.handleWriteRequest(request, transactionInfo);
       OMLockDetails omLockDetails = omClientResponse.getOmLockDetails();
       OMResponse omResponse = omClientResponse.getOMResponse();
       if (omLockDetails != null) {
@@ -737,15 +737,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @VisibleForTesting
   void addApplyTransactionTermIndex(long term, long index) {
     applyTransactionMap.put(index, term);
-  }
-
-  /**
-   * Return term associated with transaction index.
-   * @param transactionIndex
-   * @return
-   */
-  public long getTermForIndex(long transactionIndex) {
-    return applyTransactionMap.get(transactionIndex);
   }
 
   /**

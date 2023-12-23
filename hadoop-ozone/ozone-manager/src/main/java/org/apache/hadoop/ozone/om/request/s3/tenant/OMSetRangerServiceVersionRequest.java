@@ -18,6 +18,7 @@
  */
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -51,8 +52,7 @@ public class OMSetRangerServiceVersionRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(
-      OzoneManager ozoneManager, long transactionLogIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TransactionInfo transactionInfo) {
 
     OMClientResponse omClientResponse;
     final OMResponse.Builder omResponse =
@@ -65,7 +65,7 @@ public class OMSetRangerServiceVersionRequest extends OMClientRequest {
 
     omMetadataManager.getMetaTable().addCacheEntry(
         new CacheKey<>(OzoneConsts.RANGER_OZONE_SERVICE_VERSION_KEY),
-        CacheValue.get(transactionLogIndex, proposedVersionStr));
+        CacheValue.get(transactionInfo.getTransactionIndex(), proposedVersionStr));
     omResponse.setSetRangerServiceVersionResponse(
         SetRangerServiceVersionResponse.newBuilder().build());
 

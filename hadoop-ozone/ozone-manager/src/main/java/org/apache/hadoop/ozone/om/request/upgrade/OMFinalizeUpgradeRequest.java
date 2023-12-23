@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos
     .UpgradeFinalizationStatus;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -55,8 +56,7 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(
-      OzoneManager ozoneManager, long transactionLogIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TransactionInfo transactionInfo) {
     LOG.trace("Request: {}", getOmRequest());
     OMResponse.Builder responseBuilder =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
@@ -92,7 +92,7 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
       int lV = ozoneManager.getVersionManager().getMetadataLayoutVersion();
       omMetadataManager.getMetaTable().addCacheEntry(
           new CacheKey<>(LAYOUT_VERSION_KEY),
-          CacheValue.get(transactionLogIndex, String.valueOf(lV)));
+          CacheValue.get(transactionInfo.getTransactionIndex(), String.valueOf(lV)));
 
       FinalizeUpgradeResponse omResponse =
           FinalizeUpgradeResponse.newBuilder()

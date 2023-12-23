@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.function.BiPredicate;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -62,8 +63,8 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TransactionInfo transactionInfo) {
+    final long transactionLogIndex = transactionInfo.getTransactionIndex();
 
     // protobuf guarantees acls are non-null.
     List<OzoneAcl> ozoneAcls = getAcls();
