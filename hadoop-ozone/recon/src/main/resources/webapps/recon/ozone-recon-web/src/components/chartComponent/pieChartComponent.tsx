@@ -104,7 +104,8 @@ export class PieChartComponent extends React.Component<ChartProps, ChartState> {
                 }
             },
             margin: {
-                l: labelLengthOverflow ? windowWidth * 0.3 : 0
+                l: labelLengthOverflow ? windowWidth * 0.3 : 0,
+                r: (labelLengthOverflow && windowWidth < 1200) ? windowWidth * 0.2 : 0
             },
             paper_bgcolor: "#FFFFFF"
         }
