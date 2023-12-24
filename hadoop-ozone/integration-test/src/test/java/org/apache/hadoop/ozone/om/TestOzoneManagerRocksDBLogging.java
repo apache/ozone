@@ -35,6 +35,8 @@ import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.apache.ozone.test.JUnit5AwareTimeout;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /**
  * Test RocksDB logging for Ozone Manager.
  */
@@ -75,7 +77,7 @@ public class TestOzoneManagerRocksDBLogging {
       waitForRocksDbLog();
       Assert.fail("Unexpected RocksDB log: " + logCapturer.getOutput());
     } catch (TimeoutException ex) {
-      Assert.assertTrue(ex.getMessage().contains("Timed out"));
+      assertThat(ex.getMessage()).contains("Timed out");
     }
 
     enableRocksDbLogging(true);

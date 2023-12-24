@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -32,10 +33,11 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.File;
 import java.io.IOException;
@@ -52,22 +54,11 @@ import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 
-import org.junit.Rule;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
-
 /**
  * Tests the validity BCSID of a container.
  */
+@Timeout(300)
 public class TestBCSID {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
-
   private static OzoneConfiguration conf = new OzoneConfiguration();
   private static MiniOzoneCluster cluster;
   private static OzoneClient client;
@@ -80,7 +71,7 @@ public class TestBCSID {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     String path = GenericTestUtils
         .getTempPath(TestBCSID.class.getSimpleName());
@@ -110,7 +101,7 @@ public class TestBCSID {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -122,8 +113,9 @@ public class TestBCSID {
   public void testBCSID() throws Exception {
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
-            .createKey("ratis", 1024, ReplicationType.RATIS,
-                ReplicationFactor.ONE, new HashMap<>());
+            .createKey("ratis", 1024,
+                ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+                    ReplicationFactor.ONE), new HashMap<>());
     key.write("ratis".getBytes(UTF_8));
     key.close();
 
@@ -138,7 +130,7 @@ public class TestBCSID {
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
     List<OmKeyLocationInfo> keyLocationInfos =
         keyInfo.getKeyLocationVersions().get(0).getBlocksLatestVersionOnly();
-    Assert.assertEquals(1, keyLocationInfos.size());
+    Assertions.assertEquals(1, keyLocationInfos.size());
     OmKeyLocationInfo omKeyLocationInfo = keyLocationInfos.get(0);
 
     long blockCommitSequenceId =
@@ -146,16 +138,16 @@ public class TestBCSID {
             .getContainer().getContainerSet()
             .getContainer(omKeyLocationInfo.getContainerID())
             .getContainerReport().getBlockCommitSequenceId();
-    Assert.assertTrue(blockCommitSequenceId > 0);
+    Assertions.assertTrue(blockCommitSequenceId > 0);
 
     // make sure the persisted block Id in OM is same as that seen in the
     // container report to be reported to SCM.
-    Assert.assertEquals(blockCommitSequenceId,
+    Assertions.assertEquals(blockCommitSequenceId,
         omKeyLocationInfo.getBlockCommitSequenceId());
 
     // verify that on restarting the datanode, it reloads the BCSID correctly.
     cluster.restartHddsDatanode(0, true);
-    Assert.assertEquals(blockCommitSequenceId,
+    Assertions.assertEquals(blockCommitSequenceId,
         cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
             .getContainer().getContainerSet()
             .getContainer(omKeyLocationInfo.getContainerID())

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -43,6 +43,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -60,14 +61,14 @@ import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
  * Setting a timeout for every test method to 300 seconds.
  */
 @Timeout(value = 300)
-public class TestOzoneFsSnapshot {
+class TestOzoneFsSnapshot {
 
   private static MiniOzoneCluster cluster;
   private static final String OM_SERVICE_ID = "om-service-test1";
   private static OzoneManager ozoneManager;
   private static OzoneFsShell shell;
   private static final String VOLUME =
-      "vol-" + RandomStringUtils.randomNumeric(5);;
+      "vol-" + RandomStringUtils.randomNumeric(5);
   private static final String BUCKET =
       "buck-" + RandomStringUtils.randomNumeric(5);
   private static final String KEY =
@@ -80,7 +81,7 @@ public class TestOzoneFsSnapshot {
       BUCKET_PATH + OM_KEY_PREFIX + KEY;
 
   @BeforeAll
-  public static void initClass() throws Exception {
+  static void initClass() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     // Enable filesystem snapshot feature for the test regardless of the default
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
@@ -106,7 +107,7 @@ public class TestOzoneFsSnapshot {
   }
 
   @AfterAll
-  public static void shutdown() throws IOException {
+  static void shutdown() throws IOException {
     shell.close();
     if (cluster != null) {
       cluster.shutdown();
@@ -129,7 +130,7 @@ public class TestOzoneFsSnapshot {
   }
 
   @Test
-  public void testCreateSnapshotDuplicateName() throws Exception {
+  void testCreateSnapshotDuplicateName() throws Exception {
     String snapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
 
     int res = ToolRunner.run(shell,
@@ -144,7 +145,7 @@ public class TestOzoneFsSnapshot {
   }
 
   @Test
-  public void testCreateSnapshotWithSubDirInput() throws Exception {
+  void testCreateSnapshotWithSubDirInput() throws Exception {
     // Test that:
     // $ ozone fs -createSnapshot ofs://om/vol1/buck2/dir3/ snap1
     //
@@ -185,7 +186,7 @@ public class TestOzoneFsSnapshot {
   @ValueSource(strings = {"snap-1",
       "snap75795657617173401188448010125899089001363595171500499231286",
       "sn1"})
-  public void testCreateSnapshotSuccess(String snapshotName)
+  void testCreateSnapshotSuccess(String snapshotName)
       throws Exception {
     int res = ToolRunner.run(shell,
         new String[]{"-createSnapshot", BUCKET_PATH, snapshotName});
@@ -241,7 +242,7 @@ public class TestOzoneFsSnapshot {
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("createSnapshotFailureScenarios")
-  public void testCreateSnapshotFailure(String description,
+  void testCreateSnapshotFailure(String description,
                                         String paramBucketPath,
                                         String snapshotName,
                                         String expectedMessage,
@@ -258,12 +259,12 @@ public class TestOzoneFsSnapshot {
    * Test list snapshot and snapshot keys with "ozone fs -ls".
    */
   @Test
-  public void testFsLsSnapshot() throws Exception {
+  void testFsLsSnapshot(@TempDir Path tempDir) throws Exception {
     String newKey = "key-" + RandomStringUtils.randomNumeric(5);
     String newKeyPath = BUCKET_PATH + OM_KEY_PREFIX + newKey;
 
     // Write a non-zero byte key.
-    Path tempFile = Files.createTempFile("testFsLsSnapshot-", "any-suffix");
+    Path tempFile = tempDir.resolve("testFsLsSnapshot-any-suffix");
     FileUtils.write(tempFile.toFile(), "random data", UTF_8);
     execShellCommandAndGetOutput(0,
         new String[]{"-put", tempFile.toString(), newKeyPath});
@@ -294,7 +295,7 @@ public class TestOzoneFsSnapshot {
   }
 
   @Test
-  public void testDeleteBucketWithSnapshot() throws Exception {
+  void testDeleteBucketWithSnapshot() throws Exception {
     String snapshotName = createSnapshot();
 
     String snapshotPath = BUCKET_WITH_SNAPSHOT_INDICATOR_PATH
@@ -326,7 +327,7 @@ public class TestOzoneFsSnapshot {
   }
 
   @Test
-  public void testSnapshotDeleteSuccess() throws Exception {
+  void testSnapshotDeleteSuccess() throws Exception {
     String snapshotName = createSnapshot();
     // Delete the created snapshot
     int res = ToolRunner.run(shell,
@@ -372,7 +373,7 @@ public class TestOzoneFsSnapshot {
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("deleteSnapshotFailureScenarios")
-  public void testSnapshotDeleteFailure(String description,
+  void testSnapshotDeleteFailure(String description,
                                         String paramBucketPath,
                                         String snapshotName,
                                         String expectedMessage,

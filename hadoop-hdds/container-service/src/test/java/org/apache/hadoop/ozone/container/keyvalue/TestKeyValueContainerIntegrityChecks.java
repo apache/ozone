@@ -85,10 +85,6 @@ public class TestKeyValueContainerIntegrityChecks {
     setup();
   }
 
-  static Iterable<Object[]> versionInfo() {
-    return ContainerTestVersionInfo.versionParameters();
-  }
-
   private void setup() throws Exception {
     LOG.info("Testing  layout:{}", containerLayoutTestInfo.getLayout());
     this.testRoot = GenericTestUtils.getRandomizedTestDir();

@@ -76,8 +76,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
@@ -131,10 +129,6 @@ public class TestBlockDeletingService {
   private String schemaVersion;
   private int blockLimitPerInterval;
   private MutableVolumeSet volumeSet;
-
-  private static Iterable<Object[]> versionInfo() {
-    return ContainerTestVersionInfo.versionParameters();
-  }
 
   @BeforeEach
   public void init() throws IOException {
@@ -426,8 +420,7 @@ public class TestBlockDeletingService {
    * there are no delete transactions in the DB, this metadata counter should
    * be reset to zero.
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testPendingDeleteBlockReset(ContainerTestVersionInfo versionInfo)
       throws Exception {
     setLayoutAndSchemaForTest(versionInfo);
@@ -541,9 +534,7 @@ public class TestBlockDeletingService {
     }
   }
 
-
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testBlockDeletion(ContainerTestVersionInfo versionInfo)
       throws Exception {
     setLayoutAndSchemaForTest(versionInfo);
@@ -662,8 +653,7 @@ public class TestBlockDeletingService {
     svc.shutdown();
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testWithUnrecordedBlocks(ContainerTestVersionInfo versionInfo)
       throws Exception {
     setLayoutAndSchemaForTest(versionInfo);
@@ -779,8 +769,7 @@ public class TestBlockDeletingService {
     svc.shutdown();
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testShutdownService(ContainerTestVersionInfo versionInfo)
       throws Exception {
     setLayoutAndSchemaForTest(versionInfo);
@@ -811,8 +800,7 @@ public class TestBlockDeletingService {
     GenericTestUtils.waitFor(() -> service.getThreadCount() == 0, 100, 1000);
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testBlockDeletionTimeout(ContainerTestVersionInfo versionInfo)
       throws Exception {
     setLayoutAndSchemaForTest(versionInfo);
@@ -901,9 +889,8 @@ public class TestBlockDeletingService {
     return ozoneContainer;
   }
 
-  @ParameterizedTest
   @Unhealthy
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testContainerThrottle(ContainerTestVersionInfo versionInfo)
       throws Exception {
     setLayoutAndSchemaForTest(versionInfo);
@@ -970,8 +957,7 @@ public class TestBlockDeletingService {
     }
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testContainerMaxLockHoldingTime(
       ContainerTestVersionInfo versionInfo) throws Exception {
     setLayoutAndSchemaForTest(versionInfo);
@@ -1031,8 +1017,7 @@ public class TestBlockDeletingService {
     return totalSpaceUsed;
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testBlockThrottle(ContainerTestVersionInfo versionInfo)
       throws Exception {
     setLayoutAndSchemaForTest(versionInfo);

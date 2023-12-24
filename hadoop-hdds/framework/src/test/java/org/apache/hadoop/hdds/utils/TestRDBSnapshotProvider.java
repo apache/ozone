@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -228,7 +227,7 @@ public class TestRDBSnapshotProvider {
       throws IOException {
     try (Table<byte[], byte[]> firstTable = dbStore.getTable(families.
         get(familyIndex))) {
-      Assertions.assertNotNull(firstTable, "Table cannot be null");
+      assertNotNull(firstTable, "Table cannot be null");
       for (int x = 0; x < 100; x++) {
         byte[] key =
             RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
