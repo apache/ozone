@@ -67,7 +67,7 @@ export class PieChartComponent extends React.Component<ChartProps, ChartState> {
         window.addEventListener('resize', this.updateWindowSize);
         this.props.plotData.forEach((data) => {
             if (data && Object.keys(data).length !== 0){
-                if (data["labels"].some((label: string) =>{ return label.length > 35 })){
+                if (data["labels"].some((label: string) => { return label.length > 35 })){
                     this.setState({
                         ...this.state,
                         labelLengthOverflow: true
@@ -86,16 +86,18 @@ export class PieChartComponent extends React.Component<ChartProps, ChartState> {
         let layoutProps: Partial<Plotly.Legend> = 
         {
             width: windowWidth * 0.8,
-            height: windowHeight - 200,
+            height: windowHeight - 100,
             font: {
                 family: 'Roboto, sans-serif',
-                size: windowWidth * 0.009
+                size: windowWidth * 0.008
             },
             showlegend: true,
             legend: {
                 font: {
-                    size: windowWidth * 0.008
-                }
+                    size: windowWidth * 0.009
+                },
+                y: - windowHeight - 300,
+                yanchor: "bottom"
             },
             title: {
                 text: this.props.title,
@@ -105,7 +107,8 @@ export class PieChartComponent extends React.Component<ChartProps, ChartState> {
             },
             margin: {
                 l: labelLengthOverflow ? windowWidth * 0.3 : 0,
-                r: (labelLengthOverflow && windowWidth < 1200) ? windowWidth * 0.2 : 0
+                r: (labelLengthOverflow && windowWidth < 1200) ? windowWidth * 0.2 : 0,
+                b: 100
             },
             paper_bgcolor: "#FFFFFF"
         }
