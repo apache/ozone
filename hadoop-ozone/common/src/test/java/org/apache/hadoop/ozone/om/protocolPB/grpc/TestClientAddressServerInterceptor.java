@@ -27,11 +27,11 @@ import io.grpc.ServerInterceptor;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
-import org.mockito.Mockito;
 
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mockStatic;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
@@ -42,7 +42,7 @@ public class TestClientAddressServerInterceptor {
   @Test
   public void testClientAddressEntriesInHeaders() {
     try (MockedStatic<Contexts> contextsMockedStatic =
-             Mockito.mockStatic(Contexts.class)) {
+             mockStatic(Contexts.class)) {
       // given
       ServerInterceptor serverInterceptor =
           new ClientAddressServerInterceptor();
