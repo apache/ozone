@@ -37,7 +37,6 @@ public final class OmFSOFile {
   private OMMetadataManager omMetadataManager;
 
   private String fileName;
-  private Iterator<Path> pathComponents;
   private long volumeId;
   private long bucketId;
   private long parentID;
@@ -45,16 +44,14 @@ public final class OmFSOFile {
 
   @SuppressWarnings("checkstyle:parameternumber")
   private OmFSOFile(String volumeName, String bucketName, String keyName, 
-      OMMetadataManager omMetadataManager,
-      String fileName, Iterator<Path> pathComponents, long volumeId,
-      long bucketId, long parentID) {
+      OMMetadataManager omMetadataManager, String fileName,
+      long volumeId, long bucketId, long parentID) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.keyName = keyName;
     this.omMetadataManager = omMetadataManager;
 
     this.fileName = fileName;
-    this.pathComponents = pathComponents;
     this.volumeId = volumeId;
     this.bucketId = bucketId;
     this.parentID = parentID;
@@ -101,17 +98,14 @@ public final class OmFSOFile {
 
     public OmFSOFile build() throws IOException {
       String fileName = OzoneFSUtils.getFileName(this.keyName);
-      Iterator<Path> pathComponents = Paths.get(this.keyName).iterator();
       final long volumeId = omMetadataManager.getVolumeId(this.volumeName);
-      final long bucketId = omMetadataManager.getBucketId(this.volumeName,
-          this.bucketName);
+      final long bucketId = omMetadataManager.getBucketId(this.volumeName, this.bucketName);
       long parentID = OMFileRequest
-          .getParentID(volumeId, bucketId, pathComponents, this.keyName,
+          .getParentID(volumeId, bucketId, this.keyName,
           this.omMetadataManager, this.errMsg);
 
       return new OmFSOFile(volumeName, bucketName, keyName, 
-          omMetadataManager, fileName, pathComponents, 
-          volumeId, bucketId, parentID);
+          omMetadataManager, fileName, volumeId, bucketId, parentID);
     }
   }
 
@@ -145,10 +139,6 @@ public final class OmFSOFile {
 
   public long getParentID() {
     return this.parentID;
-  }
-  
-  public Iterator<Path> getPathComponents() {
-    return this.pathComponents;
   }
 
   public String getOpenFileName(long clientID) {

@@ -48,7 +48,7 @@ public class S3MultipartUploadCommitPartRequestWithFSO
   protected String getOpenKey(String volumeName, String bucketName,
       String keyName, OMMetadataManager omMetadataManager, long clientID)
       throws IOException {
-    
+
     return new OmFSOFile.Builder()
           .setVolumeName(volumeName)
           .setBucketName(bucketName)
