@@ -30,9 +30,6 @@ import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Assertions;
 
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Iterator;
 import java.util.UUID;
 
 /**
@@ -90,13 +87,11 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
 
   private long getParentID(String volumeName, String bucketName,
                            String keyName) throws IOException {
-    Path keyPath = Paths.get(keyName);
-    Iterator<Path> elements = keyPath.iterator();
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omMetadataManager.getBucketId(volumeName,
             bucketName);
     return OMFileRequest.getParentID(volumeId, bucketId,
-            elements, keyName, omMetadataManager);
+            keyName, omMetadataManager);
   }
 
   @Override
