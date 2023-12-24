@@ -24,7 +24,6 @@ import io.grpc.Metadata;
 import io.grpc.ServerCall;
 import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptor;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
@@ -33,6 +32,7 @@ import org.mockito.Mockito;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test OM GRPC server interceptor to define client ip and hostname.
@@ -68,9 +68,9 @@ public class TestClientAddressServerInterceptor {
       );
       Context context = contextArgumentCaptor.getValue();
       context.attach();
-      Assertions.assertEquals("host.example.com",
+      assertEquals("host.example.com",
           GrpcClientConstants.CLIENT_HOSTNAME_CTX_KEY.get());
-      Assertions.assertEquals("173.56.23.4",
+      assertEquals("173.56.23.4",
           GrpcClientConstants.CLIENT_IP_ADDRESS_CTX_KEY.get());
     }
   }
