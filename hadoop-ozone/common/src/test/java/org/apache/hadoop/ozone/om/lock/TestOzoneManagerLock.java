@@ -26,12 +26,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -55,7 +56,7 @@ public class TestOzoneManagerLock {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
     lock.acquireWriteLock(resource, resourceName);
     lock.releaseWriteLock(resource, resourceName);
-    Assertions.assertTrue(true);
+    assertTrue(true);
   }
 
   @Test
@@ -82,17 +83,17 @@ public class TestOzoneManagerLock {
       } catch (RuntimeException ex) {
         String message = "cannot acquire " + resource.getName() + " lock " +
             "while holding [" + resource.getName() + "] lock(s).";
-        Assertions.assertTrue(ex.getMessage().contains(message),
+        assertTrue(ex.getMessage().contains(message),
             ex.getMessage());
       }
       lock.releaseWriteLock(resource, resourceName);
-      Assertions.assertTrue(true);
+      assertTrue(true);
     } else {
       lock.acquireWriteLock(resource, resourceName);
       lock.acquireWriteLock(resource, resourceName);
       lock.releaseWriteLock(resource, resourceName);
       lock.releaseWriteLock(resource, resourceName);
-      Assertions.assertTrue(true);
+      assertTrue(true);
     }
   }
 
@@ -123,7 +124,7 @@ public class TestOzoneManagerLock {
             resourceInfo.getLockName());
       }
     }
-    Assertions.assertTrue(true);
+    assertTrue(true);
   }
 
   @Test
@@ -140,7 +141,7 @@ public class TestOzoneManagerLock {
           } catch (RuntimeException ex) {
             String message = "cannot acquire " + resource.getName() + " lock " +
                 "while holding [" + higherResource.getName() + "] lock(s).";
-            Assertions.assertTrue(ex.getMessage().contains(message),
+            assertTrue(ex.getMessage().contains(message),
                 ex.getMessage());
           }
           lock.releaseWriteLock(higherResource, resourceName);
@@ -173,7 +174,7 @@ public class TestOzoneManagerLock {
           } catch (RuntimeException ex) {
             String message = "cannot acquire " + resource.getName() + " lock " +
                 "while holding " + currentLocks + " lock(s).";
-            Assertions.assertTrue(ex.getMessage().contains(message),
+            assertTrue(ex.getMessage().contains(message),
                 ex.getMessage());
           }
         }
@@ -236,7 +237,7 @@ public class TestOzoneManagerLock {
     OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
     lock.acquireMultiUserLock("user1", "user2");
     lock.releaseMultiUserLock("user1", "user2");
-    Assertions.assertTrue(true);
+    assertTrue(true);
   }
 
   @Test
@@ -249,7 +250,7 @@ public class TestOzoneManagerLock {
     } catch (RuntimeException ex) {
       String message = "cannot acquire USER_LOCK lock while holding " +
           "[USER_LOCK] lock(s).";
-      Assertions.assertTrue(ex.getMessage().contains(message), ex.getMessage());
+      assertTrue(ex.getMessage().contains(message), ex.getMessage());
     }
     lock.releaseMultiUserLock("user1", "user2");
   }
@@ -264,7 +265,7 @@ public class TestOzoneManagerLock {
     } catch (RuntimeException ex) {
       String message = "cannot acquire USER_LOCK lock while holding " +
           "[USER_LOCK] lock(s).";
-      Assertions.assertTrue(ex.getMessage().contains(message), ex.getMessage());
+      assertTrue(ex.getMessage().contains(message), ex.getMessage());
     }
     lock.releaseWriteLock(Resource.USER_LOCK, "user3");
   }
@@ -279,7 +280,7 @@ public class TestOzoneManagerLock {
     } catch (RuntimeException ex) {
       String message = "cannot acquire USER_LOCK lock while holding " +
           "[USER_LOCK] lock(s).";
-      Assertions.assertTrue(ex.getMessage().contains(message), ex.getMessage());
+      assertTrue(ex.getMessage().contains(message), ex.getMessage());
     }
     lock.releaseMultiUserLock("user1", "user2");
   }
@@ -303,13 +304,13 @@ public class TestOzoneManagerLock {
       Thread.sleep(100);
       // Since the new thread is trying to get lock on same resource,
       // it will wait.
-      Assertions.assertFalse(gotLock.get());
+      assertFalse(gotLock.get());
       lock.releaseWriteLock(resource, resourceName);
       // Since we have released the lock, the new thread should have the lock
       // now.
       // Let's give some time for the new thread to run
       Thread.sleep(100);
-      Assertions.assertTrue(gotLock.get());
+      assertTrue(gotLock.get());
     }
 
   }
@@ -329,13 +330,13 @@ public class TestOzoneManagerLock {
     Thread.sleep(100);
     // Since the new thread is trying to get lock on same resource, it will
     // wait.
-    Assertions.assertFalse(gotLock.get());
+    assertFalse(gotLock.get());
     lock.releaseMultiUserLock("user2", "user1");
     // Since we have released the lock, the new thread should have the lock
     // now.
     // Let's give some time for the new thread to run
     Thread.sleep(100);
-    Assertions.assertTrue(gotLock.get());
+    assertTrue(gotLock.get());
   }
 
   @Test
@@ -370,26 +371,26 @@ public class TestOzoneManagerLock {
     lock.releaseReadLock(resource, resourceName);
     assertEquals(0, lock.getReadHoldCount(resource, resourceName));
 
-    Assertions.assertFalse(
+    assertFalse(
         lock.isWriteLockedByCurrentThread(resource, resourceName));
     assertEquals(0, lock.getWriteHoldCount(resource, resourceName));
     lock.acquireWriteLock(resource, resourceName);
-    Assertions.assertTrue(
+    assertTrue(
         lock.isWriteLockedByCurrentThread(resource, resourceName));
     assertEquals(1, lock.getWriteHoldCount(resource, resourceName));
 
     lock.acquireWriteLock(resource, resourceName);
-    Assertions.assertTrue(
+    assertTrue(
         lock.isWriteLockedByCurrentThread(resource, resourceName));
     assertEquals(2, lock.getWriteHoldCount(resource, resourceName));
 
     lock.releaseWriteLock(resource, resourceName);
-    Assertions.assertTrue(
+    assertTrue(
         lock.isWriteLockedByCurrentThread(resource, resourceName));
     assertEquals(1, lock.getWriteHoldCount(resource, resourceName));
 
     lock.releaseWriteLock(resource, resourceName);
-    Assertions.assertFalse(
+    assertFalse(
         lock.isWriteLockedByCurrentThread(resource, resourceName));
     assertEquals(0, lock.getWriteHoldCount(resource, resourceName));
   }
@@ -432,13 +433,13 @@ public class TestOzoneManagerLock {
     }
 
     String readHeldStat = lock.getOMLockMetrics().getReadLockHeldTimeMsStat();
-    Assertions.assertTrue(readHeldStat.contains("Samples = " + threadCount),
+    assertTrue(readHeldStat.contains("Samples = " + threadCount),
         "Expected " + threadCount +
             " samples in readLockHeldTimeMsStat: " + readHeldStat);
 
     String readWaitingStat =
         lock.getOMLockMetrics().getReadLockWaitingTimeMsStat();
-    Assertions.assertTrue(readWaitingStat.contains("Samples = " + threadCount),
+    assertTrue(readWaitingStat.contains("Samples = " + threadCount),
         "Expected " + threadCount +
             " samples in readLockWaitingTimeMsStat: " + readWaitingStat);
   }
@@ -468,13 +469,13 @@ public class TestOzoneManagerLock {
     }
 
     String writeHeldStat = lock.getOMLockMetrics().getWriteLockHeldTimeMsStat();
-    Assertions.assertTrue(writeHeldStat.contains("Samples = " + threadCount),
+    assertTrue(writeHeldStat.contains("Samples = " + threadCount),
         "Expected " + threadCount +
             " samples in writeLockHeldTimeMsStat: " + writeHeldStat);
 
     String writeWaitingStat =
         lock.getOMLockMetrics().getWriteLockWaitingTimeMsStat();
-    Assertions.assertTrue(writeWaitingStat.contains("Samples = " + threadCount),
+    assertTrue(writeWaitingStat.contains("Samples = " + threadCount),
         "Expected " + threadCount +
             " samples in writeLockWaitingTimeMsStat" + writeWaitingStat);
   }
@@ -524,26 +525,26 @@ public class TestOzoneManagerLock {
     }
 
     String readHeldStat = lock.getOMLockMetrics().getReadLockHeldTimeMsStat();
-    Assertions.assertTrue(readHeldStat.contains("Samples = " + readThreadCount),
+    assertTrue(readHeldStat.contains("Samples = " + readThreadCount),
         "Expected " + readThreadCount +
             " samples in readLockHeldTimeMsStat: " + readHeldStat);
 
     String readWaitingStat =
         lock.getOMLockMetrics().getReadLockWaitingTimeMsStat();
-    Assertions.assertTrue(readWaitingStat.contains(
+    assertTrue(readWaitingStat.contains(
             "Samples = " + readThreadCount),
         "Expected " + readThreadCount +
             " samples in readLockWaitingTimeMsStat: " + readWaitingStat);
 
     String writeHeldStat = lock.getOMLockMetrics().getWriteLockHeldTimeMsStat();
-    Assertions.assertTrue(writeHeldStat.contains(
+    assertTrue(writeHeldStat.contains(
             "Samples = " + writeThreadCount),
         "Expected " + writeThreadCount +
             " samples in writeLockHeldTimeMsStat: " + writeHeldStat);
 
     String writeWaitingStat =
         lock.getOMLockMetrics().getWriteLockWaitingTimeMsStat();
-    Assertions.assertTrue(writeWaitingStat.contains(
+    assertTrue(writeWaitingStat.contains(
             "Samples = " + writeThreadCount),
         "Expected " + writeThreadCount +
             " samples in writeLockWaitingTimeMsStat" + writeWaitingStat);
@@ -555,16 +556,16 @@ public class TestOzoneManagerLock {
     try {
       MetricsCollectorImpl metricsCollector = new MetricsCollectorImpl();
       omLockMetrics.getMetrics(metricsCollector, true);
-      Assertions.assertEquals(1, metricsCollector.getRecords().size());
+      assertEquals(1, metricsCollector.getRecords().size());
 
       String omLockMetricsRecords = metricsCollector.getRecords().toString();
-      Assertions.assertTrue(omLockMetricsRecords.contains(
+      assertTrue(omLockMetricsRecords.contains(
           "ReadLockWaitingTime"), omLockMetricsRecords);
-      Assertions.assertTrue(omLockMetricsRecords.contains("ReadLockHeldTime"),
+      assertTrue(omLockMetricsRecords.contains("ReadLockHeldTime"),
           omLockMetricsRecords);
-      Assertions.assertTrue(omLockMetricsRecords.contains(
+      assertTrue(omLockMetricsRecords.contains(
           "WriteLockWaitingTime"), omLockMetricsRecords);
-      Assertions.assertTrue(omLockMetricsRecords.contains("WriteLockHeldTime"),
+      assertTrue(omLockMetricsRecords.contains("WriteLockHeldTime"),
           omLockMetricsRecords);
     } finally {
       omLockMetrics.unRegister();
