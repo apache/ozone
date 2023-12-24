@@ -78,11 +78,8 @@ import org.junit.rules.Timeout;
 import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -946,12 +943,11 @@ public class TestOzoneClientMultipartUploadWithFSO {
   }
 
   private long getParentID(String volName, String buckName,
-      String kName, OMMetadataManager omMetadataManager) throws IOException {
-    Iterator<Path> pathComponents = Paths.get(kName).iterator();
+                           String kName, OMMetadataManager omMetadataManager) throws IOException {
     final long volumeId = omMetadataManager.getVolumeId(volName);
     final long bucketId = omMetadataManager.getBucketId(volName,
         buckName);
-    return OMFileRequest.getParentID(volumeId, bucketId, pathComponents,
+    return OMFileRequest.getParentID(volumeId, bucketId,
         kName, omMetadataManager);
   }
 
