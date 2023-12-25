@@ -73,6 +73,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.OM;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_CERT_STORAGE_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_PATH;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -130,7 +131,7 @@ public class TestDefaultCAServer {
     } catch (IllegalStateException e) {
       // This also is a runtime exception. Hence not caught by junit expected
       // exception.
-      assertTrue(e.toString().contains("Missing Root Certs"));
+      assertThat(e.toString()).contains("Missing Root Certs");
     }
   }
 
@@ -151,7 +152,7 @@ public class TestDefaultCAServer {
     } catch (IllegalStateException e) {
       // This also is a runtime exception. Hence not caught by junit expected
       // exception.
-      assertTrue(e.toString().contains("Missing Keys"));
+      assertThat(e.toString()).contains("Missing Keys");
     }
   }
 
@@ -296,8 +297,7 @@ public class TestDefaultCAServer {
               CRLReason.lookup(CRLReason.keyCompromise), now);
           result.get();
         });
-    assertTrue(execution.getCause().getMessage()
-        .contains("Certificates cannot be null"));
+    assertThat(execution.getCause().getMessage()).contains("Certificates cannot be null");
   }
 
   @Test
@@ -331,8 +331,8 @@ public class TestDefaultCAServer {
                   String.valueOf(System.nanoTime()));
           holder.get();
         });
-    assertTrue(execution.getCause().getMessage()
-        .contains("ScmId and ClusterId in CSR subject are incorrect"));
+    assertThat(execution.getCause().getMessage())
+        .contains("ScmId and ClusterId in CSR subject are incorrect");
   }
 
   @Test

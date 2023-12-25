@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.client.OzoneQuota;
 
 import org.junit.jupiter.api.Test;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -46,7 +47,8 @@ public class TestJsonUtils {
   }
 
   private static void assertContains(String str, String part) {
-    assertTrue(str.contains(part),
-        "Expected JSON to contain '" + part + "', but didn't: " + str);
+    assertThat(str)
+        .withFailMessage("Expected JSON to contain '" + part + "', but didn't: " + str)
+        .contains(part);
   }
 }

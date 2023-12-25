@@ -34,10 +34,10 @@ import java.util.stream.Stream;
 import static com.google.common.collect.Lists.newArrayList;
 import static java.time.Instant.now;
 import static java.time.temporal.ChronoUnit.DAYS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.of;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
@@ -110,8 +110,7 @@ public class TestSecretKeyManager {
       // expect the current key is newly generated.
       assertFalse(savedSecretKey.contains(state.getCurrentKey()));
       assertEquals(1, state.getSortedKeys().size());
-      assertTrue(state.getSortedKeys().contains(
-          state.getCurrentKey()));
+      assertThat(state.getSortedKeys()).contains(state.getCurrentKey());
     }
   }
 
@@ -119,7 +118,7 @@ public class TestSecretKeyManager {
                                      Collection<ManagedSecretKey> actual) {
     assertEquals(expected.size(), actual.size());
     for (ManagedSecretKey expectedKey : expected) {
-      assertTrue(actual.contains(expectedKey));
+      assertThat(actual).contains(expectedKey);
     }
   }
 

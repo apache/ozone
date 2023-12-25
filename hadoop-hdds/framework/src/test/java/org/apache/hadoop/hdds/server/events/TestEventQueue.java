@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.hdds.server.events;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.AfterEach;
@@ -110,8 +110,8 @@ public class TestEventQueue {
     Thread.currentThread().sleep(500);
 
     // As we don't see all 10 events scheduled.
-    assertTrue(eventExecutor.scheduledEvents() >= 1 &&
-        eventExecutor.scheduledEvents() <= 10);
+    assertThat(eventExecutor.scheduledEvents()).isGreaterThanOrEqualTo(1)
+        .isLessThanOrEqualTo(10);
 
     queue.processAll(60000);
 
