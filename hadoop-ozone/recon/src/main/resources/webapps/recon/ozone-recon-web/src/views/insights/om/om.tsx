@@ -885,7 +885,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
         </Link> : <Link to="/Om" style={{ pointerEvents: 'none', color:"rgba(0,0,0,0.3)" }}>No Records</Link>}</div>;
     }
     if (type === 'next') {
-      return <div> {this.state.nextClickable ? <Link to="/Om" onClick={this.fetchNextRecords}> {this.state.pageDisplayCount}&nbsp;&nbsp;{'   >>'} </Link> : <Link to="/Om" style={{ pointerEvents: 'none' }}>No More Further Records</Link>}</div>;
+      return <div> {this.state.nextClickable ? <Link to="/Om" onClick={this.fetchNextRecords}> {this.state.pageDisplayCount}&nbsp;&nbsp;{'   >>'} </Link> : <Link to="/Om" style={{ pointerEvents: 'none' }}>No Records</Link>}</div>;
     }
     return originalElement;
   };
