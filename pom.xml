@@ -121,7 +121,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <zstd-jni.version>1.5.2-5</zstd-jni.version>
     <commons-daemon.version>1.0.13</commons-daemon.version>
     <commons-io.version>2.11.0</commons-io.version>
-    <commons-lang3.version>3.7</commons-lang3.version>
+    <commons-lang3.version>3.14.0</commons-lang3.version>
     <commons-logging.version>1.2</commons-logging.version>
     <commons-logging-api.version>1.1</commons-logging-api.version>
     <commons-math3.version>3.1.1</commons-math3.version>
