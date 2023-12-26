@@ -268,6 +268,13 @@ public abstract class TestOzoneRpcClientAbstract {
     TestOzoneRpcClientAbstract.clusterId = clusterId;
   }
 
+  public static OzoneClient getClient() {
+    return TestOzoneRpcClientAbstract.ozClient;
+  }
+
+  public static MiniOzoneCluster getCluster() {
+    return TestOzoneRpcClientAbstract.cluster;
+  }
   /**
    * Test OM Proxy Provider.
    */
