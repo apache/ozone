@@ -36,7 +36,7 @@ import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 public class ContainerReplicaHistoryList {
   private static final Codec<ContainerReplicaHistoryList> CODEC
       = new DelegatedCodec<>(Proto2Codec.get(
-      ContainerReplicaHistoryListProto.class),
+      ContainerReplicaHistoryListProto.getDefaultInstance()),
       ContainerReplicaHistoryList::fromProto,
       ContainerReplicaHistoryList::toProto);
 

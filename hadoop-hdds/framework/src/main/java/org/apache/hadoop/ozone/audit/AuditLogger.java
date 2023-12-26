@@ -29,7 +29,9 @@ import org.slf4j.LoggerFactory;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
@@ -52,6 +54,7 @@ public class AuditLogger {
   public static final String AUDIT_LOG_DEBUG_CMD_LIST_PREFIX =
       "ozone.audit.log.debug.cmd.list.";
   private AuditLoggerType type;
+  private final Map<String, String> opNameCache = new ConcurrentHashMap<>();
 
   /**
    * Parametrized Constructor to initialize logger.
@@ -130,8 +133,11 @@ public class AuditLogger {
   }
 
   private boolean shouldLogAtDebug(AuditMessage auditMessage) {
-    return debugCmdSetRef.get()
-        .contains(auditMessage.getOp().toLowerCase(Locale.ROOT));
+    return debugCmdSetRef.get().contains(getLowerCaseOp(auditMessage.getOp()));
+  }
+
+  private String getLowerCaseOp(String op) {
+    return opNameCache.computeIfAbsent(op, k -> k.toLowerCase(Locale.ROOT));
   }
 
   /**

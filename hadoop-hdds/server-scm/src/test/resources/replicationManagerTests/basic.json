@@ -1,0 +1,113 @@
+[
+  { "description": "Perfect Replication Ratis", "containerState": "CLOSED", "replicationConfig": "RATIS:THREE", "sequenceId": 12,
+    "replicas": [
+        { "state": "CLOSED", "index": 0, "datanode": "d1", "sequenceId": 0, "isEmpty": false, "origin": "o1"},
+        { "state": "CLOSED", "index": 0, "datanode": "d2", "sequenceId": 0, "isEmpty": false, "origin": "o2"},
+        { "state": "CLOSED", "index": 0, "datanode": "d3", "sequenceId": 0, "isEmpty": false, "origin": "o3"}
+    ],
+    "expectation": {},
+    "commands": []
+  },
+
+  { "description": "Perfect Replication EC", "containerState": "CLOSED", "replicationConfig": "EC:RS-3-2-1024k",
+    "replicas": [
+      { "state": "CLOSED", "index": 1, "datanode": "d1", "sequenceId": 0, "isEmpty": false, "origin": "o1"},
+      { "state": "CLOSED", "index": 2, "datanode": "d2", "sequenceId": 0, "isEmpty": false, "origin": "o2"},
+      { "state": "CLOSED", "index": 3, "datanode": "d3", "sequenceId": 0, "isEmpty": false, "origin": "o3"},
+      { "state": "CLOSED", "index": 4, "datanode": "d4", "sequenceId": 0, "isEmpty": false, "origin": "o4"},
+      { "state": "CLOSED", "index": 5, "datanode": "d5", "sequenceId": 0, "isEmpty": false, "origin": "o5"}
+    ],
+    "expectation": {},
+    "commands": []
+  },
+
+  { "description": "Ratis Under Replication", "containerState": "CLOSED", "replicationConfig": "RATIS:THREE", "sequenceId": 12,
+    "replicas": [
+        { "state": "CLOSED", "index": 0, "datanode": "d1", "sequenceId": 0, "isEmpty": false, "origin": "o1"},
+        { "state": "CLOSED", "index": 0, "datanode": "d2", "sequenceId": 0, "isEmpty": false, "origin": "o2"}
+    ],
+    "expectation": { "underReplicated": 1, "underReplicatedQueue": 1 },
+    "commands": [ { "type": "replicateContainerCommand"} ]
+  },
+
+  { "description": "Ratis Under Replication pending add", "containerState": "CLOSED", "replicationConfig": "RATIS:THREE", "sequenceId": 12,
+    "replicas": [
+      { "state": "CLOSED", "index": 0, "datanode": "d1", "sequenceId": 0, "isEmpty": false, "origin": "o1"},
+      { "state": "CLOSED", "index": 0, "datanode": "d2", "sequenceId": 0, "isEmpty": false, "origin": "o2"}
+    ],
+    "pendingReplicas": [ { "type": "ADD" } ],
+    "expectation": { "underReplicated": 1, "underReplicatedQueue": 0 }
+  },
+
+  { "description": "Under Replication EC", "containerState": "CLOSED", "replicationConfig": "EC:RS-3-2-1024k",
+    "replicas": [
+      { "state": "CLOSED", "index": 1, "datanode": "d1", "sequenceId": 0, "isEmpty": false, "origin": "o1"},
+      { "state": "CLOSED", "index": 2, "datanode": "d2", "sequenceId": 0, "isEmpty": false, "origin": "o2"},
+      { "state": "CLOSED", "index": 3, "datanode": "d3", "sequenceId": 0, "isEmpty": false, "origin": "o3"}
+    ],
+    "expectation": { "underReplicated": 1, "underReplicatedQueue": 1 },
+    "commands": [ { "type": "reconstructECContainersCommand"} ]
+  },
+
+  { "description": "Over Replicated", "containerState": "CLOSED", "replicationConfig": "RATIS:THREE", "sequenceId": 12,
+    "replicas": [
+        { "state": "CLOSED", "index": 0, "datanode": "d1", "sequenceId": 0, "isEmpty": false, "origin": "o1"},
+        { "state": "CLOSED", "index": 0, "datanode": "d2", "sequenceId": 0, "isEmpty": false, "origin": "o2"},
+        { "state": "CLOSED", "index": 0, "datanode": "d3", "sequenceId": 0, "isEmpty": false, "origin": "o3"},
+        { "state": "CLOSED", "index": 0, "datanode": "d4", "sequenceId": 0, "isEmpty": false, "origin": "o3"}
+    ],
+    "expectation": { "overReplicated": 1, "overReplicatedQueue": 1 },
+    "commands": [ { "type": "deleteContainerCommand"} ]
+  },
+
+  { "description": "Over Replication EC", "containerState": "CLOSED", "replicationConfig": "EC:RS-3-2-1024k",
+    "replicas": [
+      { "state": "CLOSED", "index": 1, "datanode": "d1", "sequenceId": 0, "isEmpty": false, "origin": "o1"},
+      { "state": "CLOSED", "index": 2, "datanode": "d2", "sequenceId": 0, "isEmpty": false, "origin": "o2"},
+      { "state": "CLOSED", "index": 3, "datanode": "d3", "sequenceId": 0, "isEmpty": false, "origin": "o3"},
+      { "state": "CLOSED", "index": 4, "datanode": "d4", "sequenceId": 0, "isEmpty": false, "origin": "o4"},
+      { "state": "CLOSED", "index": 5, "datanode": "d5", "sequenceId": 0, "isEmpty": false, "origin": "o5"},
+      { "state": "CLOSED", "index": 5, "datanode": "d6", "sequenceId": 0, "isEmpty": false, "origin": "o5"}
+    ],
+    "expectation": { "overReplicated": 1, "overReplicatedQueue": 1 },
+    "commands": [ { "type": "deleteContainerCommand"} ]
+  },
+
+  { "description": "Over Replication EC pending delete", "containerState": "CLOSED", "replicationConfig": "EC:RS-3-2-1024k",
+    "replicas": [
+      { "state": "CLOSED", "index": 1, "datanode": "d1", "sequenceId": 0, "isEmpty": false, "origin": "o1"},
+      { "state": "CLOSED", "index": 2, "datanode": "d2", "sequenceId": 0, "isEmpty": false, "origin": "o2"},
+      { "state": "CLOSED", "index": 3, "datanode": "d3", "sequenceId": 0, "isEmpty": false, "origin": "o3"},
+      { "state": "CLOSED", "index": 4, "datanode": "d4", "sequenceId": 0, "isEmpty": false, "origin": "o4"},
+      { "state": "CLOSED", "index": 5, "datanode": "d5", "sequenceId": 0, "isEmpty": false, "origin": "o5"},
+      { "state": "CLOSED", "index": 5, "datanode": "d6", "sequenceId": 0, "isEmpty": false, "origin": "o5"}
+    ],
+    "pendingReplicas": [ { "type": "DELETE", "replicaIndex": 5, "datanode": "d6" } ],
+    "expectation": { "overReplicated": 1, "overReplicatedQueue": 0 }
+  },
+
+  { "description": "Over and Under Replication EC", "containerState": "CLOSED", "replicationConfig": "EC:RS-3-2-1024k",
+    "replicas": [
+      { "state": "CLOSED", "index": 1, "datanode": "d1", "sequenceId": 0, "isEmpty": false, "origin": "o1"},
+      { "state": "CLOSED", "index": 2, "datanode": "d2", "sequenceId": 0, "isEmpty": false, "origin": "o2"},
+      { "state": "CLOSED", "index": 4, "datanode": "d4", "sequenceId": 0, "isEmpty": false, "origin": "o4"},
+      { "state": "CLOSED", "index": 5, "datanode": "d5", "sequenceId": 0, "isEmpty": false, "origin": "o5"},
+      { "state": "CLOSED", "index": 5, "datanode": "d6", "sequenceId": 0, "isEmpty": false, "origin": "o5"}
+    ],
+    "expectation": { "overReplicated": 0, "overReplicatedQueue": 0, "underReplicated": 1, "underReplicatedQueue": 1 },
+    "commands": [ { "type": "reconstructECContainersCommand" } ]
+  },
+
+  { "description": "Replication Over Replicated Ratis Pending Delete", "containerState": "CLOSED", "replicationConfig": "RATIS:THREE", "sequenceId": 12,
+    "replicas": [
+      { "state": "CLOSED", "index": 0, "datanode": "d1", "sequenceId": 0, "isEmpty": false, "origin": "o1"},
+      { "state": "CLOSED", "index": 0, "datanode": "d2", "sequenceId": 0, "isEmpty": false, "origin": "o2"},
+      { "state": "CLOSED", "index": 0, "datanode": "d3", "sequenceId": 0, "isEmpty": false, "origin": "o3"},
+      { "state": "CLOSED", "index": 0, "datanode": "d4", "sequenceId": 0, "isEmpty": false, "origin": "o3"}
+    ],
+    "pendingReplicas": [ { "type":  "DELETE", "datanode":  "d2" } ],
+    "expectation": { "overReplicated":  1, "overReplicatedQueue":  0},
+    "checkCommands": [],
+    "commands": []
+  }
+]

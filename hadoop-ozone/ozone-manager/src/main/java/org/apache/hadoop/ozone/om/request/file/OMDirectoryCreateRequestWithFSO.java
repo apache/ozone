@@ -27,7 +27,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.file.OMDirectoryCreateResponseWithFSO;
@@ -81,7 +80,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+      long trxnLogIndex) {
 
     CreateDirectoryRequest createDirectoryRequest = getOmRequest()
         .getCreateDirectoryRequest();
@@ -194,8 +193,6 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
       omClientResponse = new OMDirectoryCreateResponseWithFSO(
           createErrorOMResponse(omResponse, exception), result);
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
       if (acquiredLock) {
         mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));

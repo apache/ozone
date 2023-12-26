@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponseWithFSO;
@@ -71,7 +70,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+      long trxnLogIndex) {
 
     CreateFileRequest createFileRequest = getOmRequest().getCreateFileRequest();
     KeyArgs keyArgs = createFileRequest.getKeyArgs();
@@ -240,8 +239,6 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
       omClientResponse = new OMFileCreateResponseWithFSO(createErrorOMResponse(
             omResponse, exception), getBucketLayout());
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
       if (acquiredLock) {
         mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));

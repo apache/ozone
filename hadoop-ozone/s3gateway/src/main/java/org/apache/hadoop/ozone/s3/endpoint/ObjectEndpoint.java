@@ -370,7 +370,7 @@ public class ObjectEndpoint extends EndpointBase {
         long opLatencyNs = getMetrics().updateCreateKeySuccessStats(startNanos);
         perf.appendOpLatencyNanos(opLatencyNs);
         AUDIT.logWriteSuccess(buildAuditMessageForSuccess(s3GAction,
-            getAuditParameters(), perf.build()));
+            getAuditParameters(), perf));
       }
     }
   }
@@ -405,7 +405,7 @@ public class ObjectEndpoint extends EndpointBase {
         Response response = listParts(bucketName, keyPath, uploadId,
             partMarker, maxParts, perf);
         AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
-            getAuditParameters(), perf.build()));
+            getAuditParameters(), perf));
         return response;
       }
 
@@ -444,7 +444,7 @@ public class ObjectEndpoint extends EndpointBase {
           long opLatencyNs =  getMetrics().updateGetKeySuccessStats(startNanos);
           perf.appendOpLatencyNanos(opLatencyNs);
           AUDIT.logReadSuccess(buildAuditMessageForSuccess(S3GAction.GET_KEY,
-              getAuditParameters(), perf.build()));
+              getAuditParameters(), perf));
         };
         responseBuilder = Response
             .ok(output)
@@ -468,7 +468,7 @@ public class ObjectEndpoint extends EndpointBase {
           long opLatencyNs = getMetrics().updateGetKeySuccessStats(startNanos);
           perf.appendOpLatencyNanos(opLatencyNs);
           AUDIT.logReadSuccess(buildAuditMessageForSuccess(S3GAction.GET_KEY,
-              getAuditParameters(), perf.build()));
+              getAuditParameters(), perf));
         };
         responseBuilder = Response
             .status(Status.PARTIAL_CONTENT)

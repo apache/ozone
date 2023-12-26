@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -51,10 +50,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -76,7 +72,7 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+      long trxnLogIndex) {
 
     AllocateBlockRequest allocateBlockRequest =
             getOmRequest().getAllocateBlockRequest();
@@ -185,8 +181,6 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       LOG.error("Allocate Block failed. Volume:{}, Bucket:{}, OpenKey:{}. " +
               "Exception:{}", volumeName, bucketName, openKeyName, exception);
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-              omDoubleBufferHelper);
       if (acquiredLock) {
         mergeOmLockDetails(
             omMetadataManager.getLock().releaseWriteLock(
@@ -218,9 +212,9 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
     final long bucketId = omMetadataManager.getBucketId(
             volumeName, bucketName);
     String fileName = OzoneFSUtils.getFileName(keyName);
-    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
+
     long parentID = OMFileRequest.getParentID(volumeId, bucketId,
-            pathComponents, keyName, omMetadataManager);
+          keyName, omMetadataManager);
     return omMetadataManager.getOpenFileName(volumeId, bucketId, parentID,
             fileName, clientID);
   }

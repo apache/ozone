@@ -26,7 +26,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
 import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -94,8 +93,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+      long transactionLogIndex) {
 
     CreateVolumeRequest createVolumeRequest =
         getOmRequest().getCreateVolumeRequest();
@@ -176,11 +174,6 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
       omClientResponse = new OMVolumeCreateResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
-      if (omClientResponse != null) {
-        omClientResponse.setFlushFuture(
-            ozoneManagerDoubleBufferHelper.add(omClientResponse,
-                transactionLogIndex));
-      }
       if (acquiredUserLock) {
         mergeOmLockDetails(
             omMetadataManager.getLock().releaseWriteLock(USER_LOCK, owner));

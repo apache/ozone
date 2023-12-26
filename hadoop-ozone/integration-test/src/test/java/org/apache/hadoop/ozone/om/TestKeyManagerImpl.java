@@ -127,6 +127,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import org.mockito.Mockito;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -218,7 +219,8 @@ public class TestKeyManagerImpl {
         .allocateBlock(Mockito.anyLong(), Mockito.anyInt(),
             any(ReplicationConfig.class),
             Mockito.anyString(),
-            any(ExcludeList.class))).thenThrow(
+            any(ExcludeList.class),
+            Mockito.anyString())).thenThrow(
                 new SCMException("SafeModePrecheck failed for allocateBlock",
             ResultCodes.SAFE_MODE_EXCEPTION));
     createVolume(VOLUME_NAME);
@@ -316,8 +318,8 @@ public class TestKeyManagerImpl {
     OMException omException = assertThrows(OMException.class,
          () ->
              writeClient.allocateBlock(keyArgs, 1L, new ExcludeList()));
-    assertTrue(omException.getMessage()
-        .contains("SafeModePrecheck failed for allocateBlock"));
+    assertThat(omException.getMessage())
+        .contains("SafeModePrecheck failed for allocateBlock");
   }
 
   @Test
@@ -333,8 +335,8 @@ public class TestKeyManagerImpl {
         .build();
     OMException omException = assertThrows(OMException.class,
         () -> writeClient.openKey(keyArgs));
-    assertTrue(omException.getMessage()
-        .contains("SafeModePrecheck failed for allocateBlock"));
+    assertThat(omException.getMessage())
+        .contains("SafeModePrecheck failed for allocateBlock");
   }
 
   @Test
@@ -846,9 +848,9 @@ public class TestKeyManagerImpl {
     // lookup key, random node as client
     OmKeyInfo key4 = keyManager.lookupKey(keyArgs, resolvedBucket(),
         "/d=default-drack/127.0.0.1");
-    assertTrue(
-        keyPipeline.getNodes().containsAll(key4.getLatestVersionLocations()
-            .getLocationList().get(0).getPipeline().getNodesInOrder()));
+    assertThat(keyPipeline.getNodes())
+        .containsAll(key4.getLatestVersionLocations()
+            .getLocationList().get(0).getPipeline().getNodesInOrder());
   }
 
   @NotNull
@@ -1591,11 +1593,11 @@ public class TestKeyManagerImpl {
       }
       // verify filestatus is present in directory or file set accordingly
       if (fileStatus.isDirectory()) {
-        assertTrue(directorySet.contains(normalizedKeyName),
-            directorySet + " doesn't contain " + normalizedKeyName);
+        assertThat(directorySet).withFailMessage(directorySet +
+            " doesn't contain " + normalizedKeyName).contains(normalizedKeyName);
       } else {
-        assertTrue(fileSet.contains(normalizedKeyName),
-            fileSet + " doesn't contain " + normalizedKeyName);
+        assertThat(fileSet).withFailMessage(fileSet + " doesn't contain " + normalizedKeyName)
+            .contains(normalizedKeyName);
       }
     }
 

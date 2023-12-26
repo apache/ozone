@@ -46,13 +46,11 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.UnhealthyTest;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.experimental.categories.Category;
 
 import java.io.File;
 import java.io.IOException;
@@ -129,7 +127,7 @@ public class TestParentAcl {
   }
 
   @Test
-  @Category(UnhealthyTest.class) @Unhealthy("HDDS-6335")
+  @Unhealthy("HDDS-6335")
   public void testKeyAcl()
       throws IOException {
     OzoneObj keyObj;

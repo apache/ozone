@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
-
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -37,33 +37,23 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.HashMap;
-import org.junit.Rule;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * Tests Hybrid Pipeline Creation and IO on same set of Datanodes.
  */
+@Timeout(300)
 public class TestHybridPipelineOnDatanode {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
-
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
   private static OzoneClient client;
@@ -76,7 +66,7 @@ public class TestHybridPipelineOnDatanode {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3)
@@ -90,7 +80,7 @@ public class TestHybridPipelineOnDatanode {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -117,8 +107,9 @@ public class TestHybridPipelineOnDatanode {
 
     // Write data into a key
     OzoneOutputStream out = bucket
-        .createKey(keyName1, data.length, ReplicationType.RATIS,
-            ReplicationFactor.ONE, new HashMap<>());
+        .createKey(keyName1, data.length,
+            ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+                ReplicationFactor.ONE), new HashMap<>());
     out.write(value.getBytes(UTF_8));
     out.close();
 
@@ -126,8 +117,9 @@ public class TestHybridPipelineOnDatanode {
 
     // Write data into a key
     out = bucket
-        .createKey(keyName2, data.length, ReplicationType.RATIS,
-            ReplicationFactor.THREE, new HashMap<>());
+        .createKey(keyName2, data.length,
+            ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+                ReplicationFactor.THREE), new HashMap<>());
     out.write(value.getBytes(UTF_8));
     out.close();
 
@@ -151,17 +143,18 @@ public class TestHybridPipelineOnDatanode {
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(pipelineID1);
     List<DatanodeDetails> dns = pipeline1.getNodes();
-    Assert.assertTrue(dns.size() == 1);
+    Assertions.assertEquals(1, dns.size());
 
     Pipeline pipeline2 =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(pipelineID2);
-    Assert.assertNotEquals(pipeline1, pipeline2);
-    Assert.assertTrue(pipeline1.getType() == HddsProtos.ReplicationType.RATIS);
-    Assert.assertTrue(pipeline1.getType() == pipeline2.getType());
+    Assertions.assertNotEquals(pipeline1, pipeline2);
+    Assertions.assertSame(pipeline1.getType(),
+        HddsProtos.ReplicationType.RATIS);
+    Assertions.assertSame(pipeline1.getType(), pipeline2.getType());
     // assert that the pipeline Id1 and pipelineId2 are on the same node
     // but different replication factor
-    Assert.assertTrue(pipeline2.getNodes().contains(dns.get(0)));
+    Assertions.assertTrue(pipeline2.getNodes().contains(dns.get(0)));
     byte[] b1 = new byte[data.length];
     byte[] b2 = new byte[data.length];
     // now try to read both the keys
@@ -173,8 +166,8 @@ public class TestHybridPipelineOnDatanode {
     is = bucket.readKey(keyName2);
     is.read(b2);
     is.close();
-    Assert.assertTrue(Arrays.equals(b1, data));
-    Assert.assertTrue(Arrays.equals(b1, b2));
+    Assertions.assertArrayEquals(b1, data);
+    Assertions.assertArrayEquals(b1, b2);
   }
 }
 

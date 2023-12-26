@@ -28,8 +28,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -182,13 +182,15 @@ public class SCMBlockProtocolServer implements
   public List<AllocatedBlock> allocateBlock(
       long size, int num,
       ReplicationConfig replicationConfig,
-      String owner, ExcludeList excludeList
+      String owner, ExcludeList excludeList,
+      String clientMachine
   ) throws IOException {
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("size", String.valueOf(size));
     auditMap.put("num", String.valueOf(num));
     auditMap.put("replication", replicationConfig.toString());
     auditMap.put("owner", owner);
+    auditMap.put("client", clientMachine);
     List<AllocatedBlock> blocks = new ArrayList<>(num);
 
     if (LOG.isDebugEnabled()) {
@@ -201,6 +203,14 @@ public class SCMBlockProtocolServer implements
             .allocateBlock(size, replicationConfig, owner, excludeList);
         if (block != null) {
           blocks.add(block);
+          // Sort the datanodes if client machine is specified
+          final Node client = getClientNode(clientMachine);
+          if (client != null) {
+            final List<DatanodeDetails> nodes = block.getPipeline().getNodes();
+            final List<DatanodeDetails> sorted = scm.getClusterMap()
+                .sortByDistanceCost(client, nodes, nodes.size());
+            block.getPipeline().setNodesInOrder(sorted);
+          }
         }
       }
 
@@ -348,22 +358,16 @@ public class SCMBlockProtocolServer implements
     auditMap.put("nodes", String.valueOf(nodes));
     try {
       NodeManager nodeManager = scm.getScmNodeManager();
-      Node client = getDatanode(clientMachine);
-      // not datanode
-      if (client == null) {
-        client = getOtherNode(clientMachine);
-      }
-      List<Node> nodeList = new ArrayList<>();
+      final Node client = getClientNode(clientMachine);
+      List<DatanodeDetails> nodeList = new ArrayList<>();
       nodes.forEach(uuid -> {
         DatanodeDetails node = nodeManager.getNodeByUuid(uuid);
         if (node != null) {
           nodeList.add(node);
         }
       });
-      List<? extends Node> sortedNodeList = scm.getClusterMap()
+      return scm.getClusterMap()
           .sortByDistanceCost(client, nodeList, nodeList.size());
-      return sortedNodeList.stream().map(r -> (DatanodeDetails) r).collect(
-          Collectors.toList());
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(
@@ -379,10 +383,14 @@ public class SCMBlockProtocolServer implements
     }
   }
 
-  private Node getDatanode(String clientMachine) {
+  private Node getClientNode(String clientMachine) {
+    if (StringUtils.isEmpty(clientMachine)) {
+      return null;
+    }
     List<DatanodeDetails> datanodes = scm.getScmNodeManager()
         .getNodesByAddress(clientMachine);
-    return !datanodes.isEmpty() ? datanodes.get(0) : null;
+    return !datanodes.isEmpty() ? datanodes.get(0) :
+        getOtherNode(clientMachine);
   }
 
   private Node getOtherNode(String clientMachine) {

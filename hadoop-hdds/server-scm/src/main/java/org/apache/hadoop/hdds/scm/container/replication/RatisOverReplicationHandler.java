@@ -231,7 +231,7 @@ public class RatisOverReplicationHandler
       // prefer deleting replicas with lower sequence IDs
       return replicas.stream()
           .sorted(Comparator.comparingLong(ContainerReplica::getSequenceId)
-              .reversed())
+              .thenComparing(ContainerReplica::hashCode))
           .collect(Collectors.toList());
     }
 

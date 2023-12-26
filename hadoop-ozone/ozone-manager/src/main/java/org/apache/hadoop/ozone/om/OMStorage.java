@@ -53,7 +53,20 @@ public class OMStorage extends Storage {
   static final String ERROR_OM_IS_ALREADY_INITIALIZED =
       "OM is already initialized.";
   static final String ERROR_UNEXPECTED_OM_NODE_ID_TEMPLATE =
-      "OM NodeId: %s does not match existing nodeId from VERSION file: %s";
+      "Configured OM NodeId: %s does not match the existing nodeId in the " +
+      "VERSION file: %s.%n" + "One of the possible reasons may be, that " +
+      "previously an other OM was running on this host and some metadata was " +
+      "left in the same directory that is configured for this OM instance as " +
+      "metadata directory, or someone changed the associated OM id in " +
+      "the configuration.%n" + "Please carefully assess the configuration" +
+      " and the VERSION file in the metadata directory, and either change" +
+      " the configuration back, or remove the metadata directory, and " +
+      "re-initialize this Ozone Manager. (Changing the VERSION file is not" +
+      " a good approach, as the OM id is an integral part of the Raft " +
+      "metadata also.%n" + "Note that removing the metadata from the " +
+      "majority of Ozone Managers at once can lead to loosing the filesystem" +
+      " metadata, so take extra care if you do remove the metadata and that" +
+      " data is not a leftover from previous installations.%n";
   static final String ERROR_STORAGE_NOT_INITIALIZED =
       "OM Storage is not initialized yet.";
 

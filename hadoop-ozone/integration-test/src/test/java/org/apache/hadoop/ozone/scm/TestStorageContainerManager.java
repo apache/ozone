@@ -1073,7 +1073,7 @@ public class TestStorageContainerManager {
     eventQueue.fireEvent(SCMEvents.INCREMENTAL_CONTAINER_REPORT, dndata);
     eventQueue.fireEvent(SCMEvents.INCREMENTAL_CONTAINER_REPORT, dndata);
     eventQueue.fireEvent(SCMEvents.INCREMENTAL_CONTAINER_REPORT, dndata);
-    Assert.assertTrue(containerReportExecutors.droppedEvents() == 0);
+    Assert.assertEquals(0, containerReportExecutors.droppedEvents());
     Thread.currentThread().sleep(3000);
     Assert.assertEquals(containerReportExecutors.scheduledEvents(),
         containerReportExecutors.queuedEvents());

@@ -64,10 +64,10 @@ import java.util.UUID;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Ozone Manager HA tests that stop/restart one or more OM nodes.
@@ -300,7 +300,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     final long leaderOMSnaphsotIndex = leaderOM.getRatisSnapshotIndex();
 
     // The stopped OM should be lagging behind the leader OM.
-    assertTrue(followerOM1LastAppliedIndex < leaderOMSnaphsotIndex);
+    assertThat(followerOM1LastAppliedIndex).isLessThan(leaderOMSnaphsotIndex);
 
     // Restart the stopped OM.
     followerOM1.restart();
@@ -319,8 +319,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
 
     final long followerOM1LastAppliedIndexNew =
         followerOM1.getOmRatisServer().getLastAppliedTermIndex().getIndex();
-    assertTrue(
-        followerOM1LastAppliedIndexNew > leaderOMSnaphsotIndex);
+    assertThat(followerOM1LastAppliedIndexNew).isGreaterThan(leaderOMSnaphsotIndex);
   }
 
   @Test
@@ -593,7 +592,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
 
     while (volumeIterator.hasNext()) {
       OzoneVolume next = volumeIterator.next();
-      assertTrue(expectedVolumes.contains(next.getName()));
+      assertThat(expectedVolumes).contains(next.getName());
       expectedCount++;
     }
 

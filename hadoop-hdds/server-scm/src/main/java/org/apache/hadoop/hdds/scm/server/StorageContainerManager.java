@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -412,6 +413,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (isSecretKeyEnable(securityConfig)) {
       secretKeyManagerService = new SecretKeyManagerService(scmContext, conf,
               scmHAManager.getRatisServer());
+      if (!ratisEnabled) {
+        secretKeyManagerService.getSecretKeyManager().checkAndInitialize();
+      }
       serviceManager.register(secretKeyManagerService);
     } else {
       secretKeyManagerService = null;
@@ -574,6 +578,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue.addHandler(SCMEvents.PIPELINE_REPORT, pipelineReportHandler);
     eventQueue.addHandler(SCMEvents.CRL_STATUS_REPORT, crlStatusReportHandler);
 
+    scmNodeManager.registerSendCommandNotify(
+        SCMCommandProto.Type.deleteBlocksCommand,
+        scmBlockManager.getDeletedBlockLog()::onSent);
   }
 
   private void initializeCertificateClient() throws IOException {
@@ -806,7 +813,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getScmBlockManager() != null) {
       scmBlockManager = configurator.getScmBlockManager();
     } else {
-      scmBlockManager = new BlockManagerImpl(conf, this);
+      scmBlockManager = new BlockManagerImpl(conf, scmConfig, this);
     }
     if (configurator.getReplicationManager() != null) {
       replicationManager = configurator.getReplicationManager();

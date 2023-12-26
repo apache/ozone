@@ -1435,6 +1435,10 @@ public class KeyManagerImpl implements KeyManager {
         && omKeyInfoCacheValue.getCacheValue() == null;
   }
 
+  public static boolean isKeyInCache(String key, Table keyTable) {
+    return keyTable.getCacheValue(new CacheKey(key)) != null;
+  }
+
   /**
    * Helper function for listStatus to find key in TableCache.
    */

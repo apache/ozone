@@ -48,6 +48,7 @@ import java.util.TimerTask;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import com.google.common.base.Optional;
@@ -179,7 +180,6 @@ import org.apache.hadoop.ozone.om.protocolPB.OMInterServiceProtocolPB;
 import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolClientSideImpl;
 import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolPB;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
-import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
 import org.apache.hadoop.hdds.security.exception.OzoneSecurityException;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -414,7 +414,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private OMNodeDetails omNodeDetails;
   private final Map<String, OMNodeDetails> peerNodesMap;
   private File omRatisSnapshotDir;
-  private final RatisSnapshotInfo omRatisSnapshotInfo;
+  private final AtomicReference<TransactionInfo> omTransactionInfo
+      = new AtomicReference<>(TransactionInfo.DEFAULT_VALUE);
   private final Map<String, RatisDropwizardExports> ratisMetricsMap =
       new ConcurrentHashMap<>();
   private List<RatisDropwizardExports.MetricReporter> ratisReporterList = null;
@@ -691,8 +692,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } else if (startupOption == StartupOption.FORCE_BOOTSTRAP) {
       isForcedBootstrapping = true;
     }
-
-    this.omRatisSnapshotInfo = new RatisSnapshotInfo();
 
     initializeRatisDirs(conf);
     initializeRatisServer(isBootstrapping || isForcedBootstrapping);
@@ -2180,8 +2179,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return (layoutVersion == null) ? null : Integer.parseInt(layoutVersion);
   }
 
-  public RatisSnapshotInfo getSnapshotInfo() {
-    return omRatisSnapshotInfo;
+  public TransactionInfo getTransactionInfo() {
+    return omTransactionInfo.get();
+  }
+
+  public void setTransactionInfo(TransactionInfo info) {
+    omTransactionInfo.set(info);
   }
 
   public long getRatisSnapshotIndex() throws IOException {
@@ -2223,7 +2226,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       if (omRatisServer != null) {
         omRatisServer.stop();
-        omRatisServer = null;
         OMHAMetrics.unRegister();
       }
       isOmRpcServerRunning = false;
@@ -2260,6 +2262,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (omhaMetrics != null) {
         OMHAMetrics.unRegister();
       }
+      omRatisServer = null;
       return true;
     } catch (Exception e) {
       LOG.error("OzoneManager stop failed.", e);
@@ -3027,25 +3030,38 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public String getRatisRoles() {
+  public List<List<String>> getRatisRoles() {
     List<ServiceInfo> serviceList;
+    List<List<String>> resultList = new ArrayList<>();
+    List<String> messageException = new ArrayList<>();
     int port = omNodeDetails.getRatisPort();
     RaftPeer leaderId;
     if (isRatisEnabled) {
+      if (null == omRatisServer) {
+        messageException.add("Server is shutting down");
+        resultList.add(messageException);
+        return resultList;
+      }
       try {
         leaderId = omRatisServer.getLeader();
         if (leaderId == null) {
           LOG.error("No leader found");
-          return "Exception: Not a leader";
+          messageException.add("Exception: Not a Leader");
+          resultList.add(messageException);
+          return resultList;
         }
         serviceList = getServiceList();
       } catch (IOException e) {
         LOG.error("IO-Exception Occurred", e);
-        return "Exception: " + e;
+        messageException.add("IO-Exception Occurred, " + e.getMessage());
+        resultList.add(messageException);
+        return resultList;
       }
       return OmUtils.format(serviceList, port, leaderId.getId().toString());
     } else {
-      return "Ratis-Disabled";
+      messageException.add("Ratis Disabled");
+      resultList.add(messageException);
+      return resultList;
     }
   }
 
@@ -3828,7 +3844,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try {
       if (oldOmMetadataManagerStopped) {
         time = Time.monotonicNow();
-        reloadOMState(lastAppliedIndex, term);
+        reloadOMState();
+        setTransactionInfo(TransactionInfo.valueOf(termIndex));
         omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
         newMetadataManagerStarted = true;
         LOG.info("Reloaded OM state with Term: {} and Index: {}. Spend {} ms",
@@ -3983,9 +4000,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * All the classes which use/ store MetadataManager should also be updated
    * with the new MetadataManager instance.
    */
-  void reloadOMState(long newSnapshotIndex, long newSnapshotTermIndex)
-      throws IOException {
-
+  private void reloadOMState() throws IOException {
     instantiateServices(true);
 
     // Restart required services
@@ -4012,10 +4027,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // with new data
     Files.deleteIfExists(getMetricsStorageFile().toPath());
     saveOmMetrics();
-
-    // Update OM snapshot index with the new snapshot index (from the new OM
-    // DB state).
-    omRatisSnapshotInfo.updateTermIndex(newSnapshotTermIndex, newSnapshotIndex);
   }
 
   public static Logger getLogger() {

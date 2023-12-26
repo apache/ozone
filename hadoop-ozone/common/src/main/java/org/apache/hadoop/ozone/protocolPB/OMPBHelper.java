@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.protocolPB;
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.CryptoProtocolVersion;
-import org.apache.hadoop.fs.CompositeCrcFileChecksum;
+import org.apache.hadoop.ozone.client.checksum.CompositeCrcFileChecksum;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.fs.MD5MD5CRC32CastagnoliFileChecksum;
@@ -47,7 +47,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.TokenProto;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.util.CrcUtil;
+import org.apache.hadoop.ozone.client.checksum.CrcUtil;
 import org.apache.hadoop.util.DataChecksum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

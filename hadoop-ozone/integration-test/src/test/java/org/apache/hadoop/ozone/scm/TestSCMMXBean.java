@@ -159,12 +159,12 @@ public class TestSCMMXBean {
 
     containerStateCount.forEach((k, v) -> {
       if (k.equals(HddsProtos.LifeCycleState.CLOSING.toString())) {
-        assertEquals((int)v, 5);
+        assertEquals(5, (int)v);
       } else if (k.equals(HddsProtos.LifeCycleState.CLOSED.toString())) {
-        assertEquals((int)v, 5);
+        assertEquals(5, (int)v);
       } else  {
         // Remaining all container state count should be zero.
-        assertEquals((int)v, 0);
+        assertEquals(0, (int)v);
       }
     });
 

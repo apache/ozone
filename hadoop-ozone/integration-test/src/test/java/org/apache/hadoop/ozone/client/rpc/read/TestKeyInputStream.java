@@ -24,76 +24,67 @@ import java.util.Arrays;
 
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
+import org.apache.hadoop.ozone.om.TestBucket;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.Assume;
-import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.container.TestHelper.countReplicas;
-import static org.junit.Assert.fail;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Tests {@link KeyInputStream}.
  */
-public class TestKeyInputStream extends TestInputStreamBase {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestKeyInputStream.class);
-
-  public TestKeyInputStream(ContainerLayoutVersion layout) {
-    super(layout);
-  }
+class TestKeyInputStream extends TestInputStreamBase {
 
   /**
    * This method does random seeks and reads and validates the reads are
    * correct or not.
-   * @param dataLength
-   * @param keyInputStream
-   * @param inputData
-   * @throws Exception
    */
-  private void randomSeek(int dataLength, KeyInputStream keyInputStream,
-      byte[] inputData) throws Exception {
+  private void randomSeek(TestBucket bucket, int dataLength,
+      KeyInputStream keyInputStream, byte[] inputData) throws Exception {
     // Do random seek.
     for (int i = 0; i < dataLength - 300; i += 20) {
-      validate(keyInputStream, inputData, i, 200);
+      validate(bucket, keyInputStream, inputData, i, 200);
     }
 
     // Seek to end and read in reverse order. And also this is partial chunks
     // as readLength is 20, chunk length is 100.
     for (int i = dataLength - 100; i >= 100; i -= 20) {
-      validate(keyInputStream, inputData, i, 20);
+      validate(bucket, keyInputStream, inputData, i, 20);
     }
 
     // Start from begin and seek such that we read partially chunks.
     for (int i = 0; i < dataLength - 300; i += 20) {
-      validate(keyInputStream, inputData, i, 90);
+      validate(bucket, keyInputStream, inputData, i, 90);
     }
 
   }
@@ -101,87 +92,86 @@ public class TestKeyInputStream extends TestInputStreamBase {
   /**
    * This method does random seeks and reads and validates the reads are
    * correct or not.
-   * @param dataLength
-   * @param keyInputStream
-   * @param inputData
-   * @param readSize
-   * @throws Exception
    */
-  private void randomPositionSeek(int dataLength, KeyInputStream keyInputStream,
+  private void randomPositionSeek(TestBucket bucket, int dataLength,
+      KeyInputStream keyInputStream,
       byte[] inputData, int readSize) throws Exception {
     Random rand = new Random();
     for (int i = 0; i < 100; i++) {
       int position = rand.nextInt(dataLength - readSize);
-      validate(keyInputStream, inputData, position, readSize);
+      validate(bucket, keyInputStream, inputData, position, readSize);
     }
   }
 
   /**
    * This method seeks to specified seek value and read the data specified by
    * readLength and validate the read is correct or not.
-   * @param keyInputStream
-   * @param inputData
-   * @param seek
-   * @param readLength
-   * @throws Exception
    */
-  private void validate(KeyInputStream keyInputStream, byte[] inputData,
-      long seek, int readLength) throws Exception {
+  private void validate(TestBucket bucket, KeyInputStream keyInputStream,
+      byte[] inputData, long seek, int readLength) throws Exception {
     keyInputStream.seek(seek);
 
     byte[] readData = new byte[readLength];
     keyInputStream.read(readData, 0, readLength);
 
-    validateData(inputData, (int) seek, readData);
+    bucket.validateData(inputData, (int) seek, readData);
   }
 
   /**
    * This test runs the others as a single test, so to avoid creating a new
    * mini-cluster for each test.
    */
-  @Test
-  public void testNonReplicationReads() throws Exception {
-    testInputStreams();
-    testSeekRandomly();
-    testSeek();
-    testReadChunkWithByteArray();
-    testReadChunkWithByteBuffer();
-    testSkip();
-    testECSeek();
+  @ContainerLayoutTestInfo.ContainerTest
+  void testNonReplicationReads(ContainerLayoutVersion layout) throws Exception {
+    try (MiniOzoneCluster cluster = newCluster(layout)) {
+      cluster.waitForClusterToBeReady();
+
+      try (OzoneClient client = cluster.newClient()) {
+        TestBucket bucket = TestBucket.newBuilder(client).build();
+
+        testInputStreams(bucket);
+        testSeekRandomly(bucket);
+        testSeek(bucket);
+        testReadChunkWithByteArray(bucket);
+        testReadChunkWithByteBuffer(bucket);
+        testSkip(bucket);
+        testECSeek(bucket);
+      }
+    }
   }
 
-  public void testInputStreams() throws Exception {
+  private void testInputStreams(TestBucket bucket) throws Exception {
     String keyName = getNewKeyName();
     int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE) + 1;
-    writeRandomBytes(keyName, dataLength);
+    bucket.writeRandomBytes(keyName, dataLength);
 
-    KeyInputStream keyInputStream = getKeyInputStream(keyName);
+    KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName);
 
     // Verify BlockStreams and ChunkStreams
     int expectedNumBlockStreams = BufferUtils.getNumberOfBins(
         dataLength, BLOCK_SIZE);
     List<BlockExtendedInputStream> blockStreams =
         keyInputStream.getPartStreams();
-    Assert.assertEquals(expectedNumBlockStreams, blockStreams.size());
+    assertEquals(expectedNumBlockStreams, blockStreams.size());
 
     int readBlockLength = 0;
     for (BlockExtendedInputStream stream : blockStreams) {
       BlockInputStream blockStream = (BlockInputStream) stream;
       int blockStreamLength = Math.min(BLOCK_SIZE,
           dataLength - readBlockLength);
-      Assert.assertEquals(blockStreamLength, blockStream.getLength());
+      assertEquals(blockStreamLength, blockStream.getLength());
 
       int expectedNumChunkStreams =
           BufferUtils.getNumberOfBins(blockStreamLength, CHUNK_SIZE);
       blockStream.initialize();
       List<ChunkInputStream> chunkStreams = blockStream.getChunkStreams();
-      Assert.assertEquals(expectedNumChunkStreams, chunkStreams.size());
+      assertEquals(expectedNumChunkStreams, chunkStreams.size());
 
       int readChunkLength = 0;
       for (ChunkInputStream chunkStream : chunkStreams) {
         int chunkStreamLength = Math.min(CHUNK_SIZE,
             blockStreamLength - readChunkLength);
-        Assert.assertEquals(chunkStreamLength, chunkStream.getRemaining());
+        assertEquals(chunkStreamLength, chunkStream.getRemaining());
 
         readChunkLength += chunkStreamLength;
       }
@@ -190,37 +180,37 @@ public class TestKeyInputStream extends TestInputStreamBase {
     }
   }
 
-  public void testSeekRandomly() throws Exception {
+  private void testSeekRandomly(TestBucket bucket) throws Exception {
     String keyName = getNewKeyName();
     int dataLength = (2 * BLOCK_SIZE) + (CHUNK_SIZE);
-    byte[] inputData = writeRandomBytes(keyName, dataLength);
+    byte[] inputData = bucket.writeRandomBytes(keyName, dataLength);
 
-    KeyInputStream keyInputStream = getKeyInputStream(keyName);
+    KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName);
 
     // Seek to some where end.
-    validate(keyInputStream, inputData, dataLength - 200, 100);
+    validate(bucket, keyInputStream, inputData, dataLength - 200, 100);
 
     // Now seek to start.
-    validate(keyInputStream, inputData, 0, 140);
+    validate(bucket, keyInputStream, inputData, 0, 140);
 
-    validate(keyInputStream, inputData, 200, 300);
+    validate(bucket, keyInputStream, inputData, 200, 300);
 
-    validate(keyInputStream, inputData, 30, 500);
+    validate(bucket, keyInputStream, inputData, 30, 500);
 
-    randomSeek(dataLength, keyInputStream, inputData);
+    randomSeek(bucket, dataLength, keyInputStream, inputData);
 
     // Read entire key.
-    validate(keyInputStream, inputData, 0, dataLength);
+    validate(bucket, keyInputStream, inputData, 0, dataLength);
 
     // Repeat again and check.
-    randomSeek(dataLength, keyInputStream, inputData);
+    randomSeek(bucket, dataLength, keyInputStream, inputData);
 
-    validate(keyInputStream, inputData, 0, dataLength);
+    validate(bucket, keyInputStream, inputData, 0, dataLength);
 
     keyInputStream.close();
   }
 
-  public void testECSeek() throws Exception {
+  public void testECSeek(TestBucket bucket) throws Exception {
     int ecChunkSize = 1024 * 1024;
     ECReplicationConfig repConfig = new ECReplicationConfig(3, 2, RS,
         ecChunkSize);
@@ -228,29 +218,30 @@ public class TestKeyInputStream extends TestInputStreamBase {
     // 3 full EC blocks plus one chunk
     int dataLength = (9 * BLOCK_SIZE + ecChunkSize);
 
-    byte[] inputData = writeRandomBytes(keyName, repConfig, dataLength);
-    try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
+    byte[] inputData = bucket.writeRandomBytes(keyName, repConfig, dataLength);
+    try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
 
-      validate(keyInputStream, inputData, 0, ecChunkSize + 1234);
+      validate(bucket, keyInputStream, inputData, 0, ecChunkSize + 1234);
 
-      validate(keyInputStream, inputData, 200, ecChunkSize);
+      validate(bucket, keyInputStream, inputData, 200, ecChunkSize);
 
-      validate(keyInputStream, inputData, BLOCK_SIZE * 4, ecChunkSize);
+      validate(bucket, keyInputStream, inputData, BLOCK_SIZE * 4, ecChunkSize);
 
-      validate(keyInputStream, inputData, BLOCK_SIZE * 4 + 200, ecChunkSize);
+      validate(bucket, keyInputStream, inputData,
+          BLOCK_SIZE * 4 + 200, ecChunkSize);
 
-      validate(keyInputStream, inputData, dataLength - ecChunkSize - 100,
-          ecChunkSize + 50);
+      validate(bucket, keyInputStream, inputData,
+          dataLength - ecChunkSize - 100, ecChunkSize + 50);
 
-      randomPositionSeek(dataLength, keyInputStream, inputData,
+      randomPositionSeek(bucket, dataLength, keyInputStream, inputData,
           ecChunkSize + 200);
 
       // Read entire key.
-      validate(keyInputStream, inputData, 0, dataLength);
+      validate(bucket, keyInputStream, inputData, 0, dataLength);
     }
   }
 
-  public void testSeek() throws Exception {
+  public void testSeek(TestBucket bucket) throws Exception {
     XceiverClientManager.resetXceiverClientMetrics();
     XceiverClientMetrics metrics = XceiverClientManager
         .getXceiverClientMetrics();
@@ -262,28 +253,28 @@ public class TestKeyInputStream extends TestInputStreamBase {
     String keyName = getNewKeyName();
     // write data spanning 3 chunks
     int dataLength = (2 * CHUNK_SIZE) + (CHUNK_SIZE / 2);
-    byte[] inputData = writeKey(keyName, dataLength);
+    byte[] inputData = bucket.writeKey(keyName, dataLength);
 
-    Assert.assertEquals(writeChunkCount + 3,
+    assertEquals(writeChunkCount + 3,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
 
-    KeyInputStream keyInputStream = getKeyInputStream(keyName);
+    KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName);
 
     // Seek to position 150
     keyInputStream.seek(150);
 
-    Assert.assertEquals(150, keyInputStream.getPos());
+    assertEquals(150, keyInputStream.getPos());
 
     // Seek operation should not result in any readChunk operation.
-    Assert.assertEquals(readChunkCount, metrics
+    assertEquals(readChunkCount, metrics
         .getContainerOpCountMetrics(ContainerProtos.Type.ReadChunk));
 
     byte[] readData = new byte[CHUNK_SIZE];
     keyInputStream.read(readData, 0, CHUNK_SIZE);
 
-    // Since we reading data from index 150 to 250 and the chunk boundary is
+    // Since we read data from index 150 to 250 and the chunk boundary is
     // 100 bytes, we need to read 2 chunks.
-    Assert.assertEquals(readChunkCount + 2,
+    assertEquals(readChunkCount + 2,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.ReadChunk));
 
     keyInputStream.close();
@@ -291,19 +282,19 @@ public class TestKeyInputStream extends TestInputStreamBase {
     // Verify that the data read matches with the input data at corresponding
     // indices.
     for (int i = 0; i < CHUNK_SIZE; i++) {
-      Assert.assertEquals(inputData[CHUNK_SIZE + 50 + i], readData[i]);
+      assertEquals(inputData[CHUNK_SIZE + 50 + i], readData[i]);
     }
   }
 
-  public void testReadChunkWithByteArray() throws Exception {
+  private void testReadChunkWithByteArray(TestBucket bucket) throws Exception {
     String keyName = getNewKeyName();
 
     // write data spanning multiple blocks/chunks
     int dataLength = 2 * BLOCK_SIZE + (BLOCK_SIZE / 2);
-    byte[] data = writeRandomBytes(keyName, dataLength);
+    byte[] data = bucket.writeRandomBytes(keyName, dataLength);
 
     // read chunk data using Byte Array
-    try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
+    try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
 
       int[] bufferSizeList = {BYTES_PER_CHECKSUM + 1, CHUNK_SIZE / 4,
           CHUNK_SIZE / 2, CHUNK_SIZE - 1, CHUNK_SIZE, CHUNK_SIZE + 1,
@@ -315,15 +306,15 @@ public class TestKeyInputStream extends TestInputStreamBase {
     }
   }
 
-  public void testReadChunkWithByteBuffer() throws Exception {
+  public void testReadChunkWithByteBuffer(TestBucket bucket) throws Exception {
     String keyName = getNewKeyName();
 
     // write data spanning multiple blocks/chunks
     int dataLength = 2 * BLOCK_SIZE + (BLOCK_SIZE / 2);
-    byte[] data = writeRandomBytes(keyName, dataLength);
+    byte[] data = bucket.writeRandomBytes(keyName, dataLength);
 
     // read chunk data using ByteBuffer
-    try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
+    try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
 
       int[] bufferSizeList = {BYTES_PER_CHECKSUM + 1, CHUNK_SIZE / 4,
           CHUNK_SIZE / 2, CHUNK_SIZE - 1, CHUNK_SIZE, CHUNK_SIZE + 1,
@@ -335,7 +326,7 @@ public class TestKeyInputStream extends TestInputStreamBase {
     }
   }
 
-  public void testSkip() throws Exception {
+  private void testSkip(TestBucket bucket) throws Exception {
     XceiverClientManager.resetXceiverClientMetrics();
     XceiverClientMetrics metrics = XceiverClientManager
         .getXceiverClientMetrics();
@@ -347,28 +338,28 @@ public class TestKeyInputStream extends TestInputStreamBase {
     String keyName = getNewKeyName();
     // write data spanning 3 chunks
     int dataLength = (2 * CHUNK_SIZE) + (CHUNK_SIZE / 2);
-    byte[] inputData = writeKey(keyName, dataLength);
+    byte[] inputData = bucket.writeKey(keyName, dataLength);
 
-    Assert.assertEquals(writeChunkCount + 3,
+    assertEquals(writeChunkCount + 3,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
 
-    KeyInputStream keyInputStream = getKeyInputStream(keyName);
+    KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName);
 
     // skip 150
     long skipped = keyInputStream.skip(70);
-    Assert.assertEquals(70, skipped);
-    Assert.assertEquals(70, keyInputStream.getPos());
+    assertEquals(70, skipped);
+    assertEquals(70, keyInputStream.getPos());
 
     skipped = keyInputStream.skip(0);
-    Assert.assertEquals(0, skipped);
-    Assert.assertEquals(70, keyInputStream.getPos());
+    assertEquals(0, skipped);
+    assertEquals(70, keyInputStream.getPos());
 
     skipped = keyInputStream.skip(80);
-    Assert.assertEquals(80, skipped);
-    Assert.assertEquals(150, keyInputStream.getPos());
+    assertEquals(80, skipped);
+    assertEquals(150, keyInputStream.getPos());
 
     // Skip operation should not result in any readChunk operation.
-    Assert.assertEquals(readChunkCount, metrics
+    assertEquals(readChunkCount, metrics
         .getContainerOpCountMetrics(ContainerProtos.Type.ReadChunk));
 
     byte[] readData = new byte[CHUNK_SIZE];
@@ -376,7 +367,7 @@ public class TestKeyInputStream extends TestInputStreamBase {
 
     // Since we reading data from index 150 to 250 and the chunk boundary is
     // 100 bytes, we need to read 2 chunks.
-    Assert.assertEquals(readChunkCount + 2,
+    assertEquals(readChunkCount + 2,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.ReadChunk));
 
     keyInputStream.close();
@@ -384,92 +375,85 @@ public class TestKeyInputStream extends TestInputStreamBase {
     // Verify that the data read matches with the input data at corresponding
     // indices.
     for (int i = 0; i < CHUNK_SIZE; i++) {
-      Assert.assertEquals(inputData[CHUNK_SIZE + 50 + i], readData[i]);
+      assertEquals(inputData[CHUNK_SIZE + 50 + i], readData[i]);
     }
   }
 
-  @Test
-  public void readAfterReplication() throws Exception {
-    testReadAfterReplication(false);
+  private static List<Arguments> readAfterReplicationArgs() {
+    return Arrays.asList(
+        Arguments.arguments(FILE_PER_BLOCK, false),
+        Arguments.arguments(FILE_PER_BLOCK, true),
+        Arguments.arguments(FILE_PER_CHUNK, false),
+        Arguments.arguments(FILE_PER_CHUNK, true)
+    );
   }
 
-  @Test
-  public void readAfterReplicationWithUnbuffering() throws Exception {
-    testReadAfterReplication(true);
+  @ParameterizedTest
+  @MethodSource("readAfterReplicationArgs")
+  void readAfterReplication(ContainerLayoutVersion layout,
+      boolean doUnbuffer) throws Exception {
+    try (MiniOzoneCluster cluster = newCluster(layout)) {
+      cluster.waitForClusterToBeReady();
+
+      try (OzoneClient client = cluster.newClient()) {
+        TestBucket bucket = TestBucket.newBuilder(client).build();
+
+        testReadAfterReplication(cluster, bucket, doUnbuffer);
+      }
+    }
   }
 
-  private void testReadAfterReplication(boolean doUnbuffer) throws Exception {
-    Assume.assumeTrue(getCluster().getHddsDatanodes().size() > 3);
-
+  private void testReadAfterReplication(MiniOzoneCluster cluster,
+      TestBucket bucket, boolean doUnbuffer) throws Exception {
     int dataLength = 2 * CHUNK_SIZE;
     String keyName = getNewKeyName();
-    byte[] data = writeRandomBytes(keyName, dataLength);
+    byte[] data = bucket.writeRandomBytes(keyName, dataLength);
 
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(getVolumeName())
-        .setBucketName(getBucketName())
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(bucket.delegate().getVolumeName())
+        .setBucketName(bucket.delegate().getName())
         .setKeyName(keyName)
         .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .build();
-    OmKeyInfo keyInfo = getCluster().getOzoneManager()
+    OmKeyInfo keyInfo = cluster.getOzoneManager()
         .getKeyInfo(keyArgs, false)
         .getKeyInfo();
 
     OmKeyLocationInfoGroup locations = keyInfo.getLatestVersionLocations();
-    Assert.assertNotNull(locations);
+    assertNotNull(locations);
     List<OmKeyLocationInfo> locationInfoList = locations.getLocationList();
-    Assert.assertEquals(1, locationInfoList.size());
+    assertEquals(1, locationInfoList.size());
     OmKeyLocationInfo loc = locationInfoList.get(0);
     long containerID = loc.getContainerID();
-    Assert.assertEquals(3, countReplicas(containerID, getCluster()));
+    assertEquals(3, countReplicas(containerID, cluster));
 
-    TestHelper.waitForContainerClose(getCluster(), containerID);
+    TestHelper.waitForContainerClose(cluster, containerID);
 
     List<DatanodeDetails> pipelineNodes = loc.getPipeline().getNodes();
 
     // read chunk data
-    try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
+    try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
       int b = keyInputStream.read();
-      Assert.assertNotEquals(-1, b);
+      assertNotEquals(-1, b);
       if (doUnbuffer) {
         keyInputStream.unbuffer();
       }
-      getCluster().shutdownHddsDatanode(pipelineNodes.get(0));
+      cluster.shutdownHddsDatanode(pipelineNodes.get(0));
       // check that we can still read it
       assertReadFully(data, keyInputStream, dataLength - 1, 1);
     }
 
     // read chunk data with ByteBuffer
-    try (KeyInputStream keyInputStream = getKeyInputStream(keyName)) {
+    try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
       int b = keyInputStream.read();
-      Assert.assertNotEquals(-1, b);
+      assertNotEquals(-1, b);
       if (doUnbuffer) {
         keyInputStream.unbuffer();
       }
-      getCluster().shutdownHddsDatanode(pipelineNodes.get(0));
+      cluster.shutdownHddsDatanode(pipelineNodes.get(0));
       // check that we can still read it
       assertReadFullyUsingByteBuffer(data, keyInputStream, dataLength - 1, 1);
     }
-  }
-
-  private void waitForNodeToBecomeDead(
-      DatanodeDetails datanode) throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() ->
-        HddsProtos.NodeState.DEAD == getNodeHealth(datanode),
-        100, 30000);
-    LOG.info("Node {} is {}", datanode.getUuidString(),
-        getNodeHealth(datanode));
-  }
-
-  private HddsProtos.NodeState getNodeHealth(DatanodeDetails dn) {
-    HddsProtos.NodeState health = null;
-    try {
-      NodeManager nodeManager =
-          getCluster().getStorageContainerManager().getScmNodeManager();
-      health = nodeManager.getNodeStatus(dn).getHealth();
-    } catch (NodeNotFoundException e) {
-      fail("Unexpected NodeNotFound exception");
-    }
-    return health;
   }
 
   private void assertReadFully(byte[] data, InputStream in,
@@ -485,10 +469,10 @@ public class TestKeyInputStream extends TestInputStreamBase {
           Arrays.copyOfRange(data, totalRead, totalRead + numBytesRead);
       byte[] tmp2 =
           Arrays.copyOfRange(buffer, 0, numBytesRead);
-      Assert.assertArrayEquals(tmp1, tmp2);
+      assertArrayEquals(tmp1, tmp2);
       totalRead += numBytesRead;
     }
-    Assert.assertEquals(data.length, totalRead);
+    assertEquals(data.length, totalRead);
   }
 
   private void assertReadFullyUsingByteBuffer(byte[] data, KeyInputStream in,
@@ -505,10 +489,10 @@ public class TestKeyInputStream extends TestInputStreamBase {
       byte[] tmp2 = new byte[numBytesRead];
       buffer.flip();
       buffer.get(tmp2, 0, numBytesRead);
-      Assert.assertArrayEquals(tmp1, tmp2);
+      assertArrayEquals(tmp1, tmp2);
       totalRead += numBytesRead;
       buffer.clear();
     }
-    Assert.assertEquals(data.length, totalRead);
+    assertEquals(data.length, totalRead);
   }
 }
