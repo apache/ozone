@@ -39,7 +39,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.mockito.Mockito;
+import static org.mockito.Mockito.mock;
 
 /**
  * Tests Handler interface.
@@ -55,9 +55,9 @@ public class TestHandler {
   @BeforeEach
   public void setup() throws Exception {
     this.conf = new OzoneConfiguration();
-    this.containerSet = Mockito.mock(ContainerSet.class);
-    this.volumeSet = Mockito.mock(MutableVolumeSet.class);
-    DatanodeDetails datanodeDetails = Mockito.mock(DatanodeDetails.class);
+    this.containerSet = mock(ContainerSet.class);
+    this.volumeSet = mock(MutableVolumeSet.class);
+    DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
     StateContext context = ContainerTestUtils.getMockContext(
         datanodeDetails, conf);
     ContainerMetrics metrics = ContainerMetrics.create(conf);

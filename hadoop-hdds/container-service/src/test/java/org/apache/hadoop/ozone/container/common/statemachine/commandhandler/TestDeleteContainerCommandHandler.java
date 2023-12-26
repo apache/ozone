@@ -26,8 +26,6 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Assertions;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -39,6 +37,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test for the DeleteContainerCommandHandler.
@@ -74,17 +75,14 @@ public class TestDeleteContainerCommandHandler {
 
     clock.fastForward(15000);
     handler.handle(command1, ozoneContainer, null, null);
-    Assertions.assertEquals(1, handler.getTimeoutCount());
+    assertEquals(1, handler.getTimeoutCount());
     handler.handle(command2, ozoneContainer, null, null);
     handler.handle(command3, ozoneContainer, null, null);
-    Assertions.assertEquals(1, handler.getTimeoutCount());
-    Assertions.assertEquals(3, handler.getInvocationCount());
-    Mockito.verify(controller, times(0))
-        .deleteContainer(1L, false);
-    Mockito.verify(controller, times(1))
-        .deleteContainer(2L, false);
-    Mockito.verify(controller, times(1))
-        .deleteContainer(3L, false);
+    assertEquals(1, handler.getTimeoutCount());
+    assertEquals(3, handler.getInvocationCount());
+    verify(controller, times(0)).deleteContainer(1L, false);
+    verify(controller, times(1)).deleteContainer(2L, false);
+    verify(controller, times(1)).deleteContainer(3L, false);
   }
 
   @Test
@@ -102,8 +100,7 @@ public class TestDeleteContainerCommandHandler {
     subject.handle(command, ozoneContainer, context, null);
 
     // THEN
-    Mockito.verify(controller, times(1))
-        .deleteContainer(1L, false);
+    verify(controller, times(1)).deleteContainer(1L, false);
   }
 
   @Test
@@ -121,8 +118,7 @@ public class TestDeleteContainerCommandHandler {
     subject.handle(command, ozoneContainer, context, null);
 
     // THEN
-    Mockito.verify(controller, never())
-        .deleteContainer(1L, false);
+    verify(controller, never()).deleteContainer(1L, false);
   }
 
   @Test
@@ -131,7 +127,7 @@ public class TestDeleteContainerCommandHandler {
         clock, 1);
     DeleteContainerCommand command1 = new DeleteContainerCommand(1L);
     Lock lock = new ReentrantLock();
-    Mockito.doAnswer(invocation -> {
+    doAnswer(invocation -> {
       try {
         lock.lock();
       } finally {
@@ -148,8 +144,7 @@ public class TestDeleteContainerCommandHandler {
     
       // one is waiting in execution as thread count 1, so count 1
       // and one in queue, others ignored
-      Mockito.verify(controller, times(1))
-          .deleteContainer(1L, false);
+      verify(controller, times(1)).deleteContainer(1L, false);
     } finally {
       lock.unlock();
     }

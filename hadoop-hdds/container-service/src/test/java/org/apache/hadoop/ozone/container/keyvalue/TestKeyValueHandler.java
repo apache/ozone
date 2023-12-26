@@ -61,17 +61,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.any;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
-
-import org.mockito.Mockito;
-
-import static org.mockito.Mockito.doCallRealMethod;
-import static org.mockito.Mockito.times;
 
 
 /**
@@ -94,19 +95,19 @@ public class TestKeyValueHandler {
   @BeforeEach
   public void setup() throws StorageContainerException {
     // Create mock HddsDispatcher and KeyValueHandler.
-    handler = Mockito.mock(KeyValueHandler.class);
+    handler = mock(KeyValueHandler.class);
 
     HashMap<ContainerType, Handler> handlers = new HashMap<>();
     handlers.put(ContainerType.KeyValueContainer, handler);
 
     dispatcher = new HddsDispatcher(
         new OzoneConfiguration(),
-        Mockito.mock(ContainerSet.class),
-        Mockito.mock(VolumeSet.class),
+        mock(ContainerSet.class),
+        mock(VolumeSet.class),
         handlers,
-        Mockito.mock(StateContext.class),
-        Mockito.mock(ContainerMetrics.class),
-        Mockito.mock(TokenVerifier.class)
+        mock(StateContext.class),
+        mock(ContainerMetrics.class),
+        mock(TokenVerifier.class)
     );
 
   }
@@ -116,7 +117,7 @@ public class TestKeyValueHandler {
    */
   @Test
   public void testHandlerCommandHandling() throws Exception {
-    Mockito.reset(handler);
+    reset(handler);
     // Test Create Container Request handling
     ContainerCommandRequestProto createContainerRequest =
         ContainerProtos.ContainerCommandRequestProto.newBuilder()
@@ -127,11 +128,11 @@ public class TestKeyValueHandler {
                 .getDefaultInstance())
             .build();
 
-    KeyValueContainer container = Mockito.mock(KeyValueContainer.class);
+    KeyValueContainer container = mock(KeyValueContainer.class);
 
     KeyValueHandler
         .dispatchRequest(handler, createContainerRequest, container, null);
-    Mockito.verify(handler, times(0)).handleListBlock(
+    verify(handler, times(0)).handleListBlock(
         any(ContainerCommandRequestProto.class), any());
 
     // Test Read Container Request handling
@@ -139,7 +140,7 @@ public class TestKeyValueHandler {
         getDummyCommandRequestProto(ContainerProtos.Type.ReadContainer);
     KeyValueHandler
         .dispatchRequest(handler, readContainerRequest, container, null);
-    Mockito.verify(handler, times(1)).handleReadContainer(
+    verify(handler, times(1)).handleReadContainer(
         any(ContainerCommandRequestProto.class), any());
 
     // Test Update Container Request handling
@@ -147,7 +148,7 @@ public class TestKeyValueHandler {
         getDummyCommandRequestProto(ContainerProtos.Type.UpdateContainer);
     KeyValueHandler
         .dispatchRequest(handler, updateContainerRequest, container, null);
-    Mockito.verify(handler, times(1)).handleUpdateContainer(
+    verify(handler, times(1)).handleUpdateContainer(
         any(ContainerCommandRequestProto.class), any());
 
     // Test Delete Container Request handling
@@ -155,7 +156,7 @@ public class TestKeyValueHandler {
         getDummyCommandRequestProto(ContainerProtos.Type.DeleteContainer);
     KeyValueHandler
         .dispatchRequest(handler, deleteContainerRequest, container, null);
-    Mockito.verify(handler, times(1)).handleDeleteContainer(
+    verify(handler, times(1)).handleDeleteContainer(
         any(ContainerCommandRequestProto.class), any());
 
     // Test List Container Request handling
@@ -163,7 +164,7 @@ public class TestKeyValueHandler {
         getDummyCommandRequestProto(ContainerProtos.Type.ListContainer);
     KeyValueHandler
         .dispatchRequest(handler, listContainerRequest, container, null);
-    Mockito.verify(handler, times(1)).handleUnsupportedOp(
+    verify(handler, times(1)).handleUnsupportedOp(
         any(ContainerCommandRequestProto.class));
 
     // Test Close Container Request handling
@@ -171,7 +172,7 @@ public class TestKeyValueHandler {
         getDummyCommandRequestProto(ContainerProtos.Type.CloseContainer);
     KeyValueHandler
         .dispatchRequest(handler, closeContainerRequest, container, null);
-    Mockito.verify(handler, times(1)).handleCloseContainer(
+    verify(handler, times(1)).handleCloseContainer(
         any(ContainerCommandRequestProto.class), any());
 
     // Test Put Block Request handling
@@ -179,7 +180,7 @@ public class TestKeyValueHandler {
         getDummyCommandRequestProto(ContainerProtos.Type.PutBlock);
     KeyValueHandler
         .dispatchRequest(handler, putBlockRequest, container, null);
-    Mockito.verify(handler, times(1)).handlePutBlock(
+    verify(handler, times(1)).handlePutBlock(
         any(ContainerCommandRequestProto.class), any(), any());
 
     // Test Get Block Request handling
@@ -187,7 +188,7 @@ public class TestKeyValueHandler {
         getDummyCommandRequestProto(ContainerProtos.Type.GetBlock);
     KeyValueHandler
         .dispatchRequest(handler, getBlockRequest, container, null);
-    Mockito.verify(handler, times(1)).handleGetBlock(
+    verify(handler, times(1)).handleGetBlock(
         any(ContainerCommandRequestProto.class), any());
 
     // Block Deletion is handled by BlockDeletingService and need not be
@@ -197,7 +198,7 @@ public class TestKeyValueHandler {
         getDummyCommandRequestProto(ContainerProtos.Type.ListBlock);
     KeyValueHandler
         .dispatchRequest(handler, listBlockRequest, container, null);
-    Mockito.verify(handler, times(1)).handleUnsupportedOp(
+    verify(handler, times(1)).handleUnsupportedOp(
         any(ContainerCommandRequestProto.class));
 
     // Test Read Chunk Request handling
@@ -205,7 +206,7 @@ public class TestKeyValueHandler {
         getDummyCommandRequestProto(ContainerProtos.Type.ReadChunk);
     KeyValueHandler
         .dispatchRequest(handler, readChunkRequest, container, null);
-    Mockito.verify(handler, times(1)).handleReadChunk(
+    verify(handler, times(1)).handleReadChunk(
         any(ContainerCommandRequestProto.class), any(), any());
 
     // Chunk Deletion is handled by BlockDeletingService and need not be
@@ -216,7 +217,7 @@ public class TestKeyValueHandler {
         getDummyCommandRequestProto(ContainerProtos.Type.WriteChunk);
     KeyValueHandler
         .dispatchRequest(handler, writeChunkRequest, container, null);
-    Mockito.verify(handler, times(1)).handleWriteChunk(
+    verify(handler, times(1)).handleWriteChunk(
         any(ContainerCommandRequestProto.class), any(), any());
 
     // Test List Chunk Request handling
@@ -224,7 +225,7 @@ public class TestKeyValueHandler {
         getDummyCommandRequestProto(ContainerProtos.Type.ListChunk);
     KeyValueHandler
         .dispatchRequest(handler, listChunkRequest, container, null);
-    Mockito.verify(handler, times(2)).handleUnsupportedOp(
+    verify(handler, times(2)).handleUnsupportedOp(
         any(ContainerCommandRequestProto.class));
 
     // Test Put Small File Request handling
@@ -232,7 +233,7 @@ public class TestKeyValueHandler {
         getDummyCommandRequestProto(ContainerProtos.Type.PutSmallFile);
     KeyValueHandler
         .dispatchRequest(handler, putSmallFileRequest, container, null);
-    Mockito.verify(handler, times(1)).handlePutSmallFile(
+    verify(handler, times(1)).handlePutSmallFile(
         any(ContainerCommandRequestProto.class), any(), any());
 
     // Test Get Small File Request handling
@@ -240,7 +241,7 @@ public class TestKeyValueHandler {
         getDummyCommandRequestProto(ContainerProtos.Type.GetSmallFile);
     KeyValueHandler
         .dispatchRequest(handler, getSmallFileRequest, container, null);
-    Mockito.verify(handler, times(1)).handleGetSmallFile(
+    verify(handler, times(1)).handleGetSmallFile(
         any(ContainerCommandRequestProto.class), any());
   }
 
@@ -262,7 +263,7 @@ public class TestKeyValueHandler {
       int[] interval = new int[1];
       interval[0] = 2;
       ContainerMetrics metrics = new ContainerMetrics(interval);
-      DatanodeDetails datanodeDetails = Mockito.mock(DatanodeDetails.class);
+      DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
       StateContext context = ContainerTestUtils.getMockContext(
           datanodeDetails, conf);
       KeyValueHandler keyValueHandler = new KeyValueHandler(conf,
@@ -326,7 +327,7 @@ public class TestKeyValueHandler {
             .build();
     dispatcher.dispatch(closeContainerRequest, null);
 
-    Mockito.when(handler.handleCloseContainer(any(), any()))
+    when(handler.handleCloseContainer(any(), any()))
         .thenCallRealMethod();
     doCallRealMethod().when(handler).closeContainer(any());
     // Closing invalid container should return error response.
@@ -348,7 +349,7 @@ public class TestKeyValueHandler {
       final String datanodeId = UUID.randomUUID().toString();
       final ConfigurationSource conf = new OzoneConfiguration();
       final ContainerSet containerSet = new ContainerSet(1000);
-      final MutableVolumeSet volumeSet = Mockito.mock(MutableVolumeSet.class);
+      final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
 
       HddsVolume hddsVolume = new HddsVolume.Builder(testDir).conf(conf)
           .clusterID(clusterId).datanodeUuid(datanodeId)
@@ -358,7 +359,7 @@ public class TestKeyValueHandler {
       hddsVolume.createWorkingDir(clusterId, null);
       hddsVolume.createTmpDirs(clusterId);
 
-      Mockito.when(volumeSet.getVolumesList())
+      when(volumeSet.getVolumesList())
           .thenReturn(Collections.singletonList(hddsVolume));
 
       List<HddsVolume> hddsVolumeList = StorageVolumeUtil
@@ -413,7 +414,7 @@ public class TestKeyValueHandler {
       } catch (StorageContainerException sce) {
         assertTrue(sce.getMessage().contains("Failed to move container"));
       }
-      Mockito.verify(volumeSet).checkVolumeAsync(hddsVolume);
+      verify(volumeSet).checkVolumeAsync(hddsVolume);
       // cleanup
       hddsVolume.setDeletedContainerDir(deletedContainerDir);
 

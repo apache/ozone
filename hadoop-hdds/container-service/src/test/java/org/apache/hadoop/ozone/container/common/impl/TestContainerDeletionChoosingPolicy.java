@@ -20,6 +20,9 @@ package org.apache.hadoop.ozone.container.common.impl;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -45,7 +48,6 @@ import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService.Contai
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
-import org.mockito.Mockito;
 
 /**
  * The class for testing container deletion choosing policy.
@@ -223,9 +225,9 @@ public class TestContainerDeletionChoosingPolicy {
   }
 
   private BlockDeletingService getBlockDeletingService() {
-    ozoneContainer = Mockito.mock(OzoneContainer.class);
-    Mockito.when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
-    Mockito.when(ozoneContainer.getWriteChannel()).thenReturn(null);
+    ozoneContainer = mock(OzoneContainer.class);
+    when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
+    when(ozoneContainer.getWriteChannel()).thenReturn(null);
     blockDeletingService = new BlockDeletingService(ozoneContainer,
         SERVICE_INTERVAL_IN_MILLISECONDS, SERVICE_TIMEOUT_IN_MILLISECONDS,
         TimeUnit.MILLISECONDS, 10, conf);
