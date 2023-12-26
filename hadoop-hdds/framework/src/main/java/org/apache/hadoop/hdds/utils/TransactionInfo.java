@@ -19,16 +19,16 @@
 package org.apache.hadoop.hdds.utils;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.hdds.StringUtils;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Objects;
 
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
-import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
 import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.server.storage.FileInfo;
 import org.apache.ratis.statemachine.SnapshotInfo;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
@@ -39,97 +39,93 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_SPLIT_KEY;
  * <p>
  * This class is immutable.
  */
-public final class TransactionInfo {
+public final class TransactionInfo implements Comparable<TransactionInfo> {
   private static final Codec<TransactionInfo> CODEC = new DelegatedCodec<>(
       StringCodec.get(),
-      TransactionInfo::new,
-      TransactionInfo::generateTransactionInfo,
+      TransactionInfo::valueOf,
+      TransactionInfo::toString,
       DelegatedCodec.CopyType.SHALLOW);
 
   public static Codec<TransactionInfo> getCodec() {
     return CODEC;
   }
 
-  // Term associated with Ratis Log index in Ratis enabled cluster. In
-  // non-Ratis cluster, term is set to -1.
-  private final long term; // term associated with the ratis log index.
-  // Ratis Log index in Ratis enabled cluster or the unique transaction
-  // index {@link OzoneManagerServerSideTransalatorPB#transactionIndex} in
-  // non-Ratis cluster
-  private final long transactionIndex;
-
-  private TransactionInfo(String transactionInfo) {
-    String[] tInfo =
-        transactionInfo.split(TRANSACTION_INFO_SPLIT_KEY);
+  private static TransactionInfo valueOf(String transactionInfo) {
+    final String[] tInfo = transactionInfo.split(TRANSACTION_INFO_SPLIT_KEY);
     Preconditions.checkArgument(tInfo.length == 2,
-        "Incorrect TransactionInfo value");
+        "Unexpected split length: %s in \"%s\"", tInfo.length, transactionInfo);
 
-    term = Long.parseLong(tInfo[0]);
-    transactionIndex = Long.parseLong(tInfo[1]);
-  }
-
-  private TransactionInfo(long currentTerm, long transactionIndex) {
-    this.term = currentTerm;
-    this.transactionIndex = transactionIndex;
-  }
-
-  public boolean isDefault() {
-    return transactionIndex == -1 && term == 0;
-  }
-
-  public int compareTo(TransactionInfo info) {
-    if (info.getTerm() == this.getTerm()) {
-      return (int)(this.getTransactionIndex() - info.getTransactionIndex());
-    } else {
-      return (int)(this.getTerm() - info.getTerm());
+    try {
+      return valueOf(Long.parseLong(tInfo[0]), Long.parseLong(tInfo[1]));
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Failed to parse " + transactionInfo, e);
     }
   }
 
+  public static TransactionInfo valueOf(long currentTerm, long transactionIndex) {
+    return valueOf(TermIndex.valueOf(currentTerm, transactionIndex));
+  }
+
+  public static TransactionInfo valueOf(TermIndex termIndex) {
+    return new TransactionInfo(termIndex);
+  }
+
+  public boolean isDefault() {
+    return equals(DEFAULT_VALUE);
+  }
+
+  @Override
+  public int compareTo(TransactionInfo info) {
+    return this.getTermIndex().compareTo(info.getTermIndex());
+  }
+
+  public static final TransactionInfo DEFAULT_VALUE = valueOf(0, -1);
+
   /**
-   * Get current term.
-   * @return currentTerm
+   * Use {@link SnapshotInfo} to store (term, index)
+   * which is the Ratis Log term-index in Ratis enabled cluster.
+   * In non-Ratis clusters, term is -1 and index is the unique transaction index
+   * in OzoneManagerProtocolServerSideTranslatorPB#transactionIndex.
    */
+  private final SnapshotInfo snapshotInfo;
+  /** The string need to be persisted in OM DB. */
+  private final String transactionInfoString;
+
+  private TransactionInfo(TermIndex termIndex) {
+    this.transactionInfoString = termIndex.getTerm() + TRANSACTION_INFO_SPLIT_KEY + termIndex.getIndex();
+    this.snapshotInfo = new SnapshotInfo() {
+      @Override
+      public TermIndex getTermIndex() {
+        return termIndex;
+      }
+
+      @Override
+      public List<FileInfo> getFiles() {
+        return null;
+      }
+
+      @Override
+      public String toString() {
+        return transactionInfoString;
+      }
+    };
+  }
+
+  /** @return Ratis Log term in Ratis enabled cluster; or -1 for non-Ratis clusters. */
   public long getTerm() {
-    return term;
+    return snapshotInfo.getTerm();
   }
 
   /**
-   * Get current transaction index.
-   * @return transactionIndex
+   * @return Ratis Log index in Ratis enabled cluster. For non-Ratis clusters, return the unique transaction index;
+   *         see OzoneManagerProtocolServerSideTranslatorPB#transactionIndex.
    */
   public long getTransactionIndex() {
-    return transactionIndex;
+    return snapshotInfo.getIndex();
   }
 
   public TermIndex getTermIndex() {
-    return TermIndex.valueOf(term, transactionIndex);
-  }
-
-  /**
-   * Generate String form of transaction info which need to be persisted in OM
-   * DB finally in byte array.
-   * @return transaction info.
-   */
-  private String generateTransactionInfo() {
-    return term + TRANSACTION_INFO_SPLIT_KEY + transactionIndex;
-  }
-
-  /**
-   * Convert OMTransactionInfo to byteArray to be persisted to OM DB.
-   * @return byte[]
-   */
-  public byte[] convertToByteArray() {
-    return StringUtils.string2Bytes(generateTransactionInfo());
-  }
-
-  /**
-   * Convert byte array persisted in DB to OMTransactionInfo.
-   * @param bytes
-   * @return OMTransactionInfo
-   */
-  public static TransactionInfo getFromByteArray(byte[] bytes) {
-    String tInfo = StringUtils.bytes2String(bytes);
-    return new TransactionInfo(tInfo);
+    return snapshotInfo.getTermIndex();
   }
 
   @Override
@@ -141,30 +137,21 @@ public final class TransactionInfo {
       return false;
     }
     TransactionInfo that = (TransactionInfo) o;
-    return term == that.term &&
-        transactionIndex == that.transactionIndex;
-  }
-
-  public static TransactionInfo fromTermIndex(TermIndex termIndex) {
-    return new Builder().setCurrentTerm(termIndex.getTerm())
-        .setTransactionIndex(termIndex.getIndex()).build();
+    return this.getTermIndex().equals(that.getTermIndex());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(term, transactionIndex);
+    return Objects.hash(getTerm(), getTransactionIndex());
   }
 
   @Override
   public String toString() {
-    return generateTransactionInfo();
+    return transactionInfoString;
   }
 
   /**
    * Return transaction info persisted in OM DB.
-   * @param metadataManager
-   * @return
-   * @throws IOException
    */
   public static TransactionInfo readTransactionInfo(
       DBStoreHAManager metadataManager) throws IOException {
@@ -172,31 +159,6 @@ public final class TransactionInfo {
   }
 
   public SnapshotInfo toSnapshotInfo() {
-    return new RatisSnapshotInfo(term, transactionIndex);
-  }
-
-  public static Builder builder() {
-    return new Builder();
-  }
-  /**
-   * Builder to build {@link TransactionInfo}.
-   */
-  public static class Builder {
-    private long currentTerm = 0;
-    private long transactionIndex = -1;
-
-    public Builder setCurrentTerm(long term) {
-      this.currentTerm = term;
-      return this;
-    }
-
-    public Builder setTransactionIndex(long tIndex) {
-      this.transactionIndex = tIndex;
-      return this;
-    }
-
-    public TransactionInfo build() {
-      return new TransactionInfo(currentTerm, transactionIndex);
-    }
+    return snapshotInfo;
   }
 }

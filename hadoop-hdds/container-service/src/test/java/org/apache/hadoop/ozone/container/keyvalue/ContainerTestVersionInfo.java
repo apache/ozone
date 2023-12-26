@@ -21,12 +21,16 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Stream;
 
-import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 
 /**
@@ -35,6 +39,18 @@ import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContain
  * - ChunkLayOutVersion: data layout version
  */
 public class ContainerTestVersionInfo {
+
+  /**
+   * Composite annotation for tests parameterized with {@link ContainerTestVersionInfo}.
+   */
+  @Target(ElementType.METHOD)
+  @Retention(RetentionPolicy.RUNTIME)
+  @ParameterizedTest
+  @MethodSource("org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo#getLayoutList")
+  public @interface ContainerTest {
+    // composite annotation
+  }
+
   private static final String[] SCHEMA_VERSIONS = new String[] {
       null,
       OzoneConsts.SCHEMA_V1,
@@ -66,20 +82,6 @@ public class ContainerTestVersionInfo {
 
   public ContainerLayoutVersion getLayout() {
     return this.layout;
-  }
-
-  public static Iterable<Object[]> versionParameters() {
-    return layoutList.stream().map(each -> new Object[] {each})
-        .collect(toList());
-  }
-
-  /**
-   * This method is created to support the parameterized data during
-   * migration to Junit5.
-   * @return Stream of ContainerTestVersionInfo objects.
-   */
-  public static Stream<Object> versionParametersStream() {
-    return layoutList.stream().map(each -> new Object[] {each});
   }
 
   @Override

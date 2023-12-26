@@ -38,8 +38,6 @@ import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 import java.io.File;
@@ -93,10 +91,6 @@ public class TestStaleRecoveringContainerScrubbingService {
     init();
   }
 
-  private static Iterable<Object[]> versionInfo() {
-    return ContainerTestVersionInfo.versionParameters();
-  }
-
   private void init() throws IOException {
     File volumeDir =
         Files.createDirectory(tempDir.resolve("volumeDir")).toFile();
@@ -148,8 +142,7 @@ public class TestStaleRecoveringContainerScrubbingService {
     return createdIds;
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testScrubbingStaleRecoveringContainers(
       ContainerTestVersionInfo versionInfo) throws Exception {
     initVersionInfo(versionInfo);
@@ -169,7 +162,7 @@ public class TestStaleRecoveringContainerScrubbingService {
     testClock.fastForward(1000L);
     srcss.runPeriodicalTaskNow();
     //closed container should not be scrubbed
-    Assertions.assertTrue(containerSet.containerCount() == 5);
+    Assertions.assertEquals(5, containerSet.containerCount());
 
     containerStateMap.putAll(createTestContainers(containerSet, 5,
             RECOVERING).stream()

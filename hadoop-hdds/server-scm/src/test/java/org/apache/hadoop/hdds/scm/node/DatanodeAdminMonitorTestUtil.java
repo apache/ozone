@@ -193,7 +193,7 @@ public final class DatanodeAdminMonitorTestUtil {
     mockCheckContainerState(repManager, underReplicated);
   }
 
-  private static void mockCheckContainerState(ReplicationManager repManager, boolean underReplicated)
+  static void mockCheckContainerState(ReplicationManager repManager, boolean underReplicated)
       throws ContainerNotFoundException {
     Mockito.when(repManager.checkContainerStatus(Mockito.any(ContainerInfo.class),
             Mockito.any(ReplicationManagerReport.class)))

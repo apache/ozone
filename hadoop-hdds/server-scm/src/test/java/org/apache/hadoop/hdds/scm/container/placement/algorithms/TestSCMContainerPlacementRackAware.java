@@ -423,7 +423,7 @@ public class TestSCMContainerPlacementRackAware {
       policy.chooseDatanodes(null, null, nodeNum, STORAGE_CAPACITY + 0, 15);
       fail("Storage requested exceeds capacity, this call should fail");
     } catch (Exception e) {
-      assertTrue(e.getClass().getSimpleName().equals("SCMException"));
+      assertEquals("SCMException", e.getClass().getSimpleName());
     }
 
     // get metrics
@@ -833,8 +833,7 @@ public class TestSCMContainerPlacementRackAware {
 
     // Favoured node should be returned,
     // as favoured node is in the different rack as used nodes.
-    Assertions.assertTrue(favouredNodes.get(0).getUuid() ==
-        datanodeDetails.get(0).getUuid());
+    Assertions.assertSame(favouredNodes.get(0).getUuid(), datanodeDetails.get(0).getUuid());
 
   }
 }

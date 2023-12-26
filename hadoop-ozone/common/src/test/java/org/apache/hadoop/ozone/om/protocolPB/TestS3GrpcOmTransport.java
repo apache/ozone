@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.slf4j.Logger;
@@ -48,6 +47,8 @@ import com.google.protobuf.ServiceException;
 import org.apache.ratis.protocol.RaftPeerId;
 
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.apache.hadoop.ozone.om.OMConfigKeys
     .OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH;
 
@@ -165,9 +166,9 @@ public class TestS3GrpcOmTransport {
     client.startClient(channel);
 
     final OMResponse resp = client.submitRequest(omRequest);
-    Assertions.assertEquals(resp.getStatus(), org.apache.hadoop.ozone.protocol
+    assertEquals(resp.getStatus(), org.apache.hadoop.ozone.protocol
         .proto.OzoneManagerProtocolProtos.Status.OK);
-    Assertions.assertEquals(resp.getLeaderOMNodeId(), leaderOMNodeId);
+    assertEquals(resp.getLeaderOMNodeId(), leaderOMNodeId);
   }
 
   @Test
@@ -189,9 +190,9 @@ public class TestS3GrpcOmTransport {
     // failover is performed and request is internally retried
     // second invocation request to server succeeds
     final OMResponse resp = client.submitRequest(omRequest);
-    Assertions.assertEquals(resp.getStatus(), org.apache.hadoop.ozone.protocol
+    assertEquals(resp.getStatus(), org.apache.hadoop.ozone.protocol
         .proto.OzoneManagerProtocolProtos.Status.OK);
-    Assertions.assertEquals(resp.getLeaderOMNodeId(), leaderOMNodeId);
+    assertEquals(resp.getLeaderOMNodeId(), leaderOMNodeId);
   }
 
   @Test
@@ -219,7 +220,7 @@ public class TestS3GrpcOmTransport {
       final OMResponse resp = client.submitRequest(omRequest);
       fail();
     } catch (Exception e) {
-      Assertions.assertTrue(true);
+      assertTrue(true);
     }
   }
 
@@ -254,7 +255,7 @@ public class TestS3GrpcOmTransport {
       final OMResponse resp = client.submitRequest(omRequest);
       fail();
     } catch (Exception e) {
-      Assertions.assertTrue(true);
+      assertTrue(true);
     }
   }
 }

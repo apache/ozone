@@ -37,14 +37,11 @@ import org.apache.hadoop.ozone.client.io.KeyDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -57,13 +54,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 /**
  * Tests BlockDataStreamOutput class.
  */
+@Timeout(300)
 public class TestBlockDataStreamOutput {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf = new OzoneConfiguration();
   private static OzoneClient client;
@@ -83,7 +75,7 @@ public class TestBlockDataStreamOutput {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     chunkSize = 100;
     flushSize = 2 * chunkSize;
@@ -128,7 +120,7 @@ public class TestBlockDataStreamOutput {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -184,7 +176,7 @@ public class TestBlockDataStreamOutput {
         (KeyDataStreamOutput) key.getByteBufStreamOutput();
     ByteBufferStreamOutput stream =
         keyDataStreamOutput.getStreamEntries().get(0).getByteBufStreamOutput();
-    Assert.assertTrue(stream instanceof BlockDataStreamOutput);
+    Assertions.assertTrue(stream instanceof BlockDataStreamOutput);
     TestHelper.waitForContainerClose(key, cluster);
     key.write(b);
     key.close();
@@ -208,21 +200,21 @@ public class TestBlockDataStreamOutput {
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
             .getBytes(UTF_8);
     key.write(ByteBuffer.wrap(data));
-    Assert.assertTrue(
+    Assertions.assertTrue(
         metrics.getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock)
             <= pendingPutBlockCount + 1);
     key.close();
     // Since data length is 500 , first putBlock will be at 400(flush boundary)
     // and the other at 500
-    Assert.assertTrue(
-        metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock)
-            == putBlockCount + 2);
+    Assertions.assertEquals(
+        metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock),
+        putBlockCount + 2);
     validateData(keyName, data);
   }
 
 
   static OzoneDataStreamOutput createKey(String keyName, ReplicationType type,
-      long size) throws Exception {
+                                         long size) throws Exception {
     return TestHelper.createStreamKey(
         keyName, type, size, objectStore, volumeName, bucketName);
   }
@@ -245,10 +237,10 @@ public class TestBlockDataStreamOutput {
             .getBytes(UTF_8);
     key.write(ByteBuffer.wrap(data));
     // minPacketSize= 100, so first write of 50 wont trigger a writeChunk
-    Assert.assertEquals(writeChunkCount,
+    Assertions.assertEquals(writeChunkCount,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
     key.write(ByteBuffer.wrap(data));
-    Assert.assertEquals(writeChunkCount + 1,
+    Assertions.assertEquals(writeChunkCount + 1,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
     // now close the stream, It will update the key length.
     key.close();
@@ -271,7 +263,7 @@ public class TestBlockDataStreamOutput {
         keyDataStreamOutput.getStreamEntries().get(0);
     key.write(ByteBuffer.wrap(data));
     key.close();
-    Assert.assertEquals(dataLength, stream.getTotalAckDataLength());
+    Assertions.assertEquals(dataLength, stream.getTotalAckDataLength());
   }
 
 }

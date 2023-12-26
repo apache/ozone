@@ -32,17 +32,19 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.ozone.common.ha.ratis.RatisSnapshotInfo;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.om.ratis.metrics.OzoneManagerStateMachineMetrics;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.response.DummyOMClientResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -86,7 +88,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
  */
 public class OzoneManagerStateMachine extends BaseStateMachine {
 
-  static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerStateMachine.class);
   private final SimpleStateMachineStorage storage =
       new SimpleStateMachineStorage();
@@ -95,7 +97,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private RequestHandler handler;
   private RaftGroupId raftGroupId;
   private OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
-  private final RatisSnapshotInfo snapshotInfo;
   private final ExecutorService executorService;
   private final ExecutorService installSnapshotExecutor;
   private final boolean isTracingEnabled;
@@ -111,6 +112,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   // conf/metadata entries which are received through notifyIndexUpdate.
   private ConcurrentMap<Long, Long> ratisTransactionMap =
       new ConcurrentSkipListMap<>();
+  private OzoneManagerStateMachineMetrics metrics;
 
 
   public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer,
@@ -119,7 +121,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     this.isTracingEnabled = isTracingEnabled;
     this.ozoneManager = omRatisServer.getOzoneManager();
 
-    this.snapshotInfo = ozoneManager.getSnapshotInfo();
     loadSnapshotInfoFromDB();
     this.threadPrefix = ozoneManager.getThreadNamePrefix();
 
@@ -137,6 +138,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .setNameFormat(threadPrefix + "InstallSnapshotThread").build();
     this.installSnapshotExecutor =
         HadoopExecutors.newSingleThreadExecutor(installSnapshotThreadFactory);
+    this.metrics = OzoneManagerStateMachineMetrics.create();
   }
 
   /**
@@ -163,6 +165,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
   @Override
   public SnapshotInfo getLatestSnapshot() {
+    final SnapshotInfo snapshotInfo = ozoneManager.getTransactionInfo().toSnapshotInfo();
     LOG.debug("Latest Snapshot Info {}", snapshotInfo);
     return snapshotInfo;
   }
@@ -491,17 +494,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   public long takeSnapshot() throws IOException {
     LOG.info("Current Snapshot Index {}", getLastAppliedTermIndex());
     TermIndex lastTermIndex = getLastAppliedTermIndex();
-    long lastAppliedIndex = lastTermIndex.getIndex();
-    snapshotInfo.updateTermIndex(lastTermIndex.getTerm(),
-        lastAppliedIndex);
-    TransactionInfo build = new TransactionInfo.Builder()
-        .setTransactionIndex(lastAppliedIndex)
-        .setCurrentTerm(lastTermIndex.getTerm()).build();
+    final TransactionInfo build = TransactionInfo.valueOf(lastTermIndex);
+    ozoneManager.setTransactionInfo(build);
     Table<String, TransactionInfo> txnInfoTable =
         ozoneManager.getMetadataManager().getTransactionInfoTable();
     txnInfoTable.put(TRANSACTION_INFO_KEY, build);
     ozoneManager.getMetadataManager().getStore().flushDB();
-    return lastAppliedIndex;
+    return lastTermIndex.getIndex();
   }
 
   /**
@@ -590,7 +589,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       }
     } catch (IOException e) {
       LOG.warn("Failed to write, Exception occurred ", e);
-      return createErrorResponse(request, e);
+      return createErrorResponse(request, e, trxLogIndex);
     } catch (Throwable e) {
       // For any Runtime exceptions, terminate OM.
       String errorMessage = "Request " + request + " failed with exception";
@@ -600,16 +599,20 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   private OMResponse createErrorResponse(
-      OMRequest omRequest, IOException exception) {
-    OMResponse.Builder omResponse = OMResponse.newBuilder()
+      OMRequest omRequest, IOException exception, long trxIndex) {
+    OMResponse.Builder omResponseBuilder = OMResponse.newBuilder()
         .setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(exception))
         .setCmdType(omRequest.getCmdType())
         .setTraceID(omRequest.getTraceID())
         .setSuccess(false);
     if (exception.getMessage() != null) {
-      omResponse.setMessage(exception.getMessage());
+      omResponseBuilder.setMessage(exception.getMessage());
     }
-    return omResponse.build();
+    OMResponse omResponse = omResponseBuilder.build();
+    OMClientResponse omClientResponse = new DummyOMClientResponse(omResponse);
+    omClientResponse.setFlushFuture(
+        ozoneManagerDoubleBuffer.add(omClientResponse, trxIndex));
+    return omResponse;
   }
 
   /**
@@ -689,6 +692,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         }
       }
     }
+    this.metrics.updateApplyTransactionMapSize(applyTransactionMap.size());
+    this.metrics.updateRatisTransactionMapSize(ratisTransactionMap.size());
   }
 
   public void loadSnapshotInfoFromDB() throws IOException {
@@ -699,21 +704,19 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         TransactionInfo.readTransactionInfo(
             ozoneManager.getMetadataManager());
     if (transactionInfo != null) {
-      setLastAppliedTermIndex(TermIndex.valueOf(
-          transactionInfo.getTerm(),
-          transactionInfo.getTransactionIndex()));
-      snapshotInfo.updateTermIndex(transactionInfo.getTerm(),
-          transactionInfo.getTransactionIndex());
+      final TermIndex ti =  transactionInfo.getTermIndex();
+      setLastAppliedTermIndex(ti);
+      ozoneManager.setTransactionInfo(transactionInfo);
+      LOG.info("LastAppliedIndex is set from TransactionInfo from OM DB as {}", ti);
+    } else {
+      LOG.info("TransactionInfo not found in OM DB.");
     }
-    LOG.info("LastAppliedIndex is set from TransactionInfo from OM DB as {}",
-        getLastAppliedTermIndex());
   }
 
   /**
    * Submits read request to OM and returns the response Message.
    * @param request OMRequest
    * @return response from OM
-   * @throws ServiceException
    */
   private Message queryCommand(OMRequest request) {
     OMResponse response = handler.handleReadRequest(request);
@@ -732,14 +735,39 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   @VisibleForTesting
+  public OzoneManagerRequestHandler getHandler() {
+    return (OzoneManagerRequestHandler) this.handler;
+  }
+
+  @VisibleForTesting
   public void setRaftGroupId(RaftGroupId raftGroupId) {
     this.raftGroupId = raftGroupId;
+  }
+
+  @VisibleForTesting
+  public OzoneManagerStateMachineMetrics getMetrics() {
+    return this.metrics;
   }
 
   public void stop() {
     ozoneManagerDoubleBuffer.stop();
     HadoopExecutors.shutdown(executorService, LOG, 5, TimeUnit.SECONDS);
     HadoopExecutors.shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
+    LOG.info("applyTransactionMap size {} ", applyTransactionMap.size());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("applyTransactionMap {}",
+          applyTransactionMap.keySet().stream().map(Object::toString)
+              .collect(Collectors.joining(",")));
+    }
+    LOG.info("ratisTransactionMap size {}", ratisTransactionMap.size());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("ratisTransactionMap {}",
+          ratisTransactionMap.keySet().stream().map(Object::toString)
+            .collect(Collectors.joining(",")));
+    }
+    if (metrics != null) {
+      metrics.unRegister();
+    }
   }
 
   @VisibleForTesting
