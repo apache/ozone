@@ -60,20 +60,18 @@ import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -83,7 +81,9 @@ import java.util.UUID;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -732,26 +732,14 @@ public class TestOzoneClientMultipartUploadWithFSO {
 
   }
 
-  @Test
-  public void testListPartsInvalidPartMarker() throws Exception {
-    try {
-      bucket.listParts(keyName, "random", -1, 2);
-      Assertions.fail("Should throw exception as partNumber is an invalid number!");
-    } catch (IllegalArgumentException ex) {
-      GenericTestUtils.assertExceptionContains("Should be greater than or "
-          + "equal to zero", ex);
-    }
-  }
+  @ParameterizedTest
+  @CsvSource(value = {"-1,2,Should be greater than or equal to zero",
+      "1,-1,Max Parts Should be greater than zero"})
+  public void testListPartsWithInvalidInputs(int partNumberMarker, int maxParts, String expectedErrorMessage) {
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> bucket.listParts(keyName, "random", partNumberMarker, maxParts));
 
-  @Test
-  public void testListPartsInvalidMaxParts() throws Exception {
-    try {
-      bucket.listParts(keyName, "random", 1, -1);
-      Assertions.fail("Should throw exception as max parts is an invalid number!");
-    } catch (IllegalArgumentException ex) {
-      GenericTestUtils.assertExceptionContains("Max Parts Should be greater "
-          + "than zero", ex);
-    }
+    assertThat(exception).hasMessageContaining(expectedErrorMessage);
   }
 
   @Test
@@ -917,11 +905,10 @@ public class TestOzoneClientMultipartUploadWithFSO {
 
   private long getParentID(String volName, String buckName,
                            String kName, OMMetadataManager omMetadataManager) throws IOException {
-    Iterator<Path> pathComponents = Paths.get(kName).iterator();
     final long volumeId = omMetadataManager.getVolumeId(volName);
     final long bucketId = omMetadataManager.getBucketId(volName,
         buckName);
-    return OMFileRequest.getParentID(volumeId, bucketId, pathComponents,
+    return OMFileRequest.getParentID(volumeId, bucketId,
         kName, omMetadataManager);
   }
 

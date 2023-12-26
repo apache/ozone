@@ -294,7 +294,7 @@ public class TestOzoneManagerListVolumesSecure {
                            Callable<Boolean> callable) {
     // Some thread (eg: HeartbeatEndpointTask) will use the login ugi,
     // so we could not use loginUserFromKeytabAndReturnUGI to switch user.
-    assertEquals(true, ugi.doAs((PrivilegedAction<Boolean>) () -> {
+    assertTrue(ugi.doAs((PrivilegedAction<Boolean>) () -> {
       try {
         return callable.call();
       } catch (Throwable ex) {

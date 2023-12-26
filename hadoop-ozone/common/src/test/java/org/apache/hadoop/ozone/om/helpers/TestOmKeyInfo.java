@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo.Builder;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.util.Time;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -45,6 +44,10 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /**
  * Test OmKeyInfo.
@@ -59,11 +62,11 @@ public class TestOmKeyInfo {
     OmKeyInfo keyAfterSerialization = OmKeyInfo.getFromProtobuf(
         key.getProtobuf(ClientVersion.CURRENT_VERSION));
 
-    Assertions.assertEquals(key, keyAfterSerialization);
+    assertEquals(key, keyAfterSerialization);
 
-    Assertions.assertFalse(key.isHsync());
+    assertFalse(key.isHsync());
     key.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID, "clientid");
-    Assertions.assertTrue(key.isHsync());
+    assertTrue(key.isHsync());
   }
 
   @Test
@@ -74,39 +77,39 @@ public class TestOmKeyInfo {
         key.getProtobuf(ClientVersion.CURRENT_VERSION);
 
     // No EC Config
-    Assertions.assertFalse(omKeyProto.hasEcReplicationConfig());
-    Assertions.assertEquals(THREE, omKeyProto.getFactor());
-    Assertions.assertEquals(RATIS, omKeyProto.getType());
+    assertFalse(omKeyProto.hasEcReplicationConfig());
+    assertEquals(THREE, omKeyProto.getFactor());
+    assertEquals(RATIS, omKeyProto.getType());
 
     // Reconstruct object from Proto
     OmKeyInfo recovered = OmKeyInfo.getFromProtobuf(omKeyProto);
-    Assertions.assertEquals(RATIS,
+    assertEquals(RATIS,
         recovered.getReplicationConfig().getReplicationType());
-    Assertions.assertTrue(
+    assertTrue(
         recovered.getReplicationConfig() instanceof RatisReplicationConfig);
 
     // EC Config
     key = createOmKeyInfo(new ECReplicationConfig(3, 2));
-    Assertions.assertFalse(key.isHsync());
+    assertFalse(key.isHsync());
     omKeyProto = key.getProtobuf(ClientVersion.CURRENT_VERSION);
 
-    Assertions.assertEquals(3,
+    assertEquals(3,
         omKeyProto.getEcReplicationConfig().getData());
-    Assertions.assertEquals(2,
+    assertEquals(2,
         omKeyProto.getEcReplicationConfig().getParity());
-    Assertions.assertFalse(omKeyProto.hasFactor());
-    Assertions.assertEquals(EC, omKeyProto.getType());
+    assertFalse(omKeyProto.hasFactor());
+    assertEquals(EC, omKeyProto.getType());
 
     // Reconstruct object from Proto
     recovered = OmKeyInfo.getFromProtobuf(omKeyProto);
-    Assertions.assertEquals(EC,
+    assertEquals(EC,
         recovered.getReplicationConfig().getReplicationType());
-    Assertions.assertTrue(
+    assertTrue(
         recovered.getReplicationConfig() instanceof ECReplicationConfig);
     ECReplicationConfig config =
         (ECReplicationConfig) recovered.getReplicationConfig();
-    Assertions.assertEquals(3, config.getData());
-    Assertions.assertEquals(2, config.getParity());
+    assertEquals(3, config.getData());
+    assertEquals(2, config.getParity());
   }
 
   private OmKeyInfo createOmKeyInfo(ReplicationConfig replicationConfig) {
@@ -153,10 +156,10 @@ public class TestOmKeyInfo {
 
     // OmKeyLocationInfoGroup has now implemented equals() method.
     // assertEquals should work now.
-    Assertions.assertEquals(key, cloneKey);
+    assertEquals(key, cloneKey);
 
     // Check each version content here.
-    Assertions.assertEquals(key.getKeyLocationVersions().size(),
+    assertEquals(key.getKeyLocationVersions().size(),
         cloneKey.getKeyLocationVersions().size());
 
     // Check blocks for each version.
@@ -164,16 +167,16 @@ public class TestOmKeyInfo {
       OmKeyLocationInfoGroup orig = key.getKeyLocationVersions().get(i);
       OmKeyLocationInfoGroup clone = key.getKeyLocationVersions().get(i);
 
-      Assertions.assertEquals(orig.isMultipartKey(), clone.isMultipartKey());
-      Assertions.assertEquals(orig.getVersion(), clone.getVersion());
+      assertEquals(orig.isMultipartKey(), clone.isMultipartKey());
+      assertEquals(orig.getVersion(), clone.getVersion());
 
-      Assertions.assertEquals(orig.getLocationList().size(),
+      assertEquals(orig.getLocationList().size(),
           clone.getLocationList().size());
 
       for (int j = 0; j < orig.getLocationList().size(); j++) {
         OmKeyLocationInfo origLocationInfo = orig.getLocationList().get(j);
         OmKeyLocationInfo cloneLocationInfo = clone.getLocationList().get(j);
-        Assertions.assertEquals(origLocationInfo, cloneLocationInfo);
+        assertEquals(origLocationInfo, cloneLocationInfo);
       }
     }
 
@@ -182,14 +185,14 @@ public class TestOmKeyInfo {
         IAccessAuthorizer.ACLType.WRITE, ACCESS)));
 
     // Change acls and check.
-    Assertions.assertNotEquals(key, cloneKey);
+    assertNotEquals(key, cloneKey);
 
-    Assertions.assertNotEquals(key.getAcls(), cloneKey.getAcls());
+    assertNotEquals(key.getAcls(), cloneKey.getAcls());
 
     // clone now again
     cloneKey = key.copyObject();
 
-    Assertions.assertEquals(key.getAcls(), cloneKey.getAcls());
+    assertEquals(key.getAcls(), cloneKey.getAcls());
   }
 
 

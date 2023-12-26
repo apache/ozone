@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.ozone;
 
-import org.junit.After;
-import org.junit.Before;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -42,7 +42,7 @@ public class StandardOutputTestBase {
    *
    * @throws UnsupportedEncodingException
    */
-  @Before
+  @BeforeEach
   public void setUpStreams() throws UnsupportedEncodingException {
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
@@ -51,7 +51,7 @@ public class StandardOutputTestBase {
   /**
    * Restore original error and output streams after test.
    */
-  @After
+  @AfterEach
   public void restoreStreams() {
     System.setOut(originalOut);
     System.setErr(originalErr);

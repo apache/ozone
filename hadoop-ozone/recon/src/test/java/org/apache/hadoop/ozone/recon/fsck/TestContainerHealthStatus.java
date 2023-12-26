@@ -29,13 +29,14 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacem
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import java.util.HashSet;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -60,7 +61,7 @@ public class TestContainerHealthStatus {
     when(container.containerID()).thenReturn(ContainerID.valueOf(123456));
     when(container.getContainerID()).thenReturn((long)123456);
     when(placementPolicy.validateContainerPlacement(
-        Mockito.anyList(), Mockito.anyInt()))
+        anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(1, 1, 1));
   }
 
@@ -163,7 +164,7 @@ public class TestContainerHealthStatus {
         ContainerReplicaProto.State.CLOSED,
         ContainerReplicaProto.State.CLOSED);
     when(placementPolicy.validateContainerPlacement(
-        Mockito.anyList(), Mockito.anyInt()))
+        anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(1, 2, 5));
     ContainerHealthStatus status =
         new ContainerHealthStatus(container, replicas, placementPolicy,

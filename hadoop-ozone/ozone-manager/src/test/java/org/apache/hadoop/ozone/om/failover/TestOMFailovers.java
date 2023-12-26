@@ -42,6 +42,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.event.Level;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /**
  * Tests OM failover protocols using a Mock Failover provider and a Mock OM
  * Protocol.
@@ -68,26 +70,16 @@ public class TestOMFailovers {
             failoverProxyProvider.getRetryPolicy(
                 OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT));
 
-    try {
-      proxy.submitRequest(null, null);
-      Assertions.fail("Request should fail with AccessControlException");
-    } catch (Exception ex) {
-      Assertions.assertTrue(ex instanceof ServiceException);
+    ServiceException serviceException = Assertions.assertThrows(ServiceException.class,
+        () -> proxy.submitRequest(null, null));
 
-      // Request should try all OMs one be one and fail when the last OM also
-      // throws AccessControlException.
-      GenericTestUtils.assertExceptionContains("ServiceException of " +
-          "type class org.apache.hadoop.security.AccessControlException for " +
-          "om3", ex);
-      Assertions.assertTrue(ex.getCause() instanceof AccessControlException);
-
-      Assertions.assertTrue(
-          logCapturer.getOutput().contains(getRetryProxyDebugMsg("om1")));
-      Assertions.assertTrue(
-          logCapturer.getOutput().contains(getRetryProxyDebugMsg("om2")));
-      Assertions.assertTrue(
-          logCapturer.getOutput().contains(getRetryProxyDebugMsg("om3")));
-    }
+    // Request should try all OMs one be one and fail when the last OM also
+    // throws AccessControlException.
+    assertThat(serviceException).hasCauseInstanceOf(AccessControlException.class)
+        .hasMessage("ServiceException of type class org.apache.hadoop.security.AccessControlException for om3");
+    Assertions.assertTrue(logCapturer.getOutput().contains(getRetryProxyDebugMsg("om1")));
+    Assertions.assertTrue(logCapturer.getOutput().contains(getRetryProxyDebugMsg("om2")));
+    Assertions.assertTrue(logCapturer.getOutput().contains(getRetryProxyDebugMsg("om3")));
   }
 
   private String getRetryProxyDebugMsg(String omNodeId) {

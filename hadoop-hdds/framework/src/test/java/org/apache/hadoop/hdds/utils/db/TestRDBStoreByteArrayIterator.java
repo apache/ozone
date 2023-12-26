@@ -35,10 +35,12 @@ import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -97,7 +99,7 @@ public class TestRDBStoreByteArrayIterator {
     iter.forEachRemaining(consumerStub);
 
     ArgumentCaptor<RawKeyValue.ByteArray> capture =
-        ArgumentCaptor.forClass(RawKeyValue.ByteArray.class);
+        forClass(RawKeyValue.ByteArray.class);
     verify(consumerStub, times(3)).accept(capture.capture());
     assertArrayEquals(
         new byte[]{0x00}, capture.getAllValues().get(0).getKey());
@@ -299,7 +301,7 @@ public class TestRDBStoreByteArrayIterator {
       iter.seekToLast();
       fail("Prefixed iterator does not support seekToLast");
     } catch (Exception e) {
-      assertTrue(e instanceof UnsupportedOperationException);
+      assertInstanceOf(UnsupportedOperationException.class, e);
     }
 
     iter.close();
