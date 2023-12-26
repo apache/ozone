@@ -23,6 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.verify;
+
 import com.google.gson.Gson;
 import org.apache.hadoop.http.HttpServer2;
 import org.apache.hadoop.thirdparty.com.google.common.base.Strings;
@@ -30,7 +33,6 @@ import org.apache.hadoop.util.XMLUtils;
 import org.eclipse.jetty.util.ajax.JSON;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
-import org.mockito.Mockito;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -75,10 +77,10 @@ public class TestHddsConfServlet {
     verifyMap.put("application/xml", HddsConfServlet.FORMAT_XML);
     verifyMap.put("application/json", HddsConfServlet.FORMAT_JSON);
 
-    HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+    HttpServletRequest request = mock(HttpServletRequest.class);
     for (Map.Entry<String, String> entry : verifyMap.entrySet()) {
       String contenTypeActual = entry.getValue();
-      Mockito.when(request.getHeader(HttpHeaders.ACCEPT))
+      when(request.getHeader(HttpHeaders.ACCEPT))
           .thenReturn(entry.getKey());
       assertEquals(contenTypeActual,
           HddsConfServlet.parseAcceptHeader(request));
@@ -202,10 +204,10 @@ public class TestHddsConfServlet {
       // response request
       service.doGet(request, response);
       if (cmd.equals("illegal")) {
-        Mockito.verify(response)
+        verify(response)
             .sendError(
-                Mockito.eq(HttpServletResponse.SC_NOT_FOUND),
-                Mockito.eq("illegal is not a valid command."));
+                eq(HttpServletResponse.SC_NOT_FOUND),
+                eq("illegal is not a valid command."));
       }
       String result = sw.toString().trim();
       return result;
@@ -269,10 +271,10 @@ public class TestHddsConfServlet {
         } else {
           // if property name is not empty, and it's not in configuration
           // expect proper error code and error message is set to the response
-          Mockito.verify(response)
+          verify(response)
               .sendError(
-                  Mockito.eq(HttpServletResponse.SC_NOT_FOUND),
-                  Mockito.eq("Property " + propertyName + " not found"));
+                  eq(HttpServletResponse.SC_NOT_FOUND),
+                  eq("Property " + propertyName + " not found"));
         }
       }
     } finally {

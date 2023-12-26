@@ -34,7 +34,6 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
@@ -55,6 +54,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -85,9 +85,9 @@ public class TestOzoneBlockTokenSecretManager {
     secretKey = generateValidSecretKey();
     secretKeyId = secretKey.getId();
 
-    secretKeyClient = Mockito.mock(SecretKeyVerifierClient.class);
+    secretKeyClient = mock(SecretKeyVerifierClient.class);
     SecretKeySignerClient secretKeySignerClient =
-        Mockito.mock(SecretKeySignerClient.class);
+        mock(SecretKeySignerClient.class);
     when(secretKeySignerClient.getCurrentSecretKey()).thenReturn(secretKey);
     when(secretKeyClient.getSecretKey(secretKeyId)).thenReturn(secretKey);
 

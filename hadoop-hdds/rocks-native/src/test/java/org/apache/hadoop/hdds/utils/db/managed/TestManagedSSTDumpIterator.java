@@ -33,7 +33,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Matchers;
-import org.mockito.Mockito;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -57,6 +56,8 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
 
 /**
@@ -256,12 +257,12 @@ class TestManagedSSTDumpIterator {
       InterruptedException, IOException {
     ByteArrayInputStream byteArrayInputStream =
         new ByteArrayInputStream(inputBytes);
-    ManagedSSTDumpTool tool = Mockito.mock(ManagedSSTDumpTool.class);
+    ManagedSSTDumpTool tool = mock(ManagedSSTDumpTool.class);
     File file = Files.createFile(tempDir.resolve("tmp_file.sst")).toFile();
-    Future future = Mockito.mock(Future.class);
-    Mockito.when(future.isDone()).thenReturn(false);
-    Mockito.when(future.get()).thenReturn(0);
-    Mockito.when(tool.run(Matchers.any(Map.class),
+    Future future = mock(Future.class);
+    when(future.isDone()).thenReturn(false);
+    when(future.get()).thenReturn(0);
+    when(tool.run(Matchers.any(Map.class),
             Matchers.any(ManagedOptions.class)))
         .thenReturn(new ManagedSSTDumpTool.SSTDumpToolTask(future,
             byteArrayInputStream));

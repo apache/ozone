@@ -28,7 +28,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
-
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
@@ -43,10 +42,12 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests for RocksDBTable Store.
@@ -246,8 +247,8 @@ public class TestTypedRDBTableStore {
 
   @Test
   public void testIteratorOnException() throws Exception {
-    RDBTable rdbTable = Mockito.mock(RDBTable.class);
-    Mockito.when(rdbTable.iterator((CodecBuffer) null))
+    RDBTable rdbTable = mock(RDBTable.class);
+    when(rdbTable.iterator((CodecBuffer) null))
         .thenThrow(new IOException());
     try (Table<String, String> testTable = new TypedTable<>(rdbTable,
         codecRegistry, String.class, String.class)) {
