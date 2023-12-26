@@ -4199,6 +4199,7 @@ public abstract class TestOzoneRpcClientAbstract {
   }
 
   @Test
+  @Flaky("HDDS-9967")
   public void testListSnapshot() throws IOException {
     String volumeA = "vol-a-" + RandomStringUtils.randomNumeric(5);
     String volumeB = "vol-b-" + RandomStringUtils.randomNumeric(5);
