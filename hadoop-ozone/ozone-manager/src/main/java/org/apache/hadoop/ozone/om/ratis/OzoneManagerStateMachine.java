@@ -502,12 +502,14 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         transactionInfo, lastTermIndex);
     if (null == transactionInfo) {
       // first time when db not updated with transaction info
-      snapshotInfo.updateTermIndex(lastTermIndex.getTerm(),
-          lastTermIndex.getIndex());
+      final TransactionInfo build = TransactionInfo.valueOf(lastTermIndex);
+      ozoneManager.setTransactionInfo(build);
       return lastTermIndex.getIndex();
     }
-    snapshotInfo.updateTermIndex(transactionInfo.getTerm(),
+    final TransactionInfo build = TransactionInfo.valueOf(
+        transactionInfo.getTerm(),
         transactionInfo.getTransactionIndex());
+    ozoneManager.setTransactionInfo(build);
     return transactionInfo.getTransactionIndex();
   }
 

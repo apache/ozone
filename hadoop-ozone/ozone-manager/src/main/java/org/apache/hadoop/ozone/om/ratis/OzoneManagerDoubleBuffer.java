@@ -438,10 +438,7 @@ public final class OzoneManagerDoubleBuffer {
           .initBatchOperation()) {
         omMetadataManager.getTransactionInfoTable().putWithBatch(
             batchOperation, TRANSACTION_INFO_KEY,
-            new TransactionInfo.Builder()
-                .setTransactionIndex(lastRatisTransactionIndex)
-                .setCurrentTerm(term)
-                .build());
+            TransactionInfo.valueOf(term, lastRatisTransactionIndex));
         omMetadataManager.getStore()
             .commitBatchOperation(batchOperation);
 
