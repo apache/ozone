@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -58,7 +58,7 @@ abstract class AbstractRootedOzoneFileSystemTestWithFSO extends AbstractRootedOz
    */
   @Override
   @Test
-  public void testRenameDestinationParentDoesntExist() throws Exception {
+  void testRenameDestinationParentDoesNotExist() throws Exception {
     final String root = "/root_dir";
     final String dir1 = root + "/dir1";
     final String dir2 = dir1 + "/dir2";
@@ -79,7 +79,7 @@ abstract class AbstractRootedOzoneFileSystemTestWithFSO extends AbstractRootedOz
   }
 
   @Test
-  public void testKeyRenameToBucketLevel() throws IOException {
+  void testKeyRenameToBucketLevel() throws IOException {
     final String dir = "dir1";
     final String key = dir + "/key1";
     final Path source = new Path(getBucketPath(), key);
@@ -94,10 +94,10 @@ abstract class AbstractRootedOzoneFileSystemTestWithFSO extends AbstractRootedOz
   }
 
   @Test
-  public void testRenameDir() throws Exception {
+  void testRenameDir() throws Exception {
     final String dir = "dir1";
     final Path source = new Path(getBucketPath(), dir);
-    final Path dest = new Path(source.toString() + ".renamed");
+    final Path dest = new Path(source + ".renamed");
     // Add a sub-dir to the directory to be moved.
     final Path subdir = new Path(source, "sub_dir1");
     getFs().mkdirs(subdir);
@@ -106,7 +106,7 @@ abstract class AbstractRootedOzoneFileSystemTestWithFSO extends AbstractRootedOz
     getFs().rename(source, dest);
     assertTrue(getFs().exists(dest), "Directory rename failed");
     // Verify that the subdir is also renamed i.e. keys corresponding to the
-    // sub-directories of the renamed directory have also been renamed.
+    // subdirectories of the renamed directory have also been renamed.
     assertTrue(getFs().exists(new Path(dest, "sub_dir1")),
         "Keys under the renamed directory not renamed");
     // cleanup
@@ -117,7 +117,7 @@ abstract class AbstractRootedOzoneFileSystemTestWithFSO extends AbstractRootedOz
    */
   @Override
   @Test
-  public void testRenameDirToItsOwnSubDir() throws Exception {
+  void testRenameDirToItsOwnSubDir() throws Exception {
     final String root = "/root";
     final String dir1 = root + "/dir1";
     final Path dir1Path = new Path(getBucketPath() + dir1);
@@ -137,7 +137,7 @@ abstract class AbstractRootedOzoneFileSystemTestWithFSO extends AbstractRootedOz
 
   @Override
   @Test
-  public void testDeleteVolumeAndBucket() throws IOException {
+  void testDeleteVolumeAndBucket() throws IOException {
     String volumeStr1 = getRandomNonExistVolumeName();
     Path volumePath1 = new Path(OZONE_URI_DELIMITER + volumeStr1);
     String bucketStr2 = "bucket3";
@@ -186,7 +186,7 @@ abstract class AbstractRootedOzoneFileSystemTestWithFSO extends AbstractRootedOz
    * Test the consistency of listStatusFSO with TableCache present.
    */
   @Test
-  public void testListStatusFSO() throws Exception {
+  void testListStatusFSO() throws Exception {
     // list keys batch size is 1024. Creating keys greater than the
     // batch size to test batch listing of the keys.
     int valueGreaterBatchSize = 1200;
@@ -208,7 +208,7 @@ abstract class AbstractRootedOzoneFileSystemTestWithFSO extends AbstractRootedOz
   }
 
   @Test
-  public void testLeaseRecoverable() throws Exception {
+  void testLeaseRecoverable() throws Exception {
     // Create a file
     final String dir = "dir1";
     final String key = dir + "/key1";
