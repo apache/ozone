@@ -98,11 +98,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>ozone-interface-client</artifactId>
     </dependency>
     <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-hadoop-dependency-test</artifactId>
       <scope>test</scope>
