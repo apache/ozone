@@ -46,8 +46,6 @@ public class TestJsonUtils {
   }
 
   private static void assertContains(String str, String part) {
-    assertThat(str)
-        .withFailMessage("Expected JSON to contain '" + part + "', but didn't: " + str)
-        .contains(part);
+    assertThat(str).contains(part);
   }
 }

@@ -36,7 +36,6 @@ import static java.time.Instant.now;
 import static java.time.temporal.ChronoUnit.DAYS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.params.provider.Arguments.of;
 import static org.mockito.Mockito.mock;
@@ -108,7 +107,7 @@ public class TestSecretKeyManager {
       assertSameKeys(expectedLoadedKeys, allKeys);
     } else {
       // expect the current key is newly generated.
-      assertFalse(savedSecretKey.contains(state.getCurrentKey()));
+      assertThat(savedSecretKey).doesNotContain(state.getCurrentKey());
       assertEquals(1, state.getSortedKeys().size());
       assertThat(state.getSortedKeys()).contains(state.getCurrentKey());
     }
@@ -170,7 +169,7 @@ public class TestSecretKeyManager {
       // 1. A new key is generated as current key.
       ManagedSecretKey currentKey = state.getCurrentKey();
       assertNotEquals(initialCurrentKey, currentKey);
-      assertFalse(initialKeys.contains(currentKey));
+      assertThat(initialKeys).doesNotContain(currentKey);
 
       // 2. keys are correctly rotated, expired ones are excluded.
       List<ManagedSecretKey> expectedAllKeys = expectedRetainedKeys;

@@ -297,7 +297,8 @@ public class TestDefaultCAServer {
               CRLReason.lookup(CRLReason.keyCompromise), now);
           result.get();
         });
-    assertThat(execution.getCause().getMessage()).contains("Certificates cannot be null");
+    assertThat(execution.getCause().getMessage())
+        .contains("Certificates cannot be null");
   }
 
   @Test

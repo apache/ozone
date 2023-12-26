@@ -183,11 +183,11 @@ public class TestOzoneAuditLogger {
   @Test
   public void messageIncludesAllParts() {
     String message = WRITE_FAIL_MSG.getFormattedMessage();
-    assertThat(message).withFailMessage(message).contains(USER);
-    assertThat(message).withFailMessage(message).contains(IP_ADDRESS);
-    assertThat(message).withFailMessage(message).contains(DummyAction.CREATE_VOLUME.name());
-    assertThat(message).withFailMessage(message).contains(PARAMS.toString());
-    assertThat(message).withFailMessage(message).contains(FAILURE.getStatus());
+    assertThat(message).contains(USER);
+    assertThat(message).contains(IP_ADDRESS);
+    assertThat(message).contains(DummyAction.CREATE_VOLUME.name());
+    assertThat(message).contains(PARAMS.toString());
+    assertThat(message).contains(FAILURE.getStatus());
   }
 
   /**

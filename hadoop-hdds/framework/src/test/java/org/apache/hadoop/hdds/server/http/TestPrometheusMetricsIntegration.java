@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.server.http;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -198,9 +197,9 @@ public class TestPrometheusMetricsIntegration {
 
     // THEN
     // The first metric shouldn't be present
-    assertFalse(
-        writtenMetrics.contains("stale_metric_counter{port=\"1234\""),
-        "The expected metric line is present in prometheus metrics output");
+    assertThat(writtenMetrics)
+        .withFailMessage("The expected metric line is present in prometheus metrics output")
+        .doesNotContain("stale_metric_counter{port=\"1234\"");
     assertThat(writtenMetrics)
         .withFailMessage("The expected metric line is present in prometheus metrics output")
         .contains("some_metric_counter{port=\"4321\"");
