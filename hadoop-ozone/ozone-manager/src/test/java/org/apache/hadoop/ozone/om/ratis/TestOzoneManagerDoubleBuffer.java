@@ -300,6 +300,7 @@ class TestOzoneManagerDoubleBuffer {
         doubleBuffer.getCurrentBufferSize());
 
     // Start double buffer and wait for flush.
+    doubleBuffer.resume();
     Future<?> await = awaitFlush(executorService);
     Future<Boolean> flusher = flushTransactions(executorService);
     await.get();
@@ -415,7 +416,6 @@ class TestOzoneManagerDoubleBuffer {
 
   private Future<Boolean> flushTransactions(ExecutorService executorService) {
     return executorService.submit(() -> {
-      doubleBuffer.resume();
       try {
         doubleBuffer.flushTransactions();
       } catch (Exception e) {
