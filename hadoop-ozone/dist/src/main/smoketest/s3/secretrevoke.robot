@@ -21,8 +21,9 @@ Library             String
 Resource            ../commonlib.robot
 Resource            ./commonawslib.robot
 Test Timeout        5 minutes
-Suite Setup         Setup s3 tests
 Default Tags        no-bucket-type
+Test Setup          Run Keyword          Setup v4 headers
+
 
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:9878
@@ -31,19 +32,12 @@ ${SECURITY_ENABLED}   true
 *** Test Cases ***
 
 S3 Gateway Revoke Secret
-    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
+    Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
     ${result} =         Execute                             curl -X DELETE --negotiate -u : -v ${ENDPOINT_URL}/secret
-                        IF   '${SECURITY_ENABLED}' == 'true'
-                            Should contain      ${result}       HTTP/1.1 200 OK    ignore_case=True
-                        ELSE
-                            Should contain      ${result}       S3 Secret endpoint is disabled.
-                        END
+                        Should contain      ${result}       HTTP/1.1 200 OK    ignore_case=True
 
 S3 Gateway Revoke Secret By Username
-    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab
-    ${result} =         Execute                             curl -X DELETE --negotiate -u : -v ${ENDPOINT_URL}/secret/testuser2
-                        IF   '${SECURITY_ENABLED}' == 'true'
-                            Should contain      ${result}       HTTP/1.1 200 OK    ignore_case=True
-                        ELSE
-                            Should contain      ${result}       S3 Secret endpoint is disabled.
-                        END
+    Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
+    [Setup]             Execute                             curl -X PUT --negotiate -u : -v ${ENDPOINT_URL}/secret/testuser
+    ${result} =         Execute                             curl -X DELETE --negotiate -u : -v ${ENDPOINT_URL}/secret/testuser
+                        Should contain      ${result}       HTTP/1.1 200 OK    ignore_case=True

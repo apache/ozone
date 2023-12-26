@@ -32,10 +32,12 @@ Get test user principal
     [return]            ${user}/${instance}@EXAMPLE.COM
 
 Kinit HTTP user
+    Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skip in unsecure cluster
     ${principal} =      Get test user principal    HTTP
     Wait Until Keyword Succeeds      2min       10sec      Execute            kinit -k -t /etc/security/keytabs/HTTP.keytab ${principal}
 
 Kinit test user
+    Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skip in unsecure cluster
     [arguments]                      ${user}       ${keytab}
     ${TEST_USER} =      Get test user principal    ${user}
     Set Suite Variable  ${TEST_USER}
@@ -51,3 +53,7 @@ Requires admin privilege
     Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skip privilege check in unsecure cluster
     Kinit test user     testuser2     testuser2.keytab
     Access should be denied    ${command}
+
+Revoke S3 secrets
+    Execute and Ignore Error             ozone s3 revokesecret -y
+    Execute and Ignore Error             ozone s3 revokesecret -y -u testuser
