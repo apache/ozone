@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -410,7 +411,7 @@ public class TestTypedRDBTableStore {
       }
       long keyCount = testTable.getEstimatedKeyCount();
       // The result should be larger than zero but not exceed(?) numKeys
-      assertTrue(keyCount > 0 && keyCount <= numKeys);
+      assertThat(keyCount).isGreaterThan(0).isLessThanOrEqualTo(numKeys);
     }
   }
 
