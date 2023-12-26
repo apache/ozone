@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -39,6 +40,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -54,24 +56,39 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests FinalizeBlock.
  */
+@RunWith(Parameterized.class)
 public class TestFinalizeBlock {
 
   private OzoneClient client;
@@ -85,6 +102,23 @@ public class TestFinalizeBlock {
   private ObjectStore objectStore;
   private static String volumeName = UUID.randomUUID().toString();
   private static String bucketName = UUID.randomUUID().toString();
+  private boolean schemaV3;
+  private ContainerLayoutVersion layoutVersion;
+
+  public TestFinalizeBlock(boolean enableSchemaV3, ContainerLayoutVersion version) {
+    this.schemaV3 = enableSchemaV3;
+    this.layoutVersion = version;
+  }
+
+  @Parameterized.Parameters
+  public static Iterable<Object[]> parameters() {
+    return Arrays.asList(new Object[][]{
+        {false, FILE_PER_CHUNK},
+        {true, FILE_PER_CHUNK},
+        {false, FILE_PER_BLOCK},
+        {true, FILE_PER_BLOCK},
+    });
+  }
 
   @Before
   public void setup() throws Exception {
@@ -93,8 +127,14 @@ public class TestFinalizeBlock {
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         0, StorageUnit.MB);
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
-    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL,
-        3, TimeUnit.SECONDS);
+    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1, SECONDS);
+    conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 1, SECONDS);
+    conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 1, SECONDS);
+    conf.setTimeDuration(HDDS_NODE_REPORT_INTERVAL, 1, SECONDS);
+    conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
+    conf.setBoolean(CONTAINER_SCHEMA_V3_ENABLED, schemaV3);
+    conf.setEnum(ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY, layoutVersion);
 
     DatanodeConfiguration datanodeConfiguration = conf.getObject(
         DatanodeConfiguration.class);
@@ -128,166 +168,7 @@ public class TestFinalizeBlock {
   }
 
   @Test
-  public void testFinalizeBlock()
-      throws IOException {
-    String keyName = UUID.randomUUID().toString();
-    // create key
-    createKey(keyName);
-
-    ContainerID containerId = cluster.getStorageContainerManager()
-        .getContainerManager().getContainers().get(0).containerID();
-
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
-        .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
-        .build();
-    List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList =
-        cluster.getOzoneManager().lookupKey(keyArgs).getKeyLocationVersions();
-
-    ContainerInfo container = cluster.getStorageContainerManager()
-        .getContainerManager().getContainer(containerId);
-    Pipeline pipeline = cluster.getStorageContainerManager()
-        .getPipelineManager().getPipeline(container.getPipelineID());
-
-    final ContainerProtos.ContainerCommandRequestProto request =
-        getFinalizeBlockRequest(omKeyLocationInfoGroupList, container);
-
-    XceiverClientManager xceiverClientManager = new XceiverClientManager(conf);
-    XceiverClientSpi xceiverClient =
-        xceiverClientManager.acquireClient(pipeline);
-    ContainerProtos.ContainerCommandResponseProto response =
-        xceiverClient.sendCommand(request);
-
-    Assert.assertTrue(response.getFinalizeBlock()
-        .getBlockData().getBlockID().getLocalID()
-        == omKeyLocationInfoGroupList.get(0)
-        .getLocationList().get(0).getLocalID());
-
-    Assert.assertTrue(((KeyValueContainerData)getContainerfromDN(
-        cluster.getHddsDatanodes().get(0),
-        containerId.getId()).getContainerData())
-        .getFinalizedBlockSet().size() == 1);
-  }
-
-  @Test
-  public void testFinalizeBlockReloadAfterDNRestart()
-      throws IOException {
-    String keyName = UUID.randomUUID().toString();
-    // create key
-    createKey(keyName);
-
-    ContainerID containerId = cluster.getStorageContainerManager()
-        .getContainerManager().getContainers().get(0).containerID();
-
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
-        .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
-        .build();
-    List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList =
-        cluster.getOzoneManager().lookupKey(keyArgs).getKeyLocationVersions();
-
-    ContainerInfo container = cluster.getStorageContainerManager()
-        .getContainerManager().getContainer(containerId);
-    Pipeline pipeline = cluster.getStorageContainerManager()
-        .getPipelineManager().getPipeline(container.getPipelineID());
-
-    final ContainerProtos.ContainerCommandRequestProto request =
-        getFinalizeBlockRequest(omKeyLocationInfoGroupList, container);
-
-    XceiverClientManager xceiverClientManager = new XceiverClientManager(conf);
-    XceiverClientSpi xceiverClient =
-        xceiverClientManager.acquireClient(pipeline);
-    ContainerProtos.ContainerCommandResponseProto response =
-        xceiverClient.sendCommand(request);
-
-    Assert.assertTrue(response.getFinalizeBlock()
-        .getBlockData().getBlockID().getLocalID()
-        == omKeyLocationInfoGroupList.get(0)
-        .getLocationList().get(0).getLocalID());
-    Assert.assertTrue(((KeyValueContainerData)
-        getContainerfromDN(cluster.getHddsDatanodes().get(0),
-        containerId.getId()).getContainerData())
-        .getFinalizedBlockSet().size() == 1);
-
-    try {
-      cluster.restartHddsDatanode(0, false);
-    } catch (Exception e) {
-    }
-
-    // After restart DN, finalizeBlock should be loaded into memory
-    Assert.assertTrue(((KeyValueContainerData)
-        getContainerfromDN(cluster.getHddsDatanodes().get(0),
-        containerId.getId()).getContainerData())
-        .getFinalizedBlockSet().size() == 1);
-  }
-
-  @Test
-  public void testFinalizeBlockClearAfterCloseContainer()
-      throws IOException {
-    String keyName = UUID.randomUUID().toString();
-    // create key
-    createKey(keyName);
-
-    ContainerID containerId = cluster.getStorageContainerManager()
-        .getContainerManager().getContainers().get(0).containerID();
-
-    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
-        .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
-        .build();
-    List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList =
-        cluster.getOzoneManager().lookupKey(keyArgs).getKeyLocationVersions();
-
-
-    ContainerInfo container = cluster.getStorageContainerManager()
-        .getContainerManager().getContainer(containerId);
-    Pipeline pipeline = cluster.getStorageContainerManager()
-        .getPipelineManager().getPipeline(container.getPipelineID());
-
-    final ContainerProtos.ContainerCommandRequestProto request =
-        getFinalizeBlockRequest(omKeyLocationInfoGroupList, container);
-
-    XceiverClientManager xceiverClientManager = new XceiverClientManager(conf);
-    XceiverClientSpi xceiverClient =
-        xceiverClientManager.acquireClient(pipeline);
-
-    ContainerProtos.ContainerCommandResponseProto response =
-        xceiverClient.sendCommand(request);
-    Assert.assertTrue(response.getFinalizeBlock()
-        .getBlockData().getBlockID().getLocalID()
-        == omKeyLocationInfoGroupList.get(0)
-        .getLocationList().get(0).getLocalID());
-
-    Assert.assertTrue(((KeyValueContainerData)
-        getContainerfromDN(cluster.getHddsDatanodes().get(0),
-        containerId.getId()).getContainerData())
-        .getFinalizedBlockSet().size() == 1);
-
-    OzoneTestUtils.closeAllContainers(cluster
-            .getStorageContainerManager().getEventQueue(),
-        cluster.getStorageContainerManager());
-
-    try {
-      // Finalize Block should be cleared from container data.
-      GenericTestUtils.waitFor(() ->
-              ((KeyValueContainerData)
-                  getContainerfromDN(cluster.getHddsDatanodes().get(0),
-              containerId.getId()).getContainerData())
-                  .getFinalizedBlockSet().size() == 0,
-          500, 5 * 1000);
-
-      // Restart DataNode
-      cluster.restartHddsDatanode(0, true);
-    } catch (Exception e) {
-    }
-
-    // After DN restart also there should not be any finalizeBlock
-    Assert.assertTrue(((KeyValueContainerData)getContainerfromDN(
-        cluster.getHddsDatanodes().get(0),
-        containerId.getId()).getContainerData())
-        .getFinalizedBlockSet().size() == 0);
-  }
-
-  @Test
-  public void testRejectPutAndWriteChunkAfterFinalizeBlock()
-      throws IOException {
+  public void testFinalizeBlock() throws IOException, InterruptedException, TimeoutException {
     String keyName = UUID.randomUUID().toString();
     // create key
     createKey(keyName);
@@ -314,7 +195,7 @@ public class TestFinalizeBlock {
     ContainerProtos.ContainerCommandRequestProto request =
         ContainerTestHelper.getWriteChunkRequest(pipeline, (
             new BlockID(containerId.getId(), omKeyLocationInfoGroupList.get(0)
-            .getLocationList().get(0).getLocalID())), 100);
+                .getLocationList().get(0).getLocalID())), 100);
     xceiverClient.sendCommand(request);
 
     // Before finalize block PUT block on the same block should pass through
@@ -323,15 +204,74 @@ public class TestFinalizeBlock {
 
     // Now Finalize Block
     request = getFinalizeBlockRequest(omKeyLocationInfoGroupList, container);
-    xceiverClient.sendCommand(request);
+    ContainerProtos.ContainerCommandResponseProto response =
+        xceiverClient.sendCommand(request);
 
+    Assert.assertTrue(response.getFinalizeBlock()
+        .getBlockData().getBlockID().getLocalID()
+        == omKeyLocationInfoGroupList.get(0)
+        .getLocationList().get(0).getLocalID());
+
+    Assert.assertTrue(((KeyValueContainerData)getContainerfromDN(
+        cluster.getHddsDatanodes().get(0),
+        containerId.getId()).getContainerData())
+        .getFinalizedBlockSet().size() == 1);
+
+    testRejectPutAndWriteChunkAfterFinalizeBlock(containerId, pipeline, xceiverClient, omKeyLocationInfoGroupList);
+    testFinalizeBlockReloadAfterDNRestart(containerId);
+    testFinalizeBlockClearAfterCloseContainer(containerId);
+  }
+
+  private void testFinalizeBlockReloadAfterDNRestart(ContainerID containerId) {
+    try {
+      cluster.restartHddsDatanode(0, true);
+    } catch (Exception e) {
+      fail("Fail to restart Datanode");
+    }
+
+    // After restart DN, finalizeBlock should be loaded into memory
+    Assert.assertTrue(((KeyValueContainerData)
+        getContainerfromDN(cluster.getHddsDatanodes().get(0),
+            containerId.getId()).getContainerData())
+        .getFinalizedBlockSet().size() == 1);
+  }
+
+  private void testFinalizeBlockClearAfterCloseContainer(ContainerID containerId)
+      throws InterruptedException, TimeoutException {
+    OzoneTestUtils.closeAllContainers(cluster.getStorageContainerManager().getEventQueue(),
+        cluster.getStorageContainerManager());
+
+    // Finalize Block should be cleared from container data.
+    GenericTestUtils.waitFor(() -> (
+        (KeyValueContainerData) getContainerfromDN(cluster.getHddsDatanodes().get(0),
+            containerId.getId()).getContainerData()).getFinalizedBlockSet().size() == 0,
+        100, 10 * 1000);
+    try {
+      // Restart DataNode
+      cluster.restartHddsDatanode(0, true);
+    } catch (Exception e) {
+      fail("Fail to restart Datanode");
+    }
+
+    // After DN restart also there should not be any finalizeBlock
+    Assert.assertTrue(((KeyValueContainerData)getContainerfromDN(
+        cluster.getHddsDatanodes().get(0),
+        containerId.getId()).getContainerData())
+        .getFinalizedBlockSet().size() == 0);
+  }
+
+  private void testRejectPutAndWriteChunkAfterFinalizeBlock(ContainerID containerId, Pipeline pipeline,
+      XceiverClientSpi xceiverClient, List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList)
+      throws IOException {
     // Try doing WRITE chunk on the already finalized block
-    request = ContainerTestHelper.getWriteChunkRequest(pipeline, (
-        new BlockID(containerId.getId(), omKeyLocationInfoGroupList.get(0)
-            .getLocationList().get(0).getLocalID())), 100);
+    ContainerProtos.ContainerCommandRequestProto request =
+        ContainerTestHelper.getWriteChunkRequest(pipeline,
+            (new BlockID(containerId.getId(), omKeyLocationInfoGroupList.get(0)
+                .getLocationList().get(0).getLocalID())), 100);
 
     try {
       xceiverClient.sendCommand(request);
+      fail("Write chunk should fail.");
     } catch (IOException e) {
       assertTrue(e.getCause().getMessage()
           .contains("Block already finalized"));
@@ -341,6 +281,7 @@ public class TestFinalizeBlock {
     request = ContainerTestHelper.getPutBlockRequest(request);
     try {
       xceiverClient.sendCommand(request);
+      fail("Put block should fail.");
     } catch (IOException e) {
       assertTrue(e.getCause().getMessage()
           .contains("Block already finalized"));

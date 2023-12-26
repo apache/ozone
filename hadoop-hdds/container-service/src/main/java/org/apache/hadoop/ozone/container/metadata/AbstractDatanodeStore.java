@@ -67,9 +67,9 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   private Table<String, ChunkInfoList> deletedBlocksTable;
 
-  private Table<String, Long>  finalizeBlocksTable;
+  private Table<String, Long> finalizeBlocksTable;
 
-  private Table<String, Long> finalizeBlockDataTableWithIterator;
+  private Table<String, Long> finalizeBlocksTableWithIterator;
 
   static final Logger LOG =
       LoggerFactory.getLogger(AbstractDatanodeStore.class);
@@ -179,11 +179,11 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
       checkTableStatus(deletedBlocksTable, deletedBlocksTable.getName());
 
       if (dbDef.getFinalizeBlocksColumnFamily() != null) {
-        finalizeBlockDataTableWithIterator =
+        finalizeBlocksTableWithIterator =
             dbDef.getFinalizeBlocksColumnFamily().getTable(this.store);
 
         finalizeBlocksTable = new DatanodeTable<>(
-            finalizeBlockDataTableWithIterator);
+            finalizeBlocksTableWithIterator);
         checkTableStatus(finalizeBlocksTable, finalizeBlocksTable.getName());
       }
     }
@@ -231,21 +231,21 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
   public BlockIterator<BlockData> getBlockIterator(long containerID)
       throws IOException {
     return new KeyValueBlockIterator(containerID,
-            blockDataTableWithIterator.iterator());
+        blockDataTableWithIterator.iterator());
   }
 
   @Override
   public BlockIterator<BlockData> getBlockIterator(long containerID,
       KeyPrefixFilter filter) throws IOException {
     return new KeyValueBlockIterator(containerID,
-            blockDataTableWithIterator.iterator(), filter);
+        blockDataTableWithIterator.iterator(), filter);
   }
 
   @Override
   public BlockIterator<Long> getFinalizeBlockIterator(long containerID,
       KeyPrefixFilter filter) throws IOException {
     return new KeyValueBlockLocalIdIterator(containerID,
-             finalizeBlockDataTableWithIterator.iterator(), filter);
+        finalizeBlocksTableWithIterator.iterator(), filter);
   }
 
   @Override
@@ -288,6 +288,10 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
 
   protected Table<String, BlockData> getBlockDataTableWithIterator() {
     return this.blockDataTableWithIterator;
+  }
+
+  protected Table<String, Long> getFinalizeBlocksTableWithIterator() {
+    return this.finalizeBlocksTableWithIterator;
   }
 
   private static void checkTableStatus(Table<?, ?> table, String name)

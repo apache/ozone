@@ -108,7 +108,7 @@ public interface ChunkManager {
 
   default void finalizeWriteChunk(KeyValueContainer container,
       BlockID blockId) throws IOException {
-    throw new IOException("finalizeWriteChunk is not supported");
+    // no-op
   }
 
   default String streamInit(Container container, BlockID blockID)

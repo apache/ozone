@@ -244,7 +244,6 @@ public final class KeyValueContainerUtil {
       try (DBHandle db = BlockUtils.getDB(kvContainerData, config)) {
         populateContainerMetadata(kvContainerData,
             db.getStore(), bCheckChunksFilePath);
-        populateContainerFinalizeBlock(kvContainerData, db.getStore());
       }
       return;
     }
@@ -364,6 +363,9 @@ public final class KeyValueContainerUtil {
     // startup. If this method is called but not as a part of startup,
     // The inspectors will be unloaded and this will be a no-op.
     ContainerInspectorUtil.process(kvContainerData, store);
+
+    // Load finalizeBlockLocalIds for container in memory.
+    populateContainerFinalizeBlock(kvContainerData, store);
   }
 
   /**
@@ -375,11 +377,13 @@ public final class KeyValueContainerUtil {
   private static void populateContainerFinalizeBlock(
       KeyValueContainerData kvContainerData, DatanodeStore store)
       throws IOException {
-    try (BlockIterator<Long> iter =
-            store.getFinalizeBlockIterator(kvContainerData.getContainerID(),
-            kvContainerData.getUnprefixedKeyFilter())) {
-      while (iter.hasNext()) {
-        kvContainerData.addToFinalizedBlockSet(iter.nextBlock());
+    if (store.getFinalizeBlocksTable() != null) {
+      try (BlockIterator<Long> iter =
+               store.getFinalizeBlockIterator(kvContainerData.getContainerID(),
+                   kvContainerData.getUnprefixedKeyFilter())) {
+        while (iter.hasNext()) {
+          kvContainerData.addToFinalizedBlockSet(iter.nextBlock());
+        }
       }
     }
   }

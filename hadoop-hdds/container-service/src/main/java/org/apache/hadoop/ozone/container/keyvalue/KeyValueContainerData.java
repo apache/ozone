@@ -296,8 +296,17 @@ public class KeyValueContainerData extends ContainerData {
     return finalizedBlockSet.contains(localID);
   }
 
-  public void clearFinalizedBlock() {
-    finalizedBlockSet.clear();
+  public void clearFinalizedBlock(DBHandle db) throws IOException {
+    if (!finalizedBlockSet.isEmpty()) {
+      // delete from db and clear memory
+      // Should never fail.
+      Preconditions.checkNotNull(db, "DB cannot be null here");
+      try (BatchOperation batch = db.getStore().getBatchHandler().initBatchOperation()) {
+        db.getStore().getFinalizeBlocksTable().deleteBatchWithPrefix(batch, containerPrefix());
+        db.getStore().getBatchHandler().commitBatchOperation(batch);
+      }
+      finalizedBlockSet.clear();
+    }
   }
 
   /**

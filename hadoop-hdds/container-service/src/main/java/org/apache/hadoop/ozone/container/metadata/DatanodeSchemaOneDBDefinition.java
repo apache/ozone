@@ -111,10 +111,4 @@ public class DatanodeSchemaOneDBDefinition
   public Iterable<DBColumnFamilyDefinition<?, ?>> getColumnFamilies() {
     return () -> CollectionUtils.newIterator(COLUMN_FAMILIES.values());
   }
-
-  @Override
-  public DBColumnFamilyDefinition<String, Long>
-      getFinalizeBlocksColumnFamily() {
-    return null;
-  }
 }
