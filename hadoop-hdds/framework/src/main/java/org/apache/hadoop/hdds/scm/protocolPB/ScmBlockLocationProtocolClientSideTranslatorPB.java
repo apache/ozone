@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -162,8 +163,11 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
             .setNumBlocks(num)
             .setType(replicationConfig.getReplicationType())
             .setOwner(owner)
-            .setClient(clientMachine)
             .setExcludeList(excludeList.getProtoBuf());
+
+    if (StringUtils.isNotEmpty(clientMachine)) {
+      requestBuilder.setClient(clientMachine);
+    }
 
     switch (replicationConfig.getReplicationType()) {
     case STAND_ALONE:

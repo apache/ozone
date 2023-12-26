@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils;
 
 import org.apache.ozone.test.tag.Native;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedStatic;
@@ -27,7 +28,7 @@ import org.mockito.Mockito;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.IOException;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -42,10 +43,11 @@ import static org.mockito.ArgumentMatchers.same;
  */
 public class TestNativeLibraryLoader {
 
-  private static Stream<String> nativeLibraryDirectoryLocations()
-      throws IOException {
-    return Stream.of("", File.createTempFile("prefix", "suffix")
-        .getParentFile().getAbsolutePath(), null);
+  @TempDir
+  private static Path tempDir;
+
+  private static Stream<String> nativeLibraryDirectoryLocations() {
+    return Stream.of("", tempDir.toAbsolutePath().toString(), null);
   }
 
   @Native(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)

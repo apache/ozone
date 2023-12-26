@@ -162,7 +162,7 @@ public class TestStaleRecoveringContainerScrubbingService {
     testClock.fastForward(1000L);
     srcss.runPeriodicalTaskNow();
     //closed container should not be scrubbed
-    Assertions.assertTrue(containerSet.containerCount() == 5);
+    Assertions.assertEquals(5, containerSet.containerCount());
 
     containerStateMap.putAll(createTestContainers(containerSet, 5,
             RECOVERING).stream()

@@ -350,8 +350,8 @@ public class TestRootedOzoneFileSystem {
     // Creating a child should not add parent keys to the bucket
     try {
       getKey(parent, true);
-    } catch (IOException ex) {
-      assertKeyNotFoundException(ex);
+    } catch (OMException ome) {
+      assertEquals(KEY_NOT_FOUND, ome.getResult());
     }
 
     // List status on the parent should show the child file
@@ -421,9 +421,10 @@ public class TestRootedOzoneFileSystem {
     // Creating a child should not add parent keys to the bucket
     try {
       getKey(parent, true);
-    } catch (IOException ex) {
-      assertKeyNotFoundException(ex);
+    } catch (OMException ome) {
+      assertEquals(KEY_NOT_FOUND, ome.getResult());
     }
+
 
     // Delete the child key
     assertTrue(fs.delete(child, false));
@@ -971,10 +972,6 @@ public class TestRootedOzoneFileSystem {
         .getBucket(bucketName).getKey(keyInBucket);
   }
 
-  private void assertKeyNotFoundException(IOException ex) {
-    GenericTestUtils.assertExceptionContains("KEY_NOT_FOUND", ex);
-  }
-
   /**
    * Helper function for testListStatusRootAndVolume*.
    * Each call creates one volume, one bucket under that volume,
@@ -1010,6 +1007,39 @@ public class TestRootedOzoneFileSystem {
     OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
     volume.deleteBucket(ofsPath.getBucketName());
     objectStore.deleteVolume(ofsPath.getVolumeName());
+  }
+
+  /**
+   * Create a bucket with a different owner than the volume owner
+   * and test the owner on listStatus.
+   */
+  @Test
+  public void testListStatusWithDifferentBucketOwner() throws IOException {
+    String volName = getRandomNonExistVolumeName();
+    objectStore.createVolume(volName);
+    OzoneVolume ozoneVolume = objectStore.getVolume(volName);
+
+    String buckName = "bucket-" + RandomStringUtils.randomNumeric(5);
+    UserGroupInformation currUgi = UserGroupInformation.getCurrentUser();
+    String bucketOwner = currUgi.getUserName() + RandomStringUtils.randomNumeric(5);
+    BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setOwner(bucketOwner)
+        .build();
+    ozoneVolume.createBucket(buckName, bucketArgs);
+
+    Path volPath = new Path(OZONE_URI_DELIMITER + volName);
+
+    OzoneBucket ozoneBucket = ozoneVolume.getBucket(buckName);
+
+    FileStatus[] fileStatusVolume = ofs.listStatus(volPath);
+    assertEquals(1, fileStatusVolume.length);
+    // FileStatus owner is different from the volume owner.
+    // Owner is the same as the bucket owner returned by the ObjectStore.
+    assertNotEquals(ozoneVolume.getOwner(), fileStatusVolume[0].getOwner());
+    assertEquals(ozoneBucket.getOwner(), fileStatusVolume[0].getOwner());
+
+    ozoneVolume.deleteBucket(buckName);
+    objectStore.deleteVolume(volName);
   }
 
   /**
@@ -1886,9 +1916,9 @@ public class TestRootedOzoneFileSystem {
       ContractTestUtils.touch(fs, childFolderFile);
     }
 
-    assertTrue(fs.listStatus(grandparent).length == 1);
-    assertTrue(fs.listStatus(parent).length == 9);
-    assertTrue(fs.listStatus(childFolder).length == 8);
+    assertEquals(1, fs.listStatus(grandparent).length);
+    assertEquals(9, fs.listStatus(parent).length);
+    assertEquals(8, fs.listStatus(childFolder).length);
 
     Boolean successResult = fs.delete(grandparent, true);
     assertTrue(successResult);

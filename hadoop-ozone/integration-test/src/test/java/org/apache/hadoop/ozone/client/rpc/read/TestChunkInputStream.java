@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.client.rpc.read;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.List;
 
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
@@ -27,10 +26,8 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.om.TestBucket;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -41,16 +38,11 @@ import static org.junit.jupiter.api.Assertions.assertNull;
  */
 class TestChunkInputStream extends TestInputStreamBase {
 
-  private static List<ContainerLayoutVersion> layouts() {
-    return ContainerLayoutVersion.getAllVersions();
-  }
-
   /**
    * Run the tests as a single test method to avoid needing a new mini-cluster
    * for each test.
    */
-  @ParameterizedTest
-  @MethodSource("layouts")
+  @ContainerLayoutTestInfo.ContainerTest
   void testAll(ContainerLayoutVersion layout) throws Exception {
     try (MiniOzoneCluster cluster = newCluster(layout)) {
       cluster.waitForClusterToBeReady();

@@ -31,7 +31,6 @@ import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
 import org.hadoop.ozone.recon.schema.tables.records.UnhealthyContainersRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,6 +48,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -85,7 +86,7 @@ public class TestContainerHealthTaskRecordGenerator {
     when(emptyContainer.containerID()).thenReturn(ContainerID.valueOf(345678));
     when(emptyContainer.getContainerID()).thenReturn((long) 345678);
     when(placementPolicy.validateContainerPlacement(
-        Mockito.anyList(), Mockito.anyInt()))
+        anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(1, 1, 1));
   }
 
@@ -195,7 +196,7 @@ public class TestContainerHealthTaskRecordGenerator {
     Set<ContainerReplica> replicas =
         generateReplicas(container, CLOSED, CLOSED, CLOSED);
     when(placementPolicy.validateContainerPlacement(
-        Mockito.anyList(), Mockito.anyInt()))
+        anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(2, 3, 5));
     ContainerHealthStatus status =
         new ContainerHealthStatus(container, replicas, placementPolicy,
@@ -222,7 +223,7 @@ public class TestContainerHealthTaskRecordGenerator {
 
     // Container is now placed OK - should be removed.
     when(placementPolicy.validateContainerPlacement(
-        Mockito.anyList(), Mockito.anyInt()))
+        anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(3, 3, 5));
     status = new ContainerHealthStatus(container, replicas, placementPolicy,
         reconContainerMetadataManager);
@@ -306,7 +307,7 @@ public class TestContainerHealthTaskRecordGenerator {
     replicas =
         generateReplicas(container, CLOSED, CLOSED);
     when(placementPolicy.validateContainerPlacement(
-        Mockito.anyList(), Mockito.anyInt()))
+        anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(1, 2, 5));
     status =
         new ContainerHealthStatus(container, replicas, placementPolicy,
@@ -354,7 +355,7 @@ public class TestContainerHealthTaskRecordGenerator {
     // it is mis-replicated too
     replicas.clear();
     when(placementPolicy.validateContainerPlacement(
-        Mockito.anyList(), Mockito.anyInt()))
+        anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(1, 2, 5));
     status =
         new ContainerHealthStatus(container, replicas, placementPolicy,
@@ -486,7 +487,7 @@ public class TestContainerHealthTaskRecordGenerator {
     // Under and Mis-Replicated
     replicas = generateReplicas(container, CLOSED, CLOSED);
     when(placementPolicy.validateContainerPlacement(
-        Mockito.anyList(), Mockito.anyInt()))
+        anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(1, 2, 5));
     status = new ContainerHealthStatus(container, replicas, placementPolicy,
         reconContainerMetadataManager);

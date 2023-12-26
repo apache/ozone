@@ -120,7 +120,8 @@ public class ClusterStateEndpoint {
     SCMNodeStat stats = nodeManager.getStats();
     DatanodeStorageReport storageReport =
         new DatanodeStorageReport(stats.getCapacity().get(),
-            stats.getScmUsed().get(), stats.getRemaining().get());
+            stats.getScmUsed().get(), stats.getRemaining().get(),
+            stats.getCommitted().get());
 
     ClusterStateResponse.Builder builder = ClusterStateResponse.newBuilder();
     GlobalStats volumeRecord = globalStatsDao.findById(

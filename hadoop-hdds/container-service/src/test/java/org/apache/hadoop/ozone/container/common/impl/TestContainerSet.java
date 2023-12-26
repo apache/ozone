@@ -20,8 +20,7 @@ package org.apache.hadoop.ozone.container.common.impl;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 
@@ -29,9 +28,6 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 import java.io.IOException;
@@ -45,10 +41,12 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.stream.LongStream;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -65,12 +63,7 @@ public class TestContainerSet {
     this.layoutVersion = layoutVersion;
   }
 
-  private static Iterable<Object[]> layoutVersion() {
-    return ContainerLayoutTestInfo.containerLayoutParameters();
-  }
-
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testAddGetRemoveContainer(ContainerLayoutVersion layout)
       throws StorageContainerException {
     setLayoutVersion(layout);
@@ -90,13 +83,9 @@ public class TestContainerSet {
     //addContainer
     boolean result = containerSet.addContainer(keyValueContainer);
     assertTrue(result);
-    try {
-      containerSet.addContainer(keyValueContainer);
-      fail("Adding same container ID twice should fail.");
-    } catch (StorageContainerException ex) {
-      GenericTestUtils.assertExceptionContains("Container already exists with" +
-          " container Id " + containerId, ex);
-    }
+    StorageContainerException exception = assertThrows(StorageContainerException.class,
+        () -> containerSet.addContainer(keyValueContainer));
+    assertThat(exception).hasMessage("Container already exists with container Id " + containerId);
 
     //getContainer
     KeyValueContainer container = (KeyValueContainer) containerSet
@@ -112,8 +101,7 @@ public class TestContainerSet {
     assertFalse(containerSet.removeContainer(1000L));
   }
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testIteratorsAndCount(ContainerLayoutVersion layout)
       throws StorageContainerException {
     setLayoutVersion(layout);
@@ -159,8 +147,7 @@ public class TestContainerSet {
 
   }
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testIteratorPerVolume(ContainerLayoutVersion layout)
       throws StorageContainerException {
     setLayoutVersion(layout);
@@ -205,8 +192,7 @@ public class TestContainerSet {
     assertEquals(5, count2);
   }
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void iteratorIsOrderedByScanTime(ContainerLayoutVersion layout)
       throws StorageContainerException {
     setLayoutVersion(layout);
@@ -259,8 +245,7 @@ public class TestContainerSet {
     assertEquals(containerCount, containersToBeScanned);
   }
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testGetContainerReport(ContainerLayoutVersion layout)
       throws IOException {
     setLayoutVersion(layout);
@@ -273,9 +258,7 @@ public class TestContainerSet {
     assertEquals(10, containerReportsRequestProto.getReportsList().size());
   }
 
-
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testListContainer(ContainerLayoutVersion layout)
       throws StorageContainerException {
     setLayoutVersion(layout);
@@ -289,8 +272,7 @@ public class TestContainerSet {
     assertContainerIds(startId, count, result);
   }
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testListContainerFromFirstKey(ContainerLayoutVersion layout)
       throws StorageContainerException {
     setLayoutVersion(layout);

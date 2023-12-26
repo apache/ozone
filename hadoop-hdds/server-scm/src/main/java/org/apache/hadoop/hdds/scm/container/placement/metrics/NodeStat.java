@@ -43,13 +43,26 @@ interface NodeStat {
   LongMetric getRemaining();
 
   /**
+   * Get the committed space of the node.
+   * @return the committed space of the node
+   */
+  LongMetric getCommitted();
+
+  /**
+   * Get a min free space available to spare on the node.
+   * @return a min free space available to spare
+   */
+  LongMetric getFreeSpaceToSpare();
+
+  /**
    * Set the total/used/remaining space.
    * @param capacity - total space.
    * @param used - used space.
    * @param remain - remaining space.
    */
   @VisibleForTesting
-  void set(long capacity, long used, long remain);
+  void set(long capacity, long used, long remain, long committed,
+           long freeSpaceToSpare);
 
   /**
    * Adding of the stat.

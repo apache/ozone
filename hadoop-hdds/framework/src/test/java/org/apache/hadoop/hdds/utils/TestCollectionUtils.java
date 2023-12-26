@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.utils;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -33,6 +32,7 @@ import static java.util.Collections.reverseOrder;
 import static java.util.Collections.singletonList;
 import static java.util.Comparator.naturalOrder;
 import static java.util.stream.Collectors.toList;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /** Test for {@link CollectionUtils}. */
 public class TestCollectionUtils {
@@ -90,7 +90,7 @@ public class TestCollectionUtils {
       List<List<T>> listOfLists) {
     List<T> actual = new ArrayList<>();
     CollectionUtils.newIterator(listOfLists).forEachRemaining(actual::add);
-    Assertions.assertEquals(expected, actual);
+    assertEquals(expected, actual);
   }
 
   @Test
@@ -141,7 +141,7 @@ public class TestCollectionUtils {
 
   private static <T> void assertTopN(List<T> items, Comparator<T> comparator,
       Predicate<T> filter, List<T> sorted, int limit) {
-    Assertions.assertEquals(
+    assertEquals(
         sorted.stream().filter(filter).limit(limit).collect(toList()),
         CollectionUtils.findTopN(items, limit, comparator, filter));
   }
