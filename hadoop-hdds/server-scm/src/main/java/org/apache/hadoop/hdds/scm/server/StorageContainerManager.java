@@ -160,6 +160,7 @@ import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.lease.LeaseManagerNotRunningException;
 import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
+import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.SecurityUtil;
@@ -1325,8 +1326,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       // If SCM HA was not being used before pre-finalize, and is being used
       // when the cluster is pre-finalized for the SCM HA feature, init
       // should fail.
+      final LayoutVersionManager layoutVersionManager =
+          new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
       ScmHAUnfinalizedStateValidationAction.checkScmHA(conf, scmStorageConfig,
-          new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion()));
+          layoutVersionManager);
+      layoutVersionManager.close();
 
       clusterId = scmStorageConfig.getClusterID();
       final boolean isSCMHAEnabled = scmStorageConfig.isSCMHAEnabled();
