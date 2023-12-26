@@ -215,13 +215,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       </dependency>
     </dependencies>
   </dependencyManagement>
-  <dependencies>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <scope>test</scope>
-    </dependency>
-  </dependencies>
   <build>
     <plugins>
 
