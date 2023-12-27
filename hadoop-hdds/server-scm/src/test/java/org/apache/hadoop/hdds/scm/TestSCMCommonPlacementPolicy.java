@@ -52,6 +52,7 @@ import java.util.stream.IntStream;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto.DISK;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
@@ -419,8 +420,8 @@ public class TestSCMCommonPlacementPolicy {
             .collect(Collectors.groupingBy(Function.identity(),
                     Collectors.counting()));
     Assertions.assertEquals(replicasToRemove.size(), 2);
-    Assertions.assertTrue(Sets.newHashSet(1L, 2L).contains(
-            removedReplicasRackCntMap.get(dummyPlacementPolicy.racks.get(0))));
+    assertThat(Sets.newHashSet(1L, 2L)).contains(
+            removedReplicasRackCntMap.get(dummyPlacementPolicy.racks.get(0)));
     Assertions.assertEquals(
             removedReplicasRackCntMap.get(dummyPlacementPolicy.racks.get(1)),
             removedReplicasRackCntMap.get(dummyPlacementPolicy.racks.get(0))

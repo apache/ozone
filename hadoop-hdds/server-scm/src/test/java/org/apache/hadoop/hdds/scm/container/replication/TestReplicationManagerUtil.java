@@ -41,8 +41,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainer;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for ReplicationManagerUtil.
@@ -118,22 +118,22 @@ public class TestReplicationManagerUtil {
             replicationManager);
 
     assertEquals(3, excludedAndUsedNodes.getUsedNodes().size());
-    assertTrue(excludedAndUsedNodes.getUsedNodes()
-        .contains(good.getDatanodeDetails()));
-    assertTrue(excludedAndUsedNodes.getUsedNodes()
-        .contains(maintenance.getDatanodeDetails()));
-    assertTrue(excludedAndUsedNodes.getUsedNodes()
-        .contains(pendingAdd));
+    assertThat(excludedAndUsedNodes.getUsedNodes())
+        .contains(good.getDatanodeDetails());
+    assertThat(excludedAndUsedNodes.getUsedNodes())
+        .contains(maintenance.getDatanodeDetails());
+    assertThat(excludedAndUsedNodes.getUsedNodes())
+        .contains(pendingAdd);
 
     assertEquals(4, excludedAndUsedNodes.getExcludedNodes().size());
-    assertTrue(excludedAndUsedNodes.getExcludedNodes()
-        .contains(unhealthy.getDatanodeDetails()));
-    assertTrue(excludedAndUsedNodes.getExcludedNodes()
-        .contains(decommissioning.getDatanodeDetails()));
-    assertTrue(excludedAndUsedNodes.getExcludedNodes()
-        .contains(remove.getDatanodeDetails()));
-    assertTrue(excludedAndUsedNodes.getExcludedNodes()
-        .contains(pendingDelete));
+    assertThat(excludedAndUsedNodes.getExcludedNodes())
+        .contains(unhealthy.getDatanodeDetails());
+    assertThat(excludedAndUsedNodes.getExcludedNodes())
+        .contains(decommissioning.getDatanodeDetails());
+    assertThat(excludedAndUsedNodes.getExcludedNodes())
+        .contains(remove.getDatanodeDetails());
+    assertThat(excludedAndUsedNodes.getExcludedNodes())
+        .contains(pendingDelete);
   }
 
   @Test
@@ -202,23 +202,23 @@ public class TestReplicationManagerUtil {
             replicationManager);
 
     assertEquals(4, excludedAndUsedNodes.getUsedNodes().size());
-    assertTrue(excludedAndUsedNodes.getUsedNodes()
-        .contains(good.getDatanodeDetails()));
-    assertTrue(excludedAndUsedNodes.getUsedNodes()
-        .contains(maintenance.getDatanodeDetails()));
-    assertTrue(excludedAndUsedNodes.getUsedNodes()
-        .contains(pendingAdd));
-    assertTrue(excludedAndUsedNodes.getUsedNodes().contains(unhealthyWithUniqueOrigin.getDatanodeDetails()));
+    assertThat(excludedAndUsedNodes.getUsedNodes())
+        .contains(good.getDatanodeDetails());
+    assertThat(excludedAndUsedNodes.getUsedNodes())
+        .contains(maintenance.getDatanodeDetails());
+    assertThat(excludedAndUsedNodes.getUsedNodes())
+        .contains(pendingAdd);
+    assertThat(excludedAndUsedNodes.getUsedNodes()).contains(unhealthyWithUniqueOrigin.getDatanodeDetails());
 
     assertEquals(4, excludedAndUsedNodes.getExcludedNodes().size());
-    assertTrue(excludedAndUsedNodes.getExcludedNodes()
-        .contains(unhealthyWithNonUniqueOrigin.getDatanodeDetails()));
-    assertTrue(excludedAndUsedNodes.getExcludedNodes()
-        .contains(decommissioning.getDatanodeDetails()));
-    assertTrue(excludedAndUsedNodes.getExcludedNodes()
-        .contains(remove.getDatanodeDetails()));
-    assertTrue(excludedAndUsedNodes.getExcludedNodes()
-        .contains(pendingDelete));
+    assertThat(excludedAndUsedNodes.getExcludedNodes())
+        .contains(unhealthyWithNonUniqueOrigin.getDatanodeDetails());
+    assertThat(excludedAndUsedNodes.getExcludedNodes())
+        .contains(decommissioning.getDatanodeDetails());
+    assertThat(excludedAndUsedNodes.getExcludedNodes())
+        .contains(remove.getDatanodeDetails());
+    assertThat(excludedAndUsedNodes.getExcludedNodes())
+        .contains(pendingDelete);
   }
 
 }
