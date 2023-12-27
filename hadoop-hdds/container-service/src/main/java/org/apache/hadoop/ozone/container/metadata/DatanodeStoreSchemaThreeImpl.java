@@ -94,6 +94,13 @@ public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
             .iterator(getContainerKeyPrefix(containerID)), filter);
   }
 
+  @Override
+  public BlockIterator<Long> getFinalizeBlockIterator(long containerID,
+      MetadataKeyFilters.KeyPrefixFilter filter) throws IOException {
+    return new KeyValueBlockLocalIdIterator(containerID,
+        getFinalizeBlocksTableWithIterator().iterator(getContainerKeyPrefix(containerID)), filter);
+  }
+
   public void removeKVContainerData(long containerID) throws IOException {
     String prefix = getContainerKeyPrefix(containerID);
     try (BatchOperation batch = getBatchHandler().initBatchOperation()) {

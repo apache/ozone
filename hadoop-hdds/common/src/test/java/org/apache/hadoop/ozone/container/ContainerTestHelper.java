@@ -624,6 +624,12 @@ public final class ContainerTestHelper {
                   .build())
               .build());
       break;
+    case FinalizeBlock:
+      builder
+          .setFinalizeBlock(ContainerProtos
+            .FinalizeBlockRequestProto.newBuilder()
+            .setBlockID(fakeBlockId).build());
+      break;
 
     default:
       Assert.fail("Unhandled request type " + cmdType + " in unit test");

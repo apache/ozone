@@ -78,6 +78,13 @@ public interface DatanodeStore extends Closeable {
   Table<String, ChunkInfoList> getDeletedBlocksTable();
 
   /**
+   * A Table that keeps finalize blocks requested from client.
+   *
+   * @return Table
+   */
+  Table<String, Long> getFinalizeBlocksTable();
+
+  /**
    * Helper to create and write batch transactions.
    */
   BatchOperationHandler getBatchHandler();
@@ -92,6 +99,9 @@ public interface DatanodeStore extends Closeable {
       throws IOException;
 
   BlockIterator<BlockData> getBlockIterator(long containerID,
+      KeyPrefixFilter filter) throws IOException;
+
+  BlockIterator<Long> getFinalizeBlockIterator(long containerID,
       KeyPrefixFilter filter) throws IOException;
 
   /**
