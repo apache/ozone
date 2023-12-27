@@ -149,8 +149,7 @@ public class TestLeaseRecovery {
         Thread.sleep(1000);
       }
       // The lease should have been recovered.
-      assertTrue("File should be closed", fs.recoverLease(file));
-      assertTrue(fs.isFileClosed(file));
+      assertTrue("File should be closed", fs.isFileClosed(file));
     } finally {
       closeIgnoringKeyNotFound(stream);
     }

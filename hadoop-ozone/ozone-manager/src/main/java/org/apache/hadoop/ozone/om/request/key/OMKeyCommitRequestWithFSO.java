@@ -57,7 +57,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALREADY_CLOSED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_UNDER_LEASE_RECOVERY;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
@@ -102,17 +104,17 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
     OMClientResponse omClientResponse = null;
     boolean bucketLockAcquired = false;
     Result result;
-    boolean isHSync = commitKeyRequest.hasHsync() &&
-        commitKeyRequest.getHsync();
-
-    if (isHSync) {
+    boolean isHSync = commitKeyRequest.hasHsync() && commitKeyRequest.getHsync();
+    boolean isRecovery = commitKeyRequest.hasRecovery() && commitKeyRequest.getRecovery();
+    boolean realCommit = (!isHSync) || (isHSync && isRecovery);
+    if (!realCommit) {
       omMetrics.incNumKeyHSyncs();
     } else {
       omMetrics.incNumKeyCommits();
     }
 
-    LOG.debug("isHSync = {}, volumeName = {}, bucketName = {}, keyName = {}",
-        isHSync, volumeName, bucketName, keyName);
+    LOG.debug("isHSync = {}, isRecovery = {}, volumeName = {}, bucketName = {}, keyName = {}",
+        isHSync, isRecovery, volumeName, bucketName, keyName);
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
@@ -125,7 +127,6 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       checkKeyAclsInOpenKeyTable(ozoneManager, volumeName, bucketName,
               keyName, IAccessAuthorizer.ACLType.WRITE,
               commitKeyRequest.getClientID());
-
 
       Iterator<Path> pathComponents = Paths.get(keyName).iterator();
       String dbOpenFileKey = null;
@@ -150,29 +151,46 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
               + " as parent directory doesn't exist");
       String dbFileKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
               parentID, fileName);
-      dbOpenFileKey = omMetadataManager.getOpenFileName(volumeId, bucketId,
-              parentID, fileName, commitKeyRequest.getClientID());
+      OmKeyInfo keyToDelete =
+          omMetadataManager.getKeyTable(getBucketLayout()).get(dbFileKey);
+      long writerClientId = commitKeyRequest.getClientID();
+      if (isRecovery && keyToDelete != null) {
+        String clientId = keyToDelete.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
+        if (clientId == null) {
+          throw new OMException("Failed to recovery key, as " +
+              dbFileKey + " is already closed", KEY_ALREADY_CLOSED);
+        }
+        writerClientId = Long.parseLong(clientId);
+      }
 
+      dbOpenFileKey = omMetadataManager.getOpenFileName(volumeId, bucketId,
+          parentID, fileName, writerClientId);
       omKeyInfo = OMFileRequest.getOmKeyInfoFromFileTable(true,
               omMetadataManager, dbOpenFileKey, keyName);
       if (omKeyInfo == null) {
-        String action = "commit";
-        if (isHSync) {
-          action = "hsync";
-        }
+        String action = isRecovery ? "recovery" : isHSync ? "hsync" : "commit";
         throw new OMException("Failed to " + action + " key, as " +
-                dbOpenFileKey + "entry is not found in the OpenKey table",
-                KEY_NOT_FOUND);
+            dbOpenFileKey + " entry is not found in the OpenKey table", KEY_NOT_FOUND);
       }
+
+      if (omKeyInfo.getMetadata().containsKey(OzoneConsts.LEASE_RECOVERY) &&
+          omKeyInfo.getMetadata().containsKey(OzoneConsts.HSYNC_CLIENT_ID)) {
+        if (!isRecovery) {
+          throw new OMException("Cannot commit key " + dbOpenFileKey + " with " + OzoneConsts.LEASE_RECOVERY +
+              " metadata while recovery flag is not set in request", KEY_UNDER_LEASE_RECOVERY);
+        }
+      }
+
       omKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
           commitKeyArgs.getMetadataList()));
-      if (isHSync) {
-        omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID,
-            String.valueOf(commitKeyRequest.getClientID()));
+      if (!realCommit) {
+        omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID, String.valueOf(writerClientId));
+      } else if (isRecovery) {
+        omKeyInfo.getMetadata().remove(OzoneConsts.HSYNC_CLIENT_ID);
+        omKeyInfo.getMetadata().remove(OzoneConsts.LEASE_RECOVERY);
       }
 
       omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
-
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
 
       List<OmKeyLocationInfo> uncommitted =
@@ -187,11 +205,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       // creation after the knob turned on.
       boolean isPreviousCommitHsync = false;
       Map<String, RepeatedOmKeyInfo> oldKeyVersionsToDeleteMap = null;
-      OmKeyInfo keyToDelete =
-          omMetadataManager.getKeyTable(getBucketLayout()).get(dbFileKey);
       if (null != keyToDelete) {
-        final String clientIdString
-            = String.valueOf(commitKeyRequest.getClientID());
+        final String clientIdString = String.valueOf(writerClientId);
         isPreviousCommitHsync = java.util.Optional.ofNullable(keyToDelete)
             .map(WithMetadata::getMetadata)
             .map(meta -> meta.get(OzoneConsts.HSYNC_CLIENT_ID))
@@ -203,7 +218,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       // if keyToDelete isn't null, usedNamespace shouldn't check and
       // increase.
-      if (keyToDelete != null && (isHSync || isPreviousCommitHsync)) {
+      if (keyToDelete != null && (!realCommit || isPreviousCommitHsync)) {
         correctedSpace -= keyToDelete.getReplicatedSize();
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
             correctedSpace);
@@ -240,7 +255,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       // let the uncommitted blocks pretend as key's old version blocks
       // which will be deleted as RepeatedOmKeyInfo
-      final OmKeyInfo pseudoKeyInfo = isHSync ? null
+      final OmKeyInfo pseudoKeyInfo = !realCommit ? null
           : wrapUncommittedBlocksAsPseudoKey(uncommitted, omKeyInfo);
       if (pseudoKeyInfo != null) {
         String delKeyName = omMetadataManager
@@ -256,7 +271,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       }
 
       // Add to cache of open key table and key table.
-      if (!isHSync) {
+      if (realCommit) {
         // If isHSync = false, put a tombstone in OpenKeyTable cache,
         // indicating the key is removed from OpenKeyTable.
         // So that this key can't be committed again.
@@ -271,7 +286,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       omClientResponse = new OMKeyCommitResponseWithFSO(omResponse.build(),
               omKeyInfo, dbFileKey, dbOpenFileKey, omBucketInfo.copyObject(),
-          oldKeyVersionsToDeleteMap, volumeId, isHSync);
+          oldKeyVersionsToDeleteMap, volumeId, realCommit);
 
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {
@@ -296,7 +311,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
     LOG.debug("Key commit {} with isHSync = {}, omKeyInfo = {}",
         result == Result.SUCCESS ? "succeeded" : "failed", isHSync, omKeyInfo);
 
-    if (!isHSync) {
+    if (realCommit) {
       auditLog(auditLogger, buildAuditMessage(OMAction.COMMIT_KEY, auditMap,
               exception, getOmRequest().getUserInfo()));
       processResult(commitKeyRequest, volumeName, bucketName, keyName,

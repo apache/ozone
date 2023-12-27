@@ -777,13 +777,19 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @Override
   public void hsyncKey(OmKeyArgs args, long clientId)
           throws IOException {
-    updateKey(args, clientId, true);
+    updateKey(args, clientId, true, false);
   }
 
   @Override
   public void commitKey(OmKeyArgs args, long clientId)
           throws IOException {
-    updateKey(args, clientId, false);
+    updateKey(args, clientId, false, false);
+  }
+
+  @Override
+  public void recoverKey(OmKeyArgs args, long clientId)
+      throws IOException {
+    updateKey(args, clientId, true, true);
   }
 
   public static void setReplicationConfig(ReplicationConfig replication,
@@ -799,7 +805,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     b.setType(replication.getReplicationType());
   }
 
-  private void updateKey(OmKeyArgs args, long clientId, boolean hsync)
+  private void updateKey(OmKeyArgs args, long clientId, boolean hsync, boolean recovery)
       throws IOException {
     CommitKeyRequest.Builder req = CommitKeyRequest.newBuilder();
     List<OmKeyLocationInfo> locationInfoList = args.getLocationInfoList();
@@ -820,15 +826,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     req.setKeyArgs(keyArgsBuilder.build());
     req.setClientID(clientId);
     req.setHsync(hsync);
-
+    req.setRecovery(recovery);
 
     OMRequest omRequest = createOMRequest(Type.CommitKey)
         .setCommitKeyRequest(req)
         .build();
 
     handleError(submitRequest(omRequest));
-
-
   }
 
   @Override
@@ -2440,8 +2444,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public boolean recoverLease(String volumeName, String bucketName,
-                              String keyName) throws IOException {
+  public List<OmKeyInfo> recoverLease(String volumeName, String bucketName,
+                                                 String keyName) throws IOException {
     RecoverLeaseRequest recoverLeaseRequest =
             RecoverLeaseRequest.newBuilder()
                     .setVolumeName(volumeName)
@@ -2454,7 +2458,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     RecoverLeaseResponse recoverLeaseResponse =
             handleError(submitRequest(omRequest)).getRecoverLeaseResponse();
-    return recoverLeaseResponse.getResponse();
+    ArrayList list = new ArrayList();
+    list.add(OmKeyInfo.getFromProtobuf(recoverLeaseResponse.getKeyInfo()));
+    list.add(OmKeyInfo.getFromProtobuf(recoverLeaseResponse.getOpenKeyInfo()));
+    return list;
   }
 
   @Override

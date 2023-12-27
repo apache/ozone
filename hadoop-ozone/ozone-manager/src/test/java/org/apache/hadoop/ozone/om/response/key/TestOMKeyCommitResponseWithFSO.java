@@ -55,7 +55,7 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
           new RepeatedOmKeyInfo(e)));
     }
     return new OMKeyCommitResponseWithFSO(omResponse, omKeyInfo, ozoneKey,
-        openKey, omBucketInfo, deleteKeyMap, volumeId, isHSync);
+        openKey, omBucketInfo, deleteKeyMap, volumeId, !isHSync);
   }
 
   @NotNull

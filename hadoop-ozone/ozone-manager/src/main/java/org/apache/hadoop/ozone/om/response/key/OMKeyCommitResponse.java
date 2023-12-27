@@ -50,21 +50,21 @@ public class OMKeyCommitResponse extends OmKeyResponse {
   private OmBucketInfo omBucketInfo;
   private Map<String, RepeatedOmKeyInfo> keyToDeleteMap;
 
-  private boolean isHSync;
+  private boolean realCommit;
 
   public OMKeyCommitResponse(
       @Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, String ozoneKeyName, String openKeyName,
       @Nonnull OmBucketInfo omBucketInfo,
       Map<String, RepeatedOmKeyInfo> keyToDeleteMap,
-      boolean isHSync) {
+      boolean realCommit) {
     super(omResponse, omBucketInfo.getBucketLayout());
     this.omKeyInfo = omKeyInfo;
     this.ozoneKeyName = ozoneKeyName;
     this.openKeyName = openKeyName;
     this.omBucketInfo = omBucketInfo;
     this.keyToDeleteMap = keyToDeleteMap;
-    this.isHSync = isHSync;
+    this.realCommit = realCommit;
   }
 
   /**
@@ -82,9 +82,9 @@ public class OMKeyCommitResponse extends OmKeyResponse {
       BatchOperation batchOperation) throws IOException {
 
     // Delete from OpenKey table
-    if (!isHSync()) {
+    if (isRealCommit()) {
       omMetadataManager.getOpenKeyTable(getBucketLayout())
-              .deleteWithBatch(batchOperation, openKeyName);
+          .deleteWithBatch(batchOperation, openKeyName);
     }
 
     omMetadataManager.getKeyTable(getBucketLayout())
@@ -130,7 +130,7 @@ public class OMKeyCommitResponse extends OmKeyResponse {
     }
   }
 
-  protected boolean isHSync() {
-    return isHSync;
+  protected boolean isRealCommit() {
+    return realCommit;
   }
 }

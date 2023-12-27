@@ -59,6 +59,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -733,11 +734,18 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   @Override
-  public boolean recoverLease(final String pathStr) throws IOException {
+  public List<OmKeyInfo> recoverFilePrepare(final String pathStr) throws IOException {
     incrementCounter(Statistic.INVOCATION_RECOVER_LEASE, 1);
 
     return ozoneClient.getProxy().getOzoneManagerClient().recoverLease(
         volume.getName(), bucket.getName(), pathStr);
+  }
+
+  @Override
+  public void recoverFile(OmKeyArgs keyArgs) throws IOException {
+    incrementCounter(Statistic.INVOCATION_COMMIT, 1);
+
+    ozoneClient.getProxy().getOzoneManagerClient().recoverKey(keyArgs, 0L);
   }
 
   @Override

@@ -79,6 +79,7 @@ public enum Statistic {
       "Calls of isFileClosed()"),
   INVOCATION_RECOVER_LEASE("op_recover_lease",
       "Calls of recoverLease()"),
+  INVOCATION_COMMIT("op_commit", "Calls of commit()"),
   INVOCATION_SET_SAFE_MODE("op_set_safe_mode",
       "Calls of setSafeMode()");
 
