@@ -71,7 +71,7 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
 
     long renewTime;
     try {
-      Token<OzoneTokenIdentifier> token = OMPBHelper.convertToDelegationToken(
+      Token<OzoneTokenIdentifier> token = OMPBHelper.tokenFromProto(
           renewDelegationTokenRequest.getToken());
       auditMap = buildTokenAuditMap(token);
 
@@ -133,7 +133,7 @@ public class OMRenewDelegationTokenRequest extends OMClientRequest {
         getOmRequest().getUpdatedRenewDelegationTokenRequest();
 
     Token<OzoneTokenIdentifier> ozoneTokenIdentifierToken =
-        OMPBHelper.convertToDelegationToken(updateRenewDelegationTokenRequest
+        OMPBHelper.tokenFromProto(updateRenewDelegationTokenRequest
             .getRenewDelegationTokenRequest().getToken());
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();

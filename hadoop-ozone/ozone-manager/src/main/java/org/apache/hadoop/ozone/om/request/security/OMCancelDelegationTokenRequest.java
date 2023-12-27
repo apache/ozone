@@ -66,7 +66,7 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
     Map<String, String> auditMap = null;
 
     try {
-      Token<OzoneTokenIdentifier> token = OMPBHelper.convertToDelegationToken(
+      Token<OzoneTokenIdentifier> token = OMPBHelper.tokenFromProto(
           request.getCancelDelegationTokenRequest().getToken());
       auditMap = buildTokenAuditMap(token);
 
@@ -139,7 +139,7 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
     CancelDelegationTokenRequestProto cancelDelegationTokenRequest =
         getOmRequest().getCancelDelegationTokenRequest();
 
-    return OMPBHelper.convertToDelegationToken(
+    return OMPBHelper.tokenFromProto(
         cancelDelegationTokenRequest.getToken());
   }
 

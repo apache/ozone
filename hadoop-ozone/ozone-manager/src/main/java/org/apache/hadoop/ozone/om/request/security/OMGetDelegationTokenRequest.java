@@ -103,7 +103,7 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
                           .setResponse(
                               SecurityProtos.GetDelegationTokenResponseProto
                               .newBuilder().setToken(OMPBHelper
-                                  .convertToTokenProto(token)).build())
+                                  .protoFromToken(token)).build())
                           .build())
                   .setTokenRenewInterval(ozoneManager.getDelegationTokenMgr()
                       .getTokenRenewInterval()))
@@ -153,7 +153,7 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
         .getGetDelegationTokenResponse().getResponse().getToken();
 
     Token<OzoneTokenIdentifier> ozoneTokenIdentifierToken =
-        OMPBHelper.convertToDelegationToken(tokenProto);
+        OMPBHelper.tokenFromProto(tokenProto);
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     Map<String, String> auditMap =
