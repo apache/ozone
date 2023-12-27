@@ -27,7 +27,6 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.fromSources;
@@ -121,7 +120,6 @@ public class ReplicationSupervisorScheduling {
     System.out.println(executionTime);
     assertThat(executionTime)
         .withFailMessage("Execution was too slow : " + executionTime + " ms")
-        .isLessThan(100_000
-    );
+        .isLessThan(100_000);
   }
 }
