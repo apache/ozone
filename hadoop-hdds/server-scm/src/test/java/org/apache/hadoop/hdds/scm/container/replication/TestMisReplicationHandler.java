@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.Assertions;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.HashSet;
@@ -55,7 +54,10 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -79,8 +81,8 @@ public abstract class TestMisReplicationHandler {
       NotLeaderException {
     conf = SCMTestUtils.getConf();
 
-    replicationManager = Mockito.mock(ReplicationManager.class);
-    Mockito.when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
+    replicationManager = mock(ReplicationManager.class);
+    when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocation -> {
           DatanodeDetails dd = invocation.getArgument(0);
           return new NodeStatus(dd.getPersistedOpState(),
@@ -88,10 +90,10 @@ public abstract class TestMisReplicationHandler {
         });
     ReplicationManagerConfiguration rmConf =
         conf.getObject(ReplicationManagerConfiguration.class);
-    Mockito.when(replicationManager.getConfig())
+    when(replicationManager.getConfig())
         .thenReturn(rmConf);
     metrics = ReplicationManagerMetrics.create(replicationManager);
-    Mockito.when(replicationManager.getMetrics()).thenReturn(metrics);
+    when(replicationManager.getMetrics()).thenReturn(metrics);
 
     commandsSent = new HashSet<>();
     ReplicationTestUtil.mockRMSendDatanodeCommand(
@@ -119,12 +121,12 @@ public abstract class TestMisReplicationHandler {
   }
 
   static PlacementPolicy mockPlacementPolicy() {
-    PlacementPolicy placementPolicy = Mockito.mock(PlacementPolicy.class);
+    PlacementPolicy placementPolicy = mock(PlacementPolicy.class);
     ContainerPlacementStatus mockedContainerPlacementStatus =
-        Mockito.mock(ContainerPlacementStatus.class);
-    Mockito.when(mockedContainerPlacementStatus.isPolicySatisfied())
+        mock(ContainerPlacementStatus.class);
+    when(mockedContainerPlacementStatus.isPolicySatisfied())
         .thenReturn(false);
-    Mockito.when(placementPolicy.validateContainerPlacement(anyList(),
+    when(placementPolicy.validateContainerPlacement(anyList(),
         anyInt())).thenReturn(mockedContainerPlacementStatus);
     return placementPolicy;
   }
@@ -163,9 +165,9 @@ public abstract class TestMisReplicationHandler {
         mockedPlacementPolicy, conf, replicationManager);
 
     ContainerHealthResult.MisReplicatedHealthResult result =
-            Mockito.mock(ContainerHealthResult.MisReplicatedHealthResult.class);
-    Mockito.when(result.isReplicatedOkAfterPending()).thenReturn(false);
-    Mockito.when(result.getContainerInfo()).thenReturn(container);
+            mock(ContainerHealthResult.MisReplicatedHealthResult.class);
+    when(result.isReplicatedOkAfterPending()).thenReturn(false);
+    when(result.getContainerInfo()).thenReturn(container);
     Map<ContainerReplica, Boolean> sources = availableReplicas.stream()
             .collect(Collectors.toMap(Function.identity(),
                     r -> {
@@ -189,7 +191,7 @@ public abstract class TestMisReplicationHandler {
     Set<ContainerReplica> copy = sources.entrySet().stream()
             .filter(Map.Entry::getValue).limit(misreplicationCount)
             .map(Map.Entry::getKey).collect(Collectors.toSet());
-    Mockito.when(mockedPlacementPolicy.replicasToCopyToFixMisreplication(
+    when(mockedPlacementPolicy.replicasToCopyToFixMisreplication(
             anyMap())).thenAnswer(invocation -> copy);
     Set<DatanodeDetails> remainingReplicasAfterCopy =
             availableReplicas.stream().filter(r -> !copy.contains(r))
@@ -200,9 +202,9 @@ public abstract class TestMisReplicationHandler {
                     .mapToObj(i -> MockDatanodeDetails.randomDatanodeDetails())
                     .collect(Collectors.toList());
     if (expectedNumberOfNodes > 0) {
-      Mockito.when(mockedPlacementPolicy.chooseDatanodes(
+      when(mockedPlacementPolicy.chooseDatanodes(
                       any(), any(), any(),
-                      eq(copy.size()), Mockito.anyLong(), Mockito.anyLong()))
+                      eq(copy.size()), anyLong(), anyLong()))
               .thenAnswer(invocation -> {
                 List<DatanodeDetails> datanodeDetails =
                         invocation.getArgument(0);

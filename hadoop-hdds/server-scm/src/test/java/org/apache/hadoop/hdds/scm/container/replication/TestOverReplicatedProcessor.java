@@ -26,13 +26,14 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.Ov
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.any;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.mockito.ArgumentMatchers.any;
 
 /**
  * Tests for the OverReplicatedProcessor class.
@@ -49,21 +50,21 @@ public class TestOverReplicatedProcessor {
     ConfigurationSource conf = new OzoneConfiguration();
     ReplicationManagerConfiguration rmConf =
         conf.getObject(ReplicationManagerConfiguration.class);
-    replicationManager = Mockito.mock(ReplicationManager.class);
+    replicationManager = mock(ReplicationManager.class);
 
     // use real queue
     queue = new ReplicationQueue();
     repConfig = new ECReplicationConfig(3, 2);
     overReplicatedProcessor = new OverReplicatedProcessor(
         replicationManager, rmConf::getOverReplicatedInterval);
-    Mockito.when(replicationManager.shouldRun()).thenReturn(true);
+    when(replicationManager.shouldRun()).thenReturn(true);
 
     // Even through the limit has been exceeded, it should not stop over-rep
     // processing, as the over-rep handler ignores the limit as it only does
     // delete.
-    Mockito.when(replicationManager.getReplicationInFlightLimit())
+    when(replicationManager.getReplicationInFlightLimit())
         .thenReturn(1L);
-    Mockito.when(replicationManager.getInflightReplicationCount())
+    when(replicationManager.getInflightReplicationCount())
         .thenReturn(2L);
   }
 
@@ -74,7 +75,7 @@ public class TestOverReplicatedProcessor {
     queue.enqueue(new OverReplicatedHealthResult(
         container, 3, false));
 
-    Mockito.when(replicationManager.processOverReplicatedContainer(any()))
+    when(replicationManager.processOverReplicatedContainer(any()))
         .thenReturn(1);
     overReplicatedProcessor.processAll(queue);
 
@@ -89,7 +90,7 @@ public class TestOverReplicatedProcessor {
         container, 3, false);
     queue.enqueue(result);
 
-    Mockito.when(replicationManager
+    when(replicationManager
             .processOverReplicatedContainer(any()))
         .thenThrow(new IOException("Test Exception"))
         .thenThrow(new AssertionError("Should process only one item"));

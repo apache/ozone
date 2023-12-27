@@ -26,14 +26,18 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.Un
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.any;
 
 /**
  * Tests for the UnderReplicatedProcessor class.
@@ -51,17 +55,17 @@ public class TestUnderReplicatedProcessor {
     ConfigurationSource conf = new OzoneConfiguration();
     ReplicationManagerConfiguration rmConf =
         conf.getObject(ReplicationManagerConfiguration.class);
-    replicationManager = Mockito.mock(ReplicationManager.class);
+    replicationManager = mock(ReplicationManager.class);
 
     // use real queue
     queue = new ReplicationQueue();
     repConfig = new ECReplicationConfig(3, 2);
-    Mockito.when(replicationManager.shouldRun()).thenReturn(true);
-    Mockito.when(replicationManager.getConfig()).thenReturn(rmConf);
+    when(replicationManager.shouldRun()).thenReturn(true);
+    when(replicationManager.getConfig()).thenReturn(rmConf);
     rmMetrics = ReplicationManagerMetrics.create(replicationManager);
-    Mockito.when(replicationManager.getMetrics())
+    when(replicationManager.getMetrics())
         .thenReturn(rmMetrics);
-    Mockito.when(replicationManager.getReplicationInFlightLimit())
+    when(replicationManager.getReplicationInFlightLimit())
         .thenReturn(0L);
     underReplicatedProcessor = new UnderReplicatedProcessor(
         replicationManager, rmConf::getUnderReplicatedInterval);
@@ -73,7 +77,7 @@ public class TestUnderReplicatedProcessor {
         .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
     queue.enqueue(new UnderReplicatedHealthResult(
         container, 3, true, false, false));
-    Mockito.when(replicationManager
+    when(replicationManager
             .processUnderReplicatedContainer(any()))
         .thenReturn(1);
     underReplicatedProcessor.processAll(queue);
@@ -89,7 +93,7 @@ public class TestUnderReplicatedProcessor {
         container, 3, false, false, false);
     queue.enqueue(result);
 
-    Mockito.when(replicationManager
+    when(replicationManager
             .processUnderReplicatedContainer(any()))
         .thenThrow(new IOException("Test Exception"))
         .thenThrow(new AssertionError("Should process only one item"));
@@ -102,11 +106,11 @@ public class TestUnderReplicatedProcessor {
   @Test
   public void testMessageNotProcessedIfGlobalLimitReached() throws IOException {
     AtomicLong inFlightReplications = new AtomicLong(11);
-    Mockito.when(replicationManager.getReplicationInFlightLimit())
+    when(replicationManager.getReplicationInFlightLimit())
         .thenReturn(10L);
-    Mockito.doAnswer(invocation -> inFlightReplications.get())
+    doAnswer(invocation -> inFlightReplications.get())
         .when(replicationManager).getInflightReplicationCount();
-    Mockito.when(replicationManager
+    when(replicationManager
             .processUnderReplicatedContainer(any()))
         .thenReturn(1);
 
@@ -121,7 +125,7 @@ public class TestUnderReplicatedProcessor {
     // The message should not be processed and still be on the queue (re-queued)
     assertEquals(1, queue.underReplicatedQueueSize());
     // We should not have processed anything in RM
-    Mockito.verify(replicationManager, Mockito.times(0))
+    verify(replicationManager, times(0))
         .processUnderReplicatedContainer(any());
 
     // Change the inflight replications to a value below the limit
@@ -130,7 +134,7 @@ public class TestUnderReplicatedProcessor {
 
     assertEquals(0, queue.underReplicatedQueueSize());
     // We should have processed the message now
-    Mockito.verify(replicationManager, Mockito.times(1))
+    verify(replicationManager, times(1))
         .processUnderReplicatedContainer(any());
     assertEquals(1, rmMetrics.getPendingReplicationLimitReachedTotal());
   }
