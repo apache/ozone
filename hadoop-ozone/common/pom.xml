@@ -51,11 +51,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <groupId>io.netty</groupId>
       <artifactId>netty-handler-proxy</artifactId>
     </dependency>
-      <dependency>
-        <groupId>io.netty</groupId>
-        <artifactId>netty-tcnative-boringssl-static</artifactId>
-        <scope>runtime</scope>
-      </dependency>
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-tcnative-boringssl-static</artifactId>
+      <scope>runtime</scope>
+    </dependency>
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-inline</artifactId>
