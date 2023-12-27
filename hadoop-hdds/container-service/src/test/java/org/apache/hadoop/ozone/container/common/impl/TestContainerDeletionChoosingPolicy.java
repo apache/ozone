@@ -177,8 +177,7 @@ public class TestContainerDeletionChoosingPolicy {
       KeyValueContainer container = new KeyValueContainer(data, conf);
       data.closeContainer();
       containerSet.addContainer(container);
-      assertThat(containerSet.getContainerMapCopy())
-          .containsKey(containerId);
+      assertThat(containerSet.getContainerMapCopy()).containsKey(containerId);
     }
     numberOfBlocks.sort(Collections.reverseOrder());
     int blockLimitPerInterval = 5;
