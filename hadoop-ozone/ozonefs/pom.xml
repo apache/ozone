@@ -68,12 +68,14 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-filesystem-common</artifactId>
+      <artifactId>ozone-client</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-client</artifactId>
+      <artifactId>ozone-filesystem-common</artifactId>
     </dependency>
+
+    <!-- Test dependencies -->
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-hadoop-dependency-test</artifactId>
