@@ -33,7 +33,7 @@ import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
 import static org.apache.ozone.test.GenericTestUtils.getTestDir;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -112,10 +112,8 @@ public class TestRoundRobinVolumeChoosingPolicy {
         () -> policy.chooseVolume(volumes, 300));
 
     String msg = e.getMessage();
-    assertTrue(
-        msg.contains("No volumes have enough space for a new container.  " +
-            "Most available space: 150 bytes"),
-        msg);
+    assertThat(msg).contains("No volumes have enough space for a new container.  " +
+        "Most available space: 150 bytes");
   }
 
 }

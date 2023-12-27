@@ -48,6 +48,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_CHUNK;
 
 import org.junit.jupiter.api.Assertions;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -233,12 +234,12 @@ class TestChunkUtils {
 
       // large file
       final int large = 10 << 20; // 10MB
-      Assertions.assertTrue(large > MAPPED_BUFFER_THRESHOLD);
+      assertThat(large).isGreaterThan(MAPPED_BUFFER_THRESHOLD);
       runTestReadFile(large, dir, true);
 
       // small file
       final int small = 30 << 10; // 30KB
-      Assertions.assertTrue(small <= MAPPED_BUFFER_THRESHOLD);
+      assertThat(small).isLessThanOrEqualTo(MAPPED_BUFFER_THRESHOLD);
       runTestReadFile(small, dir, false);
 
       // boundary case

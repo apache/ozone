@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.container.common.impl;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -100,9 +101,9 @@ public class TestContainerDeletionChoosingPolicy {
       data.closeContainer();
       KeyValueContainer container = new KeyValueContainer(data, conf);
       containerSet.addContainer(container);
-      assertTrue(
-          containerSet.getContainerMapCopy()
-              .containsKey(data.getContainerID()));
+      assertThat(
+          containerSet.getContainerMapCopy())
+              .containsKey(data.getContainerID());
     }
     blockDeletingService = getBlockDeletingService();
 
@@ -116,7 +117,7 @@ public class TestContainerDeletionChoosingPolicy {
     for (ContainerBlockInfo pr : result0) {
       totPendingBlocks += pr.getNumBlocksToDelete();
     }
-    assertTrue(totPendingBlocks >= blockLimitPerInterval);
+    assertThat(totPendingBlocks).isGreaterThanOrEqualTo(blockLimitPerInterval);
 
     // test random choosing. We choose 100 times the 3 datanodes twice.
     //We expect different order at least once.
@@ -176,8 +177,8 @@ public class TestContainerDeletionChoosingPolicy {
       KeyValueContainer container = new KeyValueContainer(data, conf);
       data.closeContainer();
       containerSet.addContainer(container);
-      assertTrue(
-          containerSet.getContainerMapCopy().containsKey(containerId));
+      assertThat(containerSet.getContainerMapCopy())
+          .containsKey(containerId);
     }
     numberOfBlocks.sort(Collections.reverseOrder());
     int blockLimitPerInterval = 5;
@@ -190,7 +191,7 @@ public class TestContainerDeletionChoosingPolicy {
     for (ContainerBlockInfo pr : result0) {
       totPendingBlocks += pr.getNumBlocksToDelete();
     }
-    assertTrue(totPendingBlocks >= blockLimitPerInterval);
+    assertThat(totPendingBlocks).isGreaterThanOrEqualTo(blockLimitPerInterval);
 
 
     List<ContainerBlockInfo> result1 = blockDeletingService
@@ -214,7 +215,7 @@ public class TestContainerDeletionChoosingPolicy {
       int currentCount =
           name2Count.remove(data.getContainerData().getContainerID());
       // previous count should not smaller than next one
-      assertTrue(currentCount > 0 && currentCount <= lastCount);
+      assertThat(currentCount).isGreaterThan(0).isLessThanOrEqualTo(lastCount);
       lastCount = currentCount;
     }
     // ensure all the container data are compared

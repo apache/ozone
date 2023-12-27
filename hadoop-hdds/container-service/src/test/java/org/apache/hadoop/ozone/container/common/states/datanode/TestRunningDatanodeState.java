@@ -31,6 +31,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointStates.SHUTDOWN;
 import static org.mockito.Mockito.when;
 
@@ -69,7 +70,7 @@ public class TestRunningDatanodeState {
     long startTime = Time.monotonicNow();
     state.await(500, TimeUnit.MILLISECONDS);
     long endTime = Time.monotonicNow();
-    Assertions.assertTrue((endTime - startTime) >= 500);
+    assertThat(endTime - startTime).isGreaterThanOrEqualTo(500);
 
     futureOne.complete(SHUTDOWN);
 
@@ -83,7 +84,7 @@ public class TestRunningDatanodeState {
     startTime = Time.monotonicNow();
     state.await(500, TimeUnit.MILLISECONDS);
     endTime = Time.monotonicNow();
-    Assertions.assertTrue((endTime - startTime) < 500);
+    assertThat(endTime - startTime).isLessThan(500);
 
     executorService.shutdown();
   }
