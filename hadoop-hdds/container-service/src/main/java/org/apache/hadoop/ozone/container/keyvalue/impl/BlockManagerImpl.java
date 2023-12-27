@@ -40,6 +40,7 @@ import com.google.common.base.Preconditions;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BCSID_MISMATCH;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -204,6 +205,34 @@ public class BlockManagerImpl implements BlockManager {
                 + bcsId + " chunk size " + data.getChunks().size());
       }
       return data.getSize();
+    }
+  }
+
+  @Override
+  public void finalizeBlock(Container container, BlockID blockId)
+      throws IOException {
+    Preconditions.checkNotNull(blockId, "blockId cannot " +
+        "be null for finalizeBlock operation.");
+    Preconditions.checkState(blockId.getContainerID() >= 0,
+        "Container Id cannot be negative");
+
+    KeyValueContainer kvContainer = (KeyValueContainer)container;
+    long localID = blockId.getLocalID();
+
+    kvContainer.removeFromPendingPutBlockCache(localID);
+
+    try (DBHandle db = BlockUtils.getDB(kvContainer.getContainerData(),
+        config)) {
+      // Should never fail.
+      Preconditions.checkNotNull(db, DB_NULL_ERR_MSG);
+
+      // persist finalizeBlock
+      try (BatchOperation batch = db.getStore().getBatchHandler()
+          .initBatchOperation()) {
+        db.getStore().getFinalizeBlocksTable().putWithBatch(batch,
+            kvContainer.getContainerData().getBlockKey(localID), localID);
+        db.getStore().getBatchHandler().commitBatchOperation(batch);
+      }
     }
   }
 

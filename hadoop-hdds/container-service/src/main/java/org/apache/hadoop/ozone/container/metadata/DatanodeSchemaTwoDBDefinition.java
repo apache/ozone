@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
+import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
@@ -76,6 +77,15 @@ public class DatanodeSchemaTwoDBDefinition
           StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.class,
           Proto2Codec.get(DeletedBlocksTransaction.getDefaultInstance()));
 
+  public static final DBColumnFamilyDefinition<String, Long>
+      FINALIZE_BLOCKS =
+      new DBColumnFamilyDefinition<>(
+          "finalize_blocks",
+          String.class,
+          FixedLengthStringCodec.get(),
+          Long.class,
+          LongCodec.get());
+
   public DatanodeSchemaTwoDBDefinition(String dbPath,
       ConfigurationSource config) {
     super(dbPath, config);
@@ -86,7 +96,8 @@ public class DatanodeSchemaTwoDBDefinition
           BLOCK_DATA,
           METADATA,
           DELETED_BLOCKS,
-          DELETE_TRANSACTION);
+          DELETE_TRANSACTION,
+          FINALIZE_BLOCKS);
 
   @Override
   public Map<String, DBColumnFamilyDefinition<?, ?>> getMap() {
@@ -113,5 +124,9 @@ public class DatanodeSchemaTwoDBDefinition
   public DBColumnFamilyDefinition<Long, DeletedBlocksTransaction>
       getDeleteTransactionsColumnFamily() {
     return DELETE_TRANSACTION;
+  }
+
+  public DBColumnFamilyDefinition<String, Long> getFinalizeBlocksColumnFamily() {
+    return FINALIZE_BLOCKS;
   }
 }

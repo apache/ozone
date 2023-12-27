@@ -92,6 +92,15 @@ public class DatanodeSchemaThreeDBDefinition
           DeletedBlocksTransaction.class,
           Proto2Codec.get(DeletedBlocksTransaction.getDefaultInstance()));
 
+  public static final DBColumnFamilyDefinition<String, Long>
+      FINALIZE_BLOCKS =
+      new DBColumnFamilyDefinition<>(
+          "finalize_blocks",
+          String.class,
+          FixedLengthStringCodec.get(),
+          Long.class,
+          LongCodec.get());
+
   private static String separator = "";
 
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>
@@ -99,7 +108,9 @@ public class DatanodeSchemaThreeDBDefinition
          BLOCK_DATA,
          METADATA,
          DELETED_BLOCKS,
-         DELETE_TRANSACTION);
+         DELETE_TRANSACTION,
+         FINALIZE_BLOCKS);
+
 
   public DatanodeSchemaThreeDBDefinition(String dbPath,
       ConfigurationSource config) {
@@ -122,6 +133,7 @@ public class DatanodeSchemaThreeDBDefinition
     METADATA.setCfOptions(cfOptions);
     DELETED_BLOCKS.setCfOptions(cfOptions);
     DELETE_TRANSACTION.setCfOptions(cfOptions);
+    FINALIZE_BLOCKS.setCfOptions(cfOptions);
   }
 
   @Override
@@ -149,6 +161,12 @@ public class DatanodeSchemaThreeDBDefinition
   public DBColumnFamilyDefinition<String, DeletedBlocksTransaction>
       getDeleteTransactionsColumnFamily() {
     return DELETE_TRANSACTION;
+  }
+
+  @Override
+  public DBColumnFamilyDefinition<String, Long>
+      getFinalizeBlocksColumnFamily() {
+    return FINALIZE_BLOCKS;
   }
 
   public static int getContainerKeyPrefixLength() {
