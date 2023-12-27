@@ -391,7 +391,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @Override
-
   public OMClientResponse handleWriteRequest(OMRequest omRequest, TransactionInfo transactionInfo) throws IOException {
     injectPause();
     OMClientRequest omClientRequest =

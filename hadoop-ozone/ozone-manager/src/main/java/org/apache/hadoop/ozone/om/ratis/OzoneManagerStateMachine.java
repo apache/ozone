@@ -589,7 +589,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       }
     } catch (IOException e) {
       LOG.warn("Failed to write, Exception occurred ", e);
-      return createErrorResponse(request, e, trxLogIndex);
+      return createErrorResponse(request, e, transactionInfo);
     } catch (Throwable e) {
       // For any Runtime exceptions, terminate OM.
       String errorMessage = "Request " + request + " failed with exception";
@@ -599,7 +599,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   private OMResponse createErrorResponse(
-      OMRequest omRequest, IOException exception, long trxIndex) {
+      OMRequest omRequest, IOException exception, TransactionInfo transactionInfo) {
     OMResponse.Builder omResponseBuilder = OMResponse.newBuilder()
         .setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(exception))
         .setCmdType(omRequest.getCmdType())
@@ -611,7 +611,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     OMResponse omResponse = omResponseBuilder.build();
     OMClientResponse omClientResponse = new DummyOMClientResponse(omResponse);
     omClientResponse.setFlushFuture(
-        ozoneManagerDoubleBuffer.add(omClientResponse, trxIndex));
+        ozoneManagerDoubleBuffer.add(omClientResponse, transactionInfo));
     return omResponse;
   }
 
