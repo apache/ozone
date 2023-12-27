@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.upgrade;
 
-import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -49,9 +49,9 @@ public class OMCancelPrepareRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TransactionInfo transactionInfo) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
 
-    LOG.info("OM {} Received cancel prepare request with log {}", ozoneManager.getOMNodeId(), transactionInfo);
+    LOG.info("OM {} Received cancel prepare request with log {}", ozoneManager.getOMNodeId(), termIndex);
 
     OMRequest omRequest = getOmRequest();
     OMResponse.Builder responseBuilder =
@@ -80,7 +80,7 @@ public class OMCancelPrepareRequest extends OMClientRequest {
       ozoneManager.getPrepareState().cancelPrepare();
 
       LOG.info("OM {} prepare state cancelled at log {}. Returning response {}",
-          ozoneManager.getOMNodeId(), transactionInfo, omResponse);
+          ozoneManager.getOMNodeId(), termIndex, omResponse);
     } catch (IOException e) {
       LOG.error("Cancel Prepare Request apply failed in {}. ",
           ozoneManager.getOMNodeId(), e);

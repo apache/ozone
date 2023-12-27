@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.upgrade;
 
-import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
@@ -61,10 +61,10 @@ public class OMPrepareRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TransactionInfo transactionInfo) {
-    final long transactionLogIndex = transactionInfo.getTransactionIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long transactionLogIndex = termIndex.getIndex();
 
-    LOG.info("OM {} Received prepare request with log {}", ozoneManager.getOMNodeId(), transactionInfo);
+    LOG.info("OM {} Received prepare request with log {}", ozoneManager.getOMNodeId(), termIndex);
 
     OMRequest omRequest = getOmRequest();
     OzoneManagerProtocolProtos.PrepareRequestArgs args =
@@ -96,7 +96,7 @@ public class OMPrepareRequest extends OMClientRequest {
       // the snapshot index in the prepared state.
       OzoneManagerDoubleBuffer doubleBuffer =
           ozoneManager.getOmRatisServer().getOmStateMachine().getOzoneManagerDoubleBuffer();
-      doubleBuffer.add(response, transactionInfo);
+      doubleBuffer.add(response, termIndex);
 
       OzoneManagerRatisServer omRatisServer = ozoneManager.getOmRatisServer();
       RaftServer.Division division =

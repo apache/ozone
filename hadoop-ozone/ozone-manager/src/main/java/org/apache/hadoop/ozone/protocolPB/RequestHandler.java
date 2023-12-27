@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.protocolPB;
 
-import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -25,6 +24,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
     OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
     OMResponse;
+import org.apache.ratis.server.protocol.TermIndex;
 
 import java.io.IOException;
 
@@ -56,10 +56,10 @@ public interface RequestHandler {
    * requests.
    *
    * @param omRequest
-   * @param transactionInfo - ratis transaction log (term, index)
+   * @param termIndex - ratis transaction log (term, index)
    * @return OMClientResponse
    */
-  OMClientResponse handleWriteRequest(OMRequest omRequest, TransactionInfo transactionInfo) throws IOException;
+  OMClientResponse handleWriteRequest(OMRequest omRequest, TermIndex termIndex) throws IOException;
 
   /**
    * Update the OzoneManagerDoubleBuffer. This will be called when

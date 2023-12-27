@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.request.file;
 
 import com.google.common.base.Preconditions;
 
-import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -104,7 +104,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TransactionInfo transactionInfo) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
     RecoverLeaseRequest recoverLeaseRequest = getOmRequest()
         .getRecoverLeaseRequest();
     Preconditions.checkNotNull(recoverLeaseRequest);
@@ -136,7 +136,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       acquiredLock = getOmLockDetails().isLockAcquired();
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
-      String openKeyEntryName = doWork(ozoneManager, transactionInfo.getTransactionIndex());
+      String openKeyEntryName = doWork(ozoneManager, termIndex.getIndex());
 
       // Prepare response
       boolean responseCode = true;

@@ -38,7 +38,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRespon
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.FaultInjector;
-import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.common.PayloadUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -161,6 +160,7 @@ import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.util.Preconditions;
 import org.apache.hadoop.util.ProtobufUtils;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -391,7 +391,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @Override
-  public OMClientResponse handleWriteRequest(OMRequest omRequest, TransactionInfo transactionInfo) throws IOException {
+  public OMClientResponse handleWriteRequest(OMRequest omRequest, TermIndex termIndex) throws IOException {
     injectPause();
     OMClientRequest omClientRequest =
         OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
@@ -399,12 +399,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         impl.getPerfMetrics().getValidateAndUpdateCacneLatencyNs(),
         () -> {
           OMClientResponse omClientResponse =
-              omClientRequest.validateAndUpdateCache(getOzoneManager(), transactionInfo);
+              omClientRequest.validateAndUpdateCache(getOzoneManager(), termIndex);
           Preconditions.checkNotNull(omClientResponse,
               "omClientResponse returned by validateAndUpdateCache cannot be null");
           if (omRequest.getCmdType() != Type.Prepare) {
             omClientResponse.setFlushFuture(
-                ozoneManagerDoubleBuffer.add(omClientResponse, transactionInfo));
+                ozoneManagerDoubleBuffer.add(omClientResponse, termIndex));
           }
           return omClientResponse;
         });

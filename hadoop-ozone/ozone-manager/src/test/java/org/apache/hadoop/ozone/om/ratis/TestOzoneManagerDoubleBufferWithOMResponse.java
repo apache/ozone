@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.request.volume.OMVolumeCreateRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -309,9 +310,9 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     OMBucketDeleteRequest omBucketDeleteRequest =
         new OMBucketDeleteRequest(omRequest);
 
-    final TransactionInfo transactionInfo = TransactionInfo.valueOf(term, transactionID);
-    OMClientResponse omClientResponse = omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, transactionInfo);
-    doubleBuffer.add(omClientResponse, transactionInfo);
+    final TermIndex termIndex = TermIndex.valueOf(term, transactionID);
+    OMClientResponse omClientResponse = omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, termIndex);
+    doubleBuffer.add(omClientResponse, termIndex);
     return omClientResponse;
   }
 
@@ -458,9 +459,9 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     OMVolumeCreateRequest omVolumeCreateRequest =
         new OMVolumeCreateRequest(omRequest);
 
-    final TransactionInfo transactionInfo = TransactionInfo.valueOf(transactionId);
-    OMClientResponse omClientResponse = omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, transactionInfo);
-    doubleBuffer.add(omClientResponse, transactionInfo);
+    final TermIndex termIndex = TransactionInfo.getTermIndex(transactionId);
+    OMClientResponse omClientResponse = omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, termIndex);
+    doubleBuffer.add(omClientResponse, termIndex);
     return omClientResponse;
   }
 
@@ -480,9 +481,9 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     OMBucketCreateRequest omBucketCreateRequest =
         new OMBucketCreateRequest(omRequest);
 
-    final TransactionInfo transactionInfo = TransactionInfo.valueOf(term, transactionID);
-    OMClientResponse omClientResponse = omBucketCreateRequest.validateAndUpdateCache(ozoneManager, transactionInfo);
-    doubleBuffer.add(omClientResponse, transactionInfo);
+    final TermIndex termIndex = TermIndex.valueOf(term, transactionID);
+    OMClientResponse omClientResponse = omBucketCreateRequest.validateAndUpdateCache(ozoneManager, termIndex);
+    doubleBuffer.add(omClientResponse, termIndex);
     return (OMBucketCreateResponse) omClientResponse;
   }
 

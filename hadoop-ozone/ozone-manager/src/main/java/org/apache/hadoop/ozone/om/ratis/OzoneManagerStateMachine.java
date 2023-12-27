@@ -330,8 +330,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       final OMRequest request = context != null ? (OMRequest) context
           : OMRatisHelper.convertByteStringToOMRequest(
           trx.getStateMachineLogEntry().getLogData());
-      final TransactionInfo transactionInfo = TransactionInfo.valueOf(TermIndex.valueOf(trx.getLogEntry()));
-      final long trxLogIndex = transactionInfo.getTransactionIndex();
+      final TermIndex termIndex = TermIndex.valueOf(trx.getLogEntry());
+      final long trxLogIndex = termIndex.getIndex();
       // In the current approach we have one single global thread executor.
       // with single thread. Right now this is being done for correctness, as
       // applyTransaction will be run on multiple OM's we want to execute the
@@ -371,7 +371,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       ozoneManagerDoubleBuffer.acquireUnFlushedTransactions(1);
 
       CompletableFuture<OMResponse> future = CompletableFuture.supplyAsync(
-          () -> runCommand(request, transactionInfo), executorService);
+          () -> runCommand(request, termIndex), executorService);
       future.thenApply(omResponse -> {
         if (!omResponse.getSuccess()) {
           // When INTERNAL_ERROR or METADATA_ERROR it is considered as
@@ -576,9 +576,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @return response from OM
    * @throws ServiceException
    */
-  private OMResponse runCommand(OMRequest request, TransactionInfo transactionInfo) {
+  private OMResponse runCommand(OMRequest request, TermIndex termIndex) {
     try {
-      OMClientResponse omClientResponse = handler.handleWriteRequest(request, transactionInfo);
+      OMClientResponse omClientResponse = handler.handleWriteRequest(request, termIndex);
       OMLockDetails omLockDetails = omClientResponse.getOmLockDetails();
       OMResponse omResponse = omClientResponse.getOMResponse();
       if (omLockDetails != null) {
@@ -589,7 +589,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       }
     } catch (IOException e) {
       LOG.warn("Failed to write, Exception occurred ", e);
-      return createErrorResponse(request, e, transactionInfo);
+      return createErrorResponse(request, e, termIndex);
     } catch (Throwable e) {
       // For any Runtime exceptions, terminate OM.
       String errorMessage = "Request " + request + " failed with exception";
@@ -599,7 +599,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   private OMResponse createErrorResponse(
-      OMRequest omRequest, IOException exception, TransactionInfo transactionInfo) {
+      OMRequest omRequest, IOException exception, TermIndex termIndex) {
     OMResponse.Builder omResponseBuilder = OMResponse.newBuilder()
         .setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(exception))
         .setCmdType(omRequest.getCmdType())
@@ -611,7 +611,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     OMResponse omResponse = omResponseBuilder.build();
     OMClientResponse omClientResponse = new DummyOMClientResponse(omResponse);
     omClientResponse.setFlushFuture(
-        ozoneManagerDoubleBuffer.add(omClientResponse, transactionInfo));
+        ozoneManagerDoubleBuffer.add(omClientResponse, termIndex));
     return omResponse;
   }
 

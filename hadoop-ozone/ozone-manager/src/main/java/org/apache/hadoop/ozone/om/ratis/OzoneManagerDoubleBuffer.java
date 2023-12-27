@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
@@ -333,12 +334,12 @@ public final class OzoneManagerDoubleBuffer {
 
     Map<String, List<Long>> cleanupEpochs = new HashMap<>();
     // Commit transaction info to DB.
-    final List<TransactionInfo> flushedTransactions = buffer.stream()
-        .map(DoubleBufferEntry::getTransactionInfo)
+    final List<TermIndex> flushedTransactions = buffer.stream()
+        .map(DoubleBufferEntry::getTermIndex)
         .sorted()
         .collect(Collectors.toList());
     final List<Long> flushedEpochs = flushedTransactions.stream()
-        .map(TransactionInfo::getTransactionIndex)
+        .map(TermIndex::getIndex)
         .collect(Collectors.toList());
 
     try (BatchOperation batchOperation = omMetadataManager.getStore()
@@ -349,12 +350,12 @@ public final class OzoneManagerDoubleBuffer {
       buffer.iterator().forEachRemaining(
           entry -> addCleanupEntry(entry, cleanupEpochs));
 
-      final TransactionInfo lastTransaction = flushedTransactions.get(flushedTransactions.size() - 1);
+      final TermIndex lastTransaction = flushedTransactions.get(flushedTransactions.size() - 1);
 
       addToBatchTransactionInfoWithTrace(lastTraceId,
-          lastTransaction.getTransactionIndex(),
+          lastTransaction.getIndex(),
           () -> omMetadataManager.getTransactionInfoTable().putWithBatch(
-              batchOperation, TRANSACTION_INFO_KEY, lastTransaction));
+              batchOperation, TRANSACTION_INFO_KEY, TransactionInfo.valueOf(lastTransaction)));
 
       long startTime = Time.monotonicNow();
       flushBatchWithTrace(lastTraceId, buffer.size(),
@@ -481,7 +482,7 @@ public final class OzoneManagerDoubleBuffer {
       }
       for (String table : cleanupTables) {
         cleanupEpochs.computeIfAbsent(table, list -> new ArrayList<>())
-            .add(entry.getTransactionInfo().getTransactionIndex());
+            .add(entry.getTermIndex().getIndex());
       }
     } else {
       // This is to catch early errors, when a new response class missed to
@@ -596,8 +597,8 @@ public final class OzoneManagerDoubleBuffer {
   /**
    * Add OmResponseBufferEntry to buffer.
    */
-  public synchronized CompletableFuture<Void> add(OMClientResponse response, TransactionInfo transactionInfo) {
-    currentBuffer.add(new DoubleBufferEntry<>(transactionInfo, response));
+  public synchronized CompletableFuture<Void> add(OMClientResponse response, TermIndex termIndex) {
+    currentBuffer.add(new DoubleBufferEntry<>(termIndex, response));
     notify();
 
     if (!isRatisEnabled) {

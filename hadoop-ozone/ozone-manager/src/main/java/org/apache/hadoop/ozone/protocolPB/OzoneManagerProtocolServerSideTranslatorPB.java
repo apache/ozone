@@ -323,7 +323,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
             createClientRequest(request, ozoneManager);
         request = omClientRequest.preExecute(ozoneManager);
         long index = transactionIndex.incrementAndGet();
-        omClientResponse = handler.handleWriteRequest(request, TransactionInfo.valueOf(index));
+        omClientResponse = handler.handleWriteRequest(request, TransactionInfo.getTermIndex(index));
       }
     } catch (IOException ex) {
       // As some preExecute returns error. So handle here.

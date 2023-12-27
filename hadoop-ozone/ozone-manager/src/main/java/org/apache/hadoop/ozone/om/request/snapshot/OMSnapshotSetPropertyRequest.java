@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.request.snapshot;
 
-import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -50,7 +50,7 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TransactionInfo transactionInfo) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
 
     OMClientResponse omClientResponse = null;
     OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
@@ -85,7 +85,7 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
       // Update Table Cache
       metadataManager.getSnapshotInfoTable().addCacheEntry(
           new CacheKey<>(snapshotKey),
-          CacheValue.get(transactionInfo.getTransactionIndex(), updatedSnapInfo));
+          CacheValue.get(termIndex.getIndex(), updatedSnapInfo));
       omClientResponse = new OMSnapshotSetPropertyResponse(
           omResponse.build(), updatedSnapInfo);
     } catch (IOException ex) {

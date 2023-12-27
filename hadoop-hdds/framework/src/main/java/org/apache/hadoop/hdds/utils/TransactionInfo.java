@@ -84,8 +84,8 @@ public final class TransactionInfo implements Comparable<TransactionInfo> {
   /** In non-Ratis clusters, term is -1. */
   public static final long NON_RATIS_TERM = -1;
   /** For non-Ratis case. */
-  public static TransactionInfo valueOf(long transactionIndex) {
-    return valueOf(NON_RATIS_TERM, transactionIndex);
+  public static TermIndex getTermIndex(long transactionIndex) {
+    return TermIndex.valueOf(NON_RATIS_TERM, transactionIndex);
   }
 
   /**
