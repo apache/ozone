@@ -52,8 +52,8 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.SUCCESS;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test PemFileBasedKeyStoresFactory.
@@ -79,18 +79,15 @@ public class TestPemFileBasedKeyStoresFactory {
       keyStoresFactory.init(KeyStoresFactory.Mode.CLIENT, clientAuth);
       assertEquals(clientAuth, keyStoresFactory.getKeyManagers()[0]
           instanceof ReloadingX509KeyManager);
-      assertTrue(keyStoresFactory.getTrustManagers()[0]
-          instanceof ReloadingX509TrustManager);
+      assertInstanceOf(ReloadingX509TrustManager.class, keyStoresFactory.getTrustManagers()[0]);
     } finally {
       keyStoresFactory.destroy();
     }
 
     try {
       keyStoresFactory.init(KeyStoresFactory.Mode.SERVER, clientAuth);
-      assertTrue(keyStoresFactory.getKeyManagers()[0]
-          instanceof ReloadingX509KeyManager);
-      assertTrue(keyStoresFactory.getTrustManagers()[0]
-          instanceof ReloadingX509TrustManager);
+      assertInstanceOf(ReloadingX509KeyManager.class, keyStoresFactory.getKeyManagers()[0]);
+      assertInstanceOf(ReloadingX509TrustManager.class, keyStoresFactory.getTrustManagers()[0]);
     } finally {
       keyStoresFactory.destroy();
     }

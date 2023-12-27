@@ -25,7 +25,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.mockito.Mockito;
 
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.SecurityContext;
@@ -35,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
 
 /**
  * This class test virtual host style mapping conversion to path style.
@@ -81,9 +81,8 @@ public class TestVirtualHostStyleFilter {
       pathStyleUri = new URI("http://" + s3HttpAddr + path + queryParams);
     }
     String httpMethod = "DELETE";
-    SecurityContext securityContext = Mockito.mock(SecurityContext.class);
-    PropertiesDelegate propertiesDelegate = Mockito.mock(PropertiesDelegate
-        .class);
+    SecurityContext securityContext = mock(SecurityContext.class);
+    PropertiesDelegate propertiesDelegate = mock(PropertiesDelegate.class);
     ContainerRequest containerRequest;
     if (virtualHostStyle) {
       containerRequest = new ContainerRequest(baseUri, virtualHostStyleUri,

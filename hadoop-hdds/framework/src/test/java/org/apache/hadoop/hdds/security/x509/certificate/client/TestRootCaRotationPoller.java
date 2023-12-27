@@ -44,6 +44,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -167,12 +168,12 @@ public class TestRootCaRotationPoller {
     //Then the first run encounters an error
     poller.pollRootCas();
     processingResult.join();
-    assertTrue(logCapturer.getOutput().contains(
-        "There was a caught exception when trying to sign the certificate"));
+    assertThat(logCapturer.getOutput()).contains(
+        "There was a caught exception when trying to sign the certificate");
     //And then the second clean run is successful.
     poller.pollRootCas();
-    assertTrue(logCapturer.getOutput().contains(
-        "Certificate processing was successful."));
+    assertThat(logCapturer.getOutput()).contains(
+        "Certificate processing was successful.");
   }
 
   private X509Certificate generateX509Cert(

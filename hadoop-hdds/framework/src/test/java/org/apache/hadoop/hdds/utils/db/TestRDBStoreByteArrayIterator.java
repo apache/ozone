@@ -33,8 +33,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -300,7 +302,7 @@ public class TestRDBStoreByteArrayIterator {
       iter.seekToLast();
       fail("Prefixed iterator does not support seekToLast");
     } catch (Exception e) {
-      assertTrue(e instanceof UnsupportedOperationException);
+      assertInstanceOf(UnsupportedOperationException.class, e);
     }
 
     iter.close();
@@ -327,6 +329,6 @@ public class TestRDBStoreByteArrayIterator {
     }
     String expectedTrace = sb.toString();
     String fromObjectInit = iterator.getStackTrace();
-    assertTrue(fromObjectInit.contains(expectedTrace));
+    assertThat(fromObjectInit).contains(expectedTrace);
   }
 }

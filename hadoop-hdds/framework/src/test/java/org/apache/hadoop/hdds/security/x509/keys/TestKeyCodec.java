@@ -20,6 +20,7 @@
 package org.apache.hadoop.hdds.security.x509.keys;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -105,13 +106,13 @@ public class TestKeyCodec {
     // format exists.
     byte[] privateKey = Files.readAllBytes(privateKeyPath);
     String privateKeydata = new String(privateKey, StandardCharsets.UTF_8);
-    assertTrue(privateKeydata.contains("PRIVATE KEY"));
+    assertThat(privateKeydata).contains("PRIVATE KEY");
 
     // Read the public key and test if the expected String in the PEM file
     // format exists.
     byte[] publicKey = Files.readAllBytes(publicKeyPath);
     String publicKeydata = new String(publicKey, StandardCharsets.UTF_8);
-    assertTrue(publicKeydata.contains("PUBLIC KEY"));
+    assertThat(publicKeydata).contains("PUBLIC KEY");
 
     // Let us decode the PEM file and parse it back into binary.
     KeyFactory kf = KeyFactory.getInstance(
@@ -182,15 +183,15 @@ public class TestKeyCodec {
     // Assert that rewriting of keys throws exception with valid messages.
     IOException ioException = assertThrows(IOException.class,
             () -> pemWriter.writeKey(kp));
-    assertTrue(ioException.getMessage()
-        .contains("Private Key file already exists."));
+    assertThat(ioException.getMessage())
+        .contains("Private Key file already exists.");
     FileUtils.deleteQuietly(Paths.get(
         secConfig.getKeyLocation(component).toString() + "/" + secConfig
             .getPrivateKeyFileName()).toFile());
     ioException = assertThrows(IOException.class,
             () -> pemWriter.writeKey(kp));
-    assertTrue(ioException.getMessage()
-        .contains("Public Key file already exists."));
+    assertThat(ioException.getMessage())
+        .contains("Public Key file already exists.");
     FileUtils.deleteQuietly(Paths.get(
         secConfig.getKeyLocation(component).toString() + "/" + secConfig
             .getPublicKeyFileName()).toFile());
@@ -215,8 +216,8 @@ public class TestKeyCodec {
     // Assert key rewrite fails in non Posix file system.
     IOException ioException = assertThrows(IOException.class,
             () -> pemWriter.writeKey(kp));
-    assertTrue(ioException.getMessage()
-        .contains("Unsupported File System for pem file."));
+    assertThat(ioException.getMessage())
+        .contains("Unsupported File System for pem file.");
   }
 
   @Test

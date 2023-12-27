@@ -52,9 +52,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -188,10 +185,9 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omMetadataManager.getBucketId(
         volumeName, bucketName);
-    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
-    long parentID = OMFileRequest.getParentID(volumeId, bucketId,
-        pathComponents, keyName, omMetadataManager,
-        "Cannot recover file : " + keyName
+
+    long parentID = OMFileRequest.getParentID(volumeId, bucketId, keyName,
+        omMetadataManager, "Cannot recover file : " + keyName
             + " as parent directory doesn't exist");
     String fileName = OzoneFSUtils.getFileName(keyName);
     dbFileKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,

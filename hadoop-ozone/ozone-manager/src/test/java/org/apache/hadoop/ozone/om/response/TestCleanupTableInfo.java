@@ -148,6 +148,7 @@ public class TestCleanupTableInfo {
     subTypes.remove(OmKeyResponse.class);
     // OMEchoRPCWriteResponse does not need CleanupTable.
     subTypes.remove(OMEchoRPCWriteResponse.class);
+    subTypes.remove(DummyOMClientResponse.class);
     subTypes.forEach(aClass -> {
       Assertions.assertTrue(aClass.isAnnotationPresent(CleanupTableInfo.class),
           aClass + " does not have annotation of" +
