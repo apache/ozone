@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -44,9 +43,11 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OP
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.times;
 
 /**
@@ -62,7 +63,7 @@ public class TestQuasiClosedContainerHandler {
   public void setup() {
     ratisReplicationConfig = RatisReplicationConfig.getInstance(
         HddsProtos.ReplicationFactor.THREE);
-    replicationManager = Mockito.mock(ReplicationManager.class);
+    replicationManager = mock(ReplicationManager.class);
     quasiClosedContainerHandler =
         new QuasiClosedContainerHandler(replicationManager);
   }
@@ -82,7 +83,7 @@ public class TestQuasiClosedContainerHandler {
         .build();
 
     Assertions.assertFalse(quasiClosedContainerHandler.handle(request));
-    Mockito.verify(replicationManager, times(0))
+    verify(replicationManager, times(0))
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
   }
 
@@ -101,7 +102,7 @@ public class TestQuasiClosedContainerHandler {
         .build();
 
     Assertions.assertFalse(quasiClosedContainerHandler.handle(request));
-    Mockito.verify(replicationManager, times(0))
+    verify(replicationManager, times(0))
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
   }
 
@@ -138,7 +139,7 @@ public class TestQuasiClosedContainerHandler {
 
     Assertions.assertFalse(quasiClosedContainerHandler.handle(request));
     Assertions.assertFalse(quasiClosedContainerHandler.handle(readRequest));
-    Mockito.verify(replicationManager, times(2))
+    verify(replicationManager, times(2))
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
   }
 
@@ -162,7 +163,7 @@ public class TestQuasiClosedContainerHandler {
         .build();
 
     Assertions.assertFalse(quasiClosedContainerHandler.handle(request));
-    Mockito.verify(replicationManager, times(0))
+    verify(replicationManager, times(0))
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
     Assertions.assertEquals(1, request.getReport().getStat(
         ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK));
@@ -192,7 +193,7 @@ public class TestQuasiClosedContainerHandler {
         .build();
 
     Assertions.assertFalse(quasiClosedContainerHandler.handle(request));
-    Mockito.verify(replicationManager, times(0))
+    verify(replicationManager, times(0))
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
     Assertions.assertEquals(1, request.getReport().getStat(
         ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK));
@@ -244,10 +245,10 @@ public class TestQuasiClosedContainerHandler {
     Assertions.assertFalse(quasiClosedContainerHandler.handle(readRequest));
     // verify close command was sent for replicas with sequence ID 1001, that
     // is dnTwo and dnThree
-    Mockito.verify(replicationManager, times(1))
+    verify(replicationManager, times(1))
         .sendCloseContainerReplicaCommand(eq(containerInfo), eq(dnTwo),
             anyBoolean());
-    Mockito.verify(replicationManager, times(1))
+    verify(replicationManager, times(1))
         .sendCloseContainerReplicaCommand(eq(containerInfo), eq(dnThree),
             anyBoolean());
   }

@@ -53,7 +53,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -71,6 +70,7 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_LEVEL;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.mock;
 
 /**
  * Test class for @{@link SCMBlockProtocolServer}.
@@ -133,7 +133,7 @@ public class TestSCMBlockProtocolServer {
 
     @Override
     public DeletedBlockLog getDeletedBlockLog() {
-      return Mockito.mock(DeletedBlockLogImpl.class);
+      return mock(DeletedBlockLogImpl.class);
     }
 
     @Override
@@ -186,8 +186,7 @@ public class TestSCMBlockProtocolServer {
     nodeManager = scm.getScmNodeManager();
     datanodes.forEach(dn -> nodeManager.register(dn, null, null));
     server = scm.getBlockProtocolServer();
-    service = new ScmBlockLocationProtocolServerSideTranslatorPB(server, scm,
-        Mockito.mock(ProtocolMessageMetrics.class));
+    service = new ScmBlockLocationProtocolServerSideTranslatorPB(server, scm, mock(ProtocolMessageMetrics.class));
   }
 
   @AfterEach

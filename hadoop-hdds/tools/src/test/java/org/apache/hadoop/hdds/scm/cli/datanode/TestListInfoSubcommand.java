@@ -32,9 +32,9 @@ import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.any;
 
@@ -68,9 +68,9 @@ public class TestListInfoSubcommand {
   public void testDataNodeOperationalStateAndHealthIncludedInOutput()
       throws Exception {
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.queryNode(any(), any(), any(), any()))
+    when(scmClient.queryNode(any(), any(), any(), any()))
         .thenAnswer(invocation -> getNodeDetails());
-    Mockito.when(scmClient.listPipelines())
+    when(scmClient.listPipelines())
         .thenReturn(new ArrayList<>());
 
     cmd.execute(scmClient);

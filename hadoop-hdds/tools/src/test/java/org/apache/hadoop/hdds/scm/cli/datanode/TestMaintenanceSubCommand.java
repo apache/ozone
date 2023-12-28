@@ -31,14 +31,13 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import org.mockito.Mockito;
 import picocli.CommandLine;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Matchers.anyInt;
 import static org.mockito.Matchers.anyListOf;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -70,7 +69,7 @@ public class TestMaintenanceSubCommand {
   @Test
   public void testNoErrorsWhenEnteringMaintenance() throws IOException  {
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.startMaintenanceNodes(
+    when(scmClient.startMaintenanceNodes(
         anyListOf(String.class), anyInt()))
         .thenAnswer(invocation -> new ArrayList<DatanodeAdminError>());
 
@@ -96,7 +95,7 @@ public class TestMaintenanceSubCommand {
   @Test
   public void testErrorsReportedWhenEnteringMaintenance() throws IOException  {
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.startMaintenanceNodes(
+    when(scmClient.startMaintenanceNodes(
         anyListOf(String.class), anyInt()))
         .thenAnswer(invocation -> {
           ArrayList<DatanodeAdminError> e = new ArrayList<>();

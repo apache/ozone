@@ -30,7 +30,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import picocli.CommandLine;
 
 import java.io.ByteArrayOutputStream;
@@ -43,6 +42,7 @@ import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -65,7 +65,7 @@ public class TestListPipelinesSubCommand {
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
 
     scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.listPipelines())
+    when(scmClient.listPipelines())
         .thenAnswer(invocation -> createPipelines());
   }
 

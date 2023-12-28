@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -53,8 +52,12 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.ALLOCATED;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyList;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.verify;
 
 /**
  * Test for the ECPipelineProvider.
@@ -63,10 +66,10 @@ public class TestECPipelineProvider {
 
   private PipelineProvider provider;
   private OzoneConfiguration conf;
-  private NodeManager nodeManager = Mockito.mock(NodeManager.class);
+  private NodeManager nodeManager = mock(NodeManager.class);
   private PipelineStateManager stateManager =
-      Mockito.mock(PipelineStateManager.class);
-  private PlacementPolicy placementPolicy = Mockito.mock(PlacementPolicy.class);
+      mock(PipelineStateManager.class);
+  private PlacementPolicy placementPolicy = mock(PlacementPolicy.class);
   private long containerSizeBytes;
   @BeforeEach
   public void setup() throws IOException, NodeNotFoundException {
@@ -78,9 +81,9 @@ public class TestECPipelineProvider {
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
         StorageUnit.BYTES);
     // Placement policy will always return EC number of random nodes.
-    when(placementPolicy.chooseDatanodes(Mockito.anyList(),
-        Mockito.anyList(), Mockito.anyInt(), Mockito.anyLong(),
-        Mockito.anyLong()))
+    when(placementPolicy.chooseDatanodes(anyList(),
+        anyList(), anyInt(), anyLong(),
+        anyLong()))
         .thenAnswer(invocation -> {
           List<DatanodeDetails> dns = new ArrayList<>();
           for (int i = 0; i < (int) invocation.getArguments()[2]; i++) {

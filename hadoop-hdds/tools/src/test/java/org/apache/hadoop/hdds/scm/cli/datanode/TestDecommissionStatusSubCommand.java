@@ -33,13 +33,12 @@ import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import org.mockito.Mockito;
 import picocli.CommandLine;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -72,7 +71,7 @@ public class TestDecommissionStatusSubCommand {
   @Test
   public void testSuccessWhenDecommissionStatus() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.queryNode(any(), any(), any(), any()))
+    when(scmClient.queryNode(any(), any(), any(), any()))
         .thenAnswer(invocation -> nodes); // 2 nodes decommissioning
 
     cmd.execute(scmClient);
@@ -94,7 +93,7 @@ public class TestDecommissionStatusSubCommand {
   public void testNoNodesWhenDecommissionStatus() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     // No nodes in decommissioning. No error is printed
-    Mockito.when(scmClient.queryNode(any(), any(), any(), any()))
+    when(scmClient.queryNode(any(), any(), any(), any()))
         .thenReturn(new ArrayList<>());
     cmd.execute(scmClient);
 
@@ -115,7 +114,7 @@ public class TestDecommissionStatusSubCommand {
   @Test
   public void testIdOptionDecommissionStatusSuccess() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.queryNode(any(), any(), any(), any()))
+    when(scmClient.queryNode(any(), any(), any(), any()))
         .thenAnswer(invocation -> nodes); // 2 nodes decommissioning
 
     CommandLine c = new CommandLine(cmd);
@@ -135,7 +134,7 @@ public class TestDecommissionStatusSubCommand {
   @Test
   public void testIdOptionDecommissionStatusFail() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.queryNode(any(), any(), any(), any()))
+    when(scmClient.queryNode(any(), any(), any(), any()))
         .thenAnswer(invocation -> nodes.subList(0, 1)); // host0 decommissioning
 
     CommandLine c = new CommandLine(cmd);
@@ -159,7 +158,7 @@ public class TestDecommissionStatusSubCommand {
   @Test
   public void testIpOptionDecommissionStatusSuccess() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.queryNode(any(), any(), any(), any()))
+    when(scmClient.queryNode(any(), any(), any(), any()))
         .thenAnswer(invocation -> nodes); // 2 nodes decommissioning
 
     CommandLine c = new CommandLine(cmd);
@@ -179,7 +178,7 @@ public class TestDecommissionStatusSubCommand {
   @Test
   public void testIpOptionDecommissionStatusFail() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.queryNode(any(), any(), any(), any()))
+    when(scmClient.queryNode(any(), any(), any(), any()))
         .thenAnswer(invocation -> nodes.subList(0, 1)); // host0 decommissioning
 
     CommandLine c = new CommandLine(cmd);

@@ -35,7 +35,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import picocli.CommandLine;
 
 import java.io.ByteArrayInputStream;
@@ -58,6 +57,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -84,9 +84,9 @@ public class TestInfoSubCommand {
   public void setup() throws IOException {
     scmClient = mock(ScmClient.class);
     datanodes = createDatanodeDetails(3);
-    Mockito.when(scmClient.getContainerWithPipeline(anyLong()))
+    when(scmClient.getContainerWithPipeline(anyLong()))
         .then(i -> getContainerWithPipeline(i.getArgument(0)));
-    Mockito.when(scmClient.getPipeline(any()))
+    when(scmClient.getPipeline(any()))
         .thenThrow(new PipelineNotFoundException("Pipeline not found."));
 
     appender = new TestAppender();
@@ -128,7 +128,7 @@ public class TestInfoSubCommand {
 
   @Test
   public void testMultipleContainersCanBePassed() throws Exception {
-    Mockito.when(scmClient.getContainerReplicas(anyLong()))
+    when(scmClient.getContainerReplicas(anyLong()))
         .thenReturn(getReplicas(true));
     cmd = new InfoSubcommand();
     CommandLine c = new CommandLine(cmd);
@@ -182,7 +182,7 @@ public class TestInfoSubCommand {
 
   @Test
   public void testMultipleContainersCanBePassedJson() throws Exception {
-    Mockito.when(scmClient.getContainerReplicas(anyLong()))
+    when(scmClient.getContainerReplicas(anyLong()))
         .thenReturn(getReplicas(true));
     cmd = new InfoSubcommand();
     CommandLine c = new CommandLine(cmd);
@@ -209,7 +209,7 @@ public class TestInfoSubCommand {
 
   private void testReplicaIncludedInOutput(boolean includeIndex)
       throws IOException {
-    Mockito.when(scmClient.getContainerReplicas(anyLong()))
+    when(scmClient.getContainerReplicas(anyLong()))
         .thenReturn(getReplicas(includeIndex));
     cmd = new InfoSubcommand();
     CommandLine c = new CommandLine(cmd);
@@ -249,7 +249,7 @@ public class TestInfoSubCommand {
 
   @Test
   public void testReplicasNotOutputIfError() throws IOException {
-    Mockito.when(scmClient.getContainerReplicas(anyLong()))
+    when(scmClient.getContainerReplicas(anyLong()))
         .thenThrow(new IOException("Error getting Replicas"));
     cmd = new InfoSubcommand();
     CommandLine c = new CommandLine(cmd);
@@ -271,7 +271,7 @@ public class TestInfoSubCommand {
 
   @Test
   public void testReplicasNotOutputIfErrorWithJson() throws IOException {
-    Mockito.when(scmClient.getContainerReplicas(anyLong()))
+    when(scmClient.getContainerReplicas(anyLong()))
         .thenThrow(new IOException("Error getting Replicas"));
     cmd = new InfoSubcommand();
     CommandLine c = new CommandLine(cmd);
@@ -287,16 +287,16 @@ public class TestInfoSubCommand {
 
   @Test
   public void testReplicasOutputWithJson() throws IOException {
-    Mockito.when(scmClient.getContainerReplicas(anyLong()))
+    when(scmClient.getContainerReplicas(anyLong()))
         .thenReturn(getReplicas(true));
     testJsonOutput();
   }
 
   @Test
   public void testECContainerReplicasOutputWithJson() throws IOException {
-    Mockito.when(scmClient.getContainerReplicas(anyLong()))
+    when(scmClient.getContainerReplicas(anyLong()))
         .thenReturn(getReplicas(true));
-    Mockito.when(scmClient.getContainerWithPipeline(anyLong()))
+    when(scmClient.getContainerWithPipeline(anyLong()))
         .thenReturn(getECContainerWithPipeline());
     testJsonOutput();
   }

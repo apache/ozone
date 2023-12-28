@@ -38,7 +38,6 @@ import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.junit.jupiter.api.Assertions;
-import org.mockito.Mockito;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -48,6 +47,7 @@ import java.util.stream.Collectors;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
 import static org.apache.logging.log4j.util.StackLocatorUtil.getCallerClass;
+import static org.mockito.Mockito.spy;
 
 /**
  * Provides some very generic helpers which might be used across the tests.
@@ -260,7 +260,7 @@ public abstract class GenericTestUtils {
     int modifierVal = modifiersField.getInt(field);
     modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
     T value = (T) field.get(object);
-    value = Mockito.spy(value);
+    value = spy(value);
     field.set(object, value);
     modifiersField.setInt(field, modifierVal);
     modifiersField.setAccessible(modifierFieldAccessible);
