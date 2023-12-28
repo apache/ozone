@@ -610,8 +610,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     }
     OMResponse omResponse = omResponseBuilder.build();
     OMClientResponse omClientResponse = new DummyOMClientResponse(omResponse);
-    omClientResponse.setFlushFuture(
-        ozoneManagerDoubleBuffer.add(omClientResponse, termIndex));
+    ozoneManagerDoubleBuffer.add(omClientResponse, termIndex);
     return omResponse;
   }
 

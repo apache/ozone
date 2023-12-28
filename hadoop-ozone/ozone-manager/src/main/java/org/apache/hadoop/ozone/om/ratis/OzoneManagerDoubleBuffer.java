@@ -87,15 +87,6 @@ public final class OzoneManagerDoubleBuffer {
   private Queue<DoubleBufferEntry<OMClientResponse>> currentBuffer;
   private Queue<DoubleBufferEntry<OMClientResponse>> readyBuffer;
 
-
-  // future objects which hold the future returned by add method.
-  private volatile Queue<CompletableFuture<Void>> currentFutureQueue;
-
-  // Once we have an entry in current buffer, we swap the currentFutureQueue
-  // with readyFutureQueue. After flush is completed in flushTransaction
-  // daemon thread, we complete the futures in readyFutureQueue and clear them.
-  private volatile Queue<CompletableFuture<Void>> readyFutureQueue;
-
   private final Daemon daemon;
   private final OMMetadataManager omMetadataManager;
   private final AtomicLong flushedTransactionCount = new AtomicLong(0);
@@ -197,10 +188,6 @@ public final class OzoneManagerDoubleBuffer {
     this.readyBuffer = new ConcurrentLinkedQueue<>();
     this.isRatisEnabled = isRatisEnabled;
     this.isTracingEnabled = isTracingEnabled;
-    if (!isRatisEnabled) {
-      this.currentFutureQueue = new ConcurrentLinkedQueue<>();
-      this.readyFutureQueue = new ConcurrentLinkedQueue<>();
-    }
     this.unFlushedTransactions = new Semaphore(maxUnFlushedTransactions);
     this.omMetadataManager = omMetadataManager;
     this.ozoneManagerRatisSnapShot = ozoneManagerRatisSnapShot;
@@ -369,7 +356,10 @@ public final class OzoneManagerDoubleBuffer {
     // Complete futures first and then do other things.
     // So that handler threads will be released.
     if (!isRatisEnabled) {
-      clearReadyFutureQueue(buffer.size());
+      buffer.stream()
+          .map(DoubleBufferEntry::getResponse)
+          .map(OMClientResponse::getFlushFuture)
+          .forEach(f -> f.complete(null));
     }
 
     int flushedTransactionsSize = buffer.size();
@@ -492,17 +482,6 @@ public final class OzoneManagerDoubleBuffer {
     }
   }
 
-  /**
-   * Completes futures for first count element form the readyFutureQueue
-   * so that handler thread can be released asap.
-   */
-  private void clearReadyFutureQueue(int count) {
-    while (!readyFutureQueue.isEmpty() && count > 0) {
-      readyFutureQueue.remove().complete(null);
-      count--;
-    }
-  }
-
   private void cleanupCache(Map<String, List<Long>> cleanupEpochs) {
     cleanupEpochs.forEach((tableName, epochs) -> {
       Collections.sort(epochs);
@@ -597,18 +576,12 @@ public final class OzoneManagerDoubleBuffer {
   /**
    * Add OmResponseBufferEntry to buffer.
    */
-  public synchronized CompletableFuture<Void> add(OMClientResponse response, TermIndex termIndex) {
+  public synchronized void add(OMClientResponse response, TermIndex termIndex) {
     currentBuffer.add(new DoubleBufferEntry<>(termIndex, response));
     notify();
 
     if (!isRatisEnabled) {
-      CompletableFuture<Void> future = new CompletableFuture<>();
-      currentFutureQueue.add(future);
-      return future;
-    } else {
-      // In Non-HA case we don't need future to be returned, and this return
-      // status is not used.
-      return null;
+      response.setFlushFuture(new CompletableFuture<>());
     }
   }
 
@@ -651,13 +624,6 @@ public final class OzoneManagerDoubleBuffer {
     Queue<DoubleBufferEntry<OMClientResponse>> temp = currentBuffer;
     currentBuffer = readyBuffer;
     readyBuffer = temp;
-
-    if (!isRatisEnabled) {
-      // Swap future queue.
-      Queue<CompletableFuture<Void>> tempFuture = currentFutureQueue;
-      currentFutureQueue = readyFutureQueue;
-      readyFutureQueue = tempFuture;
-    }
   }
 
   @VisibleForTesting
