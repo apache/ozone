@@ -1328,9 +1328,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       // should fail.
       final LayoutVersionManager layoutVersionManager =
           new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
-      ScmHAUnfinalizedStateValidationAction.checkScmHA(conf, scmStorageConfig,
-          layoutVersionManager);
-      layoutVersionManager.close();
+      try {
+        ScmHAUnfinalizedStateValidationAction.checkScmHA(conf, scmStorageConfig,
+            layoutVersionManager);
+      } finally {
+        layoutVersionManager.close();
+      }
 
       clusterId = scmStorageConfig.getClusterID();
       final boolean isSCMHAEnabled = scmStorageConfig.isSCMHAEnabled();
