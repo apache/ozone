@@ -19,12 +19,13 @@ package org.apache.hadoop.ozone.common;
 
 import org.apache.hadoop.util.PureJavaCrc32;
 import org.apache.hadoop.util.PureJavaCrc32C;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Random;
 import java.util.zip.Checksum;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test {@link ChecksumByteBuffer} implementations.
@@ -96,7 +97,7 @@ public class TestChecksumByteBuffer {
     }
 
     private void checkSame() {
-      Assertions.assertEquals(expected.getValue(), testee.getValue());
+      assertEquals(expected.getValue(), testee.getValue());
     }
   }
 }
