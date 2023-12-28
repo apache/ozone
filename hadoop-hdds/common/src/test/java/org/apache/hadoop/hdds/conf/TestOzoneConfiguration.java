@@ -242,18 +242,12 @@ public class TestOzoneConfiguration {
     subject.setFromObject(object);
 
     // THEN
-    assertEquals("0.0.0.0",
-        subject.get("test.scm.client.bind.host"));
-    assertEquals("localhost",
-        subject.get("test.scm.client.address"));
-    assertFalse(
-        subject.getBoolean("test.scm.client.enabled", false));
-    assertEquals(0,
-        subject.getInt("test.scm.client.port", 123));
-    assertEquals(0,
-        subject.getTimeDuration("test.scm.client.wait", 555, TimeUnit.SECONDS));
-    assertEquals(0,
-        subject.getDouble("test.scm.client.threshold", 20.5));
+    assertEquals("0.0.0.0", subject.get("test.scm.client.bind.host"));
+    assertEquals("localhost", subject.get("test.scm.client.address"));
+    assertFalse(subject.getBoolean("test.scm.client.enabled", false));
+    assertEquals(0, subject.getInt("test.scm.client.port", 123));
+    assertEquals(0, subject.getTimeDuration("test.scm.client.wait", 555, TimeUnit.SECONDS));
+    assertEquals(0, subject.getDouble("test.scm.client.threshold", 20.5));
   }
 
   @Test

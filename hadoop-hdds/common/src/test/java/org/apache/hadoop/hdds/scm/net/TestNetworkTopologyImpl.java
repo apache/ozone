@@ -78,8 +78,7 @@ public class TestNetworkTopologyImpl {
 
   @BeforeEach
   void beforeAll() {
-    mockedShuffleOperation =
-        mock(Consumer.class);
+    mockedShuffleOperation = mock(Consumer.class);
     doAnswer(args -> {
           List<? extends Node> collection = args.getArgument(0);
           Collections.shuffle(collection);

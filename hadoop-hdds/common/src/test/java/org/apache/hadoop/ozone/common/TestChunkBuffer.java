@@ -35,8 +35,6 @@ import org.junit.jupiter.api.Timeout;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -224,14 +222,6 @@ public class TestChunkBuffer {
     assertArrayEquals(expected, output.toByteArray());
     assertFalse(impl.hasRemaining());
   }
-
-//  private static void assertEquals(String message,
-//      ByteString expected, ByteString actual) {
-//    assertEquals(
-//        expected.toByteArray(),
-//        actual.toByteArray(),
-//        message);
-//  }
 
   private static String toString(byte[] arr) {
     if (arr == null || arr.length == 0) {
