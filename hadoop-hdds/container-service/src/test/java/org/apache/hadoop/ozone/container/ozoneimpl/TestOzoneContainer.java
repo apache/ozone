@@ -46,7 +46,6 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
@@ -181,12 +180,12 @@ public class TestOzoneContainer {
     ContainerTestUtils.enableSchemaV3(conf);
     OzoneContainer ozoneContainer = ContainerTestUtils
         .getOzoneContainer(datanodeDetails, conf);
-    Assertions.assertEquals(volumeSet.getVolumesList().size(),
+    assertEquals(volumeSet.getVolumesList().size(),
         ozoneContainer.getNodeReport().getStorageReportList().size());
-    Assertions.assertEquals(3,
+    assertEquals(3,
         ozoneContainer.getNodeReport().getMetadataStorageReportList()
             .size());
-    Assertions.assertEquals(3,
+    assertEquals(3,
         ozoneContainer.getNodeReport().getDbStorageReportList().size());
   }
 
@@ -196,9 +195,9 @@ public class TestOzoneContainer {
     initTest(versionInfo);
     OzoneContainer ozoneContainer = ContainerTestUtils
         .getOzoneContainer(datanodeDetails, conf);
-    Assertions.assertEquals(volumeSet.getVolumesList().size(),
+    assertEquals(volumeSet.getVolumesList().size(),
         ozoneContainer.getNodeReport().getStorageReportList().size());
-    Assertions.assertEquals(1,
+    assertEquals(1,
         ozoneContainer.getNodeReport().getMetadataStorageReportList()
             .size());
   }

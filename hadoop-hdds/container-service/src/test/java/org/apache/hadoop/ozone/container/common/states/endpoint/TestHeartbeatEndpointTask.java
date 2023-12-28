@@ -21,7 +21,13 @@ package org.apache.hadoop.ozone.container.common.states.endpoint;
 import static java.util.Collections.emptyList;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconstructECContainersCommand;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -53,10 +59,8 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 
 /**
  * This class tests the functionality of HeartbeatEndpointTask.
@@ -69,8 +73,7 @@ public class TestHeartbeatEndpointTask {
   @Test
   public void handlesReconstructContainerCommand() throws Exception {
     StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
-        Mockito.mock(
-            StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
 
     List<DatanodeDetails> targetDns = new ArrayList<>();
     targetDns.add(MockDatanodeDetails.randomDatanodeDetails());
@@ -79,7 +82,7 @@ public class TestHeartbeatEndpointTask {
         1, emptyList(), targetDns, new byte[]{2, 5},
         new ECReplicationConfig(3, 2));
 
-    Mockito.when(scm.sendHeartbeat(any()))
+    when(scm.sendHeartbeat(any()))
         .thenAnswer(invocation ->
             SCMHeartbeatResponseProto.newBuilder()
                 .setDatanodeUUID(
@@ -93,7 +96,7 @@ public class TestHeartbeatEndpointTask {
 
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeStateMachine datanodeStateMachine =
-        Mockito.mock(DatanodeStateMachine.class);
+        mock(DatanodeStateMachine.class);
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -102,7 +105,7 @@ public class TestHeartbeatEndpointTask {
     task.call();
 
     // THEN
-    Assertions.assertEquals(1, context.getCommandQueueSummary()
+    assertEquals(1, context.getCommandQueueSummary()
         .get(reconstructECContainersCommand).intValue());
   }
 
@@ -110,11 +113,11 @@ public class TestHeartbeatEndpointTask {
   public void testheartbeatWithoutReports() throws Exception {
     final long termInSCM = 42;
     StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
-        Mockito.mock(
+        mock(
             StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
     ArgumentCaptor<SCMHeartbeatRequestProto> argument = ArgumentCaptor
         .forClass(SCMHeartbeatRequestProto.class);
-    Mockito.when(scm.sendHeartbeat(argument.capture()))
+    when(scm.sendHeartbeat(argument.capture()))
         .thenAnswer(invocation ->
             SCMHeartbeatResponseProto.newBuilder()
                 .setDatanodeUUID(
@@ -125,34 +128,34 @@ public class TestHeartbeatEndpointTask {
 
     OzoneConfiguration conf = new OzoneConfiguration();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
-        Mockito.mock(DatanodeStateMachine.class), "");
+        mock(DatanodeStateMachine.class), "");
     context.setTermOfLeaderSCM(1);
     HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
         conf, context, scm);
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
-    Assertions.assertTrue(heartbeat.hasDatanodeDetails());
-    Assertions.assertFalse(heartbeat.hasNodeReport());
-    Assertions.assertFalse(heartbeat.hasContainerReport());
-    Assertions.assertEquals(0, heartbeat.getCommandStatusReportsCount());
-    Assertions.assertFalse(heartbeat.hasContainerActions());
+    assertTrue(heartbeat.hasDatanodeDetails());
+    assertFalse(heartbeat.hasNodeReport());
+    assertFalse(heartbeat.hasContainerReport());
+    assertEquals(0, heartbeat.getCommandStatusReportsCount());
+    assertFalse(heartbeat.hasContainerActions());
     OptionalLong termInDatanode = context.getTermOfLeaderSCM();
-    Assertions.assertTrue(termInDatanode.isPresent());
-    Assertions.assertEquals(termInSCM, termInDatanode.getAsLong());
+    assertTrue(termInDatanode.isPresent());
+    assertEquals(termInSCM, termInDatanode.getAsLong());
   }
 
   @Test
   public void testheartbeatWithNodeReports() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
-        Mockito.mock(DatanodeStateMachine.class), "");
+        mock(DatanodeStateMachine.class), "");
 
     StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
-        Mockito.mock(
+        mock(
             StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
     ArgumentCaptor<SCMHeartbeatRequestProto> argument = ArgumentCaptor
         .forClass(SCMHeartbeatRequestProto.class);
-    Mockito.when(scm.sendHeartbeat(argument.capture()))
+    when(scm.sendHeartbeat(argument.capture()))
         .thenAnswer(invocation ->
             SCMHeartbeatResponseProto.newBuilder()
                 .setDatanodeUUID(
@@ -166,25 +169,25 @@ public class TestHeartbeatEndpointTask {
     context.refreshFullReport(NodeReportProto.getDefaultInstance());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
-    Assertions.assertTrue(heartbeat.hasDatanodeDetails());
-    Assertions.assertTrue(heartbeat.hasNodeReport());
-    Assertions.assertFalse(heartbeat.hasContainerReport());
-    Assertions.assertEquals(0, heartbeat.getCommandStatusReportsCount());
-    Assertions.assertFalse(heartbeat.hasContainerActions());
+    assertTrue(heartbeat.hasDatanodeDetails());
+    assertTrue(heartbeat.hasNodeReport());
+    assertFalse(heartbeat.hasContainerReport());
+    assertEquals(0, heartbeat.getCommandStatusReportsCount());
+    assertFalse(heartbeat.hasContainerActions());
   }
 
   @Test
   public void testheartbeatWithContainerReports() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
-        Mockito.mock(DatanodeStateMachine.class), "");
+        mock(DatanodeStateMachine.class), "");
 
     StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
-        Mockito.mock(
+        mock(
             StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
     ArgumentCaptor<SCMHeartbeatRequestProto> argument = ArgumentCaptor
         .forClass(SCMHeartbeatRequestProto.class);
-    Mockito.when(scm.sendHeartbeat(argument.capture()))
+    when(scm.sendHeartbeat(argument.capture()))
         .thenAnswer(invocation ->
             SCMHeartbeatResponseProto.newBuilder()
                 .setDatanodeUUID(
@@ -198,25 +201,25 @@ public class TestHeartbeatEndpointTask {
     context.refreshFullReport(ContainerReportsProto.getDefaultInstance());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
-    Assertions.assertTrue(heartbeat.hasDatanodeDetails());
-    Assertions.assertFalse(heartbeat.hasNodeReport());
-    Assertions.assertTrue(heartbeat.hasContainerReport());
-    Assertions.assertEquals(0, heartbeat.getCommandStatusReportsCount());
-    Assertions.assertFalse(heartbeat.hasContainerActions());
+    assertTrue(heartbeat.hasDatanodeDetails());
+    assertFalse(heartbeat.hasNodeReport());
+    assertTrue(heartbeat.hasContainerReport());
+    assertEquals(0, heartbeat.getCommandStatusReportsCount());
+    assertFalse(heartbeat.hasContainerActions());
   }
 
   @Test
   public void testheartbeatWithCommandStatusReports() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
-        Mockito.mock(DatanodeStateMachine.class), "");
+        mock(DatanodeStateMachine.class), "");
 
     StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
-        Mockito.mock(
+        mock(
             StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
     ArgumentCaptor<SCMHeartbeatRequestProto> argument = ArgumentCaptor
         .forClass(SCMHeartbeatRequestProto.class);
-    Mockito.when(scm.sendHeartbeat(argument.capture()))
+    when(scm.sendHeartbeat(argument.capture()))
         .thenAnswer(invocation ->
             SCMHeartbeatResponseProto.newBuilder()
                 .setDatanodeUUID(
@@ -231,25 +234,25 @@ public class TestHeartbeatEndpointTask {
         CommandStatusReportsProto.getDefaultInstance());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
-    Assertions.assertTrue(heartbeat.hasDatanodeDetails());
-    Assertions.assertFalse(heartbeat.hasNodeReport());
-    Assertions.assertFalse(heartbeat.hasContainerReport());
-    Assertions.assertNotEquals(0, heartbeat.getCommandStatusReportsCount());
-    Assertions.assertFalse(heartbeat.hasContainerActions());
+    assertTrue(heartbeat.hasDatanodeDetails());
+    assertFalse(heartbeat.hasNodeReport());
+    assertFalse(heartbeat.hasContainerReport());
+    assertNotEquals(0, heartbeat.getCommandStatusReportsCount());
+    assertFalse(heartbeat.hasContainerActions());
   }
 
   @Test
   public void testheartbeatWithContainerActions() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
-        Mockito.mock(DatanodeStateMachine.class), "");
+        mock(DatanodeStateMachine.class), "");
 
     StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
-        Mockito.mock(
+        mock(
             StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
     ArgumentCaptor<SCMHeartbeatRequestProto> argument = ArgumentCaptor
         .forClass(SCMHeartbeatRequestProto.class);
-    Mockito.when(scm.sendHeartbeat(argument.capture()))
+    when(scm.sendHeartbeat(argument.capture()))
         .thenAnswer(invocation ->
             SCMHeartbeatResponseProto.newBuilder()
                 .setDatanodeUUID(
@@ -263,18 +266,18 @@ public class TestHeartbeatEndpointTask {
     context.addContainerAction(getContainerAction());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
-    Assertions.assertTrue(heartbeat.hasDatanodeDetails());
-    Assertions.assertFalse(heartbeat.hasNodeReport());
-    Assertions.assertFalse(heartbeat.hasContainerReport());
-    Assertions.assertEquals(0, heartbeat.getCommandStatusReportsCount());
-    Assertions.assertTrue(heartbeat.hasContainerActions());
+    assertTrue(heartbeat.hasDatanodeDetails());
+    assertFalse(heartbeat.hasNodeReport());
+    assertFalse(heartbeat.hasContainerReport());
+    assertEquals(0, heartbeat.getCommandStatusReportsCount());
+    assertTrue(heartbeat.hasContainerActions());
   }
 
   @Test
   public void testheartbeatWithAllReports() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeStateMachine datanodeStateMachine =
-        Mockito.mock(DatanodeStateMachine.class);
+        mock(DatanodeStateMachine.class);
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -284,15 +287,15 @@ public class TestHeartbeatEndpointTask {
     for (SCMCommandProto.Type cmd : SCMCommandProto.Type.values()) {
       commands.put(cmd, count++);
     }
-    Mockito.when(datanodeStateMachine.getQueuedCommandCount())
+    when(datanodeStateMachine.getQueuedCommandCount())
         .thenReturn(commands);
 
     StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
-        Mockito.mock(
+        mock(
             StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
     ArgumentCaptor<SCMHeartbeatRequestProto> argument = ArgumentCaptor
         .forClass(SCMHeartbeatRequestProto.class);
-    Mockito.when(scm.sendHeartbeat(argument.capture()))
+    when(scm.sendHeartbeat(argument.capture()))
         .thenAnswer(invocation ->
             SCMHeartbeatResponseProto.newBuilder()
                 .setDatanodeUUID(
@@ -310,17 +313,17 @@ public class TestHeartbeatEndpointTask {
     context.addContainerAction(getContainerAction());
     endpointTask.call();
     SCMHeartbeatRequestProto heartbeat = argument.getValue();
-    Assertions.assertTrue(heartbeat.hasDatanodeDetails());
-    Assertions.assertTrue(heartbeat.hasNodeReport());
-    Assertions.assertTrue(heartbeat.hasContainerReport());
-    Assertions.assertNotEquals(0, heartbeat.getCommandStatusReportsCount());
-    Assertions.assertTrue(heartbeat.hasContainerActions());
-    Assertions.assertTrue(heartbeat.hasCommandQueueReport());
+    assertTrue(heartbeat.hasDatanodeDetails());
+    assertTrue(heartbeat.hasNodeReport());
+    assertTrue(heartbeat.hasContainerReport());
+    assertNotEquals(0, heartbeat.getCommandStatusReportsCount());
+    assertTrue(heartbeat.hasContainerActions());
+    assertTrue(heartbeat.hasCommandQueueReport());
     CommandQueueReportProto queueCount = heartbeat.getCommandQueueReport();
-    Assertions.assertEquals(queueCount.getCommandCount(), commands.size());
-    Assertions.assertEquals(queueCount.getCountCount(), commands.size());
+    assertEquals(queueCount.getCommandCount(), commands.size());
+    assertEquals(queueCount.getCountCount(), commands.size());
     for (int i = 0; i < commands.size(); i++) {
-      Assertions.assertEquals(commands.get(queueCount.getCommand(i)).intValue(),
+      assertEquals(commands.get(queueCount.getCommand(i)).intValue(),
           queueCount.getCount(i));
     }
   }
@@ -344,16 +347,15 @@ public class TestHeartbeatEndpointTask {
         .setHostName("localhost")
         .setIpAddress("127.0.0.1")
         .build();
-    EndpointStateMachine endpointStateMachine = Mockito
-        .mock(EndpointStateMachine.class);
-    Mockito.when(endpointStateMachine.getEndPoint()).thenReturn(proxy);
-    Mockito.when(endpointStateMachine.getAddress())
+    EndpointStateMachine endpointStateMachine = mock(EndpointStateMachine.class);
+    when(endpointStateMachine.getEndPoint()).thenReturn(proxy);
+    when(endpointStateMachine.getAddress())
         .thenReturn(TEST_SCM_ENDPOINT);
     HDDSLayoutVersionManager layoutVersionManager =
-        Mockito.mock(HDDSLayoutVersionManager.class);
-    Mockito.when(layoutVersionManager.getSoftwareLayoutVersion())
+        mock(HDDSLayoutVersionManager.class);
+    when(layoutVersionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
-    Mockito.when(layoutVersionManager.getMetadataLayoutVersion())
+    when(layoutVersionManager.getMetadataLayoutVersion())
         .thenReturn(maxLayoutVersion());
     return HeartbeatEndpointTask.newBuilder()
         .setConfig(conf)

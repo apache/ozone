@@ -136,13 +136,12 @@ public final class ContainerTestUtils {
 
   public static StateContext getMockContext(DatanodeDetails datanodeDetails,
       OzoneConfiguration conf) {
-    DatanodeStateMachine stateMachine = Mockito.mock(
-        DatanodeStateMachine.class);
+    DatanodeStateMachine stateMachine = mock(DatanodeStateMachine.class);
     Mockito.lenient().when(stateMachine.getReconfigurationHandler())
         .thenReturn(new ReconfigurationHandler("DN", conf, op -> { }));
-    StateContext context = Mockito.mock(StateContext.class);
-    Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
-    Mockito.when(context.getParent()).thenReturn(stateMachine);
+    StateContext context = mock(StateContext.class);
+    when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
+    when(context.getParent()).thenReturn(stateMachine);
     return context;
   }
 

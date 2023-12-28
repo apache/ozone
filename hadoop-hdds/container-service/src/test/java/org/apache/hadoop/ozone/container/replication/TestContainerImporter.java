@@ -41,13 +41,14 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -84,12 +85,10 @@ class TestContainerImporter {
         containerSet, controllerMock, volumeSet);
     File tarFile = new File("dummy.tar");
     // second import should fail immediately
-    StorageContainerException ex = Assertions.assertThrows(
-        StorageContainerException.class,
+    StorageContainerException ex = assertThrows(StorageContainerException.class,
         () -> containerImporter.importContainer(containerId, tarFile.toPath(),
             null, NO_COMPRESSION));
-    Assertions.assertEquals(ContainerProtos.Result.CONTAINER_EXISTS,
-        ex.getResult());
+    assertEquals(ContainerProtos.Result.CONTAINER_EXISTS, ex.getResult());
     assertThat(ex.getMessage()).contains("Container already exists");
   }
 
@@ -127,11 +126,11 @@ class TestContainerImporter {
     GenericTestUtils.waitFor(semaphore::hasQueuedThreads, 10, 5000);
     // run import second time and should fail immediately as
     // first import in progress
-    StorageContainerException ex = Assertions.assertThrows(
+    StorageContainerException ex = assertThrows(
         StorageContainerException.class,
         () -> containerImporter.importContainer(containerId, tarFile.toPath(),
             null, NO_COMPRESSION));
-    Assertions.assertEquals(ContainerProtos.Result.CONTAINER_EXISTS,
+    assertEquals(ContainerProtos.Result.CONTAINER_EXISTS,
         ex.getResult());
     assertThat(ex.getMessage()).contains("import in progress");
     semaphore.release();

@@ -31,9 +31,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler.SchemaHandler;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Timeout;
-import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.apache.hadoop.hdds.protocol.proto
@@ -58,11 +56,16 @@ import static org.apache.hadoop.ozone.container.common.statemachine.commandhandl
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -92,10 +95,10 @@ public class TestDeleteBlocksCommandHandler {
   private void setup() throws Exception {
     conf = new OzoneConfiguration();
     layout = ContainerLayoutVersion.FILE_PER_BLOCK;
-    ozoneContainer = Mockito.mock(OzoneContainer.class);
+    ozoneContainer = mock(OzoneContainer.class);
     containerSet = new ContainerSet(1000);
-    volume1 = Mockito.mock(HddsVolume.class);
-    Mockito.when(volume1.getStorageID()).thenReturn("uuid-1");
+    volume1 = mock(HddsVolume.class);
+    when(volume1.getStorageID()).thenReturn("uuid-1");
     for (int i = 0; i <= 10; i++) {
       KeyValueContainerData data =
           new KeyValueContainerData(i,
@@ -116,9 +119,9 @@ public class TestDeleteBlocksCommandHandler {
     handler = spy(new DeleteBlocksCommandHandler(
         ozoneContainer, conf, dnConf, ""));
     blockDeleteMetrics = handler.getBlockDeleteMetrics();
-    TestSchemaHandler testSchemaHandler1 = Mockito.spy(new TestSchemaHandler());
-    TestSchemaHandler testSchemaHandler2 = Mockito.spy(new TestSchemaHandler());
-    TestSchemaHandler testSchemaHandler3 = Mockito.spy(new TestSchemaHandler());
+    TestSchemaHandler testSchemaHandler1 = spy(new TestSchemaHandler());
+    TestSchemaHandler testSchemaHandler2 = spy(new TestSchemaHandler());
+    TestSchemaHandler testSchemaHandler3 = spy(new TestSchemaHandler());
 
     handler.getSchemaHandlers().put(SCHEMA_V1, testSchemaHandler1);
     handler.getSchemaHandlers().put(SCHEMA_V2, testSchemaHandler2);
@@ -145,15 +148,15 @@ public class TestDeleteBlocksCommandHandler {
 
     String schemaVersionOrDefault = ((KeyValueContainerData)
         container.getContainerData()).getSupportedSchemaVersionOrDefault();
-    Mockito.verify(handler.getSchemaHandlers().get(schemaVersionOrDefault),
+    verify(handler.getSchemaHandlers().get(schemaVersionOrDefault),
         times(1)).handle(any(), any());
     // submitTasks will be executed only once, as if there were not retries
-    Mockito.verify(handler,
+    verify(handler,
         times(1)).submitTasks(any());
 
-    Assertions.assertEquals(1, results.size());
-    Assertions.assertTrue(results.get(0).getSuccess());
-    Assertions.assertEquals(0,
+    assertEquals(1, results.size());
+    assertTrue(results.get(0).getSuccess());
+    assertEquals(0,
         blockDeleteMetrics.getTotalLockTimeoutTransactionCount());
   }
 
@@ -184,24 +187,24 @@ public class TestDeleteBlocksCommandHandler {
         handler.executeCmdWithRetry(transactions);
     String schemaVersionOrDefault = ((KeyValueContainerData) nonLockedcontainer.
         getContainerData()).getSupportedSchemaVersionOrDefault();
-    Mockito.verify(handler.getSchemaHandlers().get(schemaVersionOrDefault),
+    verify(handler.getSchemaHandlers().get(schemaVersionOrDefault),
             times(1)).handle(eq((KeyValueContainerData)
             nonLockedcontainer.getContainerData()), eq(transaction2));
 
     // submitTasks will be executed twice, as if there were retries
-    Mockito.verify(handler,
+    verify(handler,
         times(1)).submitTasks(eq(transactions));
-    Mockito.verify(handler,
+    verify(handler,
         times(1)).submitTasks(eq(Arrays.asList(transaction1)));
-    Assertions.assertEquals(2, results.size());
+    assertEquals(2, results.size());
 
     // Only one transaction will succeed
     Map<Long, DeleteBlockTransactionResult> resultsMap = new HashMap<>();
     results.forEach(result -> resultsMap.put(result.getTxID(), result));
-    Assertions.assertFalse(resultsMap.get(transaction1.getTxID()).getSuccess());
-    Assertions.assertTrue(resultsMap.get(transaction2.getTxID()).getSuccess());
+    assertFalse(resultsMap.get(transaction1.getTxID()).getSuccess());
+    assertTrue(resultsMap.get(transaction2.getTxID()).getSuccess());
 
-    Assertions.assertEquals(1,
+    assertEquals(1,
         blockDeleteMetrics.getTotalLockTimeoutTransactionCount());
   }
 
@@ -244,14 +247,14 @@ public class TestDeleteBlocksCommandHandler {
     // submitTasks will be executed twice, as if there were retries
     String schemaVersionOrDefault = ((KeyValueContainerData) lockedContainer
         .getContainerData()).getSupportedSchemaVersionOrDefault();
-    Mockito.verify(handler,
+    verify(handler,
         times(2)).submitTasks(any());
-    Mockito.verify(handler.getSchemaHandlers().get(schemaVersionOrDefault),
+    verify(handler.getSchemaHandlers().get(schemaVersionOrDefault),
         times(1)).handle(any(), any());
-    Assertions.assertEquals(1, results.size());
-    Assertions.assertTrue(results.get(0).getSuccess());
+    assertEquals(1, results.size());
+    assertTrue(results.get(0).getSuccess());
 
-    Assertions.assertEquals(0,
+    assertEquals(0,
         blockDeleteMetrics.getTotalLockTimeoutTransactionCount());
   }
 
@@ -262,20 +265,20 @@ public class TestDeleteBlocksCommandHandler {
     OzoneConfiguration tmpConf = new OzoneConfiguration();
     tmpConf.setTimeDuration(BLOCK_DELETE_COMMAND_WORKER_INTERVAL, 3,
         TimeUnit.SECONDS);
-    OzoneContainer container = Mockito.mock(OzoneContainer.class);
+    OzoneContainer container = mock(OzoneContainer.class);
     DatanodeConfiguration dnConf =
         tmpConf.getObject(DatanodeConfiguration.class);
     DeleteBlocksCommandHandler commandHandler =
         spy(new DeleteBlocksCommandHandler(
             container, tmpConf, dnConf, "test"));
 
-    Assertions.assertEquals(tmpConf.getTimeDuration(
+    assertEquals(tmpConf.getTimeDuration(
         BLOCK_DELETE_COMMAND_WORKER_INTERVAL,
         BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT.getSeconds(),
         TimeUnit.SECONDS), 3);
     DeleteBlocksCommandHandler.DeleteCmdWorker deleteCmdWorker =
         commandHandler.new DeleteCmdWorker(4000);
-    Assertions.assertEquals(deleteCmdWorker.getInterval(), 4000);
+    assertEquals(deleteCmdWorker.getInterval(), 4000);
   }
 
   private DeletedBlocksTransaction createDeletedBlocksTransaction(long txID,
