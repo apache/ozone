@@ -51,6 +51,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.BLOCK_DELETE_COMMAND_WORKER_INTERVAL;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler.DeleteBlockTransactionExecutionResult;
@@ -134,7 +135,7 @@ public class TestDeleteBlocksCommandHandler {
   public void testDeleteBlocksCommandHandler(
       ContainerTestVersionInfo versionInfo) throws Exception {
     prepareTest(versionInfo);
-    Assertions.assertTrue(containerSet.containerCount() > 0);
+    assertThat(containerSet.containerCount()).isGreaterThan(0);
     Container<?> container = containerSet.getContainerIterator(volume1).next();
     DeletedBlocksTransaction transaction = createDeletedBlocksTransaction(1,
         container.getContainerData().getContainerID());
@@ -160,7 +161,7 @@ public class TestDeleteBlocksCommandHandler {
   public void testDeleteBlocksCommandHandlerWithTimeoutFailed(
       ContainerTestVersionInfo versionInfo) throws Exception {
     prepareTest(versionInfo);
-    Assertions.assertTrue(containerSet.containerCount() >= 2);
+    assertThat(containerSet.containerCount()).isGreaterThanOrEqualTo(2);
     Iterator<Container<?>> iterator =
         containerSet.getContainerIterator(volume1);
     Container<?> lockedContainer = iterator.next();
@@ -208,7 +209,7 @@ public class TestDeleteBlocksCommandHandler {
   public void testDeleteBlocksCommandHandlerSuccessfulAfterFirstTimeout(
       ContainerTestVersionInfo versionInfo) throws Exception {
     prepareTest(versionInfo);
-    Assertions.assertTrue(containerSet.containerCount() > 0);
+    assertThat(containerSet.containerCount()).isGreaterThan(0);
     Container<?> lockedContainer =
         containerSet.getContainerIterator(volume1).next();
     DeletedBlocksTransaction transaction = createDeletedBlocksTransaction(1,
