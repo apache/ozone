@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.ratis.helpers;
 
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.ratis.server.protocol.TermIndex;
 
 /**
  * Entry in OzoneManagerDouble Buffer.
@@ -26,16 +27,16 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
  */
 public class DoubleBufferEntry<Response extends OMClientResponse> {
 
-  private long trxLogIndex;
+  private final TermIndex termIndex;
   private Response response;
 
-  public DoubleBufferEntry(long trxLogIndex, Response response) {
-    this.trxLogIndex = trxLogIndex;
+  public DoubleBufferEntry(TermIndex termIndex, Response response) {
+    this.termIndex = termIndex;
     this.response = response;
   }
 
-  public long getTrxLogIndex() {
-    return trxLogIndex;
+  public TermIndex getTermIndex() {
+    return termIndex;
   }
 
   public Response getResponse() {

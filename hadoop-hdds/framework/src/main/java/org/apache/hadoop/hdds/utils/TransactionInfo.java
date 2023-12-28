@@ -81,6 +81,13 @@ public final class TransactionInfo implements Comparable<TransactionInfo> {
 
   public static final TransactionInfo DEFAULT_VALUE = valueOf(0, -1);
 
+  /** In non-Ratis clusters, term is -1. */
+  public static final long NON_RATIS_TERM = -1;
+  /** For non-Ratis case. */
+  public static TermIndex getTermIndex(long transactionIndex) {
+    return TermIndex.valueOf(NON_RATIS_TERM, transactionIndex);
+  }
+
   /**
    * Use {@link SnapshotInfo} to store (term, index)
    * which is the Ratis Log term-index in Ratis enabled cluster.

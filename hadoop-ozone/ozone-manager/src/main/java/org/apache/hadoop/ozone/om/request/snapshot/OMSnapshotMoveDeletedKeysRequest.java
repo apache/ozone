@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone.om.request.snapshot;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -58,8 +59,7 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
 
   @Override
   @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
     OmSnapshotManager omSnapshotManager = ozoneManager.getOmSnapshotManager();
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
         ozoneManager.getMetadataManager();
