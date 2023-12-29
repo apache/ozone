@@ -95,9 +95,8 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.m2/repository
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}-${{ matrix.java }}
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            maven-repo-${{ hashFiles('**/pom.xml') }}
             maven-repo-
       - name: Setup java
         uses: actions/setup-java@v3
@@ -162,12 +161,11 @@ jobs:
           git config user.email 'noreply@github.com'
           git commit --allow-empty -a -m 'workaround for HADOOP-19011'
       - name: Cache for maven dependencies
-        uses: actions/cache@v3
+        uses: actions/cache/restore@v3
         with:
           path: ~/.m2/repository
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}-${{ matrix.java }}
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            maven-repo-${{ hashFiles('**/pom.xml') }}
             maven-repo-
       - name: Setup java
         uses: actions/setup-java@v3
@@ -205,13 +203,11 @@ jobs:
           fetch-depth: 0
         if: matrix.check == 'bats'
       - name: Cache for maven dependencies
-        uses: actions/cache@v3
+        uses: actions/cache/restore@v3
         with:
           path: ~/.m2/repository
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8-${{ matrix.check }}
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            maven-repo-${{ hashFiles('**/pom.xml') }}-8
-            maven-repo-${{ hashFiles('**/pom.xml') }}
             maven-repo-
         if: ${{ !contains('author,bats,docs', matrix.check) }}
       - name: Setup java
@@ -255,13 +251,11 @@ jobs:
       - name: Checkout project
         uses: actions/checkout@v3
       - name: Cache for maven dependencies
-        uses: actions/cache@v3
+        uses: actions/cache/restore@v3
         with:
           path: ~/.m2/repository
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8-${{ matrix.profile }}
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            maven-repo-${{ hashFiles('**/pom.xml') }}-8
-            maven-repo-${{ hashFiles('**/pom.xml') }}
             maven-repo-
       - name: Setup java
         uses: actions/setup-java@v3
@@ -329,14 +323,13 @@ jobs:
       - name: Checkout project
         uses: actions/checkout@v3
       - name: Cache for maven dependencies
-        uses: actions/cache@v3
+        uses: actions/cache/restore@v3
         with:
           path: |
             ~/.m2/repository
             !~/.m2/repository/org/apache/ozone
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            maven-repo-${{ hashFiles('**/pom.xml') }}
             maven-repo-
       - name: Download Ozone repo
         id: download-ozone-repo
@@ -466,13 +459,11 @@ jobs:
       - name: Checkout project
         uses: actions/checkout@v3
       - name: Cache for maven dependencies
-        uses: actions/cache@v3
+        uses: actions/cache/restore@v3
         with:
           path: ~/.m2/repository
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8-${{ matrix.profile }}
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            maven-repo-${{ hashFiles('**/pom.xml') }}-8
-            maven-repo-${{ hashFiles('**/pom.xml') }}
             maven-repo-
       - name: Download Ozone repo
         id: download-ozone-repo
@@ -532,13 +523,11 @@ jobs:
         with:
           fetch-depth: 0
       - name: Cache for maven dependencies
-        uses: actions/cache@v3
+        uses: actions/cache/restore@v3
         with:
           path: ~/.m2/repository
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8-${{ github.job }}
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            maven-repo-${{ hashFiles('**/pom.xml') }}-8
-            maven-repo-${{ hashFiles('**/pom.xml') }}
             maven-repo-
       - name: Download artifacts
         uses: actions/download-artifact@v3
