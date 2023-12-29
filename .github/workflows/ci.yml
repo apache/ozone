@@ -328,6 +328,16 @@ jobs:
     steps:
       - name: Checkout project
         uses: actions/checkout@v3
+      - name: Cache for maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.m2/repository
+            !~/.m2/repository/org/apache/ozone
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8
+          restore-keys: |
+            maven-repo-${{ hashFiles('**/pom.xml') }}
+            maven-repo-
       - name: Download Ozone repo
         id: download-ozone-repo
         uses: actions/download-artifact@v3
