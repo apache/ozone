@@ -252,12 +252,14 @@ public class SCMDeletedBlockTransactionStatusManager {
         CommandStatus.Status newStatus) {
       Map<Long, CmdStatusData> recordForDn = scmCmdStatusRecord.get(dnId);
       if (recordForDn == null) {
-        LOG.warn("Unknown Datanode: {} scmCmdId {} newStatus {}",
+        LOG.warn("Unknown Datanode: {} scmCmdId {} report status {}",
             dnId, scmCmdId, newStatus);
         return;
       }
       if (recordForDn.get(scmCmdId) == null) {
-        LOG.warn("Unknown SCM Command: {} Datanode {} newStatus {}",
+        // Because of the delay in the DN report, the DN sometimes report obsolete
+        // Command status that are cleared by the SCM.
+        LOG.debug("Unknown SCM Command: {} Datanode {} report status {}",
             scmCmdId, dnId, newStatus);
         return;
       }
@@ -300,15 +302,15 @@ public class SCMDeletedBlockTransactionStatusManager {
         }
         break;
       default:
-        LOG.error("Can not update to Unknown new Status: {}", newStatus);
+        LOG.error("Unable to update from unknown DN report status: {}", newStatus);
         break;
       }
       if (!changed) {
         LOG.warn("Cannot update illegal status for DN: {} ScmCommandId {} " +
-            "Status From {} to {}", dnId, scmCmdId, oldStatus, newStatus);
+            "Status {} by DN report status {}", dnId, scmCmdId, oldStatus, newStatus);
       } else {
         LOG.debug("Successful update DN: {} ScmCommandId {} Status From {} to" +
-            " {}", dnId, scmCmdId, oldStatus, newStatus);
+            " {}, DN report status {}", dnId, scmCmdId, oldStatus, statusData.getStatus(), newStatus);
       }
     }
 
@@ -322,9 +324,6 @@ public class SCMDeletedBlockTransactionStatusManager {
           CmdStatusData state = removeScmCommand(dnId, scmCmdId);
           LOG.warn("Remove Timeout SCM BlockDeletionCommand {} for DN {} " +
               "after without update {}ms}", state, dnId, timeoutMs);
-        } else {
-          LOG.warn("Timeout SCM scmCmdIds {} for DN {} " +
-              "after without update {}ms}", scmCmdIds, dnId, timeoutMs);
         }
       }
     }
