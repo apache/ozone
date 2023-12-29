@@ -23,6 +23,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
@@ -39,9 +40,13 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
+import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs.Builder;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -70,17 +75,22 @@ public class OmMetadataGenerator extends BaseFreonGenerator
 
   enum Operation {
     CREATE_FILE,
+    CREATE_STREAM_FILE,
     LOOKUP_FILE,
     READ_FILE,
     LIST_STATUS,
     CREATE_KEY,
+    CREATE_STREAM_KEY,
     LOOKUP_KEY,
     GET_KEYINFO,
     HEAD_KEY,
     READ_KEY,
     LIST_KEYS,
+    LIST_KEYS_LIGHT,
     INFO_BUCKET,
     INFO_VOLUME,
+    EMPTY_RPC_WRITE_RATIS,
+    EMPTY_RPC,
     MIXED,
   }
 
@@ -156,6 +166,9 @@ public class OmMetadataGenerator extends BaseFreonGenerator
   private ReplicationConfig replicationConfig;
   private Operation[] operations;
   private boolean mixedOperation = false;
+
+  private final ReplicationConfig defaultReplicationConfig =
+      ReplicationConfig.fromProtoTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.THREE);
 
   @Override
   public Void call() throws Exception {
@@ -309,7 +322,7 @@ public class OmMetadataGenerator extends BaseFreonGenerator
     };
   }
 
-  @SuppressWarnings("checkstyle:EmptyBlock")
+  @SuppressWarnings({"checkstyle:EmptyBlock", "checkstyle:MethodLength"})
   private void applyOperation(long counter) throws Exception {
     OmKeyArgs keyArgs;
     String keyName;
@@ -326,8 +339,18 @@ public class OmMetadataGenerator extends BaseFreonGenerator
     case CREATE_KEY:
       keyName = getPath(counter);
       getMetrics().timer(operation.name()).time(() -> {
-        try (OutputStream stream = bucket.createStreamKey(keyName,
-            dataSize.toBytes(), replicationConfig, new HashMap<>())) {
+        try (OutputStream stream = bucket.createKey(keyName,
+            dataSize.toBytes())) {
+          contentGenerator.write(stream);
+        }
+        return null;
+      });
+      break;
+    case CREATE_STREAM_KEY:
+      keyName = getPath(counter);
+      getMetrics().timer(operation.name()).time(() -> {
+        try (OzoneDataStreamOutput stream = bucket.createStreamKey(
+            keyName, dataSize.toBytes(), defaultReplicationConfig, Collections.emptyMap())) {
           contentGenerator.write(stream);
         }
         return null;
@@ -389,6 +412,17 @@ public class OmMetadataGenerator extends BaseFreonGenerator
         return null;
       });
       break;
+    case CREATE_STREAM_FILE:
+      keyName = getPath(counter);
+      getMetrics().timer(operation.name()).time(() -> {
+        try (
+            OzoneDataStreamOutput stream = bucket.createStreamFile(keyName, dataSize.toBytes(),
+                replicationConfig, true, false)) {
+          contentGenerator.write(stream);
+        }
+        return null;
+      });
+      break;
     case LOOKUP_FILE:
       keyName = getPath(counter);
       keyArgs = omKeyArgsBuilder.get().setKeyName(keyName).build();
@@ -403,6 +437,22 @@ public class OmMetadataGenerator extends BaseFreonGenerator
       getMetrics().timer(operation.name()).time(() -> {
         List<OmKeyInfo> keyInfoList =
             ozoneManagerClient.listKeys(volumeName, bucketName, startKeyName,
+                "", batchSize).getKeys();
+        if (keyInfoList.size() + 1 < batchSize) {
+          throw new NoSuchFileException(
+              "There are not enough files for testing you should use "
+                  + "CREATE_FILE to create at least batch-size * threads = "
+                  + batchSize * getThreadNo());
+        }
+        return null;
+      });
+      break;
+    case LIST_KEYS_LIGHT:
+      threadSeqId = getThreadSequenceId();
+      startKeyName = getPath(threadSeqId * batchSize);
+      getMetrics().timer(operation.name()).time(() -> {
+        List<BasicOmKeyInfo> keyInfoList =
+            ozoneManagerClient.listKeysLight(volumeName, bucketName, startKeyName,
                 "", batchSize).getKeys();
         if (keyInfoList.size() + 1 < batchSize) {
           throw new NoSuchFileException(
@@ -443,6 +493,26 @@ public class OmMetadataGenerator extends BaseFreonGenerator
       getMetrics().timer(operation.name()).time(() -> {
             try {
               ozoneManagerClient.getVolumeInfo(volumeName);
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+          }
+      );
+      break;
+    case EMPTY_RPC:
+      getMetrics().timer(operation.name()).time(() -> {
+            try {
+              ozoneManagerClient.echoRPCReq(new byte[] {}, 0, false);
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+          }
+      );
+      break;
+    case EMPTY_RPC_WRITE_RATIS:
+      getMetrics().timer(operation.name()).time(() -> {
+            try {
+              ozoneManagerClient.echoRPCReq(new byte[] {}, 0, true);
             } catch (IOException e) {
               throw new RuntimeException(e);
             }
