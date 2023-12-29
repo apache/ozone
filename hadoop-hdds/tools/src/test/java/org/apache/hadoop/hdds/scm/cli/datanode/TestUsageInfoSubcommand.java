@@ -27,6 +27,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import picocli.CommandLine;
 
 import java.io.ByteArrayOutputStream;
@@ -38,9 +39,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static com.fasterxml.jackson.databind.node.JsonNodeType.ARRAY;
-import static org.mockito.Mockito.anyInt;
-import static org.mockito.Mockito.anyBoolean;
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -71,8 +69,8 @@ public class TestUsageInfoSubcommand {
   @Test
   public void testCorrectJsonValuesInReport() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
-    when(scmClient.getDatanodeUsageInfo(
-        anyBoolean(), anyInt()))
+    Mockito.when(scmClient.getDatanodeUsageInfo(
+        Mockito.anyBoolean(), Mockito.anyInt()))
         .thenAnswer(invocation -> getUsageProto());
 
     CommandLine c = new CommandLine(cmd);
@@ -104,8 +102,8 @@ public class TestUsageInfoSubcommand {
   public void testOutputDataFieldsAligning() throws IOException {
     // given
     ScmClient scmClient = mock(ScmClient.class);
-    when(scmClient.getDatanodeUsageInfo(
-            anyBoolean(), anyInt()))
+    Mockito.when(scmClient.getDatanodeUsageInfo(
+            Mockito.anyBoolean(), Mockito.anyInt()))
         .thenAnswer(invocation -> getUsageProto());
 
     CommandLine c = new CommandLine(cmd);

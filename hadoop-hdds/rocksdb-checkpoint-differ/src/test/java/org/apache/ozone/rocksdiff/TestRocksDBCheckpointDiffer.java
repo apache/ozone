@@ -71,6 +71,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.Mockito;
 import org.rocksdb.Checkpoint;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -102,8 +103,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Test RocksDBCheckpointDiffer basic functionality.
@@ -160,14 +159,14 @@ public class TestRocksDBCheckpointDiffer {
     sstBackUpDir = new File(metadataDirName, sstBackUpDirName);
     createDir(sstBackUpDir, metadataDirName + "/" + sstBackUpDirName);
 
-    config = mock(ConfigurationSource.class);
+    config = Mockito.mock(ConfigurationSource.class);
 
-    when(config.getTimeDuration(
+    Mockito.when(config.getTimeDuration(
         OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED,
         OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT,
         TimeUnit.MILLISECONDS)).thenReturn(MINUTES.toMillis(10));
 
-    when(config.getTimeDuration(
+    Mockito.when(config.getTimeDuration(
         OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL,
         OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS)).thenReturn(0L);

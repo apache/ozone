@@ -49,6 +49,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -68,7 +69,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -124,14 +124,14 @@ public class TestUpgradeManager {
       volumes.add(hddsVolume);
     }
 
-    DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
-    when(datanodeDetails.getUuidString())
+    DatanodeDetails datanodeDetails = Mockito.mock(DatanodeDetails.class);
+    Mockito.when(datanodeDetails.getUuidString())
         .thenReturn(datanodeId.toString());
-    when(datanodeDetails.getUuid()).thenReturn(datanodeId);
+    Mockito.when(datanodeDetails.getUuid()).thenReturn(datanodeId);
 
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
     final AtomicInteger loopCount = new AtomicInteger(0);
-    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+    Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenAnswer(invocation -> {
           final int ii = loopCount.getAndIncrement() % volumes.size();
           return volumes.get(ii);

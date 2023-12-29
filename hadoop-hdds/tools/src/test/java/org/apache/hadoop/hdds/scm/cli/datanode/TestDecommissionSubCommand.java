@@ -31,12 +31,13 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.mockito.Mockito;
 import picocli.CommandLine;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Matchers.anyListOf;
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -68,7 +69,7 @@ public class TestDecommissionSubCommand {
   @Test
   public void testNoErrorsWhenDecommissioning() throws IOException  {
     ScmClient scmClient = mock(ScmClient.class);
-    when(scmClient.decommissionNodes(anyListOf(String.class)))
+    Mockito.when(scmClient.decommissionNodes(anyListOf(String.class)))
         .thenAnswer(invocation -> new ArrayList<DatanodeAdminError>());
 
     CommandLine c = new CommandLine(cmd);
@@ -92,7 +93,7 @@ public class TestDecommissionSubCommand {
   @Test
   public void testErrorsReportedWhenDecommissioning() throws IOException  {
     ScmClient scmClient = mock(ScmClient.class);
-    when(scmClient.decommissionNodes(anyListOf(String.class)))
+    Mockito.when(scmClient.decommissionNodes(anyListOf(String.class)))
         .thenAnswer(invocation -> {
           ArrayList<DatanodeAdminError> e = new ArrayList<>();
           e.add(new DatanodeAdminError("host1", "host1 error"));

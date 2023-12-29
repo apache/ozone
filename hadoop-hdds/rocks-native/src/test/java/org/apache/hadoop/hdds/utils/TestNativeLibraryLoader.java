@@ -24,6 +24,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -34,8 +35,6 @@ import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
 import static org.apache.hadoop.hdds.utils.NativeLibraryLoader.NATIVE_LIB_TMP_DIR;
-import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.same;
 
@@ -59,7 +58,8 @@ public class TestNativeLibraryLoader {
     Map<String, Boolean> libraryLoadedMap = new HashMap<>();
     NativeLibraryLoader loader = new NativeLibraryLoader(libraryLoadedMap);
     try (MockedStatic<NativeLibraryLoader> mockedNativeLibraryLoader =
-             mockStatic(NativeLibraryLoader.class, CALLS_REAL_METHODS)) {
+             Mockito.mockStatic(NativeLibraryLoader.class,
+                 Mockito.CALLS_REAL_METHODS)) {
       mockedNativeLibraryLoader.when(() ->
               NativeLibraryLoader.getSystemProperty(same(NATIVE_LIB_TMP_DIR)))
           .thenReturn(nativeLibraryDirectoryLocation);
