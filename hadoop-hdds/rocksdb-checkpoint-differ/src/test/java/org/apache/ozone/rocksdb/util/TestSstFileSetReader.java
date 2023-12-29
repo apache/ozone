@@ -56,7 +56,7 @@ import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LI
 /**
  * ManagedSstFileReader tests.
  */
-class TestManagedSstFileReader {
+class TestSstFileSetReader {
 
   // Key prefix containing all characters, to check if all characters can be
   // written & read from rocksdb through SSTDumptool
@@ -139,7 +139,7 @@ class TestManagedSstFileReader {
                 .collect(Collectors.toMap(Map.Entry::getKey,
                     Map.Entry::getValue));
         try (Stream<String> keyStream =
-                 new ManagedSstFileReader(files).getKeyStream(
+                 new SstFileSetReader(files).getKeyStream(
                      lowerBound.orElse(null), upperBound.orElse(null))) {
           keyStream.forEach(key -> {
             Assertions.assertEquals(keysInBoundary.get(key), 1);
@@ -187,7 +187,7 @@ class TestManagedSstFileReader {
                           .orElse(true))
                   .collect(Collectors.toMap(Map.Entry::getKey,
                       Map.Entry::getValue));
-          try (Stream<String> keyStream = new ManagedSstFileReader(files)
+          try (Stream<String> keyStream = new SstFileSetReader(files)
               .getKeyStreamWithTombstone(sstDumpTool, lowerBound.orElse(null),
                   upperBound.orElse(null))) {
             keyStream.forEach(
