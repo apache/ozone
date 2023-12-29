@@ -66,6 +66,7 @@ import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.create
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Test ContainerReader class which loads containers from disks.
@@ -414,8 +415,8 @@ public class TestContainerReader {
       }
     }
     Assertions.assertEquals(1, exist);
-    Assertions.assertTrue(paths.contains(Paths.get(
-        containerSet.getContainer(0).getContainerData().getContainerPath())));
+    assertThat(paths).contains(Paths.get(
+        containerSet.getContainer(0).getContainerData().getContainerPath()));
 
     // For conflict1, the one with the larger BCSID should win, which is
     // conflict11.

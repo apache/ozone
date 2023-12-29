@@ -227,9 +227,9 @@ public class TestContainerSet {
       if (prevScanTime.isPresent()) {
         if (scanTime.isPresent()) {
           int result = scanTime.get().compareTo(prevScanTime.get());
-          assertTrue(result >= 0);
+          assertThat(result).isGreaterThanOrEqualTo(0);
           if (result == 0) {
-            assertTrue(prevContainerID < data.getContainerID());
+            assertThat(prevContainerID).isLessThan(data.getContainerID());
           }
         } else {
           fail("Containers not yet scanned should be sorted before " +

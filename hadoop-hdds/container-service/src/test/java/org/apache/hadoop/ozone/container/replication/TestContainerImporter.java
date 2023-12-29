@@ -47,7 +47,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -90,7 +90,7 @@ class TestContainerImporter {
             null, NO_COMPRESSION));
     Assertions.assertEquals(ContainerProtos.Result.CONTAINER_EXISTS,
         ex.getResult());
-    assertTrue(ex.getMessage().contains("Container already exists"));
+    assertThat(ex.getMessage()).contains("Container already exists");
   }
 
   @Test
@@ -133,7 +133,7 @@ class TestContainerImporter {
             null, NO_COMPRESSION));
     Assertions.assertEquals(ContainerProtos.Result.CONTAINER_EXISTS,
         ex.getResult());
-    assertTrue(ex.getMessage().contains("import in progress"));
+    assertThat(ex.getMessage()).contains("import in progress");
     semaphore.release();
   }
 

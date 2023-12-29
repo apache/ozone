@@ -61,6 +61,7 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -517,12 +518,12 @@ public class TestRatisUnderReplicationHandler {
     List<DatanodeDetails> usedNodes = usedNodesCaptor.getValue();
     List<DatanodeDetails> excludedNodes = excludedNodesCaptor.getValue();
 
-    assertTrue(usedNodes.contains(good.getDatanodeDetails()));
-    assertTrue(usedNodes.contains(maintenance.getDatanodeDetails()));
-    assertTrue(usedNodes.contains(pendingAdd));
-    assertTrue(excludedNodes.contains(unhealthy.getDatanodeDetails()));
-    assertTrue(excludedNodes.contains(decommissioning.getDatanodeDetails()));
-    assertTrue(excludedNodes.contains(pendingRemove));
+    assertThat(usedNodes).contains(good.getDatanodeDetails());
+    assertThat(usedNodes).contains(maintenance.getDatanodeDetails());
+    assertThat(usedNodes).contains(pendingAdd);
+    assertThat(excludedNodes).contains(unhealthy.getDatanodeDetails());
+    assertThat(excludedNodes).contains(decommissioning.getDatanodeDetails());
+    assertThat(excludedNodes).contains(pendingRemove);
   }
 
   @Test

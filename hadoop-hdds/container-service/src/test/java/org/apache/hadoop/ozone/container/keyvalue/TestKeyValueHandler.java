@@ -62,7 +62,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -410,7 +409,7 @@ public class TestKeyValueHandler {
       try {
         kvHandler.deleteContainer(container, true);
       } catch (StorageContainerException sce) {
-        assertTrue(sce.getMessage().contains("Failed to move container"));
+        assertThat(sce.getMessage()).contains("Failed to move container");
       }
       Mockito.verify(volumeSet).checkVolumeAsync(hddsVolume);
       // cleanup
@@ -426,7 +425,7 @@ public class TestKeyValueHandler {
       String expectedLog =
           "Delete container issued on containerID 2 which is " +
               "in a failed volume";
-      assertTrue(kvHandlerLogs.getOutput().contains(expectedLog));
+      assertThat(kvHandlerLogs.getOutput()).contains(expectedLog);
     } finally {
       FileUtils.deleteDirectory(new File(testDir));
     }
