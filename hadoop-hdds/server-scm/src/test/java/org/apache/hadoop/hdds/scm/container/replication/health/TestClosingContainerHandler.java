@@ -39,6 +39,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -52,14 +53,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CL
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.clearInvocations;
-import static org.mockito.Mockito.anyBoolean;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.any;
 
 /**
  * Tests for {@link ClosingContainerHandler}.
@@ -80,8 +74,8 @@ public class TestClosingContainerHandler {
 
   @BeforeEach
   public void setup() {
-    replicationManager = mock(ReplicationManager.class);
-    when(replicationManager.getConfig())
+    replicationManager = Mockito.mock(ReplicationManager.class);
+    Mockito.when(replicationManager.getConfig())
         .thenReturn(rmConf);
     subject = new ClosingContainerHandler(replicationManager, clock);
   }
@@ -262,14 +256,14 @@ public class TestClosingContainerHandler {
     Duration notEnoughTime = replicationInterval.multipliedBy(3).plusMillis(1);
     clock.fastForward(notEnoughTime);
     assertAndVerify(request, true, 0);
-    verify(replicationManager, never())
+    Mockito.verify(replicationManager, never())
         .updateContainerState(containerInfo.containerID(), CLOSE);
 
     // wait time has elapsed (3x + 2x + a bit)
     Duration moreTime = replicationInterval.multipliedBy(2);
     clock.fastForward(moreTime);
     assertAndVerify(request, true, 0);
-    verify(replicationManager, times(1))
+    Mockito.verify(replicationManager, Mockito.times(1))
         .updateContainerState(containerInfo.containerID(), CLOSE);
   }
 
@@ -291,10 +285,10 @@ public class TestClosingContainerHandler {
         .build();
     subject.handle(request);
 
-    verify(replicationManager, times(1))
+    Mockito.verify(replicationManager, Mockito.times(1))
         .updateContainerState(containerInfo.containerID(), QUASI_CLOSE);
 
-    clearInvocations(replicationManager);
+    Mockito.clearInvocations(replicationManager);
 
     // Now add an open container. This time, the container should not move to
     // quasi-closed, and a close should be sent for the open replica.
@@ -303,7 +297,7 @@ public class TestClosingContainerHandler {
             ContainerReplicaProto.State.OPEN, 0));
 
     assertAndVerify(request, true, 1);
-    verify(replicationManager, times(0))
+    Mockito.verify(replicationManager, Mockito.times(0))
         .updateContainerState(containerInfo.containerID(), QUASI_CLOSE);
   }
 
@@ -325,10 +319,10 @@ public class TestClosingContainerHandler {
         .build();
     subject.handle(request);
 
-    verify(replicationManager, times(1))
+    Mockito.verify(replicationManager, Mockito.times(1))
         .updateContainerState(containerInfo.containerID(), CLOSE);
 
-    clearInvocations(replicationManager);
+    Mockito.clearInvocations(replicationManager);
 
     // Now add an open container. This time, the container should not move to
     // quasi-closed, and a close should be sent for the open replica.
@@ -337,7 +331,7 @@ public class TestClosingContainerHandler {
             ContainerReplicaProto.State.OPEN, 1));
 
     assertAndVerify(request, true, 1);
-    verify(replicationManager, times(0))
+    Mockito.verify(replicationManager, Mockito.times(0))
         .updateContainerState(containerInfo.containerID(), CLOSE);
   }
 
@@ -386,9 +380,9 @@ public class TestClosingContainerHandler {
     ArgumentCaptor<Boolean> forceCaptor =
         ArgumentCaptor.forClass(Boolean.class);
     Assertions.assertTrue(subject.handle(request));
-    verify(replicationManager, times(replicas))
-        .sendCloseContainerReplicaCommand(any(ContainerInfo.class),
-            any(DatanodeDetails.class), forceCaptor.capture());
+    Mockito.verify(replicationManager, Mockito.times(replicas))
+        .sendCloseContainerReplicaCommand(Mockito.any(ContainerInfo.class),
+            Mockito.any(DatanodeDetails.class), forceCaptor.capture());
     forceCaptor.getAllValues()
         .forEach(f -> Assertions.assertEquals(force, f));
   }
@@ -396,8 +390,8 @@ public class TestClosingContainerHandler {
   private void assertAndVerify(ContainerCheckRequest request,
       boolean assertion, int times) {
     Assertions.assertEquals(assertion, subject.handle(request));
-    verify(replicationManager, times(times))
-        .sendCloseContainerReplicaCommand(any(ContainerInfo.class),
-            any(DatanodeDetails.class), anyBoolean());
+    Mockito.verify(replicationManager, Mockito.times(times))
+        .sendCloseContainerReplicaCommand(Mockito.any(ContainerInfo.class),
+            Mockito.any(DatanodeDetails.class), Mockito.anyBoolean());
   }
 }

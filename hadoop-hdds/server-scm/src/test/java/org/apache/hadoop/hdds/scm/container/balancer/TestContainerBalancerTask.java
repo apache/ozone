@@ -57,6 +57,7 @@ import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -78,11 +79,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.anyString;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.any;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -131,13 +128,13 @@ public class TestContainerBalancerTask {
       TimeoutException {
     conf = new OzoneConfiguration();
     rmConf = new ReplicationManagerConfiguration();
-    scm = mock(StorageContainerManager.class);
-    containerManager = mock(ContainerManager.class);
-    replicationManager = mock(ReplicationManager.class);
-    serviceStateManager = mock(StatefulServiceStateManagerImpl.class);
-    SCMServiceManager scmServiceManager = mock(SCMServiceManager.class);
-    moveManager = mock(MoveManager.class);
-    when(moveManager.move(any(ContainerID.class),
+    scm = Mockito.mock(StorageContainerManager.class);
+    containerManager = Mockito.mock(ContainerManager.class);
+    replicationManager = Mockito.mock(ReplicationManager.class);
+    serviceStateManager = Mockito.mock(StatefulServiceStateManagerImpl.class);
+    SCMServiceManager scmServiceManager = Mockito.mock(SCMServiceManager.class);
+    moveManager = Mockito.mock(MoveManager.class);
+    Mockito.when(moveManager.move(any(ContainerID.class),
             any(DatanodeDetails.class), any(DatanodeDetails.class)))
         .thenReturn(CompletableFuture.completedFuture(
             MoveManager.MoveResult.COMPLETED));
@@ -146,7 +143,7 @@ public class TestContainerBalancerTask {
     Disable LegacyReplicationManager. This means balancer should select RATIS
      as well as EC containers for balancing. Also, MoveManager will be used.
      */
-    when(replicationManager.getConfig()).thenReturn(rmConf);
+    Mockito.when(replicationManager.getConfig()).thenReturn(rmConf);
     rmConf.setEnableLegacy(false);
     // these configs will usually be specified in each test
     balancerConfiguration =
@@ -173,26 +170,26 @@ public class TestContainerBalancerTask {
     placementPolicyValidateProxy = new PlacementPolicyValidateProxy(
         placementPolicy, ecPlacementPolicy);
 
-    when(replicationManager
-        .isContainerReplicatingOrDeleting(any(ContainerID.class)))
+    Mockito.when(replicationManager
+        .isContainerReplicatingOrDeleting(Mockito.any(ContainerID.class)))
         .thenReturn(false);
 
-    when(replicationManager.move(any(ContainerID.class),
-        any(DatanodeDetails.class),
-        any(DatanodeDetails.class)))
+    Mockito.when(replicationManager.move(Mockito.any(ContainerID.class),
+        Mockito.any(DatanodeDetails.class),
+        Mockito.any(DatanodeDetails.class)))
         .thenReturn(CompletableFuture.
             completedFuture(MoveManager.MoveResult.COMPLETED));
 
-    when(replicationManager.getClock())
+    Mockito.when(replicationManager.getClock())
         .thenReturn(Clock.system(ZoneId.systemDefault()));
 
-    when(containerManager.getContainerReplicas(any(ContainerID.class)))
+    when(containerManager.getContainerReplicas(Mockito.any(ContainerID.class)))
         .thenAnswer(invocationOnMock -> {
           ContainerID cid = (ContainerID) invocationOnMock.getArguments()[0];
           return cidToReplicasMap.get(cid);
         });
 
-    when(containerManager.getContainer(any(ContainerID.class)))
+    when(containerManager.getContainer(Mockito.any(ContainerID.class)))
         .thenAnswer(invocationOnMock -> {
           ContainerID cid = (ContainerID) invocationOnMock.getArguments()[0];
           return cidToInfoMap.get(cid);
@@ -219,23 +216,23 @@ public class TestContainerBalancerTask {
     When StatefulServiceStateManager#saveConfiguration is called, save to
     in-memory serviceToConfigMap instead.
      */
-    doAnswer(i -> {
+    Mockito.doAnswer(i -> {
       serviceToConfigMap.put(i.getArgument(0, String.class), i.getArgument(1,
           ByteString.class));
       return null;
     }).when(serviceStateManager).saveConfiguration(
-        any(String.class),
-        any(ByteString.class));
+        Mockito.any(String.class),
+        Mockito.any(ByteString.class));
 
     /*
     When StatefulServiceStateManager#readConfiguration is called, read from
     serviceToConfigMap instead.
      */
-    when(serviceStateManager.readConfiguration(anyString())).thenAnswer(
+    when(serviceStateManager.readConfiguration(Mockito.anyString())).thenAnswer(
         i -> serviceToConfigMap.get(i.getArgument(0, String.class)));
 
-    doNothing().when(scmServiceManager)
-        .register(any(SCMService.class));
+    Mockito.doNothing().when(scmServiceManager)
+        .register(Mockito.any(SCMService.class));
     ContainerBalancer sb = new ContainerBalancer(scm);
     containerBalancerTask = new ContainerBalancerTask(scm, 0, sb,
         sb.getMetrics(), balancerConfiguration, false);
@@ -299,14 +296,14 @@ public class TestContainerBalancerTask {
       NodeNotFoundException {
     rmConf.setEnableLegacy(false);
     startBalancer(balancerConfiguration);
-    verify(moveManager, atLeastOnce())
-        .move(any(ContainerID.class),
-            any(DatanodeDetails.class),
-            any(DatanodeDetails.class));
+    Mockito.verify(moveManager, atLeastOnce())
+        .move(Mockito.any(ContainerID.class),
+            Mockito.any(DatanodeDetails.class),
+            Mockito.any(DatanodeDetails.class));
 
-    verify(replicationManager, times(0))
-        .move(any(ContainerID.class), any(
-            DatanodeDetails.class), any(DatanodeDetails.class));
+    Mockito.verify(replicationManager, times(0))
+        .move(Mockito.any(ContainerID.class), Mockito.any(
+            DatanodeDetails.class), Mockito.any(DatanodeDetails.class));
   }
 
   /**
@@ -405,7 +402,7 @@ public class TestContainerBalancerTask {
       InvalidContainerBalancerConfigurationException, TimeoutException {
 
     // let's mock such that all replicas have CLOSING state
-    when(containerManager.getContainerReplicas(any(ContainerID.class)))
+    when(containerManager.getContainerReplicas(Mockito.any(ContainerID.class)))
         .thenAnswer(invocationOnMock -> {
           ContainerID cid = (ContainerID) invocationOnMock.getArguments()[0];
           Set<ContainerReplica> replicas = cidToReplicasMap.get(cid);
@@ -573,7 +570,7 @@ public class TestContainerBalancerTask {
      move should equal number of unique, selected containers (from
      containerToTargetMap).
      */
-    verify(replicationManager, times(numContainers))
+    Mockito.verify(replicationManager, times(numContainers))
         .move(any(ContainerID.class), any(DatanodeDetails.class),
             any(DatanodeDetails.class));
 
@@ -585,7 +582,7 @@ public class TestContainerBalancerTask {
     startBalancer(balancerConfiguration);
     stopBalancer();
     numContainers = containerBalancerTask.getContainerToTargetMap().size();
-    verify(moveManager, times(numContainers))
+    Mockito.verify(moveManager, times(numContainers))
         .move(any(ContainerID.class), any(DatanodeDetails.class),
             any(DatanodeDetails.class));
   }
@@ -704,7 +701,7 @@ public class TestContainerBalancerTask {
     // deliberately set max size per iteration to a low value, 6 GB
     balancerConfiguration.setMaxSizeToMovePerIteration(6 * STORAGE_UNIT);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
-    when(moveManager.move(any(), any(), any()))
+    Mockito.when(moveManager.move(any(), any(), any()))
            .thenReturn(CompletableFuture.completedFuture(
                MoveManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY))
            .thenReturn(CompletableFuture.completedFuture(
@@ -855,9 +852,9 @@ public class TestContainerBalancerTask {
     Now, limit maxSizeToMovePerIteration but fail all container moves. The
     result should still be ITERATION_COMPLETED.
      */
-    when(replicationManager.move(any(ContainerID.class),
-            any(DatanodeDetails.class),
-            any(DatanodeDetails.class)))
+    Mockito.when(replicationManager.move(Mockito.any(ContainerID.class),
+            Mockito.any(DatanodeDetails.class),
+            Mockito.any(DatanodeDetails.class)))
         .thenReturn(CompletableFuture.completedFuture(
             MoveManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY));
     balancerConfiguration.setMaxSizeToMovePerIteration(10 * STORAGE_UNIT);
@@ -893,9 +890,9 @@ public class TestContainerBalancerTask {
 
     CompletableFuture<MoveManager.MoveResult> completedFuture =
         CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED);
-    when(replicationManager.move(any(ContainerID.class),
-            any(DatanodeDetails.class),
-            any(DatanodeDetails.class)))
+    Mockito.when(replicationManager.move(Mockito.any(ContainerID.class),
+            Mockito.any(DatanodeDetails.class),
+            Mockito.any(DatanodeDetails.class)))
         .thenReturn(completedFuture)
         .thenAnswer(invocation -> genCompletableFuture(2000));
 
@@ -928,9 +925,9 @@ public class TestContainerBalancerTask {
     should be successful. The rest should fail.
      */
     rmConf.setEnableLegacy(false);
-    when(moveManager.move(any(ContainerID.class),
-            any(DatanodeDetails.class),
-            any(DatanodeDetails.class)))
+    Mockito.when(moveManager.move(Mockito.any(ContainerID.class),
+            Mockito.any(DatanodeDetails.class),
+            Mockito.any(DatanodeDetails.class)))
         .thenReturn(completedFuture)
         .thenAnswer(invocation -> genCompletableFuture(2000));
 
@@ -957,9 +954,9 @@ public class TestContainerBalancerTask {
     CompletableFuture<MoveManager.MoveResult> future2
         = CompletableFuture.supplyAsync(() ->
         MoveManager.MoveResult.DELETION_FAIL_TIME_OUT);
-    when(replicationManager.move(any(ContainerID.class),
-            any(DatanodeDetails.class),
-            any(DatanodeDetails.class)))
+    Mockito.when(replicationManager.move(Mockito.any(ContainerID.class),
+            Mockito.any(DatanodeDetails.class),
+            Mockito.any(DatanodeDetails.class)))
         .thenReturn(future, future2);
 
     balancerConfiguration.setThreshold(10);
@@ -980,9 +977,9 @@ public class TestContainerBalancerTask {
     /*
     Try the same test with MoveManager instead of LegacyReplicationManager.
      */
-    when(moveManager.move(any(ContainerID.class),
-            any(DatanodeDetails.class),
-            any(DatanodeDetails.class)))
+    Mockito.when(moveManager.move(Mockito.any(ContainerID.class),
+            Mockito.any(DatanodeDetails.class),
+            Mockito.any(DatanodeDetails.class)))
         .thenReturn(future).thenAnswer(invocation -> future2);
 
     rmConf.setEnableLegacy(false);
@@ -1004,9 +1001,9 @@ public class TestContainerBalancerTask {
     CompletableFuture<MoveManager.MoveResult> future =
         new CompletableFuture<>();
     future.completeExceptionally(new RuntimeException("Runtime Exception"));
-    when(replicationManager.move(any(ContainerID.class),
-            any(DatanodeDetails.class),
-            any(DatanodeDetails.class)))
+    Mockito.when(replicationManager.move(Mockito.any(ContainerID.class),
+            Mockito.any(DatanodeDetails.class),
+            Mockito.any(DatanodeDetails.class)))
         .thenReturn(CompletableFuture.supplyAsync(() -> {
           try {
             Thread.sleep(1);
@@ -1038,9 +1035,9 @@ public class TestContainerBalancerTask {
     /*
     Try the same test but with MoveManager instead of ReplicationManager.
      */
-    when(moveManager.move(any(ContainerID.class),
-            any(DatanodeDetails.class),
-            any(DatanodeDetails.class)))
+    Mockito.when(moveManager.move(Mockito.any(ContainerID.class),
+            Mockito.any(DatanodeDetails.class),
+            Mockito.any(DatanodeDetails.class)))
         .thenReturn(CompletableFuture.supplyAsync(() -> {
           try {
             Thread.sleep(1);

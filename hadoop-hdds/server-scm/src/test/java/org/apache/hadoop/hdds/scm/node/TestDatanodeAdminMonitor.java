@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashSet;
@@ -49,9 +50,6 @@ import java.util.Set;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.eq;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
@@ -83,7 +81,7 @@ public class TestDatanodeAdminMonitor {
 
     nodeManager = new SimpleMockNodeManager();
 
-    repManager = mock(ReplicationManager.class);
+    repManager = Mockito.mock(ReplicationManager.class);
 
     monitor =
         new DatanodeAdminMonitorImpl(conf, eventQueue, nodeManager, repManager);
@@ -269,7 +267,7 @@ public class TestDatanodeAdminMonitor {
     replicas.add(unhealthy);
     nodeManager.setContainers(dn1, ImmutableSet.of(containerID));
 
-    when(repManager.getContainerReplicaCount(eq(containerID)))
+    Mockito.when(repManager.getContainerReplicaCount(Mockito.eq(containerID)))
         .thenReturn(new LegacyRatisContainerReplicaCount(container, replicas,
             0, 0, 3, 2));
 
@@ -292,7 +290,7 @@ public class TestDatanodeAdminMonitor {
         .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
         .build();
     replicas.add(copyOfUnhealthyOnNewNode);
-    when(repManager.getContainerReplicaCount(eq(containerID)))
+    Mockito.when(repManager.getContainerReplicaCount(Mockito.eq(containerID)))
         .thenReturn(new LegacyRatisContainerReplicaCount(container, replicas,
             0, 0, 3, 2));
     monitor.run();
@@ -341,7 +339,7 @@ public class TestDatanodeAdminMonitor {
     replicas.add(unhealthy);
     nodeManager.setContainers(dn1, ImmutableSet.of(containerID));
 
-    when(repManager.getContainerReplicaCount(eq(containerID)))
+    Mockito.when(repManager.getContainerReplicaCount(Mockito.eq(containerID)))
         .thenReturn(new RatisContainerReplicaCount(container, replicas,
             Collections.emptyList(), 2, false));
     DatanodeAdminMonitorTestUtil.mockCheckContainerState(repManager, true);
@@ -365,7 +363,7 @@ public class TestDatanodeAdminMonitor {
         .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
         .build();
     replicas.add(copyOfUnhealthyOnNewNode);
-    when(repManager.getContainerReplicaCount(eq(containerID)))
+    Mockito.when(repManager.getContainerReplicaCount(Mockito.eq(containerID)))
         .thenReturn(new RatisContainerReplicaCount(container, replicas,
             Collections.emptyList(), 2, false));
     DatanodeAdminMonitorTestUtil.mockCheckContainerState(repManager, false);
@@ -406,8 +404,8 @@ public class TestDatanodeAdminMonitor {
     nodeManager.setContainers(decommissioningNode,
         ImmutableSet.of(container.containerID()));
 
-    when(repManager.getContainerReplicaCount(
-            eq(container.containerID())))
+    Mockito.when(repManager.getContainerReplicaCount(
+            Mockito.eq(container.containerID())))
         .thenReturn(new LegacyRatisContainerReplicaCount(container, replicas,
             Collections.emptyList(), 2, true));
 
@@ -431,8 +429,8 @@ public class TestDatanodeAdminMonitor {
             .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
             .build();
     replicas.add(copyOfUnhealthyOnNewNode);
-    when(repManager.getContainerReplicaCount(
-            eq(container.containerID())))
+    Mockito.when(repManager.getContainerReplicaCount(
+            Mockito.eq(container.containerID())))
         .thenReturn(new LegacyRatisContainerReplicaCount(container, replicas,
             Collections.emptyList(), 3, true));
     monitor.run();

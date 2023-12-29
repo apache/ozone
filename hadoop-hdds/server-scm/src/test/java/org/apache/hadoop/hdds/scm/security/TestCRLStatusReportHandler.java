@@ -36,6 +36,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,8 +45,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 
 /**
@@ -67,8 +66,8 @@ public class TestCRLStatusReportHandler implements EventPublisher {
         tempDir.toAbsolutePath().toString());
     config.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
 
-    SCMStorageConfig storageConfig = mock(SCMStorageConfig.class);
-    when(storageConfig.getClusterID()).thenReturn("cluster1");
+    SCMStorageConfig storageConfig = Mockito.mock(SCMStorageConfig.class);
+    Mockito.when(storageConfig.getClusterID()).thenReturn("cluster1");
     scmMetadataStore = new SCMMetadataStoreImpl(config);
     certificateStore = new SCMCertStore.Builder()
         .setRatisServer(null)

@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -64,7 +65,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -95,7 +95,7 @@ public class TestContainerReader {
     File volumeDir =
         Files.createDirectory(tempDir.resolve("volumeDir")).toFile();
     this.conf = new OzoneConfiguration();
-    volumeSet = mock(MutableVolumeSet.class);
+    volumeSet = Mockito.mock(MutableVolumeSet.class);
     containerSet = new ContainerSet(1000);
 
     datanodeId = UUID.randomUUID();
@@ -107,7 +107,7 @@ public class TestContainerReader {
 
     volumeSet = mock(MutableVolumeSet.class);
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
-    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+    Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenReturn(hddsVolume);
 
     for (int i = 0; i < 2; i++) {
@@ -265,7 +265,7 @@ public class TestContainerReader {
         Files.createDirectory(tempDir.resolve("volumeDir" + 1)).toFile();
     RoundRobinVolumeChoosingPolicy volumeChoosingPolicy1;
 
-    volumeSet1 = mock(MutableVolumeSet.class);
+    volumeSet1 = Mockito.mock(MutableVolumeSet.class);
     UUID datanode = UUID.randomUUID();
     hddsVolume1 = new HddsVolume.Builder(volumeDir1
         .getAbsolutePath()).conf(conf).datanodeUuid(datanode
@@ -273,7 +273,7 @@ public class TestContainerReader {
     StorageVolumeUtil.checkVolume(hddsVolume1, clusterId, clusterId, conf,
         null, null);
     volumeChoosingPolicy1 = mock(RoundRobinVolumeChoosingPolicy.class);
-    when(volumeChoosingPolicy1.chooseVolume(anyList(), anyLong()))
+    Mockito.when(volumeChoosingPolicy1.chooseVolume(anyList(), anyLong()))
         .thenReturn(hddsVolume1);
 
     int containerCount = 3;

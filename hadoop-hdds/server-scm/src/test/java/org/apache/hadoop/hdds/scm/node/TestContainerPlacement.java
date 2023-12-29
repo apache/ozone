@@ -62,20 +62,20 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.test.PathUtils;
+
 import org.apache.commons.io.IOUtils;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
-
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 /**
  * Test for different container placement policy.
@@ -136,20 +136,20 @@ public class TestContainerPlacement {
   SCMNodeManager createNodeManager(OzoneConfiguration config) {
     EventQueue eventQueue = new EventQueue();
     eventQueue.addHandler(SCMEvents.NEW_NODE,
-        mock(NewNodeHandler.class));
+        Mockito.mock(NewNodeHandler.class));
     eventQueue.addHandler(SCMEvents.STALE_NODE,
-        mock(StaleNodeHandler.class));
+        Mockito.mock(StaleNodeHandler.class));
     eventQueue.addHandler(SCMEvents.DEAD_NODE,
-        mock(DeadNodeHandler.class));
+        Mockito.mock(DeadNodeHandler.class));
 
-    SCMStorageConfig storageConfig = mock(SCMStorageConfig.class);
-    when(storageConfig.getClusterID()).thenReturn("cluster1");
+    SCMStorageConfig storageConfig = Mockito.mock(SCMStorageConfig.class);
+    Mockito.when(storageConfig.getClusterID()).thenReturn("cluster1");
 
     HDDSLayoutVersionManager versionManager =
-        mock(HDDSLayoutVersionManager.class);
-    when(versionManager.getMetadataLayoutVersion())
+        Mockito.mock(HDDSLayoutVersionManager.class);
+    Mockito.when(versionManager.getMetadataLayoutVersion())
         .thenReturn(maxLayoutVersion());
-    when(versionManager.getSoftwareLayoutVersion())
+    Mockito.when(versionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
     SCMNodeManager scmNodeManager = new SCMNodeManager(config, storageConfig,
         eventQueue, null, SCMContext.emptyContext(), versionManager);

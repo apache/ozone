@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.container.replication.RatisContainerReplicaCou
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.mockito.Mockito;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -42,8 +43,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.any;
 
 /**
  * Helper class to provide common methods used to test DatanodeAdminMonitor
@@ -158,8 +157,8 @@ public final class DatanodeAdminMonitorTestUtil {
       HddsProtos.NodeOperationalState...replicaStates)
       throws ContainerNotFoundException {
     reset(repManager);
-    when(repManager.getContainerReplicaCount(
-        any(ContainerID.class)))
+    Mockito.when(repManager.getContainerReplicaCount(
+        Mockito.any(ContainerID.class)))
         .thenAnswer(invocation ->
             generateReplicaCount((ContainerID)invocation.getArguments()[0],
                 containerState, replicaStates));
@@ -186,8 +185,8 @@ public final class DatanodeAdminMonitorTestUtil {
           Integer>...replicaStates)
       throws ContainerNotFoundException {
     reset(repManager);
-    when(repManager.getContainerReplicaCount(
-            any(ContainerID.class)))
+    Mockito.when(repManager.getContainerReplicaCount(
+            Mockito.any(ContainerID.class)))
         .thenAnswer(invocation ->
             generateECReplicaCount((ContainerID)invocation.getArguments()[0],
                 repConfig, containerState, replicaStates));
@@ -196,8 +195,8 @@ public final class DatanodeAdminMonitorTestUtil {
 
   static void mockCheckContainerState(ReplicationManager repManager, boolean underReplicated)
       throws ContainerNotFoundException {
-    when(repManager.checkContainerStatus(any(ContainerInfo.class),
-            any(ReplicationManagerReport.class)))
+    Mockito.when(repManager.checkContainerStatus(Mockito.any(ContainerInfo.class),
+            Mockito.any(ReplicationManagerReport.class)))
         .then(invocation -> {
           ReplicationManagerReport report = invocation.getArgument(1);
           if (underReplicated) {

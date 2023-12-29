@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.mockito.verification.VerificationMode;
@@ -47,7 +48,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -128,7 +128,7 @@ public abstract class TestContainerScannersAbstract {
     Instant oldLastScanTime = Instant.now()
         .minus(CONTAINER_SCAN_MIN_GAP_DEFAULT, ChronoUnit.MILLIS)
         .minus(10, ChronoUnit.MINUTES);
-    when(container.getContainerData().lastDataScanTime())
+    Mockito.when(container.getContainerData().lastDataScanTime())
         .thenReturn(Optional.of(oldLastScanTime));
   }
 
@@ -138,14 +138,14 @@ public abstract class TestContainerScannersAbstract {
     Instant recentLastScanTime = Instant.now()
         .minus(CONTAINER_SCAN_MIN_GAP_DEFAULT, ChronoUnit.MILLIS)
         .plus(1, ChronoUnit.MINUTES);
-    when(container.getContainerData().lastDataScanTime())
+    Mockito.when(container.getContainerData().lastDataScanTime())
         .thenReturn(Optional.of(recentLastScanTime));
   }
 
   protected void verifyContainerMarkedUnhealthy(
       Container<?> container, VerificationMode invocationTimes)
       throws Exception {
-    verify(controller, invocationTimes).markContainerUnhealthy(
+    Mockito.verify(controller, invocationTimes).markContainerUnhealthy(
         eq(container.getContainerData().getContainerID()), any());
   }
 
@@ -156,7 +156,7 @@ public abstract class TestContainerScannersAbstract {
    * containers.
    */
   protected Container<?> mockKeyValueContainer() {
-    KeyValueContainer unhealthy = mock(KeyValueContainer.class);
+    KeyValueContainer unhealthy = Mockito.mock(KeyValueContainer.class);
 
     KeyValueContainerData data = mock(KeyValueContainerData.class);
     when(data.getContainerID()).thenReturn(CONTAINER_SEQ_ID.incrementAndGet());

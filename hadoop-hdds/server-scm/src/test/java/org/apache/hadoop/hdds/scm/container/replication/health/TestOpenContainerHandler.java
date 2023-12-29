@@ -30,16 +30,14 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import java.util.Collections;
 import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.any;
 
 /**
  * Tests for the OpenContainerHandler class.
@@ -56,7 +54,7 @@ public class TestOpenContainerHandler {
     ecReplicationConfig = new ECReplicationConfig(3, 2);
     ratisReplicationConfig = RatisReplicationConfig.getInstance(
         HddsProtos.ReplicationFactor.THREE);
-    replicationManager = mock(ReplicationManager.class);
+    replicationManager = Mockito.mock(ReplicationManager.class);
     openContainerHandler = new OpenContainerHandler(replicationManager);
   }
 
@@ -74,8 +72,8 @@ public class TestOpenContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
     Assertions.assertFalse(openContainerHandler.handle(request));
-    verify(replicationManager, times(0))
-        .sendCloseContainerEvent(any());
+    Mockito.verify(replicationManager, times(0))
+        .sendCloseContainerEvent(Mockito.any());
   }
 
   @Test
@@ -92,8 +90,8 @@ public class TestOpenContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
     Assertions.assertTrue(openContainerHandler.handle(request));
-    verify(replicationManager, times(0))
-        .sendCloseContainerEvent(any());
+    Mockito.verify(replicationManager, times(0))
+        .sendCloseContainerEvent(Mockito.any());
   }
 
   @Test
@@ -118,7 +116,7 @@ public class TestOpenContainerHandler {
         .build();
     Assertions.assertTrue(openContainerHandler.handle(request));
     Assertions.assertTrue(openContainerHandler.handle(readRequest));
-    verify(replicationManager, times(1))
+    Mockito.verify(replicationManager, times(1))
         .sendCloseContainerEvent(containerInfo.containerID());
   }
 
@@ -136,8 +134,8 @@ public class TestOpenContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
     Assertions.assertFalse(openContainerHandler.handle(request));
-    verify(replicationManager, times(0))
-        .sendCloseContainerEvent(any());
+    Mockito.verify(replicationManager, times(0))
+        .sendCloseContainerEvent(Mockito.any());
   }
 
   @Test
@@ -154,8 +152,8 @@ public class TestOpenContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
     Assertions.assertTrue(openContainerHandler.handle(request));
-    verify(replicationManager, times(0))
-        .sendCloseContainerEvent(any());
+    Mockito.verify(replicationManager, times(0))
+        .sendCloseContainerEvent(Mockito.any());
   }
 
   @Test
@@ -180,7 +178,7 @@ public class TestOpenContainerHandler {
         .build();
     Assertions.assertTrue(openContainerHandler.handle(request));
     Assertions.assertTrue(openContainerHandler.handle(readRequest));
-    verify(replicationManager, times(1))
-        .sendCloseContainerEvent(any());
+    Mockito.verify(replicationManager, times(1))
+        .sendCloseContainerEvent(Mockito.any());
   }
 }

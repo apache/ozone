@@ -17,8 +17,6 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -45,6 +43,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,15 +65,15 @@ public class TestNodeReportHandler implements EventPublisher {
   @BeforeEach
   public void resetEventCollector() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
-    SCMStorageConfig storageConfig = mock(SCMStorageConfig.class);
-    when(storageConfig.getClusterID()).thenReturn("cluster1");
+    SCMStorageConfig storageConfig = Mockito.mock(SCMStorageConfig.class);
+    Mockito.when(storageConfig.getClusterID()).thenReturn("cluster1");
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
 
     this.versionManager =
-        mock(HDDSLayoutVersionManager.class);
-    when(versionManager.getMetadataLayoutVersion())
+        Mockito.mock(HDDSLayoutVersionManager.class);
+    Mockito.when(versionManager.getMetadataLayoutVersion())
         .thenReturn(maxLayoutVersion());
-    when(versionManager.getSoftwareLayoutVersion())
+    Mockito.when(versionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
     nodeManager =
         new SCMNodeManager(conf, storageConfig, new EventQueue(), clusterMap,

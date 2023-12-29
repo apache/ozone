@@ -49,6 +49,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -67,9 +68,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.doThrow;
+import static org.mockito.ArgumentMatchers.any;
 
 /**
  * Tests upgrading a single datanode from container Schema V2 to Schema V3.
@@ -533,8 +532,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
         container.getContainerData().getSchemaVersion());
 
 
-    HddsVolume volume = mock(HddsVolume.class);
-    doThrow(new IOException("Failed to init DB")).when(volume).
+    HddsVolume volume = Mockito.mock(HddsVolume.class);
+    Mockito.doThrow(new IOException("Failed to init DB")).when(volume).
         createDbStore(any());
     Map volumeMap = new HashMap<String, StorageVolume>();
     volumeMap.put(dataVolume.getStorageID(), volume);

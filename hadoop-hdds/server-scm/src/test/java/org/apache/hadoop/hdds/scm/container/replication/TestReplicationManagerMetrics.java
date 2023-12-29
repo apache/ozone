@@ -25,10 +25,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.any;
 import static org.apache.hadoop.test.MetricsAsserts.getLongGauge;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 
@@ -57,22 +55,22 @@ public class TestReplicationManagerMetrics {
         report.increment(s);
       }
     }
-    final LegacyReplicationManager lrm = mock(
+    final LegacyReplicationManager lrm = Mockito.mock(
         LegacyReplicationManager.class);
-    when(lrm.getInflightCount(any(InflightType.class)))
+    Mockito.when(lrm.getInflightCount(Mockito.any(InflightType.class)))
         .thenReturn(0);
     ConfigurationSource conf = new OzoneConfiguration();
     ReplicationManager.ReplicationManagerConfiguration rmConf = conf
         .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
     ReplicationManager replicationManager =
-        mock(ReplicationManager.class);
-    when(replicationManager.getConfig()).thenReturn(rmConf);
-    when(replicationManager.getLegacyReplicationManager())
+        Mockito.mock(ReplicationManager.class);
+    Mockito.when(replicationManager.getConfig()).thenReturn(rmConf);
+    Mockito.when(replicationManager.getLegacyReplicationManager())
         .thenReturn(lrm);
-    when(replicationManager.getContainerReport()).thenReturn(report);
-    when(replicationManager.getContainerReplicaPendingOps())
-        .thenReturn(mock(ContainerReplicaPendingOps.class));
-    when(replicationManager.getQueue())
+    Mockito.when(replicationManager.getContainerReport()).thenReturn(report);
+    Mockito.when(replicationManager.getContainerReplicaPendingOps())
+        .thenReturn(Mockito.mock(ContainerReplicaPendingOps.class));
+    Mockito.when(replicationManager.getQueue())
         .thenReturn(new ReplicationQueue());
     metrics = ReplicationManagerMetrics.create(replicationManager);
   }

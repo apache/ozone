@@ -62,6 +62,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -75,7 +76,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.lenient;
 
 /**
  * Helper utility to test containers.
@@ -136,13 +136,13 @@ public final class ContainerTestUtils {
 
   public static StateContext getMockContext(DatanodeDetails datanodeDetails,
       OzoneConfiguration conf) {
-    DatanodeStateMachine stateMachine = mock(
+    DatanodeStateMachine stateMachine = Mockito.mock(
         DatanodeStateMachine.class);
-    lenient().when(stateMachine.getReconfigurationHandler())
+    Mockito.lenient().when(stateMachine.getReconfigurationHandler())
         .thenReturn(new ReconfigurationHandler("DN", conf, op -> { }));
-    StateContext context = mock(StateContext.class);
-    when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
-    when(context.getParent()).thenReturn(stateMachine);
+    StateContext context = Mockito.mock(StateContext.class);
+    Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
+    Mockito.when(context.getParent()).thenReturn(stateMachine);
     return context;
   }
 
@@ -221,7 +221,7 @@ public final class ContainerTestUtils {
     try {
       when(c.scanData(any(DataTransferThrottler.class), any(Canceler.class)))
           .thenReturn(dataScanResult);
-      lenient().when(c.scanMetaData()).thenReturn(metadataScanResult);
+      Mockito.lenient().when(c.scanMetaData()).thenReturn(metadataScanResult);
     } catch (InterruptedException ex) {
       // Mockito.when invocations will not throw this exception. It is just
       // required for compilation.

@@ -41,18 +41,18 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
-import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.hadoop.security.authentication.client
+    .AuthenticationException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
-
-import static org.mockito.Mockito.mock;
 
 /**
  * Verifies the statics in NodeManager.
@@ -74,7 +74,7 @@ public class TestStatisticsUpdate {
     final StorageContainerManager scm = HddsTestUtils.getScm(conf);
     nodeManager = scm.getScmNodeManager();
     final DeadNodeHandler deadNodeHandler = new DeadNodeHandler(
-        nodeManager, mock(PipelineManager.class),
+        nodeManager, Mockito.mock(PipelineManager.class),
         scm.getContainerManager());
     eventQueue.addHandler(SCMEvents.DEAD_NODE, deadNodeHandler);
     nodeReportHandler = new NodeReportHandler(nodeManager);
@@ -105,10 +105,10 @@ public class TestStatisticsUpdate {
 
     nodeReportHandler.onMessage(
         new NodeReportFromDatanode(datanode1, nodeReportProto1),
-        mock(EventPublisher.class));
+        Mockito.mock(EventPublisher.class));
     nodeReportHandler.onMessage(
         new NodeReportFromDatanode(datanode2, nodeReportProto2),
-        mock(EventPublisher.class));
+        Mockito.mock(EventPublisher.class));
 
     SCMNodeStat stat = nodeManager.getStats();
     Assertions.assertEquals(300L, stat.getCapacity().get());

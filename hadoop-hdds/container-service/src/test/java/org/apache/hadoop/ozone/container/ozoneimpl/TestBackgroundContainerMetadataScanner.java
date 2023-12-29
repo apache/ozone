@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
@@ -46,7 +47,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -71,7 +71,7 @@ public class TestBackgroundContainerMetadataScanner extends
     // should be scanned.
     setScannedTimestampRecent(healthy);
     scanner.runIteration();
-    verify(healthy, never()).scanMetaData();
+    Mockito.verify(healthy, never()).scanMetaData();
   }
 
   @Test
@@ -79,17 +79,17 @@ public class TestBackgroundContainerMetadataScanner extends
   public void testPreviouslyScannedContainerIsScanned() throws Exception {
     setScannedTimestampOld(healthy);
     scanner.runIteration();
-    verify(healthy, atLeastOnce()).scanMetaData();
+    Mockito.verify(healthy, atLeastOnce()).scanMetaData();
   }
 
   @Test
   @Override
   public void testUnscannedContainerIsScanned() throws Exception {
     // If there is no last scanned time, the container should be scanned.
-    when(healthy.getContainerData().lastDataScanTime())
+    Mockito.when(healthy.getContainerData().lastDataScanTime())
         .thenReturn(Optional.empty());
     scanner.runIteration();
-    verify(healthy, atLeastOnce()).scanMetaData();
+    Mockito.verify(healthy, atLeastOnce()).scanMetaData();
   }
 
   @Test
@@ -147,10 +147,10 @@ public class TestBackgroundContainerMetadataScanner extends
     assertEquals(1, metrics.getNumUnHealthyContainers());
 
     // The unhealthy container should have been moved to the unhealthy state.
-    verify(unhealthy.getContainerData(), atMostOnce())
+    Mockito.verify(unhealthy.getContainerData(), atMostOnce())
         .setState(UNHEALTHY);
     // Update the mock to reflect this.
-    when(unhealthy.getContainerState()).thenReturn(UNHEALTHY);
+    Mockito.when(unhealthy.getContainerState()).thenReturn(UNHEALTHY);
     assertFalse(unhealthy.shouldScanMetadata());
 
     // Clear metrics to check the next run.
@@ -175,7 +175,7 @@ public class TestBackgroundContainerMetadataScanner extends
   @Test
   @Override
   public void testWithVolumeFailure() throws Exception {
-    when(vol.isFailed()).thenReturn(true);
+    Mockito.when(vol.isFailed()).thenReturn(true);
 
     ContainerMetadataScannerMetrics metrics = scanner.getMetrics();
     // Start metadata scanner thread in the background.
@@ -184,7 +184,7 @@ public class TestBackgroundContainerMetadataScanner extends
     GenericTestUtils.waitFor(() -> metrics.getNumScanIterations() >= 1, 1000,
         5000);
     // Volume health should have been checked.
-    verify(vol, atLeastOnce()).isFailed();
+    Mockito.verify(vol, atLeastOnce()).isFailed();
     // Scanner should not have shutdown when it encountered the failed volume.
     assertTrue(scanner.isAlive());
 
@@ -197,10 +197,10 @@ public class TestBackgroundContainerMetadataScanner extends
     // been scanned.
     assertEquals(0, metrics.getNumContainersScanned());
     assertEquals(0, metrics.getNumUnHealthyContainers());
-    verify(healthy, never()).scanMetaData();
-    verify(openContainer, never()).scanMetaData();
-    verify(corruptData, never()).scanMetaData();
-    verify(openCorruptMetadata, never()).scanMetaData();
+    Mockito.verify(healthy, never()).scanMetaData();
+    Mockito.verify(openContainer, never()).scanMetaData();
+    Mockito.verify(corruptData, never()).scanMetaData();
+    Mockito.verify(openCorruptMetadata, never()).scanMetaData();
   }
 
   @Test
@@ -209,7 +209,7 @@ public class TestBackgroundContainerMetadataScanner extends
     CountDownLatch latch = new CountDownLatch(1);
 
     // Make the metadata scan block until interrupt.
-    when(healthy.scanMetaData()).then(i -> {
+    Mockito.when(healthy.scanMetaData()).then(i -> {
       latch.countDown();
       Thread.sleep(Duration.ofDays(1).toMillis());
       return null;

@@ -29,6 +29,8 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -41,9 +43,6 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.any;
 
 /**
  * Tests for ReplicationManagerUtil.
@@ -54,7 +53,7 @@ public class TestReplicationManagerUtil {
 
   @BeforeEach
   public void setup() {
-    replicationManager = mock(ReplicationManager.class);
+    replicationManager = Mockito.mock(ReplicationManager.class);
   }
 
   @Test
@@ -100,7 +99,7 @@ public class TestReplicationManagerUtil {
     pending.add(ContainerReplicaOp.create(
         ContainerReplicaOp.PendingOpType.DELETE, pendingDelete, 0));
 
-    when(replicationManager.getNodeStatus(any())).thenAnswer(
+    Mockito.when(replicationManager.getNodeStatus(Mockito.any())).thenAnswer(
         invocation -> {
           final DatanodeDetails dn = invocation.getArgument(0);
           for (ContainerReplica r : replicas) {
@@ -184,7 +183,7 @@ public class TestReplicationManagerUtil {
     pending.add(ContainerReplicaOp.create(
         ContainerReplicaOp.PendingOpType.DELETE, pendingDelete, 0));
 
-    when(replicationManager.getNodeStatus(any())).thenAnswer(
+    Mockito.when(replicationManager.getNodeStatus(Mockito.any())).thenAnswer(
         invocation -> {
           final DatanodeDetails dn = invocation.getArgument(0);
           for (ContainerReplica r : replicas) {

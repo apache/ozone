@@ -53,6 +53,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -70,12 +71,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.times;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
@@ -100,7 +95,7 @@ public class TestContainerReportHandler {
       TimeoutException {
     final OzoneConfiguration conf = SCMTestUtils.getConf();
     nodeManager = new MockNodeManager(true, 10);
-    containerManager = mock(ContainerManager.class);
+    containerManager = Mockito.mock(ContainerManager.class);
     testDir = GenericTestUtils.getTestDir(
         TestContainerReportHandler.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
@@ -119,44 +114,44 @@ public class TestContainerReportHandler {
         .setContainerReplicaPendingOps(new ContainerReplicaPendingOps(
             Clock.system(ZoneId.systemDefault())))
         .build();
-    publisher = mock(EventPublisher.class);
+    publisher = Mockito.mock(EventPublisher.class);
 
-    when(containerManager.getContainer(any(ContainerID.class)))
+    Mockito.when(containerManager.getContainer(Mockito.any(ContainerID.class)))
         .thenAnswer(invocation -> containerStateManager
             .getContainer(((ContainerID)invocation
                 .getArguments()[0])));
 
-    when(containerManager.getContainerReplicas(
-        any(ContainerID.class)))
+    Mockito.when(containerManager.getContainerReplicas(
+        Mockito.any(ContainerID.class)))
         .thenAnswer(invocation -> containerStateManager
             .getContainerReplicas(((ContainerID)invocation
                 .getArguments()[0])));
 
-    doAnswer(invocation -> {
+    Mockito.doAnswer(invocation -> {
       containerStateManager
           .updateContainerState(((ContainerID)invocation
                   .getArguments()[0]).getProtobuf(),
               (HddsProtos.LifeCycleEvent)invocation.getArguments()[1]);
       return null;
     }).when(containerManager).updateContainerState(
-        any(ContainerID.class),
-        any(HddsProtos.LifeCycleEvent.class));
+        Mockito.any(ContainerID.class),
+        Mockito.any(HddsProtos.LifeCycleEvent.class));
 
-    doAnswer(invocation -> {
+    Mockito.doAnswer(invocation -> {
       containerStateManager.updateContainerReplica(
           ((ContainerID)invocation.getArguments()[0]),
           (ContainerReplica) invocation.getArguments()[1]);
       return null;
     }).when(containerManager).updateContainerReplica(
-        any(ContainerID.class), any(ContainerReplica.class));
+        Mockito.any(ContainerID.class), Mockito.any(ContainerReplica.class));
 
-    doAnswer(invocation -> {
+    Mockito.doAnswer(invocation -> {
       containerStateManager.removeContainerReplica(
           ((ContainerID)invocation.getArguments()[0]),
           (ContainerReplica) invocation.getArguments()[1]);
       return null;
     }).when(containerManager).removeContainerReplica(
-        any(ContainerID.class), any(ContainerReplica.class));
+        Mockito.any(ContainerID.class), Mockito.any(ContainerReplica.class));
 
   }
 
@@ -989,8 +984,8 @@ public class TestContainerReportHandler {
         new ContainerReportFromDatanode(datanodeOne, containerReport);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
 
-    verify(publisher, times(1))
-        .fireEvent(any(), any(CommandForDatanode.class));
+    Mockito.verify(publisher, Mockito.times(1))
+        .fireEvent(Mockito.any(), Mockito.any(CommandForDatanode.class));
 
     Assertions.assertEquals(0, containerManager.getContainerReplicas(
         containerOne.containerID()).size());

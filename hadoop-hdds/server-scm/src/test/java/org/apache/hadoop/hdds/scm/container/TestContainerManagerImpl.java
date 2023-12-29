@@ -50,10 +50,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.OPEN;
@@ -88,7 +86,7 @@ public class TestContainerManagerImpl {
         new MockPipelineManager(dbStore, scmhaManager, nodeManager);
     pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
         ReplicationFactor.THREE));
-    pendingOpsMock = mock(ContainerReplicaPendingOps.class);
+    pendingOpsMock = Mockito.mock(ContainerReplicaPendingOps.class);
     containerManager = new ContainerManagerImpl(conf,
         scmhaManager, sequenceIdGen, pipelineManager,
         SCMDBDefinition.CONTAINERS.getTable(dbStore), pendingOpsMock);
@@ -229,7 +227,7 @@ public class TestContainerManagerImpl {
             .setBytesUsed(1234)
             .setKeyCount(123)
             .build());
-    verify(pendingOpsMock, times(1))
+    Mockito.verify(pendingOpsMock, Mockito.times(1))
         .completeAddReplica(container.containerID(), dn, 0);
   }
 
@@ -250,7 +248,7 @@ public class TestContainerManagerImpl {
             .setBytesUsed(1234)
             .setKeyCount(123)
             .build());
-    verify(pendingOpsMock, times(1))
+    Mockito.verify(pendingOpsMock, Mockito.times(1))
         .completeDeleteReplica(container.containerID(), dn, 0);
   }
 

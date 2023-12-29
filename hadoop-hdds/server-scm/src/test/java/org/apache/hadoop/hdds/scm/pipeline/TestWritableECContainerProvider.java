@@ -43,6 +43,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.Mockito;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -66,13 +68,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.anyLong;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyString;
 
 /**
  * Tests to validate the WritableECContainerProvider works correctly.
@@ -82,7 +78,7 @@ public class TestWritableECContainerProvider {
   private static final String OWNER = "SCM";
   private PipelineManager pipelineManager;
   private final ContainerManager containerManager
-      = mock(ContainerManager.class);
+      = Mockito.mock(ContainerManager.class);
 
   private OzoneConfiguration conf;
   private DBStore dbStore;
@@ -117,7 +113,7 @@ public class TestWritableECContainerProvider {
     pipelineManager =
         new MockPipelineManager(dbStore, scmhaManager, nodeManager);
 
-    doAnswer(call -> {
+    Mockito.doAnswer(call -> {
       Pipeline pipeline = (Pipeline)call.getArguments()[2];
       ContainerInfo container = createContainer(pipeline,
           repConfig, System.nanoTime());
@@ -125,12 +121,12 @@ public class TestWritableECContainerProvider {
           pipeline.getId(), container.containerID());
       containers.put(container.containerID(), container);
       return container;
-    }).when(containerManager).getMatchingContainer(anyLong(),
-        anyString(), any(Pipeline.class));
+    }).when(containerManager).getMatchingContainer(Mockito.anyLong(),
+        Mockito.anyString(), Mockito.any(Pipeline.class));
 
-    doAnswer(call ->
+    Mockito.doAnswer(call ->
         containers.get((ContainerID)call.getArguments()[0]))
-        .when(containerManager).getContainer(any(ContainerID.class));
+        .when(containerManager).getContainer(Mockito.any(ContainerID.class));
 
   }
 
@@ -427,9 +423,9 @@ public class TestWritableECContainerProvider {
 
     // Ensure ContainerManager always throws when a container is requested so
     // existing pipelines cannot be used
-    doAnswer(call -> {
+    Mockito.doAnswer(call -> {
       throw new ContainerNotFoundException();
-    }).when(containerManager).getContainer(any(ContainerID.class));
+    }).when(containerManager).getContainer(Mockito.any(ContainerID.class));
 
     ContainerInfo newContainer =
         provider.getContainer(1, repConfig, OWNER, new ExcludeList());
@@ -511,7 +507,7 @@ public class TestWritableECContainerProvider {
   @MethodSource("policies")
   public void testExcludedNodesPassedToCreatePipelineIfProvided(
       PipelineChoosePolicy policy) throws IOException {
-    PipelineManager pipelineManagerSpy = spy(pipelineManager);
+    PipelineManager pipelineManagerSpy = Mockito.spy(pipelineManager);
     provider = createSubject(pipelineManagerSpy, policy);
     ExcludeList excludeList = new ExcludeList();
 

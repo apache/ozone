@@ -78,6 +78,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -423,14 +424,14 @@ public class TestEndPoint {
     when(ozoneContainer.getNodeReport()).thenReturn(HddsTestUtils
         .createNodeReport(Arrays.asList(getStorageReports(datanodeID)),
             Arrays.asList(getMetadataStorageReports(datanodeID))));
-    ContainerController controller = mock(ContainerController.class);
+    ContainerController controller = Mockito.mock(ContainerController.class);
     when(controller.getContainerReport()).thenReturn(
         HddsTestUtils.getRandomContainerReports(10));
     when(ozoneContainer.getController()).thenReturn(controller);
     when(ozoneContainer.getPipelineReport()).thenReturn(
         HddsTestUtils.getRandomPipelineReports());
     HDDSLayoutVersionManager versionManager =
-        mock(HDDSLayoutVersionManager.class);
+        Mockito.mock(HDDSLayoutVersionManager.class);
     when(versionManager.getMetadataLayoutVersion())
         .thenReturn(maxLayoutVersion());
     when(versionManager.getSoftwareLayoutVersion())

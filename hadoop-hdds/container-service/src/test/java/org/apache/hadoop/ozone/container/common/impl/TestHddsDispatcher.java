@@ -63,6 +63,7 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,14 +87,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.doReturn;
-
 
 /**
  * Test-cases to verify the functionality of HddsDispatcher.
@@ -147,7 +142,7 @@ public class TestHddsDispatcher {
       assertEquals(ContainerProtos.Result.SUCCESS,
           responseOne.getResult());
       verify(context, times(0))
-          .addContainerActionIfAbsent(any(ContainerAction.class));
+          .addContainerActionIfAbsent(Mockito.any(ContainerAction.class));
       containerData.setBytesUsed(Double.valueOf(
           StorageUnit.MB.toBytes(950)).longValue());
       ContainerCommandResponseProto responseTwo = hddsDispatcher
@@ -155,7 +150,7 @@ public class TestHddsDispatcher {
       assertEquals(ContainerProtos.Result.SUCCESS,
           responseTwo.getResult());
       verify(context, times(1))
-          .addContainerActionIfAbsent(any(ContainerAction.class));
+          .addContainerActionIfAbsent(Mockito.any(ContainerAction.class));
 
     } finally {
       volumeSet.shutdown();
@@ -184,8 +179,8 @@ public class TestHddsDispatcher {
     SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
         spaceUsage, Duration.ZERO, inMemory(new AtomicLong(0)));
     volumeBuilder.usageCheckFactory(factory);
-    MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
-    when(volumeSet.getVolumesList())
+    MutableVolumeSet volumeSet = Mockito.mock(MutableVolumeSet.class);
+    Mockito.when(volumeSet.getVolumesList())
         .thenReturn(Collections.singletonList(volumeBuilder.build()));
     try {
       UUID scmId = UUID.randomUUID();
@@ -218,7 +213,7 @@ public class TestHddsDispatcher {
       assertEquals(ContainerProtos.Result.SUCCESS,
           response.getResult());
       verify(context, times(1))
-          .addContainerActionIfAbsent(any(ContainerAction.class));
+          .addContainerActionIfAbsent(Mockito.any(ContainerAction.class));
 
       // try creating another container now as the volume used has crossed
       // threshold
@@ -347,13 +342,13 @@ public class TestHddsDispatcher {
       ContainerCommandRequestProto writeChunkRequest = getWriteChunkRequest(
           dd.getUuidString(), 1L, 1L);
 
-      HddsDispatcher mockDispatcher = spy(hddsDispatcher);
+      HddsDispatcher mockDispatcher = Mockito.spy(hddsDispatcher);
       ContainerCommandResponseProto.Builder builder =
           getContainerCommandResponse(writeChunkRequest,
               ContainerProtos.Result.DISK_OUT_OF_SPACE, "");
       // Return DISK_OUT_OF_SPACE response when writing chunk
       // with container creation.
-      doReturn(builder.build()).when(mockDispatcher)
+      Mockito.doReturn(builder.build()).when(mockDispatcher)
           .createContainer(writeChunkRequest);
 
       GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer

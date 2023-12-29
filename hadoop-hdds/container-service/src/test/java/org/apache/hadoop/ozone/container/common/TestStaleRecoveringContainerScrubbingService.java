@@ -36,7 +36,9 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -58,8 +60,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -105,7 +105,7 @@ public class TestStaleRecoveringContainerScrubbingService {
     volumeSet = mock(MutableVolumeSet.class);
 
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
-    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+    Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenReturn(hddsVolume);
   }
 
@@ -162,7 +162,7 @@ public class TestStaleRecoveringContainerScrubbingService {
     testClock.fastForward(1000L);
     srcss.runPeriodicalTaskNow();
     //closed container should not be scrubbed
-    assertEquals(5, containerSet.containerCount());
+    Assertions.assertEquals(5, containerSet.containerCount());
 
     containerStateMap.putAll(createTestContainers(containerSet, 5,
             RECOVERING).stream()
@@ -170,9 +170,9 @@ public class TestStaleRecoveringContainerScrubbingService {
     testClock.fastForward(1000L);
     srcss.runPeriodicalTaskNow();
     //recovering container should be scrubbed since recovering timeout
-    assertEquals(10, containerSet.containerCount());
+    Assertions.assertEquals(10, containerSet.containerCount());
     for (Container<?> entry : containerSet) {
-      assertEquals(entry.getContainerState(),
+      Assertions.assertEquals(entry.getContainerState(),
               containerStateMap.get(entry.getContainerData().getContainerID()));
     }
 
@@ -184,9 +184,9 @@ public class TestStaleRecoveringContainerScrubbingService {
     testClock.fastForward(1000L);
     srcss.runPeriodicalTaskNow();
     //recovering container should not be scrubbed
-    assertEquals(15, containerSet.containerCount());
+    Assertions.assertEquals(15, containerSet.containerCount());
     for (Container<?> entry : containerSet) {
-      assertEquals(entry.getContainerState(),
+      Assertions.assertEquals(entry.getContainerState(),
               containerStateMap.get(entry.getContainerData().getContainerID()));
     }
   }

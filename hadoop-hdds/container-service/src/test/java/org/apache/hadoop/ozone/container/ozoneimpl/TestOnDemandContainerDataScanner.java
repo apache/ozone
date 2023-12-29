@@ -29,6 +29,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.mockito.stubbing.Answer;
@@ -51,8 +52,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -72,7 +71,7 @@ public class TestOnDemandContainerDataScanner extends
   public void testRecentlyScannedContainerIsSkipped() throws Exception {
     setScannedTimestampRecent(healthy);
     scanContainer(healthy);
-    verify(healthy, never()).scanData(any(), any());
+    Mockito.verify(healthy, never()).scanData(any(), any());
   }
 
   @Test
@@ -82,17 +81,17 @@ public class TestOnDemandContainerDataScanner extends
     // should be scanned.
     setScannedTimestampOld(healthy);
     scanContainer(healthy);
-    verify(healthy, atLeastOnce()).scanData(any(), any());
+    Mockito.verify(healthy, atLeastOnce()).scanData(any(), any());
   }
 
   @Test
   @Override
   public void testUnscannedContainerIsScanned() throws Exception {
     // If there is no last scanned time, the container should be scanned.
-    when(healthy.getContainerData().lastDataScanTime())
+    Mockito.when(healthy.getContainerData().lastDataScanTime())
         .thenReturn(Optional.empty());
     scanContainer(healthy);
-    verify(healthy, atLeastOnce()).scanData(any(), any());
+    Mockito.verify(healthy, atLeastOnce()).scanData(any(), any());
   }
 
   @AfterEach
@@ -107,7 +106,7 @@ public class TestOnDemandContainerDataScanner extends
         OnDemandContainerDataScanner.scanContainer(healthy);
     Assertions.assertTrue(scanFuture.isPresent());
     scanFuture.get().get();
-    verify(controller, atLeastOnce())
+    Mockito.verify(controller, atLeastOnce())
         .updateDataScanTimestamp(
             eq(healthy.getContainerData().getContainerID()), any());
   }
@@ -128,7 +127,7 @@ public class TestOnDemandContainerDataScanner extends
     OnDemandContainerDataScanner.init(conf, controller);
     //Given a container that has not finished scanning
     CountDownLatch latch = new CountDownLatch(1);
-    when(corruptData.scanData(
+    Mockito.when(corruptData.scanData(
             OnDemandContainerDataScanner.getThrottler(),
             OnDemandContainerDataScanner.getCanceler()))
         .thenAnswer((Answer<ScanResult>) invocation -> {
@@ -146,7 +145,7 @@ public class TestOnDemandContainerDataScanner extends
     Assertions.assertFalse(secondScan.isPresent());
     latch.countDown();
     onGoingScan.get().get();
-    verify(controller, atLeastOnce()).markContainerUnhealthy(
+    Mockito.verify(controller, atLeastOnce()).markContainerUnhealthy(
         eq(corruptData.getContainerData().getContainerID()), any());
   }
 
@@ -187,7 +186,7 @@ public class TestOnDemandContainerDataScanner extends
     // Without initialization,
     // there shouldn't be interaction with containerController
     OnDemandContainerDataScanner.scanContainer(corruptData);
-    verifyZeroInteractions(controller);
+    Mockito.verifyZeroInteractions(controller);
 
     scanContainer(healthy);
     verifyContainerMarkedUnhealthy(healthy, never());
@@ -208,7 +207,7 @@ public class TestOnDemandContainerDataScanner extends
   @Test
   @Override
   public void testWithVolumeFailure() throws Exception {
-    when(vol.isFailed()).thenReturn(true);
+    Mockito.when(vol.isFailed()).thenReturn(true);
 
     OnDemandContainerDataScanner.init(conf, controller);
     OnDemandScannerMetrics metrics = OnDemandContainerDataScanner.getMetrics();
@@ -230,7 +229,7 @@ public class TestOnDemandContainerDataScanner extends
   @Override
   public void testShutdownDuringScan() throws Exception {
     // Make the on demand scan block until interrupt.
-    when(healthy.scanData(any(), any())).then(i -> {
+    Mockito.when(healthy.scanData(any(), any())).then(i -> {
       Thread.sleep(Duration.ofDays(1).toMillis()); return null;
     });
 
@@ -261,10 +260,10 @@ public class TestOnDemandContainerDataScanner extends
     assertEquals(1, metrics.getNumUnHealthyContainers());
 
     // The unhealthy container should have been moved to the unhealthy state.
-    verify(unhealthy.getContainerData(), atMostOnce())
+    Mockito.verify(unhealthy.getContainerData(), atMostOnce())
         .setState(UNHEALTHY);
     // Update the mock to reflect this.
-    when(unhealthy.getContainerState()).thenReturn(UNHEALTHY);
+    Mockito.when(unhealthy.getContainerState()).thenReturn(UNHEALTHY);
     assertFalse(unhealthy.shouldScanData());
 
     // Clear metrics to check the next run.

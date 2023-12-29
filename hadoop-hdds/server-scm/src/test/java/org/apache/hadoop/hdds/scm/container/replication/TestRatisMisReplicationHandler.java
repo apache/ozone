@@ -35,6 +35,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -44,13 +45,9 @@ import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.anyLong;
-import static org.mockito.Mockito.anyInt;
-import static org.mockito.Mockito.anyList;
-import static org.mockito.Mockito.any;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 
 /**
  * Tests the RatisReplicationHandling functionality.
@@ -92,16 +89,16 @@ public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
             .createReplicas(Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
                     Pair.of(IN_SERVICE, 0));
-    PlacementPolicy placementPolicy = mock(PlacementPolicy.class);
+    PlacementPolicy placementPolicy = Mockito.mock(PlacementPolicy.class);
     ContainerPlacementStatus mockedContainerPlacementStatus =
-            mock(ContainerPlacementStatus.class);
-    when(mockedContainerPlacementStatus.isPolicySatisfied())
+            Mockito.mock(ContainerPlacementStatus.class);
+    Mockito.when(mockedContainerPlacementStatus.isPolicySatisfied())
             .thenReturn(false);
-    when(placementPolicy.validateContainerPlacement(anyList(),
+    Mockito.when(placementPolicy.validateContainerPlacement(anyList(),
                     anyInt())).thenReturn(mockedContainerPlacementStatus);
-    when(placementPolicy.chooseDatanodes(
-                    any(), any(), any(),
-                    anyInt(), anyLong(), anyLong()))
+    Mockito.when(placementPolicy.chooseDatanodes(
+                    Mockito.any(), Mockito.any(), Mockito.any(),
+                    Mockito.anyInt(), Mockito.anyLong(), Mockito.anyLong()))
             .thenThrow(new IOException("No nodes found"));
     Assertions.assertThrows(SCMException.class, () -> testMisReplication(
             availableReplicas, placementPolicy, Collections.emptyList(),
@@ -141,12 +138,12 @@ public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
             .createReplicas(Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
                     Pair.of(IN_SERVICE, 0));
-    PlacementPolicy placementPolicy = mock(PlacementPolicy.class);
+    PlacementPolicy placementPolicy = Mockito.mock(PlacementPolicy.class);
     ContainerPlacementStatus mockedContainerPlacementStatus =
-            mock(ContainerPlacementStatus.class);
-    when(mockedContainerPlacementStatus.isPolicySatisfied())
+            Mockito.mock(ContainerPlacementStatus.class);
+    Mockito.when(mockedContainerPlacementStatus.isPolicySatisfied())
             .thenReturn(true);
-    when(placementPolicy.validateContainerPlacement(anyList(),
+    Mockito.when(placementPolicy.validateContainerPlacement(anyList(),
                     anyInt())).thenReturn(mockedContainerPlacementStatus);
     testMisReplication(availableReplicas, placementPolicy,
             Collections.emptyList(), 0, 1, 0);
@@ -158,12 +155,12 @@ public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
             .createReplicas(Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
                     Pair.of(IN_SERVICE, 0));
-    PlacementPolicy placementPolicy = mock(PlacementPolicy.class);
+    PlacementPolicy placementPolicy = Mockito.mock(PlacementPolicy.class);
     ContainerPlacementStatus mockedContainerPlacementStatus =
-            mock(ContainerPlacementStatus.class);
-    when(mockedContainerPlacementStatus.isPolicySatisfied())
+            Mockito.mock(ContainerPlacementStatus.class);
+    Mockito.when(mockedContainerPlacementStatus.isPolicySatisfied())
             .thenReturn(true);
-    when(placementPolicy.validateContainerPlacement(anyList(),
+    Mockito.when(placementPolicy.validateContainerPlacement(anyList(),
             anyInt())).thenReturn(mockedContainerPlacementStatus);
     List<ContainerReplicaOp> pendingOp = Collections.singletonList(
             ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD,
@@ -181,7 +178,7 @@ public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
   @Test
   public void testAllSourcesOverloaded() throws IOException {
     ReplicationManager replicationManager = getReplicationManager();
-    doThrow(new CommandTargetOverloadedException("Overloaded"))
+    Mockito.doThrow(new CommandTargetOverloadedException("Overloaded"))
         .when(replicationManager).sendThrottledReplicationCommand(any(),
             anyList(), any(), anyInt());
 

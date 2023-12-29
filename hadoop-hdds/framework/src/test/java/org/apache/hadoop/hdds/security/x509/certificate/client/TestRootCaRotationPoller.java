@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 import java.security.KeyPair;
@@ -44,7 +45,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.mockito.Mockito.when;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL;
 
 /**
@@ -81,7 +81,7 @@ public class TestRootCaRotationPoller {
         knownCerts, scmSecurityClient, "");
     //When the scm returns the same set of root ca certificates, and they poll
     //for them
-    when(scmSecurityClient.getAllRootCaCertificates())
+    Mockito.when(scmSecurityClient.getAllRootCaCertificates())
         .thenReturn(certsFromScm);
     CompletableFuture<Void> processingResult = new CompletableFuture<>();
     AtomicBoolean isProcessed = new AtomicBoolean(false);
@@ -115,7 +115,7 @@ public class TestRootCaRotationPoller {
     RootCaRotationPoller poller = new RootCaRotationPoller(secConf,
         knownCerts, scmSecurityClient, "");
     //when the scm returns the unknown certificate to the poller
-    when(scmSecurityClient.getAllRootCaCertificates())
+    Mockito.when(scmSecurityClient.getAllRootCaCertificates())
         .thenReturn(certsFromScm);
     CompletableFuture<Void> processingResult = new CompletableFuture<>();
     AtomicBoolean isProcessed = new AtomicBoolean(false);
@@ -147,7 +147,7 @@ public class TestRootCaRotationPoller {
     certsFromScm.add(CertificateCodec.getPEMEncodedString(newRootCa));
     RootCaRotationPoller poller = new RootCaRotationPoller(secConf,
         knownCerts, scmSecurityClient, "");
-    when(scmSecurityClient.getAllRootCaCertificates())
+    Mockito.when(scmSecurityClient.getAllRootCaCertificates())
         .thenReturn(certsFromScm);
     CompletableFuture<Void> processingResult = new CompletableFuture<>();
     //When encountering an error for the first run:

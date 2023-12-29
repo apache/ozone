@@ -42,6 +42,7 @@ import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 
 import java.io.IOException;
@@ -67,8 +68,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doAnswer;
 
 /**
@@ -86,8 +85,8 @@ public class TestECOverReplicationHandler {
       CommandTargetOverloadedException {
     staleNode = null;
 
-    replicationManager = mock(ReplicationManager.class);
-    when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
+    replicationManager = Mockito.mock(ReplicationManager.class);
+    Mockito.when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocation -> {
           DatanodeDetails dd = invocation.getArgument(0);
           if (staleNode != null && staleNode.equals(dd)) {
@@ -203,9 +202,9 @@ public class TestECOverReplicationHandler {
     ContainerReplica toReturn = ReplicationTestUtil.createContainerReplica(
         container.containerID(), 1, IN_SERVICE,
         ContainerReplicaProto.State.CLOSED);
-    policy = mock(PlacementPolicy.class);
-    when(policy.replicasToRemoveToFixOverreplication(
-        any(), anyInt()))
+    policy = Mockito.mock(PlacementPolicy.class);
+    Mockito.when(policy.replicasToRemoveToFixOverreplication(
+        Mockito.any(), Mockito.anyInt()))
         .thenReturn(ImmutableSet.of(toReturn));
     testOverReplicationWithIndexes(availableReplicas, Collections.emptyMap(),
         ImmutableList.of());
@@ -330,8 +329,8 @@ public class TestECOverReplicationHandler {
     ECOverReplicationHandler ecORH =
         new ECOverReplicationHandler(policy, replicationManager);
     ContainerHealthResult.OverReplicatedHealthResult result =
-        mock(ContainerHealthResult.OverReplicatedHealthResult.class);
-    when(result.getContainerInfo()).thenReturn(container);
+        Mockito.mock(ContainerHealthResult.OverReplicatedHealthResult.class);
+    Mockito.when(result.getContainerInfo()).thenReturn(container);
 
     ecORH.processAndSendCommands(availableReplicas, pendingOps,
             result, 1);

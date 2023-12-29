@@ -38,6 +38,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -67,8 +68,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Test for SCM HA-related configuration.
@@ -140,8 +139,8 @@ class TestSCMHAConfiguration {
           scmServiceId, nodeId), port++);
     }
 
-    SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
-    when(scmStorageConfig.getState())
+    SCMStorageConfig scmStorageConfig = Mockito.mock(SCMStorageConfig.class);
+    Mockito.when(scmStorageConfig.getState())
         .thenReturn(Storage.StorageState.NOT_INITIALIZED);
     SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
 
@@ -248,8 +247,8 @@ class TestSCMHAConfiguration {
     conf.set(OZONE_SCM_DATANODE_PORT_KEY, "9898");
     conf.set(OZONE_SCM_SECURITY_SERVICE_PORT_KEY, "9899");
 
-    SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
-    when(scmStorageConfig.getState())
+    SCMStorageConfig scmStorageConfig = Mockito.mock(SCMStorageConfig.class);
+    Mockito.when(scmStorageConfig.getState())
         .thenReturn(Storage.StorageState.NOT_INITIALIZED);
     SCMHANodeDetails scmhaNodeDetails =
         SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
@@ -305,8 +304,8 @@ class TestSCMHAConfiguration {
   @Test
   public void testRatisEnabledDefaultConfigWithoutInitializedSCM()
       throws IOException {
-    SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
-    when(scmStorageConfig.getState())
+    SCMStorageConfig scmStorageConfig = Mockito.mock(SCMStorageConfig.class);
+    Mockito.when(scmStorageConfig.getState())
         .thenReturn(Storage.StorageState.NOT_INITIALIZED);
     SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
     assertEquals(SCMHAUtils.isSCMHAEnabled(conf),
@@ -324,15 +323,15 @@ class TestSCMHAConfiguration {
   @Test
   public void testRatisEnabledDefaultConfigWithInitializedSCM()
       throws IOException, NoSuchFieldException, IllegalAccessException {
-    SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
-    when(scmStorageConfig.getState())
+    SCMStorageConfig scmStorageConfig = Mockito.mock(SCMStorageConfig.class);
+    Mockito.when(scmStorageConfig.getState())
         .thenReturn(Storage.StorageState.INITIALIZED);
-    when(scmStorageConfig.isSCMHAEnabled()).thenReturn(false);
+    Mockito.when(scmStorageConfig.isSCMHAEnabled()).thenReturn(false);
     DefaultConfigManager.clearDefaultConfigs();
     SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
     assertEquals(SCMHAUtils.isSCMHAEnabled(conf),
         scmStorageConfig.isSCMHAEnabled());
-    when(scmStorageConfig.isSCMHAEnabled()).thenReturn(false);
+    Mockito.when(scmStorageConfig.isSCMHAEnabled()).thenReturn(false);
     DefaultConfigManager.clearDefaultConfigs();
     assertTrue(SCMHAUtils.isSCMHAEnabled(conf));
   }
@@ -341,10 +340,10 @@ class TestSCMHAConfiguration {
   @ValueSource(booleans = {true, false})
   public void testRatisEnabledDefaultConflictConfigWithInitializedSCM(
       boolean isRatisEnabled) {
-    SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
-    when(scmStorageConfig.getState())
+    SCMStorageConfig scmStorageConfig = Mockito.mock(SCMStorageConfig.class);
+    Mockito.when(scmStorageConfig.getState())
         .thenReturn(Storage.StorageState.INITIALIZED);
-    when(scmStorageConfig.isSCMHAEnabled()).thenReturn(isRatisEnabled);
+    Mockito.when(scmStorageConfig.isSCMHAEnabled()).thenReturn(isRatisEnabled);
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, !isRatisEnabled);
     assertThrows(ConfigurationException.class,
             () -> SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig));

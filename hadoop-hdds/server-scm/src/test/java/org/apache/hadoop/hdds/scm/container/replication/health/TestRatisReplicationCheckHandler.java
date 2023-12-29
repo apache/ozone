@@ -46,6 +46,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -68,10 +69,6 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.anyInt;
-import static org.mockito.Mockito.any;
 
 /**
  * Tests for the RatisReplicationCheckHandler class.
@@ -89,15 +86,15 @@ public class TestRatisReplicationCheckHandler {
 
   @BeforeEach
   public void setup() throws IOException, NodeNotFoundException {
-    containerPlacementPolicy = mock(PlacementPolicy.class);
-    when(containerPlacementPolicy.validateContainerPlacement(
-        any(),
-        anyInt()
+    containerPlacementPolicy = Mockito.mock(PlacementPolicy.class);
+    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+        Mockito.any(),
+        Mockito.anyInt()
     )).thenAnswer(invocation ->
         new ContainerPlacementStatusDefault(2, 2, 3));
 
-    replicationManager = mock(ReplicationManager.class);
-    when(replicationManager.getNodeStatus(any()))
+    replicationManager = Mockito.mock(ReplicationManager.class);
+    Mockito.when(replicationManager.getNodeStatus(Mockito.any()))
         .thenReturn(NodeStatus.inServiceHealthy());
     healthCheck = new RatisReplicationCheckHandler(containerPlacementPolicy,
         replicationManager);
@@ -741,9 +738,9 @@ public class TestRatisReplicationCheckHandler {
    */
   @Test
   public void testOverReplicatedWithMisReplication() {
-    when(containerPlacementPolicy.validateContainerPlacement(
-        any(),
-        anyInt()
+    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+        Mockito.any(),
+        Mockito.anyInt()
     )).thenAnswer(invocation ->
         new ContainerPlacementStatusDefault(1, 2, 3));
 
@@ -779,9 +776,9 @@ public class TestRatisReplicationCheckHandler {
 
   @Test
   public void testUnderReplicatedWithMisReplication() {
-    when(containerPlacementPolicy.validateContainerPlacement(
-        any(),
-        anyInt()
+    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+        Mockito.any(),
+        Mockito.anyInt()
     )).thenAnswer(invocation ->
         new ContainerPlacementStatusDefault(1, 2, 3));
 
@@ -808,9 +805,9 @@ public class TestRatisReplicationCheckHandler {
 
   @Test
   public void testUnderReplicatedWithMisReplicationFixedByPending() {
-    when(containerPlacementPolicy.validateContainerPlacement(
-        any(),
-        anyInt()
+    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+        Mockito.any(),
+        Mockito.anyInt()
     )).thenAnswer(invocation -> {
       List<DatanodeDetails> dns = invocation.getArgument(0);
       // If the number of DNs is 3 or less make it be mis-replicated
@@ -852,9 +849,9 @@ public class TestRatisReplicationCheckHandler {
 
   @Test
   public void testMisReplicated() {
-    when(containerPlacementPolicy.validateContainerPlacement(
-        any(),
-        anyInt()
+    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+        Mockito.any(),
+        Mockito.anyInt()
     )).thenAnswer(invocation ->
         new ContainerPlacementStatusDefault(1, 2, 3));
 
@@ -879,9 +876,9 @@ public class TestRatisReplicationCheckHandler {
 
   @Test
   public void testMisReplicatedFixedByPending() {
-    when(containerPlacementPolicy.validateContainerPlacement(
-        any(),
-        anyInt()
+    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
+        Mockito.any(),
+        Mockito.anyInt()
     )).thenAnswer(invocation -> {
       List<DatanodeDetails> dns = invocation.getArgument(0);
       // If the number of DNs is 3 or less make it be mis-replicated

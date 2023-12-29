@@ -81,6 +81,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.time.Clock;
@@ -121,13 +122,6 @@ import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicaBuilder;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.anyLong;
-import static org.mockito.Mockito.anyInt;
-import static org.mockito.Mockito.argThat;
-import static org.mockito.Mockito.anyList;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
@@ -165,14 +159,14 @@ public class TestLegacyReplicationManager {
 
     scmLogs = GenericTestUtils.LogCapturer.
         captureLogs(LegacyReplicationManager.LOG);
-    containerManager = mock(ContainerManager.class);
+    containerManager = Mockito.mock(ContainerManager.class);
     nodeManager = new SimpleMockNodeManager();
     eventQueue = new EventQueue();
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
-    PipelineManager pipelineManager = mock(PipelineManager.class);
-    when(pipelineManager.containsPipeline(any(PipelineID.class)))
+    PipelineManager pipelineManager = Mockito.mock(PipelineManager.class);
+    when(pipelineManager.containsPipeline(Mockito.any(PipelineID.class)))
         .thenReturn(true);
     containerStateManager = ContainerStateManagerImpl.newBuilder()
         .setConfiguration(conf)
@@ -188,7 +182,7 @@ public class TestLegacyReplicationManager {
     datanodeCommandHandler = new DatanodeCommandHandler();
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, datanodeCommandHandler);
 
-    when(containerManager.getContainers())
+    Mockito.when(containerManager.getContainers())
         .thenAnswer(invocation -> {
           Set<ContainerID> ids = containerStateManager.getContainerIDs();
           List<ContainerInfo> containers = new ArrayList<>();
@@ -199,23 +193,23 @@ public class TestLegacyReplicationManager {
           return containers;
         });
 
-    when(containerManager.getContainer(any(ContainerID.class)))
+    Mockito.when(containerManager.getContainer(Mockito.any(ContainerID.class)))
         .thenAnswer(invocation -> containerStateManager
             .getContainer(((ContainerID)invocation
                 .getArguments()[0])));
 
-    when(containerManager.getContainerReplicas(
-        any(ContainerID.class)))
+    Mockito.when(containerManager.getContainerReplicas(
+        Mockito.any(ContainerID.class)))
         .thenAnswer(invocation -> containerStateManager
             .getContainerReplicas(((ContainerID)invocation
                 .getArguments()[0])));
 
-    ratisContainerPlacementPolicy = mock(PlacementPolicy.class);
-    ecContainerPlacementPolicy = mock(PlacementPolicy.class);
+    ratisContainerPlacementPolicy = Mockito.mock(PlacementPolicy.class);
+    ecContainerPlacementPolicy = Mockito.mock(PlacementPolicy.class);
 
-    when(ratisContainerPlacementPolicy.chooseDatanodes(
-        any(), any(), anyInt(),
-            anyLong(), anyLong()))
+    Mockito.when(ratisContainerPlacementPolicy.chooseDatanodes(
+        Mockito.any(), Mockito.any(), Mockito.anyInt(),
+            Mockito.anyLong(), Mockito.anyLong()))
         .thenAnswer(invocation -> {
           int count = (int) invocation.getArguments()[2];
           return IntStream.range(0, count)
@@ -223,9 +217,9 @@ public class TestLegacyReplicationManager {
               .collect(Collectors.toList());
         });
 
-    when(ratisContainerPlacementPolicy.validateContainerPlacement(
-        any(),
-        anyInt()
+    Mockito.when(ratisContainerPlacementPolicy.validateContainerPlacement(
+        Mockito.any(),
+        Mockito.anyInt()
         )).thenAnswer(invocation ->
         new ContainerPlacementStatusDefault(2, 2, 3));
     clock = new TestClock(Instant.now(), ZoneId.of("UTC"));
@@ -474,7 +468,7 @@ public class TestLegacyReplicationManager {
       Assertions.assertEquals(1, report.getStat(
               ReplicationManagerReport.HealthState.MIS_REPLICATED));
 
-      verify(containerManager, times(0))
+      Mockito.verify(containerManager, times(0))
           .updateContainerState(container.containerID(),
               LifeCycleEvent.QUASI_CLOSE);
     }
@@ -659,7 +653,7 @@ public class TestLegacyReplicationManager {
       }
 
       replicationManager.processAll();
-      verify(containerManager, times(1))
+      Mockito.verify(containerManager, times(1))
           .updateContainerState(container.containerID(),
               LifeCycleEvent.QUASI_CLOSE);
 
@@ -697,7 +691,7 @@ public class TestLegacyReplicationManager {
       replicationManager.processAll();
       eventQueue.processAll(1000);
 
-      verify(containerManager, times(0))
+      Mockito.verify(containerManager, times(0))
           .updateContainerState(container.containerID(),
               LifeCycleEvent.QUASI_CLOSE);
       Assertions.assertEquals(currentCloseCommandCount + 1,
@@ -1429,9 +1423,9 @@ public class TestLegacyReplicationManager {
       policy could not find any targets. In the second iteration, return a list
       of required targets.
        */
-      when(ratisContainerPlacementPolicy.chooseDatanodes(
-          any(), any(), anyInt(),
-              anyLong(), anyLong()))
+      Mockito.when(ratisContainerPlacementPolicy.chooseDatanodes(
+          Mockito.any(), Mockito.any(), Mockito.anyInt(),
+              Mockito.anyLong(), Mockito.anyLong()))
           .thenAnswer(invocation -> {
             throw new SCMException(
                 SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
@@ -1514,9 +1508,9 @@ public class TestLegacyReplicationManager {
     @Test
     public void testUnderRepQuasiClosedContainerBlockedByUnhealthyReplicas()
         throws IOException, TimeoutException {
-      when(ratisContainerPlacementPolicy.chooseDatanodes(
-              anyList(), any(), anyInt(),
-              anyLong(), anyLong()))
+      Mockito.when(ratisContainerPlacementPolicy.chooseDatanodes(
+              Mockito.anyList(), Mockito.any(), Mockito.anyInt(),
+              Mockito.anyLong(), Mockito.anyLong()))
           .thenAnswer(invocation -> {
             List<DatanodeDetails> excluded = invocation.getArgument(0);
             if (excluded.size() == 3) {
@@ -1868,12 +1862,12 @@ public class TestLegacyReplicationManager {
       }
 
       final CloseContainerEventHandler closeContainerHandler =
-          mock(CloseContainerEventHandler.class);
+          Mockito.mock(CloseContainerEventHandler.class);
       eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
 
       replicationManager.processAll();
       eventQueue.processAll(1000);
-      verify(closeContainerHandler, times(1))
+      Mockito.verify(closeContainerHandler, Mockito.times(1))
           .onMessage(id, eventQueue);
 
       ReplicationManagerReport report = replicationManager.getContainerReport();
@@ -2989,9 +2983,9 @@ public class TestLegacyReplicationManager {
       // Ensure a mis-replicated status is returned for any containers in this
       // test where there are 3 replicas. When there are 2 or 4 replicas
       // the status returned will be healthy.
-      when(ratisContainerPlacementPolicy.validateContainerPlacement(
-              argThat(list -> list.size() == 3),
-              anyInt()
+      Mockito.when(ratisContainerPlacementPolicy.validateContainerPlacement(
+              Mockito.argThat(list -> list.size() == 3),
+              Mockito.anyInt()
       )).thenAnswer(invocation -> {
         return new ContainerPlacementStatusDefault(1, 2, 3);
       });
@@ -3025,9 +3019,9 @@ public class TestLegacyReplicationManager {
       // Now make it so that all containers seem mis-replicated no matter how
       // many replicas. This will test replicas are not scheduled if the new
       // replica does not fix the mis-replication.
-      when(ratisContainerPlacementPolicy.validateContainerPlacement(
-              anyList(),
-              anyInt()
+      Mockito.when(ratisContainerPlacementPolicy.validateContainerPlacement(
+              Mockito.anyList(),
+              Mockito.anyInt()
       )).thenAnswer(invocation -> {
         return new ContainerPlacementStatusDefault(1, 2, 3);
       });
@@ -3075,9 +3069,9 @@ public class TestLegacyReplicationManager {
 
       // Ensure a mis-replicated status is returned for any containers in this
       // test where there are exactly 3 replicas checked.
-      when(ratisContainerPlacementPolicy.validateContainerPlacement(
-              argThat(list -> list.size() == 3),
-              anyInt()
+      Mockito.when(ratisContainerPlacementPolicy.validateContainerPlacement(
+              Mockito.argThat(list -> list.size() == 3),
+              Mockito.anyInt()
       )).thenAnswer(
               invocation -> new ContainerPlacementStatusDefault(1, 2, 3));
 
@@ -3128,9 +3122,9 @@ public class TestLegacyReplicationManager {
               id, replicaThree);
       containerStateManager.updateContainerReplica(id, replicaFour);
 
-      when(ratisContainerPlacementPolicy.validateContainerPlacement(
-              argThat(list -> list.size() == 3),
-              anyInt()
+      Mockito.when(ratisContainerPlacementPolicy.validateContainerPlacement(
+              Mockito.argThat(list -> list.size() == 3),
+              Mockito.anyInt()
       )).thenAnswer(
               invocation -> new ContainerPlacementStatusDefault(2, 2, 3));
 
@@ -3179,9 +3173,9 @@ public class TestLegacyReplicationManager {
       containerStateManager.updateContainerReplica(id, replicaFour);
       containerStateManager.updateContainerReplica(id, replicaFive);
 
-      when(ratisContainerPlacementPolicy.validateContainerPlacement(
-              argThat(list -> list != null && list.size() <= 4),
-              anyInt()
+      Mockito.when(ratisContainerPlacementPolicy.validateContainerPlacement(
+              Mockito.argThat(list -> list != null && list.size() <= 4),
+              Mockito.anyInt()
       )).thenAnswer(
               invocation -> new ContainerPlacementStatusDefault(1, 2, 3));
 
