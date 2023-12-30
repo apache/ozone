@@ -134,15 +134,12 @@ class TestOzoneManagerDoubleBuffer {
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
-    OzoneManagerRatisSnapshot ozoneManagerRatisSnapshot = index -> {
-    };
 
     flushNotifier = new OzoneManagerDoubleBuffer.FlushNotifier();
     spyFlushNotifier = spy(flushNotifier);
     doubleBuffer = new OzoneManagerDoubleBuffer.Builder()
         .setOmMetadataManager(omMetadataManager)
         .setS3SecretManager(secretManager)
-        .setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
         .setmaxUnFlushedTransactionCount(1000)
         .enableRatis(true)
         .setFlushNotifier(spyFlushNotifier)

@@ -26,15 +26,11 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
-import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -66,6 +62,7 @@ import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.server.storage.RaftStorage;
 import org.apache.ratis.statemachine.SnapshotInfo;
 import org.apache.ratis.statemachine.TransactionContext;
@@ -73,6 +70,7 @@ import org.apache.ratis.statemachine.impl.BaseStateMachine;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.ExitUtils;
+import org.apache.ratis.util.IOUtils;
 import org.apache.ratis.util.LifeCycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -103,15 +101,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final AtomicInteger statePausedCount = new AtomicInteger(0);
   private final String threadPrefix;
 
-  // Map which contains index and term for the ratis transactions which are
-  // stateMachine entries which are received through applyTransaction.
-  private ConcurrentMap<Long, Long> applyTransactionMap =
-      new ConcurrentSkipListMap<>();
+  private volatile TermIndex lastNotifiedTermIndex = TermIndex.valueOf(0, RaftLog.INVALID_LOG_INDEX);
 
-  // Map which contains index and term for the ratis transactions which are
-  // conf/metadata entries which are received through notifyIndexUpdate.
-  private ConcurrentMap<Long, Long> ratisTransactionMap =
-      new ConcurrentSkipListMap<>();
   private OzoneManagerStateMachineMetrics metrics;
 
 
@@ -186,19 +177,26 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @param index index which is being updated
    */
   @Override
-  public void notifyTermIndexUpdated(long currentTerm, long index) {
-    // SnapshotInfo should be updated when the term changes.
-    // The index here refers to the log entry index and the index in
-    // SnapshotInfo represents the snapshotIndex i.e. the index of the last
-    // transaction included in the snapshot. Hence, snaphsotInfo#index is not
-    // updated here.
+  public synchronized void notifyTermIndexUpdated(long currentTerm, long index) {
+    final TermIndex newTermIndex = TermIndex.valueOf(currentTerm, index);
+    lastNotifiedTermIndex = assertUpdateIncreasingly("lastNotified", lastNotifiedTermIndex, newTermIndex);
+  }
 
-    // We need to call updateLastApplied here because now in ratis when a
-    // node becomes leader, it is checking stateMachineIndex >=
-    // placeHolderIndex (when a node becomes leader, it writes a conf entry
-    // with some information like its peers and termIndex). So, calling
-    // updateLastApplied updates lastAppliedTermIndex.
-    computeAndUpdateLastAppliedIndex(index, currentTerm, null, false);
+  public TermIndex getLastNotifiedTermIndex() {
+    return lastNotifiedTermIndex;
+  }
+
+  @Override
+  protected synchronized boolean updateLastAppliedTermIndex(TermIndex newTermIndex) {
+    assertUpdateIncreasingly("lastApplied", getLastAppliedTermIndex(), newTermIndex);
+    return super.updateLastAppliedTermIndex(newTermIndex);
+  }
+
+  /** Assert if the given {@link TermIndex} is updated increasingly. */
+  private TermIndex assertUpdateIncreasingly(String name, TermIndex oldTermIndex, TermIndex newTermIndex) {
+    Preconditions.checkArgument(newTermIndex.compareTo(oldTermIndex) >= 0,
+        "%s: newTermIndex = %s < oldTermIndex = %s", name, newTermIndex, oldTermIndex);
+    return newTermIndex;
   }
 
   /**
@@ -331,7 +329,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
           : OMRatisHelper.convertByteStringToOMRequest(
           trx.getStateMachineLogEntry().getLogData());
       final TermIndex termIndex = TermIndex.valueOf(trx.getLogEntry());
-      final long trxLogIndex = termIndex.getIndex();
       // In the current approach we have one single global thread executor.
       // with single thread. Right now this is being done for correctness, as
       // applyTransaction will be run on multiple OM's we want to execute the
@@ -365,7 +362,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
       CompletableFuture<Message> ratisFuture =
           new CompletableFuture<>();
-      applyTransactionMap.put(trxLogIndex, trx.getLogEntry().getTerm());
 
       //if there are too many pending requests, wait for doubleBuffer flushing
       ozoneManagerDoubleBuffer.acquireUnFlushedTransactions(1);
@@ -474,7 +470,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
             OMConfigKeys.OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT_DEFAULT);
     return new OzoneManagerDoubleBuffer.Builder()
         .setOmMetadataManager(ozoneManager.getMetadataManager())
-        .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
+        .setUpdateLastAppliedIndex(this::updateLastAppliedTermIndex)
         .setmaxUnFlushedTransactionCount(maxUnflushedTransactionSize)
         .setThreadPrefix(threadPrefix)
         .setS3SecretManager(ozoneManager.getS3SecretManager())
@@ -493,15 +489,28 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   @Override
   public long takeSnapshot() throws IOException {
-    LOG.info("Current Snapshot Index {}", getLastAppliedTermIndex());
-    TermIndex lastTermIndex = getLastAppliedTermIndex();
-    final TransactionInfo build = TransactionInfo.valueOf(lastTermIndex);
-    ozoneManager.setTransactionInfo(build);
-    Table<String, TransactionInfo> txnInfoTable =
-        ozoneManager.getMetadataManager().getTransactionInfoTable();
-    txnInfoTable.put(TRANSACTION_INFO_KEY, build);
+    try {
+      ozoneManagerDoubleBuffer.awaitFlush();
+    } catch (InterruptedException e) {
+      throw IOUtils.toInterruptedIOException("Interrupted ozoneManagerDoubleBuffer.awaitFlush", e);
+    }
+
+    return takeSnapshotImpl();
+  }
+
+  private synchronized long takeSnapshotImpl() throws IOException {
+    final TermIndex applied = getLastAppliedTermIndex();
+    final TermIndex notified = getLastNotifiedTermIndex();
+    final TermIndex snapshot = applied.compareTo(notified) > 0 ? applied : notified;
+    LOG.info(" applied = {}", applied);
+    LOG.info("notified = {}", notified);
+    LOG.info("snapshot = {}", snapshot);
+
+    final TransactionInfo transactionInfo = TransactionInfo.valueOf(snapshot);
+    ozoneManager.setTransactionInfo(transactionInfo);
+    ozoneManager.getMetadataManager().getTransactionInfoTable().put(TRANSACTION_INFO_KEY, transactionInfo);
     ozoneManager.getMetadataManager().getStore().flushDB();
-    return lastTermIndex.getIndex();
+    return snapshot.getIndex();
   }
 
   /**
@@ -614,87 +623,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     return omResponse;
   }
 
-  /**
-   * Update lastAppliedIndex term and it's corresponding term in the
-   * stateMachine.
-   * @param flushedEpochs
-   */
-  public void updateLastAppliedIndex(List<Long> flushedEpochs) {
-    Preconditions.checkArgument(flushedEpochs.size() > 0);
-    computeAndUpdateLastAppliedIndex(
-        flushedEpochs.get(flushedEpochs.size() - 1), -1L, flushedEpochs, true);
-  }
-
-  /**
-   * Update State machine lastAppliedTermIndex.
-   * @param lastFlushedIndex
-   * @param currentTerm
-   * @param flushedEpochs - list of ratis transactions flushed to DB. If it
-   * is just one index and term, this can be set to null.
-   * @param checkMap - if true check applyTransactionMap, ratisTransaction
-   * Map and update lastAppliedTermIndex accordingly, else check
-   * lastAppliedTermIndex and update it.
-   */
-  private synchronized void computeAndUpdateLastAppliedIndex(
-      long lastFlushedIndex, long currentTerm, List<Long> flushedEpochs,
-      boolean checkMap) {
-    if (checkMap) {
-      List<Long> flushedTrans = new ArrayList<>(flushedEpochs);
-      Long appliedTerm = null;
-      long appliedIndex = -1;
-      for (long i = getLastAppliedTermIndex().getIndex() + 1; ; i++) {
-        if (flushedTrans.contains(i)) {
-          appliedIndex = i;
-          final Long removed = applyTransactionMap.remove(i);
-          appliedTerm = removed;
-          flushedTrans.remove(i);
-        } else if (ratisTransactionMap.containsKey(i)) {
-          final Long removed = ratisTransactionMap.remove(i);
-          appliedTerm = removed;
-          appliedIndex = i;
-        } else {
-          // Add remaining which are left in flushedEpochs to
-          // ratisTransactionMap to be considered further.
-          for (long epoch : flushedTrans) {
-            ratisTransactionMap.put(epoch, applyTransactionMap.remove(epoch));
-          }
-          if (LOG.isDebugEnabled()) {
-            if (!flushedTrans.isEmpty()) {
-              LOG.debug("ComputeAndUpdateLastAppliedIndex due to SM added " +
-                  "to map remaining {}", flushedTrans);
-            }
-          }
-          break;
-        }
-      }
-      if (appliedTerm != null) {
-        updateLastAppliedTermIndex(appliedTerm, appliedIndex);
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("ComputeAndUpdateLastAppliedIndex due to SM is {}",
-              getLastAppliedTermIndex());
-        }
-      }
-    } else {
-      if (getLastAppliedTermIndex().getIndex() + 1 == lastFlushedIndex) {
-        updateLastAppliedTermIndex(currentTerm, lastFlushedIndex);
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("ComputeAndUpdateLastAppliedIndex due to notifyIndex {}",
-              getLastAppliedTermIndex());
-        }
-      } else {
-        ratisTransactionMap.put(lastFlushedIndex, currentTerm);
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("ComputeAndUpdateLastAppliedIndex due to notifyIndex " +
-              "added to map. Passed Term {} index {}, where as lastApplied " +
-              "Index {}", currentTerm, lastFlushedIndex,
-              getLastAppliedTermIndex());
-        }
-      }
-    }
-    this.metrics.updateApplyTransactionMapSize(applyTransactionMap.size());
-    this.metrics.updateRatisTransactionMapSize(ratisTransactionMap.size());
-  }
-
   public void loadSnapshotInfoFromDB() throws IOException {
     // This is done, as we have a check in Ratis for not throwing
     // LeaderNotReadyException, it checks stateMachineIndex >= raftLog
@@ -752,26 +680,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     ozoneManagerDoubleBuffer.stop();
     HadoopExecutors.shutdown(executorService, LOG, 5, TimeUnit.SECONDS);
     HadoopExecutors.shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
-    LOG.info("applyTransactionMap size {} ", applyTransactionMap.size());
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("applyTransactionMap {}",
-          applyTransactionMap.keySet().stream().map(Object::toString)
-              .collect(Collectors.joining(",")));
-    }
-    LOG.info("ratisTransactionMap size {}", ratisTransactionMap.size());
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("ratisTransactionMap {}",
-          ratisTransactionMap.keySet().stream().map(Object::toString)
-            .collect(Collectors.joining(",")));
-    }
     if (metrics != null) {
       metrics.unRegister();
     }
-  }
-
-  @VisibleForTesting
-  void addApplyTransactionTermIndex(long term, long index) {
-    applyTransactionMap.put(index, term);
   }
 
   /**

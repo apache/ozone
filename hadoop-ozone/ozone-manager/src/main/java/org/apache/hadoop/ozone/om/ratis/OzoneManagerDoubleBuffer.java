@@ -37,6 +37,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -112,8 +113,7 @@ public final class OzoneManagerDoubleBuffer {
   private final OzoneManagerDoubleBufferMetrics ozoneManagerDoubleBufferMetrics;
   private long maxFlushedTransactionsInOneIteration;
 
-  private final OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot;
-
+  private final Consumer<TermIndex> updateLastAppliedIndex;
   private final boolean isRatisEnabled;
   private final boolean isTracingEnabled;
   private final Semaphore unFlushedTransactions;
@@ -125,7 +125,7 @@ public final class OzoneManagerDoubleBuffer {
    */
   public static class Builder {
     private OMMetadataManager mm;
-    private OzoneManagerRatisSnapshot rs;
+    private Consumer<TermIndex> updateLastAppliedIndex = termIndex -> { };
     private boolean isRatisEnabled = false;
     private boolean isTracingEnabled = false;
     private int maxUnFlushedTransactionCount = 0;
@@ -139,9 +139,8 @@ public final class OzoneManagerDoubleBuffer {
       return this;
     }
 
-    public Builder setOzoneManagerRatisSnapShot(
-        OzoneManagerRatisSnapshot omrs) {
-      this.rs = omrs;
+    Builder setUpdateLastAppliedIndex(Consumer<TermIndex> updateLastAppliedIndex) {
+      this.updateLastAppliedIndex = updateLastAppliedIndex;
       return this;
     }
 
@@ -177,8 +176,6 @@ public final class OzoneManagerDoubleBuffer {
 
     public OzoneManagerDoubleBuffer build() {
       if (isRatisEnabled) {
-        Preconditions.checkNotNull(rs, "When ratis is enabled, " +
-                "OzoneManagerRatisSnapshot should not be null");
         Preconditions.checkState(maxUnFlushedTransactionCount > 0L,
             "when ratis is enable, maxUnFlushedTransactions " +
                 "should be bigger than 0");
@@ -187,7 +184,7 @@ public final class OzoneManagerDoubleBuffer {
         flushNotifier = new FlushNotifier();
       }
 
-      return new OzoneManagerDoubleBuffer(mm, rs, isRatisEnabled,
+      return new OzoneManagerDoubleBuffer(mm, updateLastAppliedIndex, isRatisEnabled,
           isTracingEnabled, maxUnFlushedTransactionCount,
           flushNotifier, s3SecretManager, threadPrefix);
     }
@@ -195,7 +192,7 @@ public final class OzoneManagerDoubleBuffer {
 
   @SuppressWarnings("checkstyle:parameternumber")
   private OzoneManagerDoubleBuffer(OMMetadataManager omMetadataManager,
-      OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot,
+      Consumer<TermIndex> updateLastAppliedIndex,
       boolean isRatisEnabled, boolean isTracingEnabled,
       int maxUnFlushedTransactions,
       FlushNotifier flushNotifier, S3SecretManager s3SecretManager,
@@ -206,7 +203,7 @@ public final class OzoneManagerDoubleBuffer {
     this.isTracingEnabled = isTracingEnabled;
     this.unFlushedTransactions = new Semaphore(maxUnFlushedTransactions);
     this.omMetadataManager = omMetadataManager;
-    this.ozoneManagerRatisSnapShot = ozoneManagerRatisSnapShot;
+    this.updateLastAppliedIndex = updateLastAppliedIndex;
     this.ozoneManagerDoubleBufferMetrics =
         OzoneManagerDoubleBufferMetrics.create();
     this.flushNotifier = flushNotifier;
@@ -336,9 +333,8 @@ public final class OzoneManagerDoubleBuffer {
         .map(Entry::getTermIndex)
         .sorted()
         .collect(Collectors.toList());
-    final List<Long> flushedEpochs = flushedTransactions.stream()
-        .map(TermIndex::getIndex)
-        .collect(Collectors.toList());
+    final int flushedTransactionsSize = flushedTransactions.size();
+    final TermIndex lastTransaction = flushedTransactions.get(flushedTransactionsSize - 1);
 
     try (BatchOperation batchOperation = omMetadataManager.getStore()
         .initBatchOperation()) {
@@ -348,7 +344,6 @@ public final class OzoneManagerDoubleBuffer {
       buffer.iterator().forEachRemaining(
           entry -> addCleanupEntry(entry, cleanupEpochs));
 
-      final TermIndex lastTransaction = flushedTransactions.get(flushedTransactions.size() - 1);
 
       addToBatchTransactionInfoWithTrace(lastTraceId,
           lastTransaction.getIndex(),
@@ -373,7 +368,6 @@ public final class OzoneManagerDoubleBuffer {
           .forEach(f -> f.complete(null));
     }
 
-    int flushedTransactionsSize = buffer.size();
     flushedTransactionCount.addAndGet(flushedTransactionsSize);
     flushIterations.incrementAndGet();
 
@@ -390,7 +384,7 @@ public final class OzoneManagerDoubleBuffer {
       releaseUnFlushedTransactions(flushedTransactionsSize);
     }
     // update the last updated index in OzoneManagerStateMachine.
-    ozoneManagerRatisSnapShot.updateLastAppliedIndex(flushedEpochs);
+    updateLastAppliedIndex.accept(lastTransaction);
 
     // set metrics.
     updateMetrics(flushedTransactionsSize);

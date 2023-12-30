@@ -117,11 +117,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     } else {
       this.ozoneManagerDoubleBuffer = new OzoneManagerDoubleBuffer.Builder()
           .setOmMetadataManager(ozoneManager.getMetadataManager())
-          // Do nothing.
-          // For OM NON-HA code, there is no need to save transaction index.
-          // As we wait until the double buffer flushes DB to disk.
-          .setOzoneManagerRatisSnapShot((i) -> {
-          })
           .enableRatis(isRatisEnabled)
           .enableTracing(TracingUtil.isTracingEnabled(
               ozoneManager.getConfiguration()))

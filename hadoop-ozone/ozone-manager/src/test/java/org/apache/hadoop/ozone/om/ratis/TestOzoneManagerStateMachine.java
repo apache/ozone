@@ -36,6 +36,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInf
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
+import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,8 +46,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -87,174 +87,43 @@ public class TestOzoneManagerStateMachine {
     when(ozoneManager.getConfiguration()).thenReturn(conf);
     ozoneManagerStateMachine =
         new OzoneManagerStateMachine(ozoneManagerRatisServer, false);
-    ozoneManagerStateMachine.notifyTermIndexUpdated(0, 0);
+  }
+
+  static void assertTermIndex(long expectedTerm, long expectedIndex, TermIndex computed) {
+    Assertions.assertEquals(expectedTerm, computed.getTerm());
+    Assertions.assertEquals(expectedIndex, computed.getIndex());
   }
 
   @Test
   public void testLastAppliedIndex() {
-
-    // Happy scenario.
+    ozoneManagerStateMachine.notifyTermIndexUpdated(0, 0);
+    assertTermIndex(0, RaftLog.INVALID_LOG_INDEX, ozoneManagerStateMachine.getLastAppliedTermIndex());
+    assertTermIndex(0, 0, ozoneManagerStateMachine.getLastNotifiedTermIndex());
 
     // Conf/metadata transaction.
     ozoneManagerStateMachine.notifyTermIndexUpdated(0, 1);
-    Assertions.assertEquals(0,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(1,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
-
-    List<Long> flushedEpochs = new ArrayList<>();
-
-    // Add some apply transactions.
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0, 2);
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0, 3);
-
-    flushedEpochs.add(2L);
-    flushedEpochs.add(3L);
+    assertTermIndex(0, RaftLog.INVALID_LOG_INDEX, ozoneManagerStateMachine.getLastAppliedTermIndex());
+    assertTermIndex(0, 1, ozoneManagerStateMachine.getLastNotifiedTermIndex());
 
     // call update last applied index
-    ozoneManagerStateMachine.updateLastAppliedIndex(flushedEpochs);
+    ozoneManagerStateMachine.updateLastAppliedTermIndex(TermIndex.valueOf(0, 2));
+    ozoneManagerStateMachine.updateLastAppliedTermIndex(TermIndex.valueOf(0, 3));
 
-    Assertions.assertEquals(0,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(3,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
+    assertTermIndex(0, 3, ozoneManagerStateMachine.getLastAppliedTermIndex());
+    assertTermIndex(0, 1, ozoneManagerStateMachine.getLastNotifiedTermIndex());
 
     // Conf/metadata transaction.
-    ozoneManagerStateMachine.notifyTermIndexUpdated(0L, 4L);
+    ozoneManagerStateMachine.notifyTermIndexUpdated(1L, 4L);
 
-    Assertions.assertEquals(0L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(4L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
+    assertTermIndex(0, 3, ozoneManagerStateMachine.getLastAppliedTermIndex());
+    assertTermIndex(1, 4, ozoneManagerStateMachine.getLastNotifiedTermIndex());
 
     // Add some apply transactions.
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 5L);
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 6L);
+    ozoneManagerStateMachine.updateLastAppliedTermIndex(TermIndex.valueOf(1L, 5L));
+    ozoneManagerStateMachine.updateLastAppliedTermIndex(TermIndex.valueOf(1L, 6L));
 
-    flushedEpochs.clear();
-    flushedEpochs.add(5L);
-    flushedEpochs.add(6L);
-    ozoneManagerStateMachine.updateLastAppliedIndex(flushedEpochs);
-
-    Assertions.assertEquals(0L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(6L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
-
-
-  }
-
-
-  @Test
-  public void testApplyTransactionsUpdateLastAppliedIndexCalledLate() {
-    // Now try a scenario where 1,2,3 transactions are in applyTransactionMap
-    // and updateLastAppliedIndex is not called for them, and before that
-    // notifyTermIndexUpdated is called with transaction 4. And see now at the
-    // end when updateLastAppliedIndex is called with epochs we have
-    // lastAppliedIndex as 4 or not.
-
-    // Conf/metadata transaction.
-    ozoneManagerStateMachine.notifyTermIndexUpdated(0, 1);
-    Assertions.assertEquals(0,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(1,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
-
-
-
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 2L);
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 3L);
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 4L);
-
-
-
-    // Conf/metadata transaction.
-    ozoneManagerStateMachine.notifyTermIndexUpdated(0L, 5L);
-
-  // Still it should be zero, as for 2,3,4 updateLastAppliedIndex is not yet
-    // called so the lastAppliedIndex will be at older value.
-    Assertions.assertEquals(0L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(1L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
-
-    List<Long> flushedEpochs = new ArrayList<>();
-
-
-    flushedEpochs.add(2L);
-    flushedEpochs.add(3L);
-    flushedEpochs.add(4L);
-
-    ozoneManagerStateMachine.updateLastAppliedIndex(flushedEpochs);
-
-    Assertions.assertEquals(0L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(5L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
-
-  }
-
-
-  @Test
-  public void testLastAppliedIndexWithMultipleExecutors() {
-
-    // first flush batch
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 1L);
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 2L);
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 4L);
-
-    List<Long> flushedEpochs = new ArrayList<>();
-
-
-    flushedEpochs.add(1L);
-    flushedEpochs.add(2L);
-    flushedEpochs.add(4L);
-
-    ozoneManagerStateMachine.updateLastAppliedIndex(flushedEpochs);
-
-    Assertions.assertEquals(0L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(2L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
-
-
-
-
-    // 2nd flush batch
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 3L);
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 5L);
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 6L);
-
-    flushedEpochs.clear();
-    flushedEpochs.add(3L);
-    flushedEpochs.add(5L);
-    flushedEpochs.add(6L);
-
-    ozoneManagerStateMachine.updateLastAppliedIndex(flushedEpochs);
-
-    Assertions.assertEquals(0L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(6L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
-
-    // 3rd flush batch
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 7L);
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 8L);
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 9L);
-    ozoneManagerStateMachine.addApplyTransactionTermIndex(0L, 10L);
-
-    flushedEpochs.clear();
-    flushedEpochs.add(7L);
-    flushedEpochs.add(8L);
-    flushedEpochs.add(9L);
-    flushedEpochs.add(10L);
-
-    ozoneManagerStateMachine.updateLastAppliedIndex(flushedEpochs);
-
-    Assertions.assertEquals(0L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getTerm());
-    Assertions.assertEquals(10L,
-        ozoneManagerStateMachine.getLastAppliedTermIndex().getIndex());
+    assertTermIndex(1, 6, ozoneManagerStateMachine.getLastAppliedTermIndex());
+    assertTermIndex(1, 4, ozoneManagerStateMachine.getLastNotifiedTermIndex());
   }
 
   @Test
