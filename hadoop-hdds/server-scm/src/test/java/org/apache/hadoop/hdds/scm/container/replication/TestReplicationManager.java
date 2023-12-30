@@ -84,6 +84,7 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicasWithSameOrigin;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.getNoNodesTestPlacementPolicy;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -1214,12 +1215,12 @@ public class TestReplicationManager {
     }
     assertEquals(2, cmdTargets.size());
     for (DatanodeDetails dn : targetNodes) {
-      assertTrue(cmdTargets.contains(dn));
+      assertThat(cmdTargets).contains(dn);
     }
 
     assertEquals(2, cmdIndexes.size());
     for (int i : missingIndexes) {
-      assertTrue(cmdIndexes.contains(i));
+      assertThat(cmdIndexes).contains(i);
     }
     assertEquals(1, replicationManager.getMetrics()
         .getEcReconstructionCmdsSentTotal());
@@ -1594,7 +1595,7 @@ public class TestReplicationManager {
     assertEquals(1, excluded.size());
     // dn 3 was at the limit already, so should be added when filtering the
     // nodes
-    assertTrue(excluded.contains(dn3));
+    assertThat(excluded).contains(dn3);
 
     // Trigger an update for dn3, but it should stay in the excluded list as its
     // count is still at the limit.
@@ -1616,7 +1617,7 @@ public class TestReplicationManager {
     excluded = replicationManager.getExcludedNodes();
     assertEquals(1, excluded.size());
     // dn 2 reached the limit from the reconstruction command
-    assertTrue(excluded.contains(dn2));
+    assertThat(excluded).contains(dn2);
 
     // Update received for DN2, it should be cleared from the excluded list.
     replicationManager.datanodeCommandCountUpdated(dn2);

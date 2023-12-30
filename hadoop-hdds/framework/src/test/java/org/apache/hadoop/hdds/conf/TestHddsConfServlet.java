@@ -17,8 +17,8 @@
  */
 package org.apache.hadoop.hdds.conf;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.eq;
@@ -113,7 +113,7 @@ public class TestHddsConfServlet {
     assertEquals(result, tags);
     // cmd is getPropertyByTag
     result = getResultWithCmd(conf, "getPropertyByTag");
-    assertTrue(result.contains("ozone.test.test.key"));
+    assertThat(result).contains("ozone.test.test.key");
     // cmd is illegal
     getResultWithCmd(conf, "illegal");
   }
@@ -254,16 +254,15 @@ public class TestHddsConfServlet {
       // in the response
       if (Strings.isNullOrEmpty(propertyName)) {
         for (Map.Entry<String, String> entry : TEST_PROPERTIES.entrySet()) {
-          assertTrue(result.contains(entry.getKey()) &&
-                  result.contains(entry.getValue()));
+          assertThat(result).contains(entry.getKey(), entry.getValue());
         }
       } else {
         if (conf.get(propertyName) != null) {
           // if property name is not empty and property is found
-          assertTrue(result.contains(propertyName));
+          assertThat(result).contains(propertyName);
           for (Map.Entry<String, String> entry : TEST_PROPERTIES.entrySet()) {
             if (!entry.getKey().equals(propertyName)) {
-              assertFalse(result.contains(entry.getKey()));
+              assertThat(result).doesNotContain(entry.getKey());
             }
           }
         } else {

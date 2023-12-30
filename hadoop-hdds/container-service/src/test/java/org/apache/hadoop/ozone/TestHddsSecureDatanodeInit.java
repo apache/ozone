@@ -53,6 +53,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.mockito.ArgumentMatchers.anyObject;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -177,8 +179,7 @@ public class TestHddsSecureDatanodeInit {
     Assertions.assertNotNull(client.getPrivateKey());
     Assertions.assertNotNull(client.getPublicKey());
     Assertions.assertNull(client.getCertificate());
-    Assertions.assertTrue(dnLogs.getOutput()
-        .contains("Init response: GETCERT"));
+    assertThat(dnLogs.getOutput()).contains("Init response: GETCERT");
   }
 
   @Test
@@ -188,13 +189,13 @@ public class TestHddsSecureDatanodeInit {
     RuntimeException rteException = Assertions.assertThrows(
         RuntimeException.class,
         () -> service.initializeCertificateClient(client));
-    Assertions.assertTrue(rteException.getMessage()
-        .contains("DN security initialization failed"));
+    assertThat(rteException.getMessage())
+        .contains("DN security initialization failed");
     Assertions.assertNull(client.getPrivateKey());
     Assertions.assertNull(client.getPublicKey());
     Assertions.assertNotNull(client.getCertificate());
-    Assertions.assertTrue(dnLogs.getOutput()
-        .contains("Init response: FAILURE"));
+    assertThat(dnLogs.getOutput())
+        .contains("Init response: FAILURE");
   }
 
   @Test
@@ -204,13 +205,13 @@ public class TestHddsSecureDatanodeInit {
     RuntimeException rteException = Assertions.assertThrows(
         RuntimeException.class,
         () -> service.initializeCertificateClient(client));
-    Assertions.assertTrue(rteException.getMessage()
-        .contains("DN security initialization failed"));
+    assertThat(rteException.getMessage())
+        .contains("DN security initialization failed");
     Assertions.assertNull(client.getPrivateKey());
     Assertions.assertNotNull(client.getPublicKey());
     Assertions.assertNull(client.getCertificate());
-    Assertions.assertTrue(dnLogs.getOutput()
-        .contains("Init response: FAILURE"));
+    assertThat(dnLogs.getOutput())
+        .contains("Init response: FAILURE");
   }
 
   @Test
@@ -221,13 +222,13 @@ public class TestHddsSecureDatanodeInit {
     RuntimeException rteException = Assertions.assertThrows(
         RuntimeException.class,
         () -> service.initializeCertificateClient(client));
-    Assertions.assertTrue(rteException.getMessage()
-        .contains("DN security initialization failed"));
+    assertThat(rteException.getMessage())
+        .contains("DN security initialization failed");
     Assertions.assertNull(client.getPrivateKey());
     Assertions.assertNotNull(client.getPublicKey());
     Assertions.assertNotNull(client.getCertificate());
-    Assertions.assertTrue(dnLogs.getOutput()
-        .contains("Init response: FAILURE"));
+    assertThat(dnLogs.getOutput())
+        .contains("Init response: FAILURE");
   }
 
   @Test
@@ -253,8 +254,8 @@ public class TestHddsSecureDatanodeInit {
     Assertions.assertNotNull(client.getPrivateKey());
     Assertions.assertNotNull(client.getPublicKey());
     Assertions.assertNotNull(client.getCertificate());
-    Assertions.assertTrue(dnLogs.getOutput()
-        .contains("Init response: GETCERT"));
+    assertThat(dnLogs.getOutput())
+        .contains("Init response: GETCERT");
     dnLogs.clearOutput();
     // reset scmClient behavior
     when(scmClient.getDataNodeCertificateChain(anyObject(), anyString()))
@@ -270,8 +271,8 @@ public class TestHddsSecureDatanodeInit {
     Assertions.assertNotNull(client.getPrivateKey());
     Assertions.assertNotNull(client.getPublicKey());
     Assertions.assertNotNull(client.getCertificate());
-    Assertions.assertTrue(dnLogs.getOutput()
-        .contains("Init response: SUCCESS"));
+    assertThat(dnLogs.getOutput())
+        .contains("Init response: SUCCESS");
   }
 
   @Test
@@ -284,8 +285,8 @@ public class TestHddsSecureDatanodeInit {
     Assertions.assertNotNull(client.getPrivateKey());
     Assertions.assertNotNull(client.getPublicKey());
     Assertions.assertNull(client.getCertificate());
-    Assertions.assertTrue(dnLogs.getOutput()
-        .contains("Init response: GETCERT"));
+    assertThat(dnLogs.getOutput())
+        .contains("Init response: GETCERT");
   }
 
   @Test
@@ -299,8 +300,8 @@ public class TestHddsSecureDatanodeInit {
     Assertions.assertNotNull(client.getPrivateKey());
     Assertions.assertNotNull(client.getPublicKey());
     Assertions.assertNotNull(client.getCertificate());
-    Assertions.assertTrue(dnLogs.getOutput()
-        .contains("Init response: SUCCESS"));
+    assertThat(dnLogs.getOutput())
+        .contains("Init response: SUCCESS");
   }
 
   /**
@@ -426,7 +427,7 @@ public class TestHddsSecureDatanodeInit {
     try {
       client.getCertificate().checkValidity();
     } catch (Exception e) {
-      Assertions.assertTrue(e instanceof CertificateExpiredException);
+      assertInstanceOf(CertificateExpiredException.class, e);
     }
 
     // provide a new valid SCMGetCertResponseProto

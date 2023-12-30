@@ -66,6 +66,7 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.matchesPattern;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -474,7 +475,7 @@ public class TestSCMContainerPlacementRackScatter {
 
     Assertions.assertEquals(totalRequest, nodeNum);
     Assertions.assertEquals(successCount, 0);
-    Assertions.assertTrue(tryCount >= nodeNum, "Not enough try");
+    assertThat(tryCount).withFailMessage("Not enough try").isGreaterThanOrEqualTo(nodeNum);
     Assertions.assertEquals(compromiseCount, 0);
   }
 

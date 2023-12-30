@@ -45,6 +45,7 @@ import org.slf4j.event.Level;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -258,7 +259,7 @@ public class TestContainerBalancer {
     Thread balancingThread = containerBalancer.getCurrentBalancingThread();
     GenericTestUtils.waitFor(
         () -> balancingThread.getState() == Thread.State.TIMED_WAITING, 2, 20);
-    Assertions.assertTrue(logCapturer.getOutput().contains(expectedLog));
+    assertThat(logCapturer.getOutput()).contains(expectedLog);
     stopBalancer();
   }
 

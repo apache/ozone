@@ -63,7 +63,7 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ClosableIterator;
 import org.apache.hadoop.util.ExitUtil;
-import org.apache.ozone.rocksdb.util.ManagedSstFileReader;
+import org.apache.ozone.rocksdb.util.SstFileSetReader;
 import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
@@ -648,8 +648,8 @@ public class TestSnapshotDiffManager {
         .map(i -> (i + 100) + "/key" + i).collect(Collectors.toSet());
 
     // Mocking SSTFileReader functions to return the above keys list.
-    try (MockedConstruction<ManagedSstFileReader> mockedSSTFileReader =
-             mockConstruction(ManagedSstFileReader.class,
+    try (MockedConstruction<SstFileSetReader> mockedSSTFileReader =
+             mockConstruction(SstFileSetReader.class,
                  (mock, context) -> {
                    when(mock.getKeyStreamWithTombstone(any(), any(), any()))
                        .thenReturn(keysIncludingTombstones.stream());

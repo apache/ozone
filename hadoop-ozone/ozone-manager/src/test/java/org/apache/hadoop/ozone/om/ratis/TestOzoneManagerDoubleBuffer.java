@@ -29,6 +29,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -144,7 +145,6 @@ class TestOzoneManagerDoubleBuffer {
         .setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
         .setmaxUnFlushedTransactionCount(1000)
         .enableRatis(true)
-        .setIndexToTerm((i) -> 1L)
         .setFlushNotifier(spyFlushNotifier)
         .build();
 
@@ -240,7 +240,7 @@ class TestOzoneManagerDoubleBuffer {
     doubleBuffer.stopDaemon();
 
     for (int i = 0; i < omClientResponses.size(); i++) {
-      doubleBuffer.add(omClientResponses.get(i), i);
+      doubleBuffer.add(omClientResponses.get(i), TransactionInfo.getTermIndex(i));
     }
 
     // Flush the current buffer.
@@ -292,7 +292,7 @@ class TestOzoneManagerDoubleBuffer {
 
     // Init double buffer.
     for (OMClientResponse omClientResponse : omClientResponses) {
-      doubleBuffer.add(omClientResponse, transactionIndex++);
+      doubleBuffer.add(omClientResponse, TransactionInfo.getTermIndex(transactionIndex++));
     }
     assertEquals(initialSize,
         doubleBuffer.getCurrentBufferSize());
@@ -386,7 +386,7 @@ class TestOzoneManagerDoubleBuffer {
     // Run validateAndUpdateCache
     OMClientResponse omClientResponse =
         s3GetSecretRequest.validateAndUpdateCache(ozoneManager, txLogIndex);
-    doubleBuffer.add(omClientResponse, txLogIndex);
+    doubleBuffer.add(omClientResponse, TransactionInfo.getTermIndex(txLogIndex));
   }
 
   private OzoneManagerProtocolProtos.OMRequest s3GetSecretRequest(

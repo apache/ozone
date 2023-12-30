@@ -28,6 +28,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.forTest;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Test replicator metric measurement.
@@ -93,10 +94,12 @@ public class TestMeasuredReplicator {
     //even containers should be failed
     long successTime = measuredReplicator.getSuccessTime().value();
     long failureTime = measuredReplicator.getFailureTime().value();
-    Assertions.assertTrue(successTime >= 300L,
-        "Measured time should be at least 300 ms but was " + successTime);
-    Assertions.assertTrue(failureTime >= 300L,
-        "Measured time should be at least 300 ms but was " + failureTime);
+    assertThat(successTime)
+        .withFailMessage("Measured time should be at least 300 ms but was " + successTime)
+        .isGreaterThanOrEqualTo(300L);
+    assertThat(failureTime)
+        .withFailMessage("Measured time should be at least 300 ms but was " + failureTime)
+        .isGreaterThanOrEqualTo(300L);
   }
 
   @Test
@@ -134,6 +137,6 @@ public class TestMeasuredReplicator {
     };
     measuredReplicator.replicate(task);
     // There might be some deviation, so we use >= 1000 here.
-    Assertions.assertTrue(measuredReplicator.getQueueTime().value() >= 1000);
+    assertThat(measuredReplicator.getQueueTime().value()).isGreaterThanOrEqualTo(1000);
   }
 }

@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.StringUtils;
@@ -36,6 +37,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipReques
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
+import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.common.PayloadUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -158,6 +161,7 @@ import static org.apache.hadoop.util.MetricUtil.captureLatencyNs;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.util.Preconditions;
 import org.apache.hadoop.util.ProtobufUtils;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -170,6 +174,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       LoggerFactory.getLogger(OzoneManagerRequestHandler.class);
   private final OzoneManager impl;
   private OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
+  private FaultInjector injector;
 
   public OzoneManagerRequestHandler(OzoneManager om,
       OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer) {
@@ -387,20 +392,20 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   @Override
-  public OMClientResponse handleWriteRequest(OMRequest omRequest,
-      long transactionLogIndex) throws IOException {
+  public OMClientResponse handleWriteRequest(OMRequest omRequest, TermIndex termIndex) throws IOException {
+    injectPause();
     OMClientRequest omClientRequest =
         OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
     return captureLatencyNs(
         impl.getPerfMetrics().getValidateAndUpdateCacneLatencyNs(),
         () -> {
           OMClientResponse omClientResponse =
-              omClientRequest.validateAndUpdateCache(getOzoneManager(), transactionLogIndex);
+              omClientRequest.validateAndUpdateCache(getOzoneManager(), termIndex);
           Preconditions.checkNotNull(omClientResponse,
               "omClientResponse returned by validateAndUpdateCache cannot be null");
           if (omRequest.getCmdType() != Type.Prepare) {
             omClientResponse.setFlushFuture(
-                ozoneManagerDoubleBuffer.add(omClientResponse, transactionLogIndex));
+                ozoneManagerDoubleBuffer.add(omClientResponse, termIndex));
           }
           return omClientResponse;
         });
@@ -409,6 +414,27 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   @Override
   public void updateDoubleBuffer(OzoneManagerDoubleBuffer omDoubleBuffer) {
     this.ozoneManagerDoubleBuffer = omDoubleBuffer;
+  }
+
+  @VisibleForTesting
+  public void setInjector(FaultInjector injector) {
+    this.injector = injector;
+  }
+
+  @VisibleForTesting
+  public FaultInjector getInjector() {
+    return injector;
+  }
+
+  /**
+   * Inject pause for test only.
+   *
+   * @throws IOException
+   */
+  private void injectPause() throws IOException {
+    if (injector != null) {
+      injector.pause();
+    }
   }
 
   private DBUpdatesResponse getOMDBUpdates(
@@ -420,7 +446,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     DBUpdates dbUpdatesWrapper =
         impl.getDBUpdates(dbUpdatesRequest);
     for (int i = 0; i < dbUpdatesWrapper.getData().size(); i++) {
-      builder.addData(OMPBHelper.getByteString(
+      builder.addData(OzonePBHelper.getByteString(
           dbUpdatesWrapper.getData().get(i)));
     }
     builder.setSequenceNumber(dbUpdatesWrapper.getCurrentSequenceNumber());

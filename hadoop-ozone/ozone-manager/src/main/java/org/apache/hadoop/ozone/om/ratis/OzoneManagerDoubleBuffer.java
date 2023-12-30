@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -38,7 +37,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -47,13 +45,13 @@ import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
-import org.apache.hadoop.ozone.om.ratis.helpers.DoubleBufferEntry;
 import org.apache.hadoop.ozone.om.ratis.metrics.OzoneManagerDoubleBufferMetrics;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
@@ -77,6 +75,25 @@ public final class OzoneManagerDoubleBuffer {
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerDoubleBuffer.class);
 
+  /** Entry for {@link #currentBuffer} and {@link #readyBuffer}. */
+  private static class Entry {
+    private final TermIndex termIndex;
+    private final OMClientResponse response;
+
+    Entry(TermIndex termIndex, OMClientResponse response) {
+      this.termIndex = termIndex;
+      this.response = response;
+    }
+
+    TermIndex getTermIndex() {
+      return termIndex;
+    }
+
+    OMClientResponse getResponse() {
+      return response;
+    }
+  }
+
   // Taken unbounded queue, if sync thread is taking too long time, we
   // might end up taking huge memory to add entries to the buffer.
   // TODO: We can avoid this using unbounded queue and use queue with
@@ -84,8 +101,8 @@ public final class OzoneManagerDoubleBuffer {
   // add entries. But in this also we might block rpc handlers, as we
   // clear entries after sync. Or we can come up with a good approach to
   // solve this.
-  private Queue<DoubleBufferEntry<OMClientResponse>> currentBuffer;
-  private Queue<DoubleBufferEntry<OMClientResponse>> readyBuffer;
+  private Queue<Entry> currentBuffer;
+  private Queue<Entry> readyBuffer;
 
 
   // future objects which hold the future returned by add method.
@@ -110,13 +127,7 @@ public final class OzoneManagerDoubleBuffer {
   private final boolean isTracingEnabled;
   private final Semaphore unFlushedTransactions;
   private final FlushNotifier flushNotifier;
-  private final String threadPrefix;
   private final S3SecretManager s3SecretManager;
-
-  /**
-   * function which will get term associated with the transaction index.
-   */
-  private final Function<Long, Long> indexToTerm;
 
   /**
    *  Builder for creating OzoneManagerDoubleBuffer.
@@ -126,7 +137,6 @@ public final class OzoneManagerDoubleBuffer {
     private OzoneManagerRatisSnapshot rs;
     private boolean isRatisEnabled = false;
     private boolean isTracingEnabled = false;
-    private Function<Long, Long> indexToTerm = null;
     private int maxUnFlushedTransactionCount = 0;
     private FlushNotifier flushNotifier;
     private S3SecretManager s3SecretManager;
@@ -154,17 +164,12 @@ public final class OzoneManagerDoubleBuffer {
       return this;
     }
 
-    public Builder setIndexToTerm(Function<Long, Long> termGet) {
-      this.indexToTerm = termGet;
-      return this;
-    }
-
     public Builder setmaxUnFlushedTransactionCount(int size) {
       this.maxUnFlushedTransactionCount = size;
       return this;
     }
 
-    public Builder setFlushNotifier(FlushNotifier flushNotifier) {
+    Builder setFlushNotifier(FlushNotifier flushNotifier) {
       this.flushNotifier = flushNotifier;
       return this;
     }
@@ -183,8 +188,6 @@ public final class OzoneManagerDoubleBuffer {
       if (isRatisEnabled) {
         Preconditions.checkNotNull(rs, "When ratis is enabled, " +
                 "OzoneManagerRatisSnapshot should not be null");
-        Preconditions.checkNotNull(indexToTerm, "When ratis is enabled " +
-            "indexToTerm should not be null");
         Preconditions.checkState(maxUnFlushedTransactionCount > 0L,
             "when ratis is enable, maxUnFlushedTransactions " +
                 "should be bigger than 0");
@@ -194,7 +197,7 @@ public final class OzoneManagerDoubleBuffer {
       }
 
       return new OzoneManagerDoubleBuffer(mm, rs, isRatisEnabled,
-          isTracingEnabled, indexToTerm, maxUnFlushedTransactionCount,
+          isTracingEnabled, maxUnFlushedTransactionCount,
           flushNotifier, s3SecretManager, threadPrefix);
     }
   }
@@ -203,7 +206,7 @@ public final class OzoneManagerDoubleBuffer {
   private OzoneManagerDoubleBuffer(OMMetadataManager omMetadataManager,
       OzoneManagerRatisSnapshot ozoneManagerRatisSnapShot,
       boolean isRatisEnabled, boolean isTracingEnabled,
-      Function<Long, Long> indexToTerm, int maxUnFlushedTransactions,
+      int maxUnFlushedTransactions,
       FlushNotifier flushNotifier, S3SecretManager s3SecretManager,
       String threadPrefix) {
     this.currentBuffer = new ConcurrentLinkedQueue<>();
@@ -219,9 +222,7 @@ public final class OzoneManagerDoubleBuffer {
     this.ozoneManagerRatisSnapShot = ozoneManagerRatisSnapShot;
     this.ozoneManagerDoubleBufferMetrics =
         OzoneManagerDoubleBufferMetrics.create();
-    this.indexToTerm = indexToTerm;
     this.flushNotifier = flushNotifier;
-    this.threadPrefix = threadPrefix;
     isRunning.set(true);
     // Daemon thread which runs in background and flushes transactions to DB.
     daemon = new Daemon(this::flushTransactions);
@@ -327,10 +328,8 @@ public final class OzoneManagerDoubleBuffer {
       // Flush #3: [request3]
       // Flush #4: [snapshotRequest2]
       // Flush #5: [request4]
-      List<Queue<DoubleBufferEntry<OMClientResponse>>> bufferQueues =
-          splitReadyBufferAtCreateSnapshot();
-
-      for (Queue<DoubleBufferEntry<OMClientResponse>> buffer : bufferQueues) {
+      final List<Queue<Entry>> bufferQueues = splitReadyBufferAtCreateSnapshot();
+      for (Queue<Entry> buffer : bufferQueues) {
         flushBatch(buffer);
       }
 
@@ -343,11 +342,16 @@ public final class OzoneManagerDoubleBuffer {
     }
   }
 
-  private void flushBatch(Queue<DoubleBufferEntry<OMClientResponse>> buffer)
-      throws IOException {
-
+  private void flushBatch(Queue<Entry> buffer) throws IOException {
     Map<String, List<Long>> cleanupEpochs = new HashMap<>();
-    List<Long> flushedEpochs;
+    // Commit transaction info to DB.
+    final List<TermIndex> flushedTransactions = buffer.stream()
+        .map(Entry::getTermIndex)
+        .sorted()
+        .collect(Collectors.toList());
+    final List<Long> flushedEpochs = flushedTransactions.stream()
+        .map(TermIndex::getIndex)
+        .collect(Collectors.toList());
 
     try (BatchOperation batchOperation = omMetadataManager.getStore()
         .initBatchOperation()) {
@@ -357,22 +361,12 @@ public final class OzoneManagerDoubleBuffer {
       buffer.iterator().forEachRemaining(
           entry -> addCleanupEntry(entry, cleanupEpochs));
 
-      // Commit transaction info to DB.
-      flushedEpochs = buffer.stream()
-          .map(DoubleBufferEntry::getTrxLogIndex)
-          .sorted()
-          .collect(Collectors.toList());
-
-      long lastRatisTransactionIndex = flushedEpochs.get(
-          flushedEpochs.size() - 1);
-
-      long term = isRatisEnabled ?
-          indexToTerm.apply(lastRatisTransactionIndex) : -1;
+      final TermIndex lastTransaction = flushedTransactions.get(flushedTransactions.size() - 1);
 
       addToBatchTransactionInfoWithTrace(lastTraceId,
-          lastRatisTransactionIndex,
+          lastTransaction.getIndex(),
           () -> omMetadataManager.getTransactionInfoTable().putWithBatch(
-              batchOperation, TRANSACTION_INFO_KEY, TransactionInfo.valueOf(term, lastRatisTransactionIndex)));
+              batchOperation, TRANSACTION_INFO_KEY, TransactionInfo.valueOf(lastTransaction)));
 
       long startTime = Time.monotonicNow();
       flushBatchWithTrace(lastTraceId, buffer.size(),
@@ -412,10 +406,9 @@ public final class OzoneManagerDoubleBuffer {
     updateMetrics(flushedTransactionsSize);
   }
 
-  private String addToBatch(Queue<DoubleBufferEntry<OMClientResponse>> buffer,
-                            BatchOperation batchOperation) {
+  private String addToBatch(Queue<Entry> buffer, BatchOperation batchOperation) {
     String lastTraceId = null;
-    for (DoubleBufferEntry<OMClientResponse> entry: buffer) {
+    for (Entry entry: buffer) {
       OMClientResponse response = entry.getResponse();
       OMResponse omResponse = response.getOMResponse();
       lastTraceId = omResponse.getTraceID();
@@ -438,7 +431,7 @@ public final class OzoneManagerDoubleBuffer {
   /**
    * Splits the readyBuffer around the create snapshot request.
    * Returns, the list of queue split by create snapshot requests.
-   *
+   * <p>
    * CreateSnapshot is used as barrier because the checkpoint creation happens
    * in RocksDB callback flush. If multiple operations are flushed in one
    * specific batch, we are not sure at the flush of which specific operation
@@ -446,23 +439,17 @@ public final class OzoneManagerDoubleBuffer {
    * There could be a possibility of race condition that is exposed to rocksDB
    * behaviour for the batch.
    * Hence, we treat createSnapshot as separate batch flush.
-   *
+   * <p>
    * e.g. requestBuffer = [request1, request2, snapshotRequest1,
    * request3, snapshotRequest2, request4]
    * response = [[request1, request2], [snapshotRequest1], [request3],
    * [snapshotRequest2], [request4]]
    */
-  private List<Queue<DoubleBufferEntry<OMClientResponse>>>
-      splitReadyBufferAtCreateSnapshot() {
-    List<Queue<DoubleBufferEntry<OMClientResponse>>> response =
-        new ArrayList<>();
-
-    Iterator<DoubleBufferEntry<OMClientResponse>> iterator =
-        readyBuffer.iterator();
+  private List<Queue<Entry>> splitReadyBufferAtCreateSnapshot() {
+    final List<Queue<Entry>> response = new ArrayList<>();
 
     OMResponse previousOmResponse = null;
-    while (iterator.hasNext()) {
-      DoubleBufferEntry<OMClientResponse> entry = iterator.next();
+    for (final Entry entry : readyBuffer) {
       OMResponse omResponse = entry.getResponse().getOMResponse();
       // New queue gets created in three conditions:
       // 1. It is first element in the response,
@@ -481,8 +468,7 @@ public final class OzoneManagerDoubleBuffer {
     return response;
   }
 
-  private void addCleanupEntry(DoubleBufferEntry entry, Map<String,
-      List<Long>> cleanupEpochs) {
+  private void addCleanupEntry(Entry entry, Map<String, List<Long>> cleanupEpochs) {
     Class<? extends OMClientResponse> responseClass =
         entry.getResponse().getClass();
     CleanupTableInfo cleanupTableInfo =
@@ -499,7 +485,7 @@ public final class OzoneManagerDoubleBuffer {
       }
       for (String table : cleanupTables) {
         cleanupEpochs.computeIfAbsent(table, list -> new ArrayList<>())
-            .add(entry.getTrxLogIndex());
+            .add(entry.getTermIndex().getIndex());
       }
     } else {
       // This is to catch early errors, when a new response class missed to
@@ -614,9 +600,8 @@ public final class OzoneManagerDoubleBuffer {
   /**
    * Add OmResponseBufferEntry to buffer.
    */
-  public synchronized CompletableFuture<Void> add(OMClientResponse response,
-      long transactionIndex) {
-    currentBuffer.add(new DoubleBufferEntry<>(transactionIndex, response));
+  public synchronized CompletableFuture<Void> add(OMClientResponse response, TermIndex termIndex) {
+    currentBuffer.add(new Entry(termIndex, response));
     notify();
 
     if (!isRatisEnabled) {
@@ -666,7 +651,7 @@ public final class OzoneManagerDoubleBuffer {
    * used by sync thread to flush transactions to DB.
    */
   private synchronized void swapCurrentAndReadyBuffer() {
-    Queue<DoubleBufferEntry<OMClientResponse>> temp = currentBuffer;
+    final Queue<Entry> temp = currentBuffer;
     currentBuffer = readyBuffer;
     readyBuffer = temp;
 

@@ -34,7 +34,7 @@ import org.apache.ratis.server.metrics.SegmentedRaftLogMetrics;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.ratis.server.metrics.SegmentedRaftLogMetrics.RAFT_LOG_SYNC_TIME;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Test RatisDropwizardRexporter.
@@ -73,9 +73,9 @@ public class TestRatisDropwizardExports {
 
     System.out.println(writer);
 
-    assertFalse(writer.toString()
-            .contains("ratis_core_ratis_log_worker_instance_syncTime"),
-        "Instance name is not moved to be a tag");
+    assertThat(writer.toString())
+        .withFailMessage("Instance name is not moved to be a tag")
+        .doesNotContain("ratis_core_ratis_log_worker_instance_syncTime");
   }
 
 }

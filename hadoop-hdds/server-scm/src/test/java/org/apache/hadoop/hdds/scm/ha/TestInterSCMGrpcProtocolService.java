@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.ozone.test.GenericTestUtils.PortAllocator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
@@ -49,7 +50,6 @@ import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -90,7 +90,7 @@ class TestInterSCMGrpcProtocolService {
 
   @Test
   void testMTLSOnInterScmGrpcProtocolServiceAccess() throws Exception {
-    int port = new Random().nextInt(1000) + 45000;
+    int port = PortAllocator.getFreePort();
     OzoneConfiguration conf = setupConfiguration(port);
     SCMCertificateClient
         scmCertClient = setupCertificateClientForMTLS(conf);
