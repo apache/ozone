@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.Test;
@@ -134,7 +133,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     // Check lastAppliedIndex is updated correctly or not.
     assertNotNull(transactionInfo);
     assertEquals(bucketCount, transactionInfo.getTransactionIndex());
-    Assertions.assertEquals(term, transactionInfo.getTerm());
+    assertEquals(term, transactionInfo.getTerm());
   }
 
   /**

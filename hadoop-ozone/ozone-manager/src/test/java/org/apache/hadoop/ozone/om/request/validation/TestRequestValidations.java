@@ -29,7 +29,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -43,6 +42,8 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateKey;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.RenameKey;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -78,7 +79,7 @@ public class TestRequestValidations {
 
   @Test
   public void testUsingRegistryWithoutLoading() throws Exception {
-    Assertions.assertThrows(NullPointerException.class, () -> {
+    assertThrows(NullPointerException.class, () -> {
       new RequestValidations()
           .fromPackage(PACKAGE)
           .withinContext(of(aFinalizedVersionManager(), metadataManager))
@@ -88,7 +89,7 @@ public class TestRequestValidations {
 
   @Test
   public void testUsingRegistryWithoutContext() throws Exception {
-    Assertions.assertThrows(NullPointerException.class, () -> {
+    assertThrows(NullPointerException.class, () -> {
       new RequestValidations()
           .fromPackage(PACKAGE)
           .load()
@@ -272,7 +273,7 @@ public class TestRequestValidations {
         .thenReturn(BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     BucketLayout buckLayout = ctx.getBucketLayout("vol-1", "buck-1");
-    Assertions.assertTrue(buckLayout.isFileSystemOptimized());
+    assertTrue(buckLayout.isFileSystemOptimized());
   }
 
   private RequestValidations loadValidations(ValidationContext ctx) {

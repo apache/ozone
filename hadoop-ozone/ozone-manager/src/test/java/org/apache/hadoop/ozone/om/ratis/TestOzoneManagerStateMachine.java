@@ -39,15 +39,19 @@ import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.statemachine.TransactionContext;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 
 import java.nio.file.Path;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -64,8 +68,8 @@ public class TestOzoneManagerStateMachine {
   @BeforeEach
   public void setup() throws Exception {
     OzoneManagerRatisServer ozoneManagerRatisServer =
-        Mockito.mock(OzoneManagerRatisServer.class);
-    OzoneManager ozoneManager = Mockito.mock(OzoneManager.class);
+        mock(OzoneManagerRatisServer.class);
+    OzoneManager ozoneManager = mock(OzoneManager.class);
     // Allow testing of prepare pre-append gate.
     when(ozoneManager.isAdmin(any(UserGroupInformation.class)))
         .thenReturn(true);
@@ -83,15 +87,15 @@ public class TestOzoneManagerStateMachine {
     when(ozoneManager.getPrepareState()).thenReturn(prepareState);
 
     when(ozoneManagerRatisServer.getOzoneManager()).thenReturn(ozoneManager);
-    when(ozoneManager.getTransactionInfo()).thenReturn(Mockito.mock(TransactionInfo.class));
+    when(ozoneManager.getTransactionInfo()).thenReturn(mock(TransactionInfo.class));
     when(ozoneManager.getConfiguration()).thenReturn(conf);
     ozoneManagerStateMachine =
         new OzoneManagerStateMachine(ozoneManagerRatisServer, false);
   }
 
   static void assertTermIndex(long expectedTerm, long expectedIndex, TermIndex computed) {
-    Assertions.assertEquals(expectedTerm, computed.getTerm());
-    Assertions.assertEquals(expectedIndex, computed.getIndex());
+    assertEquals(expectedTerm, computed.getTerm());
+    assertEquals(expectedIndex, computed.getIndex());
   }
 
   @Test
@@ -149,10 +153,9 @@ public class TestOzoneManagerStateMachine {
     TransactionContext submittedTrx = mockTransactionContext(createKeyRequest);
     TransactionContext returnedTrx =
         ozoneManagerStateMachine.preAppendTransaction(submittedTrx);
-    Assertions.assertSame(submittedTrx, returnedTrx);
+    assertSame(submittedTrx, returnedTrx);
 
-    Assertions.assertEquals(PrepareStatus.NOT_PREPARED,
-        prepareState.getState().getStatus());
+    assertEquals(PrepareStatus.NOT_PREPARED, prepareState.getState().getStatus());
 
     // Submit prepare request.
     OMRequest prepareRequest = OMRequest.newBuilder()
@@ -170,34 +173,33 @@ public class TestOzoneManagerStateMachine {
 
     submittedTrx = mockTransactionContext(prepareRequest);
     returnedTrx = ozoneManagerStateMachine.preAppendTransaction(submittedTrx);
-    Assertions.assertSame(submittedTrx, returnedTrx);
+    assertSame(submittedTrx, returnedTrx);
 
     // Prepare should be started.
-    Assertions.assertEquals(PrepareStatus.PREPARE_GATE_ENABLED,
+    assertEquals(PrepareStatus.PREPARE_GATE_ENABLED,
         prepareState.getState().getStatus());
 
     // Submitting a write request should now fail.
     try {
       ozoneManagerStateMachine.preAppendTransaction(
           mockTransactionContext(createKeyRequest));
-      Assertions.fail("Expected StateMachineException to be thrown when " +
+      fail("Expected StateMachineException to be thrown when " +
           "submitting write request while prepared.");
     } catch (StateMachineException smEx) {
-      Assertions.assertFalse(smEx.leaderShouldStepDown());
+      assertFalse(smEx.leaderShouldStepDown());
 
       Throwable cause = smEx.getCause();
-      Assertions.assertTrue(cause instanceof OMException);
-      Assertions.assertEquals(((OMException) cause).getResult(),
+      assertTrue(cause instanceof OMException);
+      assertEquals(((OMException) cause).getResult(),
           OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED);
     }
 
     // Should be able to prepare again without issue.
     submittedTrx = mockTransactionContext(prepareRequest);
     returnedTrx = ozoneManagerStateMachine.preAppendTransaction(submittedTrx);
-    Assertions.assertSame(submittedTrx, returnedTrx);
+    assertSame(submittedTrx, returnedTrx);
 
-    Assertions.assertEquals(PrepareStatus.PREPARE_GATE_ENABLED,
-        prepareState.getState().getStatus());
+    assertEquals(PrepareStatus.PREPARE_GATE_ENABLED, prepareState.getState().getStatus());
 
     // Cancel prepare is handled in the cancel request apply txn step, not
     // the pre-append state machine step, so it is tested in other classes.
@@ -209,7 +211,7 @@ public class TestOzoneManagerStateMachine {
             .setLogData(OMRatisHelper.convertRequestToByteString(request))
             .build();
 
-    TransactionContext mockTrx = Mockito.mock(TransactionContext.class);
+    TransactionContext mockTrx = mock(TransactionContext.class);
     when(mockTrx.getStateMachineLogEntry()).thenReturn(logEntry);
     when(mockTrx.getStateMachineContext()).thenReturn(request);
 

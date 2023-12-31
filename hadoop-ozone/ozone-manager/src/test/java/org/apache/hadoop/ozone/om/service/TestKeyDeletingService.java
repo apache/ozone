@@ -80,10 +80,12 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -114,7 +116,7 @@ public class TestKeyDeletingService {
     OzoneConfiguration conf = new OzoneConfiguration();
     File newFolder = folder.toFile();
     if (!newFolder.exists()) {
-      Assertions.assertTrue(newFolder.mkdirs());
+      assertTrue(newFolder.mkdirs());
     }
     System.setProperty(DBConfigFromFile.CONFIG_DIR, "/");
     ServerUtils.setOzoneMetaDirPath(conf, newFolder.toString());
@@ -161,8 +163,8 @@ public class TestKeyDeletingService {
     GenericTestUtils.waitFor(
         () -> keyDeletingService.getDeletedKeyCount().get() >= keyCount,
         1000, 10000);
-    Assertions.assertTrue(keyDeletingService.getRunCount().get() > 1);
-    Assertions.assertEquals(0, keyManager.getPendingDeletionKeys(
+    assertTrue(keyDeletingService.getRunCount().get() > 1);
+    assertEquals(0, keyManager.getPendingDeletionKeys(
         Integer.MAX_VALUE).getKeyBlocksList().size());
   }
 
@@ -206,8 +208,8 @@ public class TestKeyDeletingService {
         () -> keyDeletingService.getRunCount().get() >= 5,
         100, 1000);
     // Since SCM calls are failing, deletedKeyCount should be zero.
-    Assertions.assertEquals(0, keyDeletingService.getDeletedKeyCount().get());
-    Assertions.assertEquals(keyCount, keyManager
+    assertEquals(0, keyDeletingService.getDeletedKeyCount().get());
+    assertEquals(keyCount, keyManager
         .getPendingDeletionKeys(Integer.MAX_VALUE).getKeyBlocksList().size());
   }
 
@@ -255,7 +257,7 @@ public class TestKeyDeletingService {
         100, 1000);
     // the blockClient is set to fail the deletion of key blocks, hence no keys
     // will be deleted
-    Assertions.assertEquals(0, keyDeletingService.getDeletedKeyCount().get());
+    assertEquals(0, keyDeletingService.getDeletedKeyCount().get());
   }
 
   @Test
@@ -327,7 +329,7 @@ public class TestKeyDeletingService {
 
     // the blockClient is set to fail the deletion of key blocks, hence no keys
     // will be deleted
-    Assertions.assertEquals(0, keyDeletingService.getDeletedKeyCount().get());
+    assertEquals(0, keyDeletingService.getDeletedKeyCount().get());
   }
 
   @Test
@@ -363,8 +365,8 @@ public class TestKeyDeletingService {
     GenericTestUtils.waitFor(
         () -> keyDeletingService.getDeletedKeyCount().get() >= 1,
         1000, 10000);
-    Assertions.assertTrue(keyDeletingService.getRunCount().get() > 1);
-    Assertions.assertEquals(0, keyManager.getPendingDeletionKeys(
+    assertTrue(keyDeletingService.getRunCount().get() > 1);
+    assertEquals(0, keyManager.getPendingDeletionKeys(
         Integer.MAX_VALUE).getKeyBlocksList().size());
 
     // The 1st version of the key has 1 block and the 2nd version has 2
@@ -372,7 +374,7 @@ public class TestKeyDeletingService {
     // blocks for deletion from the KeyDeletionService
     ScmBlockLocationTestingClient scmBlockTestingClient =
         (ScmBlockLocationTestingClient) omTestManagers.getScmBlockClient();
-    Assertions.assertTrue(
+    assertTrue(
         scmBlockTestingClient.getNumberOfDeletedBlocks() >= 3);
   }
 
@@ -442,12 +444,12 @@ public class TestKeyDeletingService {
     GenericTestUtils.waitFor(
         () -> keyDeletingService.getDeletedKeyCount().get() >= 1,
         1000, 10000);
-    Assertions.assertTrue(keyDeletingService.getRunCount().get() > 1);
-    Assertions.assertEquals(0, keyManager
+    assertTrue(keyDeletingService.getRunCount().get() > 1);
+    assertEquals(0, keyManager
         .getPendingDeletionKeys(Integer.MAX_VALUE).getKeyBlocksList().size());
 
     // deletedTable should have deleted key of the snapshot bucket
-    Assertions.assertFalse(metadataManager.getDeletedTable().isEmpty());
+    assertFalse(metadataManager.getDeletedTable().isEmpty());
     String ozoneKey1 =
         metadataManager.getOzoneKey(volumeName, bucketName1, keyName);
     String ozoneKey2 =
@@ -459,11 +461,11 @@ public class TestKeyDeletingService {
     List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
         = metadataManager.getDeletedTable().getRangeKVs(
         null, 100, ozoneKey1);
-    Assertions.assertTrue(rangeKVs.size() > 0);
+    assertTrue(rangeKVs.size() > 0);
     rangeKVs
         = metadataManager.getDeletedTable().getRangeKVs(
         null, 100, ozoneKey2);
-    Assertions.assertEquals(0, rangeKVs.size());
+    assertEquals(0, rangeKVs.size());
   }
 
   /*
@@ -669,11 +671,11 @@ t
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> snapshotEntry = iterator.next();
         String snapshotName = snapshotEntry.getValue().getName();
-        Assertions.assertEquals(expectedSize.get(snapshotName),
+        assertEquals(expectedSize.get(snapshotName),
             snapshotEntry.getValue().
             getExclusiveSize());
         // Since for the test we are using RATIS/THREE
-        Assertions.assertEquals(expectedSize.get(snapshotName) * 3,
+        assertEquals(expectedSize.get(snapshotName) * 3,
             snapshotEntry.getValue().getExclusiveReplicatedSize());
       }
     }
@@ -686,7 +688,7 @@ t
              iterator = snapshotInfoTable.iterator()) {
       while (iterator.hasNext()) {
         SnapshotInfo snapInfo = iterator.next().getValue();
-        Assertions.assertEquals(snapInfo.getDeepClean(), deepClean);
+        assertEquals(snapInfo.getDeepClean(), deepClean);
       }
     }
   }

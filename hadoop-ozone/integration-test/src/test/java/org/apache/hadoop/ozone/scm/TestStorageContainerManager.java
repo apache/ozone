@@ -95,10 +95,8 @@ import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.Time;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
-import org.apache.ozone.test.FlakyTest;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.JUnit5AwareTimeout;
-import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.RaftServerConfigKeys;
@@ -108,7 +106,6 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.experimental.categories.Category;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
@@ -133,6 +130,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -985,7 +983,6 @@ public class TestStorageContainerManager {
   }
 
   @Test
-  @Category(FlakyTest.class) @Flaky("HDDS-8470")
   public void testContainerReportQueueTakingMoreTime() throws Exception {
     EventQueue eventQueue = new EventQueue();
     List<BlockingQueue<SCMDatanodeHeartbeatDispatcher.ContainerReport>>
@@ -993,11 +990,13 @@ public class TestStorageContainerManager {
     for (int i = 0; i < 1; ++i) {
       queues.add(new ContainerReportQueue());
     }
-
+    Semaphore semaphore = new Semaphore(2);
+    semaphore.acquire(2);
     ContainerReportHandler containerReportHandler =
         Mockito.mock(ContainerReportHandler.class);
     Mockito.doAnswer((inv) -> {
       Thread.currentThread().sleep(1000);
+      semaphore.release(1);
       return null;
     }).when(containerReportHandler).onMessage(Mockito.any(),
         Mockito.eq(eventQueue));
@@ -1014,8 +1013,8 @@ public class TestStorageContainerManager {
             containerReportHandler, queues, eventQueue,
             ContainerReportFromDatanode.class, executors,
             reportExecutorMap);
-    containerReportExecutors.setQueueWaitThreshold(1000);
-    containerReportExecutors.setExecWaitThreshold(1000);
+    containerReportExecutors.setQueueWaitThreshold(800);
+    containerReportExecutors.setExecWaitThreshold(800);
     
     eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportExecutors,
         containerReportHandler);
@@ -1025,15 +1024,17 @@ public class TestStorageContainerManager {
     ContainerReportFromDatanode dndata1
         = new ContainerReportFromDatanode(dn, report);
     eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata1);
+
     dn = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
         .build();
     ContainerReportFromDatanode dndata2
         = new ContainerReportFromDatanode(dn, report);
     eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata2);
-    Thread.currentThread().sleep(3000);
+    semaphore.acquire(2);
     Assert.assertTrue(containerReportExecutors.longWaitInQueueEvents() >= 1);
     Assert.assertTrue(containerReportExecutors.longTimeExecutionEvents() >= 1);
     containerReportExecutors.close();
+    semaphore.release(2);
   }
 
   @Test
