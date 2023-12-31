@@ -550,13 +550,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     // OM should be shutdown as the StateMachine has shutdown.
-    LOG.info("StateMachine has shutdown. Shutdown OzoneManager if not " +
-        "already shutdown.");
     if (!ozoneManager.isStopped()) {
+      LOG.info("Stopping {}. Shutdown also OzoneManager {}.", this, ozoneManager);
       ozoneManager.shutDown("OM state machine is shutdown by Ratis server");
     } else {
+      LOG.info("Stopping {}.", this);
       stop();
     }
   }

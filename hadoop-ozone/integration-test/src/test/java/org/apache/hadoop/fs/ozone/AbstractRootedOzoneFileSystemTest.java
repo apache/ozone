@@ -163,12 +163,11 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
   @AfterAll
   void shutdown() {
-    IOUtils.closeQuietly(client);
+    IOUtils.closeQuietly(fs, userOfs, client);
     // Tear down the cluster after EACH set of parameters
     if (cluster != null) {
       cluster.shutdown();
     }
-    IOUtils.closeQuietly(fs, userOfs);
   }
 
   @BeforeEach
@@ -276,14 +275,8 @@ abstract class AbstractRootedOzoneFileSystemTest {
             -> (RootedOzoneFileSystem) FileSystem.get(conf));
 
     if (useOnlyCache) {
-      if (omRatisEnabled) {
-        cluster.getOzoneManager().getOmRatisServer().getOmStateMachine()
-            .getOzoneManagerDoubleBuffer().stopDaemon();
-      } else {
-        cluster.getOzoneManager().getOmServerProtocol()
-            .getOzoneManagerDoubleBuffer().stopDaemon();
-        cluster.getOzoneManager().getOmServerProtocol()
-            .setShouldFlushCache(false);
+      if (!omRatisEnabled) {
+        cluster.getOzoneManager().getOmServerProtocol().setShouldFlushCache();
       }
     }
   }

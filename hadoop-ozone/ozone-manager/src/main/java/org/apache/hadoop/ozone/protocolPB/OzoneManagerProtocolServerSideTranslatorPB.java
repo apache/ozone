@@ -385,12 +385,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   }
 
   @VisibleForTesting
-  public OzoneManagerDoubleBuffer getOzoneManagerDoubleBuffer() {
-    return ozoneManagerDoubleBuffer;
-  }
-
-  @VisibleForTesting
-  public void setShouldFlushCache(boolean shouldFlushCache) {
-    this.shouldFlushCache = shouldFlushCache;
+  public void setShouldFlushCache() {
+    ozoneManagerDoubleBuffer.stopDaemon();
+    shouldFlushCache = false;
   }
 }
