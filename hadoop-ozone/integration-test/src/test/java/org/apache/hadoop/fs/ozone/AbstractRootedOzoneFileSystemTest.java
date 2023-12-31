@@ -276,7 +276,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
     if (useOnlyCache) {
       if (!omRatisEnabled) {
-        cluster.getOzoneManager().getOmServerProtocol().setShouldFlushCache();
+        cluster.getOzoneManager().getOmServerProtocol().disableShouldFlushCache();
       }
     }
   }
