@@ -341,7 +341,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   private boolean logFilesPresentInRatisPeer(OzoneManager om) {
     final RaftServer.Division server = om.getOmRatisServer().getServerDivision();
     final String ratisDir = server.getRaftServer().getProperties().get("raft.server.storage.dir");
-    final String groupIdDirName = server.getGroup().getGroupId().toString();
+    final String groupIdDirName = server.getGroup().getGroupId().getUuid().toString();
     File logDir = Paths.get(ratisDir, groupIdDirName, "current")
         .toFile();
 
