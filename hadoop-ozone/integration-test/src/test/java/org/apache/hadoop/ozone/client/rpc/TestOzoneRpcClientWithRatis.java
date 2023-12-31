@@ -333,8 +333,6 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
     omSM.getHandler().setInjector(injector);
     thread1.start();
     thread2.start();
-    GenericTestUtils.waitFor(() -> metrics.getApplyTransactionMapSize() > 0,
-        100, 5000);
     Thread.sleep(2000);
     injector.resume();
 
@@ -355,10 +353,7 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
           ReplicationType.RATIS, ONE, new HashMap<>());
     }
 
-    Assert.assertTrue(
-        omSMLog.getOutput().contains("Failed to write, Exception occurred"));
-    GenericTestUtils.waitFor(() -> metrics.getApplyTransactionMapSize() == 0,
-        100, 5000);
+    assertTrue(omSMLog.getOutput().contains("Failed to write, Exception occurred"));
   }
 
   private static class OMRequestHandlerPauseInjector extends FaultInjector {

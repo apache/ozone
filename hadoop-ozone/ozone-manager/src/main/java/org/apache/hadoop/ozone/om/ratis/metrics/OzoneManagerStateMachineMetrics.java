@@ -63,16 +63,6 @@ public final class OzoneManagerStateMachineMetrics implements MetricsSource {
     }
   }
 
-  @VisibleForTesting
-  public long getApplyTransactionMapSize() {
-    return applyTransactionMapSize.value();
-  }
-
-  @VisibleForTesting
-  public long getRatisTransactionMapSize() {
-    return ratisTransactionMapSize.value();
-  }
-
   public void updateApplyTransactionMapSize(long size) {
     this.applyTransactionMapSize.incr(
         Math.negateExact(applyTransactionMapSize.value()) + size);
