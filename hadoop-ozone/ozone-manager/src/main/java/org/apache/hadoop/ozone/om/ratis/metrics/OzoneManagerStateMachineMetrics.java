@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.ratis.metrics;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
