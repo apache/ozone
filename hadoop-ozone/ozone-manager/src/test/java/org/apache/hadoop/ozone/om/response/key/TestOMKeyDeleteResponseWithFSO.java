@@ -18,13 +18,13 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.Time;
-import org.junit.jupiter.api.Assertions;
 
 /**
  * Tests OMKeyDeleteResponse - prefix layout.
@@ -65,7 +65,7 @@ public class TestOMKeyDeleteResponseWithFSO extends TestOMKeyDeleteResponse {
 
   @Override
   protected OmKeyInfo getOmKeyInfo() {
-    Assertions.assertNotNull(getOmBucketInfo());
+    assertNotNull(getOmBucketInfo());
     return OMRequestTestUtils.createOmKeyInfo(volumeName,
             getOmBucketInfo().getBucketName(), keyName, replicationType,
             replicationFactor,

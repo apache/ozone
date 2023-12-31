@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,7 +41,6 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.junit.jupiter.api.Assertions;
 
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -252,8 +255,7 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     OMClientResponse omClientResponse =
         openKeyDeleteRequest.validateAndUpdateCache(ozoneManager, transactionId);
 
-    Assertions.assertEquals(Status.OK,
-        omClientResponse.getOMResponse().getStatus());
+    assertEquals(Status.OK, omClientResponse.getOMResponse().getStatus());
 
     assertInOpenKeyTable(keysWithHigherUpdateID);
     assertNotInOpenKeyTable(keysWithSameUpdateID);
@@ -280,10 +282,10 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
             omMetadataManager, getBucketLayout());
 
     OMMetrics metrics = ozoneManager.getMetrics();
-    Assertions.assertEquals(metrics.getNumOpenKeyDeleteRequests(), 0);
-    Assertions.assertEquals(metrics.getNumOpenKeyDeleteRequestFails(), 0);
-    Assertions.assertEquals(metrics.getNumOpenKeysSubmittedForDeletion(), 0);
-    Assertions.assertEquals(metrics.getNumOpenKeysDeleted(), 0);
+    assertEquals(metrics.getNumOpenKeyDeleteRequests(), 0);
+    assertEquals(metrics.getNumOpenKeyDeleteRequestFails(), 0);
+    assertEquals(metrics.getNumOpenKeysSubmittedForDeletion(), 0);
+    assertEquals(metrics.getNumOpenKeysDeleted(), 0);
 
     List<Pair<Long, OmKeyInfo>> existentKeys =
         makeOpenKeys(volume, bucket, key, numExistentKeys);
@@ -296,11 +298,11 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     assertNotInOpenKeyTable(existentKeys);
     assertNotInOpenKeyTable(nonExistentKeys);
 
-    Assertions.assertEquals(1, metrics.getNumOpenKeyDeleteRequests());
-    Assertions.assertEquals(0, metrics.getNumOpenKeyDeleteRequestFails());
-    Assertions.assertEquals(numExistentKeys + numNonExistentKeys,
+    assertEquals(1, metrics.getNumOpenKeyDeleteRequests());
+    assertEquals(0, metrics.getNumOpenKeyDeleteRequestFails());
+    assertEquals(numExistentKeys + numNonExistentKeys,
         metrics.getNumOpenKeysSubmittedForDeletion());
-    Assertions.assertEquals(numExistentKeys, metrics.getNumOpenKeysDeleted());
+    assertEquals(numExistentKeys, metrics.getNumOpenKeysDeleted());
   }
 
   /**
@@ -330,7 +332,7 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     OMClientResponse omClientResponse =
         openKeyDeleteRequest.validateAndUpdateCache(ozoneManager, 100L);
 
-    Assertions.assertEquals(Status.OK,
+    assertEquals(Status.OK,
         omClientResponse.getOMResponse().getStatus());
   }
 
@@ -419,8 +421,7 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
       throws Exception {
 
     for (String keyName : getDBKeyNames(openKeys)) {
-      Assertions.assertTrue(omMetadataManager.getOpenKeyTable(getBucketLayout())
-          .isExist(keyName));
+      assertTrue(omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(keyName));
     }
   }
 
@@ -436,7 +437,7 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
       throws Exception {
 
     for (String keyName : getDBKeyNames(openKeys)) {
-      Assertions.assertFalse(omMetadataManager.getOpenKeyTable(
+      assertFalse(omMetadataManager.getOpenKeyTable(
           getBucketLayout()).isExist(keyName));
     }
   }
@@ -481,7 +482,7 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
         omOpenKeysDeleteRequest.preExecute(ozoneManager);
 
     // Will not be equal, as UserInfo will be set.
-    Assertions.assertNotEquals(originalOmRequest, modifiedOmRequest);
+    assertNotEquals(originalOmRequest, modifiedOmRequest);
 
     return modifiedOmRequest;
   }
