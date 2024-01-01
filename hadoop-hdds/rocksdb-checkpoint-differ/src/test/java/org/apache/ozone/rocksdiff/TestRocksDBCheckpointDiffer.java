@@ -225,7 +225,7 @@ public class TestRocksDBCheckpointDiffer {
     deleteDirectory(metadataDirDir);
     deleteDirectory(activeDbDir);
 
-    for (File dir:cpDirList){
+    for (File dir : cpDirList) {
       deleteDirectory(dir);
     }
   }
