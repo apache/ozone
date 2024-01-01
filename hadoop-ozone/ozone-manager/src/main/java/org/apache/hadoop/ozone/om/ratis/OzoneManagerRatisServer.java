@@ -522,7 +522,7 @@ public final class OzoneManagerRatisServer {
 
     try {
       return OMRatisHelper.getOMResponseFromRaftClientReply(reply);
-    } catch (InvalidProtocolBufferException ex) {
+    } catch (IOException ex) {
       if (ex.getMessage() != null) {
         throw new ServiceException(ex.getMessage(), ex);
       } else {
