@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.ratis;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
-import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.ServiceException;
 
 import java.io.File;
