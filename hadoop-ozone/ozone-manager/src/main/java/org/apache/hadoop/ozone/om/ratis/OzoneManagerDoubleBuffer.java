@@ -28,12 +28,12 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Queue;
-import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -597,7 +597,7 @@ public final class OzoneManagerDoubleBuffer {
    */
   private synchronized boolean canFlush() {
     try {
-      while (currentBuffer.size() == 0) {
+      while (currentBuffer.isEmpty()) {
         // canFlush() only gets called when the readyBuffer is empty.
         // Since both buffers are empty, notify once for each.
         flushNotifier.notifyFlush();
@@ -649,29 +649,57 @@ public final class OzoneManagerDoubleBuffer {
     isRunning.set(true);
   }
 
+  CompletableFuture<Integer> awaitFlushAsync() {
+    return flushNotifier.await();
+  }
+
   public void awaitFlush() throws InterruptedException {
-    flushNotifier.await();
+    try {
+      awaitFlushAsync().get();
+    } catch (ExecutionException e) {
+      // the future will never be completed exceptionally.
+      throw new IllegalStateException(e);
+    }
   }
 
   static class FlushNotifier {
-    private final Set<CountDownLatch> flushLatches =
-        ConcurrentHashMap.newKeySet();
+    static class Entry {
+      private final CompletableFuture<Integer> future = new CompletableFuture<>();
+      private int count;
 
-    void await() throws InterruptedException {
+      private CompletableFuture<Integer> await() {
+        count++;
+        return future;
+      }
 
-      // Wait until both the current and ready buffers are flushed.
-      CountDownLatch latch = new CountDownLatch(2);
-      flushLatches.add(latch);
-      latch.await();
-      flushLatches.remove(latch);
+      private int complete() {
+        Preconditions.checkState(future.complete(count));
+        return future.join();
+      }
     }
 
-    int notifyFlush() {
-      int retval = flushLatches.size();
-      for (CountDownLatch l : flushLatches) {
-        l.countDown();
-      }
-      return retval;
+    /** The size of the map is at most two since it uses {@link #flushCount} + 2 in {@link #await()} .*/
+    private final Map<Integer, Entry> flushFutures = new TreeMap<>();
+    private int awaitCount;
+    private int flushCount;
+
+    synchronized CompletableFuture<Integer> await() {
+      awaitCount++;
+      final int flush = flushCount + 2;
+      LOG.debug("await flush {}", flush);
+      final Entry entry = flushFutures.computeIfAbsent(flush, key -> new Entry());
+      Preconditions.checkState(flushFutures.size() <= 2);
+      return entry.await();
+    }
+
+    synchronized int notifyFlush() {
+      final int await = awaitCount;
+      final int flush = ++flushCount;
+      awaitCount -= Optional.ofNullable(flushFutures.remove(flush))
+          .map(Entry::complete)
+          .orElse(0);
+      LOG.debug("notifyFlush {}, awaitCount: {} -> {}", flush, await, awaitCount);
+      return await;
     }
   }
 }
