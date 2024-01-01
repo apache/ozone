@@ -57,7 +57,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -75,6 +74,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 /**
  * Unit tests for ReplicatedFileChecksumHelper class.
@@ -123,9 +123,9 @@ public class TestReplicatedFileChecksumHelper {
   @Test
   public void testEmptyBlock() throws IOException {
     // test the file checksum of a file with an empty block.
-    RpcClient mockRpcClient = Mockito.mock(RpcClient.class);
+    RpcClient mockRpcClient = mock(RpcClient.class);
 
-    OzoneManagerProtocol om = Mockito.mock(OzoneManagerProtocol.class);
+    OzoneManagerProtocol om = mock(OzoneManagerProtocol.class);
     when(mockRpcClient.getOzoneManagerClient()).thenReturn(om);
 
     OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
@@ -145,9 +145,9 @@ public class TestReplicatedFileChecksumHelper {
 
     when(om.lookupKey(ArgumentMatchers.any())).thenReturn(omKeyInfo);
 
-    OzoneVolume mockVolume = Mockito.mock(OzoneVolume.class);
+    OzoneVolume mockVolume = mock(OzoneVolume.class);
     when(mockVolume.getName()).thenReturn("vol1");
-    OzoneBucket bucket = Mockito.mock(OzoneBucket.class);
+    OzoneBucket bucket = mock(OzoneBucket.class);
     when(bucket.getName()).thenReturn("bucket1");
 
     OzoneClientConfig.ChecksumCombineMode combineMode =
@@ -173,7 +173,7 @@ public class TestReplicatedFileChecksumHelper {
     // test the file checksum of a file with one block.
     OzoneConfiguration conf = new OzoneConfiguration();
 
-    RpcClient mockRpcClient = Mockito.mock(RpcClient.class);
+    RpcClient mockRpcClient = mock(RpcClient.class);
 
     List<DatanodeDetails> dns = Arrays.asList(
         DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build());
@@ -196,13 +196,13 @@ public class TestReplicatedFileChecksumHelper {
             return buildValidResponse();
           }
         };
-    XceiverClientFactory factory = Mockito.mock(XceiverClientFactory.class);
+    XceiverClientFactory factory = mock(XceiverClientFactory.class);
     when(factory.acquireClientForReadData(ArgumentMatchers.any())).
         thenReturn(xceiverClientGrpc);
 
     when(mockRpcClient.getXceiverClientManager()).thenReturn(factory);
 
-    OzoneManagerProtocol om = Mockito.mock(OzoneManagerProtocol.class);
+    OzoneManagerProtocol om = mock(OzoneManagerProtocol.class);
     when(mockRpcClient.getOzoneManagerClient()).thenReturn(om);
 
     BlockID blockID = new BlockID(1, 1);
@@ -231,9 +231,9 @@ public class TestReplicatedFileChecksumHelper {
 
     when(om.lookupKey(ArgumentMatchers.any())).thenReturn(omKeyInfo);
 
-    OzoneVolume mockVolume = Mockito.mock(OzoneVolume.class);
+    OzoneVolume mockVolume = mock(OzoneVolume.class);
     when(mockVolume.getName()).thenReturn("vol1");
-    OzoneBucket bucket = Mockito.mock(OzoneBucket.class);
+    OzoneBucket bucket = mock(OzoneBucket.class);
     when(bucket.getName()).thenReturn("bucket1");
 
     OzoneClientConfig.ChecksumCombineMode combineMode =
