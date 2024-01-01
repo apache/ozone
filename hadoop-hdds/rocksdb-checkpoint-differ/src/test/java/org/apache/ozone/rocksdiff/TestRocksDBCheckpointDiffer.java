@@ -121,6 +121,8 @@ public class TestRocksDBCheckpointDiffer {
   private static final String CP_PATH_PREFIX = "rocksdb-cp-";
   private final List<DifferSnapshotInfo> snapshots = new ArrayList<>();
 
+  private final List<File> cpDirList = new ArrayList<>();
+
   private final List<List<ColumnFamilyHandle>> colHandles = new ArrayList<>();
 
   private final String activeDbDirName = "./rocksdb-data";
@@ -222,6 +224,10 @@ public class TestRocksDBCheckpointDiffer {
     deleteDirectory(sstBackUpDir);
     deleteDirectory(metadataDirDir);
     deleteDirectory(activeDbDir);
+
+    for (File dir : cpDirList) {
+      deleteDirectory(dir);
+    }
   }
 
   /**
@@ -605,6 +611,7 @@ public class TestRocksDBCheckpointDiffer {
     if (dir.exists()) {
       deleteDirectory(dir);
     }
+    cpDirList.add(dir);
 
     createCheckPoint(activeDbDirName, cpPath, rocksDB);
     final UUID snapshotId = UUID.randomUUID();
