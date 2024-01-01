@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
-import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -57,7 +56,6 @@ import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.ozone.security.S3SecurityUtil;
-import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
@@ -272,30 +270,10 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   private ServiceException createLeaderErrorException(
       RaftServerStatus raftServerStatus) {
     if (raftServerStatus == NOT_LEADER) {
-      return createNotLeaderException();
+      return new ServiceException(omRatisServer.newOMNotLeaderException());
     } else {
       return createLeaderNotReadyException();
     }
-  }
-
-  private ServiceException createNotLeaderException() {
-    RaftPeerId raftPeerId = omRatisServer.getRaftPeerId();
-    RaftPeerId raftLeaderId = null;
-    String raftLeaderAddress = null;
-    RaftPeer leader = omRatisServer.getLeader();
-    if (null != leader) {
-      raftLeaderId = leader.getId();
-      raftLeaderAddress = omRatisServer.getRaftLeaderAddress(leader);
-    }
-
-    OMNotLeaderException notLeaderException =
-        raftLeaderId == null ? new OMNotLeaderException(raftPeerId) :
-            new OMNotLeaderException(raftPeerId, raftLeaderId,
-                raftLeaderAddress);
-
-    LOG.debug(notLeaderException.getMessage());
-
-    return new ServiceException(notLeaderException);
   }
 
   private ServiceException createLeaderNotReadyException() {

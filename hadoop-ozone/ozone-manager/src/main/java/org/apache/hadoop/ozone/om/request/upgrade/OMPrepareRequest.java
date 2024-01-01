@@ -99,9 +99,7 @@ public class OMPrepareRequest extends OMClientRequest {
       doubleBuffer.add(response, termIndex);
 
       OzoneManagerRatisServer omRatisServer = ozoneManager.getOmRatisServer();
-      RaftServer.Division division =
-          omRatisServer.getServer()
-              .getDivision(omRatisServer.getRaftGroup().getGroupId());
+      final RaftServer.Division division = omRatisServer.getServerDivision();
 
       // Wait for outstanding double buffer entries to flush to disk,
       // so they will not be purged from the log before being persisted to
