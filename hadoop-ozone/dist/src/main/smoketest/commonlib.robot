@@ -53,7 +53,3 @@ Requires admin privilege
     Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skip privilege check in unsecure cluster
     Kinit test user     testuser2     testuser2.keytab
     Access should be denied    ${command}
-
-Revoke S3 secrets
-    Execute and Ignore Error             ozone s3 revokesecret -y
-    Execute and Ignore Error             ozone s3 revokesecret -y -u testuser
