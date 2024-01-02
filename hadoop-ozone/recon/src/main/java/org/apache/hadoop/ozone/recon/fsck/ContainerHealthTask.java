@@ -468,7 +468,7 @@ public class ContainerHealthTask extends ReconScmTask {
 
       if (container.isOverReplicated()
           && !recordForStateExists.contains(
-            UnHealthyContainerStates.OVER_REPLICATED.toString())) {
+              UnHealthyContainerStates.OVER_REPLICATED.toString())) {
         records.add(recordForState(
             container, UnHealthyContainerStates.OVER_REPLICATED, time));
         populateContainerStats(container,
@@ -478,7 +478,7 @@ public class ContainerHealthTask extends ReconScmTask {
 
       if (container.isMisReplicated()
           && !recordForStateExists.contains(
-            UnHealthyContainerStates.MIS_REPLICATED.toString())) {
+              UnHealthyContainerStates.MIS_REPLICATED.toString())) {
         records.add(recordForState(
             container, UnHealthyContainerStates.MIS_REPLICATED, time));
         populateContainerStats(container,
