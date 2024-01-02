@@ -55,8 +55,8 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_E
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlEncode;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -544,7 +544,7 @@ public class TestS3GatewayMetrics {
     OS3Exception e = assertThrows(OS3Exception.class, () -> keyEndpoint.put(
         bucketName, keyName, CONTENT.length(), 1, null, body),
         "Test for CopyObjectMetric failed");
-    assertTrue(e.getErrorMessage().contains("This copy request is illegal"));
+    assertThat(e.getErrorMessage()).contains("This copy request is illegal");
     curMetric = metrics.getCopyObjectFailure();
     assertEquals(1L, curMetric - oriMetric);
   }
