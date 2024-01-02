@@ -50,9 +50,9 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HE
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlEncode;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -255,28 +255,28 @@ public class TestObjectPut {
     OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
         bucketName, keyName, CONTENT.length(), 1, null, body),
         "test copy object failed");
-    assertTrue(e.getErrorMessage().contains("This copy request is illegal"));
+    assertThat(e.getErrorMessage()).contains("This copy request is illegal");
 
     // source bucket not found
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
         nonexist + "/"  + urlEncode(keyName));
     e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(destBucket,
         destkey, CONTENT.length(), 1, null, body), "test copy object failed");
-    assertTrue(e.getCode().contains("NoSuchBucket"));
+    assertThat(e.getCode()).contains("NoSuchBucket");
 
     // dest bucket not found
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
         bucketName + "/" + urlEncode(keyName));
     e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(nonexist,
         destkey, CONTENT.length(), 1, null, body), "test copy object failed");
-    assertTrue(e.getCode().contains("NoSuchBucket"));
+    assertThat(e.getCode()).contains("NoSuchBucket");
 
     //Both source and dest bucket not found
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
         nonexist + "/" + urlEncode(keyName));
     e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(nonexist,
         destkey, CONTENT.length(), 1, null, body), "test copy object failed");
-    assertTrue(e.getCode().contains("NoSuchBucket"));
+    assertThat(e.getCode()).contains("NoSuchBucket");
 
     // source key not found
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
@@ -284,7 +284,7 @@ public class TestObjectPut {
     e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
         "nonexistent", keyName, CONTENT.length(), 1, null, body),
         "test copy object failed");
-    assertTrue(e.getCode().contains("NoSuchBucket"));
+    assertThat(e.getCode()).contains("NoSuchBucket");
   }
 
   @Test
