@@ -38,16 +38,16 @@ import org.apache.hadoop.ozone.common.Checksum;
 
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.security.token.Token;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -160,14 +160,9 @@ public class TestChunkInputStream {
   @Test
   public void testSeek() throws Exception {
     seekAndVerify(0);
+    EOFException eofException = assertThrows(EOFException.class, () ->  seekAndVerify(CHUNK_SIZE + 1));
+    assertThat(eofException).hasMessage("EOF encountered at pos: " + (CHUNK_SIZE + 1) + " for chunk: " + CHUNK_NAME);
 
-    try {
-      seekAndVerify(CHUNK_SIZE + 1);
-      fail("Seeking to more than the length of Chunk should fail.");
-    } catch (EOFException e) {
-      GenericTestUtils.assertExceptionContains("EOF encountered at pos: "
-          + (CHUNK_SIZE + 1) + " for chunk: " + CHUNK_NAME, e);
-    }
     // Seek before read should update the ChunkInputStream#chunkPosition
     seekAndVerify(25);
     assertEquals(25, chunkStream.getChunkPosition());

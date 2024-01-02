@@ -22,7 +22,6 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -36,8 +35,10 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+
 
 /**
  * Test for OzoneAcls utility class.
@@ -202,8 +203,8 @@ public class TestOzoneAclUtil {
         OzoneAcl.parseAcl("user:masstter:rw[DEFAULT]"));
 
     //[user:masstter:rwx[DEFAULT]]
-    Assertions.assertEquals(1, ozoneAcls.size());
-    Assertions.assertEquals(DEFAULT, ozoneAcls.get(0).getAclScope());
+    assertEquals(1, ozoneAcls.size());
+    assertEquals(DEFAULT, ozoneAcls.get(0).getAclScope());
 
     ozoneAcls = new ArrayList<>();
     OzoneAclUtil.addAcl(ozoneAcls,
@@ -212,8 +213,8 @@ public class TestOzoneAclUtil {
         OzoneAcl.parseAcl("user:masstter:rw[ACCESS]"));
 
     //[user:masstter:rwx[ACCESS]]
-    Assertions.assertEquals(1, ozoneAcls.size());
-    Assertions.assertEquals(ACCESS, ozoneAcls.get(0).getAclScope());
+    assertEquals(1, ozoneAcls.size());
+    assertEquals(ACCESS, ozoneAcls.get(0).getAclScope());
 
     ozoneAcls = new ArrayList<>();
     OzoneAclUtil.addAcl(ozoneAcls,
@@ -222,10 +223,10 @@ public class TestOzoneAclUtil {
         OzoneAcl.parseAcl("user:masstter:rwx[ACCESS]"));
 
     //[user:masstter:rwx[ACCESS], user:masstter:rwx[DEFAULT]]
-    Assertions.assertEquals(2, ozoneAcls.size());
-    Assertions.assertNotEquals(ozoneAcls.get(0).getAclScope(),
+    assertEquals(2, ozoneAcls.size());
+    assertNotEquals(ozoneAcls.get(0).getAclScope(),
         ozoneAcls.get(1).getAclScope());
-    Assertions.assertEquals(ozoneAcls.get(0).getAclBitSet(),
+    assertEquals(ozoneAcls.get(0).getAclBitSet(),
         ozoneAcls.get(1).getAclBitSet());
   }
 }

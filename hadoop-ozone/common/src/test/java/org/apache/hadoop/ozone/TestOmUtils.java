@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.junit.jupiter.api.Assertions;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -38,10 +38,14 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
@@ -76,7 +80,7 @@ public class TestOmUtils {
 
   @Test
   public void createOMDirThrowsIfCannotCreate() {
-    Assertions.assertThrows(IllegalArgumentException.class, () -> {
+    assertThrows(IllegalArgumentException.class, () -> {
       File parent = folder.toFile();
       File omDir = new File(new File(parent, "sub"), "dir");
       assumeTrue(parent.setWritable(false, false));
@@ -124,7 +128,7 @@ public class TestOmUtils {
     configuration.set(OZONE_OM_SERVICE_IDS_KEY, "om2,om3");
     try {
       getOzoneManagerServiceId(configuration);
-      Assertions.fail();
+      fail();
     } catch (IOException ioEx) {
       assertTrue(ioEx.getMessage()
           .contains("Cannot find the internal service id om1 in [om2, om3]"));
@@ -142,7 +146,7 @@ public class TestOmUtils {
     configuration.set(OZONE_OM_SERVICE_IDS_KEY, "om2,om1");
     try {
       getOzoneManagerServiceId(configuration);
-      Assertions.fail();
+      fail();
     } catch (IOException ioEx) {
       assertTrue(ioEx.getMessage()
           .contains("More than 1 OzoneManager ServiceID (ozone.om.service" +
@@ -152,7 +156,7 @@ public class TestOmUtils {
 
   @Test
   public void checkMaxTransactionID() {
-    Assertions.assertEquals((long) (Math.pow(2, 54) - 2), OmUtils.MAX_TRXN_ID);
+    assertEquals((long) (Math.pow(2, 54) - 2), OmUtils.MAX_TRXN_ID);
   }
 
   @Test
@@ -170,16 +174,41 @@ public class TestOmUtils {
     conf.set(OZONE_OM_ADDRESS_KEY + "." + serviceId2 + ".om1", "om1-host");
 
     Set<String> hosts = getOmHostsFromConfig(conf, serviceId);
-    Assertions.assertEquals(3, hosts.size());
-    Assertions.assertTrue(hosts.contains("omA-host"));
-    Assertions.assertTrue(hosts.contains("omB-host"));
-    Assertions.assertTrue(hosts.contains("omC-host"));
+    assertEquals(3, hosts.size());
+    assertTrue(hosts.contains("omA-host"));
+    assertTrue(hosts.contains("omB-host"));
+    assertTrue(hosts.contains("omC-host"));
 
     hosts = getOmHostsFromConfig(conf, serviceId2);
-    Assertions.assertEquals(1, hosts.size());
-    Assertions.assertTrue(hosts.contains("om1-host"));
+    assertEquals(1, hosts.size());
+    assertTrue(hosts.contains("om1-host"));
 
-    Assertions.assertTrue(getOmHostsFromConfig(conf, "newId").isEmpty());
+    assertTrue(getOmHostsFromConfig(conf, "newId").isEmpty());
+  }
+
+  @Test
+  public void testgetOmSocketAddress() {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+
+    // First try a client address with just a host name. Verify it falls
+    // back to the default port.
+    conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "1.2.3.4");
+    InetSocketAddress addr = OmUtils.getOmAddress(conf);
+    assertThat(addr.getHostString(), is("1.2.3.4"));
+    assertThat(addr.getPort(), is(OMConfigKeys.OZONE_OM_PORT_DEFAULT));
+
+    // Next try a client address with just a host name and port. Verify the port
+    // is ignored and the default OM port is used.
+    conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "1.2.3.4:100");
+    addr = OmUtils.getOmAddress(conf);
+    assertThat(addr.getHostString(), is("1.2.3.4"));
+    assertThat(addr.getPort(), is(100));
+
+    // Assert the we are able to use default configs if no value is specified.
+    conf.set(OMConfigKeys.OZONE_OM_ADDRESS_KEY, "");
+    addr = OmUtils.getOmAddress(conf);
+    assertThat(addr.getHostString(), is("0.0.0.0"));
+    assertThat(addr.getPort(), is(OMConfigKeys.OZONE_OM_PORT_DEFAULT));
   }
 }
 

@@ -20,12 +20,15 @@ package org.apache.hadoop.ozone.lock;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.Daemon;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test-cases to test LockManager.
@@ -42,7 +45,7 @@ public class TestLockManager {
     manager.writeLock("/resourceTwo");
     manager.writeUnlock("/resourceOne");
     manager.writeUnlock("/resourceTwo");
-    Assertions.assertTrue(true);
+    assertTrue(true);
   }
 
   @Test
@@ -60,13 +63,13 @@ public class TestLockManager {
     Thread.sleep(100);
     // Since the other thread is trying to get write lock on same object,
     // it will wait.
-    Assertions.assertFalse(gotLock.get());
+    assertFalse(gotLock.get());
     manager.writeUnlock("/resourceOne");
     // Since we have released the write lock, the other thread should have
     // the lock now
     // Let's give some time for the other thread to run
     Thread.sleep(100);
-    Assertions.assertTrue(gotLock.get());
+    assertTrue(gotLock.get());
   }
 
   @Test
@@ -78,7 +81,7 @@ public class TestLockManager {
     manager.readLock("/resourceTwo");
     manager.readUnlock("/resourceOne");
     manager.readUnlock("/resourceTwo");
-    Assertions.assertTrue(true);
+    assertTrue(true);
   }
 
   @Test
@@ -95,7 +98,7 @@ public class TestLockManager {
     // Let's give some time for the other thread to run
     Thread.sleep(100);
     // Since the new thread is trying to get read lock, it should work.
-    Assertions.assertTrue(gotLock.get());
+    assertTrue(gotLock.get());
     manager.readUnlock("/resourceOne");
   }
 
@@ -114,13 +117,13 @@ public class TestLockManager {
     Thread.sleep(100);
     // Since the other thread is trying to get read lock on same object,
     // it will wait.
-    Assertions.assertFalse(gotLock.get());
+    assertFalse(gotLock.get());
     manager.writeUnlock("/resourceOne");
     // Since we have released the write lock, the other thread should have
     // the lock now
     // Let's give some time for the other thread to run
     Thread.sleep(100);
-    Assertions.assertTrue(gotLock.get());
+    assertTrue(gotLock.get());
   }
 
   @Test
@@ -138,13 +141,13 @@ public class TestLockManager {
     Thread.sleep(100);
     // Since the other thread is trying to get write lock on same object,
     // it will wait.
-    Assertions.assertFalse(gotLock.get());
+    assertFalse(gotLock.get());
     manager.readUnlock("/resourceOne");
     // Since we have released the read lock, the other thread should have
     // the lock now
     // Let's give some time for the other thread to run
     Thread.sleep(100);
-    Assertions.assertTrue(gotLock.get());
+    assertTrue(gotLock.get());
   }
 
   @Test
@@ -163,17 +166,17 @@ public class TestLockManager {
     Thread.sleep(100);
     // Since the other thread is trying to get write lock on same object,
     // it will wait.
-    Assertions.assertFalse(gotLock.get());
+    assertFalse(gotLock.get());
     manager.readUnlock("/resourceOne");
     //We have only released one read lock, we still hold another read lock.
     Thread.sleep(100);
-    Assertions.assertFalse(gotLock.get());
+    assertFalse(gotLock.get());
     manager.readUnlock("/resourceOne");
     // Since we have released the read lock, the other thread should have
     // the lock now
     // Let's give some time for the other thread to run
     Thread.sleep(100);
-    Assertions.assertTrue(gotLock.get());
+    assertTrue(gotLock.get());
   }
 
   @Test
@@ -201,6 +204,6 @@ public class TestLockManager {
     }
     GenericTestUtils.waitFor(() -> done.get() == count, 100,
         10 * count * sleep);
-    Assertions.assertEquals(count, done.get());
+    assertEquals(count, done.get());
   }
 }

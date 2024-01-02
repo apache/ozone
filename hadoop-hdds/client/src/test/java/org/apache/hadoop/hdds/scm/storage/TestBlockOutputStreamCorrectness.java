@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -44,9 +45,11 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * UNIT test for BlockOutputStream.
@@ -92,8 +95,8 @@ public class TestBlockOutputStreamCorrectness {
 
     final Pipeline pipeline = MockPipeline.createRatisPipeline();
 
-    final XceiverClientManager xcm = Mockito.mock(XceiverClientManager.class);
-    Mockito.when(xcm.acquireClient(Mockito.any()))
+    final XceiverClientManager xcm = mock(XceiverClientManager.class);
+    when(xcm.acquireClient(any()))
         .thenReturn(new MockXceiverClientSpi(pipeline));
 
     OzoneClientConfig config = new OzoneClientConfig();
@@ -103,6 +106,8 @@ public class TestBlockOutputStreamCorrectness {
     config.setStreamBufferFlushSize(16 * 1024 * 1024);
     config.setChecksumType(ChecksumType.NONE);
     config.setBytesPerChecksum(256 * 1024);
+    StreamBufferArgs streamBufferArgs =
+        StreamBufferArgs.getDefaultStreamBufferArgs(pipeline.getReplicationConfig(), config);
 
     return new RatisBlockOutputStream(
         new BlockID(1L, 1L),
@@ -111,7 +116,7 @@ public class TestBlockOutputStreamCorrectness {
         bufferPool,
         config,
         null,
-        ContainerClientMetrics.acquire());
+        ContainerClientMetrics.acquire(), streamBufferArgs);
   }
 
   /**
@@ -132,11 +137,6 @@ public class TestBlockOutputStreamCorrectness {
 
     @Override
     public void connect() {
-
-    }
-
-    @Override
-    public void connect(String encodedToken) {
 
     }
 

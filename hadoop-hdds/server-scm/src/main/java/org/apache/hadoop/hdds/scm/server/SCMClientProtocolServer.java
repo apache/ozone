@@ -662,8 +662,15 @@ public class SCMClientProtocolServer implements
       final HddsProtos.LifeCycleState state = scm.getContainerManager()
           .getContainer(cid).getState();
       if (!state.equals(HddsProtos.LifeCycleState.OPEN)) {
+        ResultCodes resultCode = ResultCodes.UNEXPECTED_CONTAINER_STATE;
+        if (state.equals(HddsProtos.LifeCycleState.CLOSED)) {
+          resultCode = ResultCodes.CONTAINER_ALREADY_CLOSED;
+        }
+        if (state.equals(HddsProtos.LifeCycleState.CLOSING)) {
+          resultCode = ResultCodes.CONTAINER_ALREADY_CLOSING;
+        }
         throw new SCMException("Cannot close a " + state + " container.",
-            ResultCodes.UNEXPECTED_CONTAINER_STATE);
+            resultCode);
       }
       scm.getEventQueue().fireEvent(SCMEvents.CLOSE_CONTAINER,
           ContainerID.valueOf(containerID));

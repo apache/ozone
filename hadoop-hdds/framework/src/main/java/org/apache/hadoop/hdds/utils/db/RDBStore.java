@@ -226,12 +226,12 @@ public class RDBStore implements DBStore {
     }
 
     RDBMetrics.unRegister();
-    IOUtils.closeQuietly(checkPointManager);
+    IOUtils.close(LOG, checkPointManager);
     if (rocksDBCheckpointDiffer != null) {
       RocksDBCheckpointDifferHolder
           .invalidateCacheEntry(rocksDBCheckpointDiffer.getMetadataDir());
     }
-    IOUtils.closeQuietly(db);
+    IOUtils.close(LOG, db);
   }
 
   @Override
@@ -446,6 +446,10 @@ public class RDBStore implements DBStore {
             dbUpdatesWrapper.getCurrentSequenceNumber() - sequenceNumber);
       }
     }
+    if (!dbUpdatesWrapper.isDBUpdateSuccess()) {
+      LOG.warn("Returned DBUpdates isDBUpdateSuccess: {}",
+          dbUpdatesWrapper.isDBUpdateSuccess());
+    }
     return dbUpdatesWrapper;
   }
 
@@ -469,5 +473,9 @@ public class RDBStore implements DBStore {
 
   public RDBMetrics getMetrics() {
     return rdbMetrics;
+  }
+
+  public static Logger getLogger() {
+    return LOG;
   }
 }

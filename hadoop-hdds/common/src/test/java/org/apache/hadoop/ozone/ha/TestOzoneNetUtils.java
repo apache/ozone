@@ -18,10 +18,11 @@ package org.apache.hadoop.ozone.ha;
 
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.net.InetSocketAddress;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests for {@link OzoneNetUtils} class.
@@ -35,7 +36,7 @@ public class TestOzoneNetUtils {
     InetSocketAddress addr0 = NetUtils.createSocketAddr(fqdn, port);
     InetSocketAddress addr1 = OzoneNetUtils.getAddressWithHostNameLocal(
             addr0);
-    Assertions.assertEquals("pod0", addr1.getHostName());
-    Assertions.assertEquals(port, addr1.getPort());
+    assertEquals("pod0", addr1.getHostName());
+    assertEquals(port, addr1.getPort());
   }
 }

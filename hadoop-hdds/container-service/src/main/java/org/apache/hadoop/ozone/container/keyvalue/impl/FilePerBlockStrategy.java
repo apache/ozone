@@ -60,7 +60,6 @@ import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersi
 import static org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage.COMMIT_DATA;
 import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.limitReadSize;
-import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.readData;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.validateChunkForOverwrite;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.verifyChunkFileExists;
 
@@ -75,6 +74,7 @@ public class FilePerBlockStrategy implements ChunkManager {
   private final boolean doSyncWrite;
   private final OpenFiles files = new OpenFiles();
   private final int defaultReadBufferCapacity;
+  private final int readMappedBufferThreshold;
   private final VolumeSet volumeSet;
 
   public FilePerBlockStrategy(boolean sync, BlockManager manager,
@@ -82,6 +82,8 @@ public class FilePerBlockStrategy implements ChunkManager {
     doSyncWrite = sync;
     this.defaultReadBufferCapacity = manager == null ? 0 :
         manager.getDefaultReadBufferCapacity();
+    this.readMappedBufferThreshold = manager == null ? 0
+        : manager.getReadMappedBufferThreshold();
     this.volumeSet = volSet;
   }
 
@@ -192,8 +194,8 @@ public class FilePerBlockStrategy implements ChunkManager {
     long offset = info.getOffset();
     int bufferCapacity =  ChunkManager.getBufferCapacityForChunkRead(info,
         defaultReadBufferCapacity);
-    return readData(len, bufferCapacity,
-        array -> readData(chunkFile, array, offset, len, volume));
+    return ChunkUtils.readData(len, bufferCapacity, chunkFile, offset, volume,
+        readMappedBufferThreshold);
   }
 
   @Override

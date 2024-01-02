@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -116,6 +117,7 @@ public final class ReplicationManagerUtil {
    * @return ExcludedAndUsedNodes object containing the excluded and used lists
    */
   public static ExcludedAndUsedNodes getExcludedAndUsedNodes(
+      ContainerInfo container,
       List<ContainerReplica> replicas,
       Set<ContainerReplica> toBeRemoved,
       List<ContainerReplicaOp> pendingReplicaOps,
@@ -123,12 +125,37 @@ public final class ReplicationManagerUtil {
     List<DatanodeDetails> excludedNodes = new ArrayList<>();
     List<DatanodeDetails> usedNodes = new ArrayList<>();
 
+    List<ContainerReplica> nonUniqueUnhealthy = null;
+    if (container.getState() == HddsProtos.LifeCycleState.QUASI_CLOSED) {
+      /*
+      An UNHEALTHY replica with unique origin node id of a QUASI_CLOSED container should be a used node (not excluded
+      node) because we preserve it. The following code will find non-unique UNHEALTHY replicas. Later in the method
+      this list will be used to determine whether an UNHEALTHY replica's DN should be a used node or excluded node.
+      */
+      nonUniqueUnhealthy =
+          selectUnhealthyReplicasForDelete(container, new HashSet<>(replicas), 0, dn -> {
+            try {
+              return replicationManager.getNodeStatus(dn);
+            } catch (NodeNotFoundException e) {
+              LOG.warn("Exception for {} while selecting used and excluded nodes for container {}.", dn, container);
+              return null;
+            }
+          });
+    }
     for (ContainerReplica r : replicas) {
       if (r.getState() == ContainerReplicaProto.State.UNHEALTHY) {
-        // Hosts with an Unhealthy replica cannot receive a new replica, but
-        // they are not considered used as they will be removed later.
-        excludedNodes.add(r.getDatanodeDetails());
-        continue;
+        if (container.getState() == HddsProtos.LifeCycleState.QUASI_CLOSED) {
+          // any unique UNHEALTHY will get added as used nodes in the catch-all at the end of the loop
+          if (nonUniqueUnhealthy != null && nonUniqueUnhealthy.contains(r)) {
+            excludedNodes.add(r.getDatanodeDetails());
+            continue;
+          }
+        } else {
+          // Hosts with an UNHEALTHY replica (of a non QUASI_CLOSED container) cannot receive a new replica, but
+          // they are not considered used as they will be removed later.
+          excludedNodes.add(r.getDatanodeDetails());
+          continue;
+        }
       }
       if (toBeRemoved.contains(r)) {
         // This node is currently present, but we plan to remove it so it is not
@@ -195,22 +222,8 @@ public final class ReplicationManagerUtil {
     }
   }
 
-  /**
-   * This is intended to be call when a container is under replicated, but there
-   * are no spare nodes to create new replicas on, due to having too many
-   * unhealthy replicas or quasi-closed replicas which cannot be closed due to
-   * having a lagging sequence ID. The logic here will select a replica to
-   * delete, or return null if there are none which can be safely deleted.
-   *
-   * @param containerInfo The container to select a replica to delete from
-   * @param replicas The list of replicas for the container
-   * @param pendingDeletes number pending deletes for this container
-   * @return A replica to delete, or null if there are none which can be safely
-   *         deleted.
-   */
-  public static ContainerReplica selectUnhealthyReplicaForDelete(
-      ContainerInfo containerInfo, Set<ContainerReplica> replicas,
-      int pendingDeletes, Function<DatanodeDetails, NodeStatus> nodeStatusFn) {
+  public static List<ContainerReplica> selectUnhealthyReplicasForDelete(ContainerInfo containerInfo,
+      Set<ContainerReplica> replicas, int pendingDeletes, Function<DatanodeDetails, NodeStatus> nodeStatusFn) {
     if (pendingDeletes > 0) {
       LOG.debug("Container {} has {} pending deletes which will free nodes.",
           containerInfo, pendingDeletes);
@@ -261,16 +274,37 @@ public final class ReplicationManagerUtil {
     deleteCandidates.sort(
         Comparator.comparingLong(ContainerReplica::getSequenceId));
     if (containerInfo.getState() == HddsProtos.LifeCycleState.CLOSED) {
-      return deleteCandidates.size() > 0 ? deleteCandidates.get(0) : null;
+      return deleteCandidates.size() > 0 ? deleteCandidates : null;
     }
 
     if (containerInfo.getState() == HddsProtos.LifeCycleState.QUASI_CLOSED) {
       List<ContainerReplica> nonUniqueOrigins =
           findNonUniqueDeleteCandidates(replicas, deleteCandidates,
               nodeStatusFn);
-      return nonUniqueOrigins.size() > 0 ? nonUniqueOrigins.get(0) : null;
+      return nonUniqueOrigins.size() > 0 ? nonUniqueOrigins : null;
     }
     return null;
+  }
+
+  /**
+   * This is intended to be called when a container is under replicated, but there
+   * are no spare nodes to create new replicas on, due to having too many
+   * unhealthy replicas or quasi-closed replicas which cannot be closed due to
+   * having a lagging sequence ID. The logic here will select a replica to
+   * delete, or return null if there are none which can be safely deleted.
+   *
+   * @param containerInfo The container to select a replica to delete from
+   * @param replicas The list of replicas for the container
+   * @param pendingDeletes number pending deletes for this container
+   * @return A replica to delete, or null if there are none which can be safely
+   *         deleted.
+   */
+  public static ContainerReplica selectUnhealthyReplicaForDelete(
+      ContainerInfo containerInfo, Set<ContainerReplica> replicas,
+      int pendingDeletes, Function<DatanodeDetails, NodeStatus> nodeStatusFn) {
+    List<ContainerReplica> containerReplicas =
+        selectUnhealthyReplicasForDelete(containerInfo, replicas, pendingDeletes, nodeStatusFn);
+    return containerReplicas != null ? containerReplicas.get(0) : null;
   }
 
   /**

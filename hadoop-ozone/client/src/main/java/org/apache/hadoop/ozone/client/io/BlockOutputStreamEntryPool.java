@@ -27,10 +27,10 @@ import java.util.ListIterator;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -84,6 +84,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
   private final long openID;
   private final ExcludeList excludeList;
   private final ContainerClientMetrics clientMetrics;
+  private final StreamBufferArgs streamBufferArgs;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public BlockOutputStreamEntryPool(
@@ -94,7 +95,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
       boolean isMultipart, OmKeyInfo info,
       boolean unsafeByteBufferConversion,
       XceiverClientFactory xceiverClientFactory, long openID,
-      ContainerClientMetrics clientMetrics
+      ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs
   ) {
     this.config = config;
     this.xceiverClientFactory = xceiverClientFactory;
@@ -111,12 +112,13 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     this.excludeList = createExcludeList();
 
     this.bufferPool =
-        new BufferPool(config.getStreamBufferSize(),
-            (int) (config.getStreamBufferMaxSize() / config
+        new BufferPool(streamBufferArgs.getStreamBufferSize(),
+            (int) (streamBufferArgs.getStreamBufferMaxSize() / streamBufferArgs
                 .getStreamBufferSize()),
             ByteStringConversion
                 .createByteBufferConversion(unsafeByteBufferConversion));
     this.clientMetrics = clientMetrics;
+    this.streamBufferArgs = streamBufferArgs;
   }
 
   ExcludeList createExcludeList() {
@@ -124,17 +126,14 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
         Clock.system(ZoneOffset.UTC));
   }
 
-  BlockOutputStreamEntryPool(ContainerClientMetrics clientMetrics) {
+  BlockOutputStreamEntryPool(ContainerClientMetrics clientMetrics,
+      OzoneClientConfig clientConfig, StreamBufferArgs streamBufferArgs) {
     streamEntries = new ArrayList<>();
     omClient = null;
     keyArgs = null;
     xceiverClientFactory = null;
-    config =
-        new OzoneConfiguration().getObject(OzoneClientConfig.class);
-    config.setStreamBufferSize(0);
-    config.setStreamBufferMaxSize(0);
-    config.setStreamBufferFlushSize(0);
-    config.setStreamBufferFlushDelay(false);
+    config = clientConfig;
+    streamBufferArgs.setStreamBufferFlushDelay(false);
     requestID = null;
     int chunkSize = 0;
     bufferPool = new BufferPool(chunkSize, 1);
@@ -143,6 +142,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     openID = -1;
     excludeList = createExcludeList();
     this.clientMetrics = clientMetrics;
+    this.streamBufferArgs = null;
   }
 
   /**
@@ -189,6 +189,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
             .setBufferPool(bufferPool)
             .setToken(subKeyInfo.getToken())
             .setClientMetrics(clientMetrics)
+            .setStreamBufferArgs(streamBufferArgs)
             .build();
   }
 
@@ -253,6 +254,10 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
 
   ContainerClientMetrics getClientMetrics() {
     return clientMetrics;
+  }
+
+  StreamBufferArgs getStreamBufferArgs() {
+    return streamBufferArgs;
   }
 
   /**

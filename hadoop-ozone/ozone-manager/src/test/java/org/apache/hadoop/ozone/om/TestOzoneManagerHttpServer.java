@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.File;
 import java.net.InetSocketAddress;
 import java.net.URL;
@@ -37,7 +39,6 @@ import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -108,15 +109,15 @@ public class TestOzoneManagerHttpServer {
       DefaultMetricsSystem.initialize("TestOzoneManagerHttpServer");
       server.start();
 
-      Assertions.assertTrue(implies(policy.isHttpEnabled(),
+      assertTrue(implies(policy.isHttpEnabled(),
           canAccess("http", server.getHttpAddress())));
-      Assertions.assertTrue(implies(policy.isHttpEnabled() &&
+      assertTrue(implies(policy.isHttpEnabled() &&
               !policy.isHttpsEnabled(),
           !canAccess("https", server.getHttpsAddress())));
 
-      Assertions.assertTrue(implies(policy.isHttpsEnabled(),
+      assertTrue(implies(policy.isHttpsEnabled(),
           canAccess("https", server.getHttpsAddress())));
-      Assertions.assertTrue(implies(policy.isHttpsEnabled(),
+      assertTrue(implies(policy.isHttpsEnabled(),
           !canAccess("http", server.getHttpsAddress())));
     } finally {
       if (server != null) {
@@ -136,12 +137,11 @@ public class TestOzoneManagerHttpServer {
       // Checking if the /webserver directory does get created
       File webServerDir =
           new File(ozoneMetadataDirectory, BaseHttpServer.SERVER_DIR);
-      Assertions.assertTrue(webServerDir.exists());
+      assertTrue(webServerDir.exists());
       // Verify that the jetty directory is set correctly
       String expectedJettyDirLocation =
           ozoneMetadataDirectory.getAbsolutePath() + BaseHttpServer.SERVER_DIR;
-      Assertions.assertEquals(expectedJettyDirLocation,
-          server.getJettyBaseTmpDir());
+      assertEquals(expectedJettyDirLocation, server.getJettyBaseTmpDir());
     } finally {
       if (server != null) {
         server.stop();
