@@ -257,7 +257,7 @@ public class TestMultiTenantAccessController {
     assertEquals(unlabeledPolicy, retrievedPolicy);
 
     // Get of policies with nonexistent label should give an empty list.
-    assertTrue(controller.getLabeledPolicies(label + "1").isEmpty());
+    assertThat(controller.getLabeledPolicies(label + "1")).isEmpty();
 
     // Cleanup
     for (Policy policy: labeledPolicies) {
@@ -323,7 +323,7 @@ public class TestMultiTenantAccessController {
     // get one of the roles to check it is there but empty.
     Role retrievedRole = controller.getRole(roleName);
     assertFalse(retrievedRole.getDescription().isPresent());
-    assertTrue(retrievedRole.getUsersMap().isEmpty());
+    assertThat(retrievedRole.getUsersMap()).isEmpty();
     assertTrue(retrievedRole.getId().isPresent());
 
     // Add a user to the role.

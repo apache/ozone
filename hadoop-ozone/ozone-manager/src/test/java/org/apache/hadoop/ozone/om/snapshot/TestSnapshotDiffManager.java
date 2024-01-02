@@ -1147,7 +1147,7 @@ public class TestSnapshotDiffManager {
     // the response list should be empty.
     List<SnapshotDiffJob> jobList = snapshotDiffManager
         .getSnapshotDiffJobList(volumeName, bucketName, jobStatus, listAll);
-    assertTrue(jobList.isEmpty());
+    assertThat(jobList).isEmpty();
 
     SnapshotDiffManager spy = spy(snapshotDiffManager);
     doNothing().when(spy).generateSnapshotDiffReport(eq(diffJobKey),
@@ -1177,7 +1177,7 @@ public class TestSnapshotDiffManager {
     if (containsJob) {
       assertThat(jobList).contains(diffJob);
     } else {
-      assertTrue(jobList.isEmpty());
+      assertThat(jobList).isEmpty();
     }
   }
 

@@ -199,7 +199,7 @@ public class TestOzoneManagerRatisServer {
       OmUtils.isReadOnly(request);
       assertThat(logCapturer.getOutput())
           .withFailMessage(cmdtype + " is not categorized in OmUtils#isReadyOnly")
-          .doesNotContain("CmdType " + cmdtype + " is not " + "categorized as readOnly or not.");
+          .doesNotContain("CmdType " + cmdtype + " is not categorized as readOnly or not.");
       logCapturer.clearOutput();
     }
   }

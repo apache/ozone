@@ -515,9 +515,8 @@ public class TestKeyManagerUnit {
         .getBlockID().getLocalID());
     assertEquals(pipelineTwo.getId(),
         newBlockLocation.getPipeline().getId());
-    assertThat(newBlockLocation.getPipeline().getNodes()).contains(dnFour);
-    assertThat(newBlockLocation.getPipeline().getNodes()).contains(dnFive);
-    assertThat(newBlockLocation.getPipeline().getNodes()).contains(dnSix);
+    assertThat(newBlockLocation.getPipeline().getNodes())
+        .contains(dnFour, dnFive, dnSix);
   }
 
   private void insertKey(Pipeline pipeline, String volumeName,

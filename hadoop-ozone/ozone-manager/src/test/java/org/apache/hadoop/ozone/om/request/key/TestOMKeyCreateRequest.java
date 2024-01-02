@@ -807,8 +807,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
       omKeyCreateRequest.preExecute(ozoneManager);
       fail("checkNotAValidPath failed for path" + keyName);
     } catch (IOException ex) {
-      assertInstanceOf(OMException.class, ex);
-      OMException omException = (OMException) ex;
+      OMException omException = assertInstanceOf(OMException.class, ex);
       assertEquals(OMException.ResultCodes.INVALID_KEY_NAME,
           omException.getResult());
     }

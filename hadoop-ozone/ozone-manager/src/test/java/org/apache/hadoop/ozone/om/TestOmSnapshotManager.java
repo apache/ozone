@@ -634,7 +634,7 @@ public class TestOmSnapshotManager {
     // Create first checkpoint for the snapshot checkpoint
     OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
         first);
-    assertThat(logCapturer.getOutput()).contains(
+    assertThat(logCapturer.getOutput()).doesNotContain(
         "for snapshot " + first.getName() + " already exists.");
     logCapturer.clearOutput();
 

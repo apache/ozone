@@ -283,9 +283,8 @@ public class TestS3GetSecretRequest {
         ozoneManager, 2);
 
     // Verify that the revoke operation was successful.
-    assertInstanceOf(S3RevokeSecretResponse.class, omRevokeResponse);
     S3RevokeSecretResponse s3RevokeSecretResponse =
-        (S3RevokeSecretResponse) omRevokeResponse;
+        assertInstanceOf(S3RevokeSecretResponse.class, omRevokeResponse);
     assertEquals(OzoneManagerProtocolProtos.Status.OK.getNumber(),
         s3RevokeSecretResponse.getOMResponse().getStatus().getNumber());
 
