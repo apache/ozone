@@ -350,7 +350,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
         long start = Time.monotonicNowNanos();
         omClient.hsyncKey(keyArgs, openID);
         long datanodeHsyncLatency = Time.monotonicNowNanos() - start;
-        clientMetrics.addOMHsyncLatency(datanodeHsyncLatency/1000);
+        clientMetrics.addOMHsyncLatency(datanodeHsyncLatency / 1000);
       }
     } else {
       LOG.warn("Closing KeyOutputStream, but key args is null");

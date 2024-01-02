@@ -164,7 +164,7 @@ public class BlockOutputStreamEntry extends OutputStream {
       long start = Time.monotonicNowNanos();
       ((Syncable)out).hsync();
       long datanodeHsyncLatency = Time.monotonicNowNanos() - start;
-      clientMetrics.addDataNodeHsyncLatency(datanodeHsyncLatency/1000);
+      clientMetrics.addDataNodeHsyncLatency(datanodeHsyncLatency / 1000);
     }
   }
 

@@ -466,7 +466,7 @@ public class KeyOutputStream extends OutputStream
     blockOutputStreamEntryPool.hsyncKey(hsyncPos);
 
     long hsyncLatency = Time.monotonicNowNanos() - start;
-    clientMetrics.addHsyncLatency(hsyncLatency/1000);
+    clientMetrics.addHsyncLatency(hsyncLatency / 1000);
   }
 
   /**
