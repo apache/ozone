@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -54,6 +53,8 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class tests OMSnapshotCreateResponse.
@@ -98,9 +99,8 @@ public class TestOMSnapshotCreateResponse {
         Time.now());
 
     // confirm table is empty
-    Assertions.assertEquals(0,
-        omMetadataManager
-            .countRowsInTable(omMetadataManager.getSnapshotInfoTable()));
+    assertEquals(0, omMetadataManager
+        .countRowsInTable(omMetadataManager.getSnapshotInfoTable()));
 
     // Populate deletedTable and deletedDirectoryTable
     Set<String> dtSentinelKeys =
@@ -122,10 +122,10 @@ public class TestOMSnapshotCreateResponse {
 
     // Confirm snapshot directory was created
     String snapshotDir = getSnapshotPath(ozoneConfiguration, snapshotInfo);
-    Assertions.assertTrue((new File(snapshotDir)).exists());
+    assertTrue((new File(snapshotDir)).exists());
 
     // Confirm table has 1 entry
-    Assertions.assertEquals(1, omMetadataManager
+    assertEquals(1, omMetadataManager
         .countRowsInTable(omMetadataManager.getSnapshotInfoTable()));
 
     // Check contents of entry
@@ -134,9 +134,9 @@ public class TestOMSnapshotCreateResponse {
              it = omMetadataManager.getSnapshotInfoTable().iterator()) {
       Table.KeyValue<String, SnapshotInfo> keyValue = it.next();
       storedInfo = keyValue.getValue();
-      Assertions.assertEquals(snapshotInfo.getTableKey(), keyValue.getKey());
+      assertEquals(snapshotInfo.getTableKey(), keyValue.getKey());
     }
-    Assertions.assertEquals(snapshotInfo, storedInfo);
+    assertEquals(snapshotInfo, storedInfo);
 
     // Check deletedTable and deletedDirectoryTable clean up work as expected
     verifyEntriesLeftInDeletedTable(dtSentinelKeys);
@@ -271,13 +271,13 @@ public class TestOMSnapshotCreateResponse {
       while (keyIter.hasNext()) {
         Table.KeyValue<String, ?> entry = keyIter.next();
         String dbKey = entry.getKey();
-        Assertions.assertTrue(expectedKeys.contains(dbKey),
+        assertTrue(expectedKeys.contains(dbKey),
             table.getName() + " should contain key");
         expectedKeys.remove(dbKey);
       }
     }
 
-    Assertions.assertTrue(expectedKeys.isEmpty(),
+    assertTrue(expectedKeys.isEmpty(),
         table.getName() + " is missing keys that should be there");
   }
 }

@@ -237,7 +237,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     case SUCCESS:
     case SNAPSHOT_UNAVAILABLE:
       // Currently, only trigger for the one who installed snapshot
-      if (ozoneManager.getOmRatisServer().getServer().getPeer().equals(peer)) {
+      if (ozoneManager.getOmRatisServer().getServerDivision().getPeer().equals(peer)) {
         ozoneManager.getOmSnapshotProvider().init();
       }
       break;
@@ -610,8 +610,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     }
     OMResponse omResponse = omResponseBuilder.build();
     OMClientResponse omClientResponse = new DummyOMClientResponse(omResponse);
-    omClientResponse.setFlushFuture(
-        ozoneManagerDoubleBuffer.add(omClientResponse, termIndex));
+    ozoneManagerDoubleBuffer.add(omClientResponse, termIndex);
     return omResponse;
   }
 

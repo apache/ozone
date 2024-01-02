@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -29,7 +30,6 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
-import org.junit.jupiter.api.Assertions;
 
 import java.io.IOException;
 
@@ -44,7 +44,7 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
       OzoneManagerProtocolProtos.OMResponse omResponse, String openKey,
       String ozoneKey, RepeatedOmKeyInfo deleteKeys, Boolean isHSync)
           throws IOException {
-    Assertions.assertNotNull(omBucketInfo);
+    assertNotNull(omBucketInfo);
     long volumeId = omMetadataManager.getVolumeId(omKeyInfo.getVolumeName());
     Map<String, RepeatedOmKeyInfo> deleteKeyMap = new HashMap<>();
     if (null != keysToDelete) {
@@ -61,7 +61,7 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
   @NotNull
   @Override
   protected OmKeyInfo getOmKeyInfo() {
-    Assertions.assertNotNull(omBucketInfo);
+    assertNotNull(omBucketInfo);
     return OMRequestTestUtils.createOmKeyInfo(volumeName,
             omBucketInfo.getBucketName(), keyName, replicationType,
             replicationFactor,
@@ -72,7 +72,7 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
   @NotNull
   @Override
   protected void addKeyToOpenKeyTable() throws Exception {
-    Assertions.assertNotNull(omBucketInfo);
+    assertNotNull(omBucketInfo);
     long parentID = omBucketInfo.getObjectID();
     long objectId = parentID + 10;
 
@@ -90,7 +90,7 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
   @NotNull
   @Override
   protected String getOpenKeyName() throws IOException  {
-    Assertions.assertNotNull(omBucketInfo);
+    assertNotNull(omBucketInfo);
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omMetadataManager.getBucketId(volumeName,
             bucketName);
@@ -101,7 +101,7 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
   @NotNull
   @Override
   protected String getOzoneKey()  throws IOException {
-    Assertions.assertNotNull(omBucketInfo);
+    assertNotNull(omBucketInfo);
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omMetadataManager.getBucketId(volumeName,
             bucketName);

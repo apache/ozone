@@ -18,10 +18,8 @@
 package org.apache.hadoop.ozone.common;
 
 import org.apache.commons.collections.SetUtils;
-import org.apache.hadoop.ozone.common.statemachine
-    .InvalidStateTransitionException;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.common.statemachine.StateMachine;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
@@ -32,8 +30,10 @@ import static org.apache.hadoop.ozone.common.TestStateMachine.STATES.CLOSED;
 import static org.apache.hadoop.ozone.common.TestStateMachine.STATES.CREATING;
 import static org.apache.hadoop.ozone.common.TestStateMachine.STATES.FINAL;
 import static org.apache.hadoop.ozone.common.TestStateMachine.STATES.INIT;
-import static org.apache.hadoop.ozone.common.TestStateMachine.STATES
-    .OPERATIONAL;
+import static org.apache.hadoop.ozone.common.TestStateMachine.STATES.OPERATIONAL;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class is to test ozone common state machine.
@@ -66,28 +66,27 @@ public class TestStateMachine {
     stateMachine.addTransition(CREATING, CLEANUP, EVENTS.TIMEOUT);
 
     // Initial and Final states
-    Assertions.assertEquals(INIT, stateMachine.getInitialState(),
+    assertEquals(INIT, stateMachine.getInitialState(),
         "Initial State");
-    Assertions.assertTrue(SetUtils.isEqualSet(finals,
-        stateMachine.getFinalStates()), "Final States");
+    assertTrue(SetUtils.isEqualSet(finals, stateMachine.getFinalStates()), "Final States");
 
     // Valid state transitions
-    Assertions.assertEquals(OPERATIONAL, stateMachine.getNextState(CREATING,
+    assertEquals(OPERATIONAL, stateMachine.getNextState(CREATING,
         EVENTS.CREATE), "STATE should be OPERATIONAL after being created");
-    Assertions.assertEquals(OPERATIONAL, stateMachine.getNextState(OPERATIONAL,
+    assertEquals(OPERATIONAL, stateMachine.getNextState(OPERATIONAL,
         EVENTS.UPDATE), "STATE should be OPERATIONAL after being updated");
-    Assertions.assertEquals(CLEANUP, stateMachine.getNextState(OPERATIONAL,
+    assertEquals(CLEANUP, stateMachine.getNextState(OPERATIONAL,
         EVENTS.DELETE), "STATE should be CLEANUP after being deleted");
-    Assertions.assertEquals(CLEANUP, stateMachine.getNextState(CREATING,
+    assertEquals(CLEANUP, stateMachine.getNextState(CREATING,
         EVENTS.TIMEOUT), "STATE should be CLEANUP after being timeout");
-    Assertions.assertEquals(CLOSED, stateMachine.getNextState(OPERATIONAL,
+    assertEquals(CLOSED, stateMachine.getNextState(OPERATIONAL,
         EVENTS.CLOSE), "STATE should be CLOSED after being closed");
 
     // Negative cases: invalid transition
-    Assertions.assertThrowsExactly(InvalidStateTransitionException.class, () ->
+    assertThrowsExactly(InvalidStateTransitionException.class, () ->
         stateMachine.getNextState(OPERATIONAL, EVENTS.CREATE), "Invalid event");
 
-    Assertions.assertThrowsExactly(InvalidStateTransitionException.class, () ->
+    assertThrowsExactly(InvalidStateTransitionException.class, () ->
         stateMachine.getNextState(CREATING, EVENTS.CLOSE), "Invalid event");
   }
 

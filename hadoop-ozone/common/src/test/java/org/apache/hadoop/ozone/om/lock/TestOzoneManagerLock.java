@@ -171,6 +171,7 @@ public class TestOzoneManagerLock {
           try {
             resourceName = generateResourceName(resource);
             lock.acquireWriteLock(resource, resourceName);
+            fail("testLockViolations failed");
           } catch (RuntimeException ex) {
             String message = "cannot acquire " + resource.getName() + " lock " +
                 "while holding " + currentLocks + " lock(s).";

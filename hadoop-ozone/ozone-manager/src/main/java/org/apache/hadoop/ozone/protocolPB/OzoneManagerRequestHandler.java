@@ -404,8 +404,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
           Preconditions.checkNotNull(omClientResponse,
               "omClientResponse returned by validateAndUpdateCache cannot be null");
           if (omRequest.getCmdType() != Type.Prepare) {
-            omClientResponse.setFlushFuture(
-                ozoneManagerDoubleBuffer.add(omClientResponse, termIndex));
+            ozoneManagerDoubleBuffer.add(omClientResponse, termIndex);
           }
           return omClientResponse;
         });
