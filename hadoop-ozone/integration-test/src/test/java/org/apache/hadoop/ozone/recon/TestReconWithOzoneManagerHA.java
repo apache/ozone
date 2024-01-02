@@ -110,9 +110,9 @@ public class TestReconWithOzoneManagerHA {
       ozoneManager.set(om);
       return om != null;
     }, 100, 120000);
-    assertNotNull(ozoneManager,"Timed out waiting OM leader election to finish: "
+    assertNotNull(ozoneManager, "Timed out waiting OM leader election to finish: "
         + "no leader or more than one leader.");
-    assertTrue(ozoneManager.get().isLeaderReady(),"Should have gotten the leader!");
+    assertTrue(ozoneManager.get().isLeaderReady(), "Should have gotten the leader!");
 
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
         cluster.getReconServer().getOzoneManagerServiceProvider();
@@ -124,8 +124,7 @@ public class TestReconWithOzoneManagerHA {
         ozoneManager.get().getHttpServer().getHttpAddress().getPort() +
         OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
     String snapshotUrl = impl.getOzoneManagerSnapshotUrl();
-    assertEquals("OM Snapshot should be requested from the leader.",
-        expectedUrl, snapshotUrl);
+    assertEquals(expectedUrl, snapshotUrl);
     // Write some data
     String keyPrefix = "ratis";
     OzoneOutputStream key = objectStore.getVolume(VOL_NAME)
@@ -148,7 +147,7 @@ public class TestReconWithOzoneManagerHA {
             (Table.KeyValue<ContainerKeyPrefix, Integer>) iterator.next();
         reconKeyPrefix = keyValue.getKey().getKeyPrefix();
       }
-      assertEquals("Container data should be synced to recon.",
+      assertEquals(
           String.format("/%s/%s/%s", VOL_NAME, VOL_NAME, keyPrefix),
           reconKeyPrefix);
     }
