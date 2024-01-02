@@ -92,9 +92,11 @@ public final class ProtocolMessageMetrics<KEY> implements MetricsSource {
     counters.get(key).incrementAndGet();
     elapsedTimes.get(key).addAndGet(duration);
     if (quantileEnable) {
-      for (MutableQuantiles q : quantiles.get(key)) {
+      MutableQuantiles[] mutableQuantiles = quantiles.get(key);
+      for (MutableQuantiles q : mutableQuantiles) {
         q.add(duration);
       }
+      quantiles.put(key, mutableQuantiles);
     }
   }
 
@@ -107,9 +109,11 @@ public final class ProtocolMessageMetrics<KEY> implements MetricsSource {
       long delta = System.currentTimeMillis() - startTime;
       elapsedTimes.get(key).addAndGet(delta);
       if (quantileEnable) {
-        for (MutableQuantiles q : quantiles.get(key)) {
+        MutableQuantiles[] mutableQuantiles = quantiles.get(key);
+        for (MutableQuantiles q : mutableQuantiles) {
           q.add(delta);
         }
+        quantiles.put(key, mutableQuantiles);
       }
     };
   }
