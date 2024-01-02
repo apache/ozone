@@ -117,14 +117,14 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.eq;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -973,7 +973,7 @@ public class TestSCMNodeManager {
       // If the mlv equals slv checkpoint passed, datanodes with older mlvs
       // should be instructed to finalize.
       verify(eventPublisher, times(1))
-          .fireEvent(Mockito.eq(DATANODE_COMMAND), captor.capture());
+          .fireEvent(eq(DATANODE_COMMAND), captor.capture());
       assertEquals(captor.getValue().getDatanodeId(), node1.getUuid());
       assertEquals(captor.getValue().getCommand().getType(),
           finalizeNewLayoutVersionCommand);
@@ -981,7 +981,7 @@ public class TestSCMNodeManager {
       // SCM has not finished finalizing its mlv, so datanodes with older
       // mlvs should not be instructed to finalize yet.
       verify(eventPublisher, times(0))
-          .fireEvent(Mockito.eq(DATANODE_COMMAND), captor.capture());
+          .fireEvent(eq(DATANODE_COMMAND), captor.capture());
     }
   }
 
@@ -1043,7 +1043,7 @@ public class TestSCMNodeManager {
     ArgumentCaptor<DatanodeDetails> captor =
         ArgumentCaptor.forClass(DatanodeDetails.class);
     verify(eventPublisher, times(1))
-        .fireEvent(Mockito.eq(DATANODE_COMMAND_COUNT_UPDATED),
+        .fireEvent(eq(DATANODE_COMMAND_COUNT_UPDATED),
             captor.capture());
     assertEquals(node1, captor.getValue());
 
@@ -1060,7 +1060,7 @@ public class TestSCMNodeManager {
         node1, SCMCommandProto.Type.closeContainerCommand));
 
     verify(eventPublisher, times(2))
-        .fireEvent(Mockito.eq(DATANODE_COMMAND_COUNT_UPDATED),
+        .fireEvent(eq(DATANODE_COMMAND_COUNT_UPDATED),
             captor.capture());
     assertEquals(node1, captor.getValue());
 

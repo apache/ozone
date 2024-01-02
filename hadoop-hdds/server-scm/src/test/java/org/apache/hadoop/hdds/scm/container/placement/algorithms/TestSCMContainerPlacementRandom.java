@@ -40,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import org.mockito.Mockito;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -85,7 +85,7 @@ public class TestSCMContainerPlacementRandom {
     datanodes.get(2).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage2)));
 
-    NodeManager mockNodeManager = Mockito.mock(NodeManager.class);
+    NodeManager mockNodeManager = mock(NodeManager.class);
     when(mockNodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
 
@@ -131,7 +131,7 @@ public class TestSCMContainerPlacementRandom {
       datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
     }
 
-    NodeManager mockNodeManager = Mockito.mock(NodeManager.class);
+    NodeManager mockNodeManager = mock(NodeManager.class);
     SCMContainerPlacementRandom scmContainerPlacementRandom =
         new SCMContainerPlacementRandom(mockNodeManager, conf, null, true,
             null);
@@ -201,7 +201,7 @@ public class TestSCMContainerPlacementRandom {
     datanodes.get(2).updateMetaDataStorageReports(
         new ArrayList<>(Arrays.asList(metaStorage2)));
 
-    NodeManager mockNodeManager = Mockito.mock(NodeManager.class);
+    NodeManager mockNodeManager = mock(NodeManager.class);
     when(mockNodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
     when(mockNodeManager.getNodeByUuid(datanodes.get(0).getUuid()))

@@ -51,13 +51,14 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
+
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 /**
@@ -125,7 +126,7 @@ public class TestPipelinePlacementFactory {
     }
     nodeManagerBase = new MockNodeManager(cluster, datanodes,
         false, 10);
-    nodeManager = Mockito.spy(nodeManagerBase);
+    nodeManager = spy(nodeManagerBase);
     for (DatanodeInfo dn: dnInfos) {
       when(nodeManager.getNodeByUuid(dn.getUuidString()))
           .thenReturn(dn);

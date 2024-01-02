@@ -60,7 +60,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -87,6 +86,10 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.any;
 import static org.apache.hadoop.hdds.scm.container.TestContainerReportHandler.getContainerReportsProto;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 
@@ -114,16 +117,13 @@ public class TestIncrementalContainerReportHandler {
         GenericTestUtils.getTempPath(UUID.randomUUID().toString());
     Path scmPath = Paths.get(path, "scm-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
-    this.containerManager = Mockito.mock(ContainerManager.class);
+    this.containerManager = mock(ContainerManager.class);
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
     SCMStorageConfig storageConfig = new SCMStorageConfig(conf);
-    this.versionManager =
-        Mockito.mock(HDDSLayoutVersionManager.class);
-    Mockito.when(versionManager.getMetadataLayoutVersion())
-        .thenReturn(maxLayoutVersion());
-    Mockito.when(versionManager.getSoftwareLayoutVersion())
-        .thenReturn(maxLayoutVersion());
+    this.versionManager = mock(HDDSLayoutVersionManager.class);
+    when(versionManager.getMetadataLayoutVersion()).thenReturn(maxLayoutVersion());
+    when(versionManager.getSoftwareLayoutVersion()).thenReturn(maxLayoutVersion());
     this.nodeManager =
         new SCMNodeManager(conf, storageConfig, eventQueue, clusterMap,
             scmContext, versionManager);
@@ -147,48 +147,48 @@ public class TestIncrementalContainerReportHandler {
             Clock.system(ZoneId.systemDefault())))
         .build();
 
-    this.publisher = Mockito.mock(EventPublisher.class);
+    this.publisher = mock(EventPublisher.class);
 
-    Mockito.when(containerManager.getContainer(Mockito.any(ContainerID.class)))
+    when(containerManager.getContainer(any(ContainerID.class)))
         .thenAnswer(invocation -> containerStateManager
             .getContainer(((ContainerID)invocation
                 .getArguments()[0])));
 
-    Mockito.when(containerManager.getContainerReplicas(
-        Mockito.any(ContainerID.class)))
+    when(containerManager.getContainerReplicas(
+        any(ContainerID.class)))
         .thenAnswer(invocation -> containerStateManager
             .getContainerReplicas(((ContainerID)invocation
                 .getArguments()[0])));
 
-    Mockito.doAnswer(invocation -> {
+    doAnswer(invocation -> {
       containerStateManager
           .removeContainerReplica(((ContainerID)invocation
                   .getArguments()[0]),
               (ContainerReplica)invocation.getArguments()[1]);
       return null;
     }).when(containerManager).removeContainerReplica(
-        Mockito.any(ContainerID.class),
-        Mockito.any(ContainerReplica.class));
+        any(ContainerID.class),
+        any(ContainerReplica.class));
 
-    Mockito.doAnswer(invocation -> {
+    doAnswer(invocation -> {
       containerStateManager
           .updateContainerState(((ContainerID)invocation
                   .getArguments()[0]).getProtobuf(),
               (HddsProtos.LifeCycleEvent)invocation.getArguments()[1]);
       return null;
     }).when(containerManager).updateContainerState(
-        Mockito.any(ContainerID.class),
-        Mockito.any(HddsProtos.LifeCycleEvent.class));
+        any(ContainerID.class),
+        any(HddsProtos.LifeCycleEvent.class));
 
-    Mockito.doAnswer(invocation -> {
+    doAnswer(invocation -> {
       containerStateManager
           .updateContainerReplica(((ContainerID)invocation
                   .getArguments()[0]),
               (ContainerReplica) invocation.getArguments()[1]);
       return null;
     }).when(containerManager).updateContainerReplica(
-        Mockito.any(ContainerID.class),
-        Mockito.any(ContainerReplica.class));
+        any(ContainerID.class),
+        any(ContainerReplica.class));
 
   }
 

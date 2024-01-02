@@ -59,7 +59,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -80,11 +79,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys
-    .OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
 /**
@@ -117,16 +117,16 @@ public class TestDeletedBlockLog {
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
-    replicationManager = Mockito.mock(ReplicationManager.class);
+    replicationManager = mock(ReplicationManager.class);
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
     configurator.setReplicationManager(replicationManager);
     scm = HddsTestUtils.getScm(conf, configurator);
-    containerManager = Mockito.mock(ContainerManager.class);
+    containerManager = mock(ContainerManager.class);
     containerTable = scm.getScmMetadataStore().getContainerTable();
     scmHADBTransactionBuffer =
         new SCMHADBTransactionBufferStub(scm.getScmMetadataStore().getStore());
-    metrics = Mockito.mock(ScmBlockDeletingServiceMetrics.class);
+    metrics = mock(ScmBlockDeletingServiceMetrics.class);
     deletedBlockLog = new DeletedBlockLogImpl(conf,
         containerManager,
         scm.getScmHAManager().getRatisServer(),
@@ -389,13 +389,13 @@ public class TestDeletedBlockLog {
   }
 
   private void mockContainerHealthResult(Boolean healthy) {
-    ContainerInfo containerInfo = Mockito.mock(ContainerInfo.class);
+    ContainerInfo containerInfo = mock(ContainerInfo.class);
     ContainerHealthResult healthResult =
         new ContainerHealthResult.HealthyResult(containerInfo);
     if (!healthy) {
       healthResult = new ContainerHealthResult.UnHealthyResult(containerInfo);
     }
-    Mockito.doReturn(healthResult).when(replicationManager)
+    doReturn(healthResult).when(replicationManager)
         .getContainerReplicationHealth(any(), any());
   }
 
@@ -856,7 +856,7 @@ public class TestDeletedBlockLog {
         .setReplicationConfig(pipeline.getReplicationConfig());
 
     ContainerInfo containerInfo = builder.build();
-    Mockito.doReturn(containerInfo).when(containerManager)
+    doReturn(containerInfo).when(containerManager)
         .getContainer(ContainerID.valueOf(containerID));
 
     final Set<ContainerReplica> replicaSet = dns.stream()
@@ -888,7 +888,7 @@ public class TestDeletedBlockLog {
         .setReplicationConfig(pipeline.getReplicationConfig());
 
     ContainerInfo containerInfo = builder.build();
-    Mockito.doReturn(containerInfo).when(containerManager)
+    doReturn(containerInfo).when(containerManager)
         .getContainer(ContainerID.valueOf(containerID));
 
     final Set<ContainerReplica> replicaSet = dns.stream()
@@ -904,7 +904,7 @@ public class TestDeletedBlockLog {
     } else {
       healthResult = new ContainerHealthResult.HealthyResult(containerInfo);
     }
-    Mockito.doReturn(healthResult).when(replicationManager)
+    doReturn(healthResult).when(replicationManager)
         .getContainerReplicationHealth(containerInfo, replicaSet);
     when(containerManager.getContainerReplicas(
         ContainerID.valueOf(containerID)))

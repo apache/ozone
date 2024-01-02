@@ -39,7 +39,6 @@ import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,6 +51,8 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 
@@ -98,12 +99,9 @@ public class TestNodeStateManager {
     eventPublisher = new MockEventPublisher();
     scmSlv = maxLayoutVersion();
     scmMlv = maxLayoutVersion();
-    LayoutVersionManager mockVersionManager =
-        Mockito.mock(HDDSLayoutVersionManager.class);
-    Mockito.when(mockVersionManager.getMetadataLayoutVersion())
-        .thenReturn(scmMlv);
-    Mockito.when(mockVersionManager.getSoftwareLayoutVersion())
-        .thenReturn(scmSlv);
+    LayoutVersionManager mockVersionManager = mock(HDDSLayoutVersionManager.class);
+    when(mockVersionManager.getMetadataLayoutVersion()).thenReturn(scmMlv);
+    when(mockVersionManager.getSoftwareLayoutVersion()).thenReturn(scmSlv);
     nsm = new NodeStateManager(conf, eventPublisher, mockVersionManager,
         scmContext);
   }
