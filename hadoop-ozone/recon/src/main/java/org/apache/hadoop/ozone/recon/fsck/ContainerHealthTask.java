@@ -143,7 +143,7 @@ public class ContainerHealthTask extends ReconScmTask {
   private void checkAndProcessContainers(
       Map<UnHealthyContainerStates, Map<String, Long>>
           unhealthyContainerStateStatsMap, long currentTime) {
-    ContainerID startID = ContainerID.valueOf(0);
+    ContainerID startID = ContainerID.valueOf(1);
     List<ContainerInfo> containers = containerManager.getContainers(startID,
         Integer.parseInt(DEFAULT_FETCH_COUNT));
     long start;
@@ -158,11 +158,14 @@ public class ContainerHealthTask extends ReconScmTask {
               " processing {} containers.", Time.monotonicNow() - start,
           containers.size());
       logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
-      startID = ContainerID.valueOf(
-          containers.get(containers.size() - 1).getContainerID());
+      if (containers.size() > Integer.parseInt(DEFAULT_FETCH_COUNT)) {
+        startID = ContainerID.valueOf(
+            containers.get(containers.size() - 1).getContainerID());
+        containers.clear();
+        containers = containerManager.getContainers(startID,
+            Integer.parseInt(DEFAULT_FETCH_COUNT));
+      }
       containers.clear();
-      containers = containerManager.getContainers(startID,
-          Integer.parseInt(DEFAULT_FETCH_COUNT));
     }
   }
 
@@ -465,7 +468,7 @@ public class ContainerHealthTask extends ReconScmTask {
 
       if (container.isOverReplicated()
           && !recordForStateExists.contains(
-          UnHealthyContainerStates.OVER_REPLICATED.toString())) {
+            UnHealthyContainerStates.OVER_REPLICATED.toString())) {
         records.add(recordForState(
             container, UnHealthyContainerStates.OVER_REPLICATED, time));
         populateContainerStats(container,
@@ -475,7 +478,7 @@ public class ContainerHealthTask extends ReconScmTask {
 
       if (container.isMisReplicated()
           && !recordForStateExists.contains(
-          UnHealthyContainerStates.MIS_REPLICATED.toString())) {
+            UnHealthyContainerStates.MIS_REPLICATED.toString())) {
         records.add(recordForState(
             container, UnHealthyContainerStates.MIS_REPLICATED, time));
         populateContainerStats(container,
