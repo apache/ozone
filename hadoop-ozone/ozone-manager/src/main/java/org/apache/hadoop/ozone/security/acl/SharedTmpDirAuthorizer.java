@@ -16,7 +16,7 @@
  */
 package org.apache.hadoop.ozone.security.acl;
 
-import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 
 import java.util.Objects;
@@ -47,14 +47,10 @@ public class SharedTmpDirAuthorizer implements IAccessAuthorizer {
       throws OMException {
     Objects.requireNonNull(ozObject);
     Objects.requireNonNull(context);
-    OzoneObjInfo objInfo;
 
     if (ozObject instanceof OzoneObjInfo) {
-      objInfo = (OzoneObjInfo) ozObject;
-      if (StringUtils.isNotEmpty(objInfo.getVolumeName()) &&
-          StringUtils.isNotEmpty(objInfo.getBucketName()) &&
-          objInfo.getVolumeName().equals("tmp") &&
-          objInfo.getBucketName().equals("tmp")) {
+      OzoneObjInfo objInfo = (OzoneObjInfo) ozObject;
+      if (OFSPath.isSharedTmpBucket(objInfo)) {
         return ozoneNativeAuthorizer.checkAccess(ozObject, context);
       }
     }
