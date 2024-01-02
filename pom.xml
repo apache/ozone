@@ -187,7 +187,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <kotlin.version>1.9.22</kotlin.version>
     <metainf-services.version>1.8</metainf-services.version>
     <picocli.version>4.7.5</picocli.version>
-    <prometheus.version>0.7.0</prometheus.version>
+    <prometheus.version>0.16.0</prometheus.version>
     <reflections.version>0.9.11</reflections.version>
 
     <!-- com.google.re2j version -->
@@ -1365,6 +1365,20 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>io.prometheus</groupId>
         <artifactId>simpleclient_dropwizard</artifactId>
         <version>${prometheus.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>io.prometheus</groupId>
+            <artifactId>simpleclient_tracer_common</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>io.prometheus</groupId>
+            <artifactId>simpleclient_tracer_otel</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>io.prometheus</groupId>
+            <artifactId>simpleclient_tracer_otel_agent</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>io.prometheus</groupId>
