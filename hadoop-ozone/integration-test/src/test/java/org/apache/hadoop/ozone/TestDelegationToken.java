@@ -26,12 +26,17 @@ import java.security.KeyPair;
 import java.security.PrivilegedExceptionAction;
 import java.util.Properties;
 import java.util.stream.Stream;
+import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
+import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultCAServer;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
@@ -51,9 +56,10 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-
+import org.apache.ratis.util.ExitUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY;
@@ -80,13 +86,13 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.slf4j.event.Level.INFO;
 
-import org.apache.ratis.util.ExitUtils;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -96,7 +102,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import static org.slf4j.event.Level.INFO;
 
 /**
  * Test class to for security enabled Ozone cluster.
@@ -125,9 +130,8 @@ public final class TestDelegationToken {
   private StorageContainerManager scm;
   private OzoneManager om;
   private String host;
-  private String clusterId;
-  private String scmId;
-  private String omId;
+  private String clusterId = UUID.randomUUID().toString();
+  private String scmId = UUID.randomUUID().toString();
   private OzoneManagerProtocolClientSideTranslatorPB omClient;
 
   public static Stream<Boolean> options() {
@@ -245,6 +249,17 @@ public final class TestDelegationToken {
         spnegoKeytab.getAbsolutePath());
   }
 
+  private void initSCM() throws IOException {
+    DefaultCAServer.setTestSecureFlag(true);
+    SCMStorageConfig scmStore = new SCMStorageConfig(conf);
+    scmStore.setClusterId(clusterId);
+    scmStore.setScmId(scmId);
+    HASecurityUtils.initializeSecurity(scmStore, conf,
+        InetAddress.getLocalHost().getHostName(), true);
+    scmStore.setPrimaryScmNodeId(scmId);
+    // writes the version file properties
+    scmStore.initialize();
+  }
 
   /**
    * Performs following tests for delegation token.
@@ -258,6 +273,9 @@ public final class TestDelegationToken {
   @ParameterizedTest
   @MethodSource("options")
   public void testDelegationToken(boolean useIp) throws Exception {
+    initSCM();
+    scm = HddsTestUtils.getScmSimple(conf);
+    scm.start();
 
     // Capture logs for assertions
     LogCapturer logs = LogCapturer.captureLogs(Server.AUDITLOG);
@@ -297,6 +315,7 @@ public final class TestDelegationToken {
       om.start();
       UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
       String username = ugi.getUserName();
+      logs.clearOutput();
 
       // Get first OM client which will authenticate via Kerberos
       omClient = new OzoneManagerProtocolClientSideTranslatorPB(
@@ -309,7 +328,7 @@ public final class TestDelegationToken {
 
       // Case 1: Test successful delegation token.
       Token<OzoneTokenIdentifier> token = omClient
-          .getDelegationToken(new Text("om"));
+          .getDelegationToken(new Text("scm"));
 
       // Case 2: Test successful token renewal.
       long renewalTime = omClient.renewDelegationToken(token);
@@ -343,10 +362,9 @@ public final class TestDelegationToken {
           "Auth successful for " + username + " (auth:TOKEN)"));
       OzoneTestUtils.expectOmException(VOLUME_NOT_FOUND,
           () -> omClient.deleteVolume("vol1"));
-      assertTrue(
-          "Log file doesn't contain successful auth for user " + username,
-          logs.getOutput().contains("Auth successful for "
-              + username + " (auth:TOKEN)"));
+      assertTrue(logs.getOutput().contains("Auth successful for "
+              + username + " (auth:TOKEN)"),
+          "Log file doesn't contain successful auth for user " + username);
 
       // Case 4: Test failure of token renewal.
       // Call to renewDelegationToken will fail but it will confirm that
@@ -402,12 +420,18 @@ public final class TestDelegationToken {
 
   private void setupOm(OzoneConfiguration config) throws Exception {
     OMStorage omStore = new OMStorage(config);
-    omStore.setClusterId("testClusterId");
+    omStore.setClusterId(clusterId);
     omStore.setOmCertSerialId(OM_CERT_SERIAL_ID);
     // writes the version file properties
     omStore.initialize();
+
+    // OM uses scm/host@EXAMPLE.COM to access SCM
+    config.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY,
+        "scm/" + host + "@" + miniKdc.getRealm());
+    omKeyTab = new File(workDir, "scm.keytab");
+    config.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY, omKeyTab.getAbsolutePath());
+
     OzoneManager.setTestSecureOmFlag(true);
     om = OzoneManager.createOm(config);
   }
-
 }

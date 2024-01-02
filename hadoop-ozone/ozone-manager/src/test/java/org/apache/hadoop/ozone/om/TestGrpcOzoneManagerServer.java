@@ -18,13 +18,13 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.mockito.Mockito.mock;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.mockito.Mockito;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 
 /**
@@ -41,7 +41,7 @@ public class TestGrpcOzoneManagerServer {
   @Test
   public void testStartStop() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    ozoneManager = Mockito.mock(OzoneManager.class);
+    ozoneManager = mock(OzoneManager.class);
     omServerProtocol = ozoneManager.getOmServerProtocol();
 
     server = new GrpcOzoneManagerServer(conf,

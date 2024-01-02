@@ -27,25 +27,23 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.AfterClass;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.util.UUID;
 import java.util.List;
-
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.
     OZONE_FS_ITERATE_BATCH_SIZE;
 
 /**
  * A simple test that asserts that list status output is sorted.
  */
+@Timeout(1200)
 public class TestListStatus {
 
   private static MiniOzoneCluster cluster = null;
@@ -56,16 +54,13 @@ public class TestListStatus {
   private static OzoneBucket fsoOzoneBucket;
   private static OzoneClient client;
 
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(new Timeout(1200000));
-
   /**
    * Create a MiniDFSCluster for testing.
    * <p>
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
@@ -88,7 +83,7 @@ public class TestListStatus {
     buildNameSpaceTree(fsoOzoneBucket);
   }
 
-  @AfterClass
+  @AfterAll
   public static void teardownClass() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -193,7 +188,7 @@ public class TestListStatus {
     List<OzoneFileStatus> statuses =
         fsoOzoneBucket.listStatus(keyPrefix, false, startKey,
             numEntries, isPartialPrefix);
-    Assert.assertEquals(expectedNumKeys, statuses.size());
+    assertEquals(expectedNumKeys, statuses.size());
 
     System.out.println("BEGIN:::keyPrefix---> " + keyPrefix + ":::---> " +
         startKey);
@@ -203,7 +198,7 @@ public class TestListStatus {
       OzoneFileStatus stNext = statuses.get(i + 1);
 
       System.out.println("status:"  + stCurr);
-      Assert.assertTrue(stCurr.getPath().compareTo(stNext.getPath()) < 0);
+      assertThat(stCurr.getPath().compareTo(stNext.getPath())).isLessThan(0);
     }
 
     if (!statuses.isEmpty()) {

@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 import java.io.File;
 import java.io.IOException;
@@ -54,6 +55,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Prepare
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Slow;
 import org.apache.ozone.test.tag.Unhealthy;
+import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
@@ -295,11 +297,8 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
               .stream()
               .anyMatch((vol) -> vol.getName().equals(volumeName)));
         } catch (ExecutionException ex) {
-          Throwable cause = ex.getCause();
-          assertTrue(cause instanceof OMException);
-          assertEquals(
-              NOT_SUPPORTED_OPERATION_WHEN_PREPARED,
-              ((OMException) cause).getResult());
+          OMException cause = assertInstanceOf(OMException.class, ex.getCause());
+          assertEquals(NOT_SUPPORTED_OPERATION_WHEN_PREPARED, cause.getResult());
         }
       }
     }
@@ -340,11 +339,9 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   }
 
   private boolean logFilesPresentInRatisPeer(OzoneManager om) {
-    String ratisDir = om.getOmRatisServer().getServer().getProperties()
-        .get("raft.server.storage.dir");
-    String groupIdDirName =
-        om.getOmRatisServer().getServer().getGroupIds().iterator()
-            .next().getUuid().toString();
+    final RaftServer.Division server = om.getOmRatisServer().getServerDivision();
+    final String ratisDir = server.getRaftServer().getProperties().get("raft.server.storage.dir");
+    final String groupIdDirName = server.getGroup().getGroupId().getUuid().toString();
     File logDir = Paths.get(ratisDir, groupIdDirName, "current")
         .toFile();
 

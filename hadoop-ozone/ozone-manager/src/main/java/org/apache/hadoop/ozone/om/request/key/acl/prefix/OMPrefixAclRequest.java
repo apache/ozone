@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Map;
 
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -30,7 +31,6 @@ import org.apache.hadoop.ozone.om.PrefixManagerImpl;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl.OMPrefixAclOpResult;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -54,8 +54,8 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long trxnLogIndex = termIndex.getIndex();
 
     OmPrefixInfo omPrefixInfo = null;
 
@@ -89,8 +89,9 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
             volume, bucket, key);
       }
 
-      lockAcquired =
-          omMetadataManager.getLock().acquireWriteLock(PREFIX_LOCK, prefixPath);
+      mergeOmLockDetails(omMetadataManager.getLock()
+          .acquireWriteLock(PREFIX_LOCK, prefixPath));
+      lockAcquired = getOmLockDetails().isLockAcquired();
 
       omPrefixInfo = omMetadataManager.getPrefixTable().get(prefixPath);
 
@@ -137,11 +138,12 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
       exception = ex;
       omClientResponse = onFailure(omResponse, exception);
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
       if (lockAcquired) {
-        omMetadataManager.getLock().releaseWriteLock(PREFIX_LOCK,
-            getOzoneObj().getPath());
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(PREFIX_LOCK, getOzoneObj().getPath()));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

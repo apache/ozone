@@ -86,11 +86,14 @@ import java.util.stream.Collectors;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.ALLOCATED;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.apache.ratis.util.Preconditions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -341,7 +344,9 @@ public class TestPipelineManagerImpl {
       }
 
       // Destroy pipeline
-      pipelineManager.closePipeline(pipeline, false);
+      pipelineManager.closePipeline(pipeline.getId());
+      pipelineManager.deletePipeline(pipeline.getId());
+
       try {
         pipelineManager.getPipeline(pipeline.getId());
         fail("Pipeline should not have been retrieved");
@@ -393,7 +398,8 @@ public class TestPipelineManagerImpl {
           pipelineManager.getPipeline(pipeline.getId()).isOpen());
 
       // close the pipeline
-      pipelineManager.closePipeline(pipeline, false);
+      pipelineManager.closePipeline(pipeline.getId());
+      pipelineManager.deletePipeline(pipeline.getId());
 
       // pipeline report for destroyed pipeline should be ignored
       nodes.subList(0, 2).forEach(dn -> sendPipelineReport(dn, pipeline,
@@ -514,6 +520,8 @@ public class TestPipelineManagerImpl {
     // Allocated pipelines should not be scrubbed for 50 seconds.
     conf.setTimeDuration(
         OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, 50, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+        OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 50, TimeUnit.SECONDS);
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
     Pipeline allocatedPipeline = pipelineManager
@@ -553,8 +561,9 @@ public class TestPipelineManagerImpl {
             .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.ALLOCATED).contains(allocatedPipeline));
 
-    // The closedPipeline should be scrubbed, as they are scrubbed immediately
-    Assertions.assertFalse(pipelineManager
+    // The closedPipeline should not be scrubbed as the interval has not
+    // yet passed.
+    Assertions.assertTrue(pipelineManager
         .getPipelines(RatisReplicationConfig
                 .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.CLOSED).contains(closedPipeline));
@@ -568,6 +577,12 @@ public class TestPipelineManagerImpl {
         .getPipelines(RatisReplicationConfig
                 .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.ALLOCATED).contains(allocatedPipeline));
+
+    // The closedPipeline should now be scrubbed as the interval has passed
+    Assertions.assertFalse(pipelineManager
+        .getPipelines(RatisReplicationConfig
+                .getInstance(ReplicationFactor.THREE),
+            Pipeline.PipelineState.CLOSED).contains(closedPipeline));
 
     pipelineManager.close();
   }
@@ -698,9 +713,9 @@ public class TestPipelineManagerImpl {
     Assertions.assertTrue(pipelineStore.get(pipelineID).isClosed());
     pipelineManager.addContainerToPipelineSCMStart(pipelineID,
             ContainerID.valueOf(2));
-    assertTrue(logCapturer.getOutput().contains("Container " +
+    assertThat(logCapturer.getOutput()).contains("Container " +
             ContainerID.valueOf(2) + " in open state for pipeline=" +
-            pipelineID + " in closed state"));
+            pipelineID + " in closed state");
   }
 
   @Test
@@ -742,18 +757,18 @@ public class TestPipelineManagerImpl {
             addContainer(containerInfo.getProtobuf());
     //Add Container to PipelineStateMap
     pipelineManager.addContainerToPipeline(pipelineID, containerID);
-    pipelineManager.closePipeline(pipeline, false);
+    pipelineManager.closePipeline(pipelineID);
     String containerExpectedOutput = "Container " + containerID +
             " closed for pipeline=" + pipelineID;
     String pipelineExpectedOutput =
-        "Pipeline " + pipeline + " moved to CLOSED state";
+        "Pipeline " + pipelineID + " moved to CLOSED state";
     String logOutput = logCapturer.getOutput();
-    assertTrue(logOutput.contains(containerExpectedOutput));
-    assertTrue(logOutput.contains(pipelineExpectedOutput));
+    assertThat(logOutput).contains(containerExpectedOutput);
+    assertThat(logOutput).contains(pipelineExpectedOutput);
 
     int containerLogIdx = logOutput.indexOf(containerExpectedOutput);
     int pipelineLogIdx = logOutput.indexOf(pipelineExpectedOutput);
-    assertTrue(containerLogIdx < pipelineLogIdx);
+    assertThat(containerLogIdx).isLessThan(pipelineLogIdx);
   }
 
   @Test
@@ -847,9 +862,9 @@ public class TestPipelineManagerImpl {
 
     pipelineManager.closeStalePipelines(datanodeDetails);
     verify(pipelineManager, times(1))
-            .closePipeline(stalePipelines.get(0), false);
+            .closePipeline(stalePipelines.get(0).getId());
     verify(pipelineManager, times(1))
-            .closePipeline(stalePipelines.get(1), false);
+            .closePipeline(stalePipelines.get(1).getId());
   }
 
   @Test
@@ -917,8 +932,7 @@ public class TestPipelineManagerImpl {
     
     ContainerInfo c = provider.getContainer(1, repConfig,
         owner, new ExcludeList());
-    Assertions.assertTrue(c.equals(container),
-        "Expected container was returned");
+    Assertions.assertEquals(c, container, "Expected container was returned");
 
     // Confirm that waitOnePipelineReady was called on allocated pipelines
     ArgumentCaptor<Collection<PipelineID>> captor =
@@ -926,8 +940,9 @@ public class TestPipelineManagerImpl {
     verify(pipelineManagerSpy, times(1))
         .waitOnePipelineReady(captor.capture(), anyLong());
     Collection<PipelineID> coll = captor.getValue();
-    Assertions.assertTrue(coll.contains(allocatedPipeline.getId()),
-               "waitOnePipelineReady() was called on allocated pipeline");
+    assertThat(coll)
+        .withFailMessage("waitOnePipelineReady() was called on allocated pipeline")
+        .contains(allocatedPipeline.getId());
     pipelineManager.close();
   }
 
@@ -943,7 +958,7 @@ public class TestPipelineManagerImpl {
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE), replicas);
     Assertions.assertEquals(3, pipeline.getNodes().size());
     for (DatanodeDetails dn : pipeline.getNodes())  {
-      Assertions.assertTrue(dns.contains(dn));
+      assertThat(dns).contains(dn);
     }
   }
 
@@ -995,6 +1010,6 @@ public class TestPipelineManagerImpl {
   private static void assertFailsNotLeader(CheckedRunnable<?> block) {
     SCMException e = Assertions.assertThrows(SCMException.class, block::run);
     Assertions.assertEquals(ResultCodes.SCM_NOT_LEADER, e.getResult());
-    Assertions.assertTrue(e.getCause() instanceof NotLeaderException);
+    assertInstanceOf(NotLeaderException.class, e.getCause());
   }
 }

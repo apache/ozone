@@ -128,14 +128,12 @@ public final class ECKeyOutputStream extends KeyOutputStream
   }
 
   private ECKeyOutputStream(Builder builder) {
-    super(builder.getReplicationConfig(), builder.getClientMetrics());
+    super(builder.getReplicationConfig(), builder.getClientMetrics(),
+        builder.getClientConfig(), builder.getStreamBufferArgs());
     this.config = builder.getClientConfig();
     this.bufferPool = builder.getByteBufferPool();
     // For EC, cell/chunk size and buffer size can be same for now.
     ecChunkSize = builder.getReplicationConfig().getEcChunkSize();
-    this.config.setStreamBufferMaxSize(ecChunkSize);
-    this.config.setStreamBufferFlushSize(ecChunkSize);
-    this.config.setStreamBufferSize(ecChunkSize);
     this.numDataBlks = builder.getReplicationConfig().getData();
     this.numParityBlks = builder.getReplicationConfig().getParity();
     ecChunkBufferCache = new ECChunkBuffers(
@@ -151,7 +149,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
             builder.isMultipartKey(),
             info, builder.isUnsafeByteBufferConversionEnabled(),
             builder.getXceiverManager(), builder.getOpenHandler().getId(),
-            builder.getClientMetrics());
+            builder.getClientMetrics(), builder.getStreamBufferArgs());
 
     this.writeOffset = 0;
     this.encoder = CodecUtil.createRawEncoderWithFallback(

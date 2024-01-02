@@ -1432,6 +1432,10 @@ public class KeyManagerImpl implements KeyManager {
         && omKeyInfoCacheValue.getCacheValue() == null;
   }
 
+  public static boolean isKeyInCache(String key, Table keyTable) {
+    return keyTable.getCacheValue(new CacheKey(key)) != null;
+  }
+
   /**
    * Helper function for listStatus to find key in TableCache.
    */
@@ -1813,7 +1817,7 @@ public class KeyManagerImpl implements KeyManager {
 
   @VisibleForTesting
   void sortDatanodes(String clientMachine, OmKeyInfo... keyInfos) {
-    if (keyInfos != null && clientMachine != null && !clientMachine.isEmpty()) {
+    if (keyInfos != null && clientMachine != null) {
       Map<Set<String>, List<DatanodeDetails>> sortedPipelines = new HashMap<>();
       for (OmKeyInfo keyInfo : keyInfos) {
         OmKeyLocationInfoGroup key = keyInfo.getLatestVersionLocations();

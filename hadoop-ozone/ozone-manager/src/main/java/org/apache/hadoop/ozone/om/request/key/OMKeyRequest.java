@@ -62,6 +62,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
 import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -142,12 +143,18 @@ public abstract class OMKeyRequest extends OMClientRequest {
       OzoneBlockTokenSecretManager secretManager,
       ReplicationConfig replicationConfig, ExcludeList excludeList,
       long requestedSize, long scmBlockSize, int preallocateBlocksMax,
-      boolean grpcBlockTokenEnabled, String serviceID, OMMetrics omMetrics)
+      boolean grpcBlockTokenEnabled, String serviceID, OMMetrics omMetrics,
+      boolean shouldSortDatanodes, UserInfo userInfo)
       throws IOException {
     int dataGroupSize = replicationConfig instanceof ECReplicationConfig
         ? ((ECReplicationConfig) replicationConfig).getData() : 1;
     int numBlocks = (int) Math.min(preallocateBlocksMax,
         (requestedSize - 1) / (scmBlockSize * dataGroupSize) + 1);
+
+    String clientMachine = "";
+    if (shouldSortDatanodes) {
+      clientMachine = userInfo.getRemoteAddress();
+    }
 
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
     String remoteUser = getRemoteUser().getShortUserName();
@@ -155,7 +162,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     try {
       allocatedBlocks = scmClient.getBlockClient()
           .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
-              excludeList);
+              excludeList, clientMachine);
     } catch (SCMException ex) {
       omMetrics.incNumBlockAllocateCallFails();
       if (ex.getResult()
@@ -469,8 +476,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
     OmBucketInfo bucketInfo = null;
     if (ozoneManager.getKmsProvider() != null) {
       try {
-        acquireLock = omMetadataManager.getLock().acquireReadLock(
-            BUCKET_LOCK, volumeName, bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock().acquireReadLock(
+            BUCKET_LOCK, volumeName, bucketName));
+        acquireLock = getOmLockDetails().isLockAcquired();
 
         bucketInfo = omMetadataManager.getBucketTable().get(
             omMetadataManager.getBucketKey(volumeName,
@@ -489,8 +497,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
       } finally {
         if (acquireLock) {
-          omMetadataManager.getLock().releaseReadLock(
-              BUCKET_LOCK, volumeName, bucketName);
+          mergeOmLockDetails(omMetadataManager.getLock().releaseReadLock(
+              BUCKET_LOCK, volumeName, bucketName));
         }
       }
 
@@ -525,8 +533,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     if (ozoneManager.getKmsProvider() != null) {
-      acquireLock = omMetadataManager.getLock().acquireReadLock(
-          BUCKET_LOCK, volumeName, bucketName);
+      mergeOmLockDetails(omMetadataManager.getLock().acquireReadLock(
+          BUCKET_LOCK, volumeName, bucketName));
+      acquireLock = getOmLockDetails().isLockAcquired();
       try {
         ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
             Pair.of(keyArgs.getVolumeName(), keyArgs.getBucketName()));
@@ -548,8 +557,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
         }
       } finally {
         if (acquireLock) {
-          omMetadataManager.getLock()
-              .releaseReadLock(BUCKET_LOCK, volumeName, bucketName);
+          mergeOmLockDetails(omMetadataManager.getLock()
+              .releaseReadLock(BUCKET_LOCK, volumeName, bucketName));
         }
       }
     }

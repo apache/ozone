@@ -62,7 +62,10 @@ public class OpenContainerHandler extends AbstractCheck {
         request.getReport().incrementAndSample(
             ReplicationManagerReport.HealthState.OPEN_UNHEALTHY,
             containerInfo.containerID());
-        replicationManager.sendCloseContainerEvent(containerInfo.containerID());
+        if (!request.isReadOnly()) {
+          replicationManager
+              .sendCloseContainerEvent(containerInfo.containerID());
+        }
         return true;
       }
       // For open containers we do not want to do any further processing in RM

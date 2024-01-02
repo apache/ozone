@@ -18,9 +18,11 @@
 
 package org.apache.hadoop.ozone.s3.util;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test class to test RangeHeaderParserUtil.
@@ -37,60 +39,60 @@ public class TestRangeHeaderParserUtil {
     rangeHeader = RangeHeaderParserUtil.parseRangeHeader("bytes=0-8", 10);
     assertEquals(0, rangeHeader.getStartOffset());
     assertEquals(8, rangeHeader.getEndOffset());
-    assertEquals(false, rangeHeader.isReadFull());
-    assertEquals(false, rangeHeader.isInValidRange());
+    assertFalse(rangeHeader.isReadFull());
+    assertFalse(rangeHeader.isInValidRange());
 
     //range is with in file length, both start and end offset are same
     rangeHeader = RangeHeaderParserUtil.parseRangeHeader("bytes=0-0", 10);
     assertEquals(0, rangeHeader.getStartOffset());
     assertEquals(0, rangeHeader.getEndOffset());
-    assertEquals(false, rangeHeader.isReadFull());
-    assertEquals(false, rangeHeader.isInValidRange());
+    assertFalse(rangeHeader.isReadFull());
+    assertFalse(rangeHeader.isInValidRange());
 
     //range is not with in file length, both start and end offset are greater
     // than length
     rangeHeader = RangeHeaderParserUtil.parseRangeHeader("bytes=11-10", 10);
-    assertEquals(true, rangeHeader.isInValidRange());
+    assertTrue(rangeHeader.isInValidRange());
 
     // range is satisfying, one of the range is with in the length. So, read
     // full file
     rangeHeader = RangeHeaderParserUtil.parseRangeHeader("bytes=11-8", 10);
     assertEquals(0, rangeHeader.getStartOffset());
     assertEquals(9, rangeHeader.getEndOffset());
-    assertEquals(true, rangeHeader.isReadFull());
-    assertEquals(false, rangeHeader.isInValidRange());
+    assertTrue(rangeHeader.isReadFull());
+    assertFalse(rangeHeader.isInValidRange());
 
     // bytes spec is wrong
     rangeHeader = RangeHeaderParserUtil.parseRangeHeader("mb=11-8", 10);
     assertEquals(0, rangeHeader.getStartOffset());
     assertEquals(9, rangeHeader.getEndOffset());
-    assertEquals(true, rangeHeader.isReadFull());
-    assertEquals(false, rangeHeader.isInValidRange());
+    assertTrue(rangeHeader.isReadFull());
+    assertFalse(rangeHeader.isInValidRange());
 
     // range specified is invalid
     rangeHeader = RangeHeaderParserUtil.parseRangeHeader("bytes=-11-8", 10);
     assertEquals(0, rangeHeader.getStartOffset());
     assertEquals(9, rangeHeader.getEndOffset());
-    assertEquals(true, rangeHeader.isReadFull());
-    assertEquals(false, rangeHeader.isInValidRange());
+    assertTrue(rangeHeader.isReadFull());
+    assertFalse(rangeHeader.isInValidRange());
 
     //Last n bytes
     rangeHeader = RangeHeaderParserUtil.parseRangeHeader("bytes=-6", 10);
     assertEquals(4, rangeHeader.getStartOffset());
     assertEquals(9, rangeHeader.getEndOffset());
-    assertEquals(false, rangeHeader.isReadFull());
-    assertEquals(false, rangeHeader.isInValidRange());
+    assertFalse(rangeHeader.isReadFull());
+    assertFalse(rangeHeader.isInValidRange());
 
     rangeHeader = RangeHeaderParserUtil.parseRangeHeader("bytes=-106", 10);
     assertEquals(0, rangeHeader.getStartOffset());
     assertEquals(9, rangeHeader.getEndOffset());
-    assertEquals(false, rangeHeader.isInValidRange());
+    assertFalse(rangeHeader.isInValidRange());
 
     rangeHeader = RangeHeaderParserUtil.parseRangeHeader("bytes=3977248768" +
             "-4977248768", 4977248769L);
     assertEquals(3977248768L, rangeHeader.getStartOffset());
     assertEquals(4977248768L, rangeHeader.getEndOffset());
-    assertEquals(false, rangeHeader.isInValidRange());
+    assertFalse(rangeHeader.isInValidRange());
 
   }
 

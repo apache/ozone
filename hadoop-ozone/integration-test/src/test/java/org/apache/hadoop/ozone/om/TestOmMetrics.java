@@ -22,8 +22,9 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -66,26 +67,17 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.assertj.core.util.Lists;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.mockito.Mockito;
 
 /**
  * Test for OM metrics.
  */
+@Timeout(300)
 public class TestOmMetrics {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
   private MiniOzoneCluster cluster;
   private MiniOzoneCluster.Builder clusterBuilder;
   private OzoneConfiguration conf;
@@ -101,7 +93,7 @@ public class TestOmMetrics {
   /**
    * Create a MiniDFSCluster for testing.
    */
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
     conf.setTimeDuration(OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL,
@@ -121,15 +113,13 @@ public class TestOmMetrics {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
   }
-
-
 
   @Test
   public void testVolumeOps() throws Exception {
@@ -334,8 +324,7 @@ public class TestOmMetrics {
       writeClient.commitKey(keyArgs, keySession.getId());
     } catch (Exception e) {
       //Expected Failure in preExecute due to not enough datanode
-      Assertions.assertTrue(e.getMessage()
-          .contains("No enough datanodes to choose"), e::getMessage);
+      assertThat(e.getMessage()).contains("No enough datanodes to choose");
     }
 
     omMetrics = getMetrics("OMMetrics");

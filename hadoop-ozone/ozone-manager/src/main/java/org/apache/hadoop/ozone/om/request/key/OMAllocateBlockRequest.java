@@ -26,10 +26,10 @@ import java.util.Map;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -106,7 +107,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     //  BlockOutputStreamEntryPool, so we are fine for now. But if one some
     //  one uses direct omclient we might be in trouble.
 
-
+    UserInfo userInfo = getUserInfo();
     ReplicationConfig repConfig = ReplicationConfig.fromProto(keyArgs.getType(),
         keyArgs.getFactor(), keyArgs.getEcReplicationConfig());
     // To allocate atleast one block passing requested size and scmBlockSize
@@ -118,7 +119,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
             ozoneManager.getScmBlockSize(), ozoneManager.getScmBlockSize(),
             ozoneManager.getPreallocateBlocksMax(),
             ozoneManager.isGrpcBlockTokenEnabled(),
-            ozoneManager.getOMServiceId(), ozoneManager.getMetrics());
+            ozoneManager.getOMServiceId(), ozoneManager.getMetrics(),
+            keyArgs.getSortDatanodes(), userInfo);
 
     // Set modification time and normalize key if required.
     KeyArgs.Builder newKeyArgs =
@@ -138,14 +140,14 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     newAllocatedBlockRequest.setKeyLocation(
         omKeyLocationInfoList.get(0).getProtobuf(getOmRequest().getVersion()));
 
-    return getOmRequest().toBuilder().setUserInfo(getUserInfo())
+    return getOmRequest().toBuilder().setUserInfo(userInfo)
         .setAllocateBlockRequest(newAllocatedBlockRequest).build();
 
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long trxnLogIndex = termIndex.getIndex();
 
     OzoneManagerProtocolProtos.AllocateBlockRequest allocateBlockRequest =
         getOmRequest().getAllocateBlockRequest();
@@ -209,8 +211,9 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       List<OmKeyLocationInfo> newLocationList = Collections.singletonList(
           OmKeyLocationInfo.getFromProtobuf(blockLocation));
 
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          volumeName, bucketName);
+      mergeOmLockDetails(omMetadataManager.getLock()
+          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      acquiredLock = getOmLockDetails().isLockAcquired();
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
       // check bucket and volume quota
       long preAllocatedKeySize = newLocationList.size()
@@ -253,11 +256,13 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
       LOG.error("Allocate Block failed. Volume:{}, Bucket:{}, OpenKey:{}. " +
           "Exception:{}", volumeName, bucketName, openKeyName, exception);
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(
+            omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK,
+                volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

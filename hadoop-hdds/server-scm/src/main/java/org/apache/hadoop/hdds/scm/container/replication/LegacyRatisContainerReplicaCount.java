@@ -22,7 +22,9 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 
+import java.util.List;
 import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
@@ -48,6 +50,13 @@ public class LegacyRatisContainerReplicaCount extends
                                     int minHealthyForMaintenance) {
     super(container, replicas, inFlightAdd, inFlightDelete, replicationFactor,
         minHealthyForMaintenance);
+  }
+
+  public LegacyRatisContainerReplicaCount(ContainerInfo container,
+      Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
+      int minHealthyForMaintenance, boolean considerUnhealthy) {
+    super(container, replicas, pendingOps, minHealthyForMaintenance,
+        considerUnhealthy);
   }
 
   @Override
@@ -122,6 +131,12 @@ public class LegacyRatisContainerReplicaCount extends
   public boolean isSufficientlyReplicatedForOffline(DatanodeDetails datanode,
       NodeManager nodeManager) {
     return super.isSufficientlyReplicated() &&
-        super.getVulnerableUnhealthyReplicas(nodeManager).isEmpty();
+        super.getVulnerableUnhealthyReplicas(dn -> {
+          try {
+            return nodeManager.getNodeStatus(dn);
+          } catch (NodeNotFoundException e) {
+            return null;
+          }
+        }).isEmpty();
   }
 }

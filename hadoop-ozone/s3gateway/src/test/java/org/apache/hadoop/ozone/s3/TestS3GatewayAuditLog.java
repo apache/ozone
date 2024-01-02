@@ -33,9 +33,9 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.s3.endpoint.BucketEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.RootEndpoint;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,7 +46,7 @@ import java.util.List;
 import java.util.Map;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests for S3Gateway Audit Log.
@@ -70,7 +70,7 @@ public class TestS3GatewayAuditLog {
   private OzoneBucket bucket;
   private Map<String, String> parametersMap = new HashMap<>();
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
 
     parametersMap.clear();
@@ -100,7 +100,7 @@ public class TestS3GatewayAuditLog {
 
   }
 
-  @AfterClass
+  @AfterAll
   public static void tearDown() {
     File file = new File("audit.log");
     if (FileUtils.deleteQuietly(file)) {

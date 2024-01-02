@@ -21,12 +21,12 @@ package org.apache.hadoop.ozone.container.common.volume;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Path;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT;
@@ -37,16 +37,16 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESE
  */
 public class TestReservedVolumeSpace {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
-  @Rule
-  public TemporaryFolder temp = new TemporaryFolder();
+  @TempDir
+  private Path folder;
+  @TempDir
+  private Path temp;
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
   private HddsVolume.Builder volumeBuilder;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
-    volumeBuilder = new HddsVolume.Builder(folder.getRoot().getPath())
+    volumeBuilder = new HddsVolume.Builder(folder.toString())
         .datanodeUuid(DATANODE_UUID)
         .usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
   }
@@ -77,8 +77,8 @@ public class TestReservedVolumeSpace {
             .getReservedInBytes();
     long reservedCalculated = (long) Math.ceil(totalCapacity * percentage);
 
-    Assert.assertEquals(reservedFromVolume, reservedCalculated);
-    Assert.assertEquals(volumeCapacity, volumeCapacityReserved);
+    Assertions.assertEquals(reservedFromVolume, reservedCalculated);
+    Assertions.assertEquals(volumeCapacity, volumeCapacityReserved);
   }
 
   /**
@@ -91,12 +91,12 @@ public class TestReservedVolumeSpace {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT, "0.3");
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED,
-        folder.getRoot() + ":500B");
+        folder.toString() + ":500B");
     HddsVolume hddsVolume = volumeBuilder.conf(conf).build();
 
     long reservedFromVolume = hddsVolume.getVolumeInfo().get()
             .getReservedInBytes();
-    Assert.assertEquals(reservedFromVolume, 500);
+    Assertions.assertEquals(reservedFromVolume, 500);
   }
 
   @Test
@@ -106,7 +106,7 @@ public class TestReservedVolumeSpace {
 
     long reservedFromVolume = hddsVolume.getVolumeInfo().get()
             .getReservedInBytes();
-    Assert.assertEquals(reservedFromVolume, 0);
+    Assertions.assertEquals(reservedFromVolume, 0);
   }
 
   @Test
@@ -115,19 +115,19 @@ public class TestReservedVolumeSpace {
     conf.set(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT, "0.3");
     //Setting config for different volume, hence fallback happens
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED,
-        temp.getRoot() + ":500B");
+        temp.toString() + ":500B");
     HddsVolume hddsVolume = volumeBuilder.conf(conf).build();
 
     long reservedFromVolume = hddsVolume.getVolumeInfo().get()
             .getReservedInBytes();
-    Assert.assertNotEquals(reservedFromVolume, 0);
+    Assertions.assertNotEquals(reservedFromVolume, 0);
 
     long totalCapacity = hddsVolume.getVolumeInfo().get()
         .getUsageForTesting().getCapacity();
     float percentage = conf.getFloat(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT,
         HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT);
     long reservedCalculated = (long) Math.ceil(totalCapacity * percentage);
-    Assert.assertEquals(reservedFromVolume, reservedCalculated);
+    Assertions.assertEquals(reservedFromVolume, reservedCalculated);
   }
 
   @Test
@@ -136,12 +136,12 @@ public class TestReservedVolumeSpace {
 
     // 500C doesn't match with any Storage Unit
     conf1.set(ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED,
-        folder.getRoot() + ":500C");
+        folder.toString() + ":500C");
     HddsVolume hddsVolume1 = volumeBuilder.conf(conf1).build();
 
     long reservedFromVolume1 = hddsVolume1.getVolumeInfo().get()
             .getReservedInBytes();
-    Assert.assertEquals(reservedFromVolume1, 0);
+    Assertions.assertEquals(reservedFromVolume1, 0);
 
     OzoneConfiguration conf2 = new OzoneConfiguration();
 
@@ -151,6 +151,6 @@ public class TestReservedVolumeSpace {
 
     long reservedFromVolume2 = hddsVolume2.getVolumeInfo().get()
             .getReservedInBytes();
-    Assert.assertEquals(reservedFromVolume2, 0);
+    Assertions.assertEquals(reservedFromVolume2, 0);
   }
 }

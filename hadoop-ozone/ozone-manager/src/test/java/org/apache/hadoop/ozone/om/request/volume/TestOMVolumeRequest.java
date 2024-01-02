@@ -29,7 +29,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -42,9 +41,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.framework;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -61,11 +61,6 @@ public class TestOMVolumeRequest {
   protected OMMetrics omMetrics;
   protected OMMetadataManager omMetadataManager;
   protected AuditLogger auditLogger;
-  // Just setting ozoneManagerDoubleBuffer which does nothing.
-  protected OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
-      ((response, transactionIndex) -> {
-        return null;
-      });
 
   @BeforeEach
   public void setup() throws Exception {
@@ -85,13 +80,13 @@ public class TestOMVolumeRequest {
     when(ozoneManager.isRatisEnabled()).thenReturn(true);
     auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
-    Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
+    doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
   }
 
   @AfterEach
   public void stop() {
     omMetrics.unRegister();
-    Mockito.framework().clearInlineMocks();
+    framework().clearInlineMocks();
   }
 
   /**

@@ -29,10 +29,8 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -51,10 +49,14 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Part;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.framework;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -70,13 +72,6 @@ public class TestS3MultipartRequest {
   protected OMMetrics omMetrics;
   protected OMMetadataManager omMetadataManager;
   protected AuditLogger auditLogger;
-
-  // Just setting ozoneManagerDoubleBuffer which does nothing.
-  protected OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
-      ((response, transactionIndex) -> {
-        return null;
-      });
-
 
   @BeforeEach
   public void setup() throws Exception {
@@ -102,7 +97,7 @@ public class TestS3MultipartRequest {
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     when(ozoneManager.getDefaultReplicationConfig()).thenReturn(
         ReplicationConfig.getDefault(ozoneConfiguration));
-    Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
+    doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
     when(ozoneManager.resolveBucketLink(any(KeyArgs.class),
         any(OMClientRequest.class)))
         .thenAnswer(inv -> {
@@ -122,7 +117,7 @@ public class TestS3MultipartRequest {
   @AfterEach
   public void stop() {
     omMetrics.unRegister();
-    Mockito.framework().clearInlineMocks();
+    framework().clearInlineMocks();
   }
 
   /**
@@ -145,11 +140,11 @@ public class TestS3MultipartRequest {
     OMRequest modifiedRequest =
         s3InitiateMultipartUploadRequest.preExecute(ozoneManager);
 
-    Assertions.assertNotEquals(omRequest, modifiedRequest);
-    Assertions.assertTrue(modifiedRequest.hasInitiateMultiPartUploadRequest());
-    Assertions.assertNotNull(modifiedRequest.getInitiateMultiPartUploadRequest()
+    assertNotEquals(omRequest, modifiedRequest);
+    assertTrue(modifiedRequest.hasInitiateMultiPartUploadRequest());
+    assertNotNull(modifiedRequest.getInitiateMultiPartUploadRequest()
         .getKeyArgs().getMultipartUploadID());
-    Assertions.assertTrue(modifiedRequest.getInitiateMultiPartUploadRequest()
+    assertTrue(modifiedRequest.getInitiateMultiPartUploadRequest()
         .getKeyArgs().getModificationTime() > 0);
 
     return modifiedRequest;
@@ -183,7 +178,7 @@ public class TestS3MultipartRequest {
         s3MultipartUploadCommitPartRequest.preExecute(ozoneManager);
 
     // UserInfo and modification time is set.
-    Assertions.assertNotEquals(omRequest, modifiedRequest);
+    assertNotEquals(omRequest, modifiedRequest);
 
     return modifiedRequest;
   }
@@ -214,7 +209,7 @@ public class TestS3MultipartRequest {
         s3MultipartUploadAbortRequest.preExecute(ozoneManager);
 
     // UserInfo and modification time is set.
-    Assertions.assertNotEquals(omRequest, modifiedRequest);
+    assertNotEquals(omRequest, modifiedRequest);
 
     return modifiedRequest;
 
@@ -235,7 +230,7 @@ public class TestS3MultipartRequest {
         s3MultipartUploadCompleteRequest.preExecute(ozoneManager);
 
     // UserInfo and modification time is set.
-    Assertions.assertNotEquals(omRequest, modifiedRequest);
+    assertNotEquals(omRequest, modifiedRequest);
 
     return modifiedRequest;
 
@@ -264,11 +259,11 @@ public class TestS3MultipartRequest {
     OMRequest modifiedRequest =
         s3InitiateMultipartUploadRequestWithFSO.preExecute(ozoneManager);
 
-    Assertions.assertNotEquals(omRequest, modifiedRequest);
-    Assertions.assertTrue(modifiedRequest.hasInitiateMultiPartUploadRequest());
-    Assertions.assertNotNull(modifiedRequest.getInitiateMultiPartUploadRequest()
+    assertNotEquals(omRequest, modifiedRequest);
+    assertTrue(modifiedRequest.hasInitiateMultiPartUploadRequest());
+    assertNotNull(modifiedRequest.getInitiateMultiPartUploadRequest()
         .getKeyArgs().getMultipartUploadID());
-    Assertions.assertTrue(modifiedRequest.getInitiateMultiPartUploadRequest()
+    assertTrue(modifiedRequest.getInitiateMultiPartUploadRequest()
         .getKeyArgs().getModificationTime() > 0);
 
     return modifiedRequest;

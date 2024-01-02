@@ -188,6 +188,10 @@ public final class OzoneConfigKeys {
       "ozone.client.ec.grpc.write.timeout";
   public static final String OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT_DEFAULT = "30s";
 
+  public static final String OZONE_EC_GRPC_ZERO_COPY_ENABLED =
+      "ozone.ec.grpc.zerocopy.enabled";
+  public static final boolean OZONE_EC_GRPC_ZERO_COPY_ENABLED_DEFAULT = true;
+
   /**
    * Ozone administrator users delimited by comma.
    * If not set, only the user who launches an ozone service will be the
@@ -377,9 +381,6 @@ public final class OzoneConfigKeys {
   public static final String
       DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES =
       ScmConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES;
-  public static final int
-      DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES_DEFAULT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES_DEFAULT;
   public static final String DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS =
       ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS;
   public static final int DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS_DEFAULT =

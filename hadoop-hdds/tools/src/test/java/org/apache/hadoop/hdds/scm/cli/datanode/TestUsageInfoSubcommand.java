@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.commons.codec.CharEncoding;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
@@ -95,6 +96,38 @@ public class TestUsageInfoSubcommand {
 
     Assertions.assertEquals(5,
             json.get(0).get("containerCount").longValue());
+  }
+
+  @Test
+  public void testOutputDataFieldsAligning() throws IOException {
+    // given
+    ScmClient scmClient = mock(ScmClient.class);
+    Mockito.when(scmClient.getDatanodeUsageInfo(
+            Mockito.anyBoolean(), Mockito.anyInt()))
+        .thenAnswer(invocation -> getUsageProto());
+
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("-m");
+
+    // when
+    cmd.execute(scmClient);
+
+    // then
+    String output = outContent.toString(CharEncoding.UTF_8);
+    Assertions.assertTrue(output.contains("UUID         :"));
+    Assertions.assertTrue(output.contains("IP Address   :"));
+    Assertions.assertTrue(output.contains("Hostname     :"));
+    Assertions.assertTrue(output.contains("Capacity     :"));
+    Assertions.assertTrue(output.contains("Total Used   :"));
+    Assertions.assertTrue(output.contains("Total Used % :"));
+    Assertions.assertTrue(output.contains("Ozone Used   :"));
+    Assertions.assertTrue(output.contains("Ozone Used % :"));
+    Assertions.assertTrue(output.contains("Remaining    :"));
+    Assertions.assertTrue(output.contains("Remaining %  :"));
+    Assertions.assertTrue(output.contains("Container(s) :"));
+    Assertions.assertTrue(output.contains("Container Pre-allocated :"));
+    Assertions.assertTrue(output.contains("Remaining Allocatable   :"));
+    Assertions.assertTrue(output.contains("Free Space To Spare     :"));
   }
 
   private List<HddsProtos.DatanodeUsageInfoProto> getUsageProto() {

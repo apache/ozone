@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -31,7 +32,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
@@ -81,8 +81,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
   }
 
   @Override @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long trxnLogIndex = termIndex.getIndex();
     DeleteKeysRequest deleteKeyRequest = getOmRequest().getDeleteKeysRequest();
 
     OzoneManagerProtocolProtos.DeleteKeyArgs deleteKeyArgs =
@@ -128,8 +128,9 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       volumeName = bucket.realVolume();
       bucketName = bucket.realBucket();
 
-      acquiredLock = omMetadataManager.getLock()
-          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName);
+      mergeOmLockDetails(omMetadataManager.getLock()
+          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      acquiredLock = getOmLockDetails().isLockAcquired();
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       String volumeOwner = getVolumeOwner(omMetadataManager, volumeName);
@@ -205,11 +206,12 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
     } finally {
       if (acquiredLock) {
-        omMetadataManager.getLock()
-            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
       }
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
+      }
     }
 
     addDeletedKeys(auditMap, deleteKeys, unDeletedKeys.getKeysList());

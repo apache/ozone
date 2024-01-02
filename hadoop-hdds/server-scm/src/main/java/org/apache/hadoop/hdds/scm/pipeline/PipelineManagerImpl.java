@@ -394,7 +394,7 @@ public class PipelineManagerImpl implements PipelineManager {
   public void addContainerToPipelineSCMStart(
       PipelineID pipelineID, ContainerID containerID) throws IOException {
     // should not lock here, since no ratis operation happens.
-    stateManager.addContainerToPipelineSCMStart(pipelineID, containerID);
+    stateManager.addContainerToPipelineForce(pipelineID, containerID);
   }
 
   @Override
@@ -489,17 +489,25 @@ public class PipelineManagerImpl implements PipelineManager {
    * put pipeline in CLOSED state.
    * @param pipeline - ID of the pipeline.
    * @param onTimeout - whether to remove pipeline after some time.
-   * @throws IOException
+   * @throws IOException throws exception in case of failure
+   * @deprecated Do not use this method, onTimeout is not honored.
    */
-  @Override
+  @Deprecated
   public void closePipeline(Pipeline pipeline, boolean onTimeout)
-      throws IOException {
-    PipelineID pipelineID = pipeline.getId();
+          throws IOException {
+    closePipeline(pipeline.getId());
+  }
+
+  /**
+   * Move the Pipeline to CLOSED state.
+   * @param pipelineID ID of the Pipeline to be closed
+   * @throws IOException In case of exception while closing the Pipeline
+   */
+  public void closePipeline(PipelineID pipelineID) throws IOException {
     HddsProtos.PipelineID pipelineIDProtobuf = pipelineID.getProtobuf();
     // close containers.
     closeContainersForPipeline(pipelineID);
-
-    if (!pipeline.isClosed()) {
+    if (!getPipeline(pipelineID).isClosed()) {
       acquireWriteLock();
       try {
         stateManager.updatePipelineState(pipelineIDProtobuf,
@@ -507,15 +515,20 @@ public class PipelineManagerImpl implements PipelineManager {
       } finally {
         releaseWriteLock();
       }
-      LOG.info("Pipeline {} moved to CLOSED state", pipeline);
+      LOG.info("Pipeline {} moved to CLOSED state", pipelineID);
     }
 
     metrics.removePipelineMetrics(pipelineID);
 
-    if (!onTimeout) {
-      // close pipeline right away.
-      removePipeline(pipeline);
-    }
+  }
+
+  /**
+   * Deletes the Pipeline for the given PipelineID.
+   * @param pipelineID ID of the Pipeline to be deleted
+   * @throws IOException In case of exception while deleting the Pipeline
+   */
+  public void deletePipeline(PipelineID pipelineID) throws IOException {
+    removePipeline(getPipeline(pipelineID));
   }
 
   /** close the pipelines whose nodes' IPs are stale.
@@ -535,9 +548,10 @@ public class PipelineManagerImpl implements PipelineManager {
             pipelinesWithStaleIpOrHostname.size());
     pipelinesWithStaleIpOrHostname.forEach(p -> {
       try {
-        LOG.info("Closing the stale pipeline: {}", p.getId());
-        closePipeline(p, false);
-        LOG.info("Closed the stale pipeline: {}", p.getId());
+        final PipelineID id = p.getId();
+        LOG.info("Closing the stale pipeline: {}", id);
+        closePipeline(id);
+        deletePipeline(id);
       } catch (IOException e) {
         LOG.error("Closing the stale pipeline failed: {}", p, e);
       }
@@ -568,26 +582,34 @@ public class PipelineManagerImpl implements PipelineManager {
         ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT,
         ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
+    long pipelineDeleteTimoutInMills = conf.getTimeDuration(
+            ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT,
+            ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT_DEFAULT,
+            TimeUnit.MILLISECONDS);
 
     List<Pipeline> candidates = stateManager.getPipelines();
 
     for (Pipeline p : candidates) {
+      final PipelineID id = p.getId();
       // scrub pipelines who stay ALLOCATED for too long.
       if (p.getPipelineState() == Pipeline.PipelineState.ALLOCATED &&
           (currentTime.toEpochMilli() - p.getCreationTimestamp()
               .toEpochMilli() >= pipelineScrubTimeoutInMills)) {
+
         LOG.info("Scrubbing pipeline: id: {} since it stays at ALLOCATED " +
-            "stage for {} mins.", p.getId(),
+            "stage for {} mins.", id,
             Duration.between(currentTime, p.getCreationTimestamp())
                 .toMinutes());
-        closePipeline(p, false);
+        closePipeline(id);
+        deletePipeline(id);
       }
       // scrub pipelines who stay CLOSED for too long.
-      if (p.getPipelineState() == Pipeline.PipelineState.CLOSED) {
+      if (p.getPipelineState() == Pipeline.PipelineState.CLOSED &&
+          (currentTime.toEpochMilli() - p.getStateEnterTime().toEpochMilli())
+              >= pipelineDeleteTimoutInMills) {
         LOG.info("Scrubbing pipeline: id: {} since it stays at CLOSED stage.",
             p.getId());
-        closeContainersForPipeline(p.getId());
-        removePipeline(p);
+        deletePipeline(id);
       }
       // If a datanode is stopped and then SCM is restarted, a pipeline can get
       // stuck in an open state. For Ratis, provided some other DNs that were
@@ -599,8 +621,7 @@ public class PipelineManagerImpl implements PipelineManager {
       if (isOpenWithUnregisteredNodes(p)) {
         LOG.info("Scrubbing pipeline: id: {} as it has unregistered nodes",
             p.getId());
-        closeContainersForPipeline(p.getId());
-        closePipeline(p, true);
+        closePipeline(id);
       }
     }
   }

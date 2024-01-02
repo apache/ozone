@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
 import com.google.common.base.Preconditions;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -32,7 +33,6 @@ import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.multitenant.OzoneTenant;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -103,9 +103,8 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(
-      OzoneManager ozoneManager, long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long transactionLogIndex = termIndex.getIndex();
 
     final OMMultiTenantManager multiTenantManager =
         ozoneManager.getMultiTenantManager();
@@ -148,8 +147,9 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       decVolumeRefCount = volumeName.length() > 0;
 
       // Acquire the volume lock
-      acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
-          VOLUME_LOCK, volumeName);
+      mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
+          VOLUME_LOCK, volumeName));
+      acquiredVolumeLock = getOmLockDetails().isLockAcquired();
 
       // Check if there are any accessIds in the tenant
       if (!ozoneManager.getMultiTenantManager().isTenantEmpty(tenantId)) {
@@ -212,13 +212,16 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       omClientResponse = new OMTenantDeleteResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
       if (acquiredVolumeLock) {
-        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
+        mergeOmLockDetails(
+            omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK,
+                volumeName));
       }
       // Release authorizer write lock
       multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest();
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
+      }
     }
 
     // Perform audit logging

@@ -1,4 +1,3 @@
-share/ozone/lib/activation.jar
 share/ozone/lib/animal-sniffer-annotations.jar
 share/ozone/lib/annotations.jar
 share/ozone/lib/annotations.jar
@@ -40,7 +39,6 @@ share/ozone/lib/disruptor.jar
 share/ozone/lib/dnsjava.jar
 share/ozone/lib/error_prone_annotations.jar
 share/ozone/lib/failureaccess.jar
-share/ozone/lib/FastInfoset.jar
 share/ozone/lib/gethostname4j.jar
 share/ozone/lib/grpc-api.jar
 share/ozone/lib/grpc-context.jar
@@ -49,6 +47,7 @@ share/ozone/lib/grpc-netty.jar
 share/ozone/lib/grpc-protobuf.jar
 share/ozone/lib/grpc-protobuf-lite.jar
 share/ozone/lib/grpc-stub.jar
+share/ozone/lib/grpc-util.jar
 share/ozone/lib/gson.jar
 share/ozone/lib/guava-jre.jar
 share/ozone/lib/guice-assistedinject.jar
@@ -106,6 +105,7 @@ share/ozone/lib/jaeger-client.jar
 share/ozone/lib/jaeger-core.jar
 share/ozone/lib/jaeger-thrift.jar
 share/ozone/lib/jaeger-tracerresolver.jar
+share/ozone/lib/jakarta.activation.jar
 share/ozone/lib/jakarta.activation-api.jar
 share/ozone/lib/jakarta.annotation-api.jar
 share/ozone/lib/jakarta.inject.jar
@@ -118,8 +118,6 @@ share/ozone/lib/javax.el-api.jar
 share/ozone/lib/javax.inject.jar
 share/ozone/lib/javax.interceptor-api.jar
 share/ozone/lib/javax.servlet-api.jar
-share/ozone/lib/jaxb-api.jar
-share/ozone/lib/jaxb-core.jar
 share/ozone/lib/jaxb-runtime.jar
 share/ozone/lib/jcip-annotations.jar
 share/ozone/lib/jersey-cdi1x.jar
@@ -239,7 +237,8 @@ share/ozone/lib/ranger-plugins-cred.jar
 share/ozone/lib/ratis-client.jar
 share/ozone/lib/ratis-common.jar
 share/ozone/lib/ratis-grpc.jar
-share/ozone/lib/ratis-metrics.jar
+share/ozone/lib/ratis-metrics-api.jar
+share/ozone/lib/ratis-metrics-dropwizard3.jar
 share/ozone/lib/ratis-netty.jar
 share/ozone/lib/ratis-proto.jar
 share/ozone/lib/ratis-server-api.jar
@@ -264,7 +263,6 @@ share/ozone/lib/spring-jdbc.jar
 share/ozone/lib/spring-tx.jar
 share/ozone/lib/sqlite-jdbc.jar
 share/ozone/lib/stax2-api.jar
-share/ozone/lib/stax-ex.jar
 share/ozone/lib/txw2.jar
 share/ozone/lib/vault-java-driver.jar
 share/ozone/lib/weld-servlet-shaded.Final.jar
@@ -272,4 +270,3 @@ share/ozone/lib/woodstox-core.jar
 share/ozone/lib/zookeeper.jar
 share/ozone/lib/zookeeper-jute.jar
 share/ozone/lib/zstd-jni.jar
-share/ozone/lib/java-uuid-generator.jar

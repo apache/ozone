@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.om.request.key;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -29,6 +28,7 @@ import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -59,7 +59,7 @@ public class TestOMSetTimesRequestWithFSO extends TestOMSetTimesRequest {
     assertNotNull(keyStatus);
     assertTrue(keyStatus.isDirectory());
     long keyMtime = keyStatus.getKeyInfo().getModificationTime();
-    Assertions.assertEquals(mtime, keyMtime);
+    assertEquals(mtime, keyMtime);
 
     long newMtime = -1;
     executeAndReturn(newMtime);
@@ -69,7 +69,7 @@ public class TestOMSetTimesRequestWithFSO extends TestOMSetTimesRequest {
     assertNotNull(keyStatus);
     assertTrue(keyStatus.isDirectory());
     keyMtime = keyStatus.getKeyInfo().getModificationTime();
-    Assertions.assertEquals(mtime, keyMtime);
+    assertEquals(mtime, keyMtime);
   }
 
   /**
@@ -91,19 +91,19 @@ public class TestOMSetTimesRequestWithFSO extends TestOMSetTimesRequest {
     assertTrue(keyStatus.isFile());
     OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
         .get(tableKey);
-    Assertions.assertEquals(omKeyInfo.getKeyName(), FILE_NAME);
+    assertEquals(omKeyInfo.getKeyName(), FILE_NAME);
     long keyMtime = keyStatus.getKeyInfo().getModificationTime();
-    Assertions.assertEquals(mtime, keyMtime);
+    assertEquals(mtime, keyMtime);
     long newMtime = -1;
     executeAndReturn(newMtime);
     keyStatus = OMFileRequest.getOMKeyInfoIfExists(
         omMetadataManager, volumeName, bucketName, keyName, 0,
         ozoneManager.getDefaultReplicationConfig());
     omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(tableKey);
-    Assertions.assertEquals(omKeyInfo.getKeyName(), FILE_NAME);
+    assertEquals(omKeyInfo.getKeyName(), FILE_NAME);
     assertTrue(keyStatus.isFile());
     keyMtime = keyStatus.getKeyInfo().getModificationTime();
-    Assertions.assertEquals(mtime, keyMtime);
+    assertEquals(mtime, keyMtime);
   }
 
   protected String addKeyToTable() throws Exception {

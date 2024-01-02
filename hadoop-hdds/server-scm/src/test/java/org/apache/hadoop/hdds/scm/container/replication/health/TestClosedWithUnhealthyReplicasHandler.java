@@ -137,10 +137,23 @@ public class TestClosedWithUnhealthyReplicasHandler {
         .setContainerInfo(container)
         .build();
 
+    ContainerCheckRequest readRequest = requestBuilder
+        .setContainerReplicas(containerReplicas)
+        .setContainerInfo(container)
+        .setReadOnly(true)
+        .build();
+
     assertTrue(handler.handle(request));
     assertEquals(1, request.getReport().getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
 
+    assertTrue(handler.handle(readRequest));
+    // Same report object is incremented again
+    assertEquals(2, request.getReport().getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+
+    // Only a single delete should be sent, as the read request should not have
+    // triggered one.
     ArgumentCaptor<Integer> replicaIndexCaptor =
         ArgumentCaptor.forClass(Integer.class);
     Mockito.verify(replicationManager, Mockito.times(2))
