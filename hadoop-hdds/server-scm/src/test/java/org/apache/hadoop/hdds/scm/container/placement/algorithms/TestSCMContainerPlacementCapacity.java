@@ -41,6 +41,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.when;
@@ -155,9 +156,9 @@ public class TestSCMContainerPlacementCapacity {
     }
 
     //datanode 6 has more space than datanode 3 and datanode 4.
-    Assertions.assertTrue(selectedCount.get(datanodes.get(3)) < selectedCount
-        .get(datanodes.get(6)));
-    Assertions.assertTrue(selectedCount.get(datanodes.get(4)) < selectedCount
-        .get(datanodes.get(6)));
+    assertThat(selectedCount.get(datanodes.get(3)))
+        .isLessThan(selectedCount.get(datanodes.get(6)));
+    assertThat(selectedCount.get(datanodes.get(4)))
+        .isLessThan(selectedCount.get(datanodes.get(6)));
   }
 }

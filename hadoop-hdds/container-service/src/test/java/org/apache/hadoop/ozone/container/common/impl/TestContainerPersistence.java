@@ -91,6 +91,7 @@ import org.junit.jupiter.api.Assertions;
 
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -225,8 +226,7 @@ public class TestContainerPersistence {
     initSchemaAndVersionInfo(versionInfo);
     long testContainerID = getTestContainerID();
     addContainer(containerSet, testContainerID);
-    Assertions.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+    assertThat(containerSet.getContainerMapCopy()).containsKey(testContainerID);
     KeyValueContainerData kvData =
         (KeyValueContainerData) containerSet.getContainer(testContainerID)
             .getContainerData();
@@ -274,14 +274,13 @@ public class TestContainerPersistence {
         addContainer(containerSet, testContainerID);
     container.close();
 
-    Assertions.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+    assertThat(containerSet.getContainerMapCopy())
+        .containsKey(testContainerID);
 
     KeyValueContainerUtil.removeContainer(container.getContainerData(), conf);
     container.delete();
     containerSet.removeContainer(testContainerID);
-    Assertions.assertFalse(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+    assertThat(containerSet.getContainerMapCopy()).doesNotContainKey(testContainerID);
 
     // Adding block to a deleted container should fail.
     BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID);
@@ -302,8 +301,8 @@ public class TestContainerPersistence {
         addContainer(containerSet, testContainerID);
     container.close();
 
-    Assertions.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+    assertThat(containerSet.getContainerMapCopy())
+        .containsKey(testContainerID);
 
     // Deleting a non-empty container should fail.
     BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID);
@@ -324,8 +323,8 @@ public class TestContainerPersistence {
     Exception exception = Assertions.assertThrows(
         StorageContainerException.class,
         () -> kvHandler.deleteContainer(container, false));
-    Assertions.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+    assertThat(containerSet.getContainerMapCopy())
+        .containsKey(testContainerID);
     assertThat(exception.getMessage(),
         Matchers.containsString(
             "Non-force deletion of non-empty container is not allowed."));
@@ -341,8 +340,8 @@ public class TestContainerPersistence {
         testContainerID);
     BlockID blockID = addBlockToContainer(container);
     container.close();
-    Assertions.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+    assertThat(containerSet.getContainerMapCopy())
+        .containsKey(testContainerID);
     KeyValueContainerData containerData = container.getContainerData();
 
     // Block data and metadata tables should have data.
@@ -353,8 +352,8 @@ public class TestContainerPersistence {
         container.getContainerData().getVolume().getConf());
     container.delete();
     containerSet.removeContainer(testContainerID);
-    Assertions.assertFalse(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+    assertThat(containerSet.getContainerMapCopy())
+        .doesNotContainKey(testContainerID);
 
     // Block data and metadata tables should be cleared.
     assertContainerNotInSchema3DB(containerData, blockID);
@@ -446,10 +445,10 @@ public class TestContainerPersistence {
     KeyValueContainerData container2Data = container2.getContainerData();
     assertContainerInSchema3DB(container2Data, container2Block);
 
-    Assertions.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID1));
-    Assertions.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID2));
+    assertThat(containerSet.getContainerMapCopy())
+        .containsKey(testContainerID1);
+    assertThat(containerSet.getContainerMapCopy())
+        .containsKey(testContainerID2);
 
     // Since this test only uses one volume, both containers will reside in
     // the same volume.
@@ -479,10 +478,10 @@ public class TestContainerPersistence {
 
     File container1Dir = KeyValueContainerUtil.getTmpDirectoryPath(
         container1Data, hddsVolume).toFile();
-    Assertions.assertTrue(deleteDirFiles.contains(container1Dir));
+    assertThat(deleteDirFiles).contains(container1Dir);
     File container2Dir = KeyValueContainerUtil.getTmpDirectoryPath(
         container2Data, hddsVolume).toFile();
-    Assertions.assertTrue(deleteDirFiles.contains(container2Dir));
+    assertThat(deleteDirFiles).contains(container2Dir);
 
     // Delete container1 from the disk. Container2 should remain in the
     // deleted containers directory.
@@ -510,10 +509,10 @@ public class TestContainerPersistence {
     // Remove containers from containerSet
     containerSet.removeContainer(testContainerID1);
     containerSet.removeContainer(testContainerID2);
-    Assertions.assertFalse(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID1));
-    Assertions.assertFalse(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID2));
+    assertThat(containerSet.getContainerMapCopy())
+        .doesNotContainKey(testContainerID1);
+    assertThat(containerSet.getContainerMapCopy())
+        .doesNotContainKey(testContainerID2);
 
     // Deleted containers directory should now be empty.
     deleteDirFilesArray = deletedContainerDir.listFiles();
@@ -584,7 +583,7 @@ public class TestContainerPersistence {
       long nextKey = results.get(results.size() - 1).getContainerID();
 
       //Assert that container is returning results in a sorted fashion.
-      Assertions.assertTrue(prevKey < nextKey);
+      assertThat(prevKey).isLessThan(nextKey);
       prevKey = nextKey + 1;
       results.clear();
     }
@@ -908,8 +907,8 @@ public class TestContainerPersistence {
     container.update(newMetadata, false);
 
     assertEquals(1, containerSet.getContainerMapCopy().size());
-    Assertions.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+    assertThat(containerSet.getContainerMapCopy())
+        .containsKey(testContainerID);
 
     // Verify in-memory map
     KeyValueContainerData actualNewData = (KeyValueContainerData)

@@ -18,9 +18,12 @@ package org.apache.hadoop.hdds.utils;
 
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * Test for ResourceCache.
@@ -48,17 +51,17 @@ public class TestResourceCache {
 
     // put to cache with removing old element "6" as eviction FIFO
     resourceCache.put(1, "a");
-    Assertions.assertNull(resourceCache.get(6));
-    Assertions.assertEquals(1, count.get());
+    assertNull(resourceCache.get(6));
+    assertEquals(1, count.get());
 
     // add 5 should be success with no removal
     resourceCache.put(5, "a");
-    Assertions.assertNotNull(resourceCache.get(4));
+    assertNotNull(resourceCache.get(4));
 
     // remove and check queue
     resourceCache.remove(4);
-    Assertions.assertNull(resourceCache.get(4));
-    Assertions.assertEquals(1, count.get());
+    assertNull(resourceCache.get(4));
+    assertEquals(1, count.get());
   }
 
   @Test
@@ -96,7 +99,7 @@ public class TestResourceCache {
 
     // THEN
     for (Integer k : removedKeys) {
-      Assertions.assertNull(resourceCache.get(k));
+      assertNull(resourceCache.get(k));
     }
     // can put new entries
     for (int i = 1; i <= removedKeys.length; ++i) {

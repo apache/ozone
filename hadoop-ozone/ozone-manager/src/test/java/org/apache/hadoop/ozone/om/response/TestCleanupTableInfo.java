@@ -51,7 +51,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -148,8 +147,9 @@ public class TestCleanupTableInfo {
     subTypes.remove(OmKeyResponse.class);
     // OMEchoRPCWriteResponse does not need CleanupTable.
     subTypes.remove(OMEchoRPCWriteResponse.class);
+    subTypes.remove(DummyOMClientResponse.class);
     subTypes.forEach(aClass -> {
-      Assertions.assertTrue(aClass.isAnnotationPresent(CleanupTableInfo.class),
+      assertTrue(aClass.isAnnotationPresent(CleanupTableInfo.class),
           aClass + " does not have annotation of" +
               " CleanupTableInfo");
       CleanupTableInfo annotation =
@@ -157,7 +157,7 @@ public class TestCleanupTableInfo {
       String[] cleanupTables = annotation.cleanupTables();
       boolean cleanupAll = annotation.cleanupAll();
       if (cleanupTables.length >= 1) {
-        Assertions.assertTrue(
+        assertTrue(
             Arrays.stream(cleanupTables).allMatch(tables::contains)
         );
       } else {
@@ -276,7 +276,7 @@ public class TestCleanupTableInfo {
     OzoneConfiguration conf = new OzoneConfiguration();
     File newFolder = folder.toFile();
     if (!newFolder.exists()) {
-      Assertions.assertTrue(newFolder.mkdirs());
+      assertTrue(newFolder.mkdirs());
     }
     ServerUtils.setOzoneMetaDirPath(conf, newFolder.toString());
     return spy(new OmMetadataManagerImpl(conf, null));

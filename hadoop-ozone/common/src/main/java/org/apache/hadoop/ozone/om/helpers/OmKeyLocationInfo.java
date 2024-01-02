@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.scm.pipeline.UnknownPipelineStateException;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
-import org.apache.hadoop.ozone.protocolPB.OzonePBHelper;
+import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.security.token.Token;
 
 /**
@@ -103,7 +103,7 @@ public final class OmKeyLocationInfo extends BlockLocationInfo {
       try {
         Token<OzoneBlockTokenIdentifier> token = getToken();
         if (token != null) {
-          builder.setToken(OzonePBHelper.protoFromToken(token));
+          builder.setToken(OMPBHelper.protoFromToken(token));
         }
 
         // Pipeline can be null when key create with override and
@@ -147,8 +147,9 @@ public final class OmKeyLocationInfo extends BlockLocationInfo {
         .setCreateVersion(keyLocation.getCreateVersion())
         .setPartNumber(keyLocation.getPartNumber());
     if (keyLocation.hasToken()) {
-      builder.setToken((Token<OzoneBlockTokenIdentifier>)
-          OzonePBHelper.tokenFromProto(keyLocation.getToken()));
+      Token<OzoneBlockTokenIdentifier> token =
+          OMPBHelper.tokenFromProto(keyLocation.getToken());
+      builder.setToken(token);
     }
     return builder.build();
   }

@@ -77,8 +77,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status.DONE;
 import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.fromSources;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.LOW;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.NORMAL;
@@ -313,8 +313,8 @@ public class TestReplicationSupervisor {
     supervisor.addTask(createTask(1L));
     assertEquals(1, supervisor.getReplicationFailureCount());
     assertEquals(0, supervisor.getReplicationSuccessCount());
-    assertTrue(logCapturer.getOutput()
-        .contains("Container 1 replication was unsuccessful."));
+    assertThat(logCapturer.getOutput())
+        .contains("Container 1 replication was unsuccessful.");
   }
 
   @ContainerLayoutTestInfo.ContainerTest

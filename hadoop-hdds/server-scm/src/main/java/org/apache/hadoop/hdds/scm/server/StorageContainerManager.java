@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -160,6 +161,7 @@ import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.lease.LeaseManagerNotRunningException;
 import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
+import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.SecurityUtil;
@@ -1328,8 +1330,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       // If SCM HA was not being used before pre-finalize, and is being used
       // when the cluster is pre-finalized for the SCM HA feature, init
       // should fail.
-      ScmHAUnfinalizedStateValidationAction.checkScmHA(conf, scmStorageConfig,
-          new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion()));
+      final LayoutVersionManager layoutVersionManager =
+          new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
+      try {
+        ScmHAUnfinalizedStateValidationAction.checkScmHA(conf, scmStorageConfig,
+            layoutVersionManager);
+      } finally {
+        layoutVersionManager.close();
+      }
 
       clusterId = scmStorageConfig.getClusterID();
       final boolean isSCMHAEnabled = scmStorageConfig.isSCMHAEnabled();
@@ -1337,14 +1345,33 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       // Initialize security if security is enabled later.
       initializeSecurityIfNeeded(conf, scmStorageConfig, selfHostName, true);
 
-      if (SCMHAUtils.isSCMHAEnabled(conf) && !isSCMHAEnabled) {
+      if (conf.getBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
+          ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT) && !isSCMHAEnabled) {
         SCMRatisServerImpl.initialize(scmStorageConfig.getClusterID(),
             scmStorageConfig.getScmId(), haDetails.getLocalNodeDetails(),
             conf);
         scmStorageConfig.setSCMHAFlag(true);
         scmStorageConfig.setPrimaryScmNodeId(scmStorageConfig.getScmId());
         scmStorageConfig.forceInitialize();
-        LOG.debug("Enabled SCM HA");
+
+        /*
+         * Since Ratis is initialized on an existing cluster, we have to
+         * trigger Ratis snapshot so that this SCM can send the latest scm.db
+         * to the bootstrapping SCMs later.
+         */
+
+        try {
+          DefaultConfigManager.forceUpdateConfigValue(
+              ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+          StorageContainerManager scm = createSCM(conf);
+          scm.start();
+          scm.getScmHAManager().getRatisServer().triggerSnapshot();
+          scm.stop();
+          scm.join();
+        } catch (AuthenticationException e) {
+          throw new IOException(e);
+        }
+        LOG.info("Enabled SCM HA");
       }
 
       LOG.info("SCM already initialized. Reusing existing cluster id for sd={}"

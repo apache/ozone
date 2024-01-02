@@ -46,8 +46,8 @@ import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -156,7 +156,7 @@ public class TestCloseContainerEventHandler {
     closeHandler.onMessage(container.containerID(), eventPublisher);
     Mockito.verify(mockLeaseManager, atLeastOnce())
         .acquire(any(), anyLong(), any());
-    assertTrue(leaseList.size() > 0);
+    assertThat(leaseList.size()).isGreaterThan(0);
     // immediate check if event is published
     Mockito.verify(eventPublisher, never())
         .fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
@@ -215,7 +215,7 @@ public class TestCloseContainerEventHandler {
         .map(d -> d.getUuid())
         .collect(Collectors.toSet());
     for (CommandForDatanode c : cmds) {
-      assertTrue(pipelineDNs.contains(c.getDatanodeId()));
+      assertThat(pipelineDNs).contains(c.getDatanodeId());
       pipelineDNs.remove(c.getDatanodeId());
       CloseContainerCommand ccc = (CloseContainerCommand)c.getCommand();
       assertEquals(container.getContainerID(), ccc.getContainerID());

@@ -18,9 +18,10 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.jetbrains.annotations.NotNull;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -53,15 +54,13 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
     String openKey = getOpenKey();
 
     // Not adding key entry before to test whether commit is successful or not.
-    Assertions.assertFalse(
-        omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
+    assertFalse(omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
     omAllocateBlockResponse.addToDBBatch(omMetadataManager, batchOperation);
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assertions.assertTrue(
-        omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
+    assertTrue(omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
   }
 
   @Test
@@ -79,8 +78,7 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
 
     // Before calling addToDBBatch
     String openKey = getOpenKey();
-    Assertions.assertFalse(
-        omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
+    assertFalse(omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
 
     omAllocateBlockResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 
@@ -88,8 +86,7 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     // As omResponse is error it is a no-op.
-    Assertions.assertFalse(
-        omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
+    assertFalse(omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
 
   }
 

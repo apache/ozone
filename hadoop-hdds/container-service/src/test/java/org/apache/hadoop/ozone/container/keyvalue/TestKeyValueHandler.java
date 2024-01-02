@@ -57,10 +57,11 @@ import org.apache.ozone.test.GenericTestUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -277,16 +278,13 @@ public class TestKeyValueHandler {
       //Set a class which is not of sub class of VolumeChoosingPolicy
       conf.set(HDDS_DATANODE_VOLUME_CHOOSING_POLICY,
           "org.apache.hadoop.ozone.container.common.impl.HddsDispatcher");
-      try {
-        new KeyValueHandler(conf,
-            context.getParent().getDatanodeDetails().getUuidString(),
-            cset, volumeSet, metrics, c -> { });
-      } catch (RuntimeException ex) {
-        GenericTestUtils.assertExceptionContains("class org.apache.hadoop" +
-            ".ozone.container.common.impl.HddsDispatcher not org.apache" +
-            ".hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy",
-            ex);
-      }
+      RuntimeException exception = assertThrows(RuntimeException.class,
+          () -> new KeyValueHandler(conf, context.getParent().getDatanodeDetails().getUuidString(), cset, volumeSet,
+              metrics, c -> { }));
+
+      assertThat(exception).hasMessageEndingWith(
+          "class org.apache.hadoop.ozone.container.common.impl.HddsDispatcher " +
+              "not org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy");
     } finally {
       volumeSet.shutdown();
       FileUtil.fullyDelete(datanodeDir);
@@ -411,7 +409,7 @@ public class TestKeyValueHandler {
       try {
         kvHandler.deleteContainer(container, true);
       } catch (StorageContainerException sce) {
-        assertTrue(sce.getMessage().contains("Failed to move container"));
+        assertThat(sce.getMessage()).contains("Failed to move container");
       }
       Mockito.verify(volumeSet).checkVolumeAsync(hddsVolume);
       // cleanup
@@ -427,7 +425,7 @@ public class TestKeyValueHandler {
       String expectedLog =
           "Delete container issued on containerID 2 which is " +
               "in a failed volume";
-      assertTrue(kvHandlerLogs.getOutput().contains(expectedLog));
+      assertThat(kvHandlerLogs.getOutput()).contains(expectedLog);
     } finally {
       FileUtils.deleteDirectory(new File(testDir));
     }

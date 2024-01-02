@@ -25,8 +25,6 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
-import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -135,13 +133,10 @@ public class TestTransferLeadershipShell {
     assertSCMResetPriorities();
   }
 
-  private void assertOMResetPriorities() throws IOException {
-    OzoneManagerRatisServer ratisServer = cluster.getOMLeader()
-        .getOmRatisServer();
-    RaftGroupId raftGroupId = ratisServer.getRaftGroupId();
-    Collection<RaftPeer> raftPeers = ratisServer
-        .getServer()
-        .getDivision(raftGroupId)
+  private void assertOMResetPriorities() {
+    final Collection<RaftPeer> raftPeers = cluster.getOMLeader()
+        .getOmRatisServer()
+        .getServerDivision()
         .getGroup()
         .getPeers();
 

@@ -27,7 +27,6 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -42,6 +41,8 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -97,7 +98,7 @@ public class TestOMStorage {
 
   @Test
   public void testNoOmDbDirConfigured() {
-    Assertions.assertThrows(IllegalArgumentException.class, () -> {
+    assertThrows(IllegalArgumentException.class, () -> {
       OMStorage.getOmDbDir(new OzoneConfiguration());
     });
   }
@@ -121,11 +122,11 @@ public class TestOMStorage {
   public void testSetOmIdOnInitializedStorage() throws Exception {
     OzoneConfiguration conf = configWithOMDBDir();
     setupAPersistedVersionFile(conf);
-    Throwable exception = Assertions.assertThrows(IOException.class, () -> {
+    Throwable exception = assertThrows(IOException.class, () -> {
       OMStorage storage = new OMStorage(conf);
       storage.setOmId("omId");
     });
-    Assertions.assertEquals(ERROR_OM_IS_ALREADY_INITIALIZED,
+    assertEquals(ERROR_OM_IS_ALREADY_INITIALIZED,
         exception.getMessage());
   }
 
@@ -164,11 +165,11 @@ public class TestOMStorage {
       throws Exception {
     OzoneConfiguration conf = configWithOMDBDir();
     setupAPersistedVersionFile(conf);
-    Throwable exception = Assertions.assertThrows(IOException.class, () -> {
+    Throwable exception = assertThrows(IOException.class, () -> {
       OMStorage storage = new OMStorage(conf);
       storage.setOmNodeId("nodeId");
     });
-    Assertions.assertEquals(ERROR_OM_IS_ALREADY_INITIALIZED,
+    assertEquals(ERROR_OM_IS_ALREADY_INITIALIZED,
         exception.getMessage());
   }
 
@@ -176,11 +177,11 @@ public class TestOMStorage {
   public void testSetOMNodeIdOnInitializedStorageWithNodeID() throws Exception {
     OzoneConfiguration conf = configWithOMDBDir();
     setupAPersistedVersionFileWithNodeId(conf, "nodeId");
-    Throwable exception = Assertions.assertThrows(IOException.class, () -> {
+    Throwable exception = assertThrows(IOException.class, () -> {
       OMStorage storage = new OMStorage(conf);
       storage.setOmNodeId("nodeId");
     });
-    Assertions.assertEquals(ERROR_OM_IS_ALREADY_INITIALIZED,
+    assertEquals(ERROR_OM_IS_ALREADY_INITIALIZED,
         exception.getMessage());
   }
 
@@ -236,10 +237,10 @@ public class TestOMStorage {
 
     String expectedMsg =
         String.format(ERROR_UNEXPECTED_OM_NODE_ID_TEMPLATE, newId, nodeId);
-    Throwable exception = Assertions.assertThrows(IOException.class, () -> {
+    Throwable exception = assertThrows(IOException.class, () -> {
       storage.validateOrPersistOmNodeId(newId);
     });
-    Assertions.assertEquals(expectedMsg, exception.getMessage());
+    assertEquals(expectedMsg, exception.getMessage());
   }
 
   private void assertCertOps(OMStorage storage) throws IOException {
