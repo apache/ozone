@@ -78,9 +78,10 @@ public class ManagedSstFileReader {
 
       try (ManagedOptions options = new ManagedOptions()) {
         for (String sstFile : sstFiles) {
-          SstFileReader fileReader = new SstFileReader(options);
-          fileReader.open(sstFile);
-          estimatedSize += fileReader.getTableProperties().getNumEntries();
+          try (SstFileReader fileReader = new SstFileReader(options)) {
+            fileReader.open(sstFile);
+            estimatedSize += fileReader.getTableProperties().getNumEntries();
+          }
         }
       }
       estimatedTotalKeys = estimatedSize;
