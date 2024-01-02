@@ -167,7 +167,8 @@ public class BlockOutputStream extends OutputStream {
     this.xceiverClient = xceiverClientManager.acquireClient(pipeline);
     this.bufferPool = bufferPool;
     this.token = token;
-    this.tokenString = this.token.encodeToUrlString();
+    this.tokenString = (this.token == null) ? null:
+        this.token.encodeToUrlString();
 
     //number of buffers used before doing a flush
     refreshCurrentBuffer();
