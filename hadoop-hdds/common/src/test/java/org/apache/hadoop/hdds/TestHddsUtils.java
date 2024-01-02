@@ -39,6 +39,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -55,7 +56,7 @@ public class TestHddsUtils {
           CommonConfigurationKeysPublic.HADOOP_SECURITY_SENSITIVE_CONFIG_KEYS;
 
   @Test
-  public void testGetHostName() {
+  void testGetHostName() {
     assertEquals(Optional.of("localhost"),
         HddsUtils.getHostName("localhost:1234"));
 
@@ -67,7 +68,7 @@ public class TestHddsUtils {
   }
 
   @Test
-  public void validatePath() {
+  void validatePath() {
     HddsUtils.validatePath(Paths.get("/"), Paths.get("/"));
     HddsUtils.validatePath(Paths.get("/a"), Paths.get("/"));
     HddsUtils.validatePath(Paths.get("/a"), Paths.get("/a"));
@@ -86,7 +87,7 @@ public class TestHddsUtils {
   }
 
   @Test
-  public void testGetSCMAddresses() {
+  void testGetSCMAddresses() {
     final OzoneConfiguration conf = new OzoneConfiguration();
     Collection<InetSocketAddress> addresses;
     InetSocketAddress addr;
@@ -133,7 +134,7 @@ public class TestHddsUtils {
       assertTrue(expected1.remove(current.getHostName(),
           current.getPort()));
     }
-    assertTrue(expected1.isEmpty());
+    assertThat(expected1).isEmpty();
 
     // Verify names with spaces
     conf.setStrings(
@@ -147,7 +148,7 @@ public class TestHddsUtils {
       assertTrue(expected2.remove(current.getHostName(),
           current.getPort()));
     }
-    assertTrue(expected2.isEmpty());
+    assertThat(expected2).isEmpty();
 
     // Verify empty value
     conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "");
@@ -176,7 +177,7 @@ public class TestHddsUtils {
 
 
   @Test
-  public void testGetSCMAddressesWithHAConfig() {
+  void testGetSCMAddressesWithHAConfig() {
     OzoneConfiguration conf = new OzoneConfiguration();
     String scmServiceId = "scmserviceId";
     String[] nodes = new String[]{"scm1", "scm2", "scm3"};
@@ -209,7 +210,7 @@ public class TestHddsUtils {
   }
 
   @Test
-  public void testGetNumberFromConfigKeys() {
+  void testGetNumberFromConfigKeys() {
     final String testnum1 = "8";
     final String testnum2 = "7";
     final String serviceId = "id1";
@@ -242,7 +243,7 @@ public class TestHddsUtils {
   }
 
   @Test
-  public void testRedactSensitivePropsForLogging() {
+  void testRedactSensitivePropsForLogging() {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(SENSITIVE_CONFIG_KEYS, String.join("\n",
             "password$",
