@@ -1982,6 +1982,10 @@ public class TestSCMNodeManager {
     assertEquals(2000, stats.get("MaintenanceDiskCapacity").longValue());
     assertEquals(100, stats.get("MaintenanceDiskUsed").longValue());
     assertEquals(1900, stats.get("MaintenanceDiskRemaining").longValue());
+
+    // All nodes
+    assertEquals(12000, stats.get("TotalCapacity").longValue());
+    assertEquals(600, stats.get("TotalUsed").longValue());
   }
 
   /**
