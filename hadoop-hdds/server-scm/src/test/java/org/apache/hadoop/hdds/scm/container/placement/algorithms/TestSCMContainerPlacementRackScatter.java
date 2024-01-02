@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
@@ -68,6 +69,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -567,6 +569,72 @@ public class TestSCMContainerPlacementRackScatter {
     stat = policy.validateContainerPlacement(dns, 1);
     assertTrue(stat.isPolicySatisfied());
     assertEquals(0, stat.misReplicationCount());
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.hadoop.hdds.scm.node.NodeStatus#outOfServiceStates")
+  public void testOverReplicationAndOutOfServiceNodes(HddsProtos.NodeOperationalState state) {
+    setup(9, 3);
+    //    9 datanodes, 3 per rack.
+    //    /rack0/node0  -> IN_SERVICE - used
+    //    /rack0/node1
+    //    /rack0/node2
+    //    /rack1/node3  -> IN_SERVICE - used
+    //    /rack1/node4
+    //    /rack1/node5
+    //    /rack2/node6  -> IN_SERVICE - used
+    //    /rack2/node7
+    //    /rack2/node8
+    List<DatanodeDetails> dns = new ArrayList<>();
+    dns.add(datanodes.get(0));
+    dns.add(datanodes.get(3));
+    dns.add(datanodes.get(6));
+
+    ContainerPlacementStatus status = policy.validateContainerPlacement(dns, 3);
+    assertTrue(status.isPolicySatisfied());
+    assertEquals(3, status.actualPlacementCount());
+    assertEquals(3, status.expectedPlacementCount());
+    assertEquals(0, status.misReplicationCount());
+    assertNull(status.misReplicatedReason());
+
+    //    /rack0/node0  -> IN_SERVICE - used
+    //    /rack0/node1  -> OFFLINE    - used
+    //    /rack0/node2
+    //    /rack1/node3  -> IN_SERVICE - used
+    //    /rack1/node4  -> OFFLINE    - used
+    //    /rack1/node5
+    //    /rack2/node6  -> IN_SERVICE - used
+    //    /rack2/node7
+    //    /rack2/node8
+    datanodes.get(1).setPersistedOpState(state);
+    datanodes.get(4).setPersistedOpState(state);
+    dns.add(datanodes.get(1));
+    dns.add(datanodes.get(4));
+
+    status = policy.validateContainerPlacement(dns, 3);
+    assertTrue(status.isPolicySatisfied());
+    assertEquals(3, status.actualPlacementCount());
+    assertEquals(3, status.expectedPlacementCount());
+    assertEquals(0, status.misReplicationCount());
+    assertNull(status.misReplicatedReason());
+
+    //    /rack0/node0  -> IN_SERVICE - used
+    //    /rack0/node1  -> OFFLINE    - used
+    //    /rack0/node2  -> IN_SERVICE - used
+    //    /rack1/node3  -> IN_SERVICE - used
+    //    /rack1/node4  -> OFFLINE    - used
+    //    /rack1/node5
+    //    /rack2/node6  -> IN_SERVICE - used
+    //    /rack2/node7
+    //    /rack2/node8
+    dns.add(datanodes.get(2));
+
+    status = policy.validateContainerPlacement(dns, 3);
+    assertTrue(status.isPolicySatisfied());
+    assertEquals(3, status.actualPlacementCount());
+    assertEquals(3, status.expectedPlacementCount());
+    assertEquals(0, status.misReplicationCount());
+    assertNull(status.misReplicatedReason());
   }
 
   public List<DatanodeDetails> getDatanodes(List<Integer> dnIndexes) {
