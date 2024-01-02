@@ -28,9 +28,14 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Pipeline
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
-
 import java.io.IOException;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.any;
 
 /**
  * Test-cases to verify the functionality of PipelineActionHandler.
@@ -41,23 +46,22 @@ public class TestPipelineActionHandler {
   @Test
   public void testPipelineActionHandlerForValidPipeline() throws IOException {
 
-    final PipelineManager manager = Mockito.mock(PipelineManager.class);
-    final EventQueue queue = Mockito.mock(EventQueue.class);
+    final PipelineManager manager = mock(PipelineManager.class);
+    final EventQueue queue = mock(EventQueue.class);
     final PipelineActionHandler actionHandler = new PipelineActionHandler(
         manager, SCMContext.emptyContext(), null);
     final Pipeline pipeline = HddsTestUtils.getRandomPipeline();
 
     actionHandler.onMessage(getPipelineActionsFromDatanode(
         pipeline.getId()), queue);
-    Mockito.verify(manager, Mockito.times(1))
-        .closePipeline(pipeline.getId());
+    verify(manager, times(1)).closePipeline(pipeline.getId());
   }
 
   @Test
   public void testPipelineActionHandlerForValidPipelineInFollower()
       throws IOException {
-    final PipelineManager manager = Mockito.mock(PipelineManager.class);
-    final EventQueue queue = Mockito.mock(EventQueue.class);
+    final PipelineManager manager = mock(PipelineManager.class);
+    final EventQueue queue = mock(EventQueue.class);
     final SCMContext context = SCMContext.emptyContext();
     final PipelineActionHandler actionHandler = new PipelineActionHandler(
         manager, context, null);
@@ -66,49 +70,45 @@ public class TestPipelineActionHandler {
     context.updateLeaderAndTerm(false, 1);
     actionHandler.onMessage(getPipelineActionsFromDatanode(
         pipeline.getId()), queue);
-    Mockito.verify(manager, Mockito.times(0))
-        .closePipeline(pipeline.getId());
-    Mockito.verify(queue, Mockito.times(0))
-        .fireEvent(Mockito.eq(SCMEvents.DATANODE_COMMAND),
-            Mockito.any(CommandForDatanode.class));
+    verify(manager, times(0)).closePipeline(pipeline.getId());
+    verify(queue, times(0)).fireEvent(eq(SCMEvents.DATANODE_COMMAND),
+        any(CommandForDatanode.class));
   }
 
   @Test
   public void testPipelineActionHandlerForUnknownPipeline() throws IOException {
-    final PipelineManager manager = Mockito.mock(PipelineManager.class);
-    final EventQueue queue = Mockito.mock(EventQueue.class);
+    final PipelineManager manager = mock(PipelineManager.class);
+    final EventQueue queue = mock(EventQueue.class);
     final PipelineActionHandler actionHandler = new PipelineActionHandler(
         manager, SCMContext.emptyContext(), null);
     final Pipeline pipeline = HddsTestUtils.getRandomPipeline();
 
-    Mockito.doThrow(new PipelineNotFoundException())
+    doThrow(new PipelineNotFoundException())
         .when(manager).closePipeline(pipeline.getId());
     actionHandler.onMessage(getPipelineActionsFromDatanode(
         pipeline.getId()), queue);
-    Mockito.verify(queue, Mockito.times(1))
-        .fireEvent(Mockito.eq(SCMEvents.DATANODE_COMMAND),
-            Mockito.any(CommandForDatanode.class));
+    verify(queue, times(1)).fireEvent(eq(SCMEvents.DATANODE_COMMAND),
+        any(CommandForDatanode.class));
   }
 
   @Test
   public void testPipelineActionHandlerForUnknownPipelineInFollower()
       throws IOException {
 
-    final PipelineManager manager = Mockito.mock(PipelineManager.class);
-    final EventQueue queue = Mockito.mock(EventQueue.class);
+    final PipelineManager manager = mock(PipelineManager.class);
+    final EventQueue queue = mock(EventQueue.class);
     final SCMContext context = SCMContext.emptyContext();
     final PipelineActionHandler actionHandler = new PipelineActionHandler(
         manager, context, null);
     final Pipeline pipeline = HddsTestUtils.getRandomPipeline();
 
     context.updateLeaderAndTerm(false, 1);
-    Mockito.doThrow(new PipelineNotFoundException())
+    doThrow(new PipelineNotFoundException())
         .when(manager).closePipeline(pipeline.getId());
     actionHandler.onMessage(getPipelineActionsFromDatanode(
         pipeline.getId()), queue);
-    Mockito.verify(queue, Mockito.times(0))
-        .fireEvent(Mockito.eq(SCMEvents.DATANODE_COMMAND),
-            Mockito.any(CommandForDatanode.class));
+    verify(queue, times(0)).fireEvent(eq(SCMEvents.DATANODE_COMMAND),
+        any(CommandForDatanode.class));
 
   }
 

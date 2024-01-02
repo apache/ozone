@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -39,9 +38,11 @@ import java.util.Set;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QUASI_CLOSED;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.anyBoolean;
+import static org.mockito.Mockito.any;
 
 /**
  * Tests for the MismatchedReplicasHandler.
@@ -58,7 +59,7 @@ public class TestMismatchedReplicasHandler {
     ecReplicationConfig = new ECReplicationConfig(3, 2);
     ratisReplicationConfig = RatisReplicationConfig.getInstance(
         HddsProtos.ReplicationFactor.THREE);
-    replicationManager = Mockito.mock(ReplicationManager.class);
+    replicationManager = mock(ReplicationManager.class);
     handler = new MismatchedReplicasHandler(replicationManager);
   }
 
@@ -74,9 +75,8 @@ public class TestMismatchedReplicasHandler {
         .build();
 
     Assertions.assertFalse(handler.handle(request));
-    Mockito.verify(replicationManager, times(0))
-        .sendCloseContainerReplicaCommand(
-            any(), any(), anyBoolean());
+    verify(replicationManager, times(0)).sendCloseContainerReplicaCommand(
+        any(), any(), anyBoolean());
   }
 
   @Test
@@ -94,9 +94,8 @@ public class TestMismatchedReplicasHandler {
         .build();
     Assertions.assertFalse(handler.handle(request));
 
-    Mockito.verify(replicationManager, times(0))
-        .sendCloseContainerReplicaCommand(
-          any(), any(), anyBoolean());
+    verify(replicationManager, times(0)).sendCloseContainerReplicaCommand(
+        any(), any(), anyBoolean());
   }
 
   @Test
@@ -141,16 +140,13 @@ public class TestMismatchedReplicasHandler {
     Assertions.assertFalse(handler.handle(request));
     Assertions.assertFalse(handler.handle(readRequest));
 
-    Mockito.verify(replicationManager, times(1))
-        .sendCloseContainerReplicaCommand(
-            containerInfo, mismatch1.getDatanodeDetails(), true);
-    Mockito.verify(replicationManager, times(1))
-        .sendCloseContainerReplicaCommand(
-            containerInfo, mismatch2.getDatanodeDetails(), true);
+    verify(replicationManager, times(1)).sendCloseContainerReplicaCommand(
+        containerInfo, mismatch1.getDatanodeDetails(), true);
+    verify(replicationManager, times(1)).sendCloseContainerReplicaCommand(
+        containerInfo, mismatch2.getDatanodeDetails(), true);
     // close command should not be sent for unhealthy replica
-    Mockito.verify(replicationManager, times(0))
-        .sendCloseContainerReplicaCommand(
-            containerInfo, mismatch3.getDatanodeDetails(), true);
+    verify(replicationManager, times(0)).sendCloseContainerReplicaCommand(
+        containerInfo, mismatch3.getDatanodeDetails(), true);
   }
 
   @Test
@@ -165,9 +161,8 @@ public class TestMismatchedReplicasHandler {
         .build();
 
     Assertions.assertFalse(handler.handle(request));
-    Mockito.verify(replicationManager, times(0))
-        .sendCloseContainerReplicaCommand(
-            any(), any(), anyBoolean());
+    verify(replicationManager, times(0)).sendCloseContainerReplicaCommand(
+        any(), any(), anyBoolean());
   }
 
   @Test
@@ -185,9 +180,8 @@ public class TestMismatchedReplicasHandler {
         .build();
     Assertions.assertFalse(handler.handle(request));
 
-    Mockito.verify(replicationManager, times(0))
-        .sendCloseContainerReplicaCommand(
-            any(), any(), anyBoolean());
+    verify(replicationManager, times(0)).sendCloseContainerReplicaCommand(
+        any(), any(), anyBoolean());
   }
 
   @Test
@@ -229,16 +223,13 @@ public class TestMismatchedReplicasHandler {
     Assertions.assertFalse(handler.handle(request));
     Assertions.assertFalse(handler.handle(readRequest));
 
-    Mockito.verify(replicationManager, times(1))
-        .sendCloseContainerReplicaCommand(
-            containerInfo, mismatch1.getDatanodeDetails(), true);
-    Mockito.verify(replicationManager, times(1))
-        .sendCloseContainerReplicaCommand(
-            containerInfo, mismatch2.getDatanodeDetails(), true);
+    verify(replicationManager, times(1)).sendCloseContainerReplicaCommand(
+        containerInfo, mismatch1.getDatanodeDetails(), true);
+    verify(replicationManager, times(1)).sendCloseContainerReplicaCommand(
+        containerInfo, mismatch2.getDatanodeDetails(), true);
     // close command should not be sent for unhealthy replica
-    Mockito.verify(replicationManager, times(0))
-        .sendCloseContainerReplicaCommand(
-            containerInfo, mismatch3.getDatanodeDetails(), true);
+    verify(replicationManager, times(0)).sendCloseContainerReplicaCommand(
+        containerInfo, mismatch3.getDatanodeDetails(), true);
   }
 
   /**
@@ -284,16 +275,13 @@ public class TestMismatchedReplicasHandler {
     Assertions.assertFalse(handler.handle(request));
     Assertions.assertFalse(handler.handle(readRequest));
 
-    Mockito.verify(replicationManager, times(1))
-        .sendCloseContainerReplicaCommand(
-            containerInfo, mismatch1.getDatanodeDetails(), false);
-    Mockito.verify(replicationManager, times(1))
-        .sendCloseContainerReplicaCommand(
-            containerInfo, mismatch2.getDatanodeDetails(), false);
+    verify(replicationManager, times(1)).sendCloseContainerReplicaCommand(
+        containerInfo, mismatch1.getDatanodeDetails(), false);
+    verify(replicationManager, times(1)).sendCloseContainerReplicaCommand(
+        containerInfo, mismatch2.getDatanodeDetails(), false);
     // close command should not be sent for unhealthy replica
-    Mockito.verify(replicationManager, times(0))
-        .sendCloseContainerReplicaCommand(
-            containerInfo, mismatch3.getDatanodeDetails(), false);
+    verify(replicationManager, times(0)).sendCloseContainerReplicaCommand(
+        containerInfo, mismatch3.getDatanodeDetails(), false);
   }
 
   @Test
@@ -334,11 +322,9 @@ public class TestMismatchedReplicasHandler {
     Assertions.assertFalse(handler.handle(request));
     Assertions.assertFalse(handler.handle(readRequest));
 
-    Mockito.verify(replicationManager, times(1))
-        .sendCloseContainerReplicaCommand(
-            containerInfo, sameSeqID.getDatanodeDetails(), true);
-    Mockito.verify(replicationManager, times(0))
-        .sendCloseContainerReplicaCommand(containerInfo,
-            differentSeqID.getDatanodeDetails(), true);
+    verify(replicationManager, times(1)).sendCloseContainerReplicaCommand(
+        containerInfo, sameSeqID.getDatanodeDetails(), true);
+    verify(replicationManager, times(0)).sendCloseContainerReplicaCommand(containerInfo,
+        differentSeqID.getDatanodeDetails(), true);
   }
 }

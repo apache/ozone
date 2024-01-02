@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -51,6 +50,9 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.any;
 
 /**
  * Tests for {@link VulnerableUnhealthyReplicasHandler}.
@@ -65,7 +67,7 @@ public class TestVulnerableUnhealthyReplicasHandler {
 
   @BeforeEach
   public void setup() throws NodeNotFoundException {
-    replicationManager = Mockito.mock(ReplicationManager.class);
+    replicationManager = mock(ReplicationManager.class);
     handler = new VulnerableUnhealthyReplicasHandler(replicationManager);
     repConfig = RatisReplicationConfig.getInstance(THREE);
     repQueue = new ReplicationQueue();
@@ -76,7 +78,7 @@ public class TestVulnerableUnhealthyReplicasHandler {
         .setPendingOps(Collections.emptyList())
         .setReport(report);
 
-    Mockito.when(replicationManager.getNodeStatus(Mockito.any(DatanodeDetails.class)))
+    when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenReturn(NodeStatus.inServiceHealthy());
   }
 
@@ -139,7 +141,7 @@ public class TestVulnerableUnhealthyReplicasHandler {
     ContainerReplica unhealthy =
         createContainerReplica(container.containerID(), 0, DECOMMISSIONING, State.UNHEALTHY, sequenceId);
     replicas.add(unhealthy);
-    Mockito.when(replicationManager.getNodeStatus(Mockito.any(DatanodeDetails.class)))
+    when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocation -> {
           DatanodeDetails dn = invocation.getArgument(0);
           if (dn.equals(unhealthy.getDatanodeDetails())) {
@@ -167,7 +169,7 @@ public class TestVulnerableUnhealthyReplicasHandler {
     ContainerReplica unhealthy =
         createContainerReplica(container.containerID(), 0, DECOMMISSIONING, State.UNHEALTHY, sequenceId);
     replicas.add(unhealthy);
-    Mockito.when(replicationManager.getNodeStatus(Mockito.any(DatanodeDetails.class)))
+    when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocation -> {
           DatanodeDetails dn = invocation.getArgument(0);
           if (dn.equals(unhealthy.getDatanodeDetails())) {
@@ -198,7 +200,7 @@ public class TestVulnerableUnhealthyReplicasHandler {
     ContainerReplica unhealthy =
         createContainerReplica(container.containerID(), 0, DECOMMISSIONING, State.UNHEALTHY, sequenceId);
     replicas.add(unhealthy);
-    Mockito.when(replicationManager.getNodeStatus(Mockito.any(DatanodeDetails.class)))
+    when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocation -> {
           DatanodeDetails dn = invocation.getArgument(0);
           if (dn.equals(unhealthy.getDatanodeDetails())) {
