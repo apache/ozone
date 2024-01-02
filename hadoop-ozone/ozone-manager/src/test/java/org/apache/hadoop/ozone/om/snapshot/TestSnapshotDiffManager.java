@@ -155,6 +155,7 @@ import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.FA
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.QUEUED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.REJECTED;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -715,8 +716,8 @@ public class TestSnapshotDiffManager {
           Map.Entry<byte[], byte[]> v = oldObjectIdIter.next();
           long objectId = codecRegistry.asObject(v.getKey(), Long.class);
           assertEquals(0, objectId % 2);
-          assertTrue(objectId >= 50);
-          assertTrue(objectId < 100);
+          assertThat(objectId).isGreaterThanOrEqualTo(50);
+          assertThat(objectId).isLessThan(100);
           oldObjectIdCnt += 1;
         }
         assertEquals(nativeLibraryLoaded ? 25 : 0, oldObjectIdCnt);
@@ -729,8 +730,8 @@ public class TestSnapshotDiffManager {
           Map.Entry<byte[], byte[]> v = newObjectIdIter.next();
           long objectId = codecRegistry.asObject(v.getKey(), Long.class);
           assertEquals(0, objectId % 2);
-          assertTrue(objectId >= 26);
-          assertTrue(objectId < 50);
+          assertThat(objectId).isGreaterThanOrEqualTo(26);
+          assertThat(objectId).isLessThan(50);
           newObjectIdCnt += 1;
         }
         assertEquals(12, newObjectIdCnt);
@@ -744,8 +745,8 @@ public class TestSnapshotDiffManager {
           byte[] v = entry.getKey();
           long objectId = codecRegistry.asObject(v, Long.class);
           assertEquals(0, objectId % 2);
-          assertTrue(objectId >= 26);
-          assertTrue(objectId < (nativeLibraryLoaded ? 100 : 50));
+          assertThat(objectId).isGreaterThanOrEqualTo(26);
+          assertThat(objectId).isLessThan(nativeLibraryLoaded ? 100 : 50);
           objectIdCnt += 1;
         }
         assertEquals(nativeLibraryLoaded ? 37 : 12, objectIdCnt);
@@ -1174,7 +1175,7 @@ public class TestSnapshotDiffManager {
     // there should be a response.
     // Otherwise, response list should be empty.
     if (containsJob) {
-      assertTrue(jobList.contains(diffJob));
+      assertThat(jobList).contains(diffJob);
     } else {
       assertTrue(jobList.isEmpty());
     }

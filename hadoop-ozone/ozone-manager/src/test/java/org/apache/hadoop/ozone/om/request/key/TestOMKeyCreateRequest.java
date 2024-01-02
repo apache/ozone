@@ -67,8 +67,9 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAndBucketToDB;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -494,12 +495,12 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         (keyArgs.getDataSize() - 1) / (blockSize * dataGroupSize) + 1);
 
     // Time should be set
-    assertTrue(keyArgs.getModificationTime() > 0);
+    assertThat(keyArgs.getModificationTime()).isGreaterThan(0);
 
 
     // Client ID should be set.
     assertTrue(createKeyRequest.hasClientID());
-    assertTrue(createKeyRequest.getClientID() > 0);
+    assertThat(createKeyRequest.getClientID()).isGreaterThan(0);
 
 
     if (!originalOMRequest.getCreateKeyRequest().getKeyArgs()
@@ -716,7 +717,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
       OMException ex = assertThrows(OMException.class,
           () -> getOMKeyCreateRequest(omRequest).preExecute(ozoneManager)
       );
-      assertTrue(ex.getMessage().contains(expectedErrorMessage));
+      assertThat(ex.getMessage()).contains(expectedErrorMessage);
     }
   }
 
@@ -789,7 +790,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         "Failed to inherit parent DEFAULT acls!,");
 
     // Should not inherit parent ACCESS Acls
-    assertFalse(keyAcls.contains(parentAccessAcl));
+    assertThat(keyAcls).doesNotContain(parentAccessAcl);
   }
 
   protected void addToKeyTable(String keyName) throws Exception {
@@ -806,7 +807,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
       omKeyCreateRequest.preExecute(ozoneManager);
       fail("checkNotAValidPath failed for path" + keyName);
     } catch (IOException ex) {
-      assertTrue(ex instanceof OMException);
+      assertInstanceOf(OMException.class, ex);
       OMException omException = (OMException) ex;
       assertEquals(OMException.ResultCodes.INVALID_KEY_NAME,
           omException.getResult());

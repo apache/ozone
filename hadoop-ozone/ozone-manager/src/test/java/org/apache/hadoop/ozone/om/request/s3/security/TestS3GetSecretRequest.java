@@ -73,6 +73,7 @@ import com.google.common.base.Optional;
 
 import static org.apache.hadoop.security.authentication.util.KerberosName.DEFAULT_MECHANISM;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -282,7 +283,7 @@ public class TestS3GetSecretRequest {
         ozoneManager, 2);
 
     // Verify that the revoke operation was successful.
-    assertTrue(omRevokeResponse instanceof S3RevokeSecretResponse);
+    assertInstanceOf(S3RevokeSecretResponse.class, omRevokeResponse);
     S3RevokeSecretResponse s3RevokeSecretResponse =
         (S3RevokeSecretResponse) omRevokeResponse;
     assertEquals(OzoneManagerProtocolProtos.Status.OK.getNumber(),
@@ -301,7 +302,7 @@ public class TestS3GetSecretRequest {
     OMClientResponse omClientResponse =
         s3GetSecretRequest.validateAndUpdateCache(ozoneManager, 3);
 
-    assertTrue(omClientResponse instanceof S3GetSecretResponse);
+    assertInstanceOf(S3GetSecretResponse.class, omClientResponse);
     S3GetSecretResponse s3GetSecretResponse =
         (S3GetSecretResponse) omClientResponse;
 
@@ -387,7 +388,7 @@ public class TestS3GetSecretRequest {
     OMClientResponse omClientResponse1 =
         s3GetSecretRequest.validateAndUpdateCache(ozoneManager, 1);
     // Check response type and cast
-    assertTrue(omClientResponse1 instanceof S3GetSecretResponse);
+    assertInstanceOf(S3GetSecretResponse.class, omClientResponse1);
     final S3GetSecretResponse s3GetSecretResponse1 =
         (S3GetSecretResponse) omClientResponse1;
     // Secret is returned the first time
@@ -407,7 +408,7 @@ public class TestS3GetSecretRequest {
     OMClientResponse omClientResponse2 =
         s3GetSecretRequest.validateAndUpdateCache(ozoneManager, 2);
     // Check response type and cast
-    assertTrue(omClientResponse2 instanceof S3GetSecretResponse);
+    assertInstanceOf(S3GetSecretResponse.class, omClientResponse2);
     final S3GetSecretResponse s3GetSecretResponse2 =
         (S3GetSecretResponse) omClientResponse2;
     // no secret is returned as it is the second time
@@ -441,7 +442,7 @@ public class TestS3GetSecretRequest {
     OMClientResponse omClientResponse =
         omTenantCreateRequest.validateAndUpdateCache(ozoneManager, txLogIndex);
     // Check response type and cast
-    assertTrue(omClientResponse instanceof OMTenantCreateResponse);
+    assertInstanceOf(OMTenantCreateResponse.class, omClientResponse);
     final OMTenantCreateResponse omTenantCreateResponse =
         (OMTenantCreateResponse) omClientResponse;
     // Check response
@@ -472,8 +473,7 @@ public class TestS3GetSecretRequest {
         omTenantAssignUserAccessIdRequest.validateAndUpdateCache(ozoneManager, txLogIndex);
 
     // Check response type and cast
-    assertTrue(
-        omClientResponse instanceof OMTenantAssignUserAccessIdResponse);
+    assertInstanceOf(OMTenantAssignUserAccessIdResponse.class, omClientResponse);
     final OMTenantAssignUserAccessIdResponse
         omTenantAssignUserAccessIdResponse =
         (OMTenantAssignUserAccessIdResponse) omClientResponse;
@@ -507,7 +507,7 @@ public class TestS3GetSecretRequest {
         s3GetSecretRequest.validateAndUpdateCache(ozoneManager, txLogIndex);
 
     // Check response type and cast
-    assertTrue(omClientResponse instanceof S3GetSecretResponse);
+    assertInstanceOf(S3GetSecretResponse.class, omClientResponse);
     final S3GetSecretResponse s3GetSecretResponse =
         (S3GetSecretResponse) omClientResponse;
 
@@ -539,7 +539,7 @@ public class TestS3GetSecretRequest {
         s3GetSecretRequest.validateAndUpdateCache(ozoneManager, txLogIndex);
 
     // Check response type and cast
-    assertTrue(omClientResponse instanceof S3GetSecretResponse);
+    assertInstanceOf(S3GetSecretResponse.class, omClientResponse);
     final S3GetSecretResponse s3GetSecretResponse =
         (S3GetSecretResponse) omClientResponse;
 

@@ -60,6 +60,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_CLEANUP_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_PARTS_CLEANUP_LIMIT_PER_TASK;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -152,8 +153,8 @@ public class TestMultipartUploadCleanupService {
     // wait for requests to complete
     Thread.sleep(10 * SERVICE_INTERVAL.toMillis());
 
-    assertTrue(multipartUploadCleanupService.getSubmittedMpuInfoCount() >=
-        oldMpuInfoCount + numDEFKeys + numFSOKeys);
+    assertThat(multipartUploadCleanupService.getSubmittedMpuInfoCount())
+        .isGreaterThanOrEqualTo(oldMpuInfoCount + numDEFKeys + numFSOKeys);
     assertTrue(keyManager.getExpiredMultipartUploads(EXPIRE_THRESHOLD,
         10000).isEmpty());
 

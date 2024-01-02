@@ -29,6 +29,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.util.Arrays;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -125,8 +126,8 @@ public class TestOzoneConfigUtil {
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(OzoneConfigKeys.OZONE_S3_ADMINISTRATORS, "alice,bob");
 
-    assertTrue(OzoneConfigUtil.getS3AdminsFromConfig(configuration)
-        .containsAll(Arrays.asList("alice", "bob")));
+    assertThat(OzoneConfigUtil.getS3AdminsFromConfig(configuration))
+        .containsAll(Arrays.asList("alice", "bob"));
   }
 
   @Test
@@ -134,8 +135,8 @@ public class TestOzoneConfigUtil {
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(OzoneConfigKeys.OZONE_ADMINISTRATORS, "alice,bob");
 
-    assertTrue(OzoneConfigUtil.getS3AdminsFromConfig(configuration)
-        .containsAll(Arrays.asList("alice", "bob")));
+    assertThat(OzoneConfigUtil.getS3AdminsFromConfig(configuration))
+        .containsAll(Arrays.asList("alice", "bob"));
   }
 
   @Test
@@ -144,8 +145,8 @@ public class TestOzoneConfigUtil {
     configuration.set(OzoneConfigKeys.OZONE_S3_ADMINISTRATORS_GROUPS,
         "test1, test2");
 
-    assertTrue(OzoneConfigUtil.getS3AdminsGroupsFromConfig(
-        configuration).containsAll(Arrays.asList("test1", "test2")));
+    assertThat(OzoneConfigUtil.getS3AdminsGroupsFromConfig(configuration))
+        .containsAll(Arrays.asList("test1", "test2"));
   }
 
   @Test
@@ -154,7 +155,7 @@ public class TestOzoneConfigUtil {
     configuration.set(OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS,
         "test1, test2");
 
-    assertTrue(OzoneConfigUtil.getS3AdminsGroupsFromConfig(
-        configuration).containsAll(Arrays.asList("test1", "test2")));
+    assertThat(OzoneConfigUtil.getS3AdminsGroupsFromConfig(configuration))
+        .containsAll(Arrays.asList("test1", "test2"));
   }
 }

@@ -49,8 +49,8 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.DIRECTORY_NOT_FOUND;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -76,11 +76,11 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
 
     // Check clientID and modification time is set or not.
     assertTrue(modifiedOmRequest.hasCreateFileRequest());
-    assertTrue(modifiedOmRequest.getCreateFileRequest().getClientID() > 0);
+    assertThat(modifiedOmRequest.getCreateFileRequest().getClientID()).isGreaterThan(0);
 
     KeyArgs keyArgs = modifiedOmRequest.getCreateFileRequest().getKeyArgs();
     assertNotNull(keyArgs);
-    assertTrue(keyArgs.getModificationTime() > 0);
+    assertThat(keyArgs.getModificationTime()).isGreaterThan(0);
 
     // As our data size is 100, and scmBlockSize is default to 1000, so we
     // shall have only one block.
@@ -115,7 +115,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
 
     // When KeyName is root, nothing will be set.
     assertTrue(modifiedOmRequest.hasCreateFileRequest());
-    assertFalse(modifiedOmRequest.getCreateFileRequest().getClientID() > 0);
+    assertThat(modifiedOmRequest.getCreateFileRequest().getClientID()).isLessThanOrEqualTo(0);
 
     KeyArgs keyArgs = modifiedOmRequest.getCreateFileRequest().getKeyArgs();
     assertNotNull(keyArgs);
@@ -475,7 +475,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
               .collect(Collectors.toList()), keyAcls,
           "Failed to inherit bucket DEFAULT acls!");
       // Should not inherit parent ACCESS acls
-      assertFalse(keyAcls.contains(parentAccessAcl));
+      assertThat(keyAcls).doesNotContain(parentAccessAcl);
     }
   }
 
@@ -497,7 +497,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
 
     OMException ex = assertThrows(OMException.class,
         () -> omFileCreateRequest.preExecute(ozoneManager));
-    assertTrue(ex.getMessage().contains(expectedErrorMessage));
+    assertThat(ex.getMessage()).contains(expectedErrorMessage);
   }
 
   protected void testNonRecursivePath(String key,

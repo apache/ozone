@@ -47,8 +47,8 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -300,7 +300,7 @@ public class TestOzoneManagerStateMachine {
       assertFalse(smEx.leaderShouldStepDown());
 
       Throwable cause = smEx.getCause();
-      assertTrue(cause instanceof OMException);
+      assertInstanceOf(OMException.class, cause);
       assertEquals(((OMException) cause).getResult(),
           OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED);
     }

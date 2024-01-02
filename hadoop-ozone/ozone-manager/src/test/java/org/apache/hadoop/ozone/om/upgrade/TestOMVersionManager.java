@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.OM_REQUE
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.OM_UPGRADE_CLASS_PACKAGE;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.getRequestClasses;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.VALIDATE_IN_PREFINALIZE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -62,8 +63,8 @@ public class TestOMVersionManager {
 
     // Initial Version is always allowed.
     assertTrue(omVersionManager.isAllowed(INITIAL_VERSION));
-    assertTrue(INITIAL_VERSION.layoutVersion() <=
-        omVersionManager.getMetadataLayoutVersion());
+    assertThat(INITIAL_VERSION.layoutVersion())
+        .isLessThanOrEqualTo(omVersionManager.getMetadataLayoutVersion());
   }
 
   @Test
@@ -152,7 +153,7 @@ public class TestOMVersionManager {
             .findFirst();
 
     assertTrue(preExecuteMethod.isPresent());
-    assertTrue(preExecuteMethod.get().getParameterCount() >= 1);
+    assertThat(preExecuteMethod.get().getParameterCount()).isGreaterThanOrEqualTo(1);
     assertEquals(OzoneManager.class,
         preExecuteMethod.get().getParameterTypes()[0]);
   }

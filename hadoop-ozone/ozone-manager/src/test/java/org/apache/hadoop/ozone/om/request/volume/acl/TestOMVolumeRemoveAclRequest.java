@@ -18,10 +18,10 @@
 
 package org.apache.hadoop.ozone.om.request.volume.acl;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -60,7 +60,7 @@ public class TestOMVolumeRemoveAclRequest extends TestOMVolumeRequest {
         .getModificationTime();
     // When preExecute() of removing acl,
     // the new modification time is greater than origin one.
-    assertTrue(newModTime > originModTime);
+    assertThat(newModTime).isGreaterThan(originModTime);
   }
 
   @Test
