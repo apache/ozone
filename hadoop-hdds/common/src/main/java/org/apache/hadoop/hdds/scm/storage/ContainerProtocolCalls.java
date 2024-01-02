@@ -408,9 +408,19 @@ public final class ContainerProtocolCalls  {
     }
   }
 
-  private static ContainerCommandRequestProto.Builder writeChunkAsyncCommon(
+  /**
+   * Calls the container protocol to write a chunk.
+   *
+   * @param xceiverClient client to perform call
+   * @param chunk information about chunk to write
+   * @param blockID ID of the block
+   * @param data the data of the chunk to write
+   * @param tokenString serialized block token
+   * @throws IOException if there is an I/O error while performing the call
+   */
+  public static XceiverClientReply writeChunkAsync(
       XceiverClientSpi xceiverClient, ChunkInfo chunk, BlockID blockID,
-      ByteString data, int replicationIndex)
+      ByteString data, String tokenString, int replicationIndex)
       throws IOException, ExecutionException, InterruptedException {
     WriteChunkRequestProto.Builder writeChunkRequest =
         WriteChunkRequestProto.newBuilder()
@@ -430,47 +440,6 @@ public final class ContainerProtocolCalls  {
             .setDatanodeUuid(id)
             .setWriteChunk(writeChunkRequest);
 
-    return builder;
-
-  }
-
-  /**
-   * Calls the container protocol to write a chunk.
-   *
-   * @param xceiverClient client to perform call
-   * @param chunk information about chunk to write
-   * @param blockID ID of the block
-   * @param data the data of the chunk to write
-   * @param token token
-   * @throws IOException if there is an I/O error while performing the call
-   */
-  public static XceiverClientReply writeChunkAsync(
-      XceiverClientSpi xceiverClient, ChunkInfo chunk, BlockID blockID,
-      ByteString data, Token<? extends TokenIdentifier> token,
-      int replicationIndex, BlockData blockData
-  )
-      throws IOException, ExecutionException, InterruptedException {
-
-    ContainerCommandRequestProto.Builder builder =
-        writeChunkAsyncCommon(xceiverClient, chunk, blockID, data,
-            replicationIndex);
-    if (token != null) {
-      builder.setEncodedToken(token.encodeToUrlString());
-    }
-    ContainerCommandRequestProto request = builder.build();
-    return xceiverClient.sendCommandAsync(request);
-  }
-
-  public static XceiverClientReply writeChunkAsync(
-      XceiverClientSpi xceiverClient, ChunkInfo chunk, BlockID blockID,
-      ByteString data, String tokenString,
-      int replicationIndex, BlockData blockData
-  )
-      throws IOException, ExecutionException, InterruptedException {
-
-    ContainerCommandRequestProto.Builder builder =
-        writeChunkAsyncCommon(xceiverClient, chunk, blockID, data,
-            replicationIndex);
     if (tokenString != null) {
       builder.setEncodedToken(tokenString);
     }
