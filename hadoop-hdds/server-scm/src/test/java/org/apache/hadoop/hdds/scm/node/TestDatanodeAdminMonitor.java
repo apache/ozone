@@ -610,6 +610,7 @@ public class TestDatanodeAdminMonitor {
     DatanodeAdminMonitorTestUtil
         .mockGetContainerReplicaCount(
             repManager,
+            true,
             HddsProtos.LifeCycleState.CLOSED,
             DECOMMISSIONED,
             IN_SERVICE,
