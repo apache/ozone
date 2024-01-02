@@ -34,6 +34,8 @@ import org.junit.jupiter.api.Timeout;
 
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /**
  * Integration test to verify that if snapshot feature is disabled, OM start up
  * will fail when there are still snapshots remaining.
@@ -102,7 +104,7 @@ public class TestOmSnapshotDisabledRestart {
         // Restart OM, expect OM start up failure
         RuntimeException rte = Assertions.assertThrows(RuntimeException.class,
             () -> cluster.restartOzoneManager(om, true));
-        Assertions.assertTrue(rte.getMessage().contains("snapshots remaining"));
+        assertThat(rte.getMessage()).contains("snapshots remaining");
         // Enable snapshot feature again
         om.getConfiguration().setBoolean(
             OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);

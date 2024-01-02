@@ -62,6 +62,7 @@ import static org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput.getProtoL
 import static org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel.closeBuffers;
 import static org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel.readPutBlockRequest;
 import static org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel.writeBuffers;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /** For testing {@link KeyValueStreamDataChannel}. */
 public class TestKeyValueStreamDataChannel {
@@ -138,7 +139,7 @@ public class TestKeyValueStreamDataChannel {
 
   static void runTestBuffers(int dataSize, int max, int seed, String name)
       throws Exception {
-    Assertions.assertTrue(max >= PUT_BLOCK_PROTO_SIZE);
+    assertThat(max).isGreaterThanOrEqualTo(PUT_BLOCK_PROTO_SIZE);
 
     // random data
     final byte[] data = new byte[dataSize];

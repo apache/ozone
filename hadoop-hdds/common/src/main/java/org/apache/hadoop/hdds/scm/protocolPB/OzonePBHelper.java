@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,25 +15,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.protocolPB;
+package org.apache.hadoop.hdds.scm.protocolPB;
 
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ozone.security.proto.SecurityProtos.TokenProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TokenProto;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Helper class for converting protobuf objects.
  */
 public final class OzonePBHelper {
+
   private OzonePBHelper() {
-    /** Hidden constructor */
+    // no instances
   }
 
-  // Borrowed from ProtobuHelper.java in hadoop-common involving protobuf
+  // Borrowed from ProtobufHelper.java in hadoop-common involving protobuf
   // messages to avoid breakage due to shading of protobuf in Hadoop-3.3+.
   /**
    * Map used to cache fixed strings to ByteStrings. Since there is no
@@ -43,23 +45,17 @@ public final class OzonePBHelper {
    * This map should not be accessed directly. Used the getFixedByteString
    * methods instead.
    */
-  private static final ConcurrentHashMap<Object, ByteString>
-          FIXED_BYTESTRING_CACHE = new ConcurrentHashMap<>();
+  private static final Map<Object, ByteString>
+      FIXED_BYTE_STRING_CACHE = new ConcurrentHashMap<>();
 
   /**
    * Get the ByteString for frequently used fixed and small set strings.
    *
    * @param key string
-   * @return
    */
   public static ByteString getFixedByteString(Text key) {
-    ByteString value = FIXED_BYTESTRING_CACHE.get(key);
-    if (value == null) {
-      value = ByteString.copyFromUtf8(key.toString());
-      ByteString oldValue = FIXED_BYTESTRING_CACHE.putIfAbsent(key, value);
-      return oldValue != null ? oldValue : value;
-    }
-    return value;
+    return FIXED_BYTE_STRING_CACHE.computeIfAbsent(key,
+        k -> ByteString.copyFromUtf8(k.toString()));
   }
 
   public static ByteString getByteString(byte[] bytes) {
@@ -67,22 +63,27 @@ public final class OzonePBHelper {
     return (bytes.length == 0) ? ByteString.EMPTY : ByteString.copyFrom(bytes);
   }
 
-  public static Token<? extends TokenIdentifier> tokenFromProto(
-          TokenProto tokenProto) {
-    Token<? extends TokenIdentifier> token = new Token<>(
-            tokenProto.getIdentifier().toByteArray(),
-            tokenProto.getPassword().toByteArray(),
-            new Text(tokenProto.getKind()),
-            new Text(tokenProto.getService()));
-    return token;
+  /**
+   * Convert {@link TokenProto} (used for container tokens) to {@link Token}.
+   */
+  public static <T extends TokenIdentifier> Token<T> tokenFromProto(
+      TokenProto tokenProto) {
+    return new Token<>(
+        tokenProto.getIdentifier().toByteArray(),
+        tokenProto.getPassword().toByteArray(),
+        new Text(tokenProto.getKind()),
+        new Text(tokenProto.getService()));
   }
 
-  public static TokenProto protoFromToken(Token<?> tok) {
-    TokenProto.Builder builder = TokenProto.newBuilder().
-            setIdentifier(getByteString(tok.getIdentifier())).
-            setPassword(getByteString(tok.getPassword())).
-            setKindBytes(getFixedByteString(tok.getKind())).
-            setServiceBytes(getByteString(tok.getService().getBytes()));
-    return builder.build();
+  /**
+   * Convert {@link Token} to {@link TokenProto} (used for container tokens).
+   */
+  public static TokenProto protoFromToken(Token<?> token) {
+    return TokenProto.newBuilder()
+        .setIdentifier(getByteString(token.getIdentifier()))
+        .setPassword(getByteString(token.getPassword()))
+        .setKindBytes(getFixedByteString(token.getKind()))
+        .setServiceBytes(getByteString(token.getService().getBytes()))
+        .build();
   }
 }

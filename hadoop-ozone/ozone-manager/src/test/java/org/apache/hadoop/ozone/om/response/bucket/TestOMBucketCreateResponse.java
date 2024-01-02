@@ -19,12 +19,12 @@
 
 package org.apache.hadoop.ozone.om.response.bucket;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.nio.file.Path;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -75,7 +75,7 @@ public class TestOMBucketCreateResponse {
     String bucketName = UUID.randomUUID().toString();
     OmBucketInfo omBucketInfo = TestOMResponseUtils.createBucket(
         volumeName, bucketName);
-    Assertions.assertEquals(0,
+    assertEquals(0,
         omMetadataManager.countRowsInTable(omMetadataManager.getBucketTable()));
     OMBucketCreateResponse omBucketCreateResponse =
         new OMBucketCreateResponse(OMResponse.newBuilder()
@@ -90,15 +90,15 @@ public class TestOMBucketCreateResponse {
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assertions.assertEquals(1,
+    assertEquals(1,
         omMetadataManager.countRowsInTable(omMetadataManager.getBucketTable()));
 
     Table.KeyValue<String, OmBucketInfo> keyValue =
         omMetadataManager.getBucketTable().iterator().next();
 
-    Assertions.assertEquals(omMetadataManager.getBucketKey(volumeName,
+    assertEquals(omMetadataManager.getBucketKey(volumeName,
         bucketName), keyValue.getKey());
-    Assertions.assertEquals(omBucketInfo, keyValue.getValue());
+    assertEquals(omBucketInfo, keyValue.getValue());
   }
 
 

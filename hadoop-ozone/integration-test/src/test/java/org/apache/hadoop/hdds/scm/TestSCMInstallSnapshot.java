@@ -139,8 +139,7 @@ public class TestSCMInstallSnapshot {
     // from.
     assertNotNull(db);
     HAUtils.getTransactionInfoTable(db, new SCMDBDefinition())
-        .put(OzoneConsts.TRANSACTION_INFO_KEY, TransactionInfo.builder()
-            .setCurrentTerm(10).setTransactionIndex(100).build());
+        .put(OzoneConsts.TRANSACTION_INFO_KEY, TransactionInfo.valueOf(10, 100));
     db.close();
     ContainerID cid =
         scm.getContainerManager().getContainers().get(0).containerID();

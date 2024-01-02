@@ -17,8 +17,9 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test utilities inside OmMutipartUpload.
@@ -31,9 +32,9 @@ public class TestOmMultipartUpload {
         OmMultipartUpload.getDbKey("vol1", "bucket1", "dir1/key1", "uploadId");
     OmMultipartUpload info = OmMultipartUpload.from(key1);
 
-    Assertions.assertEquals("vol1", info.getVolumeName());
-    Assertions.assertEquals("bucket1", info.getBucketName());
-    Assertions.assertEquals("dir1/key1", info.getKeyName());
-    Assertions.assertEquals("uploadId", info.getUploadId());
+    assertEquals("vol1", info.getVolumeName());
+    assertEquals("bucket1", info.getBucketName());
+    assertEquals("dir1/key1", info.getKeyName());
+    assertEquals("uploadId", info.getUploadId());
   }
 }

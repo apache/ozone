@@ -94,9 +94,9 @@ public class TestLeaderChoosePolicy {
       leaderCount.put(leader, leaderCount.get(leader) + 1);
     }
 
-    assertTrue(leaderCount.size() == dnNum);
+    assertEquals(dnNum, leaderCount.size());
     for (Map.Entry<UUID, Integer> entry: leaderCount.entrySet()) {
-      assertTrue(leaderCount.get(entry.getKey()) == leaderNumOfEachDn);
+      assertEquals(leaderNumOfEachDn, leaderCount.get(entry.getKey()));
     }
   }
 

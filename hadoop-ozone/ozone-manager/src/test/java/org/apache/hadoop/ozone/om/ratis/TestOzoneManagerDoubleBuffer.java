@@ -29,6 +29,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -50,7 +51,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateS
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.util.KerberosName;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,9 +58,10 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 
 import static org.apache.hadoop.security.authentication.util.KerberosName.DEFAULT_MECHANISM;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -132,7 +133,7 @@ class TestOzoneManagerDoubleBuffer {
     when(ozoneManager.getS3SecretManager()).thenReturn(secretManager);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
-    Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
+    doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
     OzoneManagerRatisSnapshot ozoneManagerRatisSnapshot = index -> {
     };
 
@@ -144,7 +145,6 @@ class TestOzoneManagerDoubleBuffer {
         .setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
         .setmaxUnFlushedTransactionCount(1000)
         .enableRatis(true)
-        .setIndexToTerm((i) -> 1L)
         .setFlushNotifier(spyFlushNotifier)
         .build();
 
@@ -240,7 +240,7 @@ class TestOzoneManagerDoubleBuffer {
     doubleBuffer.stopDaemon();
 
     for (int i = 0; i < omClientResponses.size(); i++) {
-      doubleBuffer.add(omClientResponses.get(i), i);
+      doubleBuffer.add(omClientResponses.get(i), TransactionInfo.getTermIndex(i));
     }
 
     // Flush the current buffer.
@@ -292,7 +292,7 @@ class TestOzoneManagerDoubleBuffer {
 
     // Init double buffer.
     for (OMClientResponse omClientResponse : omClientResponses) {
-      doubleBuffer.add(omClientResponse, transactionIndex++);
+      doubleBuffer.add(omClientResponse, TransactionInfo.getTermIndex(transactionIndex++));
     }
     assertEquals(initialSize,
         doubleBuffer.getCurrentBufferSize());
@@ -333,7 +333,7 @@ class TestOzoneManagerDoubleBuffer {
     ugiAlice = UserGroupInformation.createRemoteUser(userPrincipalId1);
     UserGroupInformation.createRemoteUser(userPrincipalId2);
     UserGroupInformation.createRemoteUser(userPrincipalId3);
-    Assertions.assertEquals("alice", ugiAlice.getShortUserName());
+    assertEquals("alice", ugiAlice.getShortUserName());
     when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
 
     try {
@@ -348,17 +348,17 @@ class TestOzoneManagerDoubleBuffer {
 
       S3SecretCache cache = secretManager.cache();
       // Check if all the three secrets are cached.
-      Assertions.assertNotNull(cache.get(userPrincipalId1));
-      Assertions.assertNotNull(cache.get(userPrincipalId2));
-      Assertions.assertNotNull(cache.get(userPrincipalId3));
+      assertNotNull(cache.get(userPrincipalId1));
+      assertNotNull(cache.get(userPrincipalId2));
+      assertNotNull(cache.get(userPrincipalId3));
 
       // Flush the current buffer.
       doubleBuffer.flushCurrentBuffer();
 
       // Check if all the three secrets are cleared from the cache.
-      Assertions.assertNull(cache.get(userPrincipalId3));
-      Assertions.assertNull(cache.get(userPrincipalId2));
-      Assertions.assertNull(cache.get(userPrincipalId1));
+      assertNull(cache.get(userPrincipalId3));
+      assertNull(cache.get(userPrincipalId2));
+      assertNull(cache.get(userPrincipalId1));
     } finally {
       // cleanup metrics
       OzoneManagerDoubleBufferMetrics metrics =
@@ -386,7 +386,7 @@ class TestOzoneManagerDoubleBuffer {
     // Run validateAndUpdateCache
     OMClientResponse omClientResponse =
         s3GetSecretRequest.validateAndUpdateCache(ozoneManager, txLogIndex);
-    doubleBuffer.add(omClientResponse, txLogIndex);
+    doubleBuffer.add(omClientResponse, TransactionInfo.getTermIndex(txLogIndex));
   }
 
   private OzoneManagerProtocolProtos.OMRequest s3GetSecretRequest(

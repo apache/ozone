@@ -63,6 +63,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests for Pipeline Closing.
@@ -229,7 +230,7 @@ public class TestPipelineClose {
     try {
       pipelineManager.getPipeline(openPipeline.getId());
     } catch (PipelineNotFoundException e) {
-      assertTrue(false, "pipeline should exist");
+      fail("pipeline should exist");
     }
 
     DatanodeDetails datanodeDetails = openPipeline.getNodes().get(0);
@@ -275,6 +276,6 @@ public class TestPipelineClose {
     }
 
     assertTrue(found, "SCM did not receive a Close action for the Pipeline");
-    return found;
+    return true;
   }
 }

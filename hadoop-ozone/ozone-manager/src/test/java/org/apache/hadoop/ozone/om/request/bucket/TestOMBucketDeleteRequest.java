@@ -19,6 +19,10 @@
 
 package org.apache.hadoop.ozone.om.request.bucket;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -27,7 +31,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.util.Time;
@@ -53,8 +56,7 @@ public class TestOMBucketDeleteRequest extends TestBucketRequest {
         new OMBucketDeleteRequest(omRequest);
 
     // As user info gets added.
-    Assertions.assertNotEquals(omRequest,
-        omBucketDeleteRequest.preExecute(ozoneManager));
+    assertNotEquals(omRequest, omBucketDeleteRequest.preExecute(ozoneManager));
   }
 
   @Test
@@ -73,7 +75,7 @@ public class TestOMBucketDeleteRequest extends TestBucketRequest {
 
     omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, 1);
 
-    Assertions.assertNull(omMetadataManager.getBucketTable().get(
+    assertNull(omMetadataManager.getBucketTable().get(
         omMetadataManager.getBucketKey(volumeName, bucketName)));
   }
 
@@ -92,10 +94,10 @@ public class TestOMBucketDeleteRequest extends TestBucketRequest {
     OMClientResponse omClientResponse =
         omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, 1);
 
-    Assertions.assertNull(omMetadataManager.getBucketTable().get(
+    assertNull(omMetadataManager.getBucketTable().get(
         omMetadataManager.getBucketKey(volumeName, bucketName)));
 
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
+    assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
 
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
@@ -134,9 +136,9 @@ public class TestOMBucketDeleteRequest extends TestBucketRequest {
     OMClientResponse omClientResponse =
         omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, 1L);
 
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_EMPTY,
+    assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_EMPTY,
         omClientResponse.getOMResponse().getStatus());
-    Assertions.assertNotNull(omMetadataManager.getBucketTable().get(
+    assertNotNull(omMetadataManager.getBucketTable().get(
         omMetadataManager.getBucketKey(volumeName, bucketName)));
 
     // Remove the MPU keys to simulate MPU aborts / completes
@@ -150,9 +152,9 @@ public class TestOMBucketDeleteRequest extends TestBucketRequest {
     omClientResponse =
         omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, 3L);
 
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
-    Assertions.assertNull(omMetadataManager.getBucketTable().get(
+    assertNull(omMetadataManager.getBucketTable().get(
         omMetadataManager.getBucketKey(volumeName, bucketName)));
   }
 

@@ -47,6 +47,10 @@ public final class DefaultConfigManager {
     return (T) CONFIG_DEFAULT_MAP.getOrDefault(config, defaultValue);
   }
 
+  public static <T> void forceUpdateConfigValue(String config, T value) {
+    CONFIG_DEFAULT_MAP.put(config, value);
+  }
+
   @VisibleForTesting
   public static void clearDefaultConfigs() {
     CONFIG_DEFAULT_MAP.clear();

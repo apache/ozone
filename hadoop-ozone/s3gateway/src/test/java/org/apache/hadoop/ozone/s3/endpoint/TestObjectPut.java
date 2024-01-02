@@ -44,7 +44,6 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.http.HttpStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
@@ -57,7 +56,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -91,7 +92,7 @@ public class TestObjectPut {
   @Test
   public void testPutObject() throws IOException, OS3Exception {
     //GIVEN
-    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    HttpHeaders headers = mock(HttpHeaders.class);
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     objectEndpoint.setHeaders(headers);
@@ -116,7 +117,7 @@ public class TestObjectPut {
   public void testPutObjectWithECReplicationConfig()
       throws IOException, OS3Exception {
     //GIVEN
-    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    HttpHeaders headers = mock(HttpHeaders.class);
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     objectEndpoint.setHeaders(headers);
@@ -145,7 +146,7 @@ public class TestObjectPut {
     // The contentLength specified when creating the Key should be the same as
     // the Content-Length, the key Commit will compare the Content-Length with
     // the actual length of the data written.
-    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    HttpHeaders headers = mock(HttpHeaders.class);
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     objectEndpoint.setHeaders(headers);
@@ -158,7 +159,7 @@ public class TestObjectPut {
   @Test
   public void testPutObjectContentLengthForStreaming()
       throws IOException, OS3Exception {
-    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    HttpHeaders headers = mock(HttpHeaders.class);
     objectEndpoint.setHeaders(headers);
 
     String chunkedContent = "0a;chunk-signature=signature\r\n"
@@ -184,7 +185,7 @@ public class TestObjectPut {
   @Test
   public void testPutObjectWithSignedChunks() throws IOException, OS3Exception {
     //GIVEN
-    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    HttpHeaders headers = mock(HttpHeaders.class);
     objectEndpoint.setHeaders(headers);
 
     String chunkedContent = "0a;chunk-signature=signature\r\n"
@@ -215,7 +216,7 @@ public class TestObjectPut {
   @Test
   public void testCopyObject() throws IOException, OS3Exception {
     // Put object in to source bucket
-    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    HttpHeaders headers = mock(HttpHeaders.class);
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     objectEndpoint.setHeaders(headers);
@@ -288,7 +289,7 @@ public class TestObjectPut {
 
   @Test
   public void testInvalidStorageType() throws IOException {
-    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    HttpHeaders headers = mock(HttpHeaders.class);
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     objectEndpoint.setHeaders(headers);
@@ -304,7 +305,7 @@ public class TestObjectPut {
 
   @Test
   public void testEmptyStorageType() throws IOException, OS3Exception {
-    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    HttpHeaders headers = mock(HttpHeaders.class);
     ByteArrayInputStream body =
         new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     objectEndpoint.setHeaders(headers);
@@ -331,16 +332,16 @@ public class TestObjectPut {
     final int partNumber = 0;
     final String uploadId = "";
     final InputStream body = null;
-    final HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    final HttpHeaders headers = mock(HttpHeaders.class);
     final ObjectEndpoint objEndpoint = new ObjectEndpoint();
     objEndpoint.setOzoneConfiguration(new OzoneConfiguration());
     objEndpoint.setHeaders(headers);
-    final OzoneClient client = Mockito.mock(OzoneClient.class);
+    final OzoneClient client = mock(OzoneClient.class);
     objEndpoint.setClient(client);
-    final ObjectStore objectStore = Mockito.mock(ObjectStore.class);
-    final OzoneVolume volume = Mockito.mock(OzoneVolume.class);
-    final OzoneBucket bucket = Mockito.mock(OzoneBucket.class);
-    final ClientProtocol protocol = Mockito.mock(ClientProtocol.class);
+    final ObjectStore objectStore = mock(ObjectStore.class);
+    final OzoneVolume volume = mock(OzoneVolume.class);
+    final OzoneBucket bucket = mock(OzoneBucket.class);
+    final ClientProtocol protocol = mock(ClientProtocol.class);
 
     // WHEN
     when(client.getObjectStore()).thenReturn(objectStore);
@@ -354,7 +355,7 @@ public class TestObjectPut {
 
     // THEN
     assertEquals(HttpStatus.SC_OK, response.getStatus());
-    Mockito.verify(protocol).createDirectory(any(), eq(bucketName), eq(path));
+    verify(protocol).createDirectory(any(), eq(bucketName), eq(path));
   }
 
   @Test
@@ -366,16 +367,16 @@ public class TestObjectPut {
     final String uploadId = "";
     final ByteArrayInputStream body =
         new ByteArrayInputStream("content".getBytes(UTF_8));
-    final HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    final HttpHeaders headers = mock(HttpHeaders.class);
     final ObjectEndpoint objEndpoint = new ObjectEndpoint();
     objEndpoint.setOzoneConfiguration(new OzoneConfiguration());
     objEndpoint.setHeaders(headers);
-    final OzoneClient client = Mockito.mock(OzoneClient.class);
+    final OzoneClient client = mock(OzoneClient.class);
     objEndpoint.setClient(client);
-    final ObjectStore objectStore = Mockito.mock(ObjectStore.class);
-    final OzoneVolume volume = Mockito.mock(OzoneVolume.class);
-    final OzoneBucket bucket = Mockito.mock(OzoneBucket.class);
-    final ClientProtocol protocol = Mockito.mock(ClientProtocol.class);
+    final ObjectStore objectStore = mock(ObjectStore.class);
+    final OzoneVolume volume = mock(OzoneVolume.class);
+    final OzoneBucket bucket = mock(OzoneBucket.class);
+    final ClientProtocol protocol = mock(ClientProtocol.class);
 
     // WHEN
     when(client.getObjectStore()).thenReturn(objectStore);
@@ -394,6 +395,6 @@ public class TestObjectPut {
             .put(bucketName, path, length, partNumber, uploadId, body));
     assertEquals("Conflict", exception.getCode());
     assertEquals(409, exception.getHttpCode());
-    Mockito.verify(protocol, times(1)).createDirectory(any(), any(), any());
+    verify(protocol, times(1)).createDirectory(any(), any(), any());
   }
 }

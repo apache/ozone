@@ -67,8 +67,8 @@ import java.util.Arrays;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -201,7 +201,7 @@ public class TestSchemaOneBackwardsCompatibility {
                   cData.containerPrefix());
 
       for (Table.KeyValue<String, ChunkInfoList> kv: deletedBlocks) {
-        assertFalse(kv.getKey().contains(prefix));
+        assertThat(kv.getKey()).doesNotContain(prefix);
       }
 
       // Test sequentialRangeKVs.
@@ -209,7 +209,7 @@ public class TestSchemaOneBackwardsCompatibility {
           100, cData.containerPrefix());
 
       for (Table.KeyValue<String, ChunkInfoList> kv: deletedBlocks) {
-        assertFalse(kv.getKey().contains(prefix));
+        assertThat(kv.getKey()).doesNotContain(prefix);
       }
     }
 

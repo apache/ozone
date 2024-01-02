@@ -22,6 +22,7 @@ import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -50,9 +51,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -75,8 +73,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long trxnLogIndex = termIndex.getIndex();
 
     CommitKeyRequest commitKeyRequest = getOmRequest().getCommitKeyRequest();
 
@@ -126,7 +124,6 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
               commitKeyRequest.getClientID());
 
 
-      Iterator<Path> pathComponents = Paths.get(keyName).iterator();
       String dbOpenFileKey = null;
 
       List<OmKeyLocationInfo>
@@ -144,7 +141,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       final long bucketId = omMetadataManager.getBucketId(
               volumeName, bucketName);
       long parentID = OMFileRequest.getParentID(volumeId, bucketId,
-              pathComponents, keyName, omMetadataManager,
+              keyName, omMetadataManager,
               "Cannot create file : " + keyName
               + " as parent directory doesn't exist");
       String dbFileKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,

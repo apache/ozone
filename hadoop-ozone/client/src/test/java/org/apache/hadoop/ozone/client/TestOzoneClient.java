@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.ozone.test.LambdaTestUtils.VoidCallable;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -48,6 +47,11 @@ import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Real unit test for OzoneClient.
@@ -65,9 +69,9 @@ public class TestOzoneClient {
       throws Exception {
     try {
       eval.call();
-      Assertions.fail("OMException is expected");
+      fail("OMException is expected");
     } catch (OMException ex) {
-      Assertions.assertEquals(code, ex.getResult());
+      assertEquals(code, ex.getResult());
     }
   }
 
@@ -108,7 +112,7 @@ public class TestOzoneClient {
     String volumeName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
-    Assertions.assertNotNull(volume);
+    assertNotNull(volume);
     store.deleteVolume(volumeName);
     expectOmException(ResultCodes.VOLUME_NOT_FOUND,
         () -> store.getVolume(volumeName));
@@ -124,11 +128,11 @@ public class TestOzoneClient {
         .build();
     store.createVolume(volumeName, volumeArgs);
     OzoneVolume volume = store.getVolume(volumeName);
-    Assertions.assertEquals(OzoneConsts.QUOTA_RESET,
+    assertEquals(OzoneConsts.QUOTA_RESET,
         volume.getQuotaInNamespace());
-    Assertions.assertEquals(OzoneConsts.QUOTA_RESET, volume.getQuotaInBytes());
-    Assertions.assertEquals("val1", volume.getMetadata().get("key1"));
-    Assertions.assertEquals(volumeName, volume.getName());
+    assertEquals(OzoneConsts.QUOTA_RESET, volume.getQuotaInBytes());
+    assertEquals("val1", volume.getMetadata().get("key1"));
+    assertEquals(volumeName, volume.getName());
   }
 
   @Test
@@ -141,9 +145,9 @@ public class TestOzoneClient {
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
-    Assertions.assertEquals(bucketName, bucket.getName());
-    Assertions.assertFalse(bucket.getCreationTime().isBefore(testStartTime));
-    Assertions.assertFalse(volume.getCreationTime().isBefore(testStartTime));
+    assertEquals(bucketName, bucket.getName());
+    assertFalse(bucket.getCreationTime().isBefore(testStartTime));
+    assertFalse(volume.getCreationTime().isBefore(testStartTime));
   }
 
   @Test
@@ -161,14 +165,14 @@ public class TestOzoneClient {
       out.write(value.getBytes(UTF_8));
       out.close();
       OzoneKey key = bucket.getKey(keyName);
-      Assertions.assertEquals(keyName, key.getName());
+      assertEquals(keyName, key.getName());
       OzoneInputStream is = bucket.readKey(keyName);
       byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-      Assertions.assertEquals(value.length(), is.read(fileContent));
+      assertEquals(value.length(), is.read(fileContent));
       is.close();
-      Assertions.assertEquals(value, new String(fileContent, UTF_8));
-      Assertions.assertFalse(key.getCreationTime().isBefore(testStartTime));
-      Assertions.assertFalse(key.getModificationTime().isBefore(testStartTime));
+      assertEquals(value, new String(fileContent, UTF_8));
+      assertFalse(key.getCreationTime().isBefore(testStartTime));
+      assertFalse(key.getModificationTime().isBefore(testStartTime));
     }
   }
 
@@ -218,7 +222,7 @@ public class TestOzoneClient {
         out.write(value.getBytes(UTF_8));
       }
       OzoneKey key = bucket.getKey(keyName);
-      Assertions.assertEquals(keyName, key.getName());
+      assertEquals(keyName, key.getName());
     }
   }
 
@@ -240,7 +244,7 @@ public class TestOzoneClient {
           value.getBytes(UTF_8).length, ReplicationType.RATIS, ONE,
           new HashMap<>());
       out1.write(value.substring(0, value.length() - 1).getBytes(UTF_8));
-      Assertions.assertThrows(IllegalStateException.class, out1::close,
+      assertThrows(IllegalStateException.class, out1::close,
           "Expected IllegalArgumentException due to size mismatch.");
 
       // Simulating second mismatch: Write more data than expected
@@ -249,7 +253,7 @@ public class TestOzoneClient {
           new HashMap<>());
       value += "1";
       out2.write(value.getBytes(UTF_8));
-      Assertions.assertThrows(IllegalStateException.class, out2::close,
+      assertThrows(IllegalStateException.class, out2::close,
           "Expected IllegalArgumentException due to size mismatch.");
     } finally {
       client.getProxy().setIsS3Request(false);

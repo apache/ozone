@@ -82,6 +82,7 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys
     .OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.doAnswer;
@@ -168,7 +169,7 @@ public class TestDeletedBlockLog {
       for (Map.Entry<ContainerID, Long> e : map.entrySet()) {
         ContainerInfo info = containers.get(e.getKey().getId());
         try {
-          Assertions.assertTrue(e.getValue() > info.getDeleteTransactionId());
+          assertThat(e.getValue()).isGreaterThan(info.getDeleteTransactionId());
         } catch (AssertionError err) {
           throw new Exception("New TxnId " + e.getValue() + " < " + info
               .getDeleteTransactionId());
@@ -345,7 +346,7 @@ public class TestDeletedBlockLog {
     mockContainerHealthResult(true);
     Assertions.assertEquals(30 * THREE, getAllTransactions().size());
     for (ContainerInfo containerInfo : containerManager.getContainers()) {
-      Assertions.assertTrue(containerInfo.getDeleteTransactionId() > 0);
+      assertThat(containerInfo.getDeleteTransactionId()).isGreaterThan(0);
     }
   }
 
@@ -531,7 +532,7 @@ public class TestDeletedBlockLog {
       Set<DeletedBlocksTransaction> txSet1 = new HashSet<>(entry.getValue());
       Set<DeletedBlocksTransaction> txSet2 = new HashSet<>(map2.get(dnId));
 
-      Assertions.assertTrue(txSet1.containsAll(txSet2));
+      assertThat(txSet1).containsAll(txSet2);
     }
   }
 

@@ -94,6 +94,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERI
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithStoppedNodes.createKey;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -262,17 +263,16 @@ public class TestOMRatisSnapshots {
 
     long followerOMLastAppliedIndex =
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
-    assertTrue(
-        followerOMLastAppliedIndex >= leaderOMSnapshotIndex - 1);
+    assertThat(followerOMLastAppliedIndex).isGreaterThanOrEqualTo(leaderOMSnapshotIndex - 1);
 
     // After the new checkpoint is installed, the follower OM
     // lastAppliedIndex must >= the snapshot index of the checkpoint. It
     // could be great than snapshot index if there is any conf entry from ratis.
     followerOMLastAppliedIndex = followerOM.getOmRatisServer()
         .getLastAppliedTermIndex().getIndex();
-    assertTrue(followerOMLastAppliedIndex >= leaderOMSnapshotIndex);
-    assertTrue(followerOM.getOmRatisServer().getLastAppliedTermIndex()
-        .getTerm() >= leaderOMSnapshotTermIndex);
+    assertThat(followerOMLastAppliedIndex).isGreaterThanOrEqualTo(leaderOMSnapshotIndex);
+    assertThat(followerOM.getOmRatisServer().getLastAppliedTermIndex()
+        .getTerm()).isGreaterThanOrEqualTo(leaderOMSnapshotTermIndex);
 
     // Verify checkpoint installation was happened.
     String msg = "Reloaded OM state";
@@ -317,7 +317,7 @@ public class TestOMRatisSnapshots {
       sstFileUnion.addAll(sstFiles);
     }
     // Confirm that there were multiple tarballs.
-    assertTrue(sstSetList.size() > 1);
+    assertThat(sstSetList.size()).isGreaterThan(1);
     // Confirm that there was no overlap of sst files
     // between the individual tarballs.
     assertEquals(sstFileUnion.size(), sstFileCount);
@@ -378,7 +378,8 @@ public class TestOMRatisSnapshots {
         }
       }
     }
-    Assertions.assertTrue(hardLinkCount > 0, "No hard links were found");
+    assertThat(hardLinkCount).withFailMessage("No hard links were found")
+        .isGreaterThan(0);
   }
 
   @Test
@@ -471,8 +472,7 @@ public class TestOMRatisSnapshots {
     // Verify the metrics recording the incremental checkpoint at leader side
     DBCheckpointMetrics dbMetrics = leaderOM.getMetrics().
         getDBCheckpointMetrics();
-    Assertions.assertTrue(
-        dbMetrics.getLastCheckpointStreamingNumSSTExcluded() > 0);
+    assertThat(dbMetrics.getLastCheckpointStreamingNumSSTExcluded()).isGreaterThan(0);
     assertEquals(2, dbMetrics.getNumIncrementalCheckpoints());
 
     // Verify RPC server is running
@@ -552,9 +552,8 @@ public class TestOMRatisSnapshots {
         followerOM.getOmSnapshotProvider().getNumDownloaded() ==
         expectedNumDownloads, 1000, 30_000);
 
-    assertTrue(followerOM.getOmRatisServer().
-        getLastAppliedTermIndex().getIndex()
-        >= leaderOMSnapshotIndex - 1);
+    assertThat(followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex())
+        .isGreaterThanOrEqualTo(leaderOMSnapshotIndex - 1);
 
     // Now confirm tarball is just incremental and contains no unexpected
     //  files/links.
@@ -567,7 +566,7 @@ public class TestOMRatisSnapshots {
 
     // Confirm that none of the files in the tarball match one in the
     // candidate dir.
-    assertTrue(sstFiles.size() > 0);
+    assertThat(sstFiles.size()).isGreaterThan(0);
     for (String s: sstFiles) {
       File sstFile = Paths.get(followerCandidatePath.toString(), s).toFile();
       assertFalse(sstFile.exists(),
@@ -588,7 +587,7 @@ public class TestOMRatisSnapshots {
             "Incremental checkpoint should not " +
                 "duplicate existing links");
       }
-      assertTrue(lineCount > 0);
+      assertThat(lineCount).isGreaterThan(0);
     }
     return id;
   }
@@ -648,7 +647,7 @@ public class TestOMRatisSnapshots {
     File followerCandidateDir = followerOM.getOmSnapshotProvider().
         getCandidateDir();
     List<String> sstList = HAUtils.getExistingSstFiles(followerCandidateDir);
-    Assertions.assertTrue(sstList.size() > 0);
+    assertThat(sstList.size()).isGreaterThan(0);
     Collections.shuffle(sstList);
     List<String> victimSstList = sstList.subList(0, sstList.size() / 3);
     for (String sst: victimSstList) {
@@ -799,17 +798,16 @@ public class TestOMRatisSnapshots {
 
     long followerOMLastAppliedIndex =
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
-    assertTrue(
-        followerOMLastAppliedIndex >= leaderOMSnapshotIndex - 1);
+    assertThat(followerOMLastAppliedIndex).isGreaterThanOrEqualTo(leaderOMSnapshotIndex - 1);
 
     // After the new checkpoint is installed, the follower OM
     // lastAppliedIndex must >= the snapshot index of the checkpoint. It
     // could be great than snapshot index if there is any conf entry from ratis.
     followerOMLastAppliedIndex = followerOM.getOmRatisServer()
         .getLastAppliedTermIndex().getIndex();
-    assertTrue(followerOMLastAppliedIndex >= leaderOMSnapshotIndex);
-    assertTrue(followerOM.getOmRatisServer().getLastAppliedTermIndex()
-        .getTerm() >= leaderOMSnapshotTermIndex);
+    assertThat(followerOMLastAppliedIndex).isGreaterThanOrEqualTo(leaderOMSnapshotIndex);
+    assertThat(followerOM.getOmRatisServer().getLastAppliedTermIndex()
+        .getTerm()).isGreaterThanOrEqualTo(leaderOMSnapshotTermIndex);
 
     // Verify that the follower OM's DB contains the transactions which were
     // made while it was inactive.
@@ -898,17 +896,16 @@ public class TestOMRatisSnapshots {
 
     long followerOMLastAppliedIndex =
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
-    assertTrue(
-        followerOMLastAppliedIndex >= leaderOMSnapshotIndex - 1);
+    assertThat(followerOMLastAppliedIndex).isGreaterThanOrEqualTo(leaderOMSnapshotIndex - 1);
 
     // After the new checkpoint is installed, the follower OM
     // lastAppliedIndex must >= the snapshot index of the checkpoint. It
     // could be great than snapshot index if there is any conf entry from ratis.
     followerOMLastAppliedIndex = followerOM.getOmRatisServer()
         .getLastAppliedTermIndex().getIndex();
-    assertTrue(followerOMLastAppliedIndex >= leaderOMSnapshotIndex);
-    assertTrue(followerOM.getOmRatisServer().getLastAppliedTermIndex()
-        .getTerm() >= leaderOMSnapshotTermIndex);
+    assertThat(followerOMLastAppliedIndex).isGreaterThanOrEqualTo(leaderOMSnapshotIndex);
+    assertThat(followerOM.getOmRatisServer().getLastAppliedTermIndex()
+        .getTerm()).isGreaterThanOrEqualTo(leaderOMSnapshotTermIndex);
 
     // Verify that the follower OM's DB contains the transactions which were
     // made while it was inactive.

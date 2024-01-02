@@ -510,6 +510,7 @@ public class TestHddsVolume {
       assertEquals(0, volumeInfoMetrics.getCapacity());
       assertEquals(0, volumeInfoMetrics.getReserved());
       assertEquals(0, volumeInfoMetrics.getTotalCapacity());
+      assertEquals(0, volumeInfoMetrics.getCommitted());
     } finally {
       // Shutdown the volume.
       volume.shutdown();

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.security;
 
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -103,7 +104,7 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
                           .setResponse(
                               SecurityProtos.GetDelegationTokenResponseProto
                               .newBuilder().setToken(OMPBHelper
-                                  .convertToTokenProto(token)).build())
+                                  .protoFromToken(token)).build())
                           .build())
                   .setTokenRenewInterval(ozoneManager.getDelegationTokenMgr()
                       .getTokenRenewInterval()))
@@ -128,8 +129,7 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
 
     UpdateGetDelegationTokenRequest updateGetDelegationTokenRequest =
         getOmRequest().getUpdateGetDelegationTokenRequest();
@@ -153,7 +153,7 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
         .getGetDelegationTokenResponse().getResponse().getToken();
 
     Token<OzoneTokenIdentifier> ozoneTokenIdentifierToken =
-        OMPBHelper.convertToDelegationToken(tokenProto);
+        OMPBHelper.tokenFromProto(tokenProto);
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     Map<String, String> auditMap =
@@ -180,7 +180,7 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
      // Update Cache.
       omMetadataManager.getDelegationTokenTable().addCacheEntry(
           new CacheKey<>(ozoneTokenIdentifier),
-          CacheValue.get(transactionLogIndex, renewTime));
+          CacheValue.get(termIndex.getIndex(), renewTime));
 
       omClientResponse =
           new OMGetDelegationTokenResponse(ozoneTokenIdentifier, renewTime,

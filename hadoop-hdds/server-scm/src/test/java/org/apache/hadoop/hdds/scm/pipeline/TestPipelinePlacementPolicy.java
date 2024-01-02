@@ -75,6 +75,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_L
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Test for PipelinePlacementPolicy.
@@ -163,7 +164,7 @@ public class TestPipelinePlacementPolicy {
   public void testChooseNodeBasedOnNetworkTopology() {
     DatanodeDetails anchor = placementPolicy.chooseNode(nodesWithRackAwareness);
     // anchor should be removed from healthyNodes after being chosen.
-    Assertions.assertFalse(nodesWithRackAwareness.contains(anchor));
+    assertThat(nodesWithRackAwareness).doesNotContain(anchor);
 
     List<DatanodeDetails> excludedNodes =
         new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT);
@@ -173,7 +174,7 @@ public class TestPipelinePlacementPolicy {
         nodeManager.getClusterNetworkTopologyMap(), anchor);
     //DatanodeDetails nextNode = placementPolicy.chooseNodeFromNetworkTopology(
     //    nodeManager.getClusterNetworkTopologyMap(), anchor, excludedNodes);
-    Assertions.assertFalse(excludedNodes.contains(nextNode));
+    assertThat(excludedNodes).doesNotContain(nextNode);
     // next node should not be the same as anchor.
     Assertions.assertNotSame(anchor.getUuid(), nextNode.getUuid());
     // next node should be on the same rack based on topology.
@@ -250,7 +251,7 @@ public class TestPipelinePlacementPolicy {
           0, 10 * OzoneConsts.TB);
       Assertions.fail("SCMException should have been thrown.");
     } catch (SCMException ex) {
-      Assertions.assertTrue(ex.getMessage().contains(expectedMessageSubstring));
+      assertThat(ex.getMessage()).contains(expectedMessageSubstring);
     }
 
     try {
@@ -260,7 +261,7 @@ public class TestPipelinePlacementPolicy {
           0);
       Assertions.fail("SCMException should have been thrown.");
     } catch (SCMException ex) {
-      Assertions.assertTrue(ex.getMessage().contains(expectedMessageSubstring));
+      assertThat(ex.getMessage()).contains(expectedMessageSubstring);
     }
   }
 
@@ -297,8 +298,8 @@ public class TestPipelinePlacementPolicy {
     int averageLoadOnNode = maxPipelineCount *
         HddsProtos.ReplicationFactor.THREE.getNumber() / healthyNodes.size();
     for (DatanodeDetails node : healthyNodes) {
-      Assertions.assertTrue(nodeManager.getPipelinesCount(node)
-          >= averageLoadOnNode);
+      assertThat(nodeManager.getPipelinesCount(node))
+          .isGreaterThanOrEqualTo(averageLoadOnNode);
     }
     
     // Should max out pipeline usage.
@@ -563,9 +564,9 @@ public class TestPipelinePlacementPolicy {
         new ArrayList<>(), new ArrayList<>(), nodesRequired, 0, 0);
 
     Assertions.assertEquals(3, pickedDns.size());
-    Assertions.assertTrue(pickedDns.contains(dns.get(1)));
-    Assertions.assertTrue(pickedDns.contains(dns.get(2)));
-    Assertions.assertTrue(pickedDns.contains(dns.get(3)));
+    assertThat(pickedDns).contains(dns.get(1));
+    assertThat(pickedDns).contains(dns.get(2));
+    assertThat(pickedDns).contains(dns.get(3));
   }
 
   @Test

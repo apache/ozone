@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.ozone.om.response.file;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -36,7 +38,6 @@ import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequestWithFSO;
 import org.apache.hadoop.ozone.om.response.TestOMResponseUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -107,15 +108,15 @@ public class TestOMDirectoryCreateResponseWithFSO {
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assertions.assertNotNull(omMetadataManager.getDirectoryTable().get(
+    assertNotNull(omMetadataManager.getDirectoryTable().get(
             omMetadataManager.getOzonePathKey(volumeId, bucketId,
                     parentID, keyName)));
 
     Table.KeyValue<String, OmBucketInfo> keyValue =
         omMetadataManager.getBucketTable().iterator().next();
-    Assertions.assertEquals(omMetadataManager.getBucketKey(volumeName,
+    assertEquals(omMetadataManager.getBucketKey(volumeName,
         bucketName), keyValue.getKey());
-    Assertions.assertEquals(usedNamespace,
+    assertEquals(usedNamespace,
         keyValue.getValue().getUsedNamespace());
   }
 

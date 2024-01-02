@@ -22,7 +22,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.OutputStream;
 import java.io.PrintStream;
-import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.List;
@@ -31,7 +30,6 @@ import java.util.concurrent.TimeoutException;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.Layout;
 import org.apache.log4j.Level;
@@ -147,50 +145,11 @@ public abstract class GenericTestUtils {
   }
 
   /**
-   * Assert that a given file exists.
-   */
-  public static void assertExists(File f) {
-    Assertions.assertTrue(f.exists(), "File " + f + " should exist");
-  }
-
-  /**
    * Assert that a given dir can be created or it already exists.
    */
   public static void assertDirCreation(File f) {
     Assertions.assertTrue(f.mkdirs() || f.exists(),
         "Could not create dir " + f + ", nor does it exist");
-  }
-
-  public static void assertExceptionContains(String expectedText, Throwable t) {
-    assertExceptionContains(expectedText, t, "");
-  }
-
-  public static void assertExceptionContains(String expectedText, Throwable t,
-      String message) {
-    Assertions.assertNotNull(t, "Null Throwable");
-    String msg = t.toString();
-    if (msg == null) {
-      throw new AssertionError("Null Throwable.toString() value", t);
-    } else if (expectedText != null && !msg.contains(expectedText)) {
-      String prefix = StringUtils.isEmpty(message) ? "" : message + ": ";
-      throw new AssertionError(String
-          .format("%s Expected to find '%s' %s: %s", prefix, expectedText,
-              "but got unexpected exception",
-              stringifyException(t)), t);
-    }
-  }
-
-  /**
-   * Make a string representation of the exception.
-   * @param e The exception to stringify
-   * @return A string with exception name and call stack.
-   */
-  public static String stringifyException(Throwable e) {
-    StringWriter stm = new StringWriter();
-    PrintWriter wrt = new PrintWriter(stm);
-    e.printStackTrace(wrt);
-    wrt.close();
-    return stm.toString();
   }
 
   /**
