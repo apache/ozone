@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import com.google.common.base.Optional;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -33,7 +34,6 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartAbortInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -73,8 +73,8 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long trxnLogIndex = termIndex.getIndex();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumExpiredMPUAbortRequests();
@@ -127,8 +127,6 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
           new S3ExpiredMultipartUploadsAbortResponse(createErrorOMResponse(
               omResponse, exception));
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
       if (omClientResponse != null) {
         omClientResponse.setOmLockDetails(getOmLockDetails());
       }

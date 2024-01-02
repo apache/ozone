@@ -34,6 +34,8 @@ import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /**
  * Tests on {@link org.apache.hadoop.hdds.scm.metadata.Replicate}.
  */
@@ -128,7 +130,7 @@ public class TestReplicationAnnotation {
       Assertions.fail("Cannot reach here: should have seen a IOException");
     } catch (IOException e) {
       Assertions.assertNotNull(e.getMessage());
-      Assertions.assertTrue(e.getMessage().contains("submitRequest is called"));
+      assertThat(e.getMessage()).contains("submitRequest is called");
     }
   }
 }

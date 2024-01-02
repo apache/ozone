@@ -65,9 +65,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Class to test Recon Pipeline Manager.
@@ -131,11 +131,10 @@ public class TestReconPipelineManager {
 
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
-    this.versionManager =
-        Mockito.mock(HDDSLayoutVersionManager.class);
-    Mockito.when(versionManager.getMetadataLayoutVersion())
+    this.versionManager = mock(HDDSLayoutVersionManager.class);
+    when(versionManager.getMetadataLayoutVersion())
         .thenReturn(maxLayoutVersion());
-    Mockito.when(versionManager.getSoftwareLayoutVersion())
+    when(versionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
     NodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig,
         eventQueue, clusterMap, SCMContext.emptyContext(), versionManager);
@@ -149,7 +148,7 @@ public class TestReconPipelineManager {
                  scmhaManager,
                  scmContext)) {
       StorageContainerManager mock = mock(StorageContainerManager.class);
-      Mockito.when(mock.getScmNodeDetails())
+      when(mock.getScmNodeDetails())
           .thenReturn(mock(SCMNodeDetails.class));
       scmContext = new SCMContext.Builder().setIsInSafeMode(true)
               .setLeader(true).setIsPreCheckComplete(true)
@@ -185,11 +184,10 @@ public class TestReconPipelineManager {
     Pipeline pipeline = getRandomPipeline();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
-    this.versionManager =
-        Mockito.mock(HDDSLayoutVersionManager.class);
-    Mockito.when(versionManager.getMetadataLayoutVersion())
+    this.versionManager = mock(HDDSLayoutVersionManager.class);
+    when(versionManager.getMetadataLayoutVersion())
         .thenReturn(maxLayoutVersion());
-    Mockito.when(versionManager.getSoftwareLayoutVersion())
+    when(versionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
     NodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig,
         eventQueue, clusterMap, SCMContext.emptyContext(), versionManager);

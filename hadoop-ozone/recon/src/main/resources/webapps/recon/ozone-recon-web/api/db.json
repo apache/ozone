@@ -29,7 +29,8 @@
         "storageReport": {
           "capacity": 62725623808,
           "used": 488288256,
-          "remaining": 21005319168
+          "remaining": 21005319168,
+          "committed": 10240000
         },
         "pipelines": [
           {
@@ -62,7 +63,8 @@
         "storageReport": {
           "capacity": 549755813888,
           "used": 450971566080,
-          "remaining": 95784247808
+          "remaining": 95784247808,
+          "committed": 34563456
         },
         "pipelines": [
           {
@@ -95,7 +97,8 @@
         "storageReport": {
           "capacity": 549755813888,
           "used": 450971566080,
-          "remaining": 95784247808
+          "remaining": 95784247808,
+          "committed": 34562
         },
         "pipelines": [
           {
@@ -128,7 +131,8 @@
         "storageReport": {
           "capacity": 549755813888,
           "used": 450971566080,
-          "remaining": 95784247808
+          "remaining": 95784247808,
+          "committed": 4576435
         },
         "pipelines": [
           {
@@ -161,7 +165,8 @@
         "storageReport": {
           "capacity": 549755813888,
           "used": 450971566080,
-          "remaining": 95784247808
+          "remaining": 95784247808,
+          "committed": 3453121
         },
         "pipelines": [
           {
@@ -194,7 +199,8 @@
         "storageReport": {
           "capacity": 140737488355328,
           "used": 43980465111040,
-          "remaining": 86757023244288
+          "remaining": 86757023244288,
+          "committed": 3457623435
         },
         "pipelines": [
           {
@@ -233,7 +239,8 @@
         "storageReport": {
           "capacity": 140737488355328,
           "used": 43980465111040,
-          "remaining": 86757023244288
+          "remaining": 86757023244288,
+          "committed": 345624
         },
         "pipelines": [
           {
@@ -272,7 +279,8 @@
         "storageReport": {
           "capacity": 140737488355328,
           "used": 43980465111040,
-          "remaining": 86757023244288
+          "remaining": 86757023244288,
+          "committed": 123464574
         },
         "pipelines": [
           {
@@ -311,7 +319,8 @@
         "storageReport": {
           "capacity": 140737488355328,
           "used": 43980465111040,
-          "remaining": 86757023244288
+          "remaining": 86757023244288,
+          "committed": 556721345
         },
         "pipelines": [
           {
@@ -350,7 +359,8 @@
         "storageReport": {
           "capacity": 140737488355328,
           "used": 43980465111040,
-          "remaining": 86757023244288
+          "remaining": 86757023244288,
+          "committed": 45671235234
         },
         "pipelines": [
           {
@@ -389,7 +399,8 @@
         "storageReport": {
           "capacity": 140737488355328,
           "used": 0,
-          "remaining": 110737488355328
+          "remaining": 110737488355328,
+          "committed": 0
         },
         "pipelines": [],
         "containers": 0,
@@ -409,7 +420,8 @@
         "storageReport": {
           "capacity": 805306368000,
           "used": 644245094400,
-          "remaining": 121061273600
+          "remaining": 121061273600,
+          "committed": 4572345234
         },
         "pipelines": [
           {
@@ -442,7 +454,8 @@
         "storageReport": {
           "capacity": 140737488355328,
           "used": 43980465111040,
-          "remaining": 92757023244288
+          "remaining": 92757023244288,
+          "committed": 34563453
         },
         "pipelines": [
           {
@@ -475,7 +488,8 @@
         "storageReport": {
           "capacity": 549755813888,
           "used": 450971566080,
-          "remaining": 94784247808
+          "remaining": 94784247808,
+          "committed": 7234234
         },
         "pipelines": [
           {
@@ -514,7 +528,8 @@
         "storageReport": {
           "capacity": 140737488355328,
           "used": 43980465111040,
-          "remaining": 92757023244288
+          "remaining": 92757023244288,
+          "committed": 34562346
         },
         "pipelines": [
           {
@@ -547,7 +562,8 @@
         "storageReport": {
           "capacity": 140737488355328,
           "used": 43980465111040,
-          "remaining": 76757023244288
+          "remaining": 76757023244288,
+          "committed": 834324523
         },
         "pipelines": [
           {
@@ -580,7 +596,8 @@
         "storageReport": {
           "capacity": 140737488355328,
           "used": 43980465111040,
-          "remaining": 66757023244288
+          "remaining": 66757023244288,
+          "committed": 346467345
         },
         "pipelines": [
           {
@@ -619,7 +636,8 @@
         "storageReport": {
           "capacity": 140737488355328,
           "used": 43980465111040,
-          "remaining": 96157023244288
+          "remaining": 96157023244288,
+          "committed": 45245456
         },
         "pipelines": [
           {
@@ -652,7 +670,8 @@
         "storageReport": {
           "capacity": 140737488355328,
           "used": 43980465111040,
-          "remaining": 94757023244288
+          "remaining": 94757023244288,
+          "committed": 45673234
         },
         "pipelines": [
           {

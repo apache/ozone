@@ -44,7 +44,6 @@ import java.util.ArrayList;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
@@ -72,9 +71,9 @@ public class TestKeyValueContainerIntegrityChecks {
   protected static final int CHUNK_LEN = 3 * UNIT_LEN;
   protected static final int CHUNKS_PER_BLOCK = 4;
 
-  private void initialize(ContainerTestVersionInfo versionInfo) {
-    LOG.info("new TestKeyValueContainerIntegrityChecks for {}", versionInfo);
-    conf = new OzoneConfiguration();
+  void initTestData(ContainerTestVersionInfo versionInfo) throws Exception {
+    LOG.info("new {} for {}", getClass().getSimpleName(), versionInfo);
+    this.conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(
         versionInfo.getSchemaVersion(), conf);
     if (versionInfo.getLayout()
@@ -83,14 +82,10 @@ public class TestKeyValueContainerIntegrityChecks {
     } else {
       containerLayoutTestInfo = ContainerLayoutTestInfo.FILE_PER_CHUNK;
     }
+    setup();
   }
 
-  private static Stream<Object> data() {
-    return ContainerTestVersionInfo.versionParametersStream();
-  }
-
-  public void setUp(ContainerTestVersionInfo versionInfo) throws Exception {
-    initialize(versionInfo);
+  private void setup() throws Exception {
     LOG.info("Testing  layout:{}", containerLayoutTestInfo.getLayout());
     this.testRoot = GenericTestUtils.getRandomizedTestDir();
     conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());

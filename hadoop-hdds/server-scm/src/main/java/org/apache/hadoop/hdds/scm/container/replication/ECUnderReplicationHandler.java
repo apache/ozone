@@ -128,7 +128,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         container.containerID(), replicas);
 
     ReplicationManagerUtil.ExcludedAndUsedNodes excludedAndUsedNodes =
-        ReplicationManagerUtil.getExcludedAndUsedNodes(
+        ReplicationManagerUtil.getExcludedAndUsedNodes(container,
             new ArrayList<>(replicas), Collections.emptySet(), pendingOps,
             replicationManager);
     List<DatanodeDetails> excludedNodes

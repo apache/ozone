@@ -25,7 +25,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.OverReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.UnderReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,6 +34,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
@@ -423,9 +424,48 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
     return isSufficientlyReplicated();
   }
 
+  /**
+   * Checks if all replicas (except UNHEALTHY) on in-service nodes are in the
+   * same health state as the container. This is similar to what
+   * {@link ContainerReplicaCount#isHealthy()} does. The difference is in how
+   * both methods treat UNHEALTHY replicas.
+   * <p>
+   * This method is the interface between the decommissioning flow and
+   * Replication Manager. Callers can use it to check whether replicas of a
+   * container are in the same state as the container before a datanode is
+   * taken offline.
+   * </p>
+   * <p>
+   * Note that this method's purpose is to only compare the replica state with
+   * the container state. It does not check if the container has sufficient
+   * number of replicas - that is the job of {@link ContainerReplicaCount
+   * #isSufficientlyReplicatedForOffline(DatanodeDetails, NodeManager)}.
+   * @return true if the container is healthy enough, which is determined by
+   * various checks
+   * </p>
+   */
   @Override
   public boolean isHealthyEnoughForOffline() {
-    return isHealthy();
+    long countInService = getReplicas().stream()
+        .filter(r -> r.getDatanodeDetails().getPersistedOpState() == IN_SERVICE)
+        .count();
+    if (countInService == 0) {
+      /*
+      Having no in-service nodes is unexpected and SCM shouldn't allow this
+      to happen in the first place. Return false here just to be safe.
+      */
+      return false;
+    }
+
+    HddsProtos.LifeCycleState containerState = getContainer().getState();
+    return (containerState == HddsProtos.LifeCycleState.CLOSED
+        || containerState == HddsProtos.LifeCycleState.QUASI_CLOSED)
+        && getReplicas().stream()
+        .filter(r -> r.getDatanodeDetails().getPersistedOpState() == IN_SERVICE)
+        .filter(r -> r.getState() !=
+            ContainerReplicaProto.State.UNHEALTHY)
+        .allMatch(r -> ReplicationManager.compareState(
+            containerState, r.getState()));
   }
 
   /**
@@ -435,14 +475,14 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
    * to save at least one copy of each such UNHEALTHY replica. This method
    * finds such UNHEALTHY replicas.
    *
-   * @param nodeManager an instance of NodeManager
+   * @param nodeStatusFn a function used to check the {@link NodeStatus} of a node,
+   * accepting a {@link DatanodeDetails} and returning {@link NodeStatus}
    * @return List of UNHEALTHY replicas with the greatest Sequence ID that
    * need to be replicated to other nodes. Empty list if this container is not
    * QUASI_CLOSED, doesn't have a mix of healthy and UNHEALTHY replicas, or
    * if there are no replicas that need to be saved.
    */
-  List<ContainerReplica> getVulnerableUnhealthyReplicas(
-      NodeManager nodeManager) {
+  public List<ContainerReplica> getVulnerableUnhealthyReplicas(Function<DatanodeDetails, NodeStatus> nodeStatusFn) {
     if (container.getState() != HddsProtos.LifeCycleState.QUASI_CLOSED) {
       // this method is only relevant for QUASI_CLOSED containers
       return Collections.emptyList();
@@ -456,7 +496,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
       }
 
       if (replica.getSequenceId() == container.getSequenceId()) {
-        if (replica.getState() == ContainerReplicaProto.State.UNHEALTHY) {
+        if (replica.getState() == ContainerReplicaProto.State.UNHEALTHY && !replica.isEmpty()) {
           unhealthyReplicas.add(replica);
         } else if (replica.getState() ==
             ContainerReplicaProto.State.QUASI_CLOSED) {
@@ -474,20 +514,16 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
 
     unhealthyReplicas.removeIf(
         replica -> {
-          try {
-            return !nodeManager.getNodeStatus(replica.getDatanodeDetails())
-                .isHealthy();
-          } catch (NodeNotFoundException e) {
-            return true;
-          }
+          NodeStatus status = nodeStatusFn.apply(replica.getDatanodeDetails());
+          return status == null || !status.isHealthy();
         });
     /*
-    At this point, the list of unhealthyReplicas contains all UNHEALTHY
+    At this point, the list of unhealthyReplicas contains all UNHEALTHY non-empty
     replicas with the greatest Sequence ID that are on healthy Datanodes.
     Note that this also includes multiple copies of the same UNHEALTHY
     replica, that is, replicas with the same Origin ID. We need to consider
     the fact that replicas can be uniquely unhealthy. That is, 2 UNHEALTHY
-    replicas will difference Origin ID need not be exact copies of each other.
+    replicas with different Origin ID need not be exact copies of each other.
 
     Replicas that don't have at least one instance (multiple instances of a
     replica will have the same Origin ID) on an IN_SERVICE node are

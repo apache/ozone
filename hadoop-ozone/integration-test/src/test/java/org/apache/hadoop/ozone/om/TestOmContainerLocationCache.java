@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -90,7 +91,6 @@ import org.mockito.Mockito;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.security.cert.X509Certificate;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -175,7 +175,7 @@ public class TestOmContainerLocationCache {
       @NotNull
       @Override
       protected XceiverClientFactory createXceiverClientFactory(
-          List<X509Certificate> x509Certificates) throws IOException {
+          ServiceInfoEx serviceInfo) throws IOException {
         return mockDataNodeClientFactory();
       }
     };
@@ -200,6 +200,8 @@ public class TestOmContainerLocationCache {
     XceiverClientManager manager = mock(XceiverClientManager.class);
     when(manager.acquireClient(argThat(matchEmptyPipeline())))
         .thenCallRealMethod();
+    when(manager.acquireClient(argThat(matchEmptyPipeline()),
+        Mockito.anyBoolean())).thenCallRealMethod();
     when(manager.acquireClientForReadData(argThat(matchEmptyPipeline())))
         .thenCallRealMethod();
 
@@ -626,7 +628,8 @@ public class TestOmContainerLocationCache {
         .allocateBlock(Mockito.anyLong(), Mockito.anyInt(),
             any(ReplicationConfig.class),
             Mockito.anyString(),
-            any(ExcludeList.class)))
+            any(ExcludeList.class),
+            Mockito.anyString()))
         .thenReturn(Collections.singletonList(block));
   }
 

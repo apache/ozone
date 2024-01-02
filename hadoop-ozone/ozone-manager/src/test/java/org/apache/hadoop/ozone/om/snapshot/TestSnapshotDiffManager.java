@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
@@ -64,7 +63,7 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ClosableIterator;
 import org.apache.hadoop.util.ExitUtil;
-import org.apache.ozone.rocksdb.util.ManagedSstFileReader;
+import org.apache.ozone.rocksdb.util.SstFileSetReader;
 import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
@@ -74,7 +73,6 @@ import org.apache.ratis.util.ExitUtils;
 import org.awaitility.Awaitility;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -85,11 +83,9 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.Matchers;
 import org.mockito.Mock;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -102,7 +98,6 @@ import org.rocksdb.RocksIterator;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -137,6 +132,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THR
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE;
@@ -177,6 +174,8 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -206,6 +205,8 @@ public class TestSnapshotDiffManager {
   private final OMMetrics omMetrics = OMMetrics.create();
   @TempDir
   private File dbDir;
+  @TempDir
+  private File snapDiffDir;
   @Mock
   private RocksDBCheckpointDiffer differ;
   @Mock
@@ -349,6 +350,9 @@ public class TestSnapshotDiffManager {
             OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE_DEFAULT,
             StorageUnit.BYTES))
         .thenReturn(FileUtils.ONE_KB_BI.doubleValue());
+    when(configuration.getBoolean(OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB,
+        OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT))
+        .thenReturn(OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT);
 
     for (int i = 0; i < jobStatuses.size(); i++) {
       when(snapshotInfoTable.get(getTableKey(VOLUME_NAME, BUCKET_NAME,
@@ -357,7 +361,7 @@ public class TestSnapshotDiffManager {
 
     when(snapshotInfoTable.get(getTableKey(VOLUME_NAME, BUCKET_NAME,
         baseSnapshotName))).thenReturn(snapshotInfo);
-    RocksDatabase rocksDatabase = Mockito.mock(RocksDatabase.class);
+    RocksDatabase rocksDatabase = mock(RocksDatabase.class);
 
     when(rocksDatabase.getManagedRocksDb()).thenReturn(db);
     when(dbStore.getDbLocation()).thenReturn(dbDir);
@@ -385,9 +389,9 @@ public class TestSnapshotDiffManager {
           }
         };
 
-    omSnapshotManager = Mockito.mock(OmSnapshotManager.class);
-    Mockito.when(omSnapshotManager.isSnapshotStatus(
-        Matchers.any(), Matchers.any())).thenReturn(true);
+    omSnapshotManager = mock(OmSnapshotManager.class);
+    when(omSnapshotManager.isSnapshotStatus(
+        any(), any())).thenReturn(true);
     snapshotCache = new SnapshotCache(omSnapshotManager, loader, 10);
 
     snapshotDiffManager = new SnapshotDiffManager(db, differ, ozoneManager,
@@ -427,7 +431,7 @@ public class TestSnapshotDiffManager {
     UUID snap1 = UUID.randomUUID();
     UUID snap2 = UUID.randomUUID();
 
-    String diffDir = Files.createTempDirectory("snapdiff_dir").toString();
+    String diffDir = snapDiffDir.getAbsolutePath();
     Set<String> randomStrings = IntStream.range(0, numberOfFiles)
         .mapToObj(i -> RandomStringUtils.randomAlphabetic(10))
         .collect(Collectors.toSet());
@@ -467,10 +471,9 @@ public class TestSnapshotDiffManager {
   public void testGetDeltaFilesWithFullDiff(int numberOfFiles,
                                             boolean useFullDiff)
       throws IOException {
-    try (MockedStatic<RdbUtil> mockedRdbUtil =
-             Mockito.mockStatic(RdbUtil.class);
+    try (MockedStatic<RdbUtil> mockedRdbUtil = mockStatic(RdbUtil.class);
          MockedStatic<RocksDiffUtils> mockedRocksDiffUtils =
-             Mockito.mockStatic(RocksDiffUtils.class)) {
+             mockStatic(RocksDiffUtils.class)) {
       Set<String> deltaStrings = new HashSet<>();
 
       mockedRdbUtil.when(
@@ -522,8 +525,7 @@ public class TestSnapshotDiffManager {
           toSnapshotInfo,
           false,
           Collections.emptyMap(),
-          Files.createTempDirectory("snapdiff_dir").toAbsolutePath()
-              .toString());
+          snapDiffDir.getAbsolutePath());
       assertEquals(deltaStrings, deltaFiles);
     }
   }
@@ -532,10 +534,9 @@ public class TestSnapshotDiffManager {
   @ValueSource(ints = {0, 1, 2, 5, 10, 100, 1000, 10000})
   public void testGetDeltaFilesWithDifferThrowException(int numberOfFiles)
       throws IOException {
-    try (MockedStatic<RdbUtil> mockedRdbUtil =
-             Mockito.mockStatic(RdbUtil.class);
+    try (MockedStatic<RdbUtil> mockedRdbUtil = mockStatic(RdbUtil.class);
          MockedStatic<RocksDiffUtils> mockedRocksDiffUtils =
-             Mockito.mockStatic(RocksDiffUtils.class)) {
+             mockStatic(RocksDiffUtils.class)) {
       Set<String> deltaStrings = new HashSet<>();
 
       mockedRdbUtil.when(
@@ -587,8 +588,7 @@ public class TestSnapshotDiffManager {
           toSnapshotInfo,
           false,
           Collections.emptyMap(),
-          Files.createTempDirectory("snapdiff_dir").toAbsolutePath()
-              .toString());
+          snapDiffDir.getAbsolutePath());
       assertEquals(deltaStrings, deltaFiles);
 
       rcFromSnapshot.close();
@@ -640,7 +640,7 @@ public class TestSnapshotDiffManager {
       "true," + OmMetadataManagerImpl.KEY_TABLE})
   public void testObjectIdMapWithTombstoneEntries(boolean nativeLibraryLoaded,
                                                   String snapshotTableName)
-      throws NativeLibraryNotLoadedException, IOException, RocksDBException {
+      throws IOException, RocksDBException {
     Set<String> keysIncludingTombstones = IntStream.range(0, 100)
         .boxed().map(i -> (i + 100) + "/key" + i).collect(Collectors.toSet());
     // Mocking SST file with keys in SST file excluding tombstones
@@ -648,8 +648,8 @@ public class TestSnapshotDiffManager {
         .map(i -> (i + 100) + "/key" + i).collect(Collectors.toSet());
 
     // Mocking SSTFileReader functions to return the above keys list.
-    try (MockedConstruction<ManagedSstFileReader> mockedSSTFileReader =
-             Mockito.mockConstruction(ManagedSstFileReader.class,
+    try (MockedConstruction<SstFileSetReader> mockedSSTFileReader =
+             mockConstruction(SstFileSetReader.class,
                  (mock, context) -> {
                    when(mock.getKeyStreamWithTombstone(any(), any(), any()))
                        .thenReturn(keysIncludingTombstones.stream());
@@ -657,7 +657,7 @@ public class TestSnapshotDiffManager {
                        .thenReturn(keysExcludingTombstones.stream());
                  });
          MockedConstruction<ManagedSSTDumpTool> mockedSSTDumpTool =
-             Mockito.mockConstruction(ManagedSSTDumpTool.class,
+             mockConstruction(ManagedSSTDumpTool.class,
                  (mock, context) -> {
                  })
     ) {
@@ -806,7 +806,7 @@ public class TestSnapshotDiffManager {
     String fromSnapName = "fs";
     String toSnapName = "ts";
     try (MockedStatic<SnapshotDeletingService>
-             mockedSnapshotDeletingService = Mockito.mockStatic(
+             mockedSnapshotDeletingService = mockStatic(
                  SnapshotDeletingService.class)) {
       mockedSnapshotDeletingService.when(() ->
           SnapshotDeletingService.isBlockLocationInfoSame(any(OmKeyInfo.class),
@@ -823,10 +823,10 @@ public class TestSnapshotDiffManager {
       Table<String, OmKeyInfo> toSnapTable = mock(Table.class);
       when(fromSnapTable.get(anyString())).thenAnswer(i -> {
         OmKeyInfo keyInfo = mock(OmKeyInfo.class);
-        Mockito.when(keyInfo.getKeyName()).thenReturn(i.getArgument(0));
-        Mockito.when(keyInfo.isKeyInfoSame(Mockito.any(OmKeyInfo.class),
-            Mockito.eq(false), Mockito.eq(false),
-            Mockito.eq(false), Mockito.eq(false)))
+        when(keyInfo.getKeyName()).thenReturn(i.getArgument(0));
+        when(keyInfo.isKeyInfoSame(any(OmKeyInfo.class),
+            eq(false), eq(false),
+            eq(false), eq(false)))
             .thenAnswer(k -> {
               int keyVal = Integer.parseInt(((String)i.getArgument(0))
                   .substring(3));
@@ -837,12 +837,12 @@ public class TestSnapshotDiffManager {
       });
       when(toSnapTable.get(anyString())).thenAnswer(i -> {
         OmKeyInfo keyInfo = mock(OmKeyInfo.class);
-        Mockito.when(keyInfo.getKeyName()).thenReturn(i.getArgument(0));
+        when(keyInfo.getKeyName()).thenReturn(i.getArgument(0));
         return keyInfo;
       });
       when(fromSnapTable.getName()).thenReturn("table");
-      Map<String, String> tablePrefixes = Mockito.mock(Map.class);
-      Mockito.when(tablePrefixes.get(anyString())).thenReturn("");
+      Map<String, String> tablePrefixes = mock(Map.class);
+      when(tablePrefixes.get(anyString())).thenReturn("");
       SnapshotDiffManager spy = spy(snapshotDiffManager);
       doReturn(true).when(spy)
           .areDiffJobAndSnapshotsActive(volumeName, bucketName, fromSnapName,
@@ -933,7 +933,7 @@ public class TestSnapshotDiffManager {
         codecRegistry.asRawData(snapshotDiffJob2));
 
     if (pageSize <= 0 || startIdx < 0) {
-      Assertions.assertThrows(IOException.class,
+      assertThrows(IOException.class,
           () -> snapshotDiffManager.createPageResponse(snapshotDiffJob, "vol",
               "buck", "fs", "ts", startIdx, pageSize));
       return;
@@ -981,7 +981,7 @@ public class TestSnapshotDiffManager {
     String diffJobKey = fromSnapshotUUID + DELIMITER + toSnapshotUUID;
 
     SnapshotDiffJob diffJob = snapDiffJobMap.get(diffJobKey);
-    Assertions.assertNull(diffJob);
+    assertNull(diffJob);
 
 
     SnapshotDiffManager spy = spy(snapshotDiffManager);

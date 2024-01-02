@@ -58,6 +58,7 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -339,8 +340,8 @@ public class TestSCMContainerPlacementRackAware {
     // verify metrics
     Assertions.assertEquals(totalRequest, nodeNum);
     Assertions.assertEquals(successCount, nodeNum);
-    Assertions.assertTrue(tryCount > nodeNum);
-    Assertions.assertTrue(compromiseCount >= 1);
+    assertThat(tryCount).isGreaterThan(nodeNum);
+    assertThat(compromiseCount).isGreaterThanOrEqualTo(1);
   }
 
   @ParameterizedTest
@@ -365,8 +366,10 @@ public class TestSCMContainerPlacementRackAware {
     long compromiseCount = metrics.getDatanodeChooseFallbackCount();
 
     Assertions.assertEquals(nodeNum, totalRequest);
-    Assertions.assertTrue(successCount >= 1, "Not enough success count");
-    Assertions.assertTrue(tryCount >= 1, "Not enough try count");
+    assertThat(successCount).withFailMessage("Not enough success count")
+        .isGreaterThanOrEqualTo(1);
+    assertThat(tryCount).withFailMessage("Not enough try count")
+        .isGreaterThanOrEqualTo(1);
     Assertions.assertEquals(0, compromiseCount);
   }
 
@@ -423,7 +426,7 @@ public class TestSCMContainerPlacementRackAware {
       policy.chooseDatanodes(null, null, nodeNum, STORAGE_CAPACITY + 0, 15);
       fail("Storage requested exceeds capacity, this call should fail");
     } catch (Exception e) {
-      assertTrue(e.getClass().getSimpleName().equals("SCMException"));
+      assertEquals("SCMException", e.getClass().getSimpleName());
     }
 
     // get metrics
@@ -434,7 +437,7 @@ public class TestSCMContainerPlacementRackAware {
 
     Assertions.assertEquals(totalRequest, nodeNum);
     Assertions.assertEquals(successCount, 0);
-    Assertions.assertTrue(tryCount >= nodeNum, "Not enough try");
+    assertThat(tryCount).withFailMessage("Not enough try").isGreaterThanOrEqualTo(nodeNum);
     Assertions.assertEquals(compromiseCount, 0);
   }
 
@@ -793,8 +796,10 @@ public class TestSCMContainerPlacementRackAware {
     long compromiseCount = metrics.getDatanodeChooseFallbackCount();
 
     Assertions.assertEquals(nodeNum, totalRequest);
-    Assertions.assertTrue(successCount >= 1, "Not enough success count");
-    Assertions.assertTrue(tryCount >= 1, "Not enough try count");
+    assertThat(successCount).withFailMessage("Not enough success count")
+        .isGreaterThanOrEqualTo(1);
+    assertThat(tryCount).withFailMessage("Not enough try count")
+        .isGreaterThanOrEqualTo(1);
     Assertions.assertEquals(0, compromiseCount);
   }
 
@@ -833,8 +838,7 @@ public class TestSCMContainerPlacementRackAware {
 
     // Favoured node should be returned,
     // as favoured node is in the different rack as used nodes.
-    Assertions.assertTrue(favouredNodes.get(0).getUuid() ==
-        datanodeDetails.get(0).getUuid());
+    Assertions.assertSame(favouredNodes.get(0).getUuid(), datanodeDetails.get(0).getUuid());
 
   }
 }

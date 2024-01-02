@@ -27,9 +27,9 @@ import org.junit.jupiter.api.Test;
 import javax.net.ssl.KeyManager;
 import java.security.PrivateKey;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test ReloadingX509KeyManager.
@@ -61,8 +61,7 @@ public class TestReloadingX509KeyManager {
     assertEquals(privateKey2, ((ReloadingX509KeyManager)km).getPrivateKey(
         caClient.getComponentName() + "_key"));
 
-    assertTrue(reloaderLog.getOutput().contains(
-        "ReloadingX509KeyManager is reloaded"));
+    assertThat(reloaderLog.getOutput()).contains("ReloadingX509KeyManager is reloaded");
 
     // Make sure there is two reloads happened, one for server, one for client
     assertEquals(2, StringUtils.countMatches(reloaderLog.getOutput(),

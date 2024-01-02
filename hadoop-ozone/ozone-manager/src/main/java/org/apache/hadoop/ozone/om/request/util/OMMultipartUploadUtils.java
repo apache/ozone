@@ -27,9 +27,6 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Iterator;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -115,11 +112,11 @@ public final class OMMultipartUploadUtils {
         String bucketName, String keyName, String uploadID,
         OMMetadataManager metaMgr) throws IOException {
     String fileName = OzoneFSUtils.getFileName(keyName);
-    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
+
     final long volumeId = metaMgr.getVolumeId(volumeName);
     final long bucketId = metaMgr.getBucketId(volumeName, bucketName);
     long parentID =
-        OMFileRequest.getParentID(volumeId, bucketId, pathComponents,
+        OMFileRequest.getParentID(volumeId, bucketId,
             keyName, metaMgr);
 
     String multipartKey = metaMgr.getMultipartKey(volumeId, bucketId,

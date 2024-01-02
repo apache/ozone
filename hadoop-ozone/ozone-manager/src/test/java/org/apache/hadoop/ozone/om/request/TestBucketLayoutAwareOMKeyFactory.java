@@ -22,7 +22,6 @@ import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +34,7 @@ import static org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFa
 import static org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFactory.getRequestInstanceFromMap;
 import static org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFactory.OM_KEY_REQUEST_CLASSES;
 import static org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFactory.addRequestClass;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -67,7 +67,7 @@ public class TestBucketLayoutAwareOMKeyFactory {
                       getDummyOMRequest(), k,
                       BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
-              Assertions.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+              assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
                   omKeyRequest.getBucketLayout());
               omKeyReqsFSO.add(omKeyRequest);
             } catch (NoSuchMethodException e) {
@@ -85,7 +85,7 @@ public class TestBucketLayoutAwareOMKeyFactory {
                   getRequestInstanceFromMap(
                       getDummyOMRequest(), k, BucketLayout.LEGACY);
 
-              Assertions.assertEquals(BucketLayout.LEGACY,
+              assertEquals(BucketLayout.LEGACY,
                   omKeyRequest1.getBucketLayout());
               omKeyReqsLegacy.add(omKeyRequest1);
 
@@ -93,7 +93,7 @@ public class TestBucketLayoutAwareOMKeyFactory {
                   getRequestInstanceFromMap(
                       getDummyOMRequest(), k, BucketLayout.OBJECT_STORE);
 
-              Assertions.assertEquals(BucketLayout.OBJECT_STORE,
+              assertEquals(BucketLayout.OBJECT_STORE,
                   omKeyRequest2.getBucketLayout());
               omKeyReqsOBS.add(omKeyRequest2);
             } catch (NoSuchMethodException e) {
@@ -109,12 +109,12 @@ public class TestBucketLayoutAwareOMKeyFactory {
           LOG.info("Validated request class instantiation for cmdType " + k);
         });
 
-    Assertions.assertEquals(13, omKeyReqsFSO.size());
-    Assertions.assertEquals(14, omKeyReqsLegacy.size());
-    Assertions.assertEquals(14, omKeyReqsOBS.size());
+    assertEquals(13, omKeyReqsFSO.size());
+    assertEquals(14, omKeyReqsLegacy.size());
+    assertEquals(14, omKeyReqsOBS.size());
     // Check if the number of instantiated OMKeyRequest classes is equal to
     // the number of keys in the mapping.
-    Assertions.assertEquals(
+    assertEquals(
         OM_KEY_REQUEST_CLASSES.size(),
         omKeyReqsFSO.size() + omKeyReqsOBS.size());
   }

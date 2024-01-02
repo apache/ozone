@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.container.upgrade;
 
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.OzoneConsts.DATANODE_LAYOUT_VERSION_DIR;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
 import java.io.IOException;
@@ -32,8 +34,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.UpgradeTestUtils;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -65,17 +65,11 @@ public class TestDataNodeStartupSlvLessThanMlv {
     UpgradeTestUtils.createVersionFile(datanodeSubdir,
         HddsProtos.NodeType.DATANODE, mlv);
 
-    try {
-      new DatanodeStateMachine(getNewDatanodeDetails(), conf);
-      Assertions.fail("Expected IOException due to incorrect MLV on DataNode " +
-          "creation.");
-    } catch (IOException e) {
-      String expectedMessage = String.format("Metadata layout version (%s) > " +
-          "software layout version (%s)", mlv, largestSlv);
-      GenericTestUtils.assertExceptionContains(expectedMessage, e);
-    }
+    IOException ioException = assertThrows(IOException.class,
+        () -> new DatanodeStateMachine(getNewDatanodeDetails(), conf));
+    assertThat(ioException).hasMessageEndingWith(
+        String.format("Metadata layout version (%s) > software layout version (%s)", mlv, largestSlv));
   }
-
 
   private DatanodeDetails getNewDatanodeDetails() {
     DatanodeDetails.Port containerPort = DatanodeDetails.newPort(

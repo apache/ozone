@@ -83,15 +83,7 @@ public class MockXceiverClientFactory
   @Override
   public XceiverClientSpi acquireClient(Pipeline pipeline)
       throws IOException {
-    MockXceiverClientSpi mockXceiverClientSpi =
-        new MockXceiverClientSpi(pipeline, storage
-            .computeIfAbsent(pipeline.getFirstNode(),
-                r -> new MockDatanodeStorage()));
-    // Incase if this node already set to mark as failed.
-    for (IOException reason : pendingDNFailures.keySet()) {
-      mockStorageFailure(reason);
-    }
-    return mockXceiverClientSpi;
+    return acquireClient(pipeline, false);
   }
 
   @Override
@@ -111,6 +103,27 @@ public class MockXceiverClientFactory
   @Override
   public void releaseClientForReadData(XceiverClientSpi xceiverClient,
       boolean b) {
+
+  }
+
+  @Override
+  public XceiverClientSpi acquireClient(Pipeline pipeline,
+      boolean topologyAware) throws IOException {
+    MockXceiverClientSpi mockXceiverClientSpi =
+        new MockXceiverClientSpi(pipeline, storage
+            .computeIfAbsent(topologyAware ? pipeline.getClosestNode() :
+                    pipeline.getFirstNode(),
+                r -> new MockDatanodeStorage()));
+    // Incase if this node already set to mark as failed.
+    for (IOException reason : pendingDNFailures.keySet()) {
+      mockStorageFailure(reason);
+    }
+    return mockXceiverClientSpi;
+  }
+
+  @Override
+  public void releaseClient(XceiverClientSpi xceiverClient,
+                            boolean invalidateClient, boolean topologyAware) {
 
   }
 

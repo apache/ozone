@@ -50,6 +50,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -149,7 +150,7 @@ public class TestHddsDatanodeService {
     StorageVolume volume = volumeSet.getVolumesList().get(0);
 
     // Check instanceof and typecast
-    assertTrue(volume instanceof HddsVolume);
+    assertInstanceOf(HddsVolume.class, volume);
     HddsVolume hddsVolume = (HddsVolume) volume;
 
     StorageVolumeUtil.checkVolume(hddsVolume, clusterId,

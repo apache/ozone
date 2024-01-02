@@ -27,6 +27,7 @@ import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.VA
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
@@ -46,11 +47,8 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType;
-import org.apache.ozone.test.UnhealthyTest;
 import org.apache.ozone.test.tag.Unhealthy;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.junit.experimental.categories.Category;
 
 /**
  * Test OM layout version management.
@@ -75,7 +73,7 @@ public class TestOMVersionManager {
 
     try {
       new OMLayoutVersionManager(lV);
-      Assertions.fail();
+      fail();
     } catch (OMException ex) {
       assertEquals(NOT_SUPPORTED_OPERATION, ex.getResult());
     }
@@ -106,7 +104,6 @@ public class TestOMVersionManager {
   }
 
   @Test
-  @Category(UnhealthyTest.class)
   @Unhealthy("Since there is no longer a need to enforce the getRequestType " +
       "method in OM request classes, disabling the " +
       "test. Potentially revisit later.")
@@ -130,11 +127,11 @@ public class TestOMVersionManager {
           lVersion = annotation.value().layoutVersion();
         }
         if (requestTypes.contains(type + "-" + lVersion)) {
-          Assertions.fail("Duplicate request/version type found : " + type);
+          fail("Duplicate request/version type found : " + type);
         }
         requestTypes.add(type + "-" + lVersion);
       } catch (NoSuchMethodException nsmEx) {
-        Assertions.fail("getRequestType method not defined in a class." +
+        fail("getRequestType method not defined in a class." +
             nsmEx.getMessage());
       }
     }
@@ -176,8 +173,8 @@ public class TestOMVersionManager {
     lvm.registerUpgradeActions(OM_UPGRADE_CLASS_PACKAGE);
 
     action = INITIAL_VERSION.action(VALIDATE_IN_PREFINALIZE);
-    Assertions.assertTrue(action.isPresent());
-    Assertions.assertEquals(MockOmUpgradeAction.class, action.get().getClass());
+    assertTrue(action.isPresent());
+    assertEquals(MockOmUpgradeAction.class, action.get().getClass());
     OzoneManager omMock = mock(OzoneManager.class);
     action.get().execute(omMock);
     verify(omMock, times(1)).getVersion();

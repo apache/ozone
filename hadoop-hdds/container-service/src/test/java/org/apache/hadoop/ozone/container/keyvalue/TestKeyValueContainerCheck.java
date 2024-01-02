@@ -32,13 +32,12 @@ import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.File;
 import java.io.RandomAccessFile;
 
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult.FailureType.DELETED_CONTAINER;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -57,11 +56,10 @@ public class TestKeyValueContainerCheck
   /**
    * Sanity test, when there are no corruptions induced.
    */
-  @ParameterizedTest
-  @MethodSource("data")
+  @ContainerTestVersionInfo.ContainerTest
   public void testKeyValueContainerCheckNoCorruption(
       ContainerTestVersionInfo versionInfo) throws Exception {
-    setUp(versionInfo);
+    initTestData(versionInfo);
     long containerID = 101;
     int deletedBlocks = 1;
     int normalBlocks = 3;
@@ -93,11 +91,10 @@ public class TestKeyValueContainerCheck
   /**
    * Sanity test, when there are corruptions induced.
    */
-  @ParameterizedTest
-  @MethodSource("data")
+  @ContainerTestVersionInfo.ContainerTest
   public void testKeyValueContainerCheckCorruption(
       ContainerTestVersionInfo versionInfo) throws Exception {
-    setUp(versionInfo);
+    initTestData(versionInfo);
     long containerID = 102;
     int deletedBlocks = 1;
     int normalBlocks = 3;
@@ -130,7 +127,7 @@ public class TestKeyValueContainerCheck
       File chunkFile = getChunkLayout()
           .getChunkFile(containerData, blockID, chunkInfo);
       long length = chunkFile.length();
-      assertTrue(length > 0);
+      assertThat(length).isGreaterThan(0);
       // forcefully truncate the file to induce failure.
       try (RandomAccessFile file = new RandomAccessFile(chunkFile, "rws")) {
         file.setLength(length / 2);
@@ -148,11 +145,10 @@ public class TestKeyValueContainerCheck
     assertFalse(valid);
   }
 
-  @ParameterizedTest
-  @MethodSource("data")
+  @ContainerTestVersionInfo.ContainerTest
   void testKeyValueContainerCheckDeleted(ContainerTestVersionInfo versionInfo)
       throws Exception {
-    setUp(versionInfo);
+    initTestData(versionInfo);
 
     long containerID = 103;
     int deletedBlocks = 3;

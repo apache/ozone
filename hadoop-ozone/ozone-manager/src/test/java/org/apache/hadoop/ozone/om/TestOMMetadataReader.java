@@ -21,10 +21,10 @@ import io.grpc.Context;
 import org.apache.hadoop.ipc.Server;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
-import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 /**
@@ -35,10 +35,8 @@ public class TestOMMetadataReader {
   @Test
   public void testGetClientAddress() {
     try (
-        MockedStatic<Server> ipcServerStaticMock =
-            Mockito.mockStatic(Server.class);
-        MockedStatic<Context> grpcRequestContextStaticMock =
-            Mockito.mockStatic(Context.class);
+        MockedStatic<Server> ipcServerStaticMock = mockStatic(Server.class);
+        MockedStatic<Context> grpcRequestContextStaticMock = mockStatic(Context.class);
     ) {
       // given
       String expectedClientAddressInCaseOfHadoopRpcCall =

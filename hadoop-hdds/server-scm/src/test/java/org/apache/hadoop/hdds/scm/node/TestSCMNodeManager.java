@@ -42,8 +42,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
@@ -77,6 +76,7 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.test.PathUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -110,9 +110,11 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND_COUNT_UPDATED;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.NEW_NODE;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
@@ -235,6 +237,38 @@ public class TestSCMNodeManager {
       Thread.sleep(4 * 1000);
       assertEquals(nodeManager.getAllNodes().size(), registeredNodes,
           "Heartbeat thread should have picked up the scheduled heartbeats.");
+    }
+  }
+
+  @Test
+  public void testGetLastHeartbeatTimeDiff() throws Exception {
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      String timeNow = nodeManager.getLastHeartbeatTimeDiff(Time.monotonicNow());
+      assertEquals("Just now", timeNow);
+
+      String time1s = nodeManager.getLastHeartbeatTimeDiff(Time.monotonicNow() - 10000);
+      assertEquals("10s ago", time1s);
+
+      String time1m = nodeManager.getLastHeartbeatTimeDiff(Time.monotonicNow() - 60000);
+      assertEquals("1m ago", time1m);
+
+      String time1m10s = nodeManager.getLastHeartbeatTimeDiff(Time.monotonicNow() - 70000);
+      assertEquals("1m 10s ago", time1m10s);
+
+      // 1h 1m 10s
+      // 10000ms = 10s
+      // 60000ms = 1m
+      // 60000ms * 60 = 3600000ms = 1h
+      String time1h1m10s = nodeManager.getLastHeartbeatTimeDiff(Time.monotonicNow() - 3670000);
+      assertEquals("1h 1m 10s ago", time1h1m10s);
+
+      // 1d 1h 1m 10s
+      // 10000ms = 10s
+      // 60000ms = 1m
+      // 60000ms * 60 = 3600000ms = 1h
+      // 3600000ms * 24 = 86400000ms = 1d
+      String time1d1h1m10s = nodeManager.getLastHeartbeatTimeDiff(Time.monotonicNow() - 90070000);
+      assertEquals("1d 1h 1m 10s ago", time1d1h1m10s);
     }
   }
 
@@ -435,8 +469,8 @@ public class TestSCMNodeManager {
       scm.getPipelineManager().createPipeline(ratisThree);
       fail("3 nodes should not have been found for a pipeline.");
     } catch (SCMException ex) {
-      assertTrue(ex.getMessage().contains("Required 3. Found " +
-          actualNodeCount));
+      assertThat(ex.getMessage()).contains("Required 3. Found " +
+          actualNodeCount);
     }
   }
 
@@ -831,8 +865,9 @@ public class TestSCMNodeManager {
       // Step 3 : wait for 1 iteration of health check
       try {
         schedFuture.get();
-        assertTrue(nodeManager.getSkippedHealthChecks() > 0,
-            "We did not skip any heartbeat checks");
+        assertThat(nodeManager.getSkippedHealthChecks())
+            .withFailMessage("We did not skip any heartbeat checks")
+            .isGreaterThan(0);
       } catch (ExecutionException e) {
         fail("Unexpected exception waiting for Scheduled Health Check");
       }
@@ -903,8 +938,8 @@ public class TestSCMNodeManager {
             .setMetadataLayoutVersion(scmMlv + 1)
             .setSoftwareLayoutVersion(scmSlv + 1)
             .build());
-    assertTrue(logCapturer.getOutput()
-        .contains("Invalid data node in the cluster"));
+    assertThat(logCapturer.getOutput())
+        .contains("Invalid data node in the cluster");
     nodeManager.close();
   }
 
@@ -954,16 +989,17 @@ public class TestSCMNodeManager {
 
   @Test
   public void testProcessCommandQueueReport()
-      throws IOException, NodeNotFoundException {
+      throws IOException, NodeNotFoundException, AuthenticationException {
     OzoneConfiguration conf = new OzoneConfiguration();
     SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
     when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
     EventPublisher eventPublisher = mock(EventPublisher.class);
     HDDSLayoutVersionManager lvm  =
         new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
+    createNodeManager(getConf());
     SCMNodeManager nodeManager  = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
-        SCMContext.emptyContext(), lvm);
+        scmContext, lvm);
     LayoutVersionProto layoutInfo = toLayoutVersionProto(
         lvm.getMetadataLayoutVersion(), lvm.getSoftwareLayoutVersion());
 
@@ -1089,13 +1125,11 @@ public class TestSCMNodeManager {
    * @throws IOException
    */
   @Test
-  public void testScmCheckForErrorOnNullDatanodeDetails()
-      throws IOException, AuthenticationException {
+  public void testScmCheckForErrorOnNullDatanodeDetails() throws IOException, AuthenticationException {
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
-      nodeManager.processHeartbeat(null, null);
-    } catch (NullPointerException npe) {
-      GenericTestUtils.assertExceptionContains("Heartbeat is missing " +
-          "DatanodeDetails.", npe);
+      NullPointerException npe = assertThrows(NullPointerException.class,
+          () -> nodeManager.processHeartbeat(null, null));
+      assertThat(npe).hasMessage("Heartbeat is missing DatanodeDetails.");
     }
   }
 
@@ -1400,8 +1434,8 @@ public class TestSCMNodeManager {
       // Assert all healthy nodes are healthy now, this has to be a greater
       // than check since Stale nodes can be healthy when we check the state.
 
-      assertTrue(nodeManager.getNodeCount(NodeStatus.inServiceHealthy())
-          >= healthyCount);
+      assertThat(nodeManager.getNodeCount(NodeStatus.inServiceHealthy()))
+          .isGreaterThanOrEqualTo(healthyCount);
 
       assertEquals(deadCount,
           nodeManager.getNodeCount(NodeStatus.inServiceDead()));
@@ -1410,7 +1444,7 @@ public class TestSCMNodeManager {
           nodeManager.getNodes(NodeStatus.inServiceDead());
 
       for (DatanodeDetails node : deadList) {
-        assertTrue(deadNodeList.contains(node));
+        assertThat(deadNodeList).contains(node);
       }
 
 
@@ -1783,7 +1817,7 @@ public class TestSCMNodeManager {
       List<SCMCommand> command =
           nodemanager.processHeartbeat(datanodeDetails, layoutInfo);
       // With dh registered, SCM will send create pipeline command to dn
-      assertTrue(command.size() >= 1);
+      assertThat(command.size()).isGreaterThanOrEqualTo(1);
       assertTrue(command.get(0).getClass().equals(
           CloseContainerCommand.class) ||
           command.get(1).getClass().equals(CloseContainerCommand.class));

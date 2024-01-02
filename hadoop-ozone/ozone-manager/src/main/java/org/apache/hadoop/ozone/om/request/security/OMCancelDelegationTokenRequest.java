@@ -18,11 +18,11 @@
 
 package org.apache.hadoop.ozone.om.request.security;
 
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -67,7 +67,7 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
     Map<String, String> auditMap = null;
 
     try {
-      Token<OzoneTokenIdentifier> token = OMPBHelper.convertToDelegationToken(
+      Token<OzoneTokenIdentifier> token = OMPBHelper.tokenFromProto(
           request.getCancelDelegationTokenRequest().getToken());
       auditMap = buildTokenAuditMap(token);
 
@@ -85,9 +85,8 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long transactionLogIndex = termIndex.getIndex();
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     Token<OzoneTokenIdentifier> token = getToken();
@@ -124,9 +123,6 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
       exception = ex;
       omClientResponse = new OMCancelDelegationTokenResponse(null,
           createErrorOMResponse(omResponse, exception));
-    } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
     }
 
     auditLog(auditLogger,
@@ -144,7 +140,7 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
     CancelDelegationTokenRequestProto cancelDelegationTokenRequest =
         getOmRequest().getCancelDelegationTokenRequest();
 
-    return OMPBHelper.convertToDelegationToken(
+    return OMPBHelper.tokenFromProto(
         cancelDelegationTokenRequest.getToken());
   }
 

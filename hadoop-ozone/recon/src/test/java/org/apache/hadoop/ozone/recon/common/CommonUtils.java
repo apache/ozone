@@ -43,6 +43,7 @@ import java.util.HashMap;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * This is a utility class for common code for test cases.
@@ -185,8 +186,8 @@ public class CommonUtils {
     NamespaceSummaryResponse invalidObj =
         (NamespaceSummaryResponse) invalidResponse.getEntity();
     assertEquals(ResponseStatus.PATH_NOT_FOUND, invalidObj.getStatus());
-    assertEquals(null, invalidObj.getCountStats());
-    assertEquals(null, invalidObj.getObjectDBInfo());
+    assertNull(invalidObj.getCountStats());
+    assertNull(invalidObj.getObjectDBInfo());
   }
 
   public void testNSSummaryBasicInfoKey(
