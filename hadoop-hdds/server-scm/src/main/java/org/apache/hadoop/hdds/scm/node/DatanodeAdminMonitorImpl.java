@@ -42,13 +42,13 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -80,7 +80,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   private ReplicationManager replicationManager;
   private Queue<TrackedNode> pendingNodes = new ArrayDeque();
   private Queue<TrackedNode> cancelledNodes = new ArrayDeque();
-  private Set<TrackedNode> trackedNodes = new HashSet<>();
+  private Set<TrackedNode> trackedNodes = ConcurrentHashMap.newKeySet();
   private NodeDecommissionMetrics metrics;
   private long pipelinesWaitingToClose = 0;
   private long sufficientlyReplicatedContainers = 0;
