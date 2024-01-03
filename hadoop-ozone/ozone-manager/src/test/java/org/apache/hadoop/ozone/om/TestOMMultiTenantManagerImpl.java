@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -141,8 +142,8 @@ public class TestOMMultiTenantManagerImpl {
         () -> tenantManager.listUsersInTenant("tenant2", null));
     assertEquals("Tenant 'tenant2' not found!", ioException.getMessage());
 
-    assertTrue(tenantManager.listUsersInTenant(TENANT_ID, "abc")
-        .getUserAccessIds().isEmpty());
+    assertThat(tenantManager.listUsersInTenant(TENANT_ID, "abc")
+        .getUserAccessIds()).isEmpty();
   }
 
   @Test
@@ -155,10 +156,10 @@ public class TestOMMultiTenantManagerImpl {
 
     tenantManager.getCacheOp()
         .revokeUserAccessId("seed-accessId1", TENANT_ID);
-    assertTrue(tenantManager.getTenantCache().get(TENANT_ID)
-        .getAccessIdInfoMap().isEmpty());
-    assertTrue(tenantManager.listUsersInTenant(TENANT_ID, null)
-        .getUserAccessIds().isEmpty());
+    assertThat(tenantManager.getTenantCache().get(TENANT_ID)
+        .getAccessIdInfoMap()).isEmpty();
+    assertThat(tenantManager.listUsersInTenant(TENANT_ID, null)
+        .getUserAccessIds()).isEmpty();
   }
 
   @Test

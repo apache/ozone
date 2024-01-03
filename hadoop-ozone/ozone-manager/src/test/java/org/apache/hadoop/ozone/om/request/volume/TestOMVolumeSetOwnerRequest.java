@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.volume;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -106,7 +107,7 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
     // millisecond - since there is no time-consuming operation between
     // OMRequestTestUtils.addVolumeToDB (sets creationTime) and
     // preExecute (sets modificationTime).
-    assertTrue(modificationTime >= creationTime);
+    assertThat(modificationTime).isGreaterThanOrEqualTo(creationTime);
 
     OzoneManagerStorageProtos.PersistedUserVolumeInfo newOwnerVolumeList =
         omMetadataManager.getUserTable().get(newOwnerKey);

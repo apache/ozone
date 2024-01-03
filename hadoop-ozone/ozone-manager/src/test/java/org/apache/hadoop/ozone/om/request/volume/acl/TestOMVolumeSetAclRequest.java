@@ -18,10 +18,10 @@
 
 package org.apache.hadoop.ozone.om.request.volume.acl;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -61,7 +61,7 @@ public class TestOMVolumeSetAclRequest extends TestOMVolumeRequest {
     long newModTime = modifiedRequest.getSetAclRequest().getModificationTime();
     // When preExecute() of setting acl,
     // the new modification time is greater than origin one.
-    assertTrue(newModTime > originModTime);
+    assertThat(newModTime).isGreaterThan(originModTime);
   }
 
   @Test
@@ -106,10 +106,12 @@ public class TestOMVolumeSetAclRequest extends TestOMVolumeRequest {
 
     // Acl is added to aclMapAfterSet
     assertEquals(2, aclsAfterSet.size());
-    assertTrue(aclsAfterSet.contains(userAccessAcl),
-        "Access Acl should be set.");
-    assertTrue(aclsAfterSet.contains(groupDefaultAcl),
-        "Default Acl should be set.");
+    assertThat(aclsAfterSet)
+        .withFailMessage("Access Acl should be set.")
+        .contains(userAccessAcl);
+    assertThat(aclsAfterSet)
+        .withFailMessage("Default Acl should be set.")
+        .contains(groupDefaultAcl);
   }
 
   @Test

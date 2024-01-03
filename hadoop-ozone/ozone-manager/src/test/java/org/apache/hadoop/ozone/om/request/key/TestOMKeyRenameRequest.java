@@ -18,11 +18,11 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.util.UUID;
 
@@ -213,8 +213,8 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
     // set in KeyArgs.
     assertNotEquals(originalOmRequest, modifiedOmRequest);
 
-    assertTrue(modifiedOmRequest.getRenameKeyRequest()
-        .getKeyArgs().getModificationTime() > 0);
+    assertThat(modifiedOmRequest.getRenameKeyRequest()
+        .getKeyArgs().getModificationTime()).isGreaterThan(0);
 
     return modifiedOmRequest;
   }

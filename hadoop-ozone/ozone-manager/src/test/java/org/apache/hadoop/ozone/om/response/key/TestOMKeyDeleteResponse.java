@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -128,7 +129,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
         null, 100, deletedKey);
 
     // Key has blocks, it should not be in deletedKeyTable.
-    assertTrue(rangeKVs.size() > 0);
+    assertThat(rangeKVs.size()).isGreaterThan(0);
   }
 
 

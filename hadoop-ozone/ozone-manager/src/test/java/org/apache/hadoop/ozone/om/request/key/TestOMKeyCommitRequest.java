@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -650,7 +651,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
   private void verifyKeyArgs(KeyArgs originalKeyArgs, KeyArgs modifiedKeyArgs) {
 
     // Check modification time is set or not.
-    assertTrue(modifiedKeyArgs.getModificationTime() > 0);
+    assertThat(modifiedKeyArgs.getModificationTime()).isGreaterThan(0);
     assertEquals(0, originalKeyArgs.getModificationTime());
 
     assertEquals(originalKeyArgs.getVolumeName(),

@@ -84,10 +84,10 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.toList;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -515,9 +515,8 @@ public class TestKeyManagerUnit {
         .getBlockID().getLocalID());
     assertEquals(pipelineTwo.getId(),
         newBlockLocation.getPipeline().getId());
-    assertTrue(newBlockLocation.getPipeline().getNodes().contains(dnFour));
-    assertTrue(newBlockLocation.getPipeline().getNodes().contains(dnFive));
-    assertTrue(newBlockLocation.getPipeline().getNodes().contains(dnSix));
+    assertThat(newBlockLocation.getPipeline().getNodes())
+        .contains(dnFour, dnFive, dnSix);
   }
 
   private void insertKey(Pipeline pipeline, String volumeName,

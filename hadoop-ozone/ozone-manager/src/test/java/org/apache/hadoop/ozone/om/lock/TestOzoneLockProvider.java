@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Arrays;
 import java.util.Collection;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -83,13 +83,13 @@ public class TestOzoneLockProvider {
 
     if (keyPathLockEnabled) {
       if (bucketLayout == BucketLayout.OBJECT_STORE) {
-        assertTrue(ozoneLockStrategy instanceof OBSKeyPathLockStrategy);
+        assertInstanceOf(OBSKeyPathLockStrategy.class, ozoneLockStrategy);
       } else if (!enableFileSystemPaths &&
           bucketLayout == BucketLayout.LEGACY) {
-        assertTrue(ozoneLockStrategy instanceof OBSKeyPathLockStrategy);
+        assertInstanceOf(OBSKeyPathLockStrategy.class, ozoneLockStrategy);
       }
     } else {
-      assertTrue(ozoneLockStrategy instanceof RegularBucketLockStrategy);
+      assertInstanceOf(RegularBucketLockStrategy.class, ozoneLockStrategy);
     }
   }
 }

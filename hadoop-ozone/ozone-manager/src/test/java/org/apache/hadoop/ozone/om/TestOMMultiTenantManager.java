@@ -40,6 +40,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -119,7 +120,7 @@ public class TestOMMultiTenantManager {
       OMMultiTenantManager.checkAndEnableMultiTenancy(ozoneManager, conf);
       fail("Should have thrown RuntimeException");
     } catch (RuntimeException e) {
-      assertTrue(e.getMessage().contains("Failed to meet"));
+      assertThat(e.getMessage()).contains("Failed to meet");
     }
   }
 

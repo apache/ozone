@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -95,7 +96,7 @@ public class TestS3MultipartUploadCompleteRequest
       return;
     }
 
-    assertTrue(rangeKVs.size() >= 1);
+    assertThat(rangeKVs.size()).isGreaterThanOrEqualTo(1);
 
     // Count must consider unused parts on commit
     assertEquals(count,

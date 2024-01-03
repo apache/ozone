@@ -55,6 +55,7 @@ import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.createSnapsh
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.deleteSnapshotRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteSnapshot;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -287,7 +288,7 @@ public class TestOMSnapshotDeleteRequest {
     // but marked as DELETED.
     assertNotNull(snapshotInfo);
     assertEquals(SNAPSHOT_DELETED, snapshotInfo.getSnapshotStatus());
-    assertTrue(snapshotInfo.getDeletionTime() > 0L);
+    assertThat(snapshotInfo.getDeletionTime()).isGreaterThan(0L);
     assertEquals(0, omMetrics.getNumSnapshotActive());
 
     // Now delete snapshot entry again, expect error.
