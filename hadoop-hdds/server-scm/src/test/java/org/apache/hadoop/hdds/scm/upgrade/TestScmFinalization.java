@@ -41,7 +41,6 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.mockito.ArgumentMatchers;
 import org.mockito.InOrder;
 import org.mockito.verification.VerificationMode;
 import org.slf4j.Logger;
@@ -58,6 +57,8 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.matches;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -250,9 +251,9 @@ public class TestScmFinalization {
 
     // First, SCM should mark that it is beginning finalization.
     inOrder.verify(buffer, count).addToBuffer(
-        ArgumentMatchers.eq(finalizationStore),
-        ArgumentMatchers.matches(OzoneConsts.FINALIZING_KEY),
-        ArgumentMatchers.matches(""));
+        eq(finalizationStore),
+        matches(OzoneConsts.FINALIZING_KEY),
+        matches(""));
 
     // Next, all pipeline creation should be stopped.
     inOrder.verify(pipelineManager, count).freezePipelineCreation();
@@ -274,9 +275,9 @@ public class TestScmFinalization {
           inOrder.verify(nodeManager, count).forceNodesToHealthyReadOnly();
         }
         inOrder.verify(buffer, count).addToBuffer(
-            ArgumentMatchers.eq(finalizationStore),
-            ArgumentMatchers.matches(OzoneConsts.LAYOUT_VERSION_KEY),
-            ArgumentMatchers.eq(String.valueOf(feature.layoutVersion())));
+            eq(finalizationStore),
+            matches(OzoneConsts.LAYOUT_VERSION_KEY),
+            eq(String.valueOf(feature.layoutVersion())));
       }
     }
     // If this was not called in the loop, there was an error. To detect this
@@ -290,8 +291,8 @@ public class TestScmFinalization {
     // Last, the finalizing mark is removed to indicate finalization is
     // complete.
     inOrder.verify(buffer, count).removeFromBuffer(
-        ArgumentMatchers.eq(finalizationStore),
-        ArgumentMatchers.matches(OzoneConsts.FINALIZING_KEY));
+        eq(finalizationStore),
+        matches(OzoneConsts.FINALIZING_KEY));
 
     // If the initial checkpoint was FINALIZATION_COMPLETE, no mocks should
     // have been invoked.
@@ -311,7 +312,7 @@ public class TestScmFinalization {
       FinalizationCheckpoint initialCheckpoint) throws Exception {
     Table<String, String> finalizationStore = mock(Table.class);
     when(finalizationStore
-            .isExist(ArgumentMatchers.eq(OzoneConsts.FINALIZING_KEY)))
+            .isExist(eq(OzoneConsts.FINALIZING_KEY)))
         .thenReturn(initialCheckpoint.needsFinalizingMark());
     return finalizationStore;
   }

@@ -48,11 +48,10 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.when;
@@ -130,7 +129,7 @@ public class TestContainerStateManager {
         .getContainerReplicas(c1.containerID());
 
     //THEN
-    Assertions.assertEquals(3, replicas.size());
+    assertEquals(3, replicas.size());
   }
 
   @Test
@@ -150,8 +149,8 @@ public class TestContainerStateManager {
     Set<ContainerReplica> replicas = containerStateManager
         .getContainerReplicas(c1.containerID());
 
-    Assertions.assertEquals(2, replicas.size());
-    Assertions.assertEquals(3, c1.getReplicationConfig().getRequiredNodes());
+    assertEquals(2, replicas.size());
+    assertEquals(3, c1.getReplicationConfig().getRequiredNodes());
   }
 
   private void addReplica(ContainerInfo cont, DatanodeDetails node) {
