@@ -193,7 +193,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
    * Get a node which is currently tracked in the decommissioned
    * or maintenance workflow.
    *
-   * @return An unmodifiable set of the tracked nodes.
+   * @return tracked node with given IpAddress.
    */
   @VisibleForTesting
   public synchronized TrackedNode getSingleTrackedNode(String ip) {
