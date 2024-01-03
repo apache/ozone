@@ -16,7 +16,7 @@
  * limitations under the License.
  *
  */
-package org.apache.hadoop.hdds.resource;
+package org.apache.hadoop.hdds.utils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

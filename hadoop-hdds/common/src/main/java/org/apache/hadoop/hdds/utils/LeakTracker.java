@@ -16,7 +16,7 @@
  * limitations under the License.
  *
  */
-package org.apache.hadoop.hdds.resource;
+package org.apache.hadoop.hdds.utils;
 
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
