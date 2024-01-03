@@ -22,13 +22,13 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.any;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.apache.hadoop.test.MetricsAsserts.getLongGauge;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 
@@ -81,25 +81,19 @@ public class TestReplicationManagerMetrics {
 
   @Test
   public void testLifeCycleStateMetricsPresent() {
-    Assertions.assertEquals(HddsProtos.LifeCycleState.OPEN.getNumber(),
-        getGauge("OpenContainers"));
-    Assertions.assertEquals(HddsProtos.LifeCycleState.CLOSING.getNumber(),
-        getGauge("ClosingContainers"));
-    Assertions.assertEquals(HddsProtos.LifeCycleState.QUASI_CLOSED.getNumber(),
-        getGauge("QuasiClosedContainers"));
-    Assertions.assertEquals(HddsProtos.LifeCycleState.CLOSED.getNumber(),
-        getGauge("ClosedContainers"));
-    Assertions.assertEquals(HddsProtos.LifeCycleState.DELETING.getNumber(),
-        getGauge("DeletingContainers"));
-    Assertions.assertEquals(HddsProtos.LifeCycleState.DELETED.getNumber(),
-        getGauge("DeletedContainers"));
+    assertEquals(HddsProtos.LifeCycleState.OPEN.getNumber(), getGauge("OpenContainers"));
+    assertEquals(HddsProtos.LifeCycleState.CLOSING.getNumber(), getGauge("ClosingContainers"));
+    assertEquals(HddsProtos.LifeCycleState.QUASI_CLOSED.getNumber(), getGauge("QuasiClosedContainers"));
+    assertEquals(HddsProtos.LifeCycleState.CLOSED.getNumber(), getGauge("ClosedContainers"));
+    assertEquals(HddsProtos.LifeCycleState.DELETING.getNumber(), getGauge("DeletingContainers"));
+    assertEquals(HddsProtos.LifeCycleState.DELETED.getNumber(), getGauge("DeletedContainers"));
   }
 
   @Test
   public void testHealthStateMetricsPresent() {
     for (ReplicationManagerReport.HealthState s :
         ReplicationManagerReport.HealthState.values()) {
-      Assertions.assertEquals(s.ordinal(), getGauge(s.getMetricName()));
+      assertEquals(s.ordinal(), getGauge(s.getMetricName()));
     }
   }
 

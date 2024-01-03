@@ -49,7 +49,6 @@ import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -65,11 +64,14 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_LEVEL;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -201,13 +203,12 @@ public class TestSCMBlockProtocolServer {
   void sortDatanodesRelativeToDatanode() {
     List<String> nodes = getNetworkNames();
     for (DatanodeDetails dn : nodeManager.getAllNodes()) {
-      Assertions.assertEquals(ROOT_LEVEL + 2, dn.getLevel());
+      assertEquals(ROOT_LEVEL + 2, dn.getLevel());
 
       List<DatanodeDetails> sorted =
           server.sortDatanodes(nodes, nodeAddress(dn));
 
-      Assertions.assertEquals(dn, sorted.get(0),
-          "Source node should be sorted very first");
+      assertEquals(dn, sorted.get(0), "Source node should be sorted very first");
 
       assertRackOrder(dn.getNetworkLocation(), sorted);
     }
@@ -227,12 +228,12 @@ public class TestSCMBlockProtocolServer {
     int size = list.size();
 
     for (int i = 0; i < size / 2; i++) {
-      Assertions.assertEquals(rack, list.get(i).getNetworkLocation(),
+      assertEquals(rack, list.get(i).getNetworkLocation(),
           "Nodes in the same rack should be sorted first");
     }
 
     for (int i = size / 2; i < size; i++) {
-      Assertions.assertNotEquals(rack, list.get(i).getNetworkLocation(),
+      assertNotEquals(rack, list.get(i).getNetworkLocation(),
           "Nodes in the other rack should be sorted last");
     }
   }
@@ -249,7 +250,7 @@ public class TestSCMBlockProtocolServer {
     System.out.println("client = " + client);
     datanodeDetails.stream().forEach(
         node -> System.out.println(node.toString()));
-    Assertions.assertEquals(NODE_COUNT, datanodeDetails.size());
+    assertEquals(NODE_COUNT, datanodeDetails.size());
 
     // illegal client 1
     client += "X";
@@ -257,14 +258,14 @@ public class TestSCMBlockProtocolServer {
     System.out.println("client = " + client);
     datanodeDetails.stream().forEach(
         node -> System.out.println(node.toString()));
-    Assertions.assertEquals(NODE_COUNT, datanodeDetails.size());
+    assertEquals(NODE_COUNT, datanodeDetails.size());
     // illegal client 2
     client = "/default-rack";
     datanodeDetails = server.sortDatanodes(nodes, client);
     System.out.println("client = " + client);
     datanodeDetails.stream().forEach(
         node -> System.out.println(node.toString()));
-    Assertions.assertEquals(NODE_COUNT, datanodeDetails.size());
+    assertEquals(NODE_COUNT, datanodeDetails.size());
 
     // unknown node to sort
     nodes.add(UUID.randomUUID().toString());
@@ -277,7 +278,7 @@ public class TestSCMBlockProtocolServer {
             .build();
     ScmBlockLocationProtocolProtos.SortDatanodesResponseProto resp =
         service.sortDatanodes(request, ClientVersion.CURRENT_VERSION);
-    Assertions.assertEquals(NODE_COUNT, resp.getNodeList().size());
+    assertEquals(NODE_COUNT, resp.getNodeList().size());
     System.out.println("client = " + client);
     resp.getNodeList().stream().forEach(
         node -> System.out.println(node.getNetworkName()));
@@ -294,7 +295,7 @@ public class TestSCMBlockProtocolServer {
         .build();
     resp = service.sortDatanodes(request, ClientVersion.CURRENT_VERSION);
     System.out.println("client = " + client);
-    Assertions.assertEquals(0, resp.getNodeList().size());
+    assertEquals(0, resp.getNodeList().size());
     resp.getNodeList().stream().forEach(
         node -> System.out.println(node.getNetworkName()));
   }
@@ -311,12 +312,12 @@ public class TestSCMBlockProtocolServer {
     List<AllocatedBlock> allocatedBlocks = server.allocateBlock(
         blockSize, numOfBlocks, replicationConfig, "o",
         new ExcludeList(), clientAddress);
-    Assertions.assertEquals(numOfBlocks, allocatedBlocks.size());
+    assertEquals(numOfBlocks, allocatedBlocks.size());
     for (AllocatedBlock allocatedBlock: allocatedBlocks) {
       List<DatanodeDetails> nodesInOrder =
           allocatedBlock.getPipeline().getNodesInOrder();
       if (nodesInOrder.contains(clientDatanode)) {
-        Assertions.assertEquals(clientDatanode, nodesInOrder.get(0),
+        assertEquals(clientDatanode, nodesInOrder.get(0),
             "Source node should be sorted very first");
       }
       String clientLocation = clientDatanode.getNetworkLocation();
@@ -332,7 +333,7 @@ public class TestSCMBlockProtocolServer {
           }
         } else {
           if (nodeLocation.equals(clientLocation)) {
-            Assertions.fail("Node in the same rack as client " +
+            fail("Node in the same rack as client " +
                 "should not be sorted after nodes under different rack");
           }
         }

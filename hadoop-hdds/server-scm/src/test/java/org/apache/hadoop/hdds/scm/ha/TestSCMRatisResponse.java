@@ -27,9 +27,14 @@ import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.exceptions.LeaderNotReadyException;
 import org.apache.ratis.protocol.exceptions.RaftException;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Test for SCMRatisResponse.
@@ -56,9 +61,8 @@ public class TestSCMRatisResponse {
         .setLogIndex(1L)
         .build();
     SCMRatisResponse response = SCMRatisResponse.decode(reply);
-    Assertions.assertTrue(response.isSuccess());
-    Assertions.assertEquals(Message.EMPTY,
-        SCMRatisResponse.encode(response.getResult()));
+    assertTrue(response.isSuccess());
+    assertEquals(Message.EMPTY, SCMRatisResponse.encode(response.getResult()));
   }
 
   @Test
@@ -74,9 +78,9 @@ public class TestSCMRatisResponse {
         .setLogIndex(1L)
         .build();
     SCMRatisResponse response = SCMRatisResponse.decode(reply);
-    Assertions.assertFalse(response.isSuccess());
-    Assertions.assertTrue(response.getException() instanceof RaftException);
-    Assertions.assertNull(response.getResult());
+    assertFalse(response.isSuccess());
+    assertTrue(response.getException() instanceof RaftException);
+    assertNull(response.getResult());
   }
 
   @Test
@@ -84,7 +88,7 @@ public class TestSCMRatisResponse {
     // Non proto input
     Message message = Message.valueOf("test");
     // Should fail with exception.
-    Assertions.assertThrows(InvalidProtocolBufferException.class,
+    assertThrows(InvalidProtocolBufferException.class,
         () -> SCMRatisResponse.encode(message));
   }
 }

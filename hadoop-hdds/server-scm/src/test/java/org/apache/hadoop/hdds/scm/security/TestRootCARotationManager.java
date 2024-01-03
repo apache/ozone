@@ -38,7 +38,6 @@ import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -56,6 +55,9 @@ import java.util.Date;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ACK_TIMEOUT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ENABLED;
@@ -64,8 +66,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_EXPIRED_CERTIFICAT
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -157,7 +157,7 @@ public class TestRootCARotationManager {
       rootCARotationManager = new RootCARotationManager(scm);
       fail("Should fail");
     } catch (Exception e) {
-      Assertions.assertTrue(e instanceof DateTimeParseException);
+      assertTrue(e instanceof DateTimeParseException);
     }
 
     // check interval should be less than grace period
@@ -166,8 +166,8 @@ public class TestRootCARotationManager {
       rootCARotationManager = new RootCARotationManager(scm);
       fail("Should fail");
     } catch (Exception e) {
-      Assertions.assertTrue(e instanceof IllegalArgumentException);
-      Assertions.assertTrue(e.getMessage().contains("should be smaller than"));
+      assertTrue(e instanceof IllegalArgumentException);
+      assertTrue(e.getMessage().contains("should be smaller than"));
     }
 
     // invalid time of day format
@@ -177,8 +177,8 @@ public class TestRootCARotationManager {
       rootCARotationManager = new RootCARotationManager(scm);
       fail("Should fail");
     } catch (Exception e) {
-      Assertions.assertTrue(e instanceof IllegalArgumentException);
-      Assertions.assertTrue(
+      assertTrue(e instanceof IllegalArgumentException);
+      assertTrue(
           e.getMessage().contains("should follow the hh:mm:ss format"));
     }
 

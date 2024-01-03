@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.scm.update.client.UpdateServiceConfig;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -47,6 +46,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeoutException;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Tests for SCM update Service.
  */
@@ -124,14 +125,14 @@ public class TestSCMUpdateServiceGrpcServer {
       server.notifyCrlUpdate();
 
       GenericTestUtils.waitFor(() -> client.getUpdateCount() == 4, 100, 2000);
-      Assertions.assertEquals(4, client.getUpdateCount());
-      Assertions.assertEquals(0, client.getErrorCount());
+      assertEquals(4, client.getUpdateCount());
+      assertEquals(0, client.getErrorCount());
 
       revokeCertNow(certIds.get(5));
       server.notifyCrlUpdate();
       GenericTestUtils.waitFor(() -> client.getUpdateCount() > 4, 100, 2000);
-      Assertions.assertEquals(5, client.getUpdateCount());
-      Assertions.assertEquals(0, client.getErrorCount());
+      assertEquals(5, client.getUpdateCount());
+      assertEquals(0, client.getErrorCount());
     } catch (Exception e) {
       e.printStackTrace();
     } finally {
@@ -174,22 +175,22 @@ public class TestSCMUpdateServiceGrpcServer {
 
       GenericTestUtils.waitFor(() -> client.getUpdateCount() == 1,
           100, 2000);
-      Assertions.assertEquals(1, client.getUpdateCount());
-      Assertions.assertEquals(0, client.getErrorCount());
+      assertEquals(1, client.getUpdateCount());
+      assertEquals(0, client.getErrorCount());
 
       // revoke cert 5 with 10 seconds delay
       revokeCert(certIds.get(5), Instant.now().plus(Duration.ofSeconds(5)));
       server.notifyCrlUpdate();
       GenericTestUtils.waitFor(() -> client.getUpdateCount() > 1,
           100, 2000);
-      Assertions.assertTrue(2 <= client.getUpdateCount());
-      Assertions.assertEquals(0, client.getErrorCount());
-      Assertions.assertTrue(1 >= client.getClientCRLStore()
+      assertTrue(2 <= client.getUpdateCount());
+      assertEquals(0, client.getErrorCount());
+      assertTrue(1 >= client.getClientCRLStore()
           .getPendingCrlIds().size());
 
       GenericTestUtils.waitFor(() -> client.getPendingCrlRemoveCount() == 1,
           100, 20_000);
-      Assertions.assertTrue(client.getClientCRLStore()
+      assertTrue(client.getClientCRLStore()
           .getPendingCrlIds().isEmpty());
     } catch (Exception e) {
       e.printStackTrace();
@@ -240,7 +241,7 @@ public class TestSCMUpdateServiceGrpcServer {
       server.notifyCrlUpdate();
       GenericTestUtils.waitFor(() -> client.getUpdateCount() == 4,
           100, 2000);
-      Assertions.assertEquals(4, client.getUpdateCount());
+      assertEquals(4, client.getUpdateCount());
 
 
       // server restart
@@ -254,18 +255,18 @@ public class TestSCMUpdateServiceGrpcServer {
       server.start();
       GenericTestUtils.waitFor(() -> client.getErrorCount() == 1,
           100, 2000);
-      Assertions.assertEquals(4, client.getUpdateCount());
-      Assertions.assertEquals(1, client.getErrorCount());
-      Assertions.assertEquals(4, clientCRLStore.getLatestCrlId());
+      assertEquals(4, client.getUpdateCount());
+      assertEquals(1, client.getErrorCount());
+      assertEquals(4, clientCRLStore.getLatestCrlId());
       LOG.info("Test server restart end.");
 
       revokeCertNow(certIds.get(5));
       server.notifyCrlUpdate();
       GenericTestUtils.waitFor(() -> client.getUpdateCount() > 4,
           100, 5000);
-      Assertions.assertEquals(5, client.getUpdateCount());
-      Assertions.assertEquals(1, client.getErrorCount());
-      Assertions.assertEquals(5, clientCRLStore.getLatestCrlId());
+      assertEquals(5, client.getUpdateCount());
+      assertEquals(1, client.getErrorCount());
+      assertEquals(5, clientCRLStore.getLatestCrlId());
 
       // client restart
       // server onError->
@@ -276,7 +277,7 @@ public class TestSCMUpdateServiceGrpcServer {
       client.stop(true);
       client.createChannel();
       client.start();
-      Assertions.assertEquals(5, clientCRLStore.getLatestCrlId());
+      assertEquals(5, clientCRLStore.getLatestCrlId());
       GenericTestUtils.waitFor(() -> client.getUpdateCount() > 5,
           100, 2000);
       revokeCertNow(certIds.get(6));
@@ -286,9 +287,9 @@ public class TestSCMUpdateServiceGrpcServer {
 
       GenericTestUtils.waitFor(() -> client.getUpdateCount() > 6,
           100, 2000);
-      Assertions.assertTrue(client.getUpdateCount() >= 6);
-      Assertions.assertEquals(2, client.getErrorCount());
-      Assertions.assertEquals(6, clientCRLStore.getLatestCrlId());
+      assertTrue(client.getUpdateCount() >= 6);
+      assertEquals(2, client.getErrorCount());
+      assertEquals(6, clientCRLStore.getLatestCrlId());
     } catch (Exception e) {
       e.printStackTrace();
     } finally {
