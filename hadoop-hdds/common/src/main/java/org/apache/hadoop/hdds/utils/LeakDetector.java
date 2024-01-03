@@ -37,9 +37,9 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * <pre> {@code
  * class MyResource implements AutoClosable {
- *   static final UncheckedAutoCloseable LEAK_DETECTOR = new LeakDetector("MyResource");
+ *   static final LeakDetector LEAK_DETECTOR = new LeakDetector("MyResource");
  *
- *   private final LeakTracker leakTracker = LEAK_DETECTOR.track(this, () -> {
+ *   private final UncheckedAutoCloseable leakTracker = LEAK_DETECTOR.track(this, () -> {
  *      // report leaks, don't refer to the original object (MyResource) here.
  *      System.out.println("MyResource is not closed before being discarded.");
  *   });
