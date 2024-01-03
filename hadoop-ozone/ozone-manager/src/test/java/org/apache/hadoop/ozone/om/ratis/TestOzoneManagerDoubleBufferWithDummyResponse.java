@@ -49,10 +49,10 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class tests OzoneManagerDoubleBuffer implementation with
@@ -112,16 +112,16 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     waitFor(() -> metrics.getTotalNumOfFlushedTransactions() == bucketCount,
         100, 60000);
 
-    assertTrue(metrics.getTotalNumOfFlushOperations() > 0);
+    assertThat(metrics.getTotalNumOfFlushOperations()).isGreaterThan(0);
     assertEquals(bucketCount, doubleBuffer.getFlushedTransactionCount());
-    assertTrue(metrics.getMaxNumberOfTransactionsFlushedInOneIteration() > 0);
+    assertThat(metrics.getMaxNumberOfTransactionsFlushedInOneIteration()).isGreaterThan(0);
     assertEquals(bucketCount, omMetadataManager.countRowsInTable(
         omMetadataManager.getBucketTable()));
-    assertTrue(doubleBuffer.getFlushIterations() > 0);
-    assertTrue(metrics.getFlushTime().lastStat().numSamples() > 0);
-    assertTrue(metrics.getAvgFlushTransactionsInOneIteration() > 0);
+    assertThat(doubleBuffer.getFlushIterations()).isGreaterThan(0);
+    assertThat(metrics.getFlushTime().lastStat().numSamples()).isGreaterThan(0);
+    assertThat(metrics.getAvgFlushTransactionsInOneIteration()).isGreaterThan(0);
     assertEquals(bucketCount, (long) metrics.getQueueSize().lastStat().total());
-    assertTrue(metrics.getQueueSize().lastStat().numSamples() > 0);
+    assertThat(metrics.getQueueSize().lastStat().numSamples()).isGreaterThan(0);
 
     // Assert there is only instance of OM Double Metrics.
     OzoneManagerDoubleBufferMetrics metricsCopy =

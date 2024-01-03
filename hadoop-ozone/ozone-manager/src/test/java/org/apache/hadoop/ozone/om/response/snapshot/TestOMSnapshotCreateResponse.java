@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMResponse;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -271,8 +272,7 @@ public class TestOMSnapshotCreateResponse {
       while (keyIter.hasNext()) {
         Table.KeyValue<String, ?> entry = keyIter.next();
         String dbKey = entry.getKey();
-        assertTrue(expectedKeys.contains(dbKey),
-            table.getName() + " should contain key");
+        assertThat(expectedKeys).contains(dbKey);
         expectedKeys.remove(dbKey);
       }
     }

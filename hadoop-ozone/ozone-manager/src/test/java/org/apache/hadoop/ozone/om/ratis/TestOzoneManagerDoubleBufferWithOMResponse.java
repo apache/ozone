@@ -63,10 +63,10 @@ import org.apache.hadoop.util.Daemon;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newBucketInfoBuilder;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
@@ -275,7 +275,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     // total transaction count. So, just checking here whether it is less
     // than total transaction count.
     final TransactionInfo info = omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
-    assertTrue(info.getTransactionIndex() <= bucketCount + deleteCount + 2);
+    assertThat(info.getTransactionIndex()).isLessThanOrEqualTo(bucketCount + deleteCount + 2);
   }
 
   /**
@@ -411,7 +411,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
         assertRowCount(expectedBuckets, omMetadataManager.getBucketTable()),
         300, volumeCount * 300);
 
-    assertTrue(doubleBuffer.getFlushIterations() > 0);
+    assertThat(doubleBuffer.getFlushIterations()).isGreaterThan(0);
   }
 
   private boolean assertRowCount(int expected, Table<String, ?> table) {

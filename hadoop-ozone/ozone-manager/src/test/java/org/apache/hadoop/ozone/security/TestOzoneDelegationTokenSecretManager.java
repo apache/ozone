@@ -57,6 +57,7 @@ import org.apache.hadoop.util.Time;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -254,7 +255,7 @@ public class TestOzoneDelegationTokenSecretManager {
     }
 
     long renewalTime = secretManager.renewToken(token, TEST_USER.toString());
-    assertTrue(renewalTime > 0);
+    assertThat(renewalTime).isGreaterThan(0);
   }
 
   @Test
@@ -320,7 +321,7 @@ public class TestOzoneDelegationTokenSecretManager {
     IOException ioException =
         assertThrows(IOException.class,
             () -> secretManager.renewToken(token, TEST_USER.toString()));
-    assertTrue(ioException.getMessage().contains("is expired"));
+    assertThat(ioException.getMessage()).contains("is expired");
   }
 
   @Test

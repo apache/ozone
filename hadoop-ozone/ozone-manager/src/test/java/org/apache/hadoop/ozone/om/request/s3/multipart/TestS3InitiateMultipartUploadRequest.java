@@ -19,8 +19,8 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -238,7 +238,7 @@ public class TestS3InitiateMultipartUploadRequest
         "Failed to inherit parent DEFAULT acls!");
 
     // Should not inherit parent ACCESS Acls
-    assertFalse(keyAcls.contains(parentAccessAcl));
+    assertThat(keyAcls).doesNotContain(parentAccessAcl);
   }
 
 }

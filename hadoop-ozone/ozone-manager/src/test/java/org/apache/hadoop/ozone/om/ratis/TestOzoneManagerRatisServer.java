@@ -59,8 +59,8 @@ import org.slf4j.LoggerFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -197,10 +197,9 @@ public class TestOzoneManagerRatisServer {
           .setClientId(clientId)
           .build();
       OmUtils.isReadOnly(request);
-      assertFalse(
-          logCapturer.getOutput().contains("CmdType " + cmdtype + " is not " +
-              "categorized as readOnly or not."),
-          cmdtype + " is not categorized in OmUtils#isReadyOnly");
+      assertThat(logCapturer.getOutput())
+          .withFailMessage(cmdtype + " is not categorized in OmUtils#isReadyOnly")
+          .doesNotContain("CmdType " + cmdtype + " is not categorized as readOnly or not.");
       logCapturer.clearOutput();
     }
   }
