@@ -54,7 +54,6 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Unhealthy;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -77,6 +76,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doNothing;
@@ -244,15 +249,14 @@ public class TestContainerBalancerTask {
 
   @Test
   public void testCalculationOfUtilization() {
-    Assertions.assertEquals(nodesInCluster.size(), nodeUtilizations.size());
+    assertEquals(nodesInCluster.size(), nodeUtilizations.size());
     for (int i = 0; i < nodesInCluster.size(); i++) {
-      Assertions.assertEquals(nodeUtilizations.get(i),
+      assertEquals(nodeUtilizations.get(i),
           nodesInCluster.get(i).calculateUtilization(), 0.0001);
     }
 
     // should be equal to average utilization of the cluster
-    Assertions.assertEquals(averageUtilization,
-        containerBalancerTask.calculateAvgUtilization(nodesInCluster), 0.0001);
+    assertEquals(averageUtilization, containerBalancerTask.calculateAvgUtilization(nodesInCluster), 0.0001);
   }
 
   /**
@@ -281,13 +285,10 @@ public class TestContainerBalancerTask {
       unBalancedNodesAccordingToBalancer =
           containerBalancerTask.getUnBalancedNodes();
 
-      Assertions.assertEquals(
-          expectedUnBalancedNodes.size(),
-          unBalancedNodesAccordingToBalancer.size());
+      assertEquals(expectedUnBalancedNodes.size(), unBalancedNodesAccordingToBalancer.size());
 
       for (int j = 0; j < expectedUnBalancedNodes.size(); j++) {
-        Assertions.assertEquals(
-            expectedUnBalancedNodes.get(j).getDatanodeDetails(),
+        assertEquals(expectedUnBalancedNodes.get(j).getDatanodeDetails(),
             unBalancedNodesAccordingToBalancer.get(j).getDatanodeDetails());
       }
     }
@@ -324,9 +325,8 @@ public class TestContainerBalancerTask {
 
     stopBalancer();
     ContainerBalancerMetrics metrics = containerBalancerTask.getMetrics();
-    Assertions.assertEquals(0, containerBalancerTask.getUnBalancedNodes()
-        .size());
-    Assertions.assertEquals(0, metrics.getNumDatanodesUnbalanced());
+    assertEquals(0, containerBalancerTask.getUnBalancedNodes().size());
+    assertEquals(0, metrics.getNumDatanodesUnbalanced());
   }
 
   /**
@@ -368,16 +368,16 @@ public class TestContainerBalancerTask {
     stopBalancer();
 
     // balancer should have identified unbalanced nodes
-    Assertions.assertFalse(containerBalancerTask.getUnBalancedNodes()
+    assertFalse(containerBalancerTask.getUnBalancedNodes()
         .isEmpty());
     // no container should have been selected
-    Assertions.assertTrue(containerBalancerTask.getContainerToSourceMap()
+    assertTrue(containerBalancerTask.getContainerToSourceMap()
         .isEmpty());
     /*
     Iteration result should be CAN_NOT_BALANCE_ANY_MORE because no container
     move is generated
      */
-    Assertions.assertEquals(
+    assertEquals(
         ContainerBalancerTask.IterationResult.CAN_NOT_BALANCE_ANY_MORE,
         containerBalancerTask.getIterationResult());
 
@@ -391,7 +391,7 @@ public class TestContainerBalancerTask {
     // check whether all selected containers are closed
     for (ContainerID cid:
          containerBalancerTask.getContainerToSourceMap().keySet()) {
-      Assertions.assertSame(
+      assertSame(
           cidToInfoMap.get(cid).getState(), HddsProtos.LifeCycleState.CLOSED);
     }
   }
@@ -430,10 +430,10 @@ public class TestContainerBalancerTask {
     stopBalancer();
 
     // balancer should have identified unbalanced nodes
-    Assertions.assertFalse(containerBalancerTask.getUnBalancedNodes()
+    assertFalse(containerBalancerTask.getUnBalancedNodes()
         .isEmpty());
     // no container should have moved because all replicas are CLOSING
-    Assertions.assertTrue(
+    assertTrue(
         containerBalancerTask.getContainerToSourceMap().isEmpty());
   }
 
@@ -472,7 +472,7 @@ public class TestContainerBalancerTask {
     for (Map.Entry<ContainerID, DatanodeDetails> entry : map.entrySet()) {
       ContainerID container = entry.getKey();
       DatanodeDetails target = entry.getValue();
-      Assertions.assertTrue(cidToReplicasMap.get(container)
+      assertTrue(cidToReplicasMap.get(container)
           .stream()
           .map(ContainerReplica::getDatanodeDetails)
           .noneMatch(target::equals));
@@ -521,7 +521,7 @@ public class TestContainerBalancerTask {
             ecPlacementPolicy.validateContainerPlacement(replicas,
                 containerInfo.getReplicationConfig().getRequiredNodes());
       }
-      Assertions.assertTrue(placementStatus.isPolicySatisfied());
+      assertTrue(placementStatus.isPolicySatisfied());
     }
   }
 
@@ -540,9 +540,9 @@ public class TestContainerBalancerTask {
     stopBalancer();
     for (DatanodeDetails target : containerBalancerTask.getSelectedTargets()) {
       NodeStatus status = mockNodeManager.getNodeStatus(target);
-      Assertions.assertSame(HddsProtos.NodeOperationalState.IN_SERVICE,
+      assertSame(HddsProtos.NodeOperationalState.IN_SERVICE,
           status.getOperationalState());
-      Assertions.assertTrue(status.isHealthy());
+      assertTrue(status.isHealthy());
     }
   }
 
@@ -625,9 +625,9 @@ public class TestContainerBalancerTask {
     balancerConfiguration.setMaxSizeEnteringTarget(2 * OzoneConsts.MB);
     startBalancer(balancerConfiguration);
 
-    Assertions.assertFalse(containerBalancerTask.getUnBalancedNodes()
+    assertFalse(containerBalancerTask.getUnBalancedNodes()
         .isEmpty());
-    Assertions.assertTrue(containerBalancerTask.getContainerToSourceMap()
+    assertTrue(containerBalancerTask.getContainerToSourceMap()
         .isEmpty());
     stopBalancer();
 
@@ -643,9 +643,9 @@ public class TestContainerBalancerTask {
 
     stopBalancer();
     // balancer should have identified unbalanced nodes
-    Assertions.assertFalse(containerBalancerTask.getUnBalancedNodes()
+    assertFalse(containerBalancerTask.getUnBalancedNodes()
         .isEmpty());
-    Assertions.assertFalse(containerBalancerTask.getContainerToSourceMap()
+    assertFalse(containerBalancerTask.getContainerToSourceMap()
         .isEmpty());
   }
 
@@ -664,9 +664,9 @@ public class TestContainerBalancerTask {
     balancerConfiguration.setMaxSizeLeavingSource(2 * OzoneConsts.MB);
     startBalancer(balancerConfiguration);
 
-    Assertions.assertFalse(containerBalancerTask.getUnBalancedNodes()
+    assertFalse(containerBalancerTask.getUnBalancedNodes()
         .isEmpty());
-    Assertions.assertTrue(containerBalancerTask.getContainerToSourceMap()
+    assertTrue(containerBalancerTask.getContainerToSourceMap()
         .isEmpty());
     stopBalancer();
 
@@ -682,11 +682,11 @@ public class TestContainerBalancerTask {
 
     stopBalancer();
     // balancer should have identified unbalanced nodes
-    Assertions.assertFalse(containerBalancerTask.getUnBalancedNodes()
+    assertFalse(containerBalancerTask.getUnBalancedNodes()
         .isEmpty());
-    Assertions.assertFalse(containerBalancerTask.getContainerToSourceMap()
+    assertFalse(containerBalancerTask.getContainerToSourceMap()
         .isEmpty());
-    Assertions.assertNotEquals(0,
+    assertNotEquals(0,
         containerBalancerTask.getSizeScheduledForMoveInLatestIteration());
   }
 
@@ -713,21 +713,21 @@ public class TestContainerBalancerTask {
     stopBalancer();
 
     ContainerBalancerMetrics metrics = containerBalancerTask.getMetrics();
-    Assertions.assertEquals(determineExpectedUnBalancedNodes(
+    assertEquals(determineExpectedUnBalancedNodes(
             balancerConfiguration.getThreshold()).size(),
         metrics.getNumDatanodesUnbalanced());
     assertThat(metrics.getDataSizeMovedGBInLatestIteration()).isLessThanOrEqualTo(6);
     assertThat(metrics.getDataSizeMovedGB()).isGreaterThan(0);
-    Assertions.assertEquals(1, metrics.getNumIterations());
+    assertEquals(1, metrics.getNumIterations());
     assertThat(metrics.getNumContainerMovesScheduledInLatestIteration()).isGreaterThan(0);
-    Assertions.assertEquals(metrics.getNumContainerMovesScheduled(),
+    assertEquals(metrics.getNumContainerMovesScheduled(),
         metrics.getNumContainerMovesScheduledInLatestIteration());
-    Assertions.assertEquals(metrics.getNumContainerMovesScheduled(),
+    assertEquals(metrics.getNumContainerMovesScheduled(),
         metrics.getNumContainerMovesCompleted() +
             metrics.getNumContainerMovesFailed() +
             metrics.getNumContainerMovesTimeout());
-    Assertions.assertEquals(0, metrics.getNumContainerMovesTimeout());
-    Assertions.assertEquals(1, metrics.getNumContainerMovesFailed());
+    assertEquals(0, metrics.getNumContainerMovesTimeout());
+    assertEquals(1, metrics.getNumContainerMovesFailed());
   }
 
   /**
@@ -790,8 +790,8 @@ public class TestContainerBalancerTask {
         containerFromSourceMap.entrySet()) {
       DatanodeDetails source = entry.getValue();
       DatanodeDetails target = containerToTargetMap.get(entry.getKey());
-      Assertions.assertTrue(source.equals(dn1) || source.equals(dn2));
-      Assertions.assertTrue(target.equals(dn1) || target.equals(dn2));
+      assertTrue(source.equals(dn1) || source.equals(dn2));
+      assertTrue(target.equals(dn1) || target.equals(dn2));
     }
   }
 
@@ -815,13 +815,13 @@ public class TestContainerBalancerTask {
 
     ContainerBalancerConfiguration cbConf =
         ozoneConfiguration.getObject(ContainerBalancerConfiguration.class);
-    Assertions.assertEquals(1, cbConf.getThreshold(), 0.001);
+    assertEquals(1, cbConf.getThreshold(), 0.001);
 
     // Expected is 26 GB
-    Assertions.assertEquals(maxSizeLeavingSource * 1024 * 1024 * 1024,
+    assertEquals(maxSizeLeavingSource * 1024 * 1024 * 1024,
         cbConf.getMaxSizeLeavingSource());
-    Assertions.assertEquals(moveTimeout, cbConf.getMoveTimeout().toMinutes());
-    Assertions.assertEquals(replicationTimeout,
+    assertEquals(moveTimeout, cbConf.getMoveTimeout().toMinutes());
+    assertEquals(replicationTimeout,
         cbConf.getMoveReplicationTimeout().toMinutes());
   }
 
@@ -844,7 +844,7 @@ public class TestContainerBalancerTask {
     According to the setup and configurations, this iteration's result should
     be ITERATION_COMPLETED.
      */
-    Assertions.assertEquals(
+    assertEquals(
         ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
         containerBalancerTask.getIterationResult());
     stopBalancer();
@@ -862,7 +862,7 @@ public class TestContainerBalancerTask {
 
     startBalancer(balancerConfiguration);
 
-    Assertions.assertEquals(
+    assertEquals(
         ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
         containerBalancerTask.getIterationResult());
     stopBalancer();
@@ -872,7 +872,7 @@ public class TestContainerBalancerTask {
      */
     rmConf.setEnableLegacy(false);
     startBalancer(balancerConfiguration);
-    Assertions.assertEquals(
+    assertEquals(
         ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
         containerBalancerTask.getIterationResult());
     stopBalancer();
@@ -910,12 +910,9 @@ public class TestContainerBalancerTask {
     According to the setup and configurations, this iteration's result should
     be ITERATION_COMPLETED.
      */
-    Assertions.assertEquals(
-        ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
+    assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
         containerBalancerTask.getIterationResult());
-    Assertions.assertEquals(1,
-        containerBalancerTask.getMetrics()
-            .getNumContainerMovesCompletedInLatestIteration());
+    assertEquals(1, containerBalancerTask.getMetrics().getNumContainerMovesCompletedInLatestIteration());
     assertThat(containerBalancerTask.getMetrics()
             .getNumContainerMovesTimeoutInLatestIteration()).isGreaterThan(1);
     stopBalancer();
@@ -933,12 +930,9 @@ public class TestContainerBalancerTask {
         .thenAnswer(invocation -> genCompletableFuture(2000));
 
     startBalancer(balancerConfiguration);
-    Assertions.assertEquals(
-        ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
+    assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
         containerBalancerTask.getIterationResult());
-    Assertions.assertEquals(1,
-        containerBalancerTask.getMetrics()
-            .getNumContainerMovesCompletedInLatestIteration());
+    assertEquals(1, containerBalancerTask.getMetrics().getNumContainerMovesCompletedInLatestIteration());
     assertThat(containerBalancerTask.getMetrics()
         .getNumContainerMovesTimeoutInLatestIteration()).isGreaterThan(1);
     stopBalancer();
@@ -971,8 +965,7 @@ public class TestContainerBalancerTask {
 
     assertThat(containerBalancerTask.getMetrics()
         .getNumContainerMovesTimeoutInLatestIteration()).isGreaterThan(0);
-    Assertions.assertEquals(0, containerBalancerTask.getMetrics()
-        .getNumContainerMovesCompletedInLatestIteration());
+    assertEquals(0, containerBalancerTask.getMetrics().getNumContainerMovesCompletedInLatestIteration());
     stopBalancer();
 
     /*
@@ -987,8 +980,7 @@ public class TestContainerBalancerTask {
     startBalancer(balancerConfiguration);
     assertThat(containerBalancerTask.getMetrics()
         .getNumContainerMovesTimeoutInLatestIteration()).isGreaterThan(0);
-    Assertions.assertEquals(0, containerBalancerTask.getMetrics()
-        .getNumContainerMovesCompletedInLatestIteration());
+    assertEquals(0, containerBalancerTask.getMetrics().getNumContainerMovesCompletedInLatestIteration());
     stopBalancer();
   }
 
@@ -1025,8 +1017,7 @@ public class TestContainerBalancerTask {
 
     startBalancer(balancerConfiguration);
 
-    Assertions.assertEquals(
-        ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
+    assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
         containerBalancerTask.getIterationResult());
     assertThat(containerBalancerTask.getMetrics().getNumContainerMovesFailed())
         .isGreaterThanOrEqualTo(3);
@@ -1050,8 +1041,7 @@ public class TestContainerBalancerTask {
 
     rmConf.setEnableLegacy(false);
     startBalancer(balancerConfiguration);
-    Assertions.assertEquals(
-        ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
+    assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
         containerBalancerTask.getIterationResult());
     assertThat(containerBalancerTask.getMetrics().getNumContainerMovesFailed())
         .isGreaterThanOrEqualTo(3);
@@ -1069,8 +1059,7 @@ public class TestContainerBalancerTask {
     Thread balancingThread = new Thread(containerBalancerTask);
     // start the thread and assert that balancer is RUNNING
     balancingThread.start();
-    Assertions.assertEquals(ContainerBalancerTask.Status.RUNNING,
-        containerBalancerTask.getBalancerStatus());
+    assertEquals(ContainerBalancerTask.Status.RUNNING, containerBalancerTask.getBalancerStatus());
 
     /*
      Wait for the thread to start sleeping and assert that it's sleeping.
@@ -1078,7 +1067,7 @@ public class TestContainerBalancerTask {
      */
     GenericTestUtils.waitFor(
         () -> balancingThread.getState() == Thread.State.TIMED_WAITING, 1, 20);
-    Assertions.assertEquals(Thread.State.TIMED_WAITING,
+    assertEquals(Thread.State.TIMED_WAITING,
         balancingThread.getState());
 
     // interrupt the thread from its sleep, wait and assert that balancer has
@@ -1086,12 +1075,11 @@ public class TestContainerBalancerTask {
     balancingThread.interrupt();
     GenericTestUtils.waitFor(() -> containerBalancerTask.getBalancerStatus() ==
         ContainerBalancerTask.Status.STOPPED, 1, 20);
-    Assertions.assertEquals(ContainerBalancerTask.Status.STOPPED,
-        containerBalancerTask.getBalancerStatus());
+    assertEquals(ContainerBalancerTask.Status.STOPPED, containerBalancerTask.getBalancerStatus());
 
     // ensure the thread dies
     GenericTestUtils.waitFor(() -> !balancingThread.isAlive(), 1, 20);
-    Assertions.assertFalse(balancingThread.isAlive());
+    assertFalse(balancingThread.isAlive());
   }
 
   /**
@@ -1119,11 +1107,11 @@ public class TestContainerBalancerTask {
      */
     Map<ContainerID, DatanodeDetails> containerToSource =
         containerBalancerTask.getContainerToSourceMap();
-    Assertions.assertFalse(containerToSource.isEmpty());
+    assertFalse(containerToSource.isEmpty());
     for (Map.Entry<ContainerID, DatanodeDetails> entry :
         containerToSource.entrySet()) {
       ContainerInfo containerInfo = cidToInfoMap.get(entry.getKey());
-      Assertions.assertNotSame(HddsProtos.ReplicationType.EC,
+      assertNotSame(HddsProtos.ReplicationType.EC,
           containerInfo.getReplicationType());
     }
   }

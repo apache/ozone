@@ -21,6 +21,9 @@ package org.apache.hadoop.hdds.scm.node;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -73,7 +76,6 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -228,14 +230,14 @@ public class TestDeadNodeHandler {
     // First set the node to IN_MAINTENANCE and ensure the container replicas
     // are not removed on the dead event
     datanode1 = nodeManager.getNodeByUuid(datanode1.getUuidString());
-    Assertions.assertTrue(
+    assertTrue(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
     nodeManager.setNodeOperationalState(datanode1,
         HddsProtos.NodeOperationalState.IN_MAINTENANCE);
     deadNodeHandler.onMessage(datanode1, publisher);
     // make sure the node is removed from
     // ClusterNetworkTopology when it is considered as dead
-    Assertions.assertFalse(
+    assertFalse(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
 
     verify(deletedBlockLog, times(0))
@@ -243,16 +245,16 @@ public class TestDeadNodeHandler {
 
     Set<ContainerReplica> container1Replicas = containerManager
         .getContainerReplicas(ContainerID.valueOf(container1.getContainerID()));
-    Assertions.assertEquals(2, container1Replicas.size());
+    assertEquals(2, container1Replicas.size());
 
     Set<ContainerReplica> container2Replicas = containerManager
         .getContainerReplicas(ContainerID.valueOf(container2.getContainerID()));
-    Assertions.assertEquals(2, container2Replicas.size());
+    assertEquals(2, container2Replicas.size());
 
     Set<ContainerReplica> container3Replicas = containerManager
             .getContainerReplicas(
                 ContainerID.valueOf(container3.getContainerID()));
-    Assertions.assertEquals(1, container3Replicas.size());
+    assertEquals(1, container3Replicas.size());
 
     // Now set the node to anything other than IN_MAINTENANCE and the relevant
     // replicas should be removed
@@ -263,35 +265,31 @@ public class TestDeadNodeHandler {
     deadNodeHandler.onMessage(datanode1, publisher);
     //datanode1 has been removed from ClusterNetworkTopology, another
     //deadNodeHandler.onMessage call will not change this
-    Assertions.assertFalse(
+    assertFalse(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
-    Assertions.assertEquals(0, 
-        nodeManager.getCommandQueueCount(datanode1.getUuid(), cmd.getType()));
+    assertEquals(0, nodeManager.getCommandQueueCount(datanode1.getUuid(), cmd.getType()));
 
     verify(deletedBlockLog, times(1))
         .onDatanodeDead(datanode1.getUuid());
 
     container1Replicas = containerManager
         .getContainerReplicas(ContainerID.valueOf(container1.getContainerID()));
-    Assertions.assertEquals(1, container1Replicas.size());
-    Assertions.assertEquals(datanode2,
-        container1Replicas.iterator().next().getDatanodeDetails());
+    assertEquals(1, container1Replicas.size());
+    assertEquals(datanode2, container1Replicas.iterator().next().getDatanodeDetails());
 
     container2Replicas = containerManager
         .getContainerReplicas(ContainerID.valueOf(container2.getContainerID()));
-    Assertions.assertEquals(1, container2Replicas.size());
-    Assertions.assertEquals(datanode2,
-        container2Replicas.iterator().next().getDatanodeDetails());
+    assertEquals(1, container2Replicas.size());
+    assertEquals(datanode2, container2Replicas.iterator().next().getDatanodeDetails());
 
     container3Replicas = containerManager
         .getContainerReplicas(ContainerID.valueOf(container3.getContainerID()));
-    Assertions.assertEquals(1, container3Replicas.size());
-    Assertions.assertEquals(datanode3,
-        container3Replicas.iterator().next().getDatanodeDetails());
+    assertEquals(1, container3Replicas.size());
+    assertEquals(datanode3, container3Replicas.iterator().next().getDatanodeDetails());
 
     //datanode will be added back to ClusterNetworkTopology if it resurrects
     healthyReadOnlyNodeHandler.onMessage(datanode1, publisher);
-    Assertions.assertTrue(
+    assertTrue(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
 
   }

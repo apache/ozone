@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.apache.ozone.test.TestClock;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -52,6 +51,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CL
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
@@ -208,7 +209,7 @@ public class TestClosingContainerHandler {
 
     assertAndVerify(readRequest, true, 0);
     assertAndVerify(request, true, 3);
-    report.getStats().forEach((k, v) -> Assertions.assertEquals(0L, v));
+    report.getStats().forEach((k, v) -> assertEquals(0L, v));
   }
 
   @Test
@@ -227,9 +228,9 @@ public class TestClosingContainerHandler {
     assertAndVerify(request, true, 0);
     report.getStats().forEach((k, v) -> {
       if (k.equals("MISSING")) {
-        Assertions.assertEquals(1L, v);
+        assertEquals(1L, v);
       } else {
-        Assertions.assertEquals(0L, v);
+        assertEquals(0L, v);
       }
     });
   }
@@ -384,17 +385,17 @@ public class TestClosingContainerHandler {
 
     ArgumentCaptor<Boolean> forceCaptor =
         ArgumentCaptor.forClass(Boolean.class);
-    Assertions.assertTrue(subject.handle(request));
+    assertTrue(subject.handle(request));
     verify(replicationManager, times(replicas))
         .sendCloseContainerReplicaCommand(any(ContainerInfo.class),
             any(DatanodeDetails.class), forceCaptor.capture());
     forceCaptor.getAllValues()
-        .forEach(f -> Assertions.assertEquals(force, f));
+        .forEach(f -> assertEquals(force, f));
   }
 
   private void assertAndVerify(ContainerCheckRequest request,
       boolean assertion, int times) {
-    Assertions.assertEquals(assertion, subject.handle(request));
+    assertEquals(assertion, subject.handle(request));
     verify(replicationManager, times(times))
         .sendCloseContainerReplicaCommand(any(ContainerInfo.class),
             any(DatanodeDetails.class), anyBoolean());
