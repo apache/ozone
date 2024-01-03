@@ -24,8 +24,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Containe
 import java.util.List;
 
 /**
- * Customized queue to handle FCR and ICR from datanode optimally,
- * avoiding duplicate FCR reports.
+ * Customized queue to handle multiple ICR report together.
  */
 public class ReconContainerReportQueue extends ContainerReportQueue {
 
