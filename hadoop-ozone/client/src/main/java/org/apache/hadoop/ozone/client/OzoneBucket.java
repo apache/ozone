@@ -301,6 +301,10 @@ public class OzoneBucket extends WithMetadata {
     return owner;
   }
 
+  public int getListCacheSize() {
+    return listCacheSize;
+  }
+
   /**
    * Builder for OmBucketInfo.
   /**
@@ -403,6 +407,10 @@ public class OzoneBucket extends WithMetadata {
   public void setReplicationConfig(ReplicationConfig replicationConfig)
       throws IOException {
     proxy.setReplicationConfig(volumeName, name, replicationConfig);
+  }
+
+  public void setListCacheSize(int listCacheSize) {
+    this.listCacheSize = listCacheSize;
   }
 
   /**
