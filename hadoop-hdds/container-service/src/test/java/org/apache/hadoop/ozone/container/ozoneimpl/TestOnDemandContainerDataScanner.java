@@ -109,6 +109,15 @@ public class TestOnDemandContainerDataScanner extends
     Mockito.verify(controller, atLeastOnce())
         .updateDataScanTimestamp(
             eq(healthy.getContainerData().getContainerID()), any());
+
+    // Metrics for deleted container should not be updated.
+    scanFuture =
+        OnDemandContainerDataScanner.scanContainer(healthy);
+    Assertions.assertTrue(scanFuture.isPresent());
+    scanFuture.get().get();
+    Mockito.verify(controller, never())
+        .updateDataScanTimestamp(
+            eq(deletedContainer.getContainerData().getContainerID()), any());
   }
 
   @Test
@@ -196,6 +205,9 @@ public class TestOnDemandContainerDataScanner extends
     verifyContainerMarkedUnhealthy(openCorruptMetadata, never());
     scanContainer(openContainer);
     verifyContainerMarkedUnhealthy(openContainer, never());
+    // Deleted containers should not be marked unhealthy
+    scanContainer(deletedContainer);
+    verifyContainerMarkedUnhealthy(deletedContainer, never());
   }
 
   /**

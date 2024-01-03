@@ -99,7 +99,7 @@ public class TestBackgroundContainerMetadataScanner extends
 
     ContainerMetadataScannerMetrics metrics = scanner.getMetrics();
     assertEquals(1, metrics.getNumScanIterations());
-    assertEquals(3, metrics.getNumContainersScanned());
+    assertEquals(4, metrics.getNumContainersScanned());
     assertEquals(1, metrics.getNumUnHealthyContainers());
   }
 

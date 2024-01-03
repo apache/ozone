@@ -42,6 +42,7 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.conf.OzoneConfiguration.newInstanceOf;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getDeletedContainerResult;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyScanResult;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.CONTAINER_SCAN_MIN_GAP_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -71,6 +72,9 @@ public abstract class TestContainerScannersAbstract {
 
   @Mock
   protected Container<ContainerData> corruptData;
+
+  @Mock
+  protected Container<ContainerData> deletedContainer;
 
   @Mock
   protected HddsVolume vol;
@@ -206,7 +210,13 @@ public abstract class TestContainerScannersAbstract {
         false, getUnhealthyScanResult(), ScanResult.healthy(),
         CONTAINER_SEQ_ID, vol);
 
-    containers.addAll(Arrays.asList(healthy, corruptData, openCorruptMetadata));
+    // Mock container that has been deleted during scan.
+    ContainerTestUtils.setupMockContainer(deletedContainer,
+        true, ScanResult.healthy(), getDeletedContainerResult(),
+        CONTAINER_SEQ_ID, vol);
+
+    containers.addAll(Arrays.asList(healthy, corruptData, openCorruptMetadata,
+        deletedContainer));
     ContainerController mock = mock(ContainerController.class);
     when(mock.getContainers(vol)).thenReturn(containers.iterator());
     when(mock.getContainers()).thenReturn(containers);
