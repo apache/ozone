@@ -16,22 +16,35 @@
  * limitations under the License.
  *
  */
-package org.apache.hadoop.hdds.utils.db.managed;
+package org.apache.hadoop.hdds.utils;
 
-import org.apache.hadoop.hdds.utils.LeakTracker;
-import org.rocksdb.CompactRangeOptions;
-
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
+import java.lang.ref.ReferenceQueue;
+import java.lang.ref.WeakReference;
+import java.util.Set;
 
 /**
- * Managed CompactRangeOptions.
+ * A token to track resource closure.
+ *
+ * @see LeakDetector
  */
-public class ManagedCompactRangeOptions extends CompactRangeOptions {
-  private final LeakTracker leakTracker = track(this);
+public class LeakTracker extends WeakReference<Object> {
+  private final Set<LeakTracker> allLeaks;
+  private final Runnable leakReporter;
+  LeakTracker(Object referent, ReferenceQueue<Object> referenceQueue,
+      Set<LeakTracker> allLeaks, Runnable leakReporter) {
+    super(referent, referenceQueue);
+    this.allLeaks = allLeaks;
+    this.leakReporter = leakReporter;
+  }
 
-  @Override
+  /**
+   * Called by the tracked resource when closing.
+   */
   public void close() {
-    super.close();
-    leakTracker.close();
+    allLeaks.remove(this);
+  }
+
+  void reportLeak() {
+    leakReporter.run();
   }
 }
