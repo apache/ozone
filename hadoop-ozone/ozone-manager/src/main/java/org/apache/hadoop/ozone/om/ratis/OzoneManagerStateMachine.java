@@ -101,7 +101,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final AtomicInteger statePausedCount = new AtomicInteger(0);
   private final String threadPrefix;
 
+  /** The last {@link TermIndex} received from {@link #notifyTermIndexUpdated(long, long)}. */
   private volatile TermIndex lastNotifiedTermIndex = TermIndex.valueOf(0, RaftLog.INVALID_LOG_INDEX);
+  /** The last index skipped by {@link #notifyTermIndexUpdated(long, long)}. */
+  private volatile long lastSkippedIndex = RaftLog.INVALID_LOG_INDEX;
 
   private OzoneManagerStateMachineMetrics metrics;
 
@@ -168,17 +171,14 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     ozoneManager.omHAMetricsInit(newLeaderId.toString());
   }
 
-  /**
-   * Called to notify state machine about indexes which are processed
-   * internally by Raft Server, this currently happens when conf entries are
-   * processed in raft Server. This keep state machine to keep a track of index
-   * updates.
-   * @param currentTerm term of the current log entry
-   * @param index index which is being updated
-   */
+  /** Notified by Ratis for non-StateMachine term-index update. */
   @Override
-  public synchronized void notifyTermIndexUpdated(long currentTerm, long index) {
-    final TermIndex newTermIndex = TermIndex.valueOf(currentTerm, index);
+  public synchronized void notifyTermIndexUpdated(long currentTerm, long newIndex) {
+    final long oldIndex = lastNotifiedTermIndex.getIndex();
+    if (newIndex - oldIndex > 1) {
+      lastSkippedIndex = newIndex - 1;
+    }
+    final TermIndex newTermIndex = TermIndex.valueOf(currentTerm, newIndex);
     lastNotifiedTermIndex = assertUpdateIncreasingly("lastNotified", lastNotifiedTermIndex, newTermIndex);
   }
 
@@ -343,32 +343,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       // lastAppliedIndex in OzoneManager StateMachine, even if other
       // executor has completed the transactions with id more.
 
-      // We have 300 transactions, And for each volume we have transactions
-      // of 150. Volume1 transactions 0 - 149 and Volume2 transactions 150 -
-      // 299.
-      // Example: Executor1 - Volume1 - 100 (current completed transaction)
-      // Example: Executor2 - Volume2 - 299 (current completed transaction)
-
-      // Now we have applied transactions of 0 - 100 and 149 - 299. We
-      // cannot update lastAppliedIndex to 299. We need to update it to 100,
-      // since 101 - 149 are not applied. When OM restarts it will
-      // applyTransactions from lastAppliedIndex.
-      // We can update the lastAppliedIndex to 100, and update it to 299,
-      // only after completing 101 - 149. In initial stage, we are starting
-      // with single global executor. Will revisit this when needed.
-
-      // Add the term index and transaction log index to applyTransaction map
-      // . This map will be used to update lastAppliedIndex.
-
-      CompletableFuture<Message> ratisFuture =
-          new CompletableFuture<>();
-
       //if there are too many pending requests, wait for doubleBuffer flushing
       ozoneManagerDoubleBuffer.acquireUnFlushedTransactions(1);
 
-      CompletableFuture<OMResponse> future = CompletableFuture.supplyAsync(
-          () -> runCommand(request, termIndex), executorService);
-      future.thenApply(omResponse -> {
+      return CompletableFuture.supplyAsync(() -> runCommand(request, termIndex), executorService)
+          .thenApply(omResponse -> {
         if (!omResponse.getSuccess()) {
           // When INTERNAL_ERROR or METADATA_ERROR it is considered as
           // critical error and terminate the OM. Considering INTERNAL_ERROR
@@ -391,11 +370,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
         // For successful response and for all other errors which are not
         // critical, we can complete future normally.
-        ratisFuture.complete(OMRatisHelper.convertResponseToMessage(
-            omResponse));
-        return ratisFuture;
+        return OMRatisHelper.convertResponseToMessage(omResponse);
       });
-      return ratisFuture;
     } catch (Exception e) {
       return completeExceptionally(e);
     }
@@ -489,10 +465,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   @Override
   public long takeSnapshot() throws IOException {
-    try {
-      ozoneManagerDoubleBuffer.awaitFlush();
-    } catch (InterruptedException e) {
-      throw IOUtils.toInterruptedIOException("Interrupted ozoneManagerDoubleBuffer.awaitFlush", e);
+    // wait until applied == skipped
+    while (getLastAppliedTermIndex().getIndex() < lastSkippedIndex) {
+      try {
+        ozoneManagerDoubleBuffer.awaitFlush();
+      } catch (InterruptedException e) {
+        throw IOUtils.toInterruptedIOException("Interrupted ozoneManagerDoubleBuffer.awaitFlush", e);
+      }
     }
 
     return takeSnapshotImpl();
@@ -503,6 +482,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     final TermIndex notified = getLastNotifiedTermIndex();
     final TermIndex snapshot = applied.compareTo(notified) > 0 ? applied : notified;
     LOG.info(" applied = {}", applied);
+    LOG.info(" skipped = {}", lastSkippedIndex);
     LOG.info("notified = {}", notified);
     LOG.info("snapshot = {}", snapshot);
 
