@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.hdds.HddsUtils.getSCMAddressForDatanodes;
 import static org.apache.hadoop.hdds.HddsUtils.processForLogging;
@@ -38,12 +39,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT;
-
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -199,7 +197,7 @@ public class TestHddsUtils {
     Collection<InetSocketAddress> scmAddressList =
         HddsUtils.getSCMAddressForDatanodes(conf);
 
-    Assertions.assertNotNull(scmAddressList);
+    assertNotNull(scmAddressList);
     assertEquals(3, scmAddressList.size());
 
     for (InetSocketAddress next : scmAddressList) {

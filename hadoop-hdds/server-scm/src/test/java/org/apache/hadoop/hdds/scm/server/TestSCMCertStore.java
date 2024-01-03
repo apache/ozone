@@ -60,6 +60,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.DATANODE
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.OM;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -143,8 +144,9 @@ public class TestSCMCertStore {
 
     assertNotNull(certInfo);
     assertNotNull(certInfo.getX509Certificate());
-    assertTrue(certInfo.getTimestamp() > 0L,
-        "Timestamp should be greater than 0");
+    assertThat(certInfo.getTimestamp())
+        .withFailMessage("Timestamp should be greater than 0")
+        .isGreaterThan(0L);
 
     long crlId = scmCertStore.getLatestCrlId();
     assertEquals(sequenceId.get().longValue(), crlId);

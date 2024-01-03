@@ -135,12 +135,22 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
           SCMCommandProto.Type.deleteBlocksCommand, command.getType());
       return;
     }
-
+    DeleteCmdInfo cmd = new DeleteCmdInfo((DeleteBlocksCommand) command,
+        container, context, connectionManager);
     try {
-      DeleteCmdInfo cmd = new DeleteCmdInfo((DeleteBlocksCommand) command,
-          container, context, connectionManager);
       deleteCommandQueues.add(cmd);
     } catch (IllegalStateException e) {
+      String dnId = context.getParent().getDatanodeDetails().getUuidString();
+      Consumer<CommandStatus> updateFailure = (cmdStatus) -> {
+        cmdStatus.markAsFailed();
+        ContainerBlocksDeletionACKProto emptyACK =
+            ContainerBlocksDeletionACKProto
+                .newBuilder()
+                .setDnId(dnId)
+                .build();
+        ((DeleteBlockCommandStatus)cmdStatus).setBlocksDeletionAck(emptyACK);
+      };
+      updateCommandStatus(cmd.getContext(), cmd.getCmd(), updateFailure, LOG);
       LOG.warn("Command is discarded because of the command queue is full");
     }
   }
@@ -382,9 +392,13 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     } finally {
       final ContainerBlocksDeletionACKProto deleteAck =
           blockDeletionACK;
-      final boolean status = cmdExecuted;
+      final boolean executedStatus = cmdExecuted;
       Consumer<CommandStatus> statusUpdater = (cmdStatus) -> {
-        cmdStatus.setStatus(status);
+        if (executedStatus) {
+          cmdStatus.markAsExecuted();
+        } else {
+          cmdStatus.markAsFailed();
+        }
         ((DeleteBlockCommandStatus)cmdStatus).setBlocksDeletionAck(deleteAck);
       };
       updateCommandStatus(cmd.getContext(), cmd.getCmd(), statusUpdater, LOG);

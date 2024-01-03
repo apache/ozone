@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OmUtils;
@@ -34,7 +38,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeyRequest;
 import org.apache.hadoop.util.Time;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -87,7 +90,7 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
         getOMKeyRenameRequest(modifiedOmRequest);
     OMClientResponse response =
         omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L);
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.RENAME_OPEN_FILE,
+    assertEquals(OzoneManagerProtocolProtos.Status.RENAME_OPEN_FILE,
         response.getOMResponse().getStatus());
   }
 
@@ -95,7 +98,7 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
   @Test
   public void testValidateAndUpdateCacheWithToKeyInvalid() throws Exception {
     String invalidToKeyName = "invalid:";
-    Assertions.assertThrows(
+    assertThrows(
         OMException.class, () -> doPreExecute(createRenameKeyRequest(
             volumeName, bucketName, fromKeyName, invalidToKeyName)));  }
 
@@ -104,14 +107,14 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
     String emptyToKeyName = "";
     OMRequest omRequest = doPreExecute(createRenameKeyRequest(volumeName,
         bucketName, fromKeyName, emptyToKeyName));
-    Assertions.assertEquals(omRequest.getRenameKeyRequest().getToKeyName(), "");
+    assertEquals(omRequest.getRenameKeyRequest().getToKeyName(), "");
   }
 
   @Override
   @Test
   public void testValidateAndUpdateCacheWithFromKeyInvalid() throws Exception {
     String invalidFromKeyName = "";
-    Assertions.assertThrows(
+    assertThrows(
         OMException.class, () -> doPreExecute(createRenameKeyRequest(
             volumeName, bucketName, invalidFromKeyName, toKeyName)));
   }
@@ -134,8 +137,8 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
         modifiedOmRequest.getRenameKeyRequest().getKeyArgs().getKeyName();
     String expectedSrcKeyName = OmUtils.normalizeKey(toKeyName, false);
     String expectedDstKeyName = OmUtils.normalizeKey(fromKeyName, false);
-    Assertions.assertEquals(expectedSrcKeyName, normalizedSrcName);
-    Assertions.assertEquals(expectedDstKeyName, normalizedDstName);
+    assertEquals(expectedSrcKeyName, normalizedSrcName);
+    assertEquals(expectedDstKeyName, normalizedDstName);
   }
 
   /**
@@ -166,10 +169,10 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
 
     // Will not be equal, as UserInfo will be set and modification time is
     // set in KeyArgs.
-    Assertions.assertNotEquals(originalOmRequest, modifiedOmRequest);
+    assertNotEquals(originalOmRequest, modifiedOmRequest);
 
-    Assertions.assertTrue(modifiedOmRequest.getRenameKeyRequest()
-        .getKeyArgs().getModificationTime() > 0);
+    assertThat(modifiedOmRequest.getRenameKeyRequest()
+        .getKeyArgs().getModificationTime()).isGreaterThan(0);
 
     return modifiedOmRequest;
   }
@@ -212,10 +215,8 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
         .getDirectoryTable().get(getDBKeyName(fromKeyParentInfo));
     OmDirectoryInfo updatedToKeyParentInfo = omMetadataManager
         .getDirectoryTable().get(getDBKeyName(toKeyParentInfo));
-    Assertions.assertEquals(except,
-        updatedFromKeyParentInfo.getModificationTime());
-    Assertions.assertEquals(except,
-        updatedToKeyParentInfo.getModificationTime());
+    assertEquals(except, updatedFromKeyParentInfo.getModificationTime());
+    assertEquals(except, updatedToKeyParentInfo.getModificationTime());
   }
 
   @Override

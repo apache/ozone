@@ -18,11 +18,12 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import java.io.IOException;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -86,11 +87,10 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
         keyName, multipartUploadID);
 
     // Check table and response.
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
-    Assertions.assertNull(
-        omMetadataManager.getMultipartInfoTable().get(multipartKey));
-    Assertions.assertNull(omMetadataManager
+    assertNull(omMetadataManager.getMultipartInfoTable().get(multipartKey));
+    assertNull(omMetadataManager
         .getOpenKeyTable(s3MultipartUploadAbortRequest.getBucketLayout())
         .get(multipartOpenKey));
 
@@ -118,7 +118,7 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
         s3MultipartUploadAbortRequest.validateAndUpdateCache(ozoneManager, 2L);
 
     // Check table and response.
-    Assertions.assertEquals(
+    assertEquals(
         OzoneManagerProtocolProtos.Status.NO_SUCH_MULTIPART_UPLOAD_ERROR,
         omClientResponse.getOMResponse().getStatus());
 
@@ -145,7 +145,7 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
         s3MultipartUploadAbortRequest.validateAndUpdateCache(ozoneManager, 2L);
 
     // Check table and response.
-    Assertions.assertEquals(
+    assertEquals(
         OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
 
@@ -173,7 +173,7 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
         s3MultipartUploadAbortRequest.validateAndUpdateCache(ozoneManager, 2L);
 
     // Check table and response.
-    Assertions.assertEquals(
+    assertEquals(
         OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
 

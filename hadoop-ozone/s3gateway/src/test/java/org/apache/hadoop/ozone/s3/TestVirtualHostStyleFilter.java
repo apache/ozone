@@ -32,7 +32,6 @@ import java.net.URI;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 
@@ -187,16 +186,15 @@ public class TestVirtualHostStyleFilter {
     ContainerRequest containerRequest = createContainerRequest("mybucket" +
         ".localhost:9878", null, "?prefix=bh", true);
     virtualHostStyleFilter.filter(containerRequest);
-    assertTrue(expected.toString().contains(containerRequest.getRequestUri()
-        .toString()));
+    assertThat(expected.toString())
+        .contains(containerRequest.getRequestUri().toString());
 
     containerRequest = createContainerRequest("mybucket" +
         ".localhost:9878", null, "?prefix=bh&type=dir", true);
     virtualHostStyleFilter.filter(containerRequest);
     expected = new URI("http://" + s3HttpAddr +
         "/mybucket?prefix=bh&type=dir");
-    assertTrue(expected.toString().contains(containerRequest.getRequestUri()
-        .toString()));
+    assertThat(expected.toString()).contains(containerRequest.getRequestUri().toString());
 
   }
 

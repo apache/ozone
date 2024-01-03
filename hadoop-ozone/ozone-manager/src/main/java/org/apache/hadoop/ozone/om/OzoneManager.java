@@ -386,8 +386,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omClientProtocolMetrics;
   private OzoneManagerHttpServer httpServer;
   private final OMStorage omStorage;
-  private final ScmBlockLocationProtocol scmBlockClient;
-  private final StorageContainerLocationProtocol scmContainerClient;
   private ObjectName omInfoBeanName;
   private Timer metricsTimer;
   private ScheduleOMMetricsWriteTask scheduleOMMetricsWriteTask;
@@ -603,9 +601,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Honor property 'hadoop.security.token.service.use_ip'
     omRpcAddressTxt = new Text(SecurityUtil.buildTokenService(omNodeRpcAddr));
 
-    scmContainerClient = getScmContainerClient(configuration);
+    final StorageContainerLocationProtocol scmContainerClient = getScmContainerClient(configuration);
     // verifies that the SCM info in the OM Version file is correct.
-    scmBlockClient = getScmBlockClient(configuration);
+    final ScmBlockLocationProtocol scmBlockClient = getScmBlockClient(configuration);
     this.scmClient = new ScmClient(scmBlockClient, scmContainerClient,
         configuration);
     this.ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
@@ -1904,7 +1902,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * change could be to add or to remove an OM from the ring.
    */
   public void updatePeerList(List<String> newPeers) {
-    List<String> currentPeers = omRatisServer.getPeerIds();
+    final Set<String> currentPeers = omRatisServer.getPeerIds();
 
     // NodeIds present in new node list and not in current peer list are the
     // bootstapped OMs and should be added to the peer list
@@ -2411,16 +2409,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public void cancelDelegationToken(Token<OzoneTokenIdentifier> token)
       throws OMException {
-    OzoneTokenIdentifier id = null;
     try {
       String canceller = getRemoteUser().getUserName();
-      id = delegationTokenMgr.cancelToken(token, canceller);
+      final OzoneTokenIdentifier id = delegationTokenMgr.cancelToken(token, canceller);
       LOG.trace("Delegation token cancelled for dt: {}", id);
     } catch (OMException oex) {
       throw oex;
     } catch (IOException ex) {
       LOG.error("Delegation token cancellation failed for dt id: {}, cause: {}",
-          id, ex.getMessage());
+          token.getIdentifier(), ex.getMessage());
       throw new OMException("Delegation token renewal failed for dt: " + token,
           ex, TOKEN_ERROR_OTHER);
     }
@@ -3029,40 +3026,33 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return "" + omRpcAddress.getPort();
   }
 
+  private static List<List<String>> getRatisRolesException(String exceptionString) {
+    return Collections.singletonList(Collections.singletonList(exceptionString));
+  }
+
   @Override
   public List<List<String>> getRatisRoles() {
-    List<ServiceInfo> serviceList;
-    List<List<String>> resultList = new ArrayList<>();
-    List<String> messageException = new ArrayList<>();
     int port = omNodeDetails.getRatisPort();
-    RaftPeer leaderId;
-    if (isRatisEnabled) {
-      if (null == omRatisServer) {
-        messageException.add("Server is shutting down");
-        resultList.add(messageException);
-        return resultList;
-      }
-      try {
-        leaderId = omRatisServer.getLeader();
-        if (leaderId == null) {
-          LOG.error("No leader found");
-          messageException.add("Exception: Not a Leader");
-          resultList.add(messageException);
-          return resultList;
-        }
-        serviceList = getServiceList();
-      } catch (IOException e) {
-        LOG.error("IO-Exception Occurred", e);
-        messageException.add("IO-Exception Occurred, " + e.getMessage());
-        resultList.add(messageException);
-        return resultList;
-      }
-      return OmUtils.format(serviceList, port, leaderId.getId().toString());
-    } else {
-      messageException.add("Ratis Disabled");
-      resultList.add(messageException);
-      return resultList;
+    if (!isRatisEnabled) {
+      return getRatisRolesException("Ratis is disabled");
     }
+    if (null == omRatisServer) {
+      return getRatisRolesException("Server is shutting down");
+    }
+    final RaftPeerId leaderId = omRatisServer.getLeaderId();
+    if (leaderId == null) {
+      LOG.error("No leader found");
+      return getRatisRolesException("No leader found");
+    }
+
+    final List<ServiceInfo> serviceList;
+    try {
+      serviceList = getServiceList();
+    } catch (IOException e) {
+      LOG.error("Failed to getServiceList", e);
+      return getRatisRolesException("IO-Exception Occurred, " + e.getMessage());
+    }
+    return OmUtils.format(serviceList, port, leaderId.toString());
   }
 
   /**
@@ -3212,16 +3202,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put("newLeaderId", newLeaderId);
     try {
-      RaftGroupId groupID = omRatisServer.getRaftGroup().getGroupId();
-      RaftServer.Division division = omRatisServer.getServer()
-          .getDivision(groupID);
-      RaftPeerId targetPeerId;
+      final RaftServer.Division division = omRatisServer.getServerDivision();
+      final RaftPeerId targetPeerId;
       if (newLeaderId.isEmpty()) {
-        RaftPeer curLeader = omRatisServer.getLeader();
-        targetPeerId = division.getGroup()
-            .getPeers().stream().filter(a -> !a.equals(curLeader)).findFirst()
-            .map(RaftPeer::getId).orElseThrow(() -> new IOException("Cannot" +
-                " find a new leader to transfer leadership."));
+        final RaftPeerId curLeader = omRatisServer.getLeaderId();
+        targetPeerId = division.getGroup().getPeers().stream()
+            .map(RaftPeer::getId)
+            .filter(id -> !id.equals(curLeader))
+            .findFirst()
+            .orElseThrow(() -> new IOException("Cannot find a new leader to transfer leadership."));
       } else {
         targetPeerId = RaftPeerId.valueOf(newLeaderId);
       }
@@ -4124,24 +4113,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     OzoneManagerRatisServer.RaftServerStatus raftServerStatus =
         omRatisServer.checkLeaderStatus();
     RaftPeerId raftPeerId = omRatisServer.getRaftPeerId();
-    RaftPeerId raftLeaderId = null;
-    String raftLeaderAddress = null;
-    RaftPeer leader = omRatisServer.getLeader();
-    if (null != leader) {
-      raftLeaderId = leader.getId();
-      raftLeaderAddress = omRatisServer.getRaftLeaderAddress(leader);
-    }
 
     switch (raftServerStatus) {
     case LEADER_AND_READY: return;
     case LEADER_AND_NOT_READY:
-      throw new OMLeaderNotReadyException(
-        raftPeerId.toString() + " is Leader " +
-            "but not ready to process request yet.");
+      throw new OMLeaderNotReadyException(raftPeerId + " is Leader but not ready to process request yet.");
     case NOT_LEADER:
-      throw raftLeaderId == null ? new OMNotLeaderException(raftPeerId) :
-          new OMNotLeaderException(raftPeerId, raftLeaderId,
-              raftLeaderAddress);
+      throw omRatisServer.newOMNotLeaderException();
     default: throw new IllegalStateException(
         "Unknown Ratis Server state: " + raftServerStatus);
     }

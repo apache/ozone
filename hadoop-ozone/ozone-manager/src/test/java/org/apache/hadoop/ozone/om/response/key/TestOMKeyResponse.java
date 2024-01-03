@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import static org.mockito.Mockito.framework;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Random;
@@ -36,7 +37,6 @@ import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -128,7 +128,7 @@ public class TestOMKeyResponse {
 
   @AfterEach
   public void stop() {
-    Mockito.framework().clearInlineMocks();
+    framework().clearInlineMocks();
     if (batchOperation != null) {
       batchOperation.close();
     }

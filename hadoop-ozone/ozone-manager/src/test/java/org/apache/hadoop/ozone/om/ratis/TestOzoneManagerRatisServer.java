@@ -51,17 +51,16 @@ import org.apache.ratis.statemachine.SnapshotInfo;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.LifeCycle;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 import org.slf4j.LoggerFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -116,7 +115,7 @@ public class TestOzoneManagerRatisServer {
     when(omStorage.getClusterID()).thenReturn("test");
     when(omStorage.getOmId()).thenReturn(UUID.randomUUID().toString());
     // Starts a single node Ratis server
-    ozoneManager = Mockito.mock(OzoneManager.class);
+    ozoneManager = mock(OzoneManager.class);
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.toAbsolutePath().toString());
@@ -150,7 +149,7 @@ public class TestOzoneManagerRatisServer {
    */
   @Test
   public void testStartOMRatisServer() throws Exception {
-    Assertions.assertEquals(LifeCycle.State.RUNNING,
+    assertEquals(LifeCycle.State.RUNNING,
         omRatisServer.getServerState(),
         "Ratis Server should be in running state");
   }
@@ -177,10 +176,8 @@ public class TestOzoneManagerRatisServer {
     TermIndex lastAppliedTermIndex =
         omRatisServer.getLastAppliedTermIndex();
 
-    Assertions.assertEquals(newSnapshotIndex.getIndex(),
-        lastAppliedTermIndex.getIndex());
-    Assertions.assertEquals(newSnapshotIndex.getTerm(),
-        lastAppliedTermIndex.getTerm());
+    assertEquals(newSnapshotIndex.getIndex(), lastAppliedTermIndex.getIndex());
+    assertEquals(newSnapshotIndex.getTerm(), lastAppliedTermIndex.getTerm());
   }
 
   /**
@@ -200,10 +197,9 @@ public class TestOzoneManagerRatisServer {
           .setClientId(clientId)
           .build();
       OmUtils.isReadOnly(request);
-      assertFalse(
-          logCapturer.getOutput().contains("CmdType " + cmdtype + " is not " +
-              "categorized as readOnly or not."),
-          cmdtype + " is not categorized in OmUtils#isReadyOnly");
+      assertThat(logCapturer.getOutput())
+          .withFailMessage(cmdtype + " is not categorized in OmUtils#isReadyOnly")
+          .doesNotContain("CmdType " + cmdtype + " is not categorized as readOnly or not.");
       logCapturer.clearOutput();
     }
   }
@@ -214,8 +210,8 @@ public class TestOzoneManagerRatisServer {
     UUID uuid = UUID.nameUUIDFromBytes(OzoneConsts.OM_SERVICE_ID_DEFAULT
         .getBytes(UTF_8));
     RaftGroupId raftGroupId = omRatisServer.getRaftGroup().getGroupId();
-    Assertions.assertEquals(uuid, raftGroupId.getUuid());
-    Assertions.assertEquals(raftGroupId.toByteString().size(), 16);
+    assertEquals(uuid, raftGroupId.getUuid());
+    assertEquals(raftGroupId.toByteString().size(), 16);
   }
 
   @Test
@@ -247,8 +243,8 @@ public class TestOzoneManagerRatisServer {
 
     UUID uuid = UUID.nameUUIDFromBytes(customOmServiceId.getBytes(UTF_8));
     RaftGroupId raftGroupId = newOmRatisServer.getRaftGroup().getGroupId();
-    Assertions.assertEquals(uuid, raftGroupId.getUuid());
-    Assertions.assertEquals(raftGroupId.toByteString().size(), 16);
+    assertEquals(uuid, raftGroupId.getUuid());
+    assertEquals(raftGroupId.toByteString().size(), 16);
     newOmRatisServer.stop();
   }
 

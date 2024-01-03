@@ -465,6 +465,16 @@ public abstract class SCMCommonPlacementPolicy implements
     }
     int maxReplicasPerRack = getMaxReplicasPerRack(replicas,
             Math.min(requiredRacks, numRacks));
+
+    // There are scenarios where there could be excessive replicas on a rack due to nodes
+    // in decommission or maintenance or over-replication in general.
+    // In these cases, ReplicationManager shouldn't report mis-replication.
+    // The original intention of mis-replication was to indicate that there isn't enough rack tolerance.
+    // In case of over-replication, this isn't an issue.
+    // Mis-replication should be an issue once over-replication is fixed, not before.
+    // Adjust the maximum number of replicas per rack to allow containers
+    // with excessive replicas to not be reported as mis-replicated.
+    maxReplicasPerRack += Math.max(0, dns.size() - replicas);
     return new ContainerPlacementStatusDefault(
         currentRackCount.size(), requiredRacks, numRacks, maxReplicasPerRack,
             currentRackCount);

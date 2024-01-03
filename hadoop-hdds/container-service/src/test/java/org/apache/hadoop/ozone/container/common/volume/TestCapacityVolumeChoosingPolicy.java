@@ -40,8 +40,8 @@ import java.util.Map;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
 import static org.apache.ozone.test.GenericTestUtils.getTestDir;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests {@link CapacityVolumeChoosingPolicy}.
@@ -120,10 +120,8 @@ public class TestCapacityVolumeChoosingPolicy {
       chooseCount.put(volume, chooseCount.get(volume) + 1);
     }
 
-    Assertions.assertTrue(chooseCount.get(hddsVolume3) >
-        chooseCount.get(hddsVolume1));
-    Assertions.assertTrue(chooseCount.get(hddsVolume3) >
-        chooseCount.get(hddsVolume2));
+    assertThat(chooseCount.get(hddsVolume3)).isGreaterThan(chooseCount.get(hddsVolume1));
+    assertThat(chooseCount.get(hddsVolume3)).isGreaterThan(chooseCount.get(hddsVolume2));
   }
 
   @Test
@@ -132,10 +130,9 @@ public class TestCapacityVolumeChoosingPolicy {
         () -> policy.chooseVolume(volumes, 500));
 
     String msg = e.getMessage();
-    assertTrue(
-        msg.contains("No volumes have enough space for a new container.  " +
-            "Most available space: 250 bytes"),
-        msg);
+    assertThat(msg)
+        .contains("No volumes have enough space for a new container.  " +
+            "Most available space: 250 bytes");
   }
 
   @Test

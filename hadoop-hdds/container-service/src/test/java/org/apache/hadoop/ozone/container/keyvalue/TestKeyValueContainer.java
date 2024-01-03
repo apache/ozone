@@ -93,6 +93,7 @@ import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -419,7 +420,7 @@ public class TestKeyValueContainer {
         container.importContainerData(fis, packer);
         fail("Container import should fail");
       } catch (Exception ex) {
-        assertTrue(ex instanceof IOException);
+        assertInstanceOf(IOException.class, ex);
       } finally {
         File directory =
             new File(container.getContainerData().getContainerPath());
@@ -744,7 +745,7 @@ public class TestKeyValueContainer {
     try (DBHandle db1 =
              BlockUtils.getDB(keyValueContainer.getContainerData(), CONF)) {
       DatanodeStore store1 = db1.getStore();
-      Assertions.assertTrue(store1 instanceof AbstractDatanodeStore);
+      assertInstanceOf(AbstractDatanodeStore.class, store1);
       outProfile1 = ((AbstractDatanodeStore) store1).getDbProfile();
     }
 
@@ -765,7 +766,7 @@ public class TestKeyValueContainer {
     try (DBHandle db2 =
         BlockUtils.getDB(keyValueContainer.getContainerData(), otherConf)) {
       DatanodeStore store2 = db2.getStore();
-      Assertions.assertTrue(store2 instanceof AbstractDatanodeStore);
+      assertInstanceOf(AbstractDatanodeStore.class, store2);
       outProfile2 = ((AbstractDatanodeStore) store2).getDbProfile();
     }
 
@@ -901,7 +902,7 @@ public class TestKeyValueContainer {
       Thread.sleep(7000);
       List<LiveFileMetaData> fileMetaDataList2 =
           ((RDBStore)(dnStore.getStore())).getDb().getLiveFilesMetaData();
-      assertTrue(fileMetaDataList2.size() < fileMetaDataList1.size());
+      assertThat(fileMetaDataList2.size()).isLessThan(fileMetaDataList1.size());
     } catch (Exception e) {
       Fail.fail("TestAutoCompactionSmallSstFile failed");
     } finally {

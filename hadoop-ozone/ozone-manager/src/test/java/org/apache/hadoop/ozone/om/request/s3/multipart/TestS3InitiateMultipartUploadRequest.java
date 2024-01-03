@@ -19,6 +19,11 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -28,7 +33,6 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -67,7 +71,7 @@ public class TestS3InitiateMultipartUploadRequest
     OMClientResponse omClientResponse =
         s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager, 100L);
 
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
 
     String multipartKey = getMultipartKey(volumeName, bucketName, keyName,
@@ -77,22 +81,20 @@ public class TestS3InitiateMultipartUploadRequest
     OmKeyInfo openMPUKeyInfo = omMetadataManager
         .getOpenKeyTable(s3InitiateMultipartUploadRequest.getBucketLayout())
         .get(multipartKey);
-    Assertions.assertNotNull(openMPUKeyInfo);
-    Assertions.assertNotNull(openMPUKeyInfo.getLatestVersionLocations());
-    Assertions.assertTrue(openMPUKeyInfo.getLatestVersionLocations()
-        .isMultipartKey());
-    Assertions.assertNotNull(omMetadataManager.getMultipartInfoTable()
-        .get(multipartKey));
+    assertNotNull(openMPUKeyInfo);
+    assertNotNull(openMPUKeyInfo.getLatestVersionLocations());
+    assertTrue(openMPUKeyInfo.getLatestVersionLocations().isMultipartKey());
+    assertNotNull(omMetadataManager.getMultipartInfoTable().get(multipartKey));
 
-    Assertions.assertEquals(modifiedRequest.getInitiateMultiPartUploadRequest()
+    assertEquals(modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getMultipartUploadID(),
         omMetadataManager.getMultipartInfoTable().get(multipartKey)
             .getUploadID());
 
-    Assertions.assertEquals(
+    assertEquals(
         modifiedRequest.getInitiateMultiPartUploadRequest().getKeyArgs()
             .getModificationTime(), openMPUKeyInfo.getModificationTime());
-    Assertions.assertEquals(
+    assertEquals(
         modifiedRequest.getInitiateMultiPartUploadRequest().getKeyArgs()
             .getModificationTime(), openMPUKeyInfo.getCreationTime());
 
@@ -116,17 +118,17 @@ public class TestS3InitiateMultipartUploadRequest
     OMClientResponse omClientResponse =
         s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager, 100L);
 
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
+    assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
 
     String multipartKey = getMultipartKey(volumeName, bucketName, keyName,
         modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getMultipartUploadID());
 
-    Assertions.assertNull(omMetadataManager
+    assertNull(omMetadataManager
         .getOpenKeyTable(s3InitiateMultipartUploadRequest.getBucketLayout())
         .get(multipartKey));
-    Assertions.assertNull(omMetadataManager.getMultipartInfoTable()
+    assertNull(omMetadataManager.getMultipartInfoTable()
         .get(multipartKey));
   }
 
@@ -145,18 +147,17 @@ public class TestS3InitiateMultipartUploadRequest
     OMClientResponse omClientResponse =
         s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager, 100L);
 
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
+    assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
 
     String multipartKey = getMultipartKey(volumeName, bucketName, keyName,
         modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getMultipartUploadID());
 
-    Assertions.assertNull(omMetadataManager
+    assertNull(omMetadataManager
         .getOpenKeyTable(s3InitiateMultipartUploadRequest.getBucketLayout())
         .get(multipartKey));
-    Assertions.assertNull(omMetadataManager.getMultipartInfoTable()
-        .get(multipartKey));
+    assertNull(omMetadataManager.getMultipartInfoTable().get(multipartKey));
   }
 
   protected String getMultipartKey(String volumeName, String bucketName,
@@ -188,7 +189,7 @@ public class TestS3InitiateMultipartUploadRequest
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     List<OzoneAcl> bucketAcls = omMetadataManager.getBucketTable()
         .get(bucketKey).getAcls();
-    Assertions.assertEquals(acls, bucketAcls);
+    assertEquals(acls, bucketAcls);
 
     // create file with acls inherited from parent DEFAULT acls
     OMRequest modifiedRequest = doPreExecuteInitiateMPU(volumeName,
@@ -199,7 +200,7 @@ public class TestS3InitiateMultipartUploadRequest
 
     OMClientResponse omClientResponse =
         s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager, 100L);
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
 
     String multipartKey = getMultipartKey(volumeName, bucketName, keyName,
@@ -231,13 +232,13 @@ public class TestS3InitiateMultipartUploadRequest
 
     // Should inherit parent DEFAULT Acls
     // [user:newUser:rw[DEFAULT], group:newGroup:rwl[DEFAULT]]
-    Assertions.assertEquals(parentDefaultAcl.stream()
+    assertEquals(parentDefaultAcl.stream()
             .map(acl -> acl.setAclScope(OzoneAcl.AclScope.ACCESS))
             .collect(Collectors.toList()), keyAcls,
         "Failed to inherit parent DEFAULT acls!");
 
     // Should not inherit parent ACCESS Acls
-    Assertions.assertFalse(keyAcls.contains(parentAccessAcl));
+    assertThat(keyAcls).doesNotContain(parentAccessAcl);
   }
 
 }
