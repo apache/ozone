@@ -26,6 +26,7 @@ import java.lang.ref.ReferenceQueue;
 import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Simple general resource leak detector using {@link ReferenceQueue} and {@link java.lang.ref.WeakReference} to
@@ -54,13 +55,14 @@ import java.util.concurrent.ConcurrentHashMap;
  * }</pre>
  */
 public class LeakDetector {
-  public static final Logger LOG = LoggerFactory.getLogger(LeakDetector.class);
+  private static final Logger LOG = LoggerFactory.getLogger(LeakDetector.class);
+  private static final AtomicLong COUNTER = new AtomicLong();
   private final ReferenceQueue<Object> queue = new ReferenceQueue<>();
   private final Set<LeakTracker> allLeaks = Collections.newSetFromMap(new ConcurrentHashMap<>());
   private final String name;
 
   public LeakDetector(String name) {
-    this.name = name;
+    this.name = name + COUNTER.getAndIncrement();
     start();
   }
 
