@@ -50,7 +50,6 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -276,7 +275,7 @@ public class TestContainerReportHandler {
     final ContainerReportFromDatanode containerReportFromDatanode =
         new ContainerReportFromDatanode(datanodeOne, containerReport);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
-    Assertions.assertEquals(2, containerManager.getContainerReplicas(
+    assertEquals(2, containerManager.getContainerReplicas(
         containerOne.containerID()).size());
 
   }
@@ -336,7 +335,7 @@ public class TestContainerReportHandler {
         new ContainerReportFromDatanode(datanodeFour, containerReport);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
 
-    Assertions.assertEquals(4, containerManager.getContainerReplicas(
+    assertEquals(4, containerManager.getContainerReplicas(
         containerOne.containerID()).size());
   }
 
@@ -407,7 +406,7 @@ public class TestContainerReportHandler {
         new ContainerReportFromDatanode(datanodeOne, containerReport);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
 
-    Assertions.assertEquals(LifeCycleState.CLOSED,
+    assertEquals(LifeCycleState.CLOSED,
         containerManager.getContainer(containerOne.containerID()).getState());
   }
 
@@ -422,20 +421,17 @@ public class TestContainerReportHandler {
     createAndHandleContainerReport(container.containerID(),
         ContainerReplicaProto.State.CLOSED, dns.get(1), 2);
     // index is 2; container shouldn't transition to CLOSED
-    Assertions.assertEquals(LifeCycleState.CLOSING,
-        containerManager.getContainer(container.containerID()).getState());
+    assertEquals(LifeCycleState.CLOSING, containerManager.getContainer(container.containerID()).getState());
 
     createAndHandleContainerReport(container.containerID(),
         ContainerReplicaProto.State.CLOSED, dns.get(2), 3);
     // index is 3; container shouldn't transition to CLOSED
-    Assertions.assertEquals(LifeCycleState.CLOSING,
-        containerManager.getContainer(container.containerID()).getState());
+    assertEquals(LifeCycleState.CLOSING, containerManager.getContainer(container.containerID()).getState());
 
     createAndHandleContainerReport(container.containerID(),
         ContainerReplicaProto.State.CLOSED, dns.get(0), 1);
     // index is 1; container should transition to CLOSED
-    Assertions.assertEquals(LifeCycleState.CLOSED,
-        containerManager.getContainer(container.containerID()).getState());
+    assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(container.containerID()).getState());
 
     // Test with an EC 6-3 container
     replicationConfig = new ECReplicationConfig(6, 3);
@@ -446,14 +442,12 @@ public class TestContainerReportHandler {
     createAndHandleContainerReport(container2.containerID(),
         ContainerReplicaProto.State.CLOSED, dns.get(5), 6);
     // index is 6, container shouldn't transition to CLOSED
-    Assertions.assertEquals(LifeCycleState.CLOSING,
-        containerManager.getContainer(container2.containerID()).getState());
+    assertEquals(LifeCycleState.CLOSING, containerManager.getContainer(container2.containerID()).getState());
 
     createAndHandleContainerReport(container2.containerID(),
         ContainerReplicaProto.State.CLOSED, dns.get(8), 9);
     // index is 9, container should transition to CLOSED
-    Assertions.assertEquals(LifeCycleState.CLOSED,
-        containerManager.getContainer(container2.containerID()).getState());
+    assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(container2.containerID()).getState());
   }
 
   /**
@@ -467,7 +461,7 @@ public class TestContainerReportHandler {
   private List<DatanodeDetails> setupECContainerForTesting(
       ContainerInfo container)
       throws IOException, TimeoutException, NodeNotFoundException {
-    Assertions.assertEquals(HddsProtos.ReplicationType.EC,
+    assertEquals(HddsProtos.ReplicationType.EC,
         container.getReplicationType());
     final int numDatanodes =
         container.getReplicationConfig().getRequiredNodes();
@@ -576,8 +570,7 @@ public class TestContainerReportHandler {
         new ContainerReportFromDatanode(datanodeOne, containerReport);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
 
-    Assertions.assertEquals(LifeCycleState.QUASI_CLOSED,
-        containerManager.getContainer(containerOne.containerID()).getState());
+    assertEquals(LifeCycleState.QUASI_CLOSED, containerManager.getContainer(containerOne.containerID()).getState());
   }
 
   @Test
@@ -648,8 +641,7 @@ public class TestContainerReportHandler {
         new ContainerReportFromDatanode(datanodeOne, containerReport);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
 
-    Assertions.assertEquals(LifeCycleState.CLOSED,
-        containerManager.getContainer(containerOne.containerID()).getState());
+    assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(containerOne.containerID()).getState());
   }
 
   @Test
@@ -991,7 +983,7 @@ public class TestContainerReportHandler {
 
     verify(publisher, times(1)).fireEvent(any(), any(CommandForDatanode.class));
 
-    Assertions.assertEquals(0, containerManager.getContainerReplicas(
+    assertEquals(0, containerManager.getContainerReplicas(
         containerOne.containerID()).size());
   }
 
