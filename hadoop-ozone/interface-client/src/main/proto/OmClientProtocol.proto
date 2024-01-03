@@ -851,6 +851,7 @@ message SnapshotInfo {
   // snapshot exclusive size after replication
   optional uint64 exclusiveReplicatedSize = 18;
   // note: shared sizes can be calculated from: referenced - exclusive
+  optional bool deepCleanedDeletedDir = 19;
 }
 
 message SnapshotDiffJobProto {
@@ -1891,15 +1892,16 @@ message SnapshotMoveKeyInfos {
 
 message SnapshotPurgeRequest {
   repeated string snapshotDBKeys = 1;
-  repeated string updatedSnapshotDBKey = 2;
 }
 
 message SetSnapshotPropertyRequest {
-  optional SnapshotProperty snapshotProperty = 1;
+  optional string snapshotKey = 1;
+  optional SnapshotSize snapshotSize = 2;
+  optional bool deepCleanedDeletedDir = 3;
+  optional bool deepCleanedDeletedKey = 4;
 }
 
-message SnapshotProperty {
-  optional string snapshotKey = 1;
+message SnapshotSize {
   optional uint64 exclusiveSize = 2;
   optional uint64 exclusiveReplicatedSize = 3;
 }
