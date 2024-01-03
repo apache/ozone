@@ -48,7 +48,6 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -76,6 +75,8 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test parent acl requirements when accessing children with native authorizer.
@@ -238,35 +239,35 @@ public class TestParentAcl {
     OzoneAcl parentAcl = new OzoneAcl(USER,
         testUgi1.getUserName(), parentAclType, ACCESS);
 
-    Assertions.assertFalse(nativeAuthorizer.checkAccess(child, requestContext));
+    assertFalse(nativeAuthorizer.checkAccess(child, requestContext));
     if (child.getResourceType() == BUCKET) {
       // add the bucket acl
       addBucketAcl(child.getVolumeName(), child.getBucketName(), childAcl);
-      Assertions.assertFalse(nativeAuthorizer.checkAccess(
+      assertFalse(nativeAuthorizer.checkAccess(
           child, requestContext));
 
       // add the volume acl (parent), now bucket access is allowed.
       addVolumeAcl(child.getVolumeName(), parentAcl);
-      Assertions.assertTrue(nativeAuthorizer.checkAccess(
+      assertTrue(nativeAuthorizer.checkAccess(
           child, requestContext));
 
     } else if (child.getResourceType() == KEY) {
       // add key acl is not enough
       addKeyAcl(child.getVolumeName(), child.getBucketName(),
           child.getKeyName(), childAcl);
-      Assertions.assertFalse(nativeAuthorizer.checkAccess(
+      assertFalse(nativeAuthorizer.checkAccess(
           child, requestContext));
 
       // add the bucket acl is not enough (parent)
       addBucketAcl(child.getVolumeName(), child.getBucketName(), parentAcl);
-      Assertions.assertFalse(nativeAuthorizer.checkAccess(
+      assertFalse(nativeAuthorizer.checkAccess(
           child, requestContext));
 
       // add the volume acl (grand-parent), now key access is allowed.
       OzoneAcl parentVolumeAcl = new OzoneAcl(USER,
           testUgi1.getUserName(), READ, ACCESS);
       addVolumeAcl(child.getVolumeName(), parentVolumeAcl);
-      Assertions.assertTrue(nativeAuthorizer.checkAccess(
+      assertTrue(nativeAuthorizer.checkAccess(
           child, requestContext));
     }
   }

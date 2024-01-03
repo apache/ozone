@@ -58,6 +58,7 @@ import static java.nio.file.Files.newInputStream;
 import static java.nio.file.Files.newOutputStream;
 import static org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker.CONTAINER_FILE_NAME;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Test the tar/untar for a given container.
@@ -207,7 +208,7 @@ public class TestTarContainerPacker {
         entries.put(entry.getName(), entry);
       }
 
-      Assertions.assertTrue(entries.containsKey(CONTAINER_FILE_NAME));
+      assertThat(entries).containsKey(CONTAINER_FILE_NAME);
     } finally {
       if (tarStream != null) {
         tarStream.close();

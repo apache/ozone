@@ -41,7 +41,6 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.io.TempDir;
 
 import javax.ws.rs.core.Response;
@@ -59,6 +58,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializ
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconUtils.createTarFile;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -148,7 +148,7 @@ public class TestTriggerDBSyncEndpoint {
     TriggerDBSyncEndpoint triggerDBSyncEndpoint
         = reconTestInjector.getInstance(TriggerDBSyncEndpoint.class);
     Response response = triggerDBSyncEndpoint.triggerOMDBSync();
-    Assertions.assertEquals(200, response.getStatus());
-    Assertions.assertEquals(true, response.getEntity());
+    assertEquals(200, response.getStatus());
+    assertEquals(true, response.getEntity());
   }
 }

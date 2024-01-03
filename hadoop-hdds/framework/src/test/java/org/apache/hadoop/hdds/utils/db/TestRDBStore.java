@@ -48,6 +48,7 @@ import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
 
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -139,7 +140,7 @@ public class TestRDBStore {
     rdbStore.compactDB();
     int metaSizeAfterCompact = rdbStore.getDb().getLiveFilesMetaDataSize();
 
-    assertTrue(metaSizeAfterCompact < metaSizeBeforeCompact);
+    assertThat(metaSizeAfterCompact).isLessThan(metaSizeBeforeCompact);
     assertEquals(metaSizeAfterCompact, 2);
 
   }

@@ -66,6 +66,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Tests upgrading a single datanode from pre-SCM HA volume format that used
@@ -422,8 +423,8 @@ public class TestDatanodeUpgradeToScmHA {
     KeyValueContainerData data =
         (KeyValueContainerData) dsm.getContainer().getContainerSet()
             .getContainer(containerID).getContainerData();
-    Assertions.assertTrue(data.getChunksPath().contains(expectedID));
-    Assertions.assertTrue(data.getMetadataPath().contains(expectedID));
+    assertThat(data.getChunksPath()).contains(expectedID);
+    assertThat(data.getMetadataPath()).contains(expectedID);
   }
 
   public void checkFinalizedVolumePathID(File volume, String scmID,
@@ -440,10 +441,10 @@ public class TestDatanodeUpgradeToScmHA {
       Assertions.assertEquals(2, subdirs.size());
 
       File scmIDDir = new File(hddsRoot, scmID);
-      Assertions.assertTrue(subdirs.contains(scmIDDir));
+      assertThat(subdirs).contains(scmIDDir);
 
       File clusterIDDir = new File(hddsRoot, CLUSTER_ID);
-      Assertions.assertTrue(subdirs.contains(clusterIDDir));
+      assertThat(subdirs).contains(clusterIDDir);
       Assertions.assertTrue(Files.isSymbolicLink(clusterIDDir.toPath()));
       Path symlinkTarget = Files.readSymbolicLink(clusterIDDir.toPath());
       Assertions.assertEquals(scmID, symlinkTarget.toString());
@@ -477,7 +478,7 @@ public class TestDatanodeUpgradeToScmHA {
     // Volume should only have the specified ID directory.
     Assertions.assertEquals(1, subdirs.size());
     File idDir = new File(hddsRoot, expectedID);
-    Assertions.assertTrue(subdirs.contains(idDir));
+    assertThat(subdirs).contains(idDir);
   }
 
   public List<File> getHddsSubdirs(File volume) {
@@ -533,9 +534,7 @@ public class TestDatanodeUpgradeToScmHA {
     if (exactMatch) {
       Assertions.assertEquals(expectedMlv, mlv);
     } else {
-      Assertions.assertTrue(expectedMlv <= mlv,
-          "Expected minimum mlv(" + expectedMlv
-          + ") is smaller than mlv(" + mlv + ").");
+      assertThat(expectedMlv).isLessThanOrEqualTo(mlv);
     }
 
     callVersionEndpointTask();

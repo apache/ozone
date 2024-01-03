@@ -40,8 +40,8 @@ import org.apache.hadoop.ozone.om.request.volume.OMVolumeCreateRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -60,14 +60,19 @@ import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
 import org.apache.hadoop.ozone.om.response.bucket.OMBucketDeleteResponse;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.Daemon;
-import org.mockito.Mockito;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newBucketInfoBuilder;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 /**
  * This class tests OzoneManagerDouble Buffer with actual OMResponse classes.
@@ -91,8 +96,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
 
   @BeforeEach
   public void setup() throws IOException {
-    ozoneManager = Mockito.mock(OzoneManager.class,
-        Mockito.withSettings().stubOnly());
+    ozoneManager = mock(OzoneManager.class, withSettings().stubOnly());
     omMetrics = OMMetrics.create();
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
@@ -102,9 +106,9 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getMaxUserVolumeCount()).thenReturn(10L);
-    auditLogger = Mockito.mock(AuditLogger.class);
+    auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
-    Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
+    doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
     ozoneManagerRatisSnapshot = index -> {
       lastAppliedIndex = index.get(index.size() - 1);
     };
@@ -113,7 +117,6 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
         .setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
         .setmaxUnFlushedTransactionCount(100000)
         .enableRatis(true)
-        .setIndexToTerm((i) -> term)
         .build();
   }
 
@@ -180,10 +183,10 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
         doubleBuffer.getFlushedTransactionCount() ==
             (bucketCount + deleteCount + 1), 100, 120000);
 
-    Assertions.assertEquals(1, omMetadataManager.countRowsInTable(
+    assertEquals(1, omMetadataManager.countRowsInTable(
         omMetadataManager.getVolumeTable()));
 
-    Assertions.assertEquals(5, omMetadataManager.countRowsInTable(
+    assertEquals(5, omMetadataManager.countRowsInTable(
         omMetadataManager.getBucketTable()));
 
     // Now after this in our DB we should have 5 buckets and one volume
@@ -203,9 +206,8 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
         omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
     assertNotNull(transactionInfo);
 
-    Assertions.assertEquals(lastAppliedIndex,
-        transactionInfo.getTransactionIndex());
-    Assertions.assertEquals(term, transactionInfo.getTerm());
+    assertEquals(lastAppliedIndex, transactionInfo.getTransactionIndex());
+    assertEquals(term, transactionInfo.getTerm());
   }
 
   /**
@@ -253,10 +255,10 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     GenericTestUtils.waitFor(() -> doubleBuffer.getFlushedTransactionCount()
             == (bucketCount + deleteCount + 2), 100, 120000);
 
-    Assertions.assertEquals(2, omMetadataManager.countRowsInTable(
+    assertEquals(2, omMetadataManager.countRowsInTable(
         omMetadataManager.getVolumeTable()));
 
-    Assertions.assertEquals(10, omMetadataManager.countRowsInTable(
+    assertEquals(10, omMetadataManager.countRowsInTable(
         omMetadataManager.getBucketTable()));
 
     // Now after this in our DB we should have 5 buckets and one volume
@@ -273,7 +275,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     // running in parallel, so lastAppliedIndex cannot be always
     // total transaction count. So, just checking here whether it is less
     // than total transaction count.
-    Assertions.assertTrue(lastAppliedIndex <= bucketCount + deleteCount + 2);
+    assertTrue(lastAppliedIndex <= bucketCount + deleteCount + 2);
 
 
   }
@@ -310,9 +312,9 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     OMBucketDeleteRequest omBucketDeleteRequest =
         new OMBucketDeleteRequest(omRequest);
 
-    OMClientResponse omClientResponse =
-        omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, transactionID);
-    doubleBuffer.add(omClientResponse, transactionID);
+    final TermIndex termIndex = TermIndex.valueOf(term, transactionID);
+    OMClientResponse omClientResponse = omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, termIndex);
+    doubleBuffer.add(omClientResponse, termIndex);
     return omClientResponse;
   }
 
@@ -324,18 +326,14 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
       OMVolumeCreateResponse omVolumeCreateResponse) throws Exception {
     OmVolumeArgs tableVolumeArgs = omMetadataManager.getVolumeTable().get(
         omMetadataManager.getVolumeKey(volumeName));
-    Assertions.assertNotNull(tableVolumeArgs);
+    assertNotNull(tableVolumeArgs);
 
     OmVolumeArgs omVolumeArgs = omVolumeCreateResponse.getOmVolumeArgs();
 
-    Assertions.assertEquals(omVolumeArgs.getVolume(),
-        tableVolumeArgs.getVolume());
-    Assertions.assertEquals(omVolumeArgs.getAdminName(),
-        tableVolumeArgs.getAdminName());
-    Assertions.assertEquals(omVolumeArgs.getOwnerName(),
-        tableVolumeArgs.getOwnerName());
-    Assertions.assertEquals(omVolumeArgs.getCreationTime(),
-        tableVolumeArgs.getCreationTime());
+    assertEquals(omVolumeArgs.getVolume(), tableVolumeArgs.getVolume());
+    assertEquals(omVolumeArgs.getAdminName(), tableVolumeArgs.getAdminName());
+    assertEquals(omVolumeArgs.getOwnerName(), tableVolumeArgs.getOwnerName());
+    assertEquals(omVolumeArgs.getCreationTime(), tableVolumeArgs.getCreationTime());
   }
 
   /**
@@ -355,14 +353,11 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
       } catch (IOException ex) {
         fail("testDoubleBufferWithMixOfTransactions failed");
       }
-      Assertions.assertNotNull(tableBucketInfo);
+      assertNotNull(tableBucketInfo);
 
-      Assertions.assertEquals(omBucketInfo.getVolumeName(),
-          tableBucketInfo.getVolumeName());
-      Assertions.assertEquals(omBucketInfo.getBucketName(),
-          tableBucketInfo.getBucketName());
-      Assertions.assertEquals(omBucketInfo.getCreationTime(),
-          tableBucketInfo.getCreationTime());
+      assertEquals(omBucketInfo.getVolumeName(), tableBucketInfo.getVolumeName());
+      assertEquals(omBucketInfo.getBucketName(), tableBucketInfo.getBucketName());
+      assertEquals(omBucketInfo.getCreationTime(), tableBucketInfo.getCreationTime());
     });
   }
 
@@ -374,7 +369,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
       deleteBucketQueue) {
     deleteBucketQueue.forEach((omBucketDeleteResponse -> {
       try {
-        Assertions.assertNull(omMetadataManager.getBucketTable().get(
+        assertNull(omMetadataManager.getBucketTable().get(
             omMetadataManager.getBucketKey(
                 omBucketDeleteResponse.getVolumeName(),
                 omBucketDeleteResponse.getBucketName())));
@@ -418,7 +413,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
         assertRowCount(expectedBuckets, omMetadataManager.getBucketTable()),
         300, volumeCount * 300);
 
-    Assertions.assertTrue(doubleBuffer.getFlushIterations() > 0);
+    assertTrue(doubleBuffer.getFlushIterations() > 0);
   }
 
   private boolean assertRowCount(int expected, Table<String, ?> table) {
@@ -459,9 +454,9 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     OMVolumeCreateRequest omVolumeCreateRequest =
         new OMVolumeCreateRequest(omRequest);
 
-    OMClientResponse omClientResponse =
-        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, transactionId);
-    doubleBuffer.add(omClientResponse, transactionId);
+    final TermIndex termIndex = TransactionInfo.getTermIndex(transactionId);
+    OMClientResponse omClientResponse = omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, termIndex);
+    doubleBuffer.add(omClientResponse, termIndex);
     return omClientResponse;
   }
 
@@ -481,9 +476,9 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     OMBucketCreateRequest omBucketCreateRequest =
         new OMBucketCreateRequest(omRequest);
 
-    OMClientResponse omClientResponse =
-        omBucketCreateRequest.validateAndUpdateCache(ozoneManager, transactionID);
-    doubleBuffer.add(omClientResponse, transactionID);
+    final TermIndex termIndex = TermIndex.valueOf(term, transactionID);
+    OMClientResponse omClientResponse = omBucketCreateRequest.validateAndUpdateCache(ozoneManager, termIndex);
+    doubleBuffer.add(omClientResponse, termIndex);
     return (OMBucketCreateResponse) omClientResponse;
   }
 

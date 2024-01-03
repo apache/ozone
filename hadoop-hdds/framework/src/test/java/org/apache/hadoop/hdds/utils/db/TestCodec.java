@@ -35,6 +35,7 @@ import java.util.function.Consumer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.utils.db.CodecTestUtil.gc;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -164,7 +165,7 @@ public final class TestCodec {
     };
     for (String original : docs) {
       final int serializedSize = runTestStringCodec(original);
-      assertTrue(original.length() < serializedSize);
+      assertThat(original.length()).isLessThan(serializedSize);
     }
 
     final String multiByteChars = "官方发行包包括了源代码包和二进制代码包";

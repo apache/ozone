@@ -19,6 +19,8 @@
 package org.apache.hadoop.ozone.om.upgrade;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateKey;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -30,7 +32,6 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCreateRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.ozone.test.tag.Unhealthy;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.reflections.Reflections;
@@ -55,7 +56,7 @@ public class TestOmVersionManagerRequestFactory {
     // Try getting v1 of 'CreateKey'.
     Class<? extends OMClientRequest> requestType =
         omVersionManager.getHandler(CreateKey.name());
-    Assertions.assertEquals(requestType, OMKeyCreateRequest.class);
+    assertEquals(requestType, OMKeyCreateRequest.class);
   }
 
   @Test
@@ -72,11 +73,11 @@ public class TestOmVersionManagerRequestFactory {
       }
       Method getRequestTypeMethod = requestClass.getMethod(
           "getRequestType");
-      Assertions.assertNotNull(getRequestTypeMethod);
+      assertNotNull(getRequestTypeMethod);
 
       Constructor<? extends OMClientRequest> constructorWithOmRequestArg =
           requestClass.getDeclaredConstructor(OMRequest.class);
-      Assertions.assertNotNull(constructorWithOmRequestArg);
+      assertNotNull(constructorWithOmRequestArg);
     }
   }
 }

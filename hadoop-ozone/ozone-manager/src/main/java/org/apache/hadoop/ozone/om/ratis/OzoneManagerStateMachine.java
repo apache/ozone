@@ -32,6 +32,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -40,8 +41,10 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.om.ratis.metrics.OzoneManagerStateMachineMetrics;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.response.DummyOMClientResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -85,7 +88,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
  */
 public class OzoneManagerStateMachine extends BaseStateMachine {
 
-  static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerStateMachine.class);
   private final SimpleStateMachineStorage storage =
       new SimpleStateMachineStorage();
@@ -109,6 +112,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   // conf/metadata entries which are received through notifyIndexUpdate.
   private ConcurrentMap<Long, Long> ratisTransactionMap =
       new ConcurrentSkipListMap<>();
+  private OzoneManagerStateMachineMetrics metrics;
 
 
   public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer,
@@ -134,6 +138,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .setNameFormat(threadPrefix + "InstallSnapshotThread").build();
     this.installSnapshotExecutor =
         HadoopExecutors.newSingleThreadExecutor(installSnapshotThreadFactory);
+    this.metrics = OzoneManagerStateMachineMetrics.create();
   }
 
   /**
@@ -232,7 +237,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     case SUCCESS:
     case SNAPSHOT_UNAVAILABLE:
       // Currently, only trigger for the one who installed snapshot
-      if (ozoneManager.getOmRatisServer().getServer().getPeer().equals(peer)) {
+      if (ozoneManager.getOmRatisServer().getServerDivision().getPeer().equals(peer)) {
         ozoneManager.getOmSnapshotProvider().init();
       }
       break;
@@ -325,7 +330,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       final OMRequest request = context != null ? (OMRequest) context
           : OMRatisHelper.convertByteStringToOMRequest(
           trx.getStateMachineLogEntry().getLogData());
-      long trxLogIndex = trx.getLogEntry().getIndex();
+      final TermIndex termIndex = TermIndex.valueOf(trx.getLogEntry());
+      final long trxLogIndex = termIndex.getIndex();
       // In the current approach we have one single global thread executor.
       // with single thread. Right now this is being done for correctness, as
       // applyTransaction will be run on multiple OM's we want to execute the
@@ -365,7 +371,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       ozoneManagerDoubleBuffer.acquireUnFlushedTransactions(1);
 
       CompletableFuture<OMResponse> future = CompletableFuture.supplyAsync(
-          () -> runCommand(request, trxLogIndex), executorService);
+          () -> runCommand(request, termIndex), executorService);
       future.thenApply(omResponse -> {
         if (!omResponse.getSuccess()) {
           // When INTERNAL_ERROR or METADATA_ERROR it is considered as
@@ -470,7 +476,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .setOmMetadataManager(ozoneManager.getMetadataManager())
         .setOzoneManagerRatisSnapShot(this::updateLastAppliedIndex)
         .setmaxUnFlushedTransactionCount(maxUnflushedTransactionSize)
-        .setIndexToTerm(this::getTermForIndex).setThreadPrefix(threadPrefix)
+        .setThreadPrefix(threadPrefix)
         .setS3SecretManager(ozoneManager.getS3SecretManager())
         .enableRatis(true)
         .enableTracing(isTracingEnabled)
@@ -570,10 +576,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @return response from OM
    * @throws ServiceException
    */
-  private OMResponse runCommand(OMRequest request, long trxLogIndex) {
+  private OMResponse runCommand(OMRequest request, TermIndex termIndex) {
     try {
-      OMClientResponse omClientResponse =
-          handler.handleWriteRequest(request, trxLogIndex);
+      OMClientResponse omClientResponse = handler.handleWriteRequest(request, termIndex);
       OMLockDetails omLockDetails = omClientResponse.getOmLockDetails();
       OMResponse omResponse = omClientResponse.getOMResponse();
       if (omLockDetails != null) {
@@ -584,7 +589,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       }
     } catch (IOException e) {
       LOG.warn("Failed to write, Exception occurred ", e);
-      return createErrorResponse(request, e);
+      return createErrorResponse(request, e, termIndex);
     } catch (Throwable e) {
       // For any Runtime exceptions, terminate OM.
       String errorMessage = "Request " + request + " failed with exception";
@@ -594,16 +599,19 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   private OMResponse createErrorResponse(
-      OMRequest omRequest, IOException exception) {
-    OMResponse.Builder omResponse = OMResponse.newBuilder()
+      OMRequest omRequest, IOException exception, TermIndex termIndex) {
+    OMResponse.Builder omResponseBuilder = OMResponse.newBuilder()
         .setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(exception))
         .setCmdType(omRequest.getCmdType())
         .setTraceID(omRequest.getTraceID())
         .setSuccess(false);
     if (exception.getMessage() != null) {
-      omResponse.setMessage(exception.getMessage());
+      omResponseBuilder.setMessage(exception.getMessage());
     }
-    return omResponse.build();
+    OMResponse omResponse = omResponseBuilder.build();
+    OMClientResponse omClientResponse = new DummyOMClientResponse(omResponse);
+    ozoneManagerDoubleBuffer.add(omClientResponse, termIndex);
+    return omResponse;
   }
 
   /**
@@ -683,6 +691,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         }
       }
     }
+    this.metrics.updateApplyTransactionMapSize(applyTransactionMap.size());
+    this.metrics.updateRatisTransactionMapSize(ratisTransactionMap.size());
   }
 
   public void loadSnapshotInfoFromDB() throws IOException {
@@ -724,28 +734,44 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   @VisibleForTesting
+  public OzoneManagerRequestHandler getHandler() {
+    return (OzoneManagerRequestHandler) this.handler;
+  }
+
+  @VisibleForTesting
   public void setRaftGroupId(RaftGroupId raftGroupId) {
     this.raftGroupId = raftGroupId;
+  }
+
+  @VisibleForTesting
+  public OzoneManagerStateMachineMetrics getMetrics() {
+    return this.metrics;
   }
 
   public void stop() {
     ozoneManagerDoubleBuffer.stop();
     HadoopExecutors.shutdown(executorService, LOG, 5, TimeUnit.SECONDS);
     HadoopExecutors.shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
+    LOG.info("applyTransactionMap size {} ", applyTransactionMap.size());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("applyTransactionMap {}",
+          applyTransactionMap.keySet().stream().map(Object::toString)
+              .collect(Collectors.joining(",")));
+    }
+    LOG.info("ratisTransactionMap size {}", ratisTransactionMap.size());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("ratisTransactionMap {}",
+          ratisTransactionMap.keySet().stream().map(Object::toString)
+            .collect(Collectors.joining(",")));
+    }
+    if (metrics != null) {
+      metrics.unRegister();
+    }
   }
 
   @VisibleForTesting
   void addApplyTransactionTermIndex(long term, long index) {
     applyTransactionMap.put(index, term);
-  }
-
-  /**
-   * Return term associated with transaction index.
-   * @param transactionIndex
-   * @return
-   */
-  public long getTermForIndex(long transactionIndex) {
-    return applyTransactionMap.get(transactionIndex);
   }
 
   /**

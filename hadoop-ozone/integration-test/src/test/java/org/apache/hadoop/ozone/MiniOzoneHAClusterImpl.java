@@ -221,8 +221,12 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   @Override
   public void restartOzoneManager() throws IOException {
-    for (OzoneManager ozoneManager : omhaService.getActiveServices()) {
-      stopOM(ozoneManager);
+    for (OzoneManager ozoneManager : omhaService.getServices()) {
+      try {
+        stopOM(ozoneManager);
+      } catch (Exception e) {
+        LOG.warn("Failed to stop OM: {}", ozoneManager.getOMServiceId());
+      }
     }
     omhaService.inactiveServices().forEachRemaining(omhaService::activate);
     for (OzoneManager ozoneManager : omhaService.getServices()) {

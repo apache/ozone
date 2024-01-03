@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration
 import java.io.File;
 import java.io.RandomAccessFile;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -118,7 +119,7 @@ public class TestKeyValueContainerCheck
       File chunkFile = getChunkLayout()
           .getChunkFile(containerData, blockID, chunkInfo);
       long length = chunkFile.length();
-      assertTrue(length > 0);
+      assertThat(length).isGreaterThan(0);
       // forcefully truncate the file to induce failure.
       try (RandomAccessFile file = new RandomAccessFile(chunkFile, "rws")) {
         file.setLength(length / 2);

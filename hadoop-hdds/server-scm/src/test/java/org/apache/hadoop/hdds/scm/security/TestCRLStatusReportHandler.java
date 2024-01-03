@@ -45,6 +45,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 
 /**
@@ -100,8 +101,7 @@ public class TestCRLStatusReportHandler implements EventPublisher {
         getCRLStatusReport(dn2, pendingCRLIds2, 2L);
     crlStatusReportHandler.onMessage(reportFromDatanode1, this);
     CRLStatus crlStatus = certificateStore.getCRLStatusForDN(dn1.getUuid());
-    Assertions.assertTrue(
-        crlStatus.getPendingCRLIds().containsAll(pendingCRLIds1));
+    assertThat(crlStatus.getPendingCRLIds()).containsAll(pendingCRLIds1);
     Assertions.assertEquals(5L, crlStatus.getReceivedCRLId());
 
     pendingCRLIds1.remove(0);
@@ -115,8 +115,7 @@ public class TestCRLStatusReportHandler implements EventPublisher {
 
     crlStatusReportHandler.onMessage(reportFromDatanode2, this);
     crlStatus = certificateStore.getCRLStatusForDN(dn2.getUuid());
-    Assertions.assertTrue(
-        crlStatus.getPendingCRLIds().containsAll(pendingCRLIds2));
+    assertThat(crlStatus.getPendingCRLIds()).containsAll(pendingCRLIds2);
     Assertions.assertEquals(2L, crlStatus.getReceivedCRLId());
   }
 

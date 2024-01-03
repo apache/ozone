@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -29,7 +30,6 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
-import org.junit.jupiter.api.Assertions;
 
 import java.io.IOException;
 import java.util.List;
@@ -104,9 +104,7 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
   protected void verifyKeyName(OmKeyInfo omKeyInfo) {
     // prefix layout format - stores fileName in the keyName DB field.
     String fileName = OzoneFSUtils.getFileName(keyName);
-    Assertions.assertEquals(fileName, omKeyInfo.getFileName(),
-        "Incorrect FileName");
-    Assertions.assertEquals(fileName, omKeyInfo.getKeyName(),
-        "Incorrect KeyName");
+    assertEquals(fileName, omKeyInfo.getFileName(), "Incorrect FileName");
+    assertEquals(fileName, omKeyInfo.getKeyName(), "Incorrect KeyName");
   }
 }

@@ -68,6 +68,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 
 /**
@@ -177,8 +178,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     DbVolume dbVolume = (DbVolume) dsm.getContainer().getDbVolumeSet()
         .getVolumesList().get(0);
     Assertions.assertEquals(dbVolume, dataVolume.getDbVolume());
-    Assertions.assertTrue(
-        dbVolume.getHddsVolumeIDs().contains(dataVolume.getStorageID()));
+    assertThat(dbVolume.getHddsVolumeIDs()).contains(dataVolume.getStorageID());
     File dbFile = new File(dbVolume.getStorageDir().getAbsolutePath() + "/" +
         dbVolume.getClusterID() + "/" + dataVolume.getStorageID());
     Assertions.assertTrue(dbFile.exists());
@@ -570,8 +570,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
     KeyValueContainerData data =
         (KeyValueContainerData) dsm.getContainer().getContainerSet()
             .getContainer(containerID).getContainerData();
-    Assertions.assertTrue(data.getChunksPath().contains(expectedID));
-    Assertions.assertTrue(data.getMetadataPath().contains(expectedID));
+    assertThat(data.getChunksPath()).contains(expectedID);
+    assertThat(data.getMetadataPath()).contains(expectedID);
   }
 
   public List<File> getHddsSubdirs(File volume) {
@@ -628,9 +628,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     if (exactMatch) {
       Assertions.assertEquals(expectedMlv, mlv);
     } else {
-      Assertions.assertTrue(expectedMlv <= mlv,
-          "Expected minimum mlv(" + expectedMlv
-              + ") is smaller than mlv(" + mlv + ").");
+      assertThat(expectedMlv).isLessThanOrEqualTo(mlv);
     }
 
     callVersionEndpointTask();

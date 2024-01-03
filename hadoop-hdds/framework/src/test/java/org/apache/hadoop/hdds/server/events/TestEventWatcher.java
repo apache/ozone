@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.hdds.server.events;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -206,8 +207,9 @@ public class TestEventWatcher {
             + " all messages");
 
     //_at least_ two are timed out.
-    assertTrue(metrics.getTimedOutEvents().value() >= 2,
-        "At least two events should be timed out.");
+    assertThat(metrics.getTimedOutEvents().value())
+        .withFailMessage("At least two events should be timed out.")
+        .isGreaterThanOrEqualTo(2);
 
     DefaultMetricsSystem.shutdown();
   }
