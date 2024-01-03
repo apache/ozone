@@ -147,7 +147,7 @@ public class TestBackgroundContainerDataScanner extends
         .updateDataScanTimestamp(
             eq(corruptData.getContainerData().getContainerID()), any());
     // Metrics for Deleted container should not be updated.
-    Mockito.verify(controller, never())
+    verify(controller, never())
         .updateDataScanTimestamp(
             eq(deletedContainer.getContainerData().getContainerID()), any());
   }

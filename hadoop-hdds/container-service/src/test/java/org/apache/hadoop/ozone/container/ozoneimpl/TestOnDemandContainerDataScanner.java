@@ -114,9 +114,9 @@ public class TestOnDemandContainerDataScanner extends
     // Metrics for deleted container should not be updated.
     scanFuture =
         OnDemandContainerDataScanner.scanContainer(healthy);
-    Assertions.assertTrue(scanFuture.isPresent());
+    assertTrue(scanFuture.isPresent());
     scanFuture.get().get();
-    Mockito.verify(controller, never())
+    verify(controller, never())
         .updateDataScanTimestamp(
             eq(deletedContainer.getContainerData().getContainerID()), any());
   }
