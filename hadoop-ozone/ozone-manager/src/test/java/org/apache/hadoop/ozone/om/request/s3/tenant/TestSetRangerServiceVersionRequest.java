@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.mockito.Mockito.framework;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -97,7 +97,7 @@ public class TestSetRangerServiceVersionRequest {
             ozoneManager, txLogIndex);
 
     // Check response type and cast
-    assertTrue(clientResponse instanceof OMSetRangerServiceVersionResponse);
+    assertInstanceOf(OMSetRangerServiceVersionResponse.class, clientResponse);
     final OMSetRangerServiceVersionResponse omSetRangerServiceVersionResponse =
         (OMSetRangerServiceVersionResponse) clientResponse;
 

@@ -80,6 +80,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -163,7 +164,7 @@ public class TestKeyDeletingService {
     GenericTestUtils.waitFor(
         () -> keyDeletingService.getDeletedKeyCount().get() >= keyCount,
         1000, 10000);
-    assertTrue(keyDeletingService.getRunCount().get() > 1);
+    assertThat(keyDeletingService.getRunCount().get()).isGreaterThan(1);
     assertEquals(0, keyManager.getPendingDeletionKeys(
         Integer.MAX_VALUE).getKeyBlocksList().size());
   }
@@ -365,7 +366,7 @@ public class TestKeyDeletingService {
     GenericTestUtils.waitFor(
         () -> keyDeletingService.getDeletedKeyCount().get() >= 1,
         1000, 10000);
-    assertTrue(keyDeletingService.getRunCount().get() > 1);
+    assertThat(keyDeletingService.getRunCount().get()).isGreaterThan(1);
     assertEquals(0, keyManager.getPendingDeletionKeys(
         Integer.MAX_VALUE).getKeyBlocksList().size());
 
@@ -374,8 +375,7 @@ public class TestKeyDeletingService {
     // blocks for deletion from the KeyDeletionService
     ScmBlockLocationTestingClient scmBlockTestingClient =
         (ScmBlockLocationTestingClient) omTestManagers.getScmBlockClient();
-    assertTrue(
-        scmBlockTestingClient.getNumberOfDeletedBlocks() >= 3);
+    assertThat(scmBlockTestingClient.getNumberOfDeletedBlocks()).isGreaterThanOrEqualTo(3);
   }
 
   private void createAndDeleteKeys(KeyManager keyManager, int keyCount,
@@ -444,7 +444,7 @@ public class TestKeyDeletingService {
     GenericTestUtils.waitFor(
         () -> keyDeletingService.getDeletedKeyCount().get() >= 1,
         1000, 10000);
-    assertTrue(keyDeletingService.getRunCount().get() > 1);
+    assertThat(keyDeletingService.getRunCount().get()).isGreaterThan(1);
     assertEquals(0, keyManager
         .getPendingDeletionKeys(Integer.MAX_VALUE).getKeyBlocksList().size());
 
@@ -461,7 +461,7 @@ public class TestKeyDeletingService {
     List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
         = metadataManager.getDeletedTable().getRangeKVs(
         null, 100, ozoneKey1);
-    assertTrue(rangeKVs.size() > 0);
+    assertThat(rangeKVs.size()).isGreaterThan(0);
     rangeKVs
         = metadataManager.getDeletedTable().getRangeKVs(
         null, 100, ozoneKey2);

@@ -17,9 +17,9 @@
  */
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -72,7 +72,7 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
         .getModificationTime();
     long newModTime = preExecuteRequest.getAddAclRequest()
         .getModificationTime();
-    assertTrue(newModTime > originModTime);
+    assertThat(newModTime).isGreaterThan(originModTime);
 
     // Execute original request
     OMClientResponse omClientResponse = omKeyAddAclRequest
@@ -128,7 +128,7 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
         .getModificationTime();
     long newModTime = preExecuteRequest.getRemoveAclRequest()
         .getModificationTime();
-    assertTrue(newModTime > originModTime);
+    assertThat(newModTime).isGreaterThan(originModTime);
 
     OMClientResponse omClientRemoveAclResponse = omKeyRemoveAclRequest
         .validateAndUpdateCache(ozoneManager, 100L);
@@ -169,7 +169,7 @@ public class TestOMKeyAclRequest extends TestOMKeyRequest {
         .getModificationTime();
     long newModTime = preExecuteRequest.getSetAclRequest()
         .getModificationTime();
-    assertTrue(newModTime > originModTime);
+    assertThat(newModTime).isGreaterThan(originModTime);
 
     OMClientResponse omClientResponse = omKeySetAclRequest
         .validateAndUpdateCache(ozoneManager, 100L);

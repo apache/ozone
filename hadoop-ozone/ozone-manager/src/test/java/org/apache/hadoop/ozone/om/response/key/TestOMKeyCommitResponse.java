@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -126,7 +127,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
     List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
         = omMetadataManager.getDeletedTable().getRangeKVs(
         null, 100, deletedKey);
-    assertTrue(rangeKVs.size() > 0);
+    assertThat(rangeKVs.size()).isGreaterThan(0);
     assertEquals(1, rangeKVs.get(0).getValue().getOmKeyInfoList().size());
 
   }

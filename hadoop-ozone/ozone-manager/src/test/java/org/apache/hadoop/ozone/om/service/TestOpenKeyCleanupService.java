@@ -64,8 +64,8 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TestOpenKeyCleanupService {
   private OzoneManagerProtocol writeClient;
@@ -313,8 +313,7 @@ class TestOpenKeyCleanupService {
   }
 
   private static void assertAtLeast(long expectedMinimum, long actual) {
-    assertTrue(actual >= expectedMinimum,
-        () -> actual + " < " + expectedMinimum);
+    assertThat(actual).isGreaterThanOrEqualTo(expectedMinimum);
   }
 
   private void assertExpiredOpenKeys(boolean expectedToEmpty, boolean hsync,

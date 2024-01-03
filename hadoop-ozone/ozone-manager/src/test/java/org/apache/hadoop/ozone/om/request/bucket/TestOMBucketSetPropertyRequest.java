@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 
 import static org.apache.hadoop.hdds.client.ReplicationType.EC;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -79,7 +80,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
         .getModificationTime();
     long newModTime = preExecuteRequest.getSetBucketPropertyRequest()
         .getModificationTime();
-    assertTrue(newModTime > originModTime);
+    assertThat(newModTime).isGreaterThan(originModTime);
 
     // As user info gets added.
     assertNotEquals(omRequest, omBucketSetPropertyRequest.preExecute(ozoneManager));
@@ -201,15 +202,15 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
         .validateAndUpdateCache(ozoneManager, 1);
 
     //capture the error log
-    assertTrue(logs.getOutput().contains(
-        "Setting bucket property failed for bucket"));
+    assertThat(logs.getOutput()).contains(
+        "Setting bucket property failed for bucket");
 
     assertFalse(omClientResponse.getOMResponse().getSuccess());
     assertEquals(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
-    assertTrue(omClientResponse.getOMResponse().getMessage().
+    assertThat(omClientResponse.getOMResponse().getMessage()).
         contains("Total buckets quota in this volume " +
-            "should not be greater than volume quota"));
+            "should not be greater than volume quota");
   }
 
   @Test
@@ -243,7 +244,7 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
         OzoneManagerProtocolProtos.Status.NOT_SUPPORTED_OPERATION,
         omClientResponse.getOMResponse().getStatus());
     String message = omClientResponse.getOMResponse().getMessage();
-    assertTrue(message.contains("Cannot set property on link"), message);
+    assertThat(message).contains("Cannot set property on link");
   }
 
   @Test
@@ -396,9 +397,9 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     assertFalse(omClientResponse.getOMResponse().getSuccess());
     assertEquals(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.QUOTA_ERROR);
-    assertTrue(omClientResponse.getOMResponse().getMessage().
+    assertThat(omClientResponse.getOMResponse().getMessage()).
         contains("Cannot update bucket quota. Requested spaceQuota less than " +
-            "used spaceQuota"));
+            "used spaceQuota");
   }
 
   @Test
@@ -428,9 +429,9 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     assertFalse(omClientResponse.getOMResponse().getSuccess());
     assertEquals(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.QUOTA_ERROR);
-    assertTrue(omClientResponse.getOMResponse().getMessage().
+    assertThat(omClientResponse.getOMResponse().getMessage()).
         contains("Cannot update bucket quota. NamespaceQuota requested " +
-            "is less than used namespaceQuota"));
+            "is less than used namespaceQuota");
   }
 
   @Test
