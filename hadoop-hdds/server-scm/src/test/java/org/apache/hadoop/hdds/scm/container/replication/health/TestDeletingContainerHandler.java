@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -52,6 +51,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETING;
 
@@ -100,7 +101,7 @@ public class TestDeletingContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
-    Assertions.assertFalse(deletingContainerHandler.handle(request));
+    assertFalse(deletingContainerHandler.handle(request));
   }
 
   @Test
@@ -118,7 +119,7 @@ public class TestDeletingContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
-    Assertions.assertFalse(deletingContainerHandler.handle(request));
+    assertFalse(deletingContainerHandler.handle(request));
   }
 
   /**
@@ -154,11 +155,11 @@ public class TestDeletingContainerHandler {
     builder.setReadOnly(true);
     ContainerCheckRequest readRequest = builder.build();
 
-    Assertions.assertTrue(deletingContainerHandler.handle(readRequest));
+    assertTrue(deletingContainerHandler.handle(readRequest));
     verify(replicationManager, times(0)).updateContainerState(any(ContainerID.class),
         any(HddsProtos.LifeCycleEvent.class));
 
-    Assertions.assertTrue(deletingContainerHandler.handle(request));
+    assertTrue(deletingContainerHandler.handle(request));
     verify(replicationManager, times(times)).updateContainerState(any(ContainerID.class),
         any(HddsProtos.LifeCycleEvent.class));
   }
@@ -241,7 +242,7 @@ public class TestDeletingContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
-    Assertions.assertTrue(deletingContainerHandler.handle(request));
+    assertTrue(deletingContainerHandler.handle(request));
 
     verify(replicationManager, times(times)).sendDeleteCommand(any(ContainerInfo.class), anyInt(),
         any(DatanodeDetails.class), eq(false));

@@ -29,13 +29,13 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import java.util.HashSet;
 import java.util.Set;
 
 import static org.mockito.Mockito.mock;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
@@ -88,8 +88,7 @@ public class TestNodeDecommissionMetrics {
             HddsProtos.NodeState.HEALTHY));
     monitor.startMonitoring(dn1);
     monitor.run();
-    Assertions.assertEquals(1,
-        metrics.getDecommissioningMaintenanceNodesTotal());
+    assertEquals(1, metrics.getDecommissioningMaintenanceNodesTotal());
   }
 
   /**
@@ -108,10 +107,8 @@ public class TestNodeDecommissionMetrics {
     // Stop monitor and run.
     monitor.stopMonitoring(dn1);
     monitor.run();
-    Assertions.assertEquals(0,
-        metrics.getDecommissioningMaintenanceNodesTotal());
-    Assertions.assertEquals(1,
-        metrics.getRecommissionNodesTotal());
+    assertEquals(0, metrics.getDecommissioningMaintenanceNodesTotal());
+    assertEquals(1, metrics.getRecommissionNodesTotal());
   }
 
   /**
@@ -133,22 +130,17 @@ public class TestNodeDecommissionMetrics {
     monitor.run();
     // Ensure a StartAdmin event was fired
     eventQueue.processAll(20000);
-    Assertions.assertEquals(2,
-        metrics.getPipelinesWaitingToCloseTotal());
+    assertEquals(2, metrics.getPipelinesWaitingToCloseTotal());
 
     // should have host specific metric collected
     // for datanode_host1
-    Assertions.assertEquals(2,
-        metrics.getPipelinesWaitingToCloseByHost(
-            "datanode_host1"));
+    assertEquals(2, metrics.getPipelinesWaitingToCloseByHost("datanode_host1"));
     // Clear the pipelines and the metric collected for
     // datanode_host1 should clear
     nodeManager.setPipelines(dn1, 0);
     monitor.run();
     eventQueue.processAll(20000);
-    Assertions.assertEquals(0,
-        metrics.getPipelinesWaitingToCloseByHost(
-            "datanode_host1"));
+    assertEquals(0, metrics.getPipelinesWaitingToCloseByHost("datanode_host1"));
   }
 
   /**
@@ -184,13 +176,11 @@ public class TestNodeDecommissionMetrics {
     // container after the first run
     monitor.startMonitoring(dn1);
     monitor.run();
-    Assertions.assertEquals(1,
-        metrics.getContainersUnderReplicatedTotal());
+    assertEquals(1, metrics.getContainersUnderReplicatedTotal());
 
     // should have host specific metric collected
     // for datanode_host1
-    Assertions.assertEquals(1,
-        metrics.getUnderReplicatedByHost("datanode_host1"));
+    assertEquals(1, metrics.getUnderReplicatedByHost("datanode_host1"));
   }
 
   /**
@@ -224,13 +214,11 @@ public class TestNodeDecommissionMetrics {
     monitor.run();
     // expect dn in decommissioning workflow with container
     // sufficiently replicated
-    Assertions.assertEquals(1,
-        metrics.getContainersSufficientlyReplicatedTotal());
+    assertEquals(1, metrics.getContainersSufficientlyReplicatedTotal());
 
     // should have host specific metric collected
     // for datanode_host1
-    Assertions.assertEquals(1,
-        metrics.getSufficientlyReplicatedByHost("datanode_host1"));
+    assertEquals(1, metrics.getSufficientlyReplicatedByHost("datanode_host1"));
   }
 
   /**
@@ -260,14 +248,11 @@ public class TestNodeDecommissionMetrics {
     monitor.startMonitoring(dn1);
 
     monitor.run();
-    Assertions.assertEquals(1,
-        metrics.getContainersUnClosedTotal());
+    assertEquals(1, metrics.getContainersUnClosedTotal());
 
     // should have host specific metric collected
     // for datanode_host1
-    Assertions.assertEquals(1,
-        metrics.getUnClosedContainersByHost(
-            "datanode_host1"));
+    assertEquals(1, metrics.getUnClosedContainersByHost("datanode_host1"));
   }
 
   /**
@@ -311,8 +296,7 @@ public class TestNodeDecommissionMetrics {
     monitor.startMonitoring(dn2);
 
     monitor.run();
-    Assertions.assertEquals(3,
-        metrics.getContainersUnderReplicatedTotal());
+    assertEquals(3, metrics.getContainersUnderReplicatedTotal());
   }
 
   /**
@@ -340,7 +324,6 @@ public class TestNodeDecommissionMetrics {
     monitor.startMonitoring(dn2);
 
     monitor.run();
-    Assertions.assertEquals(3,
-        metrics.getPipelinesWaitingToCloseTotal());
+    assertEquals(3, metrics.getPipelinesWaitingToCloseTotal());
   }
 }

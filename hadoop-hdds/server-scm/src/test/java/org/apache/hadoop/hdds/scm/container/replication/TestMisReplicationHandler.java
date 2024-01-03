@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.junit.jupiter.api.Assertions;
 
 import java.io.IOException;
 import java.util.HashSet;
@@ -49,6 +48,9 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.replicateContainerCommand;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
@@ -205,7 +207,7 @@ public abstract class TestMisReplicationHandler {
               .thenAnswer(invocation -> {
                 List<DatanodeDetails> datanodeDetails =
                         invocation.getArgument(0);
-                Assertions.assertTrue(remainingReplicasAfterCopy
+                assertTrue(remainingReplicasAfterCopy
                         .containsAll(datanodeDetails));
                 return targetNodes;
               });
@@ -217,18 +219,18 @@ public abstract class TestMisReplicationHandler {
       misReplicationHandler.processAndSendCommands(availableReplicas,
           pendingOp, result, maintenanceCnt);
     } finally {
-      Assertions.assertEquals(expectedNumberOfCommands, commandsSent.size());
+      assertEquals(expectedNumberOfCommands, commandsSent.size());
       for (Pair<DatanodeDetails, SCMCommand<?>> pair : commandsSent) {
         SCMCommand<?> command = pair.getValue();
-        Assertions.assertSame(replicateContainerCommand, command.getType());
+        assertSame(replicateContainerCommand, command.getType());
         ReplicateContainerCommand replicateContainerCommand =
             (ReplicateContainerCommand) command;
-        Assertions.assertEquals(replicateContainerCommand.getContainerID(),
+        assertEquals(replicateContainerCommand.getContainerID(),
             container.getContainerID());
         DatanodeDetails replicateSrcDn = pair.getKey();
         DatanodeDetails target = replicateContainerCommand.getTargetDatanode();
-        Assertions.assertTrue(sourceDns.contains(replicateSrcDn));
-        Assertions.assertTrue(targetNodes.contains(target));
+        assertTrue(sourceDns.contains(replicateSrcDn));
+        assertTrue(targetNodes.contains(target));
         int replicaIndex = replicateContainerCommand.getReplicaIndex();
         assertReplicaIndex(replicaIndexMap, replicateSrcDn, replicaIndex);
       }

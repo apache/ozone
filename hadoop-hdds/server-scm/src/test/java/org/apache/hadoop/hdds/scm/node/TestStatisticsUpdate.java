@@ -42,7 +42,6 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -53,6 +52,7 @@ import java.util.Arrays;
 import java.util.Collections;
 
 import static org.mockito.Mockito.mock;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Verifies the statics in NodeManager.
@@ -111,14 +111,14 @@ public class TestStatisticsUpdate {
         mock(EventPublisher.class));
 
     SCMNodeStat stat = nodeManager.getStats();
-    Assertions.assertEquals(300L, stat.getCapacity().get());
-    Assertions.assertEquals(270L, stat.getRemaining().get());
-    Assertions.assertEquals(30L, stat.getScmUsed().get());
+    assertEquals(300L, stat.getCapacity().get());
+    assertEquals(270L, stat.getRemaining().get());
+    assertEquals(30L, stat.getScmUsed().get());
 
     SCMNodeMetric nodeStat = nodeManager.getNodeStat(datanode1);
-    Assertions.assertEquals(100L, nodeStat.get().getCapacity().get());
-    Assertions.assertEquals(90L, nodeStat.get().getRemaining().get());
-    Assertions.assertEquals(10L, nodeStat.get().getScmUsed().get());
+    assertEquals(100L, nodeStat.get().getCapacity().get());
+    assertEquals(90L, nodeStat.get().getRemaining().get());
+    assertEquals(10L, nodeStat.get().getScmUsed().get());
 
     //TODO: Support logic to mark a node as dead in NodeManager.
 
@@ -137,10 +137,9 @@ public class TestStatisticsUpdate {
     nodeManager.processHeartbeat(datanode2, layoutInfo);
     //THEN statistics in SCM should changed.
     stat = nodeManager.getStats();
-    Assertions.assertEquals(200L, stat.getCapacity().get());
-    Assertions.assertEquals(180L,
-        stat.getRemaining().get());
-    Assertions.assertEquals(20L, stat.getScmUsed().get());
+    assertEquals(200L, stat.getCapacity().get());
+    assertEquals(180L, stat.getRemaining().get());
+    assertEquals(20L, stat.getScmUsed().get());
   }
 
 }

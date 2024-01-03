@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -38,6 +37,7 @@ import java.util.Set;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QUASI_CLOSED;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -74,7 +74,7 @@ public class TestMismatchedReplicasHandler {
         .setContainerReplicas(Collections.emptySet())
         .build();
 
-    Assertions.assertFalse(handler.handle(request));
+    assertFalse(handler.handle(request));
     verify(replicationManager, times(0)).sendCloseContainerReplicaCommand(
         any(), any(), anyBoolean());
   }
@@ -92,7 +92,7 @@ public class TestMismatchedReplicasHandler {
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
-    Assertions.assertFalse(handler.handle(request));
+    assertFalse(handler.handle(request));
 
     verify(replicationManager, times(0)).sendCloseContainerReplicaCommand(
         any(), any(), anyBoolean());
@@ -137,8 +137,8 @@ public class TestMismatchedReplicasHandler {
 
     // this handler always returns false so other handlers can fix issues
     // such as under replication
-    Assertions.assertFalse(handler.handle(request));
-    Assertions.assertFalse(handler.handle(readRequest));
+    assertFalse(handler.handle(request));
+    assertFalse(handler.handle(readRequest));
 
     verify(replicationManager, times(1)).sendCloseContainerReplicaCommand(
         containerInfo, mismatch1.getDatanodeDetails(), true);
@@ -160,7 +160,7 @@ public class TestMismatchedReplicasHandler {
         .setContainerReplicas(Collections.emptySet())
         .build();
 
-    Assertions.assertFalse(handler.handle(request));
+    assertFalse(handler.handle(request));
     verify(replicationManager, times(0)).sendCloseContainerReplicaCommand(
         any(), any(), anyBoolean());
   }
@@ -178,7 +178,7 @@ public class TestMismatchedReplicasHandler {
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
-    Assertions.assertFalse(handler.handle(request));
+    assertFalse(handler.handle(request));
 
     verify(replicationManager, times(0)).sendCloseContainerReplicaCommand(
         any(), any(), anyBoolean());
@@ -220,8 +220,8 @@ public class TestMismatchedReplicasHandler {
 
     // this handler always returns false so other handlers can fix issues
     // such as under replication
-    Assertions.assertFalse(handler.handle(request));
-    Assertions.assertFalse(handler.handle(readRequest));
+    assertFalse(handler.handle(request));
+    assertFalse(handler.handle(readRequest));
 
     verify(replicationManager, times(1)).sendCloseContainerReplicaCommand(
         containerInfo, mismatch1.getDatanodeDetails(), true);
@@ -272,8 +272,8 @@ public class TestMismatchedReplicasHandler {
 
     // this handler always returns false so other handlers can fix issues
     // such as under replication
-    Assertions.assertFalse(handler.handle(request));
-    Assertions.assertFalse(handler.handle(readRequest));
+    assertFalse(handler.handle(request));
+    assertFalse(handler.handle(readRequest));
 
     verify(replicationManager, times(1)).sendCloseContainerReplicaCommand(
         containerInfo, mismatch1.getDatanodeDetails(), false);
@@ -319,8 +319,8 @@ public class TestMismatchedReplicasHandler {
 
     // this handler always returns false so other handlers can fix issues
     // such as under replication
-    Assertions.assertFalse(handler.handle(request));
-    Assertions.assertFalse(handler.handle(readRequest));
+    assertFalse(handler.handle(request));
+    assertFalse(handler.handle(readRequest));
 
     verify(replicationManager, times(1)).sendCloseContainerReplicaCommand(
         containerInfo, sameSeqID.getDatanodeDetails(), true);

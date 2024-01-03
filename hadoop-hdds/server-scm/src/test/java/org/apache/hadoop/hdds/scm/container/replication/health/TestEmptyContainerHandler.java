@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -46,6 +45,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
 
@@ -257,11 +257,10 @@ public class TestEmptyContainerHandler {
   private void assertAndVerify(ContainerCheckRequest request,
       boolean assertion, int times, long numEmptyExpected)
       throws IOException {
-    Assertions.assertEquals(assertion, emptyContainerHandler.handle(request));
+    assertEquals(assertion, emptyContainerHandler.handle(request));
     verify(replicationManager, times(times)).sendDeleteCommand(any(ContainerInfo.class), anyInt(),
         any(DatanodeDetails.class), eq(false));
-    Assertions.assertEquals(numEmptyExpected, request.getReport().getStat(
-        ReplicationManagerReport.HealthState.EMPTY));
+    assertEquals(numEmptyExpected, request.getReport().getStat(ReplicationManagerReport.HealthState.EMPTY));
 
     if (times > 0) {
       verify(replicationManager, times(1)).updateContainerState(any(ContainerID.class),

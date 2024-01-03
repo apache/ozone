@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -43,6 +42,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OP
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.eq;
@@ -82,7 +83,7 @@ public class TestQuasiClosedContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
-    Assertions.assertFalse(quasiClosedContainerHandler.handle(request));
+    assertFalse(quasiClosedContainerHandler.handle(request));
     verify(replicationManager, times(0))
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
   }
@@ -101,7 +102,7 @@ public class TestQuasiClosedContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
-    Assertions.assertFalse(quasiClosedContainerHandler.handle(request));
+    assertFalse(quasiClosedContainerHandler.handle(request));
     verify(replicationManager, times(0))
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
   }
@@ -137,8 +138,8 @@ public class TestQuasiClosedContainerHandler {
         .setReadOnly(true)
         .build();
 
-    Assertions.assertFalse(quasiClosedContainerHandler.handle(request));
-    Assertions.assertFalse(quasiClosedContainerHandler.handle(readRequest));
+    assertFalse(quasiClosedContainerHandler.handle(request));
+    assertFalse(quasiClosedContainerHandler.handle(readRequest));
     verify(replicationManager, times(2))
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
   }
@@ -162,10 +163,10 @@ public class TestQuasiClosedContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
-    Assertions.assertFalse(quasiClosedContainerHandler.handle(request));
+    assertFalse(quasiClosedContainerHandler.handle(request));
     verify(replicationManager, times(0))
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
-    Assertions.assertEquals(1, request.getReport().getStat(
+    assertEquals(1, request.getReport().getStat(
         ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK));
   }
 
@@ -192,10 +193,10 @@ public class TestQuasiClosedContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
-    Assertions.assertFalse(quasiClosedContainerHandler.handle(request));
+    assertFalse(quasiClosedContainerHandler.handle(request));
     verify(replicationManager, times(0))
         .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
-    Assertions.assertEquals(1, request.getReport().getStat(
+    assertEquals(1, request.getReport().getStat(
         ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK));
   }
 
@@ -241,8 +242,8 @@ public class TestQuasiClosedContainerHandler {
         .setReadOnly(true)
         .build();
 
-    Assertions.assertFalse(quasiClosedContainerHandler.handle(request));
-    Assertions.assertFalse(quasiClosedContainerHandler.handle(readRequest));
+    assertFalse(quasiClosedContainerHandler.handle(request));
+    assertFalse(quasiClosedContainerHandler.handle(readRequest));
     // verify close command was sent for replicas with sequence ID 1001, that
     // is dnTwo and dnThree
     verify(replicationManager, times(1))

@@ -37,9 +37,11 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -136,16 +138,16 @@ public class TestSCMContainerPlacementCapacity {
           .chooseDatanodes(existingNodes, null, 1, 15, 15);
 
       //then
-      Assertions.assertEquals(1, datanodeDetails.size());
+      assertEquals(1, datanodeDetails.size());
       DatanodeDetails datanode0Details = datanodeDetails.get(0);
 
-      Assertions.assertNotEquals(
+      assertNotEquals(
           datanodes.get(0), datanode0Details,
           "Datanode 0 should not been selected: excluded by parameter");
-      Assertions.assertNotEquals(
+      assertNotEquals(
           datanodes.get(1), datanode0Details,
           "Datanode 1 should not been selected: excluded by parameter");
-      Assertions.assertNotEquals(
+      assertNotEquals(
           datanodes.get(2), datanode0Details,
           "Datanode 2 should not been selected: not enough space there");
 
@@ -155,9 +157,9 @@ public class TestSCMContainerPlacementCapacity {
     }
 
     //datanode 6 has more space than datanode 3 and datanode 4.
-    Assertions.assertTrue(selectedCount.get(datanodes.get(3)) < selectedCount
+    assertTrue(selectedCount.get(datanodes.get(3)) < selectedCount
         .get(datanodes.get(6)));
-    Assertions.assertTrue(selectedCount.get(datanodes.get(4)) < selectedCount
+    assertTrue(selectedCount.get(datanodes.get(4)) < selectedCount
         .get(datanodes.get(6)));
   }
 }

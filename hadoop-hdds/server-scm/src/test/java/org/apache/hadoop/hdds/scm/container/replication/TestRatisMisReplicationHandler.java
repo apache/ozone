@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -44,6 +43,8 @@ import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doThrow;
@@ -101,7 +102,7 @@ public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
                     any(), any(), any(),
                     anyInt(), anyLong(), anyLong()))
             .thenThrow(new IOException("No nodes found"));
-    Assertions.assertThrows(SCMException.class, () -> testMisReplication(
+    assertThrows(SCMException.class, () -> testMisReplication(
             availableReplicas, placementPolicy, Collections.emptyList(),
             0, 2, 0));
   }
@@ -182,7 +183,7 @@ public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
             Pair.of(IN_SERVICE, 0));
-    Assertions.assertThrows(CommandTargetOverloadedException.class,
+    assertThrows(CommandTargetOverloadedException.class,
         () -> testMisReplication(availableReplicas, mockPlacementPolicy(),
             Collections.emptyList(), 0, 1, 1, 0));
   }
@@ -199,6 +200,6 @@ public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
   protected void assertReplicaIndex(
       Map<DatanodeDetails, Integer> expectedReplicaIndexes,
       DatanodeDetails sourceDatanode, int actualReplicaIndex) {
-    Assertions.assertEquals(0, actualReplicaIndex);
+    assertEquals(0, actualReplicaIndex);
   }
 }

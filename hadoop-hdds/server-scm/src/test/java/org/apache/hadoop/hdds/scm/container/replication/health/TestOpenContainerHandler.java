@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -36,6 +35,8 @@ import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -73,7 +74,7 @@ public class TestOpenContainerHandler {
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
-    Assertions.assertFalse(openContainerHandler.handle(request));
+    assertFalse(openContainerHandler.handle(request));
     verify(replicationManager, times(0)).sendCloseContainerEvent(any());
   }
 
@@ -90,7 +91,7 @@ public class TestOpenContainerHandler {
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
-    Assertions.assertTrue(openContainerHandler.handle(request));
+    assertTrue(openContainerHandler.handle(request));
     verify(replicationManager, times(0)).sendCloseContainerEvent(any());
   }
 
@@ -114,8 +115,8 @@ public class TestOpenContainerHandler {
         .setContainerReplicas(containerReplicas)
         .setReadOnly(true)
         .build();
-    Assertions.assertTrue(openContainerHandler.handle(request));
-    Assertions.assertTrue(openContainerHandler.handle(readRequest));
+    assertTrue(openContainerHandler.handle(request));
+    assertTrue(openContainerHandler.handle(readRequest));
     verify(replicationManager, times(1))
         .sendCloseContainerEvent(containerInfo.containerID());
   }
@@ -133,7 +134,7 @@ public class TestOpenContainerHandler {
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
-    Assertions.assertFalse(openContainerHandler.handle(request));
+    assertFalse(openContainerHandler.handle(request));
     verify(replicationManager, times(0)).sendCloseContainerEvent(any());
   }
 
@@ -150,7 +151,7 @@ public class TestOpenContainerHandler {
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
-    Assertions.assertTrue(openContainerHandler.handle(request));
+    assertTrue(openContainerHandler.handle(request));
     verify(replicationManager, times(0)).sendCloseContainerEvent(any());
   }
 
@@ -174,8 +175,8 @@ public class TestOpenContainerHandler {
         .setContainerReplicas(containerReplicas)
         .setReadOnly(true)
         .build();
-    Assertions.assertTrue(openContainerHandler.handle(request));
-    Assertions.assertTrue(openContainerHandler.handle(readRequest));
+    assertTrue(openContainerHandler.handle(request));
+    assertTrue(openContainerHandler.handle(readRequest));
     verify(replicationManager, times(1)).sendCloseContainerEvent(any());
   }
 }
