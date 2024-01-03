@@ -67,7 +67,7 @@ for i in $(seq 1 ${ITERATIONS}); do
 
   # shellcheck source=hadoop-ozone/dev-support/checks/_mvn_unit_report.sh
   source "${DIR}/_mvn_unit_report.sh"
-  if [[ ${irc} == 0 ]] && [[ -s "${REPORT_FILE}" ]]; then
+  if [[ ${irc} == 0 ]] && [[ -s "${REPORT_DIR}/summary.txt" ]]; then
     irc=1
   fi
 
