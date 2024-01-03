@@ -30,4 +30,8 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   </description>
   <name>Apache Ozone Annotation Processing</name>
   <packaging>jar</packaging>
+
+  <properties>
+    <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
+  </properties>
 </project>

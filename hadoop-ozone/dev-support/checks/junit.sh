@@ -50,6 +50,7 @@ if [[ "${CHECK}" == "integration" ]] || [[ ${ITERATIONS} -gt 1 ]]; then
 fi
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/${CHECK}"}
+REPORT_FILE="${REPORT_DIR}/summary.txt"
 mkdir -p "$REPORT_DIR"
 
 rc=0
@@ -66,13 +67,13 @@ for i in $(seq 1 ${ITERATIONS}); do
 
   # shellcheck source=hadoop-ozone/dev-support/checks/_mvn_unit_report.sh
   source "${DIR}/_mvn_unit_report.sh"
-  if [[ ${irc} == 0 ]] && [[ -s "${REPORT_DIR}/summary.txt" ]]; then
+  if [[ ${irc} == 0 ]] && [[ -s "${REPORT_FILE}" ]]; then
     irc=1
   fi
 
   if [[ ${ITERATIONS} -gt 1 ]]; then
     REPORT_DIR="${original_report_dir}"
-    echo "Iteration ${i} exit code: ${irc}" | tee -a "${REPORT_DIR}/summary.txt"
+    echo "Iteration ${i} exit code: ${irc}" | tee -a "${REPORT_FILE}"
   fi
 
   if [[ ${rc} == 0 ]]; then
@@ -83,6 +84,11 @@ for i in $(seq 1 ${ITERATIONS}); do
     break
   fi
 done
+
+# check if Maven failed due to some error other than test failure
+if [[ ${rc} -ne 0 ]] && [[ ! -s "${REPORT_FILE}" ]]; then
+  grep -m1 -F '[ERROR]' "${REPORT_DIR}/output.log" > "${REPORT_FILE}"
+fi
 
 if [[ "${OZONE_WITH_COVERAGE}" == "true" ]]; then
   #Archive combined jacoco records

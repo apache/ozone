@@ -27,6 +27,10 @@
   <name>Apache Ozone HDDS Managed RocksDB</name>
   <packaging>jar</packaging>
 
+  <properties>
+    <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>org.apache.ozone</groupId>
