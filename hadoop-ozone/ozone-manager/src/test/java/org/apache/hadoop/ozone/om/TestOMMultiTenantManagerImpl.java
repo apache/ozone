@@ -22,9 +22,13 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -40,11 +44,9 @@ import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.multitenant.CachedTenantState;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserAccessIdInfo;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 
 /**
  * Tests for Multi Tenant Manager APIs.
@@ -71,20 +73,17 @@ public class TestOMMultiTenantManagerImpl {
     assignUserToTenantInDB(TENANT_ID, "seed-accessId1", "seed-user1", false,
         false);
 
-    ozoneManager = Mockito.mock(OzoneManager.class);
-    Mockito.when(ozoneManager.getMetadataManager())
-        .thenReturn(omMetadataManager);
+    ozoneManager = mock(OzoneManager.class);
+    when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
 
-    OzoneConfiguration ozoneConfiguration =
-        Mockito.mock(OzoneConfiguration.class);
-    Mockito.when(ozoneConfiguration.getTimeDuration(
+    OzoneConfiguration ozoneConfiguration = mock(OzoneConfiguration.class);
+    when(ozoneConfiguration.getTimeDuration(
         OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL,
         OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT.getDuration(),
         OZONE_OM_MULTITENANCY_RANGER_SYNC_INTERVAL_DEFAULT.getUnit(),
         TimeUnit.SECONDS))
         .thenReturn(10L);
-    Mockito.when(ozoneManager.getConfiguration())
-        .thenReturn(ozoneConfiguration);
+    when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
 
     tenantManager = new OMMultiTenantManagerImpl(ozoneManager, conf);
   }
@@ -135,7 +134,7 @@ public class TestOMMultiTenantManagerImpl {
       } else if (user.equals("seed-user1")) {
         assertEquals("seed-accessId1", userAccessId.getAccessId());
       } else {
-        Assertions.fail();
+        fail();
       }
     }
 
@@ -143,8 +142,8 @@ public class TestOMMultiTenantManagerImpl {
         () -> tenantManager.listUsersInTenant("tenant2", null));
     assertEquals("Tenant 'tenant2' not found!", ioException.getMessage());
 
-    assertTrue(tenantManager.listUsersInTenant(TENANT_ID, "abc")
-        .getUserAccessIds().isEmpty());
+    assertThat(tenantManager.listUsersInTenant(TENANT_ID, "abc")
+        .getUserAccessIds()).isEmpty();
   }
 
   @Test
@@ -157,10 +156,10 @@ public class TestOMMultiTenantManagerImpl {
 
     tenantManager.getCacheOp()
         .revokeUserAccessId("seed-accessId1", TENANT_ID);
-    assertTrue(tenantManager.getTenantCache().get(TENANT_ID)
-        .getAccessIdInfoMap().isEmpty());
-    assertTrue(tenantManager.listUsersInTenant(TENANT_ID, null)
-        .getUserAccessIds().isEmpty());
+    assertThat(tenantManager.getTenantCache().get(TENANT_ID)
+        .getAccessIdInfoMap()).isEmpty();
+    assertThat(tenantManager.listUsersInTenant(TENANT_ID, null)
+        .getUserAccessIds()).isEmpty();
   }
 
   @Test

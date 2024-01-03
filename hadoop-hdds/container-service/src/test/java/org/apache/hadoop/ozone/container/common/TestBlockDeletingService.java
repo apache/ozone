@@ -76,8 +76,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
@@ -109,6 +107,7 @@ import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.create
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -131,10 +130,6 @@ public class TestBlockDeletingService {
   private String schemaVersion;
   private int blockLimitPerInterval;
   private MutableVolumeSet volumeSet;
-
-  private static Iterable<Object[]> versionInfo() {
-    return ContainerTestVersionInfo.versionParameters();
-  }
 
   @BeforeEach
   public void init() throws IOException {
@@ -426,8 +421,7 @@ public class TestBlockDeletingService {
    * there are no delete transactions in the DB, this metadata counter should
    * be reset to zero.
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testPendingDeleteBlockReset(ContainerTestVersionInfo versionInfo)
       throws Exception {
     setLayoutAndSchemaForTest(versionInfo);
@@ -541,9 +535,7 @@ public class TestBlockDeletingService {
     }
   }
 
-
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testBlockDeletion(ContainerTestVersionInfo versionInfo)
       throws Exception {
     setLayoutAndSchemaForTest(versionInfo);
@@ -600,7 +592,7 @@ public class TestBlockDeletingService {
 
       // Container contains 3 blocks. So, space used by the container
       // should be greater than zero.
-      assertTrue(containerSpace > 0);
+      assertThat(containerSpace).isGreaterThan(0);
 
       // An interval will delete 1 * 2 blocks
       deleteAndWait(svc, 1);
@@ -611,7 +603,7 @@ public class TestBlockDeletingService {
       // After first interval 2 blocks will be deleted. Hence, current space
       // used by the container should be less than the space used by the
       // container initially(before running deletion services).
-      assertTrue(containerData.get(0).getBytesUsed() < containerSpace);
+      assertThat(containerData.get(0).getBytesUsed()).isLessThan(containerSpace);
       assertEquals(2,
           deletingServiceMetrics.getSuccessCount()
               - deleteSuccessCount);
@@ -662,8 +654,7 @@ public class TestBlockDeletingService {
     svc.shutdown();
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testWithUnrecordedBlocks(ContainerTestVersionInfo versionInfo)
       throws Exception {
     setLayoutAndSchemaForTest(versionInfo);
@@ -779,8 +770,7 @@ public class TestBlockDeletingService {
     svc.shutdown();
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testShutdownService(ContainerTestVersionInfo versionInfo)
       throws Exception {
     setLayoutAndSchemaForTest(versionInfo);
@@ -811,8 +801,7 @@ public class TestBlockDeletingService {
     GenericTestUtils.waitFor(() -> service.getThreadCount() == 0, 100, 1000);
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testBlockDeletionTimeout(ContainerTestVersionInfo versionInfo)
       throws Exception {
     setLayoutAndSchemaForTest(versionInfo);
@@ -876,8 +865,8 @@ public class TestBlockDeletingService {
 
       // The block deleting successfully and shouldn't catch timed
       // out warning log.
-      assertFalse(newLog.getOutput().contains(
-          "Background task executes timed out, retrying in next interval"));
+      assertThat(newLog.getOutput())
+          .doesNotContain("Background task executes timed out, retrying in next interval");
     }
     svc.shutdown();
   }
@@ -901,9 +890,8 @@ public class TestBlockDeletingService {
     return ozoneContainer;
   }
 
-  @ParameterizedTest
   @Unhealthy
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testContainerThrottle(ContainerTestVersionInfo versionInfo)
       throws Exception {
     setLayoutAndSchemaForTest(versionInfo);
@@ -970,8 +958,7 @@ public class TestBlockDeletingService {
     }
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testContainerMaxLockHoldingTime(
       ContainerTestVersionInfo versionInfo) throws Exception {
     setLayoutAndSchemaForTest(versionInfo);
@@ -1031,8 +1018,7 @@ public class TestBlockDeletingService {
     return totalSpaceUsed;
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testBlockThrottle(ContainerTestVersionInfo versionInfo)
       throws Exception {
     setLayoutAndSchemaForTest(versionInfo);

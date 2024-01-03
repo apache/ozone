@@ -78,6 +78,7 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.PREFIX;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -401,7 +402,7 @@ public class TestOzoneNativeAuthorizer {
       // Fetch current acls and validate.
       acls = aclImplementor.getAcl(obj);
       assertEquals(1, acls.size());
-      assertTrue(acls.contains(newAcl));
+      assertThat(acls).contains(newAcl);
 
       // Special handling for ALL.
       if (a1.equals(ALL)) {

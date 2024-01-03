@@ -30,11 +30,10 @@ import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -81,7 +80,7 @@ public class TestRatisPipelineCreateAndDestroy {
     init(numOfDatanodes);
     // make sure two pipelines are created
     waitForPipelines(2);
-    Assert.assertEquals(numOfDatanodes, pipelineManager.getPipelines(
+    Assertions.assertEquals(numOfDatanodes, pipelineManager.getPipelines(
         RatisReplicationConfig.getInstance(
             ReplicationFactor.ONE)).size());
 
@@ -103,7 +102,7 @@ public class TestRatisPipelineCreateAndDestroy {
     // make sure two pipelines are created
     waitForPipelines(2);
     // No Factor ONE pipeline is auto created.
-    Assert.assertEquals(0, pipelineManager.getPipelines(
+    Assertions.assertEquals(0, pipelineManager.getPipelines(
         RatisReplicationConfig.getInstance(
             ReplicationFactor.ONE)).size());
 
@@ -140,17 +139,12 @@ public class TestRatisPipelineCreateAndDestroy {
                     100, 10 * 1000);
 
     // try creating another pipeline now
-    try {
-      pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
-          ReplicationFactor.THREE));
-      Assert.fail("pipeline creation should fail after shutting down pipeline");
-    } catch (IOException ioe) {
-      // As now all datanodes are shutdown, they move to stale state, there
-      // will be no sufficient datanodes to create the pipeline.
-      Assert.assertTrue(ioe instanceof SCMException);
-      Assert.assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES,
-          ((SCMException) ioe).getResult());
-    }
+    SCMException ioe = Assertions.assertThrows(SCMException.class, () ->
+        pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
+            ReplicationFactor.THREE)),
+        "pipeline creation should fail after shutting down pipeline");
+    Assertions.assertEquals(
+        SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES, ioe.getResult());
 
     // make sure pipelines is destroyed
     waitForPipelines(0);

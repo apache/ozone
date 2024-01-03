@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -46,6 +45,8 @@ import static com.google.common.collect.Sets.newHashSet;
 import static java.util.Arrays.asList;
 import static org.apache.commons.lang.RandomStringUtils.randomAlphabetic;
 import static org.apache.hadoop.hdds.client.ReplicationConfig.fromTypeAndFactor;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -119,7 +120,7 @@ public class TestScmClient {
     Map<Long, Pipeline> locations =
         scmClient.getContainerLocations(prepopulatedIds, false);
     locations.forEach((id, pipeline) -> {
-      Assertions.assertEquals(actualLocations.get(id).getPipeline(), pipeline);
+      assertEquals(actualLocations.get(id).getPipeline(), pipeline);
     });
     verify(containerLocationProtocol, times(1))
         .getContainerWithPipelineBatch(prepopulatedIds);
@@ -138,7 +139,7 @@ public class TestScmClient {
 
     locations = scmClient.getContainerLocations(testContainerIds, forceRefresh);
     locations.forEach((id, pipeline) -> {
-      Assertions.assertEquals(actualLocations.get(id).getPipeline(), pipeline);
+      assertEquals(actualLocations.get(id).getPipeline(), pipeline);
     });
 
     if (!expectedScmCallIds.isEmpty()) {
@@ -153,17 +154,17 @@ public class TestScmClient {
     when(containerLocationProtocol
         .getContainerWithPipelineBatch(newHashSet(1L)))
         .thenThrow(ioException);
-    IOException actual = Assertions.assertThrows(IOException.class,
+    IOException actual = assertThrows(IOException.class,
         () -> scmClient.getContainerLocations(newHashSet(1L), false));
-    Assertions.assertEquals(ioException, actual);
+    assertEquals(ioException, actual);
 
     RuntimeException runtimeException = new IllegalStateException("Test");
     when(containerLocationProtocol
         .getContainerWithPipelineBatch(newHashSet(2L)))
         .thenThrow(runtimeException);
-    RuntimeException actualRt = Assertions.assertThrows(RuntimeException.class,
+    RuntimeException actualRt = assertThrows(RuntimeException.class,
         () -> scmClient.getContainerLocations(newHashSet(2L), false));
-    Assertions.assertEquals(runtimeException, actualRt.getCause());
+    assertEquals(runtimeException, actualRt.getCause());
   }
 
   ContainerWithPipeline createPipeline(long containerId) {

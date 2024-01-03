@@ -36,8 +36,6 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.log4j.PatternLayout;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -45,6 +43,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.apache.ozone.test.GenericTestUtils.toLog4j;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -58,8 +57,7 @@ public class TestKeyValueContainerMetadataInspector
     extends TestKeyValueContainerIntegrityChecks {
   private static final long CONTAINER_ID = 102;
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testRunDisabled(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initTestData(versionInfo);
@@ -84,8 +82,7 @@ public class TestKeyValueContainerMetadataInspector
     assertNull(runInspectorAndGetReport(containerData));
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testSystemPropertyAndReadOnly(
       ContainerTestVersionInfo versionInfo) throws Exception {
     initTestData(versionInfo);
@@ -119,8 +116,7 @@ public class TestKeyValueContainerMetadataInspector
     System.clearProperty(KeyValueContainerMetadataInspector.SYSTEM_PROPERTY);
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testIncorrectTotalsNoData(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initTestData(versionInfo);
@@ -134,8 +130,7 @@ public class TestKeyValueContainerMetadataInspector
         createBlocks, setBlocks, setBytes, 0, 0);
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testIncorrectTotalsWithData(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initTestData(versionInfo);
@@ -150,8 +145,7 @@ public class TestKeyValueContainerMetadataInspector
         createBlocks, setBlocks, setBytes, 0, 0);
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testCorrectTotalsNoData(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initTestData(versionInfo);
@@ -164,8 +158,7 @@ public class TestKeyValueContainerMetadataInspector
     inspectThenRepairOnCorrectContainer(container.getContainerData());
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testCorrectTotalsWithData(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initTestData(versionInfo);
@@ -207,8 +200,7 @@ public class TestKeyValueContainerMetadataInspector
   static final DeletedBlocksTransactionGeneratorForTesting GENERATOR
       = new DeletedBlocksTransactionGeneratorForTesting();
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testCorrectDeleteWithTransaction(
       ContainerTestVersionInfo versionInfo) throws Exception {
     initTestData(versionInfo);
@@ -231,8 +223,7 @@ public class TestKeyValueContainerMetadataInspector
     inspectThenRepairOnCorrectContainer(container.getContainerData());
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testIncorrectDeleteWithTransaction(
       ContainerTestVersionInfo versionInfo) throws Exception {
     initTestData(versionInfo);
@@ -256,8 +247,7 @@ public class TestKeyValueContainerMetadataInspector
         deleteCount, numDeletedLocalIds);
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testIncorrectDeleteWithoutTransaction(
       ContainerTestVersionInfo versionInfo) throws Exception {
     initTestData(versionInfo);
@@ -549,8 +539,9 @@ public class TestKeyValueContainerMetadataInspector
 
   private void containsAllStrings(String logOutput, String[] expectedMessages) {
     for (String expectedMessage : expectedMessages) {
-      assertTrue(logOutput.contains(expectedMessage),
-          "Log output did not contain \"" + expectedMessage + "\"");
+      assertThat(logOutput)
+          .withFailMessage("Log output did not contain \"" + expectedMessage + "\"")
+          .contains(expectedMessage);
     }
   }
 }

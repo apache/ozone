@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -63,6 +62,7 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test cases to verify the metrics exposed by SCMPipelineManager.
@@ -151,10 +151,10 @@ public class TestSCMContainerPlacementPolicyMetrics {
         getLongCounter("DatanodeChooseFallbackCount", metrics);
 
     // Seems no under-replicated closed containers get replicated
-    Assert.assertTrue(totalRequest == 0);
-    Assert.assertTrue(tryCount == 0);
-    Assert.assertTrue(sucessCount == 0);
-    Assert.assertTrue(compromiseCount == 0);
+    assertEquals(0, totalRequest);
+    assertEquals(0, tryCount);
+    assertEquals(0, sucessCount);
+    assertEquals(0, compromiseCount);
   }
 
   @AfterEach

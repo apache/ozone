@@ -41,6 +41,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import org.mockito.Mockito;
 import static org.mockito.Mockito.when;
@@ -103,13 +104,13 @@ public class TestSCMContainerPlacementCapacity {
         .thenReturn(new ArrayList<>(datanodes));
 
     when(mockNodeManager.getNodeStat(any()))
-        .thenReturn(new SCMNodeMetric(100L, 0L, 100L));
+        .thenReturn(new SCMNodeMetric(100L, 0L, 100L, 0, 90));
     when(mockNodeManager.getNodeStat(datanodes.get(2)))
-        .thenReturn(new SCMNodeMetric(100L, 90L, 10L));
+        .thenReturn(new SCMNodeMetric(100L, 90L, 10L, 0, 9));
     when(mockNodeManager.getNodeStat(datanodes.get(3)))
-        .thenReturn(new SCMNodeMetric(100L, 80L, 20L));
+        .thenReturn(new SCMNodeMetric(100L, 80L, 20L, 0, 19));
     when(mockNodeManager.getNodeStat(datanodes.get(4)))
-        .thenReturn(new SCMNodeMetric(100L, 70L, 30L));
+        .thenReturn(new SCMNodeMetric(100L, 70L, 30L, 0, 20));
     when(mockNodeManager.getNodeByUuid(any(UUID.class))).thenAnswer(
             invocation -> datanodes.stream()
                 .filter(dn -> dn.getUuid().equals(invocation.getArgument(0)))
@@ -155,9 +156,9 @@ public class TestSCMContainerPlacementCapacity {
     }
 
     //datanode 6 has more space than datanode 3 and datanode 4.
-    Assertions.assertTrue(selectedCount.get(datanodes.get(3)) < selectedCount
-        .get(datanodes.get(6)));
-    Assertions.assertTrue(selectedCount.get(datanodes.get(4)) < selectedCount
-        .get(datanodes.get(6)));
+    assertThat(selectedCount.get(datanodes.get(3)))
+        .isLessThan(selectedCount.get(datanodes.get(6)));
+    assertThat(selectedCount.get(datanodes.get(4)))
+        .isLessThan(selectedCount.get(datanodes.get(6)));
   }
 }

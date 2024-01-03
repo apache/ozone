@@ -62,9 +62,9 @@ import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaO
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -357,7 +357,7 @@ public class TestECOverReplicationHandler {
     );
 
     index2commandNum.keySet().forEach(i -> {
-      assertTrue(index2excessNum.containsKey(i));
+      assertThat(index2excessNum).containsKey(i);
       assertEquals(index2commandNum.get(i), index2excessNum.get(i));
     });
   }

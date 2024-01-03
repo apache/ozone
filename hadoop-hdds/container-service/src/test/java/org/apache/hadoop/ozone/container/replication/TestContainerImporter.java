@@ -18,13 +18,15 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
-import org.apache.commons.compress.archivers.ArchiveEntry;
+
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -44,10 +46,10 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -56,6 +58,9 @@ import static org.mockito.Mockito.when;
  * Test for {@link ContainerImporter}.
  */
 class TestContainerImporter {
+
+  @TempDir
+  private File tempDir;
 
   private OzoneConfiguration conf;
 
@@ -87,7 +92,7 @@ class TestContainerImporter {
             null, NO_COMPRESSION));
     Assertions.assertEquals(ContainerProtos.Result.CONTAINER_EXISTS,
         ex.getResult());
-    assertTrue(ex.getMessage().contains("Container already exists"));
+    assertThat(ex.getMessage()).contains("Container already exists");
   }
 
   @Test
@@ -130,26 +135,24 @@ class TestContainerImporter {
             null, NO_COMPRESSION));
     Assertions.assertEquals(ContainerProtos.Result.CONTAINER_EXISTS,
         ex.getResult());
-    assertTrue(ex.getMessage().contains("import in progress"));
+    assertThat(ex.getMessage()).contains("import in progress");
     semaphore.release();
   }
 
   private File containerTarFile(
       long containerId, ContainerData containerData) throws IOException {
-    TemporaryFolder tempFolder = new TemporaryFolder();
-    tempFolder.create();
-    File yamlFile = tempFolder.newFile("container.yaml");
+    File yamlFile = new File(tempDir, "container.yaml");
     ContainerDataYaml.createContainerFile(
         ContainerProtos.ContainerType.KeyValueContainer, containerData,
         yamlFile);
-    File tarFile = tempFolder.newFile(
+    File tarFile = new File(tempDir,
         ContainerUtils.getContainerTarName(containerId));
     try (FileOutputStream output = new FileOutputStream(tarFile)) {
-      TarArchiveOutputStream archive = new TarArchiveOutputStream(output);
-      ArchiveEntry entry = archive.createArchiveEntry(yamlFile,
+      ArchiveOutputStream<TarArchiveEntry> archive = new TarArchiveOutputStream(output);
+      TarArchiveEntry entry = archive.createArchiveEntry(yamlFile,
           "container.yaml");
       archive.putArchiveEntry(entry);
-      try (InputStream input = new FileInputStream(yamlFile)) {
+      try (InputStream input = Files.newInputStream(yamlFile.toPath())) {
         IOUtils.copy(input, archive);
       }
       archive.closeArchiveEntry();

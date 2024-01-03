@@ -91,7 +91,9 @@ import org.junit.jupiter.api.Assertions;
 
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
@@ -100,8 +102,6 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -136,10 +136,6 @@ public class TestContainerPersistence {
     this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
-  }
-
-  private static Iterable<Object[]> versionInfo() {
-    return ContainerTestVersionInfo.versionParameters();
   }
 
   @BeforeAll
@@ -224,15 +220,13 @@ public class TestContainerPersistence {
     return container;
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testCreateContainer(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initSchemaAndVersionInfo(versionInfo);
     long testContainerID = getTestContainerID();
     addContainer(containerSet, testContainerID);
-    Assertions.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+    assertThat(containerSet.getContainerMapCopy()).containsKey(testContainerID);
     KeyValueContainerData kvData =
         (KeyValueContainerData) containerSet.getContainer(testContainerID)
             .getContainerData();
@@ -250,8 +244,7 @@ public class TestContainerPersistence {
     }
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testCreateDuplicateContainer(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initSchemaAndVersionInfo(versionInfo);
@@ -266,8 +259,7 @@ public class TestContainerPersistence {
     }
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testAddingBlockToDeletedContainer(
       ContainerTestVersionInfo versionInfo) throws Exception {
     initSchemaAndVersionInfo(versionInfo);
@@ -282,14 +274,13 @@ public class TestContainerPersistence {
         addContainer(containerSet, testContainerID);
     container.close();
 
-    Assertions.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+    assertThat(containerSet.getContainerMapCopy())
+        .containsKey(testContainerID);
 
     KeyValueContainerUtil.removeContainer(container.getContainerData(), conf);
     container.delete();
     containerSet.removeContainer(testContainerID);
-    Assertions.assertFalse(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+    assertThat(containerSet.getContainerMapCopy()).doesNotContainKey(testContainerID);
 
     // Adding block to a deleted container should fail.
     BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID);
@@ -301,8 +292,7 @@ public class TestContainerPersistence {
         Matchers.containsString("Error opening DB."));
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testDeleteNonEmptyContainer(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initSchemaAndVersionInfo(versionInfo);
@@ -311,8 +301,8 @@ public class TestContainerPersistence {
         addContainer(containerSet, testContainerID);
     container.close();
 
-    Assertions.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+    assertThat(containerSet.getContainerMapCopy())
+        .containsKey(testContainerID);
 
     // Deleting a non-empty container should fail.
     BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID);
@@ -333,15 +323,14 @@ public class TestContainerPersistence {
     Exception exception = Assertions.assertThrows(
         StorageContainerException.class,
         () -> kvHandler.deleteContainer(container, false));
-    Assertions.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+    assertThat(containerSet.getContainerMapCopy())
+        .containsKey(testContainerID);
     assertThat(exception.getMessage(),
         Matchers.containsString(
             "Non-force deletion of non-empty container is not allowed."));
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testDeleteContainer(ContainerTestVersionInfo versionInfo)
       throws IOException {
     initSchemaAndVersionInfo(versionInfo);
@@ -351,8 +340,8 @@ public class TestContainerPersistence {
         testContainerID);
     BlockID blockID = addBlockToContainer(container);
     container.close();
-    Assertions.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+    assertThat(containerSet.getContainerMapCopy())
+        .containsKey(testContainerID);
     KeyValueContainerData containerData = container.getContainerData();
 
     // Block data and metadata tables should have data.
@@ -363,8 +352,8 @@ public class TestContainerPersistence {
         container.getContainerData().getVolume().getConf());
     container.delete();
     containerSet.removeContainer(testContainerID);
-    Assertions.assertFalse(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+    assertThat(containerSet.getContainerMapCopy())
+        .doesNotContainKey(testContainerID);
 
     // Block data and metadata tables should be cleared.
     assertContainerNotInSchema3DB(containerData, blockID);
@@ -434,8 +423,7 @@ public class TestContainerPersistence {
    *
    * @throws Exception
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testDeleteContainerWithRenaming(
       ContainerTestVersionInfo versionInfo) throws Exception {
     initSchemaAndVersionInfo(versionInfo);
@@ -457,10 +445,10 @@ public class TestContainerPersistence {
     KeyValueContainerData container2Data = container2.getContainerData();
     assertContainerInSchema3DB(container2Data, container2Block);
 
-    Assertions.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID1));
-    Assertions.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID2));
+    assertThat(containerSet.getContainerMapCopy())
+        .containsKey(testContainerID1);
+    assertThat(containerSet.getContainerMapCopy())
+        .containsKey(testContainerID2);
 
     // Since this test only uses one volume, both containers will reside in
     // the same volume.
@@ -490,10 +478,10 @@ public class TestContainerPersistence {
 
     File container1Dir = KeyValueContainerUtil.getTmpDirectoryPath(
         container1Data, hddsVolume).toFile();
-    Assertions.assertTrue(deleteDirFiles.contains(container1Dir));
+    assertThat(deleteDirFiles).contains(container1Dir);
     File container2Dir = KeyValueContainerUtil.getTmpDirectoryPath(
         container2Data, hddsVolume).toFile();
-    Assertions.assertTrue(deleteDirFiles.contains(container2Dir));
+    assertThat(deleteDirFiles).contains(container2Dir);
 
     // Delete container1 from the disk. Container2 should remain in the
     // deleted containers directory.
@@ -521,10 +509,10 @@ public class TestContainerPersistence {
     // Remove containers from containerSet
     containerSet.removeContainer(testContainerID1);
     containerSet.removeContainer(testContainerID2);
-    Assertions.assertFalse(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID1));
-    Assertions.assertFalse(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID2));
+    assertThat(containerSet.getContainerMapCopy())
+        .doesNotContainKey(testContainerID1);
+    assertThat(containerSet.getContainerMapCopy())
+        .doesNotContainKey(testContainerID2);
 
     // Deleted containers directory should now be empty.
     deleteDirFilesArray = deletedContainerDir.listFiles();
@@ -532,8 +520,7 @@ public class TestContainerPersistence {
     assertEquals(0, deleteDirFilesArray.length);
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testGetContainerReports(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initSchemaAndVersionInfo(versionInfo);
@@ -570,8 +557,7 @@ public class TestContainerPersistence {
    *
    * @throws IOException
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testListContainer(ContainerTestVersionInfo versionInfo)
       throws IOException {
     initSchemaAndVersionInfo(versionInfo);
@@ -597,7 +583,7 @@ public class TestContainerPersistence {
       long nextKey = results.get(results.size() - 1).getContainerID();
 
       //Assert that container is returning results in a sorted fashion.
-      Assertions.assertTrue(prevKey < nextKey);
+      assertThat(prevKey).isLessThan(nextKey);
       prevKey = nextKey + 1;
       results.clear();
     }
@@ -628,7 +614,7 @@ public class TestContainerPersistence {
         .getVolume().getCommittedBytes();
     commitDecrement = commitBytesBefore - commitBytesAfter;
     // did we decrement commit bytes by the amount of data we wrote?
-    Assertions.assertTrue(commitDecrement == info.getLen());
+    assertEquals(commitDecrement, info.getLen());
     return info;
 
   }
@@ -639,8 +625,7 @@ public class TestContainerPersistence {
    * @throws IOException
    * @throws NoSuchAlgorithmException
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testWriteChunk(ContainerTestVersionInfo versionInfo)
       throws IOException {
     initSchemaAndVersionInfo(versionInfo);
@@ -656,8 +641,7 @@ public class TestContainerPersistence {
    * @throws IOException
    * @throws NoSuchAlgorithmException
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testWritReadManyChunks(ContainerTestVersionInfo versionInfo)
       throws IOException {
     initSchemaAndVersionInfo(versionInfo);
@@ -705,8 +689,7 @@ public class TestContainerPersistence {
    *
    * @throws IOException
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testOverWrite(ContainerTestVersionInfo versionInfo)
       throws IOException {
     initSchemaAndVersionInfo(versionInfo);
@@ -742,8 +725,7 @@ public class TestContainerPersistence {
    *
    * @throws IOException
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testDeleteChunk(ContainerTestVersionInfo versionInfo)
       throws IOException {
     initSchemaAndVersionInfo(versionInfo);
@@ -769,8 +751,7 @@ public class TestContainerPersistence {
    *
    * @throws IOException
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testPutBlock(ContainerTestVersionInfo versionInfo)
       throws IOException {
     initSchemaAndVersionInfo(versionInfo);
@@ -796,8 +777,7 @@ public class TestContainerPersistence {
    *
    * @throws IOException
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testPutBlockWithInvalidBCSId(ContainerTestVersionInfo versionInfo)
       throws IOException {
     initSchemaAndVersionInfo(versionInfo);
@@ -830,7 +810,7 @@ public class TestContainerPersistence {
           getBlock(container, blockID1);
       Assertions.fail("Expected exception not thrown");
     } catch (StorageContainerException sce) {
-      Assertions.assertTrue(sce.getResult() == UNKNOWN_BCSID);
+      assertSame(UNKNOWN_BCSID, sce.getResult());
     }
 
     try {
@@ -841,7 +821,7 @@ public class TestContainerPersistence {
           getBlock(container, blockID1);
       Assertions.fail("Expected exception not thrown");
     } catch (StorageContainerException sce) {
-      Assertions.assertTrue(sce.getResult() == BCSID_MISMATCH);
+      assertSame(BCSID_MISMATCH, sce.getResult());
     }
     readBlockData = blockManager.
         getBlock(container, blockData.getBlockID());
@@ -855,8 +835,7 @@ public class TestContainerPersistence {
    *
    * @throws IOException
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testPutBlockWithLotsOfChunks(ContainerTestVersionInfo versionInfo)
       throws IOException {
     initSchemaAndVersionInfo(versionInfo);
@@ -910,8 +889,7 @@ public class TestContainerPersistence {
    *
    * @throws IOException
    */
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testUpdateContainer(ContainerTestVersionInfo versionInfo)
       throws IOException {
     initSchemaAndVersionInfo(versionInfo);
@@ -929,8 +907,8 @@ public class TestContainerPersistence {
     container.update(newMetadata, false);
 
     assertEquals(1, containerSet.getContainerMapCopy().size());
-    Assertions.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+    assertThat(containerSet.getContainerMapCopy())
+        .containsKey(testContainerID);
 
     // Verify in-memory map
     KeyValueContainerData actualNewData = (KeyValueContainerData)
@@ -995,8 +973,7 @@ public class TestContainerPersistence {
     return blockData;
   }
 
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testListBlock(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initSchemaAndVersionInfo(versionInfo);

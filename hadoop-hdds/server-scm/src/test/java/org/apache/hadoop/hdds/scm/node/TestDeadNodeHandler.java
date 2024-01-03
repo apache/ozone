@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
@@ -90,6 +91,7 @@ public class TestDeadNodeHandler {
   private EventQueue eventQueue;
   private String storageDir;
   private SCMContext scmContext;
+  private DeletedBlockLog deletedBlockLog;
 
   @BeforeEach
   public void setup() throws IOException, AuthenticationException {
@@ -117,8 +119,9 @@ public class TestDeadNodeHandler {
     pipelineManager.setPipelineProvider(RATIS,
         mockRatisProvider);
     containerManager = scm.getContainerManager();
+    deletedBlockLog = Mockito.mock(DeletedBlockLog.class);
     deadNodeHandler = new DeadNodeHandler(nodeManager,
-        Mockito.mock(PipelineManager.class), containerManager);
+        Mockito.mock(PipelineManager.class), containerManager, deletedBlockLog);
     healthyReadOnlyNodeHandler =
         new HealthyReadOnlyNodeHandler(nodeManager,
             pipelineManager);
@@ -134,6 +137,7 @@ public class TestDeadNodeHandler {
   }
 
   @Test
+  @SuppressWarnings("checkstyle:MethodLength")
   public void testOnMessage() throws Exception {
     //GIVEN
     DatanodeDetails datanode1 = MockDatanodeDetails.randomDatanodeDetails();
@@ -233,6 +237,9 @@ public class TestDeadNodeHandler {
     Assertions.assertFalse(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
 
+    Mockito.verify(deletedBlockLog, Mockito.times(0))
+        .onDatanodeDead(datanode1.getUuid());
+
     Set<ContainerReplica> container1Replicas = containerManager
         .getContainerReplicas(ContainerID.valueOf(container1.getContainerID()));
     Assertions.assertEquals(2, container1Replicas.size());
@@ -259,6 +266,9 @@ public class TestDeadNodeHandler {
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
     Assertions.assertEquals(0, 
         nodeManager.getCommandQueueCount(datanode1.getUuid(), cmd.getType()));
+
+    Mockito.verify(deletedBlockLog, Mockito.times(1))
+        .onDatanodeDead(datanode1.getUuid());
 
     container1Replicas = containerManager
         .getContainerReplicas(ContainerID.valueOf(container1.getContainerID()));

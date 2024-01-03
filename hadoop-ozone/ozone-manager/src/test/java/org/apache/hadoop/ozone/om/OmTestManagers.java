@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.mockito.Mockito.mock;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
@@ -28,7 +29,6 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 
@@ -83,8 +83,7 @@ public final class OmTestManagers {
                         StorageContainerLocationProtocol containerClient)
       throws AuthenticationException, IOException {
     if (containerClient == null) {
-      containerClient =
-          Mockito.mock(StorageContainerLocationProtocol.class);
+      containerClient = mock(StorageContainerLocationProtocol.class);
     }
     scmBlockClient = blockClient != null ? blockClient :
         new ScmBlockLocationTestingClient(null, null, 0);
@@ -107,7 +106,7 @@ public final class OmTestManagers {
     HddsWhiteboxTestUtils.setInternalState(keyManager,
         "scmClient", scmClient);
     HddsWhiteboxTestUtils.setInternalState(keyManager,
-        "secretManager", Mockito.mock(OzoneBlockTokenSecretManager.class));
+        "secretManager", mock(OzoneBlockTokenSecretManager.class));
 
     om.start();
     writeClient = OzoneClientFactory.getRpcClient(conf)
@@ -124,7 +123,7 @@ public final class OmTestManagers {
 
   //initializing and returning a mock kmsProvider
   public KeyProviderCryptoExtension kmsProviderInit() {
-    kmsProvider = Mockito.mock(KeyProviderCryptoExtension.class);
+    kmsProvider = mock(KeyProviderCryptoExtension.class);
 
     HddsWhiteboxTestUtils.setInternalState(om,
             "kmsProvider", kmsProvider);

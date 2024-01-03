@@ -20,30 +20,23 @@ package org.apache.hadoop.ozone.recon;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Timeout;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY;
 
 /**
  * Test Recon SCM HA Snapshot Download implementation.
  */
+@Timeout(100)
 public class TestReconScmHASnapshot {
-
-  /**
-   * Set a timeout for each test.
-   */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(100));
   private OzoneConfiguration conf;
   private MiniOzoneCluster ozoneCluster = null;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_SCM_HA_ENABLE_KEY, true);
@@ -63,7 +56,7 @@ public class TestReconScmHASnapshot {
     TestReconScmSnapshot.testSnapshot(ozoneCluster);
   }
 
-  @After
+  @AfterEach
   public void shutdown() throws Exception {
     if (ozoneCluster != null) {
       ozoneCluster.shutdown();

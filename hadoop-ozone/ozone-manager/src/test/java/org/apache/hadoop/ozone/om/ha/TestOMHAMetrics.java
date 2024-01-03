@@ -16,10 +16,10 @@
  */
 package org.apache.hadoop.ozone.om.ha;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -45,8 +45,7 @@ public class TestOMHAMetrics {
     omhaMetrics = OMHAMetrics.create(NODE_ID, leaderId);
 
     omhaMetrics.getMetrics(METRICS_COLLECTOR, true);
-    Assertions.assertEquals(1,
-        omhaMetrics.getOmhaInfoOzoneManagerHALeaderState());
+    assertEquals(1, omhaMetrics.getOmhaInfoOzoneManagerHALeaderState());
   }
 
   @Test
@@ -55,7 +54,6 @@ public class TestOMHAMetrics {
     omhaMetrics = OMHAMetrics.create(NODE_ID, leaderId);
 
     omhaMetrics.getMetrics(METRICS_COLLECTOR, true);
-    Assertions.assertEquals(0,
-        omhaMetrics.getOmhaInfoOzoneManagerHALeaderState());
+    assertEquals(0, omhaMetrics.getOmhaInfoOzoneManagerHALeaderState());
   }
 }

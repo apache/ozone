@@ -21,7 +21,6 @@ import org.apache.hadoop.fs.Syncable;
 import org.apache.ratis.util.MemoizedSupplier;
 import org.apache.ratis.util.function.CheckedConsumer;
 import org.apache.ratis.util.function.CheckedFunction;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
@@ -31,6 +30,11 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.function.Supplier;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test {@link SelectorOutputStream}.
@@ -100,14 +104,14 @@ public class TestSelectorOutputStream {
 
     // checkout auto selection
     final boolean isAbove = byteToWrite > threshold;
-    Assertions.assertFalse(belowThreshold.isInitialized());
-    Assertions.assertEquals(isAbove, aboveThreshold.isInitialized());
+    assertFalse(belowThreshold.isInitialized());
+    assertEquals(isAbove, aboveThreshold.isInitialized());
 
     final boolean isBelow = !isAbove;
     if (op != null) {
       op.accept(out);
-      Assertions.assertEquals(isBelow, belowThreshold.isInitialized());
-      Assertions.assertEquals(isAbove, aboveThreshold.isInitialized());
+      assertEquals(isBelow, belowThreshold.isInitialized());
+      assertEquals(isAbove, aboveThreshold.isInitialized());
     }
   }
 
@@ -134,11 +138,11 @@ public class TestSelectorOutputStream {
 
   @Test
   public void testHflushNonSyncable() {
-    final IllegalStateException thrown = Assertions.assertThrows(
+    final IllegalStateException thrown = assertThrows(
         IllegalStateException.class,
         () -> runTestSelector(10, 2, Op.HFLUSH, false));
     LOG.info("thrown", thrown);
-    Assertions.assertTrue(thrown.getMessage().contains("not Syncable"));
+    assertTrue(thrown.getMessage().contains("not Syncable"));
   }
 
   @Test
@@ -150,10 +154,10 @@ public class TestSelectorOutputStream {
 
   @Test
   public void testHSyncNonSyncable() {
-    final IllegalStateException thrown = Assertions.assertThrows(
+    final IllegalStateException thrown = assertThrows(
         IllegalStateException.class,
         () -> runTestSelector(10, 2, Op.HSYNC, false));
     LOG.info("thrown", thrown);
-    Assertions.assertTrue(thrown.getMessage().contains("not Syncable"));
+    assertTrue(thrown.getMessage().contains("not Syncable"));
   }
 }

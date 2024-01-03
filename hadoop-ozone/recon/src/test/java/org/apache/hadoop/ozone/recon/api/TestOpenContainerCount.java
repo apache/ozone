@@ -59,7 +59,6 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -69,6 +68,8 @@ import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayo
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -337,7 +338,7 @@ public class TestOpenContainerCount {
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
     } catch (Exception ex) {
-      Assertions.fail(ex.getMessage());
+      fail(ex.getMessage());
     }
   }
 
@@ -360,7 +361,7 @@ public class TestOpenContainerCount {
       --expectedCnt;
       closeContainer(id);
       DatanodeMetadata metadata = getDatanodeMetadata();
-      Assertions.assertEquals(expectedCnt, metadata.getOpenContainers());
+      assertEquals(expectedCnt, metadata.getOpenContainers());
     }
   }
 
@@ -429,7 +430,7 @@ public class TestOpenContainerCount {
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
     } catch (Exception ex) {
-      Assertions.fail(ex.getMessage());
+      fail(ex.getMessage());
     }
   }
 

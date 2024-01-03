@@ -17,6 +17,10 @@
  */
 package org.apache.hadoop.ozone.container.common.impl;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -41,10 +45,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService.ContainerBlockInfo;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
 
 /**
@@ -66,10 +67,6 @@ public class TestContainerDeletionChoosingPolicy {
     this.layoutVersion = layout;
   }
 
-  private static Iterable<Object[]> layoutVersion() {
-    return ContainerLayoutTestInfo.containerLayoutParameters();
-  }
-
   @BeforeEach
   public void init() throws Throwable {
     conf = new OzoneConfiguration();
@@ -77,8 +74,7 @@ public class TestContainerDeletionChoosingPolicy {
         .getTempPath(TestContainerDeletionChoosingPolicy.class.getSimpleName());
   }
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testRandomChoosingPolicy(ContainerLayoutVersion layout)
       throws IOException {
     setLayoutVersion(layout);
@@ -86,7 +82,7 @@ public class TestContainerDeletionChoosingPolicy {
     if (containerDir.exists()) {
       FileUtils.deleteDirectory(new File(path));
     }
-    Assertions.assertTrue(containerDir.mkdirs());
+    assertTrue(containerDir.mkdirs());
 
     conf.set(
         ScmConfigKeys.OZONE_SCM_KEY_VALUE_CONTAINER_DELETION_CHOOSING_POLICY,
@@ -105,9 +101,9 @@ public class TestContainerDeletionChoosingPolicy {
       data.closeContainer();
       KeyValueContainer container = new KeyValueContainer(data, conf);
       containerSet.addContainer(container);
-      Assertions.assertTrue(
-          containerSet.getContainerMapCopy()
-              .containsKey(data.getContainerID()));
+      assertThat(
+          containerSet.getContainerMapCopy())
+              .containsKey(data.getContainerID());
     }
     blockDeletingService = getBlockDeletingService();
 
@@ -121,7 +117,7 @@ public class TestContainerDeletionChoosingPolicy {
     for (ContainerBlockInfo pr : result0) {
       totPendingBlocks += pr.getNumBlocksToDelete();
     }
-    Assertions.assertTrue(totPendingBlocks >= blockLimitPerInterval);
+    assertThat(totPendingBlocks).isGreaterThanOrEqualTo(blockLimitPerInterval);
 
     // test random choosing. We choose 100 times the 3 datanodes twice.
     //We expect different order at least once.
@@ -138,12 +134,11 @@ public class TestContainerDeletionChoosingPolicy {
         }
       }
     }
-    Assertions.fail("Chosen container results were same 100 times");
+    fail("Chosen container results were same 100 times");
 
   }
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testTopNOrderedChoosingPolicy(ContainerLayoutVersion layout)
       throws IOException {
     setLayoutVersion(layout);
@@ -151,7 +146,7 @@ public class TestContainerDeletionChoosingPolicy {
     if (containerDir.exists()) {
       FileUtils.deleteDirectory(new File(path));
     }
-    Assertions.assertTrue(containerDir.mkdirs());
+    assertTrue(containerDir.mkdirs());
 
     conf.set(
         ScmConfigKeys.OZONE_SCM_KEY_VALUE_CONTAINER_DELETION_CHOOSING_POLICY,
@@ -182,8 +177,7 @@ public class TestContainerDeletionChoosingPolicy {
       KeyValueContainer container = new KeyValueContainer(data, conf);
       data.closeContainer();
       containerSet.addContainer(container);
-      Assertions.assertTrue(
-          containerSet.getContainerMapCopy().containsKey(containerId));
+      assertThat(containerSet.getContainerMapCopy()).containsKey(containerId);
     }
     numberOfBlocks.sort(Collections.reverseOrder());
     int blockLimitPerInterval = 5;
@@ -196,7 +190,7 @@ public class TestContainerDeletionChoosingPolicy {
     for (ContainerBlockInfo pr : result0) {
       totPendingBlocks += pr.getNumBlocksToDelete();
     }
-    Assertions.assertTrue(totPendingBlocks >= blockLimitPerInterval);
+    assertThat(totPendingBlocks).isGreaterThanOrEqualTo(blockLimitPerInterval);
 
 
     List<ContainerBlockInfo> result1 = blockDeletingService
@@ -211,7 +205,7 @@ public class TestContainerDeletionChoosingPolicy {
         break;
       }
     }
-    Assertions.assertEquals(containerCount, result1.size());
+    assertEquals(containerCount, result1.size());
 
     // verify the order of return list
     int initialName2CountSize = name2Count.size();
@@ -220,11 +214,11 @@ public class TestContainerDeletionChoosingPolicy {
       int currentCount =
           name2Count.remove(data.getContainerData().getContainerID());
       // previous count should not smaller than next one
-      Assertions.assertTrue(currentCount > 0 && currentCount <= lastCount);
+      assertThat(currentCount).isGreaterThan(0).isLessThanOrEqualTo(lastCount);
       lastCount = currentCount;
     }
     // ensure all the container data are compared
-    Assertions.assertEquals(result1.size(),
+    assertEquals(result1.size(),
         initialName2CountSize - name2Count.size());
   }
 

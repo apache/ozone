@@ -122,6 +122,8 @@ import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicaBuilder;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
@@ -327,8 +329,7 @@ public class TestLegacyReplicationManager {
           replicationManager.getLegacyReplicationManager()
               .getContainerReplicaCount(container);
 
-      Assertions.assertTrue(
-          replicaCount instanceof LegacyRatisContainerReplicaCount);
+      assertInstanceOf(LegacyRatisContainerReplicaCount.class, replicaCount);
       Assertions.assertFalse(replicaCount.isSufficientlyReplicated());
       Assertions.assertFalse(replicaCount.isSufficientlyReplicatedForOffline(
           decommissioningReplica.getDatanodeDetails(), nodeManager));
@@ -1172,8 +1173,7 @@ public class TestLegacyReplicationManager {
       List<DatanodeDetails> sourceDatanodes =
           replicateCommand.getSourceDatanodes();
       Assertions.assertEquals(2, sourceDatanodes.size());
-      Assertions.assertFalse(
-          sourceDatanodes.contains(unhealthyReplica.getDatanodeDetails()));
+      assertThat(sourceDatanodes).doesNotContain(unhealthyReplica.getDatanodeDetails());
       Assertions.assertEquals(0,
           datanodeCommandHandler.getInvocationCount(
               SCMCommandProto.Type.deleteContainerCommand));
@@ -1246,17 +1246,16 @@ public class TestLegacyReplicationManager {
           datanodeCommandHandler.getReceivedCommands().stream().findFirst();
       Assertions.assertTrue(cmdOptional.isPresent());
       SCMCommand<?> scmCmd = cmdOptional.get().getCommand();
-      Assertions.assertTrue(scmCmd instanceof ReplicateContainerCommand);
+      assertInstanceOf(ReplicateContainerCommand.class, scmCmd);
       ReplicateContainerCommand repCmd = (ReplicateContainerCommand) scmCmd;
 
       // Only the closed replicas should have been used as sources.
       List<DatanodeDetails> repSources = repCmd.getSourceDatanodes();
       Assertions.assertEquals(2, repSources.size());
-      Assertions.assertTrue(repSources.containsAll(
+      assertThat(repSources).containsAll(
           Arrays.asList(closedReplica1.getDatanodeDetails(),
-              closedReplica2.getDatanodeDetails())));
-      Assertions.assertFalse(
-          repSources.contains(quasiReplica.getDatanodeDetails()));
+              closedReplica2.getDatanodeDetails()));
+      assertThat(repSources).doesNotContain(quasiReplica.getDatanodeDetails());
     }
 
     /**
@@ -1295,17 +1294,16 @@ public class TestLegacyReplicationManager {
           datanodeCommandHandler.getReceivedCommands().stream().findFirst();
       Assertions.assertTrue(cmdOptional.isPresent());
       SCMCommand<?> scmCmd = cmdOptional.get().getCommand();
-      Assertions.assertTrue(scmCmd instanceof ReplicateContainerCommand);
+      assertInstanceOf(ReplicateContainerCommand.class, scmCmd);
       ReplicateContainerCommand repCmd = (ReplicateContainerCommand) scmCmd;
 
       // Only the quasi closed replicas should have been used as a sources.
       List<DatanodeDetails> repSources = repCmd.getSourceDatanodes();
       Assertions.assertEquals(2, repSources.size());
-      Assertions.assertTrue(repSources.containsAll(
+      assertThat(repSources).containsAll(
           Arrays.asList(quasiReplica1.getDatanodeDetails(),
-              quasiReplica2.getDatanodeDetails())));
-      Assertions.assertFalse(
-          repSources.contains(unhealthyReplica.getDatanodeDetails()));
+              quasiReplica2.getDatanodeDetails()));
+      assertThat(repSources).doesNotContain(unhealthyReplica.getDatanodeDetails());
     }
 
     /**
@@ -1582,8 +1580,7 @@ public class TestLegacyReplicationManager {
       ReplicateContainerCommand command = (ReplicateContainerCommand)
           replicateCommands.iterator().next().getCommand();
       List<DatanodeDetails> sources = command.getSourceDatanodes();
-      Assertions.assertTrue(sources.contains(quasi1.getDatanodeDetails()) &&
-          sources.contains(quasi2.getDatanodeDetails()));
+      assertThat(sources).contains(quasi1.getDatanodeDetails(), quasi2.getDatanodeDetails());
       ContainerReplica replica3 =
           getReplicas(container.containerID(), QUASI_CLOSED,
               container.getSequenceId(), quasi1.getOriginDatanodeId(),
@@ -2621,8 +2618,8 @@ public class TestLegacyReplicationManager {
       DatanodeDetails dn3 = addNode(new NodeStatus(IN_SERVICE, HEALTHY));
       CompletableFuture<MoveManager.MoveResult> cf =
               replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
-      Assertions.assertTrue(scmLogs.getOutput().contains(
-              "receive a move request about container"));
+      assertThat(scmLogs.getOutput()).contains(
+              "receive a move request about container");
       Thread.sleep(100L);
       Assertions.assertTrue(datanodeCommandHandler.received(
               SCMCommandProto.Type.replicateContainerCommand, dn3));
@@ -2664,8 +2661,8 @@ public class TestLegacyReplicationManager {
               new NodeStatus(IN_SERVICE, HEALTHY), CLOSED);
       DatanodeDetails dn3 = addNode(new NodeStatus(IN_SERVICE, HEALTHY));
       replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
-      Assertions.assertTrue(scmLogs.getOutput().contains(
-              "receive a move request about container"));
+      assertThat(scmLogs.getOutput()).contains(
+              "receive a move request about container");
       Thread.sleep(100L);
       Assertions.assertTrue(datanodeCommandHandler.received(
               SCMCommandProto.Type.replicateContainerCommand, dn3));
@@ -2736,8 +2733,8 @@ public class TestLegacyReplicationManager {
       resetReplicationManager();
       replicationManager.getMoveScheduler()
               .reinitialize(SCMDBDefinition.MOVE.getTable(dbStore));
-      Assertions.assertFalse(replicationManager.getMoveScheduler()
-              .getInflightMove().containsKey(id));
+      assertThat(replicationManager.getMoveScheduler()
+              .getInflightMove()).doesNotContainKey(id);
 
       //completeableFuture is not stored in DB, so after scm crash and
       //restart ,completeableFuture is missing
@@ -2762,8 +2759,8 @@ public class TestLegacyReplicationManager {
       DatanodeDetails dn4 = addNode(new NodeStatus(IN_SERVICE, HEALTHY));
       CompletableFuture<MoveManager.MoveResult> cf =
               replicationManager.move(id, dn1.getDatanodeDetails(), dn4);
-      Assertions.assertTrue(scmLogs.getOutput().contains(
-              "receive a move request about container"));
+      assertThat(scmLogs.getOutput()).contains(
+              "receive a move request about container");
       Thread.sleep(100L);
       Assertions.assertTrue(datanodeCommandHandler.received(
               SCMCommandProto.Type.replicateContainerCommand, dn4));
@@ -2807,8 +2804,8 @@ public class TestLegacyReplicationManager {
       DatanodeDetails dn3 = addNode(new NodeStatus(IN_SERVICE, HEALTHY));
       CompletableFuture<MoveManager.MoveResult> cf =
               replicationManager.move(id, dn1.getDatanodeDetails(), dn3);
-      Assertions.assertTrue(scmLogs.getOutput().contains(
-              "receive a move request about container"));
+      assertThat(scmLogs.getOutput()).contains(
+              "receive a move request about container");
 
       nodeManager.setNodeStatus(dn3, new NodeStatus(IN_SERVICE, STALE));
       replicationManager.processAll();
@@ -3283,7 +3280,7 @@ public class TestLegacyReplicationManager {
         .map(CommandForDatanode::getDatanodeId)
         .collect(Collectors.toSet());
 
-    Assertions.assertTrue(deleteCandidateIDs.containsAll(chosenDNIDs));
+    assertThat(deleteCandidateIDs).containsAll(chosenDNIDs);
   }
 
   /**
@@ -3304,7 +3301,7 @@ public class TestLegacyReplicationManager {
         .map(CommandForDatanode::getDatanodeId)
         .collect(Collectors.toSet());
 
-    Assertions.assertTrue(chosenDNIDs.containsAll(deleteDNIDs));
+    assertThat(chosenDNIDs).containsAll(deleteDNIDs);
   }
 
   private ContainerInfo createContainer(LifeCycleState containerState)

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.common.interfaces;
 
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -85,7 +86,7 @@ public class TestHandler {
     Handler kvHandler = dispatcher.getHandler(
         ContainerProtos.ContainerType.KeyValueContainer);
 
-    Assertions.assertTrue((kvHandler instanceof KeyValueHandler),
+    assertInstanceOf(KeyValueHandler.class, kvHandler,
         "getHandlerForContainerType returned incorrect handler");
   }
 

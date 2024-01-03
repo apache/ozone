@@ -15,19 +15,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.fs.ozone;
 
-package org.apache.hadoop.ozone.om.ratis.utils;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.junit.jupiter.api.TestInstance;
 
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
-
-import java.util.concurrent.CompletableFuture;
-
-/**
- * Helper interface for OzoneManagerDoubleBuffer.
- *
- */
-public interface OzoneManagerDoubleBufferHelper {
-
-  CompletableFuture<Void> add(OMClientResponse response,
-      long transactionIndex);
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class TestOFSWithFSPathsAndOMRatisAndCacheOnly extends AbstractRootedOzoneFileSystemTest {
+  TestOFSWithFSPathsAndOMRatisAndCacheOnly() {
+    super(BucketLayout.LEGACY, true, true, false, true);
+  }
 }

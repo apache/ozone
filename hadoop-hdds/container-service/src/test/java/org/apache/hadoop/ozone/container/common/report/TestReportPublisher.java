@@ -173,8 +173,8 @@ public class TestReportPublisher {
         .build();
     cmdStatusMap.put(obj1.getCmdId(), obj1);
     cmdStatusMap.put(obj2.getCmdId(), obj2);
-    // We are not sending the commands whose status is PENDING.
-    Assertions.assertEquals(1,
+    // We will sending the commands whose status is PENDING and EXECUTED
+    Assertions.assertEquals(2,
         ((CommandStatusReportPublisher) publisher).getReport()
             .getCmdStatusCount(),
         "Should publish report with 2 status objects");
