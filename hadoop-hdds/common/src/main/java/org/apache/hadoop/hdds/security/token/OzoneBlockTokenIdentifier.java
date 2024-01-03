@@ -141,6 +141,18 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
     this.maxLength = token.getMaxLength();
   }
 
+  @Override
+  public void readFromByteArray(byte[] bytes) throws IOException {
+    BlockTokenSecretProto token =
+        BlockTokenSecretProto.parseFrom(bytes);
+    setOwnerId(token.getOwnerId());
+    setExpiry(Instant.ofEpochMilli(token.getExpiryDate()));
+    setSecretKeyId(ProtobufUtils.fromProtobuf(token.getSecretKeyId()));
+    this.blockId = token.getBlockId();
+    this.modes = EnumSet.copyOf(token.getModesList());
+    this.maxLength = token.getMaxLength();
+  }
+
   @VisibleForTesting
   public static OzoneBlockTokenIdentifier readFieldsProtobuf(DataInput in)
       throws IOException {
@@ -168,6 +180,21 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
       builder.addModes(AccessModeProto.valueOf(mode.name()));
     }
     out.write(builder.build().toByteArray());
+  }
+
+  @Override
+  public byte[] getBytes() {
+    BlockTokenSecretProto.Builder builder = BlockTokenSecretProto.newBuilder()
+        .setBlockId(blockId)
+        .setOwnerId(getOwnerId())
+        .setSecretKeyId(ProtobufUtils.toProtobuf(getSecretKeyId()))
+        .setExpiryDate(getExpiryDate())
+        .setMaxLength(maxLength);
+    // Add access mode allowed
+    for (AccessModeProto mode : modes) {
+      builder.addModes(AccessModeProto.valueOf(mode.name()));
+    }
+    return builder.build().toByteArray();
   }
 
   /**

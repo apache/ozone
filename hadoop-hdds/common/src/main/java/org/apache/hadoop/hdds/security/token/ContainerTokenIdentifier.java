@@ -88,6 +88,16 @@ public class ContainerTokenIdentifier extends ShortLivedTokenIdentifier {
   }
 
   @Override
+  public void readFromByteArray(byte[] bytes) throws IOException {
+    ContainerTokenSecretProto proto =
+        ContainerTokenSecretProto.parseFrom(bytes);
+    setSecretKeyId(ProtobufUtils.fromProtobuf(proto.getSecretKeyId()));
+    setExpiry(Instant.ofEpochMilli(proto.getExpiryDate()));
+    setOwnerId(proto.getOwnerId());
+    this.containerID = ContainerID.getFromProtobuf(proto.getContainerId());
+  }
+
+  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;
