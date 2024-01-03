@@ -34,9 +34,10 @@ import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
@@ -70,11 +71,9 @@ public class TestSCMDatanodeHeartbeatDispatcher {
               @Override
               public <PAYLOAD, EVENT extends Event<PAYLOAD>> void fireEvent(
                   EVENT event, PAYLOAD payload) {
-                Assertions.assertEquals(event, NODE_REPORT);
+                assertEquals(event, NODE_REPORT);
                 eventReceived.incrementAndGet();
-                Assertions.assertEquals(nodeReport,
-                    ((NodeReportFromDatanode)payload).getReport());
-
+                assertEquals(nodeReport, ((NodeReportFromDatanode)payload).getReport());
               }
             });
 
@@ -86,7 +85,7 @@ public class TestSCMDatanodeHeartbeatDispatcher {
         .setNodeReport(nodeReport)
         .build();
     dispatcher.dispatch(heartbeat);
-    Assertions.assertEquals(1, eventReceived.get());
+    assertEquals(1, eventReceived.get());
 
 
   }
@@ -113,16 +112,16 @@ public class TestSCMDatanodeHeartbeatDispatcher {
               @Override
               public <PAYLOAD, EVENT extends Event<PAYLOAD>> void fireEvent(
                   EVENT event, PAYLOAD payload) {
-                Assertions.assertTrue(
+                assertTrue(
                     event.equals(CONTAINER_REPORT)
                         || event.equals(CMD_STATUS_REPORT));
 
                 if (payload instanceof ContainerReportFromDatanode) {
-                  Assertions.assertEquals(containerReport,
+                  assertEquals(containerReport,
                       ((ContainerReportFromDatanode) payload).getReport());
                 }
                 if (payload instanceof CommandStatusReportFromDatanode) {
-                  Assertions.assertEquals(commandStatusReport,
+                  assertEquals(commandStatusReport,
                       ((CommandStatusReportFromDatanode) payload).getReport());
                 }
                 eventReceived.incrementAndGet();
@@ -138,7 +137,7 @@ public class TestSCMDatanodeHeartbeatDispatcher {
             .addCommandStatusReports(commandStatusReport)
             .build();
     dispatcher.dispatch(heartbeat);
-    Assertions.assertEquals(2, eventReceived.get());
+    assertEquals(2, eventReceived.get());
 
 
   }

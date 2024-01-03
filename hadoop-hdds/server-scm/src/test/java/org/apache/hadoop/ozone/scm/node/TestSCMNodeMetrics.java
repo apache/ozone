@@ -42,7 +42,6 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -152,8 +151,7 @@ public class TestSCMNodeMetrics {
         .addStorageReport(storageReport).build();
 
     nodeManager.processNodeReport(registeredDatanode, nodeReport);
-    Assertions.assertEquals(nrProcessed + 1,
-        getCounter("NumNodeReportProcessed"),
+    assertEquals(nrProcessed + 1, getCounter("NumNodeReportProcessed"),
         "NumNodeReportProcessed");
   }
 
