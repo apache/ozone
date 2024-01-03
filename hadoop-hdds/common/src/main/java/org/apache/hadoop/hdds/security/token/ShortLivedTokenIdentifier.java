@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.TokenIdentifier;
 
-import java.io.DataInput;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Objects;

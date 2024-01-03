@@ -23,14 +23,10 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
-import org.apache.hadoop.io.DataInputByteBuffer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.Objects;
 
