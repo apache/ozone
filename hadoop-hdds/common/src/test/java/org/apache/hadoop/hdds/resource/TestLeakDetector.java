@@ -28,18 +28,21 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * Test LeakDetector.
  */
-public class TestLeakDetector {
+class TestLeakDetector {
   private static final LeakDetector LEAK_DETECTOR = new LeakDetector("test");
-  private AtomicInteger leaks = new AtomicInteger(0);
+  private final AtomicInteger leaks = new AtomicInteger(0);
 
   @Test
-  public void testLeakDetector() throws Exception {
+  void testNoLeaks() throws Exception {
     // create and close resource => no leaks.
     createResource(true);
     System.gc();
     Thread.sleep(100);
     assertEquals(0, leaks.get());
+  }
 
+  @Test
+  void testLeaks() throws Exception {
     // create and not close => leaks.
     createResource(false);
     System.gc();
@@ -47,7 +50,7 @@ public class TestLeakDetector {
     assertEquals(1, leaks.get());
   }
 
-  private void createResource(boolean close) throws Exception {
+  private void createResource(boolean close) {
     MyResource resource = new MyResource(leaks);
     if (close) {
       resource.close();
