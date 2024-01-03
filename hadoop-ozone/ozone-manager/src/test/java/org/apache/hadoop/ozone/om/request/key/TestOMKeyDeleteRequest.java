@@ -49,14 +49,12 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
   @ParameterizedTest
   @ValueSource(strings = {"keyName", "a/b/keyName", "a/.snapshot/keyName", "a.snapshot/b/keyName"})
   public void testPreExecute(String testKeyName) throws Exception {
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager, getBucketLayout());
-    String ozoneKey = addKeyToTable();
-    OmKeyInfo omKeyInfo =
-        omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    String ozoneKey = addKeyToTable(testKeyName);
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
     Assertions.assertNotNull(omKeyInfo);
 
-    doPreExecute(createDeleteKeyRequest(testKeyName));
+    doPreExecute(createDeleteKeyRequest(ozoneKey));
   }
 
   @ParameterizedTest
@@ -190,12 +188,15 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
   }
 
   protected String addKeyToTable() throws Exception {
+    return addKeyToTable(keyName);
+  }
+
+  private String addKeyToTable(String key) throws Exception {
     OMRequestTestUtils.addKeyToTable(false, volumeName,
-            bucketName, keyName, clientID, replicationType, replicationFactor,
+            bucketName, key, clientID, replicationType, replicationFactor,
             omMetadataManager);
 
-    return omMetadataManager.getOzoneKey(volumeName, bucketName,
-            keyName);
+    return omMetadataManager.getOzoneKey(volumeName, bucketName, key);
   }
 
   protected OMKeyDeleteRequest getOmKeyDeleteRequest(
