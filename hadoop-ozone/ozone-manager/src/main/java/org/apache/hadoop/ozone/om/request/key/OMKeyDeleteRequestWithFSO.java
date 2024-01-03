@@ -209,7 +209,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       OzoneManager ozoneManager,
       OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs)
       throws IOException {
-    return resolveBucketAndCheckKeyAclsWithFso(newKeyArgs.build(),
+    return resolveBucketAndCheckKeyAclsWithFSO(newKeyArgs.build(),
         ozoneManager, IAccessAuthorizer.ACLType.DELETE);
   }
 }
