@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
@@ -48,6 +47,8 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.mockito.Mockito.doReturn;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Test get object.
@@ -88,12 +89,12 @@ public class TestObjectGet {
     rest = new ObjectEndpoint();
     rest.setClient(client);
     rest.setOzoneConfiguration(new OzoneConfiguration());
-    headers = Mockito.mock(HttpHeaders.class);
+    headers = mock(HttpHeaders.class);
     rest.setHeaders(headers);
 
-    context = Mockito.mock(ContainerRequestContext.class);
-    Mockito.when(context.getUriInfo()).thenReturn(Mockito.mock(UriInfo.class));
-    Mockito.when(context.getUriInfo().getQueryParameters())
+    context = mock(ContainerRequestContext.class);
+    when(context.getUriInfo()).thenReturn(mock(UriInfo.class));
+    when(context.getUriInfo().getQueryParameters())
         .thenReturn(new MultivaluedHashMap<>());
     rest.setContext(context);
   }
@@ -154,7 +155,7 @@ public class TestObjectGet {
         CONTENT_DISPOSITION2);
     queryParameter.putSingle("response-content-encoding", CONTENT_ENCODING2);
 
-    Mockito.when(context.getUriInfo().getQueryParameters())
+    when(context.getUriInfo().getQueryParameters())
         .thenReturn(queryParameter);
     Response response = rest.get("b1", "key1", 0, null, 0, null);
 
@@ -175,14 +176,14 @@ public class TestObjectGet {
   @Test
   public void getRangeHeader() throws IOException, OS3Exception {
     Response response;
-    Mockito.when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-0");
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-0");
 
     response = rest.get("b1", "key1", 0, null, 0, null);
     assertEquals("1", response.getHeaderString("Content-Length"));
     assertEquals(String.format("bytes 0-0/%s", CONTENT.length()),
         response.getHeaderString("Content-Range"));
 
-    Mockito.when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-");
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-");
     response = rest.get("b1", "key1", 0, null, 0, null);
     assertEquals(String.valueOf(CONTENT.length()),
         response.getHeaderString("Content-Length"));
@@ -201,7 +202,7 @@ public class TestObjectGet {
     // https://www.rfc-editor.org/rfc/rfc7233#section-4.1
     // The 206 (Partial Content) status code indicates that the server is
     //   successfully fulfilling a range request for the target resource
-    Mockito.when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-1");
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-1");
     response = rest.get("b1", "key1", 0, null, 0, null);
     assertEquals(response.getStatus(),
         Response.Status.PARTIAL_CONTENT.getStatusCode());

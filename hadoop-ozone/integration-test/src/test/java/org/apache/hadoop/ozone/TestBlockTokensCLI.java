@@ -33,14 +33,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,6 +48,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static java.time.Duration.between;
@@ -78,19 +71,20 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_F
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.Assertions;
 /**
  * Integration test class to verify block token CLI commands functionality in a
  * secure cluster.
  */
 @InterfaceAudience.Private
+@Timeout(value = 180, unit = TimeUnit.SECONDS)
 public final class TestBlockTokensCLI {
   private static final Logger LOG = LoggerFactory
       .getLogger(TestBlockTokensCLI.class);
-
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(180));
-
   private static MiniKdc miniKdc;
   private static OzoneAdmin ozoneAdmin;
   private static OzoneConfiguration conf;
@@ -105,7 +99,7 @@ public final class TestBlockTokensCLI {
   private static MiniOzoneHAClusterImpl cluster;
   private static OzoneClient client;
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
@@ -128,7 +122,7 @@ public final class TestBlockTokensCLI {
     ozoneAdmin = new OzoneAdmin(conf);
   }
 
-  @AfterClass
+  @AfterAll
   public static void stop() {
     miniKdc.stop();
     IOUtils.close(LOG, client);

@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
@@ -75,7 +76,7 @@ public class TestSCMRatisResponse {
         .build();
     SCMRatisResponse response = SCMRatisResponse.decode(reply);
     Assertions.assertFalse(response.isSuccess());
-    Assertions.assertTrue(response.getException() instanceof RaftException);
+    assertInstanceOf(RaftException.class, response.getException());
     Assertions.assertNull(response.getResult());
   }
 

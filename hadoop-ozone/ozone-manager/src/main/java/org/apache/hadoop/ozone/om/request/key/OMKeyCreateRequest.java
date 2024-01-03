@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
@@ -56,7 +57,6 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyResponse;
@@ -185,8 +185,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long trxnLogIndex = termIndex.getIndex();
     CreateKeyRequest createKeyRequest = getOmRequest().getCreateKeyRequest();
 
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
@@ -345,8 +345,6 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       omClientResponse = new OMKeyCreateResponse(
           createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
       if (acquireLock) {
         mergeOmLockDetails(ozoneLockStrategy
             .releaseWriteLock(omMetadataManager, volumeName,

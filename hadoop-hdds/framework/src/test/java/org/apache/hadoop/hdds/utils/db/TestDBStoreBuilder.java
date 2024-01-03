@@ -39,6 +39,7 @@ import java.util.Collection;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -207,7 +208,7 @@ public class TestDBStoreBuilder {
 
     try (DBStore dbStore = DBStoreBuilder.newBuilder(conf, sampleDB)
         .setName("SampleStore").setPath(newFolder.toPath()).build()) {
-      assertTrue(dbStore instanceof RDBStore);
+      assertInstanceOf(RDBStore.class, dbStore);
 
       RDBStore rdbStore = (RDBStore) dbStore;
       Collection<RocksDatabase.ColumnFamily> cfFamilies =
@@ -273,7 +274,7 @@ public class TestDBStoreBuilder {
             .setName("SampleStore")
             .disableDefaultCFAutoCompaction(disableAutoCompaction)
             .setPath(newFolder.toPath()).build()) {
-      assertTrue(dbStore instanceof RDBStore);
+      assertInstanceOf(RDBStore.class, dbStore);
 
       RDBStore rdbStore = (RDBStore) dbStore;
       Collection<RocksDatabase.ColumnFamily> cfFamilies =

@@ -19,9 +19,9 @@
 package org.apache.hadoop.ozone.om.request.util;
 
 import com.google.protobuf.ByteString;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.common.PayloadUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.util.OMEchoRPCWriteResponse;
@@ -40,8 +40,7 @@ public class OMEchoRPCWriteRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
 
     EchoRPCRequest echoRPCRequest = getOmRequest().getEchoRPCRequest();
 
@@ -56,8 +55,6 @@ public class OMEchoRPCWriteRequest extends OMClientRequest {
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
     OMClientResponse omClientResponse = new OMEchoRPCWriteResponse(
         omResponse.setEchoRPCResponse(echoRPCResponse).build());
-    addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-        omDoubleBufferHelper);
 
     return omClientResponse;
   }

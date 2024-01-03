@@ -134,6 +134,7 @@ import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.CA
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.with;
 import static org.awaitility.Awaitility.await;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -1392,10 +1393,10 @@ public abstract class TestOmSnapshot {
     SnapshotDiffReportOzone
         diff3 = getSnapDiffReport(volume, bucket, snap3, snap4);
     assertEquals(1, diff3.getDiffList().size());
-    assertTrue(diff3.getDiffList().contains(
+    assertThat(diff3.getDiffList()).contains(
         SnapshotDiffReportOzone.getDiffReportEntry(
             SnapshotDiffReportOzone.DiffType.RENAME, key2,
-             key2Renamed)));
+             key2Renamed));
 
 
     // Create a directory
@@ -1406,9 +1407,9 @@ public abstract class TestOmSnapshot {
     SnapshotDiffReportOzone
         diff4 = getSnapDiffReport(volume, bucket, snap4, snap5);
     assertEquals(1, diff4.getDiffList().size());
-    assertTrue(diff4.getDiffList().contains(
+    assertThat(diff4.getDiffList()).contains(
         SnapshotDiffReportOzone.getDiffReportEntry(
-            SnapshotDiffReportOzone.DiffType.CREATE, dir1)));
+            SnapshotDiffReportOzone.DiffType.CREATE, dir1));
 
     String key3 = createFileKeyWithPrefix(bucket1, "key-3-");
     String snap6 = "snap" + counter.incrementAndGet();

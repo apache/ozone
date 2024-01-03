@@ -45,6 +45,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Tests for EcContainerReplicaCounts.
@@ -282,7 +283,7 @@ public class TestECContainerReplicaCount {
     Assertions.assertEquals(4, rcnt.additionalMaintenanceCopiesNeeded(false));
     Set<Integer> maintenanceOnly = rcnt.maintenanceOnlyIndexes(false);
     for (int i = 1; i <= repConfig.getRequiredNodes(); i++) {
-      Assertions.assertTrue(maintenanceOnly.contains(i));
+      assertThat(maintenanceOnly).contains(i);
     }
 
     // include pending adds but still have insufficient replication
@@ -320,7 +321,7 @@ public class TestECContainerReplicaCount {
     // Even though we don't need new copies, the following call will return
     // any indexes only have a maintenance copy.
     Assertions.assertEquals(1, rcnt.maintenanceOnlyIndexes(false).size());
-    Assertions.assertTrue(rcnt.maintenanceOnlyIndexes(false).contains(5));
+    assertThat(rcnt.maintenanceOnlyIndexes(false)).contains(5);
   }
 
   @Test
@@ -341,8 +342,8 @@ public class TestECContainerReplicaCount {
     // Even though we don't need new copies, the following call will return
     // any indexes only have a maintenance copy.
     Assertions.assertEquals(2, rcnt.maintenanceOnlyIndexes(false).size());
-    Assertions.assertTrue(rcnt.maintenanceOnlyIndexes(false).contains(1));
-    Assertions.assertTrue(rcnt.maintenanceOnlyIndexes(false).contains(5));
+    assertThat(rcnt.maintenanceOnlyIndexes(false)).contains(1);
+    assertThat(rcnt.maintenanceOnlyIndexes(false)).contains(5);
   }
 
   @Test
@@ -372,7 +373,7 @@ public class TestECContainerReplicaCount {
     // Even though we don't need new copies, the following call will return
     // any indexes only have a maintenance copy.
     Assertions.assertEquals(1, rcnt.maintenanceOnlyIndexes(false).size());
-    Assertions.assertTrue(rcnt.maintenanceOnlyIndexes(false).contains(5));
+    assertThat(rcnt.maintenanceOnlyIndexes(false)).contains(5);
   }
 
   @Test
@@ -417,8 +418,8 @@ public class TestECContainerReplicaCount {
     Assertions.assertEquals(0, rcnt.maintenanceOnlyIndexes(false).size());
 
     Assertions.assertEquals(2, rcnt.unavailableIndexes(true).size());
-    Assertions.assertTrue(rcnt.unavailableIndexes(true).contains(4));
-    Assertions.assertTrue(rcnt.unavailableIndexes(true).contains(5));
+    assertThat(rcnt.unavailableIndexes(true)).contains(4);
+    assertThat(rcnt.unavailableIndexes(true)).contains(5);
   }
 
   @Test
@@ -441,7 +442,7 @@ public class TestECContainerReplicaCount {
 
     Set<Integer> maintenanceOnly = rcnt.maintenanceOnlyIndexes(true);
     Assertions.assertEquals(1, maintenanceOnly.size());
-    Assertions.assertTrue(maintenanceOnly.contains(5));
+    assertThat(maintenanceOnly).contains(5);
   }
 
   @Test
@@ -483,8 +484,8 @@ public class TestECContainerReplicaCount {
     Assertions.assertFalse(rcnt.isOverReplicated(true));
 
     Assertions.assertEquals(2, rcnt.unavailableIndexes(true).size());
-    Assertions.assertTrue(rcnt.unavailableIndexes(true).contains(1));
-    Assertions.assertTrue(rcnt.unavailableIndexes(true).contains(5));
+    assertThat(rcnt.unavailableIndexes(true)).contains(1);
+    assertThat(rcnt.unavailableIndexes(true)).contains(5);
   }
 
   @Test
@@ -504,9 +505,7 @@ public class TestECContainerReplicaCount {
     Assertions.assertEquals(3, rcnt.additionalMaintenanceCopiesNeeded(true));
     Set<Integer> maintenanceOnly = rcnt.maintenanceOnlyIndexes(true);
     Assertions.assertEquals(4, maintenanceOnly.size());
-    Assertions.assertTrue(
-        maintenanceOnly.contains(2) && maintenanceOnly.contains(3) &&
-            maintenanceOnly.contains(4) && maintenanceOnly.contains(5));
+    assertThat(maintenanceOnly).contains(2, 3, 4, 5);
 
     Assertions.assertEquals(0, rcnt.unavailableIndexes(true).size());
   }

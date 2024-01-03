@@ -68,7 +68,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -84,7 +83,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -187,8 +187,7 @@ public class TestHSync {
           RepeatedOmKeyInfo val = kv.getValue();
           LOG.error("Unexpected deletedTable entry: key = {}, val = {}",
               key, val);
-          Assertions.fail("deletedTable should not have such entry. key = " +
-              key);
+          fail("deletedTable should not have such entry. key = " + key);
         }
       }
     }
@@ -332,7 +331,7 @@ public class TestHSync {
     int offset = 0;
     try (FSDataInputStream in = fs.open(file)) {
       final long skipped = in.skip(length);
-      Assertions.assertEquals(length, skipped);
+      assertEquals(length, skipped);
 
       for (; ;) {
         final int n = in.read(buffer, 0, buffer.length);

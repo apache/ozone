@@ -27,7 +27,6 @@ import java.util.StringJoiner;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 
@@ -40,6 +39,9 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.
     OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.
     OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests OMFailoverProxyProvider failover behaviour.
@@ -121,10 +123,10 @@ public class TestOMFailoverProxyProvider {
     Collection<String> allNodeIds = config.getTrimmedStringCollection(ConfUtils.
         addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID));
     allNodeIds.remove(provider.getCurrentProxyOMNodeId());
-    Assertions.assertTrue(allNodeIds.size() > 0,
+    assertTrue(allNodeIds.size() > 0,
         "This test needs at least 2 OMs");
     provider.setNextOmProxy(allNodeIds.iterator().next());
-    Assertions.assertEquals(0, provider.getWaitTime());
+    assertEquals(0, provider.getWaitTime());
   }
 
   /**
@@ -150,7 +152,7 @@ public class TestOMFailoverProxyProvider {
                                   long waitTimeAfter) {
     for (int attempt = 0; attempt < numNextNodeFailoverTimes; attempt++) {
       provider.selectNextOmProxy();
-      Assertions.assertEquals(waitTimeAfter, provider.getWaitTime());
+      assertEquals(waitTimeAfter, provider.getWaitTime());
       provider.performFailover(null);
     }
   }
@@ -162,7 +164,7 @@ public class TestOMFailoverProxyProvider {
     provider.performFailover(null);
     for (int attempt = 1; attempt <= numSameNodeFailoverTimes; attempt++) {
       provider.setNextOmProxy(provider.getCurrentProxyOMNodeId());
-      Assertions.assertEquals(attempt * waitBetweenRetries,
+      assertEquals(attempt * waitBetweenRetries,
           provider.getWaitTime());
     }
   }
@@ -175,7 +177,7 @@ public class TestOMFailoverProxyProvider {
     OzoneConfiguration ozoneConf = new OzoneConfiguration();
     ArrayList<String> nodeAddrs = new ArrayList<>(
         Arrays.asList("4.3.2.1:9862", "2.1.0.5:9862", "3.2.1.0:9862"));
-    Assertions.assertEquals(numNodes, nodeAddrs.size());
+    assertEquals(numNodes, nodeAddrs.size());
 
     StringJoiner allNodeIds = new StringJoiner(",");
     for (int i = 1; i <= numNodes; i++) {
@@ -197,7 +199,7 @@ public class TestOMFailoverProxyProvider {
 
     Collections.sort(nodeAddrs);
     String expectedDtService = String.join(",", nodeAddrs);
-    Assertions.assertEquals(expectedDtService, dtService.toString());
+    assertEquals(expectedDtService, dtService.toString());
   }
 
 }

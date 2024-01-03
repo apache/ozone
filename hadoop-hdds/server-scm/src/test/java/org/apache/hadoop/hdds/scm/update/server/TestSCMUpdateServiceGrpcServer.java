@@ -47,6 +47,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeoutException;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /**
  * Tests for SCM update Service.
  */
@@ -182,9 +184,9 @@ public class TestSCMUpdateServiceGrpcServer {
       server.notifyCrlUpdate();
       GenericTestUtils.waitFor(() -> client.getUpdateCount() > 1,
           100, 2000);
-      Assertions.assertTrue(2 <= client.getUpdateCount());
+      assertThat(2L).isLessThanOrEqualTo(client.getUpdateCount());
       Assertions.assertEquals(0, client.getErrorCount());
-      Assertions.assertTrue(1 >= client.getClientCRLStore()
+      assertThat(1).isGreaterThanOrEqualTo(client.getClientCRLStore()
           .getPendingCrlIds().size());
 
       GenericTestUtils.waitFor(() -> client.getPendingCrlRemoveCount() == 1,
@@ -286,7 +288,7 @@ public class TestSCMUpdateServiceGrpcServer {
 
       GenericTestUtils.waitFor(() -> client.getUpdateCount() > 6,
           100, 2000);
-      Assertions.assertTrue(client.getUpdateCount() >= 6);
+      assertThat(client.getUpdateCount()).isGreaterThanOrEqualTo(6);
       Assertions.assertEquals(2, client.getErrorCount());
       Assertions.assertEquals(6, clientCRLStore.getLatestCrlId());
     } catch (Exception e) {

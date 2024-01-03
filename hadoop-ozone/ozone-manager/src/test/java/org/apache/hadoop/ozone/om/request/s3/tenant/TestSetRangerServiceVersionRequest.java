@@ -17,11 +17,15 @@
  */
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.mockito.Mockito.framework;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.tenant.OMSetRangerServiceVersionResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
@@ -29,11 +33,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetRangerServiceVersionRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -48,26 +50,23 @@ public class TestSetRangerServiceVersionRequest {
   private Path folder;
 
   private OzoneManager ozoneManager;
-  // Set ozoneManagerDoubleBuffer to do nothing.
-  private final OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
-      ((response, transactionIndex) -> null);
 
   @BeforeEach
   public void setUp() throws Exception {
-    ozoneManager = Mockito.mock(OzoneManager.class);
-    Mockito.when(ozoneManager.getVersionManager())
+    ozoneManager = mock(OzoneManager.class);
+    when(ozoneManager.getVersionManager())
         .thenReturn(new OMLayoutVersionManager(1));
 
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.toAbsolutePath().toString());
-    Mockito.when(ozoneManager.getMetadataManager())
+    when(ozoneManager.getMetadataManager())
         .thenReturn(new OmMetadataManagerImpl(conf, ozoneManager));
   }
 
   @AfterEach
   public void tearDown() throws Exception {
-    Mockito.framework().clearInlineMocks();
+    framework().clearInlineMocks();
   }
 
   private OMRequest createRangerSyncRequest(long rangerServiceVersion) {
@@ -95,16 +94,15 @@ public class TestSetRangerServiceVersionRequest {
 
     // Run validateAndUpdateCaches
     OMClientResponse clientResponse = request.validateAndUpdateCache(
-            ozoneManager, txLogIndex, ozoneManagerDoubleBufferHelper);
+            ozoneManager, txLogIndex);
 
     // Check response type and cast
-    Assertions.assertTrue(clientResponse
-        instanceof OMSetRangerServiceVersionResponse);
+    assertInstanceOf(OMSetRangerServiceVersionResponse.class, clientResponse);
     final OMSetRangerServiceVersionResponse omSetRangerServiceVersionResponse =
         (OMSetRangerServiceVersionResponse) clientResponse;
 
     // Verify response
     String verStr = omSetRangerServiceVersionResponse.getNewServiceVersion();
-    Assertions.assertEquals(10L, Long.parseLong(verStr));
+    assertEquals(10L, Long.parseLong(verStr));
   }
 }

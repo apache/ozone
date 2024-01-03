@@ -17,15 +17,12 @@
  */
 package org.apache.hadoop.hdds.scm.cli.container;
 
-import java.io.IOException;
 import java.util.concurrent.Callable;
 
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
-import org.apache.hadoop.hdds.scm.client.ScmClient;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
@@ -62,13 +59,5 @@ public class ContainerCommands implements Callable<Void>, SubcommandWithParent {
   @Override
   public Class<?> getParentType() {
     return OzoneAdmin.class;
-  }
-
-  public static void checkContainerExists(ScmClient scmClient, long containerId)
-      throws IOException {
-    ContainerInfo container = scmClient.getContainer(containerId);
-    if (container == null) {
-      throw new IllegalArgumentException("No such container " + containerId);
-    }
   }
 }

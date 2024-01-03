@@ -52,6 +52,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.ALLOCATED;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -147,7 +148,7 @@ public class TestECPipelineProvider {
     List<DatanodeDetails> nodes = pipeline.getNodes();
     Assertions.assertEquals(replicas.size() - deadNodes.size(), nodes.size());
     for (DatanodeDetails d : deadNodes) {
-      Assertions.assertFalse(nodes.contains(d));
+      assertThat(nodes).doesNotContain(d);
     }
   }
 

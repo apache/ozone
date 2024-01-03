@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotSetPropertyResponse;
@@ -42,7 +41,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnap
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -71,13 +69,9 @@ public class TestOMSnapshotSetPropertyRequestAndResponse {
   private long exclusiveSize;
   private long exclusiveSizeAfterRepl;
 
-  // Just setting ozoneManagerDoubleBuffer which does nothing.
-  private static final OzoneManagerDoubleBufferHelper
-      DOUBLE_BUFFER_HELPER = ((response, transactionIndex) -> null);
-
   @BeforeEach
   void setup(@TempDir File testDir) throws Exception {
-    ozoneManager = Mockito.mock(OzoneManager.class);
+    ozoneManager = mock(OzoneManager.class);
     OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
     when(lvm.isAllowed(anyString())).thenReturn(true);
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
@@ -117,8 +111,7 @@ public class TestOMSnapshotSetPropertyRequestAndResponse {
       // Validate and Update Cache
       OMSnapshotSetPropertyResponse omSnapshotSetPropertyResponse =
           (OMSnapshotSetPropertyResponse) omSnapshotSetPropertyRequest
-              .validateAndUpdateCache(ozoneManager, 200L,
-                  DOUBLE_BUFFER_HELPER);
+              .validateAndUpdateCache(ozoneManager, 200L);
 
       // Commit to DB.
       batchOperation = omMetadataManager.getStore().initBatchOperation();

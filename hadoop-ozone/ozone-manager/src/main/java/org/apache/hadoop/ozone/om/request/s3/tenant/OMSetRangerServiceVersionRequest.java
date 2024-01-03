@@ -18,12 +18,12 @@
  */
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -52,9 +52,7 @@ public class OMSetRangerServiceVersionRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(
-      OzoneManager ozoneManager, long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
 
     OMClientResponse omClientResponse;
     final OMResponse.Builder omResponse =
@@ -67,7 +65,7 @@ public class OMSetRangerServiceVersionRequest extends OMClientRequest {
 
     omMetadataManager.getMetaTable().addCacheEntry(
         new CacheKey<>(OzoneConsts.RANGER_OZONE_SERVICE_VERSION_KEY),
-        CacheValue.get(transactionLogIndex, proposedVersionStr));
+        CacheValue.get(termIndex.getIndex(), proposedVersionStr));
     omResponse.setSetRangerServiceVersionResponse(
         SetRangerServiceVersionResponse.newBuilder().build());
 
@@ -75,8 +73,6 @@ public class OMSetRangerServiceVersionRequest extends OMClientRequest {
         omResponse.build(),
         OzoneConsts.RANGER_OZONE_SERVICE_VERSION_KEY,
         proposedVersionStr);
-    addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-        ozoneManagerDoubleBufferHelper);
 
     return omClientResponse;
   }

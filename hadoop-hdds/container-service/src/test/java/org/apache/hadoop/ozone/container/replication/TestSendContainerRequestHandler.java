@@ -34,6 +34,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -68,7 +69,7 @@ class TestSendContainerRequestHandler {
     StreamObserver observer = mock(StreamObserver.class);
     doAnswer(invocation -> {
       Object arg = invocation.getArgument(0);
-      Assertions.assertTrue(arg instanceof StorageContainerException);
+      assertInstanceOf(StorageContainerException.class, arg);
       Assertions.assertEquals(ContainerProtos.Result.CONTAINER_EXISTS,
           ((StorageContainerException) arg).getResult());
       return null;
