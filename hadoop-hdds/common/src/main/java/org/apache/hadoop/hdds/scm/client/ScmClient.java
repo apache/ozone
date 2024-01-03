@@ -39,6 +39,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * The interface to call into underlying container layer.
@@ -200,7 +201,7 @@ public interface ScmClient extends Closeable {
    * @return A nodes that matches the requested UUID.
    * @throws IOException
    */
-  HddsProtos.Node querySingleNode(String uuid) throws IOException;
+  HddsProtos.Node queryNode(UUID uuid) throws IOException;
 
   /**
    * Allows a list of hosts to be decommissioned. The hosts are identified

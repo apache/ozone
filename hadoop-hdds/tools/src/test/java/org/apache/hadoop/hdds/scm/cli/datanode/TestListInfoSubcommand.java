@@ -110,7 +110,7 @@ public class TestListInfoSubcommand {
     List<HddsProtos.Node> nodes = getNodeDetails();
 
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.querySingleNode(any()))
+    Mockito.when(scmClient.queryNode(any()))
         .thenAnswer(invocation -> nodes.get(0));
     Mockito.when(scmClient.listPipelines())
         .thenReturn(new ArrayList<>());

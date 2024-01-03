@@ -116,6 +116,7 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.util.ProtobufUtils;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -125,6 +126,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto.Status.CONTAINER_ALREADY_CLOSED;
@@ -489,9 +491,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public HddsProtos.Node querySingleNode(String uuid) throws IOException {
+  public HddsProtos.Node queryNode(UUID uuid) throws IOException {
     SingleNodeQueryRequestProto request = SingleNodeQueryRequestProto.newBuilder()
-        .setUuid(uuid)
+        .setUuid(ProtobufUtils.toProtobuf(uuid))
         .build();
     SingleNodeQueryResponseProto response =
         submitRequest(Type.SingleNodeQuery,

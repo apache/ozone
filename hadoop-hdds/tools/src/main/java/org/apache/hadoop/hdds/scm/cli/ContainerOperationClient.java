@@ -59,6 +59,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT;
@@ -226,8 +227,8 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public HddsProtos.Node querySingleNode(String uuid) throws IOException {
-    return storageContainerLocationClient.querySingleNode(uuid);
+  public HddsProtos.Node queryNode(UUID uuid) throws IOException {
+    return storageContainerLocationClient.queryNode(uuid);
   }
 
   @Override

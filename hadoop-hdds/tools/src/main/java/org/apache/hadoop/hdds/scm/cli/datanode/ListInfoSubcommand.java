@@ -29,6 +29,7 @@ import picocli.CommandLine;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -83,7 +84,7 @@ public class ListInfoSubcommand extends ScmSubcommand {
   public void execute(ScmClient scmClient) throws IOException {
     pipelines = scmClient.listPipelines();
     if (!Strings.isNullOrEmpty(uuid)) {
-      HddsProtos.Node node = scmClient.querySingleNode(uuid);
+      HddsProtos.Node node = scmClient.queryNode(UUID.fromString(uuid));
       DatanodeWithAttributes dwa = new DatanodeWithAttributes(DatanodeDetails
           .getFromProtoBuf(node.getNodeID()),
           node.getNodeOperationalStates(0),

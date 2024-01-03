@@ -122,6 +122,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
+import org.apache.hadoop.util.ProtobufUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -879,7 +880,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       SingleNodeQueryRequestProto request)
       throws IOException {
 
-    HddsProtos.Node datanode = impl.querySingleNode(request.getUuid());
+    HddsProtos.Node datanode = impl.queryNode(ProtobufUtils.fromProtobuf(request.getUuid()));
     return SingleNodeQueryResponseProto.newBuilder()
         .setDatanode(datanode)
         .build();

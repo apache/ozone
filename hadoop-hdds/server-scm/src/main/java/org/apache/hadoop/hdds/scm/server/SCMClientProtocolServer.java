@@ -109,6 +109,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageContainerLocationProtocolService.newReflectiveBlockingService;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
@@ -613,12 +614,12 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public HddsProtos.Node querySingleNode(String uuid)
+  public HddsProtos.Node queryNode(UUID uuid)
       throws IOException {
     HddsProtos.Node result = null;
     for (DatanodeDetails node : scm.getScmNodeManager().getAllNodes()) {
       try {
-        if (node.getUuid().toString().equals(uuid)) {
+        if (node.getUuid().equals(uuid)) {
           NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
           result = HddsProtos.Node.newBuilder()
               .setNodeID(node.getProtoBufMessage())

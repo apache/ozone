@@ -330,7 +330,7 @@ message NodeQueryResponseProto {
 }
 
 message SingleNodeQueryRequestProto {
-  required string uuid = 1;
+  required UUID uuid = 1;
 }
 
 message SingleNodeQueryResponseProto {
