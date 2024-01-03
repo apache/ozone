@@ -43,10 +43,10 @@ import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolServer
 import org.apache.ozone.test.GenericTestUtils;
 
 import com.google.protobuf.BlockingService;
-import org.mockito.Mockito;
 
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
 import static org.apache.logging.log4j.util.StackLocatorUtil.getCallerClass;
+import static org.mockito.Mockito.mock;
 
 /**
  * Test Endpoint class.
@@ -106,7 +106,7 @@ public final class SCMTestUtils {
         StorageContainerDatanodeProtocolService.
             newReflectiveBlockingService(
                 new StorageContainerDatanodeProtocolServerSideTranslatorPB(
-                    server, Mockito.mock(ProtocolMessageMetrics.class)));
+                    server, mock(ProtocolMessageMetrics.class)));
 
     RPC.Server scmServer = startRpcServer(hadoopConfig, rpcServerAddresss,
         StorageContainerDatanodeProtocolPB.class, scmDatanodeService,

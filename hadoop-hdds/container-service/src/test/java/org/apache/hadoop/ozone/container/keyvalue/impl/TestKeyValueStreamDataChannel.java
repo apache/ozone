@@ -38,7 +38,6 @@ import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
 import org.apache.ratis.thirdparty.io.netty.buffer.Unpooled;
 import org.apache.ratis.util.ReferenceCountedObject;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,6 +62,8 @@ import static org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamData
 import static org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel.readPutBlockRequest;
 import static org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel.writeBuffers;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** For testing {@link KeyValueStreamDataChannel}. */
 public class TestKeyValueStreamDataChannel {
@@ -101,7 +102,7 @@ public class TestKeyValueStreamDataChannel {
     buf.writeBytes(protoLengthBuf);
 
     final ContainerCommandRequestProto proto = readPutBlockRequest(buf);
-    Assertions.assertEquals(PUT_BLOCK_PROTO, proto);
+    assertEquals(PUT_BLOCK_PROTO, proto);
   }
 
   @Test
@@ -167,18 +168,18 @@ public class TestKeyValueStreamDataChannel {
     // check output
     final ByteBuf outBuf = out.getOutBuf();
     LOG.info("outBuf = {}", outBuf);
-    Assertions.assertEquals(dataSize, outBuf.readableBytes());
+    assertEquals(dataSize, outBuf.readableBytes());
     for (int i = 0; i < dataSize; i++) {
-      Assertions.assertEquals(data[i], outBuf.readByte());
+      assertEquals(data[i], outBuf.readByte());
     }
     outBuf.release();
   }
 
   static void assertReply(DataStreamReply reply, int byteWritten,
       ContainerCommandRequestProto proto) {
-    Assertions.assertTrue(reply.isSuccess());
-    Assertions.assertEquals(byteWritten, reply.getBytesWritten());
-    Assertions.assertEquals(proto, ((Reply)reply).getPutBlockRequest());
+    assertTrue(reply.isSuccess());
+    assertEquals(byteWritten, reply.getBytesWritten());
+    assertEquals(proto, ((Reply)reply).getPutBlockRequest());
   }
 
   static class Output implements DataStreamOutput {
