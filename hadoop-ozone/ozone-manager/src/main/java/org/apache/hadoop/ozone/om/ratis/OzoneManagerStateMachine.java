@@ -347,43 +347,29 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       ozoneManagerDoubleBuffer.acquireUnFlushedTransactions(1);
 
       return CompletableFuture.supplyAsync(() -> runCommand(request, termIndex), executorService)
-          .thenApply(omResponse -> {
-        if (!omResponse.getSuccess()) {
-          // When INTERNAL_ERROR or METADATA_ERROR it is considered as
-          // critical error and terminate the OM. Considering INTERNAL_ERROR
-          // also for now because INTERNAL_ERROR is thrown for any error
-          // which is not type OMException.
-
-          // Not done future with completeExceptionally because if we do
-          // that OM will still continue applying transaction until next
-          // snapshot. So in OM case if a transaction failed with un
-          // recoverable error and if we wait till snapshot to terminate
-          // OM, then if some client requested the read transaction of the
-          // failed request, there is a chance we shall give wrong result.
-          // So, to avoid these kind of issue, we should terminate OM here.
-          if (omResponse.getStatus() == INTERNAL_ERROR) {
-            terminate(omResponse, OMException.ResultCodes.INTERNAL_ERROR);
-          } else if (omResponse.getStatus() == METADATA_ERROR) {
-            terminate(omResponse, OMException.ResultCodes.METADATA_ERROR);
-          }
-        }
-
-        // For successful response and for all other errors which are not
-        // critical, we can complete future normally.
-        return OMRatisHelper.convertResponseToMessage(omResponse);
-      });
+          .thenApply(this::processResponse);
     } catch (Exception e) {
       return completeExceptionally(e);
     }
   }
 
-  /**
-   * Terminate OM.
-   * @param omResponse
-   * @param resultCode
-   */
-  private void terminate(OMResponse omResponse,
-      OMException.ResultCodes resultCode) {
+  private Message processResponse(OMResponse omResponse) {
+    if (!omResponse.getSuccess()) {
+      // INTERNAL_ERROR or METADATA_ERROR are considered as critical errors.
+      // In such cases, OM must be terminated instead of completing the future exceptionally,
+      // Otherwise, OM may continue applying transactions which leads to an inconsistent state.
+      if (omResponse.getStatus() == INTERNAL_ERROR) {
+        terminate(omResponse, OMException.ResultCodes.INTERNAL_ERROR);
+      } else if (omResponse.getStatus() == METADATA_ERROR) {
+        terminate(omResponse, OMException.ResultCodes.METADATA_ERROR);
+      }
+    }
+
+    // For successful response and non-critical errors, convert the response.
+    return OMRatisHelper.convertResponseToMessage(omResponse);
+  }
+
+  private static void terminate(OMResponse omResponse, OMException.ResultCodes resultCode) {
     OMException exception = new OMException(omResponse.getMessage(),
         resultCode);
     String errorMessage = "OM Ratis Server has received unrecoverable " +
