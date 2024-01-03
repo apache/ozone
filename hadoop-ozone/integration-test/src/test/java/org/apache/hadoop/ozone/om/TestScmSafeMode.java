@@ -63,6 +63,7 @@ import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -173,8 +174,8 @@ public class TestScmSafeMode {
     IOException ioException = assertThrows(IOException.class,
         () -> bucket1.createKey(keyName, 1000, RATIS, ONE,
             new HashMap<>()));
-    assertTrue(ioException.getMessage()
-        .contains("SafeModePrecheck failed for allocateBlock"));
+    assertThat(ioException.getMessage())
+        .contains("SafeModePrecheck failed for allocateBlock");
   }
 
   /**
@@ -272,7 +273,7 @@ public class TestScmSafeMode {
     scm = cluster.getStorageContainerManager();
     assertTrue(scm.isInSafeMode());
     assertFalse(logCapturer.getOutput().contains("SCM exiting safe mode."));
-    assertTrue(scm.getCurrentContainerThreshold() == 0);
+    assertEquals(0, scm.getCurrentContainerThreshold());
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
       dn.start();
     }
@@ -286,8 +287,8 @@ public class TestScmSafeMode {
     double safeModeCutoff = conf
         .getDouble(HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT,
             HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT_DEFAULT);
-    assertTrue(scm.getCurrentContainerThreshold() >= safeModeCutoff);
-    assertTrue(logCapturer.getOutput().contains("SCM exiting safe mode."));
+    assertThat(scm.getCurrentContainerThreshold()).isGreaterThanOrEqualTo(safeModeCutoff);
+    assertThat(logCapturer.getOutput()).contains("SCM exiting safe mode.");
     assertFalse(scm.isInSafeMode());
   }
 
@@ -302,8 +303,8 @@ public class TestScmSafeMode {
         () -> scm.getClientProtocolServer()
             .allocateContainer(ReplicationType.STAND_ALONE,
                 ReplicationFactor.ONE, ""));
-    assertTrue(scmException.getMessage()
-        .contains("SafeModePrecheck failed for allocateContainer"));
+    assertThat(scmException.getMessage())
+        .contains("SafeModePrecheck failed for allocateContainer");
     cluster.startHddsDatanodes();
     cluster.waitForClusterToBeReady();
     cluster.waitTobeOutOfSafeMode();

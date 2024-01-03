@@ -18,13 +18,15 @@
 package org.apache.hadoop.hdds.conf;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * In HDDS-5035, we met the case that ozone-default-generated.xml got
@@ -54,13 +56,10 @@ public class TestGeneratedConfigurationOverwrite {
   @Test
   public void getConfigurationObject() {
     // Check Config Type of String
-    Assertions.assertNotNull(
-        conf.getObject(SimpleConfiguration.class).getBindHost());
+    assertNotNull(conf.getObject(SimpleConfiguration.class).getBindHost());
     // Check Config Type of Int
-    Assertions.assertNotEquals(
-        conf.getObject(SimpleConfiguration.class).getPort(), 0);
+    assertNotEquals(0, conf.getObject(SimpleConfiguration.class).getPort());
     // Check Config Type of Time
-    Assertions.assertNotEquals(
-        conf.getObject(SimpleConfiguration.class).getWaitTime(), 0);
+    assertNotEquals(0, conf.getObject(SimpleConfiguration.class).getWaitTime());
   }
 }

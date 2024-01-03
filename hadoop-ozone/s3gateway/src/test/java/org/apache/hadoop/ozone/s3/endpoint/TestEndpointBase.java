@@ -33,9 +33,8 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
@@ -67,14 +66,13 @@ public class TestEndpointBase {
 
     Map<String, String> filteredCustomMetadata =
             endpointBase.getCustomMetadataFromHeaders(s3requestHeaders);
-    assertTrue(filteredCustomMetadata.containsKey("custom-key1"));
+    assertThat(filteredCustomMetadata).containsKey("custom-key1");
     assertEquals(
             "custom-value1", filteredCustomMetadata.get("custom-key1"));
-    assertTrue(filteredCustomMetadata.containsKey("custom-key2"));
+    assertThat(filteredCustomMetadata).containsKey("custom-key2");
     assertEquals(
             "custom-value2", filteredCustomMetadata.get("custom-key2"));
-    assertFalse(
-            filteredCustomMetadata.containsKey(OzoneConsts.GDPR_FLAG));
+    assertThat(filteredCustomMetadata).doesNotContainKey(OzoneConsts.GDPR_FLAG);
   }
 
   /**
@@ -101,7 +99,7 @@ public class TestEndpointBase {
         .getCustomMetadataFromHeaders(s3requestHeaders),
         "getCustomMetadataFromHeaders should fail." +
             " Expected OS3Exception not thrown");
-    assertTrue(e.getCode().contains("MetadataTooLarge"));
+    assertThat(e.getCode()).contains("MetadataTooLarge");
   }
 
 }

@@ -28,7 +28,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
@@ -44,32 +43,34 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.commons.io.FileUtils;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_CHUNK;
-
-import org.junit.jupiter.api.Assertions;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-
-import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for {@link ChunkUtils}.
  */
-public class TestChunkUtils {
+class TestChunkUtils {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestChunkUtils.class);
 
-  private static final String PREFIX = TestChunkUtils.class.getSimpleName();
   private static final int BUFFER_CAPACITY = 1 << 20;
   private static final int MAPPED_BUFFER_THRESHOLD = 32 << 10;
   private static final Random RANDOM = new Random();
+
+  @TempDir
+  private Path tempDir;
 
   static ChunkBuffer readData(File file, long off, long len)
       throws StorageContainerException {
@@ -79,154 +80,136 @@ public class TestChunkUtils {
   }
 
   @Test
-  public void concurrentReadOfSameFile() throws Exception {
+  void concurrentReadOfSameFile() throws Exception {
     String s = "Hello World";
     byte[] array = s.getBytes(UTF_8);
     ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.wrap(array));
-    Path tempFile = Files.createTempFile(PREFIX, "concurrent");
-    try {
-      int len = data.limit();
-      int offset = 0;
-      File file = tempFile.toFile();
-      ChunkUtils.writeData(file, data, offset, len, null, true);
-      int threads = 10;
-      ExecutorService executor = new ThreadPoolExecutor(threads, threads,
-          0, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
-      AtomicInteger processed = new AtomicInteger();
-      AtomicBoolean failed = new AtomicBoolean();
-      for (int i = 0; i < threads; i++) {
-        final int threadNumber = i;
-        executor.execute(() -> {
-          try {
-            final ChunkBuffer chunk = readData(file, offset, len);
-            // There should be only one element in readBuffers
-            final List<ByteBuffer> buffers = chunk.asByteBufferList();
-            Assertions.assertEquals(1, buffers.size());
-            final ByteBuffer readBuffer = buffers.get(0);
+    Path tempFile = tempDir.resolve("concurrent");
+    int len = data.limit();
+    int offset = 0;
+    File file = tempFile.toFile();
+    ChunkUtils.writeData(file, data, offset, len, null, true);
+    int threads = 10;
+    ExecutorService executor = new ThreadPoolExecutor(threads, threads,
+        0, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
+    AtomicInteger processed = new AtomicInteger();
+    AtomicBoolean failed = new AtomicBoolean();
+    for (int i = 0; i < threads; i++) {
+      final int threadNumber = i;
+      executor.execute(() -> {
+        try {
+          final ChunkBuffer chunk = readData(file, offset, len);
+          // There should be only one element in readBuffers
+          final List<ByteBuffer> buffers = chunk.asByteBufferList();
+          assertEquals(1, buffers.size());
+          final ByteBuffer readBuffer = buffers.get(0);
 
-            LOG.info("Read data ({}): {}", threadNumber,
-                new String(readBuffer.array(), UTF_8));
-            if (!Arrays.equals(array, readBuffer.array())) {
-              failed.set(true);
-            }
-            assertEquals(len, readBuffer.remaining());
-          } catch (Exception e) {
-            LOG.error("Failed to read data ({})", threadNumber, e);
+          LOG.info("Read data ({}): {}", threadNumber,
+              new String(readBuffer.array(), UTF_8));
+          if (!Arrays.equals(array, readBuffer.array())) {
             failed.set(true);
           }
-          processed.incrementAndGet();
-        });
-      }
-      try {
-        GenericTestUtils.waitFor(() -> processed.get() == threads,
-            100, (int) TimeUnit.SECONDS.toMillis(5));
-      } finally {
-        executor.shutdownNow();
-      }
-      assertFalse(failed.get());
-    } finally {
-      Files.deleteIfExists(tempFile);
+          assertEquals(len, readBuffer.remaining());
+        } catch (Exception e) {
+          LOG.error("Failed to read data ({})", threadNumber, e);
+          failed.set(true);
+        }
+        processed.incrementAndGet();
+      });
     }
+    try {
+      GenericTestUtils.waitFor(() -> processed.get() == threads,
+          100, (int) TimeUnit.SECONDS.toMillis(5));
+    } finally {
+      executor.shutdownNow();
+    }
+    assertFalse(failed.get());
   }
 
   @Test
-  public void concurrentProcessing() throws Exception {
+  void concurrentProcessing() throws Exception {
     final int perThreadWait = 1000;
     final int maxTotalWait = 5000;
     int threads = 20;
-    List<Path> paths = new LinkedList<>();
 
+    ExecutorService executor = new ThreadPoolExecutor(threads, threads,
+        0, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
+    AtomicInteger processed = new AtomicInteger();
+    for (int i = 0; i < threads; i++) {
+      Path path = tempDir.resolve(String.valueOf(i));
+      executor.execute(() -> {
+        try {
+          ChunkUtils.processFileExclusively(path, () -> {
+            try {
+              Thread.sleep(perThreadWait);
+            } catch (InterruptedException e) {
+              e.printStackTrace();
+            }
+            processed.incrementAndGet();
+            return null;
+          });
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+      });
+    }
     try {
-      ExecutorService executor = new ThreadPoolExecutor(threads, threads,
-          0, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
-      AtomicInteger processed = new AtomicInteger();
-      for (int i = 0; i < threads; i++) {
-        Path path = Files.createTempFile(PREFIX, String.valueOf(i));
-        paths.add(path);
-        executor.execute(() -> {
-          try {
-            ChunkUtils.processFileExclusively(path, () -> {
-              try {
-                Thread.sleep(perThreadWait);
-              } catch (InterruptedException e) {
-                e.printStackTrace();
-              }
-              processed.incrementAndGet();
-              return null;
-            });
-          } catch (InterruptedException e) {
-            e.printStackTrace();
-          }
-        });
-      }
-      try {
-        GenericTestUtils.waitFor(() -> processed.get() == threads,
-            100, maxTotalWait);
-      } finally {
-        executor.shutdownNow();
-      }
+      GenericTestUtils.waitFor(() -> processed.get() == threads,
+          100, maxTotalWait);
     } finally {
-      for (Path path : paths) {
-        FileUtils.deleteQuietly(path.toFile());
-      }
+      executor.shutdownNow();
     }
   }
 
   @Test
-  public void serialRead() throws Exception {
+  void serialRead() throws IOException {
     String s = "Hello World";
     byte[] array = s.getBytes(UTF_8);
     ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.wrap(array));
-    Path tempFile = Files.createTempFile(PREFIX, "serial");
-    try {
-      File file = tempFile.toFile();
-      int len = data.limit();
-      int offset = 0;
-      ChunkUtils.writeData(file, data, offset, len, null, true);
+    Path tempFile = tempDir.resolve("serial");
+    File file = tempFile.toFile();
+    int len = data.limit();
+    int offset = 0;
+    ChunkUtils.writeData(file, data, offset, len, null, true);
 
-      final ChunkBuffer chunk = readData(file, offset, len);
-      // There should be only one element in readBuffers
-      final List<ByteBuffer> buffers = chunk.asByteBufferList();
-      Assertions.assertEquals(1, buffers.size());
-      final ByteBuffer readBuffer = buffers.get(0);
+    final ChunkBuffer chunk = readData(file, offset, len);
+    // There should be only one element in readBuffers
+    final List<ByteBuffer> buffers = chunk.asByteBufferList();
+    assertEquals(1, buffers.size());
+    final ByteBuffer readBuffer = buffers.get(0);
 
-      assertArrayEquals(array, readBuffer.array());
-      assertEquals(len, readBuffer.remaining());
-    } catch (Exception e) {
-      LOG.error("Failed to read data", e);
-    } finally {
-      Files.deleteIfExists(tempFile);
-    }
+    assertArrayEquals(array, readBuffer.array());
+    assertEquals(len, readBuffer.remaining());
   }
 
   @Test
-  public void validateChunkForOverwrite() throws IOException {
+  void validateChunkForOverwrite() throws IOException {
 
-    Path tempFile = Files.createTempFile(PREFIX, "overwrite");
+    Path tempFile = tempDir.resolve("overwrite");
     FileUtils.write(tempFile.toFile(), "test", UTF_8);
 
-    Assertions.assertTrue(
+    assertTrue(
         ChunkUtils.validateChunkForOverwrite(tempFile.toFile(),
             new ChunkInfo("chunk", 3, 5)));
 
-    Assertions.assertFalse(
+    assertFalse(
         ChunkUtils.validateChunkForOverwrite(tempFile.toFile(),
             new ChunkInfo("chunk", 5, 5)));
 
     try (FileChannel fileChannel =
              FileChannel.open(tempFile, StandardOpenOption.READ)) {
-      Assertions.assertTrue(
+      assertTrue(
           ChunkUtils.validateChunkForOverwrite(fileChannel,
               new ChunkInfo("chunk", 3, 5)));
 
-      Assertions.assertFalse(
+      assertFalse(
           ChunkUtils.validateChunkForOverwrite(fileChannel,
               new ChunkInfo("chunk", 5, 5)));
     }
   }
 
   @Test
-  public void readMissingFile() {
+  void readMissingFile() {
     // given
     int len = 123;
     int offset = 0;
@@ -238,23 +221,23 @@ public class TestChunkUtils {
         () -> readData(nonExistentFile, offset, len));
 
     // then
-    Assertions.assertEquals(UNABLE_TO_FIND_CHUNK, e.getResult());
+    assertEquals(UNABLE_TO_FIND_CHUNK, e.getResult());
   }
 
   @Test
-  public void testReadData() throws Exception {
+  void testReadData() throws Exception {
     final File dir = GenericTestUtils.getTestDir("testReadData");
     try {
-      Assertions.assertTrue(dir.mkdirs());
+      assertTrue(dir.mkdirs());
 
       // large file
       final int large = 10 << 20; // 10MB
-      Assertions.assertTrue(large > MAPPED_BUFFER_THRESHOLD);
+      assertThat(large).isGreaterThan(MAPPED_BUFFER_THRESHOLD);
       runTestReadFile(large, dir, true);
 
       // small file
       final int small = 30 << 10; // 30KB
-      Assertions.assertTrue(small <= MAPPED_BUFFER_THRESHOLD);
+      assertThat(small).isLessThanOrEqualTo(MAPPED_BUFFER_THRESHOLD);
       runTestReadFile(small, dir, false);
 
       // boundary case
@@ -299,22 +282,22 @@ public class TestChunkUtils {
         written += toWrite;
       }
     }
-    Assertions.assertEquals(length, file.length());
+    assertEquals(length, file.length());
 
     // read the file back
     final ChunkBuffer chunk = readData(file, 0, length);
-    Assertions.assertEquals(length, chunk.remaining());
+    assertEquals(length, chunk.remaining());
 
     final List<ByteBuffer> buffers = chunk.asByteBufferList();
     LOG.info("buffers.size(): {}", buffers.size());
-    Assertions.assertEquals((length - 1) / BUFFER_CAPACITY + 1, buffers.size());
+    assertEquals((length - 1) / BUFFER_CAPACITY + 1, buffers.size());
     LOG.info("buffer class: {}", buffers.get(0).getClass());
 
     RANDOM.setSeed(seed);
     for (ByteBuffer b : buffers) {
-      Assertions.assertEquals(isMapped, b instanceof MappedByteBuffer);
+      assertEquals(isMapped, b instanceof MappedByteBuffer);
       RANDOM.nextBytes(array);
-      Assertions.assertEquals(ByteBuffer.wrap(array, 0, b.remaining()), b);
+      assertEquals(ByteBuffer.wrap(array, 0, b.remaining()), b);
     }
   }
 }

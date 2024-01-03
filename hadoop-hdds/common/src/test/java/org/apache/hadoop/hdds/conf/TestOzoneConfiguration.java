@@ -30,12 +30,18 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Test class for OzoneConfiguration.
@@ -80,7 +86,7 @@ public class TestOzoneConfiguration {
 
       Path fileResource = new Path(coreDefault.getAbsolutePath());
       conf.addResource(fileResource);
-      Assertions.assertEquals("XYZ", conf.getAllPropertiesByTag("MYCUSTOMTAG")
+      assertEquals("XYZ", conf.getAllPropertiesByTag("MYCUSTOMTAG")
           .getProperty("dfs.random.key"));
     }
 
@@ -98,11 +104,11 @@ public class TestOzoneConfiguration {
     }
 
     // Test if values are getting overridden even without tags being present
-    Assertions.assertEquals("3", conf.getAllPropertiesByTag("HDFS")
+    assertEquals("3", conf.getAllPropertiesByTag("HDFS")
         .getProperty("dfs.replication"));
-    Assertions.assertEquals("ABC", conf.getAllPropertiesByTag("MYCUSTOMTAG")
+    assertEquals("ABC", conf.getAllPropertiesByTag("MYCUSTOMTAG")
         .getProperty("dfs.random.key"));
-    Assertions.assertEquals("true", conf.getAllPropertiesByTag("YARN")
+    assertEquals("true", conf.getAllPropertiesByTag("YARN")
         .getProperty("dfs.cblock.trace.io"));
   }
 
@@ -122,14 +128,14 @@ public class TestOzoneConfiguration {
     SimpleConfiguration configuration =
         ozoneConfig.getObject(SimpleConfiguration.class);
 
-    Assertions.assertEquals("host", configuration.getBindHost());
-    Assertions.assertEquals("address", configuration.getClientAddress());
-    Assertions.assertTrue(configuration.isEnabled());
-    Assertions.assertEquals(5555, configuration.getPort());
-    Assertions.assertEquals(600, configuration.getWaitTime());
-    Assertions.assertSame(Integer.class, configuration.getMyClass());
-    Assertions.assertEquals(10.5, configuration.getThreshold());
-    Assertions.assertEquals(Duration.ofSeconds(3), configuration.getDuration());
+    assertEquals("host", configuration.getBindHost());
+    assertEquals("address", configuration.getClientAddress());
+    assertTrue(configuration.isEnabled());
+    assertEquals(5555, configuration.getPort());
+    assertEquals(600, configuration.getWaitTime());
+    assertSame(Integer.class, configuration.getMyClass());
+    assertEquals(10.5, configuration.getThreshold());
+    assertEquals(Duration.ofSeconds(3), configuration.getDuration());
   }
 
   @Test
@@ -139,11 +145,11 @@ public class TestOzoneConfiguration {
     SimpleConfiguration configuration =
         ozoneConfiguration.getObject(SimpleConfiguration.class);
 
-    Assertions.assertTrue(configuration.isEnabled());
-    Assertions.assertEquals(9878, configuration.getPort());
-    Assertions.assertSame(Object.class, configuration.getMyClass());
-    Assertions.assertEquals(10, configuration.getThreshold());
-    Assertions.assertEquals(Duration.ofHours(1), configuration.getDuration());
+    assertTrue(configuration.isEnabled());
+    assertEquals(9878, configuration.getPort());
+    assertSame(Object.class, configuration.getMyClass());
+    assertEquals(10, configuration.getThreshold());
+    assertEquals(Duration.ofHours(1), configuration.getDuration());
   }
 
   @Test
@@ -165,21 +171,17 @@ public class TestOzoneConfiguration {
     subject.setFromObject(object);
 
     // THEN
-    Assertions.assertEquals(object.getBindHost(),
-        subject.get("test.scm.client.bind.host"));
-    Assertions.assertEquals(object.getClientAddress(),
-        subject.get("test.scm.client.address"));
-    Assertions.assertEquals(object.isEnabled(),
-        subject.getBoolean("test.scm.client.enabled", false));
-    Assertions.assertEquals(object.getPort(),
-        subject.getInt("test.scm.client.port", 0));
-    Assertions.assertEquals(TimeUnit.SECONDS.toMinutes(object.getWaitTime()),
+    assertEquals(object.getBindHost(), subject.get("test.scm.client.bind.host"));
+    assertEquals(object.getClientAddress(), subject.get("test.scm.client.address"));
+    assertEquals(object.isEnabled(), subject.getBoolean("test.scm.client.enabled", false));
+    assertEquals(object.getPort(), subject.getInt("test.scm.client.port", 0));
+    assertEquals(TimeUnit.SECONDS.toMinutes(object.getWaitTime()),
         subject.getTimeDuration("test.scm.client.wait", 0, TimeUnit.MINUTES));
-    Assertions.assertSame(this.getClass(),
+    assertSame(this.getClass(),
         subject.getClass("test.scm.client.class", null));
-    Assertions.assertEquals(object.getThreshold(),
+    assertEquals(object.getThreshold(),
         subject.getDouble("test.scm.client.threshold", 20.5));
-    Assertions.assertEquals(object.getDuration().toMillis(),
+    assertEquals(object.getDuration().toMillis(),
         subject.getTimeDuration("test.scm.client.duration", 0,
             TimeUnit.MILLISECONDS));
   }
@@ -194,18 +196,13 @@ public class TestOzoneConfiguration {
     subject.setFromObject(object);
 
     // THEN
-    Assertions.assertEquals("0.0.0.0",
-        subject.get("test.scm.client.bind.host"));
-    Assertions.assertEquals("localhost",
-        subject.get("test.scm.client.address"));
-    Assertions.assertTrue(
-        subject.getBoolean("test.scm.client.enabled", false));
-    Assertions.assertEquals(9878,
-        subject.getInt("test.scm.client.port", 123));
-    Assertions.assertEquals(TimeUnit.MINUTES.toSeconds(30),
+    assertEquals("0.0.0.0", subject.get("test.scm.client.bind.host"));
+    assertEquals("localhost", subject.get("test.scm.client.address"));
+    assertTrue(subject.getBoolean("test.scm.client.enabled", false));
+    assertEquals(9878, subject.getInt("test.scm.client.port", 123));
+    assertEquals(TimeUnit.MINUTES.toSeconds(30),
         subject.getTimeDuration("test.scm.client.wait", 555, TimeUnit.SECONDS));
-    Assertions.assertEquals(10,
-        subject.getDouble("test.scm.client.threshold", 20.5));
+    assertEquals(10, subject.getDouble("test.scm.client.threshold", 20.5));
   }
 
   @Test
@@ -229,10 +226,10 @@ public class TestOzoneConfiguration {
     OzoneConfiguration ozoneConfiguration =
         new OzoneConfiguration(configuration);
     // ozoneConfig value matches input config value for the corresponding key
-    Assertions.assertEquals(val, ozoneConfiguration.get(key));
-    Assertions.assertEquals(val, configuration.get(key));
+    assertEquals(val, ozoneConfiguration.get(key));
+    assertEquals(val, configuration.get(key));
 
-    Assertions.assertNotEquals(val, new OzoneConfiguration().get(key));
+    assertNotEquals(val, new OzoneConfiguration().get(key));
   }
 
   @Test
@@ -245,18 +242,12 @@ public class TestOzoneConfiguration {
     subject.setFromObject(object);
 
     // THEN
-    Assertions.assertEquals("0.0.0.0",
-        subject.get("test.scm.client.bind.host"));
-    Assertions.assertEquals("localhost",
-        subject.get("test.scm.client.address"));
-    Assertions.assertFalse(
-        subject.getBoolean("test.scm.client.enabled", false));
-    Assertions.assertEquals(0,
-        subject.getInt("test.scm.client.port", 123));
-    Assertions.assertEquals(0,
-        subject.getTimeDuration("test.scm.client.wait", 555, TimeUnit.SECONDS));
-    Assertions.assertEquals(0,
-        subject.getDouble("test.scm.client.threshold", 20.5));
+    assertEquals("0.0.0.0", subject.get("test.scm.client.bind.host"));
+    assertEquals("localhost", subject.get("test.scm.client.address"));
+    assertFalse(subject.getBoolean("test.scm.client.enabled", false));
+    assertEquals(0, subject.getInt("test.scm.client.port", 123));
+    assertEquals(0, subject.getTimeDuration("test.scm.client.wait", 555, TimeUnit.SECONDS));
+    assertEquals(0, subject.getDouble("test.scm.client.threshold", 20.5));
   }
 
   @Test
@@ -264,7 +255,7 @@ public class TestOzoneConfiguration {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.setInt("test.scm.client.port", -3);
 
-    Assertions.assertThrows(NumberFormatException.class,
+    assertThrows(NumberFormatException.class,
         () -> ozoneConfiguration.getObject(SimpleConfiguration.class));
   }
 
@@ -272,14 +263,14 @@ public class TestOzoneConfiguration {
   @EnumSource
   void tagIsRecognized(ConfigTag tag) {
     OzoneConfiguration subject = new OzoneConfiguration();
-    Assertions.assertTrue(subject.isPropertyTag(tag.name()),
+    assertTrue(subject.isPropertyTag(tag.name()),
         () -> tag + " should be recognized as config tag");
   }
 
   @Test
   void unknownTag() {
     OzoneConfiguration subject = new OzoneConfiguration();
-    Assertions.assertFalse(subject.isPropertyTag("not-a-tag"));
+    assertFalse(subject.isPropertyTag("not-a-tag"));
   }
 
   private void appendProperty(BufferedWriter out, String name, String val)

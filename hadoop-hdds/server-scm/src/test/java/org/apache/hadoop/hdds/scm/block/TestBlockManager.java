@@ -87,6 +87,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /**
  * Tests for SCM Block Manager.
  */
@@ -239,8 +241,7 @@ public class TestBlockManager {
         .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
             excludeList);
     Assertions.assertNotNull(block);
-    Assertions.assertTrue(
-        excludeList.getPipelineIds().contains(block.getPipeline().getId()));
+    assertThat(excludeList.getPipelineIds()).contains(block.getPipeline().getId());
   }
 
   @Test

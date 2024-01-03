@@ -18,8 +18,10 @@
 
 package org.apache.hadoop.hdds.ratis;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /** Class to test {@link ServerNotLeaderException} parsing. **/
 class TestServerNotLeaderExceptionMessageParsing {
@@ -31,7 +33,7 @@ class TestServerNotLeaderExceptionMessageParsing {
         "Server:cf0bc565-a41b-4784-a24d-3048d5a5b013 is not the leader. "
             + "Suggested leader is Server:scm5-3.scm5.root.hwx.site:9863";
     ServerNotLeaderException snle = new ServerNotLeaderException(msg);
-    Assertions.assertEquals(snle.getSuggestedLeader(), "scm5-3.scm5.root.hwx" +
+    assertEquals(snle.getSuggestedLeader(), "scm5-3.scm5.root.hwx" +
         ".site:9863");
 
     String message = "Server:7fdd7170-75cc-4e11-b343-c2657c2f2f39 is not the " +
@@ -39,7 +41,7 @@ class TestServerNotLeaderExceptionMessageParsing {
         "at org.apache.hadoop.hdds.ratis.ServerNotLeaderException" +
         ".convertToNotLeaderException(ServerNotLeaderException.java:96)";
     snle = new ServerNotLeaderException(message);
-    Assertions.assertEquals("scm5-3.scm5.root.hwx.site:9863",
+    assertEquals("scm5-3.scm5.root.hwx.site:9863",
         snle.getSuggestedLeader());
 
     // Test hostname with out "."
@@ -48,7 +50,7 @@ class TestServerNotLeaderExceptionMessageParsing {
         "at org.apache.hadoop.hdds.ratis.ServerNotLeaderException" +
         ".convertToNotLeaderException(ServerNotLeaderException.java:96)";
     snle = new ServerNotLeaderException(message);
-    Assertions.assertEquals("localhost:98634",
+    assertEquals("localhost:98634",
         snle.getSuggestedLeader());
 
     message = "Server:7fdd7170-75cc-4e11-b343-c2657c2f2f39 is not the " +
@@ -56,14 +58,14 @@ class TestServerNotLeaderExceptionMessageParsing {
         "at org.apache.hadoop.hdds.ratis.ServerNotLeaderException" +
         ".convertToNotLeaderException(ServerNotLeaderException.java:96)";
     snle = new ServerNotLeaderException(message);
-    Assertions.assertNull(snle.getSuggestedLeader());
+    assertNull(snle.getSuggestedLeader());
 
     message = "Server:7fdd7170-75cc-4e11-b343-c2657c2f2f39 is not the " +
         "leader.Suggested leader is Server:localhost:98634:8988 \n" +
         "at org.apache.hadoop.hdds.ratis.ServerNotLeaderException" +
         ".convertToNotLeaderException(ServerNotLeaderException.java:96)";
     snle = new ServerNotLeaderException(message);
-    Assertions.assertEquals("localhost:98634",
+    assertEquals("localhost:98634",
         snle.getSuggestedLeader());
 
     message = "Server:7fdd7170-75cc-4e11-b343-c2657c2f2f39 is not the " +
@@ -71,7 +73,7 @@ class TestServerNotLeaderExceptionMessageParsing {
         "at org.apache.hadoop.hdds.ratis.ServerNotLeaderException" +
         ".convertToNotLeaderException(ServerNotLeaderException.java)";
     snle = new ServerNotLeaderException(message);
-    Assertions.assertNull(snle.getSuggestedLeader());
+    assertNull(snle.getSuggestedLeader());
   }
 
 }

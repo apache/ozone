@@ -46,16 +46,16 @@ import java.util.stream.StreamSupport;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
- * ManagedSstFileReader provides an abstraction layer using which we can
- * iterate over multiple underlying SST files transparently.
+ * Provides an abstraction layer using which we can iterate over multiple
+ * underlying SST files transparently.
  */
-public class ManagedSstFileReader {
+public class SstFileSetReader {
 
   private final Collection<String> sstFiles;
 
   private volatile long estimatedTotalKeys = -1;
 
-  public ManagedSstFileReader(final Collection<String> sstFiles) {
+  public SstFileSetReader(final Collection<String> sstFiles) {
     this.sstFiles = sstFiles;
   }
 
@@ -78,9 +78,10 @@ public class ManagedSstFileReader {
 
       try (ManagedOptions options = new ManagedOptions()) {
         for (String sstFile : sstFiles) {
-          SstFileReader fileReader = new SstFileReader(options);
-          fileReader.open(sstFile);
-          estimatedSize += fileReader.getTableProperties().getNumEntries();
+          try (SstFileReader fileReader = new SstFileReader(options)) {
+            fileReader.open(sstFile);
+            estimatedSize += fileReader.getTableProperties().getNumEntries();
+          }
         }
       }
       estimatedTotalKeys = estimatedSize;

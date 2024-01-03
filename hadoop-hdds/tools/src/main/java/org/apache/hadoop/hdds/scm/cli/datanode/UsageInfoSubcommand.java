@@ -155,8 +155,16 @@ public class UsageInfoSubcommand extends ScmSubcommand {
         + " B", StringUtils.byteDesc(info.getRemaining()));
     System.out.printf("%-13s: %s %n", "Remaining %",
         PERCENT_FORMAT.format(info.getRemainingRatio()));
-    System.out.printf("%-13s: %d %n%n", "Container(s)",
+    System.out.printf("%-13s: %d %n", "Container(s)",
             info.getContainerCount());
+    System.out.printf("%-24s: %s (%s) %n", "Container Pre-allocated",
+        info.getCommitted() + " B", StringUtils.byteDesc(info.getCommitted()));
+    System.out.printf("%-24s: %s (%s) %n", "Remaining Allocatable",
+        (info.getRemaining() - info.getCommitted()) + " B",
+        StringUtils.byteDesc((info.getRemaining() - info.getCommitted())));
+    System.out.printf("%-24s: %s (%s) %n%n", "Free Space To Spare",
+        info.getFreeSpaceToSpare() + " B",
+        StringUtils.byteDesc(info.getFreeSpaceToSpare()));
   }
 
   /**
@@ -181,6 +189,8 @@ public class UsageInfoSubcommand extends ScmSubcommand {
     private long capacity = 0;
     private long used = 0;
     private long remaining = 0;
+    private long committed = 0;
+    private long freeSpaceToSpare = 0;
     private long containerCount = 0;
 
     DatanodeUsage(HddsProtos.DatanodeUsageInfoProto proto) {
@@ -196,8 +206,14 @@ public class UsageInfoSubcommand extends ScmSubcommand {
       if (proto.hasRemaining()) {
         remaining = proto.getRemaining();
       }
+      if (proto.hasCommitted()) {
+        committed = proto.getCommitted();
+      }
       if (proto.hasContainerCount()) {
         containerCount = proto.getContainerCount();
+      }
+      if (proto.hasFreeSpaceToSpare()) {
+        freeSpaceToSpare = proto.getFreeSpaceToSpare();
       }
     }
 
@@ -219,6 +235,12 @@ public class UsageInfoSubcommand extends ScmSubcommand {
 
     public long getRemaining() {
       return remaining;
+    }
+    public long getCommitted() {
+      return committed;
+    }
+    public long getFreeSpaceToSpare() {
+      return freeSpaceToSpare;
     }
 
     public long getContainerCount() {

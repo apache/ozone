@@ -27,28 +27,22 @@ import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import org.apache.ratis.statemachine.impl.SingleFileSnapshotInfo;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
+
 import org.junit.experimental.categories.Category;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import picocli.CommandLine;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * Tests Freon with Datanode restarts without waiting for pipeline to close.
  */
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
 public class TestFreonWithDatanodeFastRestart {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
-
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
 
@@ -58,7 +52,7 @@ public class TestFreonWithDatanodeFastRestart {
    * Ozone is made active by setting OZONE_ENABLED = true
    *
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -72,7 +66,7 @@ public class TestFreonWithDatanodeFastRestart {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -94,14 +88,14 @@ public class TestFreonWithDatanodeFastRestart {
     String expectedSnapFile =
         storage.getSnapshotFile(termIndexBeforeRestart.getTerm(),
             termIndexBeforeRestart.getIndex()).getAbsolutePath();
-    Assert.assertEquals(expectedSnapFile,
+    Assertions.assertEquals(expectedSnapFile,
         snapshotInfo.getFile().getPath().toString());
-    Assert.assertEquals(termInSnapshot, termIndexBeforeRestart);
+    Assertions.assertEquals(termInSnapshot, termIndexBeforeRestart);
 
     // After restart the term index might have progressed to apply pending
     // transactions.
     TermIndex termIndexAfterRestart = sm.getLastAppliedTermIndex();
-    Assert.assertTrue(termIndexAfterRestart.getIndex() >=
+    Assertions.assertTrue(termIndexAfterRestart.getIndex() >=
         termIndexBeforeRestart.getIndex());
     // TODO: fix me
     // Give some time for the datanode to register again with SCM.
@@ -127,10 +121,10 @@ public class TestFreonWithDatanodeFastRestart {
         "--validate-writes"
     );
 
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
-    Assert.assertEquals(0, randomKeyGenerator.getUnsuccessfulValidationCount());
+    Assertions.assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
+    Assertions.assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
+    Assertions.assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
+    Assertions.assertEquals(0, randomKeyGenerator.getUnsuccessfulValidationCount());
   }
 
   private StateMachine getStateMachine() throws Exception {

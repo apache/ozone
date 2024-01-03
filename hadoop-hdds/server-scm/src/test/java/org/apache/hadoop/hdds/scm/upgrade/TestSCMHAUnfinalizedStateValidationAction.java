@@ -87,8 +87,13 @@ public class TestSCMHAUnfinalizedStateValidationAction {
        Ratis SCM -> Non Ratis SCM not supported
      */
     if (haEnabledPreFinalized != haEnabledBefore) {
-      Assertions.assertThrows(ConfigurationException.class,
-              () -> StorageContainerManager.scmInit(conf, CLUSTER_ID));
+      if (haEnabledBefore) {
+        Assertions.assertThrows(ConfigurationException.class,
+            () -> StorageContainerManager.scmInit(conf, CLUSTER_ID));
+      } else {
+        Assertions.assertThrows(UpgradeException.class,
+            () -> StorageContainerManager.scmInit(conf, CLUSTER_ID));
+      }
       return;
     }
     StorageContainerManager scm = HddsTestUtils.getScm(conf);

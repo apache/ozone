@@ -64,6 +64,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -287,7 +288,7 @@ public class TestOzoneRpcClientForAclAuditLog {
     try {
       // When log entry is expected, the log file will contain one line and
       // that must be equal to the expected string
-      assertTrue(lines.size() != 0);
+      assertNotEquals(0, lines.size());
       for (String exp: expected) {
         assertTrue(lines.get(0).contains(exp));
       }

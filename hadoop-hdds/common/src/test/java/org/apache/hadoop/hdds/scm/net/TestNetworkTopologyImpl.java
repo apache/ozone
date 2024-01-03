@@ -54,6 +54,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -62,7 +63,6 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,8 +78,7 @@ public class TestNetworkTopologyImpl {
 
   @BeforeEach
   void beforeAll() {
-    mockedShuffleOperation =
-        Mockito.mock(Consumer.class);
+    mockedShuffleOperation = mock(Consumer.class);
     doAnswer(args -> {
           List<? extends Node> collection = args.getArgument(0);
           Collections.shuffle(collection);

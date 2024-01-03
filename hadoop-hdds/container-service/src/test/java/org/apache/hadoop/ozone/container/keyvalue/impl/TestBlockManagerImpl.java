@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -49,6 +48,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * This class is used to test key related operations on the container.
@@ -93,7 +93,7 @@ public class TestBlockManagerImpl {
     volumeSet = mock(MutableVolumeSet.class);
 
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
-    Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenReturn(hddsVolume);
 
     keyValueContainerData = new KeyValueContainerData(1L,

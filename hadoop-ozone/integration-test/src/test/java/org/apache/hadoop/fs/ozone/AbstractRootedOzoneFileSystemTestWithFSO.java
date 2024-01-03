@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -24,53 +24,31 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests to verify ofs with prefix enabled cases.
  */
-@RunWith(Parameterized.class)
-public class TestRootedOzoneFileSystemWithFSO
-    extends TestRootedOzoneFileSystem {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+abstract class AbstractRootedOzoneFileSystemTestWithFSO extends AbstractRootedOzoneFileSystemTest {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(TestRootedOzoneFileSystemWithFSO.class);
+      LoggerFactory.getLogger(AbstractRootedOzoneFileSystemTestWithFSO.class);
 
-  @Parameterized.Parameters
-  public static Collection<Object[]> data() {
-    return Arrays.asList(
-        new Object[]{true, true, false, false},
-        new Object[]{true, false, false, false},
-        new Object[]{true, true, false, true},
-        new Object[]{true, false, false, true}
-    );
-  }
-
-  public TestRootedOzoneFileSystemWithFSO(boolean setDefaultFs,
-      boolean enableOMRatis, boolean isAclEnabled, boolean noFlush) {
-    super(setDefaultFs, enableOMRatis, isAclEnabled, noFlush);
-  }
-
-  @BeforeClass
-  public static void init()
-      throws IOException, InterruptedException, TimeoutException {
-    setIsBucketFSOptimized(true);
+  AbstractRootedOzoneFileSystemTestWithFSO(boolean enableOMRatis, boolean isAclEnabled, boolean noFlush) {
+    super(BucketLayout.FILE_SYSTEM_OPTIMIZED, true, enableOMRatis, isAclEnabled, noFlush);
   }
 
   /**
@@ -80,7 +58,7 @@ public class TestRootedOzoneFileSystemWithFSO
    */
   @Override
   @Test
-  public void testRenameDestinationParentDoesntExist() throws Exception {
+  void testRenameDestinationParentDoesNotExist() throws Exception {
     final String root = "/root_dir";
     final String dir1 = root + "/dir1";
     final String dir2 = dir1 + "/dir2";
@@ -101,7 +79,7 @@ public class TestRootedOzoneFileSystemWithFSO
   }
 
   @Test
-  public void testKeyRenameToBucketLevel() throws IOException {
+  void testKeyRenameToBucketLevel() throws IOException {
     final String dir = "dir1";
     final String key = dir + "/key1";
     final Path source = new Path(getBucketPath(), key);
@@ -109,28 +87,28 @@ public class TestRootedOzoneFileSystemWithFSO
     final Path dest = new Path(String.valueOf(getBucketPath()));
     LOG.info("Will move {} to {}", source, dest);
     getFs().rename(source, getBucketPath());
-    assertTrue("Key rename failed",
-        getFs().exists(new Path(getBucketPath(), "key1")));
+    assertTrue(getFs().exists(new Path(getBucketPath(), "key1")),
+        "Key rename failed");
     // cleanup
     getFs().delete(dest, true);
   }
 
   @Test
-  public void testRenameDir() throws Exception {
+  void testRenameDir() throws Exception {
     final String dir = "dir1";
     final Path source = new Path(getBucketPath(), dir);
-    final Path dest = new Path(source.toString() + ".renamed");
+    final Path dest = new Path(source + ".renamed");
     // Add a sub-dir to the directory to be moved.
     final Path subdir = new Path(source, "sub_dir1");
     getFs().mkdirs(subdir);
     LOG.info("Created dir {}", subdir);
     LOG.info("Will move {} to {}", source, dest);
     getFs().rename(source, dest);
-    assertTrue("Directory rename failed", getFs().exists(dest));
+    assertTrue(getFs().exists(dest), "Directory rename failed");
     // Verify that the subdir is also renamed i.e. keys corresponding to the
-    // sub-directories of the renamed directory have also been renamed.
-    assertTrue("Keys under the renamed directory not renamed",
-        getFs().exists(new Path(dest, "sub_dir1")));
+    // subdirectories of the renamed directory have also been renamed.
+    assertTrue(getFs().exists(new Path(dest, "sub_dir1")),
+        "Keys under the renamed directory not renamed");
     // cleanup
     getFs().delete(dest, true);
   }
@@ -139,7 +117,7 @@ public class TestRootedOzoneFileSystemWithFSO
    */
   @Override
   @Test
-  public void testRenameDirToItsOwnSubDir() throws Exception {
+  void testRenameDirToItsOwnSubDir() throws Exception {
     final String root = "/root";
     final String dir1 = root + "/dir1";
     final Path dir1Path = new Path(getBucketPath() + dir1);
@@ -159,7 +137,7 @@ public class TestRootedOzoneFileSystemWithFSO
 
   @Override
   @Test
-  public void testDeleteVolumeAndBucket() throws IOException {
+  void testDeleteVolumeAndBucket() throws IOException {
     String volumeStr1 = getRandomNonExistVolumeName();
     Path volumePath1 = new Path(OZONE_URI_DELIMITER + volumeStr1);
     String bucketStr2 = "bucket3";
@@ -201,14 +179,14 @@ public class TestRootedOzoneFileSystemWithFSO
     assertTrue(getFs().delete(bucketPath2, true));
     assertTrue(getFs().delete(volumePath1, false));
     long deletes = getOMMetrics().getNumKeyDeletes();
-    assertTrue(deletes == prevDeletes + 1);
+    assertEquals(prevDeletes + 1, deletes);
   }
 
   /**
    * Test the consistency of listStatusFSO with TableCache present.
    */
   @Test
-  public void testListStatusFSO() throws Exception {
+  void testListStatusFSO() throws Exception {
     // list keys batch size is 1024. Creating keys greater than the
     // batch size to test batch listing of the keys.
     int valueGreaterBatchSize = 1200;
@@ -230,7 +208,7 @@ public class TestRootedOzoneFileSystemWithFSO
   }
 
   @Test
-  public void testLeaseRecoverable() throws Exception {
+  void testLeaseRecoverable() throws Exception {
     // Create a file
     final String dir = "dir1";
     final String key = dir + "/key1";

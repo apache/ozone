@@ -162,6 +162,14 @@ public class VolumeUsage implements SpaceUsageSource {
 
   }
 
+  public static boolean hasVolumeEnoughSpace(long volumeAvailableSpace,
+                                             long volumeCommittedBytesCount,
+                                             long requiredSpace,
+                                             long volumeFreeSpaceToSpare) {
+    return (volumeAvailableSpace - volumeCommittedBytesCount) >
+        Math.max(requiredSpace, volumeFreeSpaceToSpare);
+  }
+
   /**
    * Class representing precomputed space values of a volume.
    * This class is intended to store precomputed values, such as capacity

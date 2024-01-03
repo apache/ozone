@@ -19,20 +19,21 @@ package org.apache.hadoop.ozone.s3;
 
 import org.apache.hadoop.fs.InvalidRequestException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.ozone.test.GenericTestUtils;
 import org.glassfish.jersey.internal.PropertiesDelegate;
 import org.glassfish.jersey.server.ContainerRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.SecurityContext;
 import java.net.URI;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.mock;
 
 /**
  * This class test virtual host style mapping conversion to path style.
@@ -79,9 +80,8 @@ public class TestVirtualHostStyleFilter {
       pathStyleUri = new URI("http://" + s3HttpAddr + path + queryParams);
     }
     String httpMethod = "DELETE";
-    SecurityContext securityContext = Mockito.mock(SecurityContext.class);
-    PropertiesDelegate propertiesDelegate = Mockito.mock(PropertiesDelegate
-        .class);
+    SecurityContext securityContext = mock(SecurityContext.class);
+    PropertiesDelegate propertiesDelegate = mock(PropertiesDelegate.class);
     ContainerRequest containerRequest;
     if (virtualHostStyle) {
       containerRequest = new ContainerRequest(baseUri, virtualHostStyleUri,
@@ -186,54 +186,27 @@ public class TestVirtualHostStyleFilter {
     ContainerRequest containerRequest = createContainerRequest("mybucket" +
         ".localhost:9878", null, "?prefix=bh", true);
     virtualHostStyleFilter.filter(containerRequest);
-    assertTrue(expected.toString().contains(containerRequest.getRequestUri()
-        .toString()));
+    assertThat(expected.toString())
+        .contains(containerRequest.getRequestUri().toString());
 
     containerRequest = createContainerRequest("mybucket" +
         ".localhost:9878", null, "?prefix=bh&type=dir", true);
     virtualHostStyleFilter.filter(containerRequest);
     expected = new URI("http://" + s3HttpAddr +
         "/mybucket?prefix=bh&type=dir");
-    assertTrue(expected.toString().contains(containerRequest.getRequestUri()
-        .toString()));
+    assertThat(expected.toString()).contains(containerRequest.getRequestUri().toString());
 
   }
 
-  @Test
-  public void testVirtualHostStyleWithNoMatchingDomain() throws Exception {
-
-    VirtualHostStyleFilter virtualHostStyleFilter =
-        new VirtualHostStyleFilter();
+  @ParameterizedTest
+  @CsvSource(value = {"mybucket.myhost:9999,No matching domain", "mybucketlocalhost:9878,invalid format"})
+  public void testVirtualHostStyleWithInvalidInputs(String hostAddress,
+                                                    String expectErrorMessage) throws Exception {
+    VirtualHostStyleFilter virtualHostStyleFilter = new VirtualHostStyleFilter();
     virtualHostStyleFilter.setConfiguration(conf);
-
-    ContainerRequest containerRequest = createContainerRequest("mybucket" +
-        ".myhost:9999", null, null, true);
-    try {
-      virtualHostStyleFilter.filter(containerRequest);
-      fail("testVirtualHostStyleWithNoMatchingDomain");
-    } catch (InvalidRequestException ex) {
-      GenericTestUtils.assertExceptionContains("No matching domain", ex);
-    }
-
+    ContainerRequest containerRequest = createContainerRequest(hostAddress, null, null, true);
+    InvalidRequestException exception = assertThrows(InvalidRequestException.class,
+        () -> virtualHostStyleFilter.filter(containerRequest));
+    assertThat(exception).hasMessageContaining(expectErrorMessage);
   }
-
-  @Test
-  public void testIncorrectVirtualHostStyle() throws
-      Exception {
-
-    VirtualHostStyleFilter virtualHostStyleFilter =
-        new VirtualHostStyleFilter();
-    virtualHostStyleFilter.setConfiguration(conf);
-
-    ContainerRequest containerRequest = createContainerRequest("mybucket" +
-        "localhost:9878", null, null, true);
-    try {
-      virtualHostStyleFilter.filter(containerRequest);
-      fail("testIncorrectVirtualHostStyle failed");
-    } catch (InvalidRequestException ex) {
-      GenericTestUtils.assertExceptionContains("invalid format", ex);
-    }
-
-  }
-
 }

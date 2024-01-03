@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.Persisted
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -41,6 +40,7 @@ import java.io.IOException;
 import java.util.UUID;
 import java.nio.file.Path;
 
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -107,10 +107,10 @@ public class TestOMVolumeDeleteResponse {
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assertions.assertNull(omMetadataManager.getVolumeTable().get(
+    assertNull(omMetadataManager.getVolumeTable().get(
             omMetadataManager.getVolumeKey(volumeName)));
 
-    Assertions.assertNull(omMetadataManager.getUserTable().get(
+    assertNull(omMetadataManager.getUserTable().get(
         omMetadataManager.getUserKey(userName)));
   }
 

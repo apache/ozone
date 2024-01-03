@@ -253,6 +253,12 @@ public class TestSCMNodeMetrics {
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
     assertGauge("DecommissionedSSDRemaining", 0L,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("AllNodes", 1,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("TotalCapacity", 100L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("TotalUsed", 10L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
 
     LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
     LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
