@@ -29,6 +29,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <name>Apache Ozone HDDS Hadoop Server dependencies</name>
   <packaging>jar</packaging>
 
+  <properties>
+    <maven.test.skip>true</maven.test.skip> <!-- no tests in this module -->
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
