@@ -18,7 +18,7 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import org.apache.hadoop.hdds.resource.LeakTracker;
+import org.apache.hadoop.hdds.utils.LeakTracker;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.TableFormatConfig;
 

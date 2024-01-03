@@ -19,8 +19,8 @@
 package org.apache.hadoop.hdds.utils.db.managed;
 
 import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.resource.LeakDetector;
-import org.apache.hadoop.hdds.resource.LeakTracker;
+import org.apache.hadoop.hdds.utils.LeakDetector;
+import org.apache.hadoop.hdds.utils.LeakTracker;
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
 import org.rocksdb.RocksDB;

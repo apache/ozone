@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdds.resource;
 
+import org.apache.hadoop.hdds.utils.LeakDetector;
+import org.apache.hadoop.hdds.utils.LeakTracker;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicInteger;
