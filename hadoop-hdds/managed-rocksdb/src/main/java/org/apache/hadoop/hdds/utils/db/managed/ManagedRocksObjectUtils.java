@@ -51,14 +51,14 @@ public final class ManagedRocksObjectUtils {
 
   static LeakTracker track(AutoCloseable object) {
     ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
-    final String name = object.getClass().getSimpleName();
+    final Class<?> clazz = object.getClass();
     final StackTraceElement[] stackTrace = getStackTrace();
-    return LEAK_DETECTOR.track(object, () -> reportLeak(name, formatStackTrace(stackTrace)));
+    return LEAK_DETECTOR.track(object, () -> reportLeak(clazz, formatStackTrace(stackTrace)));
   }
 
-  static void reportLeak(String name, String stackTrace) {
+  static void reportLeak(Class<?> clazz, String stackTrace) {
     ManagedRocksObjectMetrics.INSTANCE.increaseLeakObject();
-    String warning = String.format("%s is not closed properly", name);
+    String warning = String.format("%s is not closed properly", clazz.getSimpleName());
     if (stackTrace != null && LOG.isDebugEnabled()) {
       String debugMessage = String.format("%nStackTrace for unclosed instance: %s", stackTrace);
       warning = warning.concat(debugMessage);
