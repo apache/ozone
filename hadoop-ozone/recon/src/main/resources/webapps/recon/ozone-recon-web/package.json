@@ -25,7 +25,7 @@
     "less": "^3.13.1",
     "less-loader": "^5.0.0",
     "moment": "^2.29.4",
-    "plotly.js": "^1.58.5",
+    "plotly.js": "^2.25.2",
     "pretty-ms": "^5.1.0",
     "react": "^16.8.6",
     "react-app-rewired": "^2.2.1",
