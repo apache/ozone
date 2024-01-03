@@ -142,7 +142,7 @@ public class TestOmSnapshotInfo {
     assertEquals(
         snapshotInfoEntryExpected.getExclusiveReplicatedSize(),
         snapshotInfoEntryActual.getExclusiveReplicatedSize());
-    Assertions.assertEquals(
+    assertEquals(
         snapshotInfoEntryExpected.getDeepCleanedDeletedDir(),
         snapshotInfoEntryActual.getDeepCleanedDeletedDir());
 
@@ -181,7 +181,7 @@ public class TestOmSnapshotInfo {
         snapshotInfoActual.getExclusiveSize());
     assertEquals(snapshotInfoExpected.getExclusiveReplicatedSize(),
         snapshotInfoActual.getExclusiveReplicatedSize());
-    Assertions.assertEquals(snapshotInfoExpected.getDeepCleanedDeletedDir(),
+    assertEquals(snapshotInfoExpected.getDeepCleanedDeletedDir(),
         snapshotInfoActual.getDeepCleanedDeletedDir());
 
     assertEquals(snapshotInfoExpected, snapshotInfoActual);
