@@ -18,6 +18,7 @@
  */
 package org.apache.hadoop.hdds.utils;
 
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,7 +36,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <pre> {@code
  * class MyResource implements AutoClosable {
- *   static final LeakDetector LEAK_DETECTOR = new LeakDetector("MyResource");
+ *   static final UncheckedAutoCloseable LEAK_DETECTOR = new LeakDetector("MyResource");
  *
  *   private final LeakTracker leakTracker = LEAK_DETECTOR.track(this, () -> {
  *      // report leaks, don't refer to the original object (MyResource) here.
@@ -89,7 +90,7 @@ public class LeakDetector {
     LOG.warn("Exiting leak detector {}.", name);
   }
 
-  public LeakTracker track(Object leakable, Runnable reportLeak) {
+  public UncheckedAutoCloseable track(Object leakable, Runnable reportLeak) {
     // A rate filter can be put here to only track a subset of all objects, e.g. 5%, 10%,
     // if we have proofs that leak tracking impacts performance, or a single LeakDetector
     // thread can't keep up with the pace of object allocation.
