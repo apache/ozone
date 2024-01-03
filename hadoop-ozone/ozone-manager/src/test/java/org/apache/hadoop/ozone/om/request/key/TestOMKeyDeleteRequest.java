@@ -54,7 +54,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
     OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
     Assertions.assertNotNull(omKeyInfo);
 
-    doPreExecute(createDeleteKeyRequest(ozoneKey));
+    doPreExecute(createDeleteKeyRequest(testKeyName));
   }
 
   @ParameterizedTest
@@ -154,7 +154,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
    * @return OMRequest - modified request returned from preExecute.
    * @throws Exception
    */
-  private OMRequest doPreExecute(OMRequest originalOmRequest) throws Exception {
+  protected OMRequest doPreExecute(OMRequest originalOmRequest) throws Exception {
 
     OMKeyDeleteRequest omKeyDeleteRequest =
             getOmKeyDeleteRequest(originalOmRequest);
@@ -171,7 +171,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
    * Create OMRequest which encapsulates DeleteKeyRequest.
    * @return OMRequest
    */
-  private OMRequest createDeleteKeyRequest() {
+  protected OMRequest createDeleteKeyRequest() {
     return createDeleteKeyRequest(keyName);
   }
 
@@ -191,7 +191,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
     return addKeyToTable(keyName);
   }
 
-  private String addKeyToTable(String key) throws Exception {
+  protected String addKeyToTable(String key) throws Exception {
     OMRequestTestUtils.addKeyToTable(false, volumeName,
             bucketName, key, clientID, replicationType, replicationFactor,
             omMetadataManager);
