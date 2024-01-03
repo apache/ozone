@@ -52,6 +52,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static java.util.Collections.singletonMap;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -192,7 +193,7 @@ public class TestBucketManagerImpl {
       BucketManager bucketManager = omTestManagers.getBucketManager();
       bucketManager.getBucketInfo("sample-vol", "bucket-one");
     });
-    assertTrue(exception.getMessage().contains("Bucket not found"));
+    assertThat(exception.getMessage()).contains("Bucket not found");
     assertEquals(ResultCodes.BUCKET_NOT_FOUND,
         exception.getResult());
   }
@@ -337,7 +338,7 @@ public class TestBucketManagerImpl {
     });
     assertEquals(ResultCodes.BUCKET_NOT_FOUND,
           omEx.getResult());
-    assertTrue(omEx.getMessage().contains("Bucket not found"));
+    assertThat(omEx.getMessage()).contains("Bucket not found");
   }
 
   @Test
