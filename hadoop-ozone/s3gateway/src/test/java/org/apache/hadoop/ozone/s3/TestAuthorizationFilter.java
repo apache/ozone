@@ -47,14 +47,16 @@ import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.CONTENT_TY
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.HOST_HEADER;
 import static org.apache.hadoop.ozone.s3.signature.StringToSignProducer.X_AMAZ_DATE;
 import static org.apache.hadoop.ozone.s3.signature.StringToSignProducer.X_AMZ_CONTENT_SHA256;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-import org.junit.Assert;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 
 /**
  * This class test string to sign generation.
@@ -155,14 +157,14 @@ public class TestAuthorizationFilter {
               authHeader.startsWith("AWS ")) {
         // Empty auth header and unsupported AWS signature
         // should fail with Invalid Request.
-        Assert.assertEquals(HTTP_FORBIDDEN, ex.getResponse().getStatus());
-        Assert.assertEquals(expectedErrorMsg,
+        assertEquals(HTTP_FORBIDDEN, ex.getResponse().getStatus());
+        assertEquals(expectedErrorMsg,
             ex.getMessage());
       } else {
         // Other requests have stale timestamp and
         // should fail with Malformed Authorization Header.
-        Assert.assertEquals(HTTP_BAD_REQUEST, ex.getResponse().getStatus());
-        Assert.assertEquals(expectedErrorMsg,
+        assertEquals(HTTP_BAD_REQUEST, ex.getResponse().getStatus());
+        assertEquals(expectedErrorMsg,
             ex.getMessage());
 
       }
@@ -256,11 +258,9 @@ public class TestAuthorizationFilter {
       authorizationFilter.filter(context);
 
       if (path.startsWith("/secret")) {
-        Assert.assertNull(
-            authorizationFilter.getSignatureInfo().getUnfilteredURI());
+        assertNull(authorizationFilter.getSignatureInfo().getUnfilteredURI());
 
-        Assert.assertNull(
-            authorizationFilter.getSignatureInfo().getStringToSign());
+        assertNull(authorizationFilter.getSignatureInfo().getStringToSign());
       } else {
         String canonicalRequest = method + "\n"
             + path + "\n"
@@ -280,13 +280,13 @@ public class TestAuthorizationFilter {
             + CURDATE + "/us-east-1/s3/aws4_request\n"
             + Hex.encode(md.digest()).toLowerCase();
 
-        Assert.assertEquals("Unfiltered URI is not preserved",
-            path,
-            authorizationFilter.getSignatureInfo().getUnfilteredURI());
+        assertEquals(path,
+            authorizationFilter.getSignatureInfo().getUnfilteredURI(),
+            "Unfiltered URI is not preserved");
 
-        Assert.assertEquals("String to sign is invalid",
-            expectedStrToSign,
-            authorizationFilter.getSignatureInfo().getStringToSign());
+        assertEquals(expectedStrToSign,
+            authorizationFilter.getSignatureInfo().getStringToSign(),
+            "String to sign is invalid");
       }
     } catch (Exception ex) {
       fail("Unexpected exception: " + ex);
@@ -310,21 +310,21 @@ public class TestAuthorizationFilter {
     headerMap.putSingle(X_AMAZ_DATE, date);
     headerMap.putSingle(CONTENT_TYPE, contentType);
 
-    UriInfo uriInfo = Mockito.mock(UriInfo.class);
-    ContainerRequestContext context = Mockito.mock(
+    UriInfo uriInfo = mock(UriInfo.class);
+    ContainerRequestContext context = mock(
         ContainerRequestContext.class);
-    Mockito.when(uriInfo.getQueryParameters()).thenReturn(queryMap);
-    Mockito.when(uriInfo.getRequestUri()).thenReturn(
+    when(uriInfo.getQueryParameters()).thenReturn(queryMap);
+    when(uriInfo.getRequestUri()).thenReturn(
         new URI("http://" + host + path));
 
-    Mockito.when(context.getMethod()).thenReturn(method);
-    Mockito.when(context.getUriInfo()).thenReturn(uriInfo);
-    Mockito.when(context.getHeaders()).thenReturn(headerMap);
-    Mockito.when(context.getHeaderString(AUTHORIZATION_HEADER))
+    when(context.getMethod()).thenReturn(method);
+    when(context.getUriInfo()).thenReturn(uriInfo);
+    when(context.getHeaders()).thenReturn(headerMap);
+    when(context.getHeaderString(AUTHORIZATION_HEADER))
         .thenReturn(authHeader);
-    Mockito.when(context.getUriInfo().getQueryParameters())
+    when(context.getUriInfo().getQueryParameters())
         .thenReturn(queryMap);
-    Mockito.when(context.getUriInfo().getPathParameters())
+    when(context.getUriInfo().getPathParameters())
         .thenReturn(pathParamsMap);
 
     return context;

@@ -27,6 +27,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_F
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.base.Strings;
 import java.io.File;
@@ -42,7 +44,6 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.Callable;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
@@ -55,15 +56,11 @@ import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTrans
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,15 +68,13 @@ import org.slf4j.LoggerFactory;
  * Test OzoneManager list volume operation under combinations of configs
  * in secure mode.
  */
+@Timeout(1200)
 public class TestOzoneManagerListVolumesSecure {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestOzoneManagerListVolumesSecure.class);
 
-  private static final Logger LOG = LoggerFactory
-      .getLogger(TestOzoneManagerListVolumesSecure.class);
-
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(1200));
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   private String realm;
   private OzoneConfiguration conf;
@@ -105,14 +100,14 @@ public class TestOzoneManagerListVolumesSecure {
   private UserGroupInformation userUGI1;
   private UserGroupInformation userUGI2;
 
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     this.conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
     conf.set(OZONE_SECURITY_ENABLED_KEY, "true");
     conf.set("hadoop.security.authentication", "kerberos");
 
-    this.workDir = folder.newFolder();
+    this.workDir = folder.toFile();
 
     startMiniKdc();
     this.realm = miniKdc.getRealm();
@@ -144,8 +139,8 @@ public class TestOzoneManagerListVolumesSecure {
   }
 
   private void createPrincipals() throws Exception {
-    String host = InetAddress.getLocalHost().getCanonicalHostName().
-        toLowerCase();
+    String host = InetAddress.getLocalHost()
+        .getCanonicalHostName().toLowerCase();
     String hostAndRealm = host + "@" + this.realm;
     this.adminPrincipal = adminUser + "/" + hostAndRealm;
     this.adminPrincipalInOtherHost = adminUser + "/otherhost@" + this.realm;
@@ -168,21 +163,12 @@ public class TestOzoneManagerListVolumesSecure {
     miniKdc.createPrincipal(keytab, principal);
   }
 
-  @After
+  @AfterEach
   public void stop() {
-    try {
-      stopMiniKdc();
-
-      if (om != null) {
-        om.stop();
-        om.join();
-      }
-
-      if (workDir != null) {
-        FileUtils.deleteDirectory(workDir);
-      }
-    } catch (Exception e) {
-      LOG.error("Failed to stop TestSecureOzoneCluster", e);
+    stopMiniKdc();
+    if (om != null) {
+      om.stop();
+      om.join();
     }
   }
 
@@ -190,7 +176,7 @@ public class TestOzoneManagerListVolumesSecure {
    * Setup test environment.
    */
   private void setupEnvironment(boolean aclEnabled,
-      boolean volListAllAllowed) throws Exception {
+                                boolean volListAllAllowed) throws Exception {
     Path omPath = Paths.get(workDir.getPath(), "om-meta");
     conf.set(OZONE_METADATA_DIRS, omPath.toString());
 
@@ -249,7 +235,7 @@ public class TestOzoneManagerListVolumesSecure {
     if (!Strings.isNullOrEmpty(aclString)) {
       OzoneObj obj = OzoneObjInfo.Builder.newBuilder().setVolumeName(volumeName)
           .setResType(OzoneObj.ResourceType.VOLUME).setStoreType(OZONE).build();
-      Assert.assertTrue(client.setAcl(obj, OzoneAcl.parseAcls(aclString)));
+      assertTrue(client.setAcl(obj, OzoneAcl.parseAcls(aclString)));
     }
   }
 
@@ -258,7 +244,7 @@ public class TestOzoneManagerListVolumesSecure {
    * under different config combination.
    */
   private void checkUser(String userName, List<String> expectVol,
-      boolean expectListAllSuccess) throws IOException {
+                         boolean expectListAllSuccess) throws IOException {
 
     OzoneManagerProtocolClientSideTranslatorPB client =
         new OzoneManagerProtocolClientSideTranslatorPB(
@@ -275,7 +261,7 @@ public class TestOzoneManagerListVolumesSecure {
         String volumeName = v.getVolume();
         accessibleVolumes.add(volumeName);
       }
-      Assert.assertEquals(new HashSet<>(expectVol), accessibleVolumes);
+      assertEquals(new HashSet<>(expectVol), accessibleVolumes);
     } catch (OMException e) {
       if (!expectListAllSuccess &&
           e.getResult() == OMException.ResultCodes.PERMISSION_DENIED) {
@@ -291,8 +277,8 @@ public class TestOzoneManagerListVolumesSecure {
     //  disallowed).
     try {
       volumeList = client.listAllVolumes("volume", "", 100);
-      Assert.assertEquals(6, volumeList.size());
-      Assert.assertTrue(expectListAllSuccess);
+      assertEquals(6, volumeList.size());
+      assertTrue(expectListAllSuccess);
     } catch (OMException ex) {
       if (!expectListAllSuccess &&
           ex.getResult() == OMException.ResultCodes.PERMISSION_DENIED) {
@@ -305,10 +291,10 @@ public class TestOzoneManagerListVolumesSecure {
   }
 
   private static void doAs(UserGroupInformation ugi,
-      Callable<Boolean> callable) {
+                           Callable<Boolean> callable) {
     // Some thread (eg: HeartbeatEndpointTask) will use the login ugi,
     // so we could not use loginUserFromKeytabAndReturnUGI to switch user.
-    Assert.assertEquals(true, ugi.doAs((PrivilegedAction) () -> {
+    assertTrue(ugi.doAs((PrivilegedAction<Boolean>) () -> {
       try {
         return callable.call();
       } catch (Throwable ex) {

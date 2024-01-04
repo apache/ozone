@@ -30,10 +30,10 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
 
 import java.time.Duration;
@@ -54,7 +54,7 @@ public class TestFreonWithPipelineDestroy {
    * Ozone is made active by setting OZONE_ENABLED = true
    *
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT,
@@ -85,7 +85,7 @@ public class TestFreonWithPipelineDestroy {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -108,16 +108,16 @@ public class TestFreonWithPipelineDestroy {
     cmd.execute("--num-of-volumes", "1",
         "--num-of-buckets", "1",
         "--num-of-keys", "1",
-        "--key-size", "20971520",
+        "--key-size", "20MB",
         "--factor", "THREE",
         "--type", "RATIS",
         "--validate-writes"
     );
 
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
-    Assert.assertEquals(0,
+    Assertions.assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
+    Assertions.assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
+    Assertions.assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
+    Assertions.assertEquals(0,
         randomKeyGenerator.getUnsuccessfulValidationCount());
   }
 

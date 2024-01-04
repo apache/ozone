@@ -20,8 +20,6 @@ package org.apache.hadoop.ozone.container.keyvalue;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -42,6 +40,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.io.FileUtils;
@@ -124,7 +123,7 @@ public class TarContainerPacker
         Files.createDirectories(parent);
       }
 
-      try (OutputStream fileOutput = new FileOutputStream(path.toFile());
+      try (OutputStream fileOutput = Files.newOutputStream(path);
            OutputStream output = new BufferedOutputStream(fileOutput)) {
         int bufferSize = 1024;
         byte[] buffer = new byte[bufferSize + 1];
@@ -157,7 +156,7 @@ public class TarContainerPacker
 
     KeyValueContainerData containerData = container.getContainerData();
 
-    try (ArchiveOutputStream archiveOutput = tar(compress(output))) {
+    try (ArchiveOutputStream<TarArchiveEntry> archiveOutput = tar(compress(output))) {
       includeFile(container.getContainerFile(), CONTAINER_FILE_NAME,
           archiveOutput);
 
@@ -172,7 +171,7 @@ public class TarContainerPacker
   @Override
   public byte[] unpackContainerDescriptor(InputStream input)
       throws IOException {
-    try (ArchiveInputStream archiveInput = untar(decompress(input))) {
+    try (ArchiveInputStream<TarArchiveEntry> archiveInput = untar(decompress(input))) {
 
       ArchiveEntry entry = archiveInput.getNextEntry();
       while (entry != null) {
@@ -219,9 +218,7 @@ public class TarContainerPacker
 
   public static Path getChunkPath(Path baseDir,
       KeyValueContainerData containerData) {
-    Path chunkDir = KeyValueContainerLocationUtil.getChunksLocationPath(
-        baseDir.toString()).toPath();
-    return chunkDir;
+    return KeyValueContainerLocationUtil.getChunksLocationPath(baseDir.toString()).toPath();
   }
 
   private byte[] readEntry(InputStream input, final long size)
@@ -240,11 +237,11 @@ public class TarContainerPacker
   }
 
   private void includePath(Path dir, String subdir,
-      ArchiveOutputStream archiveOutput) throws IOException {
+      ArchiveOutputStream<TarArchiveEntry> archiveOutput) throws IOException {
 
     // Add a directory entry before adding files, in case the directory is
     // empty.
-    ArchiveEntry entry = archiveOutput.createArchiveEntry(dir.toFile(), subdir);
+    TarArchiveEntry entry = archiveOutput.createArchiveEntry(dir.toFile(), subdir);
     archiveOutput.putArchiveEntry(entry);
     archiveOutput.closeArchiveEntry();
 
@@ -258,20 +255,20 @@ public class TarContainerPacker
   }
 
   static void includeFile(File file, String entryName,
-      ArchiveOutputStream archiveOutput) throws IOException {
-    ArchiveEntry entry = archiveOutput.createArchiveEntry(file, entryName);
+      ArchiveOutputStream<TarArchiveEntry> archiveOutput) throws IOException {
+    TarArchiveEntry entry = archiveOutput.createArchiveEntry(file, entryName);
     archiveOutput.putArchiveEntry(entry);
-    try (InputStream input = new FileInputStream(file)) {
+    try (InputStream input = Files.newInputStream(file.toPath())) {
       IOUtils.copy(input, archiveOutput);
     }
     archiveOutput.closeArchiveEntry();
   }
 
-  private static ArchiveInputStream untar(InputStream input) {
+  private static ArchiveInputStream<TarArchiveEntry> untar(InputStream input) {
     return new TarArchiveInputStream(input);
   }
 
-  private static ArchiveOutputStream tar(OutputStream output) {
+  private static ArchiveOutputStream<TarArchiveEntry> tar(OutputStream output) {
     TarArchiveOutputStream os = new TarArchiveOutputStream(output);
     os.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
     return os;
@@ -290,7 +287,7 @@ public class TarContainerPacker
   private byte[] innerUnpack(InputStream input, Path dbRoot, Path chunksRoot)
       throws IOException {
     byte[] descriptorFileContent = null;
-    try (ArchiveInputStream archiveInput = untar(decompress(input))) {
+    try (ArchiveInputStream<TarArchiveEntry> archiveInput = untar(decompress(input))) {
       ArchiveEntry entry = archiveInput.getNextEntry();
       while (entry != null) {
         String name = entry.getName();

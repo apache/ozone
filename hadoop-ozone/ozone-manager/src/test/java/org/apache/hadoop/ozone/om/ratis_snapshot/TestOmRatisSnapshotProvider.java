@@ -35,13 +35,13 @@ import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.OzoneConsts.MULTIPART_FORM_DATA_BOUNDARY;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
@@ -107,7 +107,7 @@ public class TestOmRatisSnapshotProvider {
     omRatisSnapshotProvider.downloadSnapshot(leaderNodeId, targetFile);
 
     sb.append("--" + MULTIPART_FORM_DATA_BOUNDARY + "--" + CR_NL);
-    Assertions.assertEquals(sb.toString(),
+    assertEquals(sb.toString(),
         new String(outputStream.toByteArray(), StandardCharsets.UTF_8));
   }
 
@@ -125,7 +125,7 @@ public class TestOmRatisSnapshotProvider {
 
     sb.append(fileName).append(CR_NL);
     sb.append("--" + MULTIPART_FORM_DATA_BOUNDARY + "--" + CR_NL);
-    Assertions.assertEquals(sb.toString(),
+    assertEquals(sb.toString(),
         new String(outputStream.toByteArray(), StandardCharsets.UTF_8));
   }
 
@@ -138,7 +138,7 @@ public class TestOmRatisSnapshotProvider {
     OmRatisSnapshotProvider.writeFormData(connection, new ArrayList<>());
 
     sb.append("--" + MULTIPART_FORM_DATA_BOUNDARY + "--" + CR_NL);
-    Assertions.assertEquals(sb.toString(),
+    assertEquals(sb.toString(),
         new String(outputStream.toByteArray(), StandardCharsets.UTF_8));
   }
 

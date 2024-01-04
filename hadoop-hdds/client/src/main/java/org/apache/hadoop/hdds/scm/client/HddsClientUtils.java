@@ -296,6 +296,20 @@ public final class HddsClientUtils {
     return t;
   }
 
+  // This will return the underlying expected exception if it exists
+  // in an exception trace. Otherwise, returns null.
+  public static Throwable containsException(Exception e,
+            Class<? extends Exception> expectedExceptionClass) {
+    Throwable t = e;
+    while (t != null) {
+      if (expectedExceptionClass.isInstance(t)) {
+        return t;
+      }
+      t = t.getCause();
+    }
+    return null;
+  }
+
   public static RetryPolicy createRetryPolicy(int maxRetryCount,
       long retryInterval) {
     // retry with fixed sleep between retries

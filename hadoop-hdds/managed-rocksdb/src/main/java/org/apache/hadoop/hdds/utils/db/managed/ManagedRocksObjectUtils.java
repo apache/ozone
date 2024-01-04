@@ -19,10 +19,11 @@
 package org.apache.hadoop.hdds.utils.db.managed;
 
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.utils.LeakDetector;
+import org.apache.hadoop.hdds.utils.LeakTracker;
 import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
 import org.rocksdb.RocksDB;
-import org.rocksdb.RocksObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,42 +42,36 @@ public final class ManagedRocksObjectUtils {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(ManagedRocksObjectUtils.class);
+
   private static final Duration POLL_DELAY_DURATION = Duration.ZERO;
   private static final Duration POLL_INTERVAL_DURATION = Duration.ofMillis(100);
 
-  static void assertClosed(RocksObject rocksObject) {
-    assertClosed(rocksObject, null);
-  }
 
-  public static void assertClosed(ManagedObject<?> object) {
-    assertClosed(object.get(), object.getStackTrace());
-  }
+  private static final LeakDetector LEAK_DETECTOR = new LeakDetector("ManagedRocksObject");
 
-  static void assertClosed(RocksObject rocksObject, String stackTrace) {
+  static LeakTracker track(AutoCloseable object) {
     ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
-    if (rocksObject.isOwningHandle()) {
-      reportLeak(rocksObject, stackTrace);
-    }
+    final Class<?> clazz = object.getClass();
+    final StackTraceElement[] stackTrace = getStackTrace();
+    return LEAK_DETECTOR.track(object, () -> reportLeak(clazz, formatStackTrace(stackTrace)));
   }
 
-  static void reportLeak(Object object, String stackTrace) {
+  static void reportLeak(Class<?> clazz, String stackTrace) {
     ManagedRocksObjectMetrics.INSTANCE.increaseLeakObject();
-    String warning = String.format("%s is not closed properly",
-        object.getClass().getSimpleName());
+    String warning = String.format("%s is not closed properly", clazz.getSimpleName());
     if (stackTrace != null && LOG.isDebugEnabled()) {
-      String debugMessage = String
-          .format("%nStackTrace for unclosed instance: %s", stackTrace);
+      String debugMessage = String.format("%nStackTrace for unclosed instance: %s", stackTrace);
       warning = warning.concat(debugMessage);
     }
     LOG.warn(warning);
   }
 
-  static @Nullable StackTraceElement[] getStackTrace() {
+  private static @Nullable StackTraceElement[] getStackTrace() {
     return HddsUtils.getStackTrace(LOG);
   }
 
-  static String formatStackTrace(StackTraceElement[] elements) {
-    return HddsUtils.formatStackTrace(elements, 3);
+  static String formatStackTrace(@Nullable StackTraceElement[] elements) {
+    return HddsUtils.formatStackTrace(elements, 4);
   }
 
   /**

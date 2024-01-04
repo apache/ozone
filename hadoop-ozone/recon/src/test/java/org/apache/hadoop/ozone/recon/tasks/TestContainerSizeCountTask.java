@@ -79,6 +79,11 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
 
   @Test
   public void testProcess() {
+    // mock a container with invalid used bytes
+    final ContainerInfo omContainerInfo0 = mock(ContainerInfo.class);
+    given(omContainerInfo0.containerID()).willReturn(new ContainerID(0));
+    given(omContainerInfo0.getUsedBytes()).willReturn(-1L);
+
     // Write 2 keys
     ContainerInfo omContainerInfo1 = mock(ContainerInfo.class);
     given(omContainerInfo1.containerID()).willReturn(new ContainerID(1));
@@ -90,6 +95,7 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
 
     // mock getContainers method to return a list of containers
     List<ContainerInfo> containers = new ArrayList<>();
+    containers.add(omContainerInfo0);
     containers.add(omContainerInfo1);
     containers.add(omContainerInfo2);
 

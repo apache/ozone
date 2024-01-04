@@ -51,7 +51,6 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 
-import java.io.IOException;
 import java.net.ConnectException;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -64,10 +63,10 @@ import java.util.UUID;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Ozone Manager HA tests that stop/restart one or more OM nodes.
@@ -238,88 +237,6 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
   }
 
   @Test
-  void testOMRatisSnapshot() throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
-
-    VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
-        .setOwner(userName)
-        .setAdmin(adminName)
-        .build();
-
-    ObjectStore objectStore = getObjectStore();
-    objectStore.createVolume(volumeName, createVolumeArgs);
-    OzoneVolume retVolumeinfo = objectStore.getVolume(volumeName);
-
-    retVolumeinfo.createBucket(bucketName);
-    OzoneBucket ozoneBucket = retVolumeinfo.getBucket(bucketName);
-
-    String leaderOMNodeId = OmFailoverProxyUtil
-        .getFailoverProxyProvider(objectStore.getClientProxy())
-        .getCurrentProxyOMNodeId();
-
-    OzoneManager ozoneManager = getCluster().getOzoneManager(leaderOMNodeId);
-
-    // Send commands to ratis to increase the log index so that ratis
-    // triggers a snapshot on the state machine.
-
-    long appliedLogIndex = 0;
-    while (appliedLogIndex <= getSnapshotThreshold()) {
-      createKey(ozoneBucket);
-      appliedLogIndex = ozoneManager.getOmRatisServer()
-          .getLastAppliedTermIndex().getIndex();
-    }
-
-    GenericTestUtils.waitFor(() -> {
-      try {
-        if (ozoneManager.getRatisSnapshotIndex() > 0) {
-          return true;
-        }
-      } catch (IOException ex) {
-        Assertions.fail("test failed during transactionInfo read");
-      }
-      return false;
-    }, 1000, 100000);
-
-    // The current lastAppliedLogIndex on the state machine should be greater
-    // than or equal to the saved snapshot index.
-    long smLastAppliedIndex =
-        ozoneManager.getOmRatisServer().getLastAppliedTermIndex().getIndex();
-    long ratisSnapshotIndex = ozoneManager.getRatisSnapshotIndex();
-    assertTrue(smLastAppliedIndex >= ratisSnapshotIndex,
-        "LastAppliedIndex on OM State Machine ("
-        + smLastAppliedIndex + ") is less than the saved snapshot index("
-        + ratisSnapshotIndex + ").");
-
-    // Add more transactions to Ratis to trigger another snapshot
-    while (appliedLogIndex <= (smLastAppliedIndex + getSnapshotThreshold())) {
-      createKey(ozoneBucket);
-      appliedLogIndex = ozoneManager.getOmRatisServer()
-          .getLastAppliedTermIndex().getIndex();
-    }
-
-    GenericTestUtils.waitFor(() -> {
-      try {
-        if (ozoneManager.getRatisSnapshotIndex() > 0) {
-          return true;
-        }
-      } catch (IOException ex) {
-        Assertions.fail("test failed during transactionInfo read");
-      }
-      return false;
-    }, 1000, 100000);
-
-    // The new snapshot index must be greater than the previous snapshot index
-    long ratisSnapshotIndexNew = ozoneManager.getRatisSnapshotIndex();
-    assertTrue(ratisSnapshotIndexNew > ratisSnapshotIndex,
-        "Latest snapshot index must be greater than previous " +
-            "snapshot indices");
-
-  }
-
-  @Test
   @Order(Integer.MAX_VALUE)
   void testOMRestart() throws Exception {
     // start fresh cluster
@@ -381,7 +298,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     final long leaderOMSnaphsotIndex = leaderOM.getRatisSnapshotIndex();
 
     // The stopped OM should be lagging behind the leader OM.
-    assertTrue(followerOM1LastAppliedIndex < leaderOMSnaphsotIndex);
+    assertThat(followerOM1LastAppliedIndex).isLessThan(leaderOMSnaphsotIndex);
 
     // Restart the stopped OM.
     followerOM1.restart();
@@ -400,8 +317,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
 
     final long followerOM1LastAppliedIndexNew =
         followerOM1.getOmRatisServer().getLastAppliedTermIndex().getIndex();
-    assertTrue(
-        followerOM1LastAppliedIndexNew > leaderOMSnaphsotIndex);
+    assertThat(followerOM1LastAppliedIndexNew).isGreaterThan(leaderOMSnaphsotIndex);
   }
 
   @Test
@@ -471,7 +387,8 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     final RaftProperties p = getCluster()
         .getOzoneManager()
         .getOmRatisServer()
-        .getServer()
+        .getServerDivision()
+        .getRaftServer()
         .getProperties();
     final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);
     assertEquals(TimeDuration.ZERO, t,
@@ -673,7 +590,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
 
     while (volumeIterator.hasNext()) {
       OzoneVolume next = volumeIterator.next();
-      assertTrue(expectedVolumes.contains(next.getName()));
+      assertThat(expectedVolumes).contains(next.getName());
       expectedCount++;
     }
 

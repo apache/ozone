@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -79,7 +80,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 
-import static org.junit.Assert.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -251,9 +255,9 @@ public class TestEndPoint {
       List<HddsVolume> volumesList = StorageVolumeUtil.getHddsVolumesList(
           ozoneContainer.getVolumeSet().getFailedVolumesList());
       Assertions.assertEquals(1, volumesList.size());
-      Assertions.assertTrue(logCapturer.getOutput()
+      assertThat(logCapturer.getOutput())
           .contains("org.apache.hadoop.ozone.common" +
-              ".InconsistentStorageStateException: Mismatched ClusterIDs"));
+              ".InconsistentStorageStateException: Mismatched ClusterIDs");
       Assertions.assertEquals(0,
           ozoneContainer.getVolumeSet().getVolumesList().size());
       Assertions.assertEquals(1,
@@ -285,6 +289,32 @@ public class TestEndPoint {
           = new DatanodeLayoutStorage(ozoneConf,
           "na_expect_storage_initialized");
       assertEquals(scmServerImpl.getClusterId(), layout.getClusterID());
+
+      // Delete storage volume info
+      File storageDir = ozoneContainer.getVolumeSet()
+          .getVolumesList().get(0).getStorageDir();
+      FileUtils.forceDelete(storageDir);
+
+      // Format volume VERSION file with
+      // different clusterId than SCM clusterId.
+      ozoneContainer.getVolumeSet().getVolumesList()
+          .get(0).format("different_cluster_id");
+      // Update layout clusterId and persist it.
+      layout.setClusterId("different_cluster_id");
+      layout.persistCurrentState();
+
+      // As the volume level clusterId didn't match with SCM clusterId
+      // Even after the version call, the datanode layout file should
+      // not update its clusterID field.
+      rpcEndPoint.setState(EndpointStateMachine.EndPointStates.GETVERSION);
+      versionTask.call();
+      DatanodeLayoutStorage layout1
+          = new DatanodeLayoutStorage(ozoneConf,
+          "na_expect_storage_initialized");
+
+      assertEquals("different_cluster_id", layout1.getClusterID());
+      assertNotEquals(scmServerImpl.getClusterId(), layout1.getClusterID());
+      FileUtils.forceDelete(storageDir);
     }
   }
 
@@ -339,7 +369,7 @@ public class TestEndPoint {
       EndpointStateMachine.EndPointStates newState = versionTask.call();
       long end = Time.monotonicNow();
       scmServerImpl.setRpcResponseDelay(0);
-      Assertions.assertTrue(end - start <= rpcTimeout + tolerance);
+      assertThat(end - start).isLessThanOrEqualTo(rpcTimeout + tolerance);
       Assertions.assertEquals(EndpointStateMachine.EndPointStates.GETVERSION,
           newState);
     }
@@ -460,7 +490,7 @@ public class TestEndPoint {
     registerTaskHelper(serverAddress, 1000, false).close();
     long end = Time.monotonicNow();
     scmServerImpl.setRpcResponseDelay(0);
-    Assertions.assertTrue(end - start <= rpcTimeout + tolerance);
+    assertThat(end - start).isLessThanOrEqualTo(rpcTimeout + tolerance);
   }
 
   @Test
@@ -511,7 +541,7 @@ public class TestEndPoint {
       Map<Long, CommandStatus> map = stateContext.getCommandStatusMap();
       Assertions.assertNotNull(map);
       Assertions.assertEquals(1, map.size(), "Should have 1 objects");
-      Assertions.assertTrue(map.containsKey(3L));
+      assertThat(map).containsKey(3L);
       Assertions.assertEquals(Type.deleteBlocksCommand, map.get(3L).getType());
       Assertions.assertEquals(Status.PENDING, map.get(3L).getStatus());
 
@@ -612,7 +642,7 @@ public class TestEndPoint {
     long end = Time.monotonicNow();
     scmServerImpl.setRpcResponseDelay(0);
     // 6s is introduced by DeleteBlocksCommandHandler#stop
-    Assertions.assertTrue(end - start <= rpcTimeout + tolerance + 6000);
+    assertThat(end - start).isLessThanOrEqualTo(rpcTimeout + tolerance + 6000);
   }
 
   private OzoneContainer createVolume(OzoneConfiguration conf)
@@ -630,7 +660,7 @@ public class TestEndPoint {
     StorageVolume volume = volumeSet.getVolumesList().get(0);
 
     // Check instanceof and typecast
-    Assertions.assertTrue(volume instanceof HddsVolume);
+    assertInstanceOf(HddsVolume.class, volume);
     return ozoneContainer;
   }
 

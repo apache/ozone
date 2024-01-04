@@ -36,8 +36,8 @@ import java.nio.file.Paths;
 import java.util.UUID;
 import java.util.stream.Stream;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test for StorageVolume health checks using Real volume instances with
@@ -166,8 +166,8 @@ public class TestStorageVolumeHealthChecks {
     CONF.clear();
     DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
     // Make sure default values are not invalid.
-    assertTrue(dnConf.getVolumeIOFailureTolerance() <
-        dnConf.getVolumeIOTestCount());
+    assertThat(dnConf.getVolumeIOFailureTolerance())
+        .isLessThan(dnConf.getVolumeIOTestCount());
   }
 
   @Test

@@ -22,13 +22,13 @@ import com.google.common.primitives.Bytes;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
-import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.TestUtils;
 import org.apache.ozone.test.tag.Native;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Named;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -41,6 +41,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -62,10 +64,12 @@ import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LI
  */
 class TestManagedSSTDumpIterator {
 
+  @TempDir
+  private Path tempDir;
+
   private File createSSTFileWithKeys(
       TreeMap<Pair<String, Integer>, String> keys) throws Exception {
-    File file = File.createTempFile("tmp_sst_file", ".sst");
-    file.deleteOnExit();
+    File file = Files.createFile(tempDir.resolve("tmp_sst_file.sst")).toFile();
     try (ManagedEnvOptions envOptions = new ManagedEnvOptions();
          ManagedOptions managedOptions = new ManagedOptions();
          ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(
@@ -248,12 +252,12 @@ class TestManagedSSTDumpIterator {
   @ParameterizedTest
   @MethodSource("invalidPipeInputStreamBytes")
   public void testInvalidSSTDumpIteratorWithKeyFormat(byte[] inputBytes)
-      throws NativeLibraryNotLoadedException, ExecutionException,
+      throws ExecutionException,
       InterruptedException, IOException {
     ByteArrayInputStream byteArrayInputStream =
         new ByteArrayInputStream(inputBytes);
     ManagedSSTDumpTool tool = Mockito.mock(ManagedSSTDumpTool.class);
-    File file = File.createTempFile("tmp", ".sst");
+    File file = Files.createFile(tempDir.resolve("tmp_file.sst")).toFile();
     Future future = Mockito.mock(Future.class);
     Mockito.when(future.isDone()).thenReturn(false);
     Mockito.when(future.get()).thenReturn(0);

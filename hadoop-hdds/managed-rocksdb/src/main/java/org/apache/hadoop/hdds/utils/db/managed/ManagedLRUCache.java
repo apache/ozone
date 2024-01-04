@@ -18,19 +18,24 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.hadoop.hdds.utils.LeakTracker;
 import org.rocksdb.LRUCache;
+
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * Managed LRUCache.
  */
 public class ManagedLRUCache extends LRUCache {
+  private final LeakTracker leakTracker = track(this);
+
   public ManagedLRUCache(long capacity) {
     super(capacity);
   }
 
   @Override
-  protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
-    super.finalize();
+  public void close() {
+    super.close();
+    leakTracker.close();
   }
 }

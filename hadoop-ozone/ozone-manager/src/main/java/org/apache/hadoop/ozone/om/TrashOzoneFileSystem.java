@@ -86,12 +86,15 @@ public class TrashOzoneFileSystem extends FileSystem {
   private static final Logger LOG =
       LoggerFactory.getLogger(TrashOzoneFileSystem.class);
 
+  private final OzoneConfiguration ozoneConfiguration;
+
   public TrashOzoneFileSystem(OzoneManager ozoneManager) throws IOException {
     this.ozoneManager = ozoneManager;
     this.userName =
           UserGroupInformation.getCurrentUser().getShortUserName();
     this.runCount = new AtomicLong(0);
     setConf(ozoneManager.getConfiguration());
+    ozoneConfiguration = OzoneConfiguration.of(getConf());
   }
 
   private RaftClientRequest getRatisRequest(
@@ -156,8 +159,8 @@ public class TrashOzoneFileSystem extends FileSystem {
     ozoneManager.getMetrics().incNumTrashRenames();
     LOG.trace("Src:" + src + "Dst:" + dst);
     // check whether the src and dst belong to the same bucket & trashroot.
-    OFSPath srcPath = new OFSPath(src, OzoneConfiguration.of(getConf()));
-    OFSPath dstPath = new OFSPath(dst, OzoneConfiguration.of(getConf()));
+    OFSPath srcPath = new OFSPath(src, ozoneConfiguration);
+    OFSPath dstPath = new OFSPath(dst, ozoneConfiguration);
     OmBucketInfo bucket = ozoneManager.getBucketInfo(srcPath.getVolumeName(),
         srcPath.getBucketName());
     if (bucket.getBucketLayout().isFileSystemOptimized()) {
@@ -191,7 +194,7 @@ public class TrashOzoneFileSystem extends FileSystem {
   @Override
   public boolean delete(Path path, boolean b) throws IOException {
     ozoneManager.getMetrics().incNumTrashDeletes();
-    OFSPath srcPath = new OFSPath(path, OzoneConfiguration.of(getConf()));
+    OFSPath srcPath = new OFSPath(path, ozoneConfiguration);
     OmBucketInfo bucket = ozoneManager.getBucketInfo(srcPath.getVolumeName(),
         srcPath.getBucketName());
     if (bucket.getBucketLayout().isFileSystemOptimized()) {
@@ -283,7 +286,7 @@ public class TrashOzoneFileSystem extends FileSystem {
   }
 
   private OmKeyArgs constructOmKeyArgs(Path path) {
-    OFSPath ofsPath = new OFSPath(path, OzoneConfiguration.of(getConf()));
+    OFSPath ofsPath = new OFSPath(path, ozoneConfiguration);
     String volume = ofsPath.getVolumeName();
     String bucket = ofsPath.getBucketName();
     String key = ofsPath.getKeyName();
@@ -363,7 +366,7 @@ public class TrashOzoneFileSystem extends FileSystem {
         this.pathKey = addTrailingSlashIfNeeded(pathKey);
       }
       OFSPath fsPath = new OFSPath(pathKey,
-          OzoneConfiguration.of(getConf()));
+          ozoneConfiguration);
       keyIterator =
           getKeyIterator(fsPath.getVolumeName(), fsPath.getBucketName(),
               fsPath.getKeyName());
@@ -411,7 +414,7 @@ public class TrashOzoneFileSystem extends FileSystem {
       if (status.isDirectory()) {
         LOG.trace("Iterating directory: {}", pathKey);
         OFSPath ofsPath = new OFSPath(pathKey,
-            OzoneConfiguration.of(getConf()));
+            ozoneConfiguration);
         String ofsPathprefix =
             ofsPath.getNonKeyPathNoPrefixDelim() + OZONE_URI_DELIMITER;
         while (keyIterator.hasNext()) {
@@ -510,9 +513,9 @@ public class TrashOzoneFileSystem extends FileSystem {
       for (String keyPath : keyPathList) {
         String newPath = dstPath.concat(keyPath.substring(srcPath.length()));
         OFSPath src = new OFSPath(keyPath,
-            OzoneConfiguration.of(getConf()));
+            ozoneConfiguration);
         OFSPath dst = new OFSPath(newPath,
-            OzoneConfiguration.of(getConf()));
+            ozoneConfiguration);
 
         OzoneManagerProtocolProtos.OMRequest omRequest =
             getRenameKeyRequest(src, dst);
@@ -582,7 +585,7 @@ public class TrashOzoneFileSystem extends FileSystem {
       LOG.trace("Deleting keys: {}", keyPathList);
       for (String keyPath : keyPathList) {
         OFSPath path = new OFSPath(keyPath,
-            OzoneConfiguration.of(getConf()));
+            ozoneConfiguration);
         OzoneManagerProtocolProtos.OMRequest omRequest =
             getDeleteKeysRequest(path);
         try {

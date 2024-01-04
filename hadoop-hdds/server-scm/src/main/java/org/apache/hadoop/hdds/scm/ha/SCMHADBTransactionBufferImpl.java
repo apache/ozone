@@ -158,12 +158,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
           .get(TRANSACTION_INFO_KEY);
       if (latestTrxInfo == null) {
         // transaction table is empty
-        latestTrxInfo =
-            TransactionInfo
-                .builder()
-                .setTransactionIndex(-1)
-                .setCurrentTerm(0)
-                .build();
+        latestTrxInfo = TransactionInfo.DEFAULT_VALUE;
       }
       latestSnapshot.set(latestTrxInfo.toSnapshotInfo());
     } finally {

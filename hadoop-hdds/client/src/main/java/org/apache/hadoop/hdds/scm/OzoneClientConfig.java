@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -184,7 +185,7 @@ public class OzoneClientConfig {
   @Config(key = "exclude.nodes.expiry.time",
       defaultValue = "600000",
       description = "Time after which an excluded node is reconsidered for" +
-          " writes in EC. If the value is zero, the node is excluded for the" +
+          " writes. If the value is zero, the node is excluded for the" +
           " life of the client",
       tags = ConfigTag.CLIENT)
   private long excludeNodesExpiryTime = 10 * 60 * 1000;
@@ -254,6 +255,7 @@ public class OzoneClientConfig {
     return streamBufferFlushSize;
   }
 
+  @VisibleForTesting
   public void setStreamBufferFlushSize(long streamBufferFlushSize) {
     this.streamBufferFlushSize = streamBufferFlushSize;
   }
@@ -262,6 +264,7 @@ public class OzoneClientConfig {
     return streamBufferSize;
   }
 
+  @VisibleForTesting
   public void setStreamBufferSize(int streamBufferSize) {
     this.streamBufferSize = streamBufferSize;
   }
@@ -270,6 +273,7 @@ public class OzoneClientConfig {
     return streamBufferFlushDelay;
   }
 
+  @VisibleForTesting
   public void setStreamBufferFlushDelay(boolean streamBufferFlushDelay) {
     this.streamBufferFlushDelay = streamBufferFlushDelay;
   }
@@ -278,6 +282,7 @@ public class OzoneClientConfig {
     return streamBufferMaxSize;
   }
 
+  @VisibleForTesting
   public void setStreamBufferMaxSize(long streamBufferMaxSize) {
     this.streamBufferMaxSize = streamBufferMaxSize;
   }

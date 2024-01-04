@@ -18,17 +18,20 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.hadoop.hdds.utils.LeakTracker;
 import org.rocksdb.IngestExternalFileOptions;
+
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * Managed IngestExternalFileOptions.
  */
-public class ManagedIngestExternalFileOptions extends
-    IngestExternalFileOptions {
+public class ManagedIngestExternalFileOptions extends IngestExternalFileOptions {
+  private final LeakTracker leakTracker = track(this);
 
   @Override
-  protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
-    super.finalize();
+  public void close() {
+    super.close();
+    leakTracker.close();
   }
 }

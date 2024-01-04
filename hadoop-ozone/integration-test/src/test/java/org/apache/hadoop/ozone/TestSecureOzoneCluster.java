@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultApprover;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultProfile;
@@ -110,6 +111,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ACK_TIMEOUT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL;
@@ -147,6 +149,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_TRANSPORT_CLASS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_EXPIRED;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.USER_MISMATCH;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 
 import org.apache.ozone.test.LambdaTestUtils;
@@ -159,6 +162,7 @@ import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
+import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -173,6 +177,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -440,6 +445,27 @@ final class TestSecureOzoneCluster {
       ioException = assertThrows(IOException.class,
           scmRpcClient::forceExitSafeMode);
       assertTrue(ioException.getMessage().contains(cannotAuthMessage));
+    } finally {
+      if (scm != null) {
+        scm.stop();
+      }
+    }
+  }
+
+  @Test
+  public void testSecretManagerInitializedNonHASCM() throws Exception {
+    conf.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
+    initSCM();
+    scm = HddsTestUtils.getScmSimple(conf);
+    //Reads the SCM Info from SCM instance
+    try {
+      scm.start();
+
+      SecretKeyManager secretKeyManager = scm.getSecretKeyManager();
+      boolean inSafeMode = scm.getScmSafeModeManager().getInSafeMode();
+      Assert.assertTrue(!SCMHAUtils.isSCMHAEnabled(conf));
+      Assert.assertTrue(inSafeMode);
+      Assert.assertTrue(secretKeyManager.isInitialized());
     } finally {
       if (scm != null) {
         scm.stop();
@@ -814,21 +840,12 @@ final class TestSecureOzoneCluster {
           OmTransportFactory.create(conf, ugiNonAdmin, null),
           RandomStringUtils.randomAscii(5));
 
-      try {
-        omClientNonAdmin.getS3Secret("HADOOP/JOHN");
-        // Expected to fail because current ugi isn't an admin
-        fail("non-admin getS3Secret didn't fail as intended");
-      } catch (IOException ex) {
-        GenericTestUtils.assertExceptionContains("USER_MISMATCH", ex);
-      }
-
-      try {
-        omClientNonAdmin.revokeS3Secret("HADOOP/DOE");
-        // Expected to fail because current ugi isn't an admin
-        fail("non-admin revokeS3Secret didn't fail as intended");
-      } catch (IOException ex) {
-        GenericTestUtils.assertExceptionContains("USER_MISMATCH", ex);
-      }
+      OMException omException = assertThrows(OMException.class,
+          () -> omClientNonAdmin.getS3Secret("HADOOP/JOHN"));
+      assertSame(USER_MISMATCH, omException.getResult());
+      omException = assertThrows(OMException.class,
+          () -> omClientNonAdmin.revokeS3Secret("HADOOP/DOE"));
+      assertSame(USER_MISMATCH, omException.getResult());
 
     } finally {
       if (scm != null) {
@@ -1444,7 +1461,7 @@ final class TestSecureOzoneCluster {
         .setSubject(subject)
         .setDigitalSignature(true)
         .setDigitalEncryption(true);
-    
+
     addIpAndDnsDataToBuilder(csrBuilder);
     LocalDateTime start = LocalDateTime.now();
     Duration certDuration = conf.getDefaultCertDuration();

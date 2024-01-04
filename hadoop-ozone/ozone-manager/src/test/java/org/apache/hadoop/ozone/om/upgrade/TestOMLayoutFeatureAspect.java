@@ -19,8 +19,8 @@
 package org.apache.hadoop.ozone.om.upgrade;
 
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -75,8 +75,8 @@ public class TestOMLayoutFeatureAspect {
 
     OMException omException = assertThrows(OMException.class,
         () -> aspect.checkLayoutFeature(joinPoint));
-    assertTrue(omException.getMessage()
-        .contains("cannot be invoked before finalization"));
+    assertThat(omException.getMessage())
+        .contains("cannot be invoked before finalization");
   }
 
   @Test
@@ -97,7 +97,7 @@ public class TestOMLayoutFeatureAspect {
 
     OMException omException = assertThrows(OMException.class,
         () -> aspect.beforeRequestApplyTxn(joinPoint));
-    assertTrue(omException.getMessage()
-        .contains("cannot be invoked before finalization"));
+    assertThat(omException.getMessage())
+        .contains("cannot be invoked before finalization");
   }
 }

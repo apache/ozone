@@ -18,16 +18,20 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.hadoop.hdds.utils.LeakTracker;
 import org.rocksdb.BloomFilter;
+
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * Managed BloomFilter.
  */
 public class ManagedBloomFilter extends BloomFilter {
+  private final LeakTracker leakTracker = track(this);
 
   @Override
-  protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
-    super.finalize();
+  public void close() {
+    super.close();
+    leakTracker.close();
   }
 }

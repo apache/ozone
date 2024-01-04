@@ -33,7 +33,6 @@ import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -42,6 +41,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -124,17 +124,17 @@ public class TestOMVolumeSetOwnerResponse {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
 
-    Assertions.assertEquals(1,
+    assertEquals(1,
         omMetadataManager.countRowsInTable(omMetadataManager.getVolumeTable()));
 
     Table.KeyValue<String, OmVolumeArgs> keyValue =
         omMetadataManager.getVolumeTable().iterator().next();
 
-    Assertions.assertEquals(omMetadataManager.getVolumeKey(volumeName),
+    assertEquals(omMetadataManager.getVolumeKey(volumeName),
         keyValue.getKey());
-    Assertions.assertEquals(newOwnerVolumeArgs, keyValue.getValue());
+    assertEquals(newOwnerVolumeArgs, keyValue.getValue());
 
-    Assertions.assertEquals(volumeList,
+    assertEquals(volumeList,
         omMetadataManager.getUserTable().get(
             omMetadataManager.getUserKey(newOwner)));
   }
@@ -155,7 +155,7 @@ public class TestOMVolumeSetOwnerResponse {
     try {
       omVolumeSetOwnerResponse.checkAndUpdateDB(omMetadataManager,
           batchOperation);
-      Assertions.assertEquals(0, omMetadataManager.countRowsInTable(
+      assertEquals(0, omMetadataManager.countRowsInTable(
           omMetadataManager.getVolumeTable()));
     } catch (IOException ex) {
       fail("testAddToDBBatchFailure failed");

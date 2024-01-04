@@ -18,7 +18,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
   <modelVersion>4.0.0</modelVersion>
   <groupId>org.apache.ozone</groupId>
   <artifactId>ozone-main</artifactId>
-  <version>1.4.0-SNAPSHOT</version>
+  <version>1.5.0-SNAPSHOT</version>
   <description>Apache Ozone Main</description>
   <name>Apache Ozone Main</name>
   <packaging>pom</packaging>
@@ -62,23 +62,23 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
   </organization>
 
   <properties>
-    <hadoop2.version>2.7.3</hadoop2.version>
+    <hadoop2.version>2.10.2</hadoop2.version>
     <hadoop.version>3.3.6</hadoop.version>
 
     <!-- version for hdds/ozone components -->
     <hdds.version>${ozone.version}</hdds.version>
-    <ozone.version>1.4.0-SNAPSHOT</ozone.version>
-    <ozone.release>Hot Springs</ozone.release>
+    <ozone.version>1.5.0-SNAPSHOT</ozone.version>
+    <ozone.release>Indiana Dunes</ozone.release>
     <declared.hdds.version>${hdds.version}</declared.hdds.version>
     <declared.ozone.version>${ozone.version}</declared.ozone.version>
 
     <!-- HDDS Rocks Native dependency version-->
     <hdds.rocks.native.version>${hdds.version}</hdds.rocks.native.version>
     <!-- Apache Ratis version -->
-    <ratis.version>2.5.1</ratis.version>
+    <ratis.version>3.0.0</ratis.version>
 
     <!-- Apache Ratis thirdparty version -->
-    <ratis.thirdparty.version>1.0.4</ratis.thirdparty.version>
+    <ratis.thirdparty.version>1.0.5</ratis.thirdparty.version>
 
     <!-- Apache Ranger plugin version -->
     <ranger.version>2.3.0</ranger.version>
@@ -101,6 +101,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <release-year>2019</release-year>
 
     <failIfNoTests>false</failIfNoTests>
+    <surefire.failIfNoSpecifiedTests>false</surefire.failIfNoSpecifiedTests>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
     <jetty.version>9.4.53.v20231009</jetty.version>
     <java.dev.jna.version>5.2.0</java.dev.jna.version>
@@ -112,44 +113,44 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <testsThreadCount>4</testsThreadCount>
 
     <commons-beanutils.version>1.9.4</commons-beanutils.version>
-    <commons-cli.version>1.2</commons-cli.version>
+    <commons-cli.version>1.6.0</commons-cli.version>
     <commons-codec.version>1.15</commons-codec.version>
     <commons-collections.version>3.2.2</commons-collections.version>
-    <commons-compress.version>1.21</commons-compress.version>
+    <commons-compress.version>1.25.0</commons-compress.version>
     <commons-configuration2.version>2.1.1</commons-configuration2.version>
     <zstd-jni.version>1.5.2-5</zstd-jni.version>
     <commons-daemon.version>1.0.13</commons-daemon.version>
     <commons-io.version>2.11.0</commons-io.version>
-    <commons-lang3.version>3.7</commons-lang3.version>
+    <commons-lang3.version>3.14.0</commons-lang3.version>
     <commons-logging.version>1.2</commons-logging.version>
     <commons-logging-api.version>1.1</commons-logging-api.version>
     <commons-math3.version>3.1.1</commons-math3.version>
-    <commons-net.version>3.9.0</commons-net.version>
+    <commons-net.version>3.10.0</commons-net.version>
     <commons-pool2.version>2.6.0</commons-pool2.version>
     <commons-text.version>1.10.0</commons-text.version>
     <commons-validator.version>1.6</commons-validator.version>
     <commons-fileupload.version>1.5</commons-fileupload.version>
-    <download-maven-plugin.version>1.6.8</download-maven-plugin.version>
+    <download-maven-plugin.version>1.7.1</download-maven-plugin.version>
 
     <test.build.dir>${project.build.directory}/test-dir</test.build.dir>
     <test.build.data>${test.build.dir}</test.build.data>
 
     <java.security.egd>file:///dev/urandom</java.security.egd>
 
-    <annotation-api.version>1.2</annotation-api.version>
+    <annotation-api.version>1.3.2</annotation-api.version>
     <assertj.version>3.12.2</assertj.version>
     <asm.version>5.0.4</asm.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.67</bouncycastle.version>
-    <cglib.version>3.2.0</cglib.version>
+    <cglib.version>3.3.0</cglib.version>
     <derby.version>10.14.2.0</derby.version>
     <codahale-metrics.version>3.0.2</codahale-metrics.version>
     <dropwizard-metrics.version>3.2.4</dropwizard-metrics.version>
     <jacoco.version>0.8.5</jacoco.version>
     <javassist.version>3.21.0-GA</javassist.version>
-    <javax-activation.version>1.1.1</javax-activation.version>
-    <jaxb-api.version>2.3.0</jaxb-api.version>
-    <jaxb-runtime.version>2.3.0.1</jaxb-runtime.version>
+    <activation-api.version>1.2.2</activation-api.version>
+    <jaxb-api.version>2.3.3</jaxb-api.version>
+    <jaxb-runtime.version>2.3.9</jaxb-runtime.version>
     <jsch.version>0.1.54</jsch.version>
     <cdi-api.version>2.0</cdi-api.version>
     <servlet-api.version>3.1.0</servlet-api.version>
@@ -159,7 +160,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <!-- jersey version -->
     <jersey.version>1.19.4</jersey.version>
-    <jersey2.version>2.34</jersey2.version>
+    <jersey2.version>2.41</jersey2.version>
 
     <!-- jackson versions -->
     <jackson1.version>1.9.13</jackson1.version>
@@ -175,18 +176,18 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <!-- httpcomponents versions -->
     <httpclient.version>4.5.13</httpclient.version>
-    <httpcore.version>4.4.13</httpcore.version>
+    <httpcore.version>4.4.16</httpcore.version>
 
     <!-- SLF4J/LOG4J version -->
     <slf4j.version>1.7.36</slf4j.version>
     <log4j2.version>2.17.1</log4j2.version>
     <disruptor.version>3.4.2</disruptor.version>
-    <reload4j.version>1.2.22</reload4j.version>
+    <reload4j.version>1.2.25</reload4j.version>
 
-    <kotlin.version>1.6.21</kotlin.version>
+    <kotlin.version>1.9.22</kotlin.version>
     <metainf-services.version>1.8</metainf-services.version>
     <picocli.version>4.7.5</picocli.version>
-    <prometheus.version>0.7.0</prometheus.version>
+    <prometheus.version>0.16.0</prometheus.version>
     <reflections.version>0.9.11</reflections.version>
 
     <!-- com.google.re2j version -->
@@ -201,9 +202,8 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <findbugs.version>3.0.0</findbugs.version>
     <spotbugs.version>3.1.12</spotbugs.version>
     <dnsjava.version>2.1.7</dnsjava.version>
-    <jakarta.activation.version>1.2.2</jakarta.activation.version>
-    <okhttp3.version>4.9.3</okhttp3.version>
-    <stax2.version>4.2.1</stax2.version>
+    <okhttp3.version>4.12.0</okhttp3.version>
+    <stax2.version>4.2.2</stax2.version>
     <jakarta.inject.version>2.6.1</jakarta.inject.version>
     <jakarta.annotation.version>1.3.5</jakarta.annotation.version>
     <joda.time.version>2.12.5</joda.time.version>
@@ -216,16 +216,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <objenesis.version>1.0</objenesis.version>
     <okhttp.version>2.7.5</okhttp.version>
-    <okio.version>3.4.0</okio.version>
-    <mockito1-powermock.version>1.10.19</mockito1-powermock.version>
+    <okio.version>3.6.0</okio.version>
     <mockito2.version>3.5.9</mockito2.version>
     <hamcrest.version>1.3</hamcrest.version>
-    <powermock1.version>1.6.5</powermock1.version>
-    <powermock2.version>2.0.4</powermock2.version>
     <jmockit.version>1.24</jmockit.version>
     <junit4.version>4.13.1</junit4.version>
-    <junit.jupiter.version>5.8.2</junit.jupiter.version>
-    <junit.platform.version>1.8.2</junit.platform.version>
+    <junit5.version>5.10.1</junit5.version>
     <zookeeper.version>3.7.2</zookeeper.version>
 
     <!-- Maven protoc compiler -->
@@ -236,10 +232,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- Use netty version known to work with grpc-netty. See table: -->
     <!-- https://github.com/grpc/grpc-java/blob/master/SECURITY.md#netty -->
     <netty.version>4.1.100.Final</netty.version>
-    <io.grpc.version>1.51.1</io.grpc.version>
+    <io.grpc.version>1.58.0</io.grpc.version>
 
     <rocksdb.version>7.7.3</rocksdb.version>
-    <sqlite.version>3.41.2.2</sqlite.version>
+    <sqlite.version>3.44.1.0</sqlite.version>
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
 
     <!-- define the Java language version used by the compiler -->
@@ -257,21 +253,21 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- Plugin versions and config -->
     <maven-surefire-plugin.argLine>-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
     <unstable-test-groups>flaky | org.apache.ozone.test.FlakyTest | slow | org.apache.ozone.test.SlowTest | unhealthy | org.apache.ozone.test.UnhealthyTest</unstable-test-groups>
-    <maven-surefire-plugin.version>3.0.0-M5</maven-surefire-plugin.version>
+    <maven-surefire-plugin.version>3.2.2</maven-surefire-plugin.version>
     <maven-surefire-report-plugin.version>${maven-surefire-plugin.version}</maven-surefire-report-plugin.version>
     <maven-failsafe-plugin.version>${maven-surefire-plugin.version}</maven-failsafe-plugin.version>
 
     <maven-clean-plugin.version>3.3.2</maven-clean-plugin.version>
-    <maven-compiler-plugin.version>3.1</maven-compiler-plugin.version>
+    <maven-compiler-plugin.version>3.9.0</maven-compiler-plugin.version>
     <maven-install-plugin.version>3.1.1</maven-install-plugin.version>
     <maven-resources-plugin.version>3.1.0</maven-resources-plugin.version>
-    <maven-shade-plugin.version>3.4.1</maven-shade-plugin.version>
+    <maven-shade-plugin.version>3.5.1</maven-shade-plugin.version>
     <maven-jar-plugin.version>2.5</maven-jar-plugin.version>
-    <maven-war-plugin.version>3.1.0</maven-war-plugin.version>
-    <maven-source-plugin.version>2.3</maven-source-plugin.version>
+    <maven-war-plugin.version>3.4.0</maven-war-plugin.version>
+    <maven-source-plugin.version>3.3.0</maven-source-plugin.version>
     <maven-pdf-plugin.version>1.6.1</maven-pdf-plugin.version>
     <maven-remote-resources-plugin.version>1.5</maven-remote-resources-plugin.version>
-    <maven-enforcer-plugin.version>3.2.1</maven-enforcer-plugin.version>
+    <maven-enforcer-plugin.version>3.4.1</maven-enforcer-plugin.version>
     <maven-javadoc-plugin.version>3.0.1</maven-javadoc-plugin.version>
     <maven-assembly-plugin.version>3.6.0</maven-assembly-plugin.version>
     <apache-rat-plugin.version>0.12</apache-rat-plugin.version>
@@ -282,7 +278,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <exec-maven-plugin.version>1.3.1</exec-maven-plugin.version>
     <license-maven-plugin.version>2.3.0</license-maven-plugin.version>
     <make-maven-plugin.version>1.0-beta-1</make-maven-plugin.version>
-    <native-maven-plugin.version>1.0-alpha-8</native-maven-plugin.version>
+    <native-maven-plugin.version>1.0-alpha-11</native-maven-plugin.version>
     <maven-checkstyle-plugin.version>3.1.2</maven-checkstyle-plugin.version>
     <maven-site-plugin.version>3.9.1</maven-site-plugin.version>
     <maven-antrun-plugin.version>3.1.0</maven-antrun-plugin.version>
@@ -301,7 +297,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <aspectj.version>1.9.7</aspectj.version>
     <aspectj-plugin.version>1.14.0</aspectj-plugin.version>
-    <restrict-imports.enforcer.version>2.0.0</restrict-imports.enforcer.version>
+    <restrict-imports.enforcer.version>2.4.0</restrict-imports.enforcer.version>
     <awaitility.version>4.2.0</awaitility.version>
     <bzip2.version>1.0.8</bzip2.version>
     <zlib.version>1.2.13</zlib.version>
@@ -310,8 +306,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <zstd.version>1.4.9</zstd.version>
     <jgrapht.version>1.0.1</jgrapht.version>
 
+    <spring.version>5.3.27</spring.version>
+    <jooq.version>3.11.10</jooq.version>
+
     <vault.driver.version>5.1.0</vault.driver.version>
-    <java.uuid.generator.version>4.3.0</java.uuid.generator.version>
     <native.lib.tmp.dir></native.lib.tmp.dir>
   </properties>
 
@@ -808,11 +806,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${zstd-jni.version}</version>
       </dependency>
       <dependency>
-        <groupId>javax.activation</groupId>
-        <artifactId>activation</artifactId>
-        <version>${javax-activation.version}</version>
-      </dependency>
-      <dependency>
         <groupId>javax.annotation</groupId>
         <artifactId>javax.annotation-api</artifactId>
         <version>${annotation-api.version}</version>
@@ -1043,6 +1036,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${ratis.version}</version>
       </dependency>
       <dependency>
+        <artifactId>ratis-metrics-dropwizard3</artifactId>
+        <groupId>org.apache.ratis</groupId>
+        <version>${ratis.version}</version>
+      </dependency>
+      <dependency>
         <artifactId>ratis-netty</artifactId>
         <groupId>org.apache.ratis</groupId>
         <version>${ratis.version}</version>
@@ -1142,7 +1140,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>com.codahale.metrics</groupId>
         <artifactId>metrics-core</artifactId>
         <version>${codahale-metrics.version}</version>
-        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>com.lmax</groupId>
@@ -1163,6 +1160,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>junit</groupId>
         <artifactId>junit</artifactId>
         <version>${junit4.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>org.hamcrest</groupId>
+            <artifactId>hamcrest-core</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>org.jacoco</groupId>
@@ -1176,40 +1179,32 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${javassist.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter-api</artifactId>
-        <version>${junit.jupiter.version}</version>
-        <scope>test</scope>
+        <groupId>org.jooq</groupId>
+        <artifactId>jooq</artifactId>
+        <version>${jooq.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>javax.xml.bind</groupId>
+            <artifactId>jaxb-api</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter-migrationsupport</artifactId>
-        <version>${junit.jupiter.version}</version>
-        <scope>test</scope>
+        <groupId>org.jooq</groupId>
+        <artifactId>jooq-codegen</artifactId>
+        <version>${jooq.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter-engine</artifactId>
-        <version>${junit.jupiter.version}</version>
-        <scope>test</scope>
+        <groupId>org.jooq</groupId>
+        <artifactId>jooq-meta</artifactId>
+        <version>${jooq.version}</version>
       </dependency>
       <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter-params</artifactId>
-        <version>${junit.jupiter.version}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.junit.vintage</groupId>
-        <artifactId>junit-vintage-engine</artifactId>
-        <version>${junit.jupiter.version}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.junit.platform</groupId>
-        <artifactId>junit-platform-launcher</artifactId>
-        <version>${junit.platform.version}</version>
-        <scope>test</scope>
+        <groupId>org.junit</groupId>
+        <artifactId>junit-bom</artifactId>
+        <version>${junit5.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>commons-collections</groupId>
@@ -1263,6 +1258,17 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${slf4j.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-jdbc</artifactId>
+        <version>${spring.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-jcl</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
         <groupId>com.fasterxml.woodstox</groupId>
         <artifactId>woodstox-core</artifactId>
         <version>${woodstox.version}</version>
@@ -1278,43 +1284,26 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.hamcrest</groupId>
         <artifactId>hamcrest-all</artifactId>
         <version>${hamcrest.version}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.hamcrest</groupId>
-        <artifactId>hamcrest-core</artifactId>
-        <version>${hamcrest.version}</version>
-        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.jmockit</groupId>
         <artifactId>jmockit</artifactId>
         <version>${jmockit.version}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.mockito</groupId>
-        <artifactId>mockito-all</artifactId>
-        <version>${mockito1-powermock.version}</version>
-        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.mockito</groupId>
         <artifactId>mockito-core</artifactId>
         <version>${mockito2.version}</version>
-        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.mockito</groupId>
         <artifactId>mockito-junit-jupiter</artifactId>
         <version>${mockito2.version}</version>
-        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>com.google.testing.compile</groupId>
         <artifactId>compile-testing</artifactId>
         <version>${compile-testing.version}</version>
-        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.objenesis</groupId>
@@ -1382,13 +1371,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </dependency>
       <dependency>
         <groupId>org.jetbrains.kotlin</groupId>
-        <artifactId>kotlin-stdlib</artifactId>
+        <artifactId>kotlin-bom</artifactId>
         <version>${kotlin.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.jetbrains.kotlin</groupId>
-        <artifactId>kotlin-stdlib-common</artifactId>
-        <version>${kotlin.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
       </dependency>
       <dependency>
         <groupId>io.opentracing</groupId>
@@ -1399,6 +1385,20 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>io.prometheus</groupId>
         <artifactId>simpleclient_dropwizard</artifactId>
         <version>${prometheus.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>io.prometheus</groupId>
+            <artifactId>simpleclient_tracer_common</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>io.prometheus</groupId>
+            <artifactId>simpleclient_tracer_otel</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>io.prometheus</groupId>
+            <artifactId>simpleclient_tracer_otel_agent</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>io.prometheus</groupId>
@@ -1421,14 +1421,20 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${findbugs.version}</version>
       </dependency>
       <dependency>
-        <groupId>javax.xml.bind</groupId>
-        <artifactId>jaxb-api</artifactId>
+        <groupId>jakarta.xml.bind</groupId>
+        <artifactId>jakarta.xml.bind-api</artifactId>
         <version>${jaxb-api.version}</version>
       </dependency>
       <dependency>
         <groupId>org.glassfish.jaxb</groupId>
         <artifactId>jaxb-runtime</artifactId>
         <version>${jaxb-runtime.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>javax.xml.bind</groupId>
+            <artifactId>jaxb-api</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>com.sun.jersey</groupId>
@@ -1438,9 +1444,18 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
       <dependency>
         <groupId>org.bouncycastle</groupId>
+        <artifactId>bcprov-jdk15on</artifactId>
+        <version>${bouncycastle.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcpkix-jdk15on</artifactId>
+        <version>${bouncycastle.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
         <artifactId>bcprov-jdk16</artifactId>
         <version>${bouncycastle.version}</version>
-        <scope>test</scope>
       </dependency>
 
       <dependency>
@@ -1458,30 +1473,11 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.assertj</groupId>
         <artifactId>assertj-core</artifactId>
         <version>${assertj.version}</version>
-        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.jboss.weld.servlet</groupId>
         <artifactId>weld-servlet-shaded</artifactId>
         <version>${weld-servlet.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.powermock</groupId>
-        <artifactId>powermock-module-junit4</artifactId>
-        <version>${powermock2.version}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.powermock</groupId>
-        <artifactId>powermock-api-mockito</artifactId>
-        <version>${powermock1.version}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>org.powermock</groupId>
-        <artifactId>powermock-api-mockito2</artifactId>
-        <version>${powermock2.version}</version>
-        <scope>test</scope>
       </dependency>
       <dependency>
         <groupId>org.reflections</groupId>
@@ -1506,7 +1502,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       <dependency>
         <groupId>jakarta.activation</groupId>
         <artifactId>jakarta.activation-api</artifactId>
-        <version>${jakarta.activation.version}</version>
+        <version>${activation-api.version}</version>
       </dependency>
       <dependency>
         <groupId>com.squareup.okhttp3</groupId>
@@ -1572,12 +1568,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.mockito</groupId>
         <artifactId>mockito-inline</artifactId>
         <version>${mockito2.version}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>com.fasterxml.uuid</groupId>
-        <artifactId>java-uuid-generator</artifactId>
-        <version>${java.uuid.generator.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -1850,11 +1840,14 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                 <rules>
                   <restrictImports>
                     <includeTestCode>true</includeTestCode>
+                    <parseFullCompilationUnit>true</parseFullCompilationUnit>
                     <reason>Use JUnit5</reason>
                     <bannedImports>
-                      <bannedImport>org.junit.*</bannedImport>
-                      <bannedImport>static org.junit.*.*</bannedImport>
+                      <bannedImport>org.junit.**</bannedImport>
                     </bannedImports>
+                    <allowedImports>
+                      <allowedImport>org.junit.jupiter.**</allowedImport>
+                    </allowedImports>
                   </restrictImports>
                 </rules>
               </configuration>
@@ -2008,10 +2001,10 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             <require.test.libhadoop>${require.test.libhadoop}</require.test.libhadoop>
           </systemPropertyVariables>
           <properties>
-            <property>
-              <name>listener</name>
-              <value>org.apache.ozone.test.TimedOutTestsListener</value>
-            </property>
+            <configurationParameters>
+              junit.platform.output.capture.stdout = true
+              junit.platform.output.capture.stderr = true
+            </configurationParameters>
           </properties>
           <includes>
             <include>**/Test*.java</include>

@@ -18,16 +18,20 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.hadoop.hdds.utils.LeakTracker;
 import org.rocksdb.DBOptions;
+
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * Managed DBOptions.
  */
 public class ManagedDBOptions extends DBOptions {
+  private final LeakTracker leakTracker = track(this);
 
   @Override
-  protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
-    super.finalize();
+  public void close() {
+    super.close();
+    leakTracker.close();
   }
 }

@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -36,6 +35,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -60,7 +62,7 @@ public class TestSimpleContainerDownloader {
         tempDir, NO_COMPRESSION);
 
     //THEN
-    Assertions.assertEquals(datanodes.get(0).getUuidString(),
+    assertEquals(datanodes.get(0).getUuidString(),
         result.toString());
     downloader.verifyAllClientsClosed();
   }
@@ -82,7 +84,7 @@ public class TestSimpleContainerDownloader {
 
     //THEN
     //first datanode is failed, second worked
-    Assertions.assertEquals(datanodes.get(1).getUuidString(),
+    assertEquals(datanodes.get(1).getUuidString(),
         result.toString());
     downloader.verifyAllClientsClosed();
   }
@@ -103,7 +105,7 @@ public class TestSimpleContainerDownloader {
 
     //THEN
     //first datanode is failed, second worked
-    Assertions.assertEquals(datanodes.get(1).getUuidString(),
+    assertEquals(datanodes.get(1).getUuidString(),
         result.toString());
     downloader.verifyAllClientsClosed();
   }
@@ -132,7 +134,7 @@ public class TestSimpleContainerDownloader {
     }
 
     //there is 1/3^10_000 chance for false positive, which is practically 0.
-    Assertions.fail(
+    fail(
         "Datanodes are selected 10000 times but second datanode was never "
             + "used.");
     downloader.verifyAllClientsClosed();
@@ -213,7 +215,7 @@ public class TestSimpleContainerDownloader {
         long containerId, Path downloadPath) {
 
       DatanodeDetails datanode = datanodeRef.get();
-      Assertions.assertNotNull(datanode);
+      assertNotNull(datanode);
 
       if (failedDatanodes.contains(datanode)) {
         if (directException) {

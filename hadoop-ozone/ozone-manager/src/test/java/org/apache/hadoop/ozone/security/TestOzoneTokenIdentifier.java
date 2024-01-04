@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.security;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
@@ -58,7 +60,6 @@ import org.apache.hadoop.util.Time;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -295,7 +296,7 @@ public class TestOzoneTokenIdentifier {
     OzoneTokenIdentifier id2 = new OzoneTokenIdentifier();
 
     id2.readFields(dis);
-    Assertions.assertEquals(id, id2);
+    assertEquals(id, id2);
   }
 
 
@@ -327,7 +328,7 @@ public class TestOzoneTokenIdentifier {
     DataInputStream in = new DataInputStream(buf);
     OzoneTokenIdentifier idDecode = new OzoneTokenIdentifier();
     idDecode.readFields(in);
-    Assertions.assertEquals(idEncode, idDecode);
+    assertEquals(idEncode, idDecode);
   }
 
   @Test
@@ -342,9 +343,9 @@ public class TestOzoneTokenIdentifier {
     try {
       idRead =  idCodec.fromPersistedFormat(oldIdBytes);
     } catch (IOException ex) {
-      Assertions.fail("Should not fail to load old token format");
+      fail("Should not fail to load old token format");
     }
-    Assertions.assertEquals(idWrite, idRead,
+    assertEquals(idWrite, idRead,
         "Deserialize Serialized Token should equal.");
   }
 }

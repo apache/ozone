@@ -54,6 +54,7 @@ import org.apache.hadoop.hdds.scm.container.replication.health.OpenContainerHand
 import org.apache.hadoop.hdds.scm.container.replication.health.QuasiClosedContainerHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.RatisReplicationCheckHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.RatisUnhealthyReplicationCheckHandler;
+import org.apache.hadoop.hdds.scm.container.replication.health.VulnerableUnhealthyReplicasHandler;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
@@ -197,6 +198,8 @@ public class ReplicationManager implements SCMService {
   private final UnderReplicatedProcessor underReplicatedProcessor;
   private final OverReplicatedProcessor overReplicatedProcessor;
   private final HealthCheck containerCheckChain;
+  private final ReplicationQueue nullReplicationQueue =
+      new NullReplicationQueue();
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -243,7 +246,7 @@ public class ReplicationManager implements SCMService {
     this.ecMisReplicationCheckHandler =
         new ECMisReplicationCheckHandler(ecContainerPlacement);
     this.ratisReplicationCheckHandler =
-        new RatisReplicationCheckHandler(ratisContainerPlacement);
+        new RatisReplicationCheckHandler(ratisContainerPlacement, this);
     this.nodeManager = nodeManager;
     this.metrics = ReplicationManagerMetrics.create(this);
 
@@ -277,7 +280,8 @@ public class ReplicationManager implements SCMService {
         .addNext(ratisReplicationCheckHandler)
         .addNext(new ClosedWithUnhealthyReplicasHandler(this))
         .addNext(ecMisReplicationCheckHandler)
-        .addNext(new RatisUnhealthyReplicationCheckHandler());
+        .addNext(new RatisUnhealthyReplicationCheckHandler())
+        .addNext(new VulnerableUnhealthyReplicasHandler(this));
     start();
   }
 
@@ -840,6 +844,12 @@ public class ReplicationManager implements SCMService {
   protected void processContainer(ContainerInfo containerInfo,
       ReplicationQueue repQueue, ReplicationManagerReport report)
       throws ContainerNotFoundException {
+    processContainer(containerInfo, repQueue, report, false);
+  }
+
+  protected boolean processContainer(ContainerInfo containerInfo,
+      ReplicationQueue repQueue, ReplicationManagerReport report,
+      boolean readOnly) throws ContainerNotFoundException {
     synchronized (containerInfo) {
       ContainerID containerID = containerInfo.containerID();
       final boolean isEC = isEC(containerInfo.getReplicationConfig());
@@ -856,6 +866,7 @@ public class ReplicationManager implements SCMService {
           .setReport(report)
           .setPendingOps(pendingOps)
           .setReplicationQueue(repQueue)
+          .setReadOnly(readOnly)
           .build();
       // This will call the chain of container health handlers in turn which
       // will issue commands as needed, update the report and perhaps add
@@ -865,6 +876,7 @@ public class ReplicationManager implements SCMService {
         LOG.debug("Container {} had no actions after passing through the " +
             "check chain", containerInfo.containerID());
       }
+      return handled;
     }
   }
 
@@ -967,6 +979,25 @@ public class ReplicationManager implements SCMService {
     } else {
       return ratisReplicationCheckHandler.checkHealth(request);
     }
+  }
+
+  /**
+   * This method is used to check the container health status. It runs all the
+   * same checks ReplicationManager runs against a container to determine if it
+   * is under replicated or over replicated etc, but in a readOnly mode so no
+   * commands are sent. The passed in ReplicationManagerReport is updated and
+   * the caller can query it on return to see the results of the check.
+   * @param containerInfo The container to check
+   * @param report The instance of the replicationManager report to update with
+   *               the results of the check.
+   * @return True if the handler chain took action on the request or false other
+   *         wise. If the method returns false, then the container is deemed
+   *         healthy by replication manager.
+   */
+  public boolean checkContainerStatus(ContainerInfo containerInfo,
+      ReplicationManagerReport report) throws ContainerNotFoundException {
+    report.increment(containerInfo.getState());
+    return processContainer(containerInfo, nullReplicationQueue, report, true);
   }
 
   /**
