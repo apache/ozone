@@ -26,8 +26,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.Test;
@@ -50,10 +50,10 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class tests OzoneManagerDoubleBuffer implementation with
@@ -85,7 +85,6 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
         .setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
         .setmaxUnFlushedTransactionCount(10000)
         .enableRatis(true)
-        .setIndexToTerm((val) -> term)
         .build();
   }
 
@@ -114,21 +113,21 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
 
     for (int i = 0; i < bucketCount; i++) {
       doubleBuffer.add(createDummyBucketResponse(volumeName),
-          trxId.incrementAndGet());
+          TermIndex.valueOf(term, trxId.incrementAndGet()));
     }
     waitFor(() -> metrics.getTotalNumOfFlushedTransactions() == bucketCount,
         100, 60000);
 
-    assertTrue(metrics.getTotalNumOfFlushOperations() > 0);
+    assertThat(metrics.getTotalNumOfFlushOperations()).isGreaterThan(0);
     assertEquals(bucketCount, doubleBuffer.getFlushedTransactionCount());
-    assertTrue(metrics.getMaxNumberOfTransactionsFlushedInOneIteration() > 0);
+    assertThat(metrics.getMaxNumberOfTransactionsFlushedInOneIteration()).isGreaterThan(0);
     assertEquals(bucketCount, omMetadataManager.countRowsInTable(
         omMetadataManager.getBucketTable()));
-    assertTrue(doubleBuffer.getFlushIterations() > 0);
-    assertTrue(metrics.getFlushTime().lastStat().numSamples() > 0);
-    assertTrue(metrics.getAvgFlushTransactionsInOneIteration() > 0);
+    assertThat(doubleBuffer.getFlushIterations()).isGreaterThan(0);
+    assertThat(metrics.getFlushTime().lastStat().numSamples()).isGreaterThan(0);
+    assertThat(metrics.getAvgFlushTransactionsInOneIteration()).isGreaterThan(0);
     assertEquals(bucketCount, (long) metrics.getQueueSize().lastStat().total());
-    assertTrue(metrics.getQueueSize().lastStat().numSamples() > 0);
+    assertThat(metrics.getQueueSize().lastStat().numSamples()).isGreaterThan(0);
 
     // Assert there is only instance of OM Double Metrics.
     OzoneManagerDoubleBufferMetrics metricsCopy =
@@ -143,9 +142,8 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
         omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
     assertNotNull(transactionInfo);
 
-    Assertions.assertEquals(lastAppliedIndex,
-        transactionInfo.getTransactionIndex());
-    Assertions.assertEquals(term, transactionInfo.getTerm());
+    assertEquals(lastAppliedIndex, transactionInfo.getTransactionIndex());
+    assertEquals(term, transactionInfo.getTerm());
   }
 
   /**

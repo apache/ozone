@@ -35,13 +35,11 @@ import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.StatusException;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 import org.mockito.stubbing.OngoingStubbing;
 
 import java.io.EOFException;
@@ -92,7 +90,7 @@ public class TestBlockInputStream {
   @BeforeEach
   @SuppressWarnings("unchecked")
   public void setup() throws Exception {
-    refreshFunction = Mockito.mock(Function.class);
+    refreshFunction = mock(Function.class);
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     checksum = new Checksum(ChecksumType.NONE, CHUNK_SIZE);
     createChunkList(5);
@@ -376,7 +374,7 @@ public class TestBlockInputStream {
       subject.initialize();
 
       // WHEN
-      Assertions.assertThrows(ex.getClass(),
+      assertThrows(ex.getClass(),
           () -> subject.read(new byte[len], 0, len));
 
       // THEN

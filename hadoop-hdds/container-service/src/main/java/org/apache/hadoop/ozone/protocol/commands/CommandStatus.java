@@ -63,12 +63,22 @@ public class CommandStatus {
    *
    * @param status
    */
-  public void setStatus(Status status) {
+  private void setStatus(Status status) {
     this.status = status;
   }
 
-  public void setStatus(boolean cmdExecuted) {
-    setStatus(cmdExecuted ? Status.EXECUTED : Status.FAILED);
+  /**
+   * Marks the command status as executed.
+   */
+  public void markAsExecuted() {
+    setStatus(Status.EXECUTED);
+  }
+
+  /**
+   * Marks the command status as failed.
+   */
+  public void markAsFailed() {
+    setStatus(Status.FAILED);
   }
 
   /**

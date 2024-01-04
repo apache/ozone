@@ -54,6 +54,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /**
  * Test for PipelineStateManagerImpl.
  */
@@ -118,7 +120,7 @@ public class TestPipelineStateManagerImpl {
         () -> stateManager.addPipeline(createDummyPipeline(0)
             .getProtobufMessage(ClientVersion.CURRENT_VERSION)));
     // replication factor and number of nodes in the pipeline do not match
-    Assertions.assertTrue(e.getMessage().contains("do not match"));
+    assertThat(e.getMessage()).contains("do not match");
 
     // add a pipeline
     Pipeline pipeline = createDummyPipeline(1);
@@ -131,7 +133,7 @@ public class TestPipelineStateManagerImpl {
       // Cannot add a pipeline twice
       e = Assertions.assertThrows(SCMException.class,
           () -> stateManager.addPipeline(pipelineProto));
-      Assertions.assertTrue(e.getMessage().contains("Duplicate pipeline ID"));
+      assertThat(e.getMessage()).contains("Duplicate pipeline ID");
 
       // verify pipeline returned is same
       Assertions.assertEquals(pipeline.getId(),
@@ -324,7 +326,7 @@ public class TestPipelineStateManagerImpl {
       Assertions.fail("Container should not have been added");
     } catch (IOException e) {
       // Can not add a container to removed pipeline
-      Assertions.assertTrue(e.getMessage().contains("not found"));
+      assertThat(e.getMessage()).contains("not found");
     }
   }
 
@@ -344,7 +346,7 @@ public class TestPipelineStateManagerImpl {
       Assertions.fail("Pipeline should not have been removed");
     } catch (IOException e) {
       // can not remove a pipeline which already has containers
-      Assertions.assertTrue(e.getMessage().contains("not yet closed"));
+      assertThat(e.getMessage()).contains("not yet closed");
     }
 
     // close the pipeline

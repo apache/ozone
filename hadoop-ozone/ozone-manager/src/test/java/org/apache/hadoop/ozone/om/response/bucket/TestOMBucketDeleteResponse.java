@@ -19,12 +19,12 @@
 
 package org.apache.hadoop.ozone.om.response.bucket;
 
+import static org.junit.jupiter.api.Assertions.assertNull;
 import java.nio.file.Path;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -103,6 +103,9 @@ public class TestOMBucketDeleteResponse {
 
     Assertions.assertNull(omMetadataManager.getBucketTable().get(
         omMetadataManager.getBucketKey(volumeName, bucketName)));
+    
+    assertNull(omMetadataManager.getBucketTable().get(
+            omMetadataManager.getBucketKey(volumeName, bucketName)));
   }
 
 }

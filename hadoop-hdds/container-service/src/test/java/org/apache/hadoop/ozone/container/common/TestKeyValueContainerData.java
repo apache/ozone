@@ -26,11 +26,9 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
 
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -53,12 +51,7 @@ public class TestKeyValueContainerData {
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 
-  private static Iterable<Object[]> versionInfo() {
-    return ContainerTestVersionInfo.versionParameters();
-  }
-
-  @ParameterizedTest
-  @MethodSource("versionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testKeyValueData(ContainerTestVersionInfo versionInfo) {
     initVersionInfo(versionInfo);
     long containerId = 1L;
@@ -71,7 +64,7 @@ public class TestKeyValueContainerData {
     AtomicLong val = new AtomicLong(0);
     UUID pipelineId = UUID.randomUUID();
     UUID datanodeId = UUID.randomUUID();
-    HddsVolume vol = Mockito.mock(HddsVolume.class);
+    HddsVolume vol = mock(HddsVolume.class);
 
     KeyValueContainerData kvData = new KeyValueContainerData(containerId,
         layout,

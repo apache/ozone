@@ -15,484 +15,477 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <parent>
-        <artifactId>hdds</artifactId>
-        <groupId>org.apache.ozone</groupId>
-        <version>1.5.0-SNAPSHOT</version>
-    </parent>
-    <modelVersion>4.0.0</modelVersion>
-    <name>Apache Ozone HDDS RocksDB Tools</name>
-    <artifactId>hdds-rocks-native</artifactId>
+  <parent>
+    <artifactId>hdds</artifactId>
+    <groupId>org.apache.ozone</groupId>
+    <version>1.5.0-SNAPSHOT</version>
+  </parent>
+  <modelVersion>4.0.0</modelVersion>
+  <name>Apache Ozone HDDS RocksDB Tools</name>
+  <artifactId>hdds-rocks-native</artifactId>
 
-    <dependencies>
-        <dependency>
-            <groupId>org.apache.ozone</groupId>
-            <artifactId>hdds-test-utils</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.ozone</groupId>
-            <artifactId>hdds-managed-rocksdb</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-io</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-api</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-params</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-junit-jupiter</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-inline</artifactId>
-            <scope>test</scope>
-        </dependency>
-    </dependencies>
-    <properties>
-        <allow.junit4>false</allow.junit4>
+  <dependencies>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-managed-rocksdb</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty</groupId>
+      <artifactId>jetty-io</artifactId>
+    </dependency>
 
-        <maven.compiler.source>8</maven.compiler.source>
-        <maven.compiler.target>8</maven.compiler.target>
-    </properties>
+    <!-- Test dependencies -->
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-hadoop-dependency-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-test-utils</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-inline</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+  <properties>
+    <allow.junit4>false</allow.junit4>
 
-    <build>
+    <maven.compiler.source>8</maven.compiler.source>
+    <maven.compiler.target>8</maven.compiler.target>
+  </properties>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-maven-plugin</artifactId>
+        <configuration>
+          <excludeFilterFile>${basedir}/dev-support/findbugsExcludeFile.xml</excludeFilterFile>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+  <profiles>
+    <profile>
+      <id>cpu-count</id>
+      <activation>
+        <property>
+          <name>!system.numCores</name>
+        </property>
+      </activation>
+      <build>
         <plugins>
-            <plugin>
-                <groupId>com.github.spotbugs</groupId>
-                <artifactId>spotbugs-maven-plugin</artifactId>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>build-helper-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>get-cpu-count</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>cpu-count</goal>
+                </goals>
                 <configuration>
-                    <excludeFilterFile>${basedir}/dev-support/findbugsExcludeFile.xml</excludeFilterFile>
+                  <cpuCount>system.numCores</cpuCount>
                 </configuration>
-            </plugin>
+              </execution>
+            </executions>
+          </plugin>
         </plugins>
-    </build>
-    <profiles>
-        <profile>
-            <id>cpu-count</id>
-            <activation>
-                <property>
-                    <name>!system.numCores</name>
-                </property>
-            </activation>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>build-helper-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>get-cpu-count</id>
-                                <phase>generate-sources</phase>
-                                <goals>
-                                    <goal>cpu-count</goal>
-                                </goals>
-                                <configuration>
-                                    <cpuCount>system.numCores</cpuCount>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-        <profile>
-            <id>rocks_tools_native</id>
-            <activation>
-                <property>
-                    <name>rocks_tools_native</name>
-                </property>
-            </activation>
-            <properties>
-                <cmake.standards>20</cmake.standards>
-                <sstDump.include>true</sstDump.include>
-            </properties>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>com.googlecode.maven-download-plugin</groupId>
-                        <artifactId>download-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>rocksdb source download</id>
-                                <phase>generate-sources</phase>
-                                <goals>
-                                    <goal>wget</goal>
-                                </goals>
-                                <configuration>
-                                    <url>https://github.com/facebook/rocksdb/archive/refs/tags/v${rocksdb.version}.tar.gz</url>
-                                    <outputFileName>rocksdb-v${rocksdb.version}.tar.gz</outputFileName>
-                                    <outputDirectory>${project.build.directory}/rocksdb</outputDirectory>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>zlib source download</id>
-                                <phase>generate-sources</phase>
-                                <goals>
-                                    <goal>wget</goal>
-                                </goals>
-                                <configuration>
-                                    <url>https://zlib.net/fossils/zlib-${zlib.version}.tar.gz</url>
-                                    <outputFileName>zlib-${zlib.version}.tar.gz</outputFileName>
-                                    <outputDirectory>${project.build.directory}/zlib</outputDirectory>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>bzip2 source download</id>
-                                <phase>generate-sources</phase>
-                                <goals>
-                                    <goal>wget</goal>
-                                </goals>
-                                <configuration>
-                                    <url>https://sourceware.org/pub/bzip2/bzip2-${bzip2.version}.tar.gz</url>
-                                    <outputFileName>bzip2-v${bzip2.version}.tar.gz</outputFileName>
-                                    <outputDirectory>${project.build.directory}/bzip2</outputDirectory>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>lz4 source download</id>
-                                <phase>generate-sources</phase>
-                                <goals>
-                                    <goal>wget</goal>
-                                </goals>
-                                <configuration>
-                                    <url>https://github.com/lz4/lz4/archive/refs/tags/v${lz4.version}.tar.gz</url>
-                                    <outputFileName>lz4-v${lz4.version}.tar.gz</outputFileName>
-                                    <outputDirectory>${project.build.directory}/lz4</outputDirectory>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>snappy source download</id>
-                                <phase>generate-sources</phase>
-                                <goals>
-                                    <goal>wget</goal>
-                                </goals>
-                                <configuration>
-                                    <url>https://github.com/google/snappy/archive/refs/tags/${snappy.version}.tar.gz</url>
-                                    <outputFileName>snappy-v${snappy.version}.tar.gz</outputFileName>
-                                    <outputDirectory>${project.build.directory}/snappy</outputDirectory>
-                                </configuration>
-                            </execution>
-                            <execution>
-                                <id>zstd source download</id>
-                                <phase>generate-sources</phase>
-                                <goals>
-                                    <goal>wget</goal>
-                                </goals>
-                                <configuration>
-                                    <url>https://github.com/facebook/zstd/archive/refs/tags/v${zstd.version}.tar.gz</url>
-                                    <outputFileName>zstd-v${zstd.version}.tar.gz</outputFileName>
-                                    <outputDirectory>${project.build.directory}/zstd</outputDirectory>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-patch-plugin</artifactId>
-                        <version>1.1.1</version>
-                        <configuration>
-                            <patchFile>${basedir}/src/main/patches/rocks-native.patch</patchFile>
-                            <strip>1</strip>
-                            <targetDirectory>${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}</targetDirectory>
-                        </configuration>
-                        <executions>
-                            <execution>
-                                <id>patch</id>
-                                <phase>process-sources</phase>
-                                <goals>
-                                    <goal>apply</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <artifactId>maven-antrun-plugin</artifactId>
-                        <version>${maven-antrun-plugin.version}</version>
-                        <executions>
-                            <execution>
-                                <id>unzip-artifact</id>
-                                <phase>generate-sources</phase>
-                                <configuration>
-                                    <target>
-                                        <untar src="${project.build.directory}/rocksdb/rocksdb-v${rocksdb.version}.tar.gz" compression="gzip" dest="${project.build.directory}/rocksdb/" />
-                                        <untar src="${project.build.directory}/zlib/zlib-${zlib.version}.tar.gz" compression="gzip" dest="${project.build.directory}/zlib/" />
-                                        <untar src="${project.build.directory}/bzip2/bzip2-v${bzip2.version}.tar.gz" compression="gzip" dest="${project.build.directory}/bzip2/" />
-                                        <untar src="${project.build.directory}/lz4/lz4-v${lz4.version}.tar.gz" compression="gzip" dest="${project.build.directory}/lz4/" />
-                                        <untar src="${project.build.directory}/snappy/snappy-v${snappy.version}.tar.gz" compression="gzip" dest="${project.build.directory}/snappy/" />
-                                        <untar src="${project.build.directory}/zstd/zstd-v${zstd.version}.tar.gz" compression="gzip" dest="${project.build.directory}/zstd/" />
-                                    </target>
-                                </configuration>
-                                <goals>
-                                    <goal>run</goal>
-                                </goals>
-                            </execution>
-                            <execution>
-                                <id>build-zlib</id>
-                                <phase>process-sources</phase>
-                                <configuration>
-                                    <target>
-                                        <chmod file="${project.build.directory}/zlib/zlib-${zlib.version}/configure" perm="775" />
-                                        <exec executable="./configure" dir="${project.build.directory}/zlib/zlib-${zlib.version}" failonerror="true">
-                                            <arg line="--static"/>
-                                            <env key="CFLAGS" value="-fPIC"/>
-                                        </exec>
-                                        <exec executable="make" dir="${project.build.directory}/zlib/zlib-${zlib.version}" failonerror="true"/>
-                                    </target>
-                                </configuration>
-                                <goals>
-                                    <goal>run</goal>
-                                </goals>
-                            </execution>
-                            <execution>
-                                <id>build-bzip2</id>
-                                <phase>process-sources</phase>
-                                <configuration>
-                                    <target>
-                                        <exec executable="make" dir="${project.build.directory}/bzip2/bzip2-${bzip2.version}" failonerror="true">
-                                            <arg line="CFLAGS='-fPIC'"/>
-                                        </exec>
-                                    </target>
-                                </configuration>
-                                <goals>
-                                    <goal>run</goal>
-                                </goals>
-                            </execution>
-                            <execution>
-                                <id>build-lz4</id>
-                                <phase>process-sources</phase>
-                                <configuration>
-                                    <target>
-                                        <exec executable="make" dir="${project.build.directory}/lz4/lz4-${lz4.version}" failonerror="true">
-                                            <arg line="CFLAGS='-fPIC'"/>
-                                        </exec>
-                                    </target>
-                                </configuration>
-                                <goals>
-                                    <goal>run</goal>
-                                </goals>
-                            </execution>
-                            <execution>
-                                <id>build-zstd</id>
-                                <phase>process-sources</phase>
-                                <configuration>
-                                    <target>
-                                        <exec executable="make" dir="${project.build.directory}/zstd/zstd-${zstd.version}" failonerror="true">
-                                            <arg line="CFLAGS='-fPIC'"/>
-                                        </exec>
-                                    </target>
-                                </configuration>
-                                <goals>
-                                    <goal>run</goal>
-                                </goals>
-                            </execution>
-                            <execution>
-                                <id>build-snappy</id>
-                                <phase>process-sources</phase>
-                                <configuration>
-                                    <target>
-                                        <mkdir dir="${project.build.directory}/snappy/lib"/>
-                                        <exec executable="cmake" failonerror="true" dir="${project.build.directory}/snappy/lib">
-                                            <arg line="${project.build.directory}/snappy/snappy-${snappy.version}"/>
-                                            <env key="CFLAGS" value="-fPIC"/>
-                                            <env key="CXXFLAGS" value="-fPIC"/>
-                                        </exec>
-                                        <exec executable="make" dir="${project.build.directory}/snappy/lib" failonerror="true"/>
-                                    </target>
-                                </configuration>
-                                <goals>
-                                    <goal>run</goal>
-                                </goals>
-                            </execution>
-                            <execution>
-                                <id>build-rocksjava</id>
-                                <phase>generate-resources</phase>
-                                <configuration>
-                                    <target>
-                                        <exec executable="chmod" failonerror="true">
-                                            <arg line="-R"/>
-                                            <arg line="775"/>
-                                            <arg line="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}"/>
-                                        </exec>
-                                        <exec executable="make" dir="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}" failonerror="true">
-                                            <arg line="DEBUG_LEVEL=0"/>
-                                            <arg line="EXTRA_CXXFLAGS='-fPIC -I${project.build.directory}/snappy/lib -I${project.build.directory}/snappy/snappy-${snappy.version} -I${project.build.directory}/lz4/lz4-${lz4.version}/lib -I${project.build.directory}/zstd/zstd-${zstd.version}/lib -I${project.build.directory}/zstd/zstd-${zstd.version}/lib/dictBuilder -I${project.build.directory}/bzip2/bzip2-${bzip2.version} -I${project.build.directory}/zlib/zlib-${zlib.version}'"/>
-                                            <arg line="EXTRA_LDFLAGS='-L${project.build.directory}/snappy/lib -L${project.build.directory}/lz4/lz4-${lz4.version}/lib -L${project.build.directory}/zstd/zstd-${zstd.version}/lib -L${project.build.directory}/bzip2/bzip2-${bzip2.version} -L${project.build.directory}/zlib/zlib-${zlib.version}'"/>
-                                            <arg line="-j${system.numCores}"/>
-                                            <arg line="tools"/>
-                                        </exec>
-                                    </target>
-                                </configuration>
-                                <goals>
-                                    <goal>run</goal>
-                                </goals>
-                            </execution>
-                            <execution>
-                                <id>build-rocks-tools</id>
-                                <phase>process-classes</phase>
-                                <configuration>
-                                    <target>
-                                        <mkdir dir="${project.build.directory}/native/rocksdb"/>
-                                        <exec executable="cmake" failonerror="true" dir="${project.build.directory}/native/rocksdb">
-                                            <env key="CFLAGS" value="-fPIC"/>
-                                            <env key="CXXFLAGS" value="-fPIC"/>
-                                            <arg line="${basedir}/src"/>
-                                            <arg line="-DGENERATED_JAVAH=${project.build.directory}/native/javah"/>
-                                            <arg line="-DNATIVE_DIR=${basedir}/src/main/native"/>
-                                            <arg line="-DSST_DUMP_INCLUDE=${sstDump.include}"/>
-                                            <arg line="-DCMAKE_STANDARDS=${cmake.standards}"/>
-                                            <arg line="-DROCKSDB_HEADERS=${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}/include"/>
-                                            <arg line="-DROCKSDB_LIB=${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}"/>
-                                            <arg line="-DZLIB_LIB=${project.build.directory}/zlib/zlib-${zlib.version}"/>
-                                            <arg line="-DBZIP2_LIB=${project.build.directory}/bzip2/bzip2-${bzip2.version}"/>
-                                            <arg line="-DLZ4_LIB=${project.build.directory}/lz4/lz4-${lz4.version}/lib"/>
-                                            <arg line="-DSNAPPY_LIB=${project.build.directory}/snappy/lib"/>
-                                            <arg line="-DZSTD_LIB=${project.build.directory}/zstd/zstd-${zstd.version}/lib"/>
-                                        </exec>
-                                        <exec executable="make" dir="${project.build.directory}/native/rocksdb" failonerror="true"/>
-                                    </target>
-                                </configuration>
-                                <goals>
-                                    <goal>run</goal>
-                                </goals>
-                            </execution>
-                            <execution>
-                                <id>copy-lib-file</id>
-                                <phase>process-classes</phase>
-                                <configuration>
-                                    <target>
-                                        <copy toDir="${project.build.outputDirectory}">
-                                            <fileset dir="${project.build.directory}/native/rocksdb" includes="**/lib*.*" />
-                                        </copy>
-                                    </target>
-                                </configuration>
-                                <goals>
-                                    <goal>run</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-jar-plugin</artifactId>
-                        <version>${maven-jar-plugin.version}</version>
-                        <configuration>
-                            <includes>
-                                <include>**/*.class</include>
-                                <include>**/lib*.dylib</include>
-                                <include>**/lib*.so</include>
-                                <include>**/lib*.jnilib</include>
-                                <include>**/lib*.dll</include>
-                            </includes>
-                        </configuration>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-surefire-plugin</artifactId>
-                        <configuration>
-                            <groups>native</groups>
-                            <argLine>${maven-surefire-plugin.argLine} @{argLine} -Djava.library.path=${project.build.directory}/native/rocksdb</argLine>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-        <profile>
-            <id>java-8</id>
-            <activation>
-                <jdk>1.8</jdk>
-                <property>
-                    <name>rocks_tools_native</name>
-                </property>
-            </activation>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>native-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <phase>compile</phase>
-                                <goals>
-                                    <goal>javah</goal>
-                                </goals>
-                                <configuration>
-                                    <javahPath>${env.JAVA_HOME}/bin/javah</javahPath>
-                                    <javahClassNames>
-                                        <javahClassName>org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool</javahClassName>
-                                        <javahClassName>org.apache.hadoop.hdds.utils.db.managed.PipeInputStream</javahClassName>
-                                    </javahClassNames>
-                                    <javahOutputDirectory>${project.build.directory}/native/javah</javahOutputDirectory>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-        <profile>
-            <id>java-11</id>
-            <activation>
-                <jdk>[11,]</jdk>
-                <property>
-                    <name>rocks_tools_native</name>
-                </property>
-            </activation>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-dependency-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>copy-jars</id>
-                                <phase>process-sources</phase>
-                                <goals>
-                                    <goal>copy-dependencies</goal>
-                                </goals>
-                                <configuration>
-                                    <outputDirectory>${project.build.directory}/dependency</outputDirectory>
-                                    <includeScope>runtime</includeScope>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
+      </build>
+    </profile>
+    <profile>
+      <id>rocks_tools_native</id>
+      <activation>
+        <property>
+          <name>rocks_tools_native</name>
+        </property>
+      </activation>
+      <properties>
+        <cmake.standards>20</cmake.standards>
+        <sstDump.include>true</sstDump.include>
+      </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>com.googlecode.maven-download-plugin</groupId>
+            <artifactId>download-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>rocksdb source download</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>wget</goal>
+                </goals>
+                <configuration>
+                  <url>https://github.com/facebook/rocksdb/archive/refs/tags/v${rocksdb.version}.tar.gz</url>
+                  <outputFileName>rocksdb-v${rocksdb.version}.tar.gz</outputFileName>
+                  <outputDirectory>${project.build.directory}/rocksdb</outputDirectory>
+                </configuration>
+              </execution>
+              <execution>
+                <id>zlib source download</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>wget</goal>
+                </goals>
+                <configuration>
+                  <url>https://zlib.net/fossils/zlib-${zlib.version}.tar.gz</url>
+                  <outputFileName>zlib-${zlib.version}.tar.gz</outputFileName>
+                  <outputDirectory>${project.build.directory}/zlib</outputDirectory>
+                </configuration>
+              </execution>
+              <execution>
+                <id>bzip2 source download</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>wget</goal>
+                </goals>
+                <configuration>
+                  <url>https://sourceware.org/pub/bzip2/bzip2-${bzip2.version}.tar.gz</url>
+                  <outputFileName>bzip2-v${bzip2.version}.tar.gz</outputFileName>
+                  <outputDirectory>${project.build.directory}/bzip2</outputDirectory>
+                </configuration>
+              </execution>
+              <execution>
+                <id>lz4 source download</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>wget</goal>
+                </goals>
+                <configuration>
+                  <url>https://github.com/lz4/lz4/archive/refs/tags/v${lz4.version}.tar.gz</url>
+                  <outputFileName>lz4-v${lz4.version}.tar.gz</outputFileName>
+                  <outputDirectory>${project.build.directory}/lz4</outputDirectory>
+                </configuration>
+              </execution>
+              <execution>
+                <id>snappy source download</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>wget</goal>
+                </goals>
+                <configuration>
+                  <url>https://github.com/google/snappy/archive/refs/tags/${snappy.version}.tar.gz</url>
+                  <outputFileName>snappy-v${snappy.version}.tar.gz</outputFileName>
+                  <outputDirectory>${project.build.directory}/snappy</outputDirectory>
+                </configuration>
+              </execution>
+              <execution>
+                <id>zstd source download</id>
+                <phase>generate-sources</phase>
+                <goals>
+                  <goal>wget</goal>
+                </goals>
+                <configuration>
+                  <url>https://github.com/facebook/zstd/archive/refs/tags/v${zstd.version}.tar.gz</url>
+                  <outputFileName>zstd-v${zstd.version}.tar.gz</outputFileName>
+                  <outputDirectory>${project.build.directory}/zstd</outputDirectory>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-patch-plugin</artifactId>
+            <version>1.1.1</version>
+            <configuration>
+              <patchFile>${basedir}/src/main/patches/rocks-native.patch</patchFile>
+              <strip>1</strip>
+              <targetDirectory>${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}</targetDirectory>
+            </configuration>
+            <executions>
+              <execution>
+                <id>patch</id>
+                <phase>process-sources</phase>
+                <goals>
+                  <goal>apply</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <version>${maven-antrun-plugin.version}</version>
+            <executions>
+              <execution>
+                <id>unzip-artifact</id>
+                <phase>generate-sources</phase>
+                <configuration>
+                  <target>
+                    <untar src="${project.build.directory}/rocksdb/rocksdb-v${rocksdb.version}.tar.gz" compression="gzip" dest="${project.build.directory}/rocksdb/" />
+                    <untar src="${project.build.directory}/zlib/zlib-${zlib.version}.tar.gz" compression="gzip" dest="${project.build.directory}/zlib/" />
+                    <untar src="${project.build.directory}/bzip2/bzip2-v${bzip2.version}.tar.gz" compression="gzip" dest="${project.build.directory}/bzip2/" />
+                    <untar src="${project.build.directory}/lz4/lz4-v${lz4.version}.tar.gz" compression="gzip" dest="${project.build.directory}/lz4/" />
+                    <untar src="${project.build.directory}/snappy/snappy-v${snappy.version}.tar.gz" compression="gzip" dest="${project.build.directory}/snappy/" />
+                    <untar src="${project.build.directory}/zstd/zstd-v${zstd.version}.tar.gz" compression="gzip" dest="${project.build.directory}/zstd/" />
+                  </target>
+                </configuration>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+              </execution>
+              <execution>
+                <id>build-zlib</id>
+                <phase>process-sources</phase>
+                <configuration>
+                  <target>
+                    <chmod file="${project.build.directory}/zlib/zlib-${zlib.version}/configure" perm="775" />
+                    <exec executable="./configure" dir="${project.build.directory}/zlib/zlib-${zlib.version}" failonerror="true">
+                      <arg line="--static"/>
+                      <env key="CFLAGS" value="-fPIC"/>
+                    </exec>
+                    <exec executable="make" dir="${project.build.directory}/zlib/zlib-${zlib.version}" failonerror="true"/>
+                  </target>
+                </configuration>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+              </execution>
+              <execution>
+                <id>build-bzip2</id>
+                <phase>process-sources</phase>
+                <configuration>
+                  <target>
+                    <exec executable="make" dir="${project.build.directory}/bzip2/bzip2-${bzip2.version}" failonerror="true">
+                      <arg line="CFLAGS='-fPIC'"/>
+                    </exec>
+                  </target>
+                </configuration>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+              </execution>
+              <execution>
+                <id>build-lz4</id>
+                <phase>process-sources</phase>
+                <configuration>
+                  <target>
+                    <exec executable="make" dir="${project.build.directory}/lz4/lz4-${lz4.version}" failonerror="true">
+                      <arg line="CFLAGS='-fPIC'"/>
+                    </exec>
+                  </target>
+                </configuration>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+              </execution>
+              <execution>
+                <id>build-zstd</id>
+                <phase>process-sources</phase>
+                <configuration>
+                  <target>
+                    <exec executable="make" dir="${project.build.directory}/zstd/zstd-${zstd.version}" failonerror="true">
+                      <arg line="CFLAGS='-fPIC'"/>
+                    </exec>
+                  </target>
+                </configuration>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+              </execution>
+              <execution>
+                <id>build-snappy</id>
+                <phase>process-sources</phase>
+                <configuration>
+                  <target>
+                    <mkdir dir="${project.build.directory}/snappy/lib"/>
+                    <exec executable="cmake" failonerror="true" dir="${project.build.directory}/snappy/lib">
+                      <arg line="${project.build.directory}/snappy/snappy-${snappy.version}"/>
+                      <env key="CFLAGS" value="-fPIC"/>
+                      <env key="CXXFLAGS" value="-fPIC"/>
+                    </exec>
+                    <exec executable="make" dir="${project.build.directory}/snappy/lib" failonerror="true"/>
+                  </target>
+                </configuration>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+              </execution>
+              <execution>
+                <id>build-rocksjava</id>
+                <phase>generate-resources</phase>
+                <configuration>
+                  <target>
+                    <exec executable="chmod" failonerror="true">
+                      <arg line="-R"/>
+                      <arg line="775"/>
+                      <arg line="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}"/>
+                    </exec>
+                    <exec executable="make" dir="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}" failonerror="true">
+                      <arg line="DEBUG_LEVEL=0"/>
+                      <arg line="EXTRA_CXXFLAGS='-fPIC -I${project.build.directory}/snappy/lib -I${project.build.directory}/snappy/snappy-${snappy.version} -I${project.build.directory}/lz4/lz4-${lz4.version}/lib -I${project.build.directory}/zstd/zstd-${zstd.version}/lib -I${project.build.directory}/zstd/zstd-${zstd.version}/lib/dictBuilder -I${project.build.directory}/bzip2/bzip2-${bzip2.version} -I${project.build.directory}/zlib/zlib-${zlib.version}'"/>
+                      <arg line="EXTRA_LDFLAGS='-L${project.build.directory}/snappy/lib -L${project.build.directory}/lz4/lz4-${lz4.version}/lib -L${project.build.directory}/zstd/zstd-${zstd.version}/lib -L${project.build.directory}/bzip2/bzip2-${bzip2.version} -L${project.build.directory}/zlib/zlib-${zlib.version}'"/>
+                      <arg line="-j${system.numCores}"/>
+                      <arg line="tools"/>
+                    </exec>
+                  </target>
+                </configuration>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+              </execution>
+              <execution>
+                <id>build-rocks-tools</id>
+                <phase>process-classes</phase>
+                <configuration>
+                  <target>
+                    <mkdir dir="${project.build.directory}/native/rocksdb"/>
+                    <exec executable="cmake" failonerror="true" dir="${project.build.directory}/native/rocksdb">
+                      <env key="CFLAGS" value="-fPIC"/>
+                      <env key="CXXFLAGS" value="-fPIC"/>
+                      <arg line="${basedir}/src"/>
+                      <arg line="-DGENERATED_JAVAH=${project.build.directory}/native/javah"/>
+                      <arg line="-DNATIVE_DIR=${basedir}/src/main/native"/>
+                      <arg line="-DSST_DUMP_INCLUDE=${sstDump.include}"/>
+                      <arg line="-DCMAKE_STANDARDS=${cmake.standards}"/>
+                      <arg line="-DROCKSDB_HEADERS=${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}/include"/>
+                      <arg line="-DROCKSDB_LIB=${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}"/>
+                      <arg line="-DZLIB_LIB=${project.build.directory}/zlib/zlib-${zlib.version}"/>
+                      <arg line="-DBZIP2_LIB=${project.build.directory}/bzip2/bzip2-${bzip2.version}"/>
+                      <arg line="-DLZ4_LIB=${project.build.directory}/lz4/lz4-${lz4.version}/lib"/>
+                      <arg line="-DSNAPPY_LIB=${project.build.directory}/snappy/lib"/>
+                      <arg line="-DZSTD_LIB=${project.build.directory}/zstd/zstd-${zstd.version}/lib"/>
+                    </exec>
+                    <exec executable="make" dir="${project.build.directory}/native/rocksdb" failonerror="true"/>
+                  </target>
+                </configuration>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+              </execution>
+              <execution>
+                <id>copy-lib-file</id>
+                <phase>process-classes</phase>
+                <configuration>
+                  <target>
+                    <copy toDir="${project.build.outputDirectory}">
+                      <fileset dir="${project.build.directory}/native/rocksdb" includes="**/lib*.*" />
+                    </copy>
+                  </target>
+                </configuration>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-jar-plugin</artifactId>
+            <version>${maven-jar-plugin.version}</version>
+            <configuration>
+              <includes>
+                <include>**/*.class</include>
+                <include>**/lib*.dylib</include>
+                <include>**/lib*.so</include>
+                <include>**/lib*.jnilib</include>
+                <include>**/lib*.dll</include>
+              </includes>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <groups>native</groups>
+              <argLine>${maven-surefire-plugin.argLine} @{argLine} -Djava.library.path=${project.build.directory}/native/rocksdb</argLine>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>java-8</id>
+      <activation>
+        <jdk>1.8</jdk>
+        <property>
+          <name>rocks_tools_native</name>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>native-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <phase>compile</phase>
+                <goals>
+                  <goal>javah</goal>
+                </goals>
+                <configuration>
+                  <javahPath>${env.JAVA_HOME}/bin/javah</javahPath>
+                  <javahClassNames>
+                    <javahClassName>org.apache.hadoop.hdds.utils.db.managed.ManagedSSTDumpTool</javahClassName>
+                    <javahClassName>org.apache.hadoop.hdds.utils.db.managed.PipeInputStream</javahClassName>
+                  </javahClassNames>
+                  <javahOutputDirectory>${project.build.directory}/native/javah</javahOutputDirectory>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>java-11</id>
+      <activation>
+        <jdk>[11,]</jdk>
+        <property>
+          <name>rocks_tools_native</name>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-dependency-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>copy-jars</id>
+                <phase>process-sources</phase>
+                <goals>
+                  <goal>copy-dependencies</goal>
+                </goals>
+                <configuration>
+                  <outputDirectory>${project.build.directory}/dependency</outputDirectory>
+                  <includeScope>runtime</includeScope>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
 
-                    <plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>exec-maven-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>javach</id>
-                                <goals>
-                                    <goal>exec</goal>
-                                </goals>
-                                <phase>compile</phase>
-                                <configuration>
-                                    <executable>${env.JAVA_HOME}/bin/javac</executable>
-                                    <arguments>
-                                        <argument>-cp</argument>
-                                        <argument>${project.build.outputDirectory}:${project.build.directory}/dependency/*</argument>
-                                        <argument>-h</argument>
-                                        <argument>${project.build.directory}/native/javah</argument>
-                                        <argument>${project.basedir}/src/main/java/org/apache/hadoop/hdds/utils/db/managed/ManagedSSTDumpTool.java</argument>
-                                        <argument>${project.basedir}/src/main/java/org/apache/hadoop/hdds/utils/db/managed/PipeInputStream.java</argument>
-                                    </arguments>
-                                </configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>javach</id>
+                <goals>
+                  <goal>exec</goal>
+                </goals>
+                <phase>compile</phase>
+                <configuration>
+                  <executable>${env.JAVA_HOME}/bin/javac</executable>
+                  <arguments>
+                    <argument>-cp</argument>
+                    <argument>${project.build.outputDirectory}:${project.build.directory}/dependency/*</argument>
+                    <argument>-h</argument>
+                    <argument>${project.build.directory}/native/javah</argument>
+                    <argument>${project.basedir}/src/main/java/org/apache/hadoop/hdds/utils/db/managed/ManagedSSTDumpTool.java</argument>
+                    <argument>${project.basedir}/src/main/java/org/apache/hadoop/hdds/utils/db/managed/PipeInputStream.java</argument>
+                  </arguments>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>

@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.
-        StorageContainerLocationProtocolClientSideTranslatorPB;
+    StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -41,31 +41,22 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Rule;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.
-        OZONE_SCM_STALENODE_INTERVAL;
+    OZONE_SCM_STALENODE_INTERVAL;
 
 /**
  * This class tests the 2 way commit in Ratis.
  */
+@Timeout(300)
 public class Test2WayCommitInRatis {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
-
   private MiniOzoneCluster cluster;
   private OzoneClient client;
   private ObjectStore objectStore;
@@ -93,9 +84,9 @@ public class Test2WayCommitInRatis {
 
     // Make sure the pipeline does not get destroyed quickly
     conf.setTimeDuration(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL,
-            60, TimeUnit.SECONDS);
+        60, TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 60000,
-            TimeUnit.SECONDS);
+        TimeUnit.SECONDS);
     DatanodeRatisServerConfig ratisServerConfig =
         conf.getObject(DatanodeRatisServerConfig.class);
     ratisServerConfig.setRequestTimeOut(Duration.ofSeconds(3));
@@ -154,8 +145,8 @@ public class Test2WayCommitInRatis {
             HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
     XceiverClientSpi xceiverClient = clientManager
         .acquireClient(container1.getPipeline());
-    Assert.assertEquals(1, xceiverClient.getRefcount());
-    Assert.assertEquals(container1.getPipeline(),
+    Assertions.assertEquals(1, xceiverClient.getRefcount());
+    Assertions.assertEquals(container1.getPipeline(),
         xceiverClient.getPipeline());
     Pipeline pipeline = xceiverClient.getPipeline();
     XceiverClientRatis ratisClient = (XceiverClientRatis) xceiverClient;
@@ -164,7 +155,7 @@ public class Test2WayCommitInRatis {
             container1.getContainerInfo().getContainerID(),
             xceiverClient.getPipeline()));
     reply.getResponse().get();
-    Assert.assertEquals(3, ratisClient.getCommitInfoMap().size());
+    Assertions.assertEquals(3, ratisClient.getCommitInfoMap().size());
     // wait for the container to be created on all the nodes
     xceiverClient.watchForCommit(reply.getLogIndex());
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
@@ -181,10 +172,10 @@ public class Test2WayCommitInRatis {
     xceiverClient.watchForCommit(reply.getLogIndex());
 
     // commitInfo Map will be reduced to 2 here
-    Assert.assertEquals(2, ratisClient.getCommitInfoMap().size());
+    Assertions.assertEquals(2, ratisClient.getCommitInfoMap().size());
     clientManager.releaseClient(xceiverClient, false);
-    Assert.assertTrue(logCapturer.getOutput().contains("3 way commit failed"));
-    Assert
+    Assertions.assertTrue(logCapturer.getOutput().contains("3 way commit failed"));
+    Assertions
         .assertTrue(logCapturer.getOutput().contains("Committed by majority"));
     logCapturer.stopCapturing();
     shutdown();

@@ -113,6 +113,7 @@ public class ContainerHealthResult {
     private boolean hasUnReplicatedOfflineIndexes = false;
     private boolean offlineIndexesOkAfterPending = false;
     private int requeueCount = 0;
+    private boolean hasVulnerableUnhealthy = false;
 
     public UnderReplicatedHealthResult(ContainerInfo containerInfo,
         int remainingRedundancy, boolean dueToOutOfService,
@@ -267,6 +268,14 @@ public class ContainerHealthResult {
 
     public boolean isMissing() {
       return isMissing;
+    }
+
+    public void setHasVulnerableUnhealthy(boolean hasVulnerableUnhealthy) {
+      this.hasVulnerableUnhealthy = hasVulnerableUnhealthy;
+    }
+
+    public boolean hasVulnerableUnhealthy() {
+      return hasVulnerableUnhealthy;
     }
 
     @Override

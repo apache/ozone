@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -83,13 +84,16 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicasWithSameOrigin;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.getNoNodesTestPlacementPolicy;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 
 /**
@@ -443,6 +447,63 @@ public class TestReplicationManager {
     assertEquals(0, repQueue.overReplicatedQueueSize());
   }
 
+  @Test
+  public void testQuasiClosedContainerWithVulnerableUnhealthyReplica()
+      throws IOException, NodeNotFoundException {
+    RatisReplicationConfig ratisRepConfig =
+        RatisReplicationConfig.getInstance(THREE);
+    long sequenceID = 10;
+    ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
+        HddsProtos.LifeCycleState.QUASI_CLOSED, sequenceID);
+
+    // this method creates replicas with same origin id and zero sequence id
+    Set<ContainerReplica> replicas =
+        createReplicasWithSameOrigin(container.containerID(),
+            ContainerReplicaProto.State.QUASI_CLOSED, 0, 0, 0);
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, ContainerReplicaProto.State.UNHEALTHY, sequenceID));
+    ContainerReplica decommissioning =
+        createContainerReplica(container.containerID(), 0, DECOMMISSIONING,
+            ContainerReplicaProto.State.UNHEALTHY, sequenceID);
+    replicas.add(decommissioning);
+    storeContainerAndReplicas(container, replicas);
+    Mockito.when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
+        .thenAnswer(invocation -> {
+          DatanodeDetails dn = invocation.getArgument(0);
+          if (dn.equals(decommissioning.getDatanodeDetails())) {
+            return new NodeStatus(DECOMMISSIONING, HddsProtos.NodeState.HEALTHY);
+          }
+
+          return NodeStatus.inServiceHealthy();
+        });
+
+    replicationManager.processContainer(container, repQueue, repReport);
+    assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    assertEquals(1, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+
+    Mockito.when(ratisPlacementPolicy.chooseDatanodes(anyList(), anyList(), eq(null), eq(1), anyLong(),
+        anyLong())).thenAnswer(invocation -> ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()));
+    Mockito.when(nodeManager.getTotalDatanodeCommandCounts(any(DatanodeDetails.class), any(), any()))
+        .thenAnswer(invocation -> {
+          Map<SCMCommandProto.Type, Integer> map = new HashMap<>();
+          map.put(SCMCommandProto.Type.replicateContainerCommand, 0);
+          map.put(SCMCommandProto.Type.reconstructECContainersCommand, 0);
+          return map;
+        });
+    RatisUnderReplicationHandler handler =
+        new RatisUnderReplicationHandler(ratisPlacementPolicy, configuration, replicationManager);
+
+    handler.processAndSendCommands(replicas, Collections.emptyList(), repQueue.dequeueUnderReplicatedContainer(), 2);
+    assertEquals(1, commandsSent.size());
+    Pair<UUID, SCMCommand<?>> command = commandsSent.iterator().next();
+    assertEquals(SCMCommandProto.Type.replicateContainerCommand, command.getValue().getType());
+    assertEquals(decommissioning.getDatanodeDetails().getUuid(), command.getKey());
+  }
+
   /**
    * When there is Quasi Closed Replica with incorrect sequence id
    * for a Closed container, it's treated as unhealthy and deleted.
@@ -518,7 +579,7 @@ public class TestReplicationManager {
 
     boolean result = replicationManager.checkContainerStatus(
         container, repReport);
-    assertEquals(false, result);
+    assertFalse(result);
   }
 
   @Test
@@ -546,7 +607,7 @@ public class TestReplicationManager {
         container, repReport);
     assertEquals(1, repReport.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(true, result);
+    assertTrue(result);
   }
 
   /**
@@ -1154,12 +1215,12 @@ public class TestReplicationManager {
     }
     assertEquals(2, cmdTargets.size());
     for (DatanodeDetails dn : targetNodes) {
-      assertTrue(cmdTargets.contains(dn));
+      assertThat(cmdTargets).contains(dn);
     }
 
     assertEquals(2, cmdIndexes.size());
     for (int i : missingIndexes) {
-      assertTrue(cmdIndexes.contains(i));
+      assertThat(cmdIndexes).contains(i);
     }
     assertEquals(1, replicationManager.getMetrics()
         .getEcReconstructionCmdsSentTotal());
@@ -1534,7 +1595,7 @@ public class TestReplicationManager {
     assertEquals(1, excluded.size());
     // dn 3 was at the limit already, so should be added when filtering the
     // nodes
-    assertTrue(excluded.contains(dn3));
+    assertThat(excluded).contains(dn3);
 
     // Trigger an update for dn3, but it should stay in the excluded list as its
     // count is still at the limit.
@@ -1556,7 +1617,7 @@ public class TestReplicationManager {
     excluded = replicationManager.getExcludedNodes();
     assertEquals(1, excluded.size());
     // dn 2 reached the limit from the reconstruction command
-    assertTrue(excluded.contains(dn2));
+    assertThat(excluded).contains(dn2);
 
     // Update received for DN2, it should be cleared from the excluded list.
     replicationManager.datanodeCommandCountUpdated(dn2);

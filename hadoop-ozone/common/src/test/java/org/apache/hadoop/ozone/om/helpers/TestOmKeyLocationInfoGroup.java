@@ -16,12 +16,13 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test OmKeyLocationInfoGroup.
@@ -33,8 +34,8 @@ public class TestOmKeyLocationInfoGroup {
     OmKeyLocationInfoGroup testInstance = createTestInstance();
     List<OmKeyLocationInfo> latestList =
         testInstance.getBlocksLatestVersionOnly();
-    Assertions.assertEquals(1, latestList.size());
-    Assertions.assertEquals(2, latestList.get(0).getCreateVersion());
+    assertEquals(1, latestList.size());
+    assertEquals(2, latestList.get(0).getCreateVersion());
   }
 
   @Test
@@ -42,7 +43,7 @@ public class TestOmKeyLocationInfoGroup {
     OmKeyLocationInfoGroup testInstance = createTestInstance();
     Collection<OmKeyLocationInfo> list = testInstance.getLocationList(
         1L);
-    Assertions.assertEquals(2, list.size());
+    assertEquals(2, list.size());
   }
 
   @Test
@@ -51,9 +52,9 @@ public class TestOmKeyLocationInfoGroup {
     List<OmKeyLocationInfo> locationInfoList = createLocationList();
     OmKeyLocationInfoGroup newInstance =
         testInstance.generateNextVersion(locationInfoList);
-    Assertions.assertEquals(1, newInstance.getLocationList().size());
+    assertEquals(1, newInstance.getLocationList().size());
     // createTestInstance is of version 2, nextVersion should be 3
-    Assertions.assertEquals(3, newInstance.getVersion());
+    assertEquals(3, newInstance.getVersion());
 
   }
 
