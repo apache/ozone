@@ -67,29 +67,29 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
       description = "Format output as JSON")
   private boolean json;
 
+  // TODO: Use {@link org.apache.hadoop.ozone.shell.ListOptions}?
   @CommandLine.Option(
-      names = {"-p", "--path"},
-      description = "Show only open files under this path.",
-      defaultValue = "/",
-      hidden = false
+      names = {"-p", "--prefix"},
+      description = "Filter results by the specified path on the server side.",
+      defaultValue = "/"
   )
-  private String path;
+  private String pathPrefix;
 
   @CommandLine.Option(
-      names = {"-n"},
-      description = "Numerical limit of open files/keys to return.",
-      defaultValue = "1000",
-      hidden = false
+      names = {"-l", "--length"},
+      description = "Maximum number of items to list",
+      defaultValue = "100"
   )
-  private long count;
+  private long limit;
 
   @CommandLine.Option(
-      names = {"-t", "--token"},  // TODO: Conform to Ozone CLI convention
-      description = "Previous/last file/key path as the continuation token.",
-      defaultValue = "",
-      hidden = false
+      names = {"-s", "--start"},
+      description = "The item to start the listing from.\n" +
+          "i.e. continuation token. " +
+          "This will be excluded from the result.",
+      defaultValue = ""
   )
-  private String cToken;
+  private String startItem;
 
   @Override
   public Void call() throws Exception {
@@ -103,7 +103,7 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
         parent.createOmClient(omServiceId, omHost, false);
 
     ListOpenFilesResult res =
-        ozoneManagerClient.listOpenFiles(path, count, cToken);
+        ozoneManagerClient.listOpenFiles(pathPrefix, limit, startItem);
 
     if (json) {
       // Print detailed JSON
@@ -128,11 +128,11 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
 
     // TODO: Conform to HDFS style output
     String msg = res.getGlobalTotal() + " global open files (estimated). " +
-        "Showing " + openFileList.size() + " open files (limit " + count + ") " +
-        "under path prefix:\n  " + path;
+        "Showing " + openFileList.size() + " open files (limit " + limit + ") " +
+        "under path prefix:\n  " + pathPrefix;
 
-    if (cToken != null && !cToken.isEmpty()) {
-      msg += "\nafter continuation token:\n  " + cToken;
+    if (startItem != null && !startItem.isEmpty()) {
+      msg += "\nafter continuation token:\n  " + startItem;
     }
     msg += "\nClient ID\t\tPath";
     System.out.println(msg);
@@ -170,11 +170,11 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
     if (json) {
       nextBatchCmd += " --json";
     }
-    nextBatchCmd += " -n " + count;
-    if (!path.isEmpty()) {
-      nextBatchCmd += " -p " + path;
+    nextBatchCmd += " -n " + limit;
+    if (!pathPrefix.isEmpty()) {
+      nextBatchCmd += " -p " + pathPrefix;
     }
-    if (!cToken.isEmpty()) {
+    if (!startItem.isEmpty()) {
       nextBatchCmd += " -t " + lastElementFullPath;
     }
     return nextBatchCmd;

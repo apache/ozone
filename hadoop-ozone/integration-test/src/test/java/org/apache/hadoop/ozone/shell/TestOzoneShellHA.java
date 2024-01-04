@@ -557,9 +557,10 @@ public class TestOzoneShellHA {
     final String volumeName = "volumelof";
 
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
-//    final String hostPrefix = OZONE_OFS_URI_SCHEME + "://localhost:9862";
     OzoneConfiguration clientConf =
         getClientConfForOFS(hostPrefix, cluster.getConf());
+//    final String hostPrefix = OZONE_OFS_URI_SCHEME + "://localhost:9862";
+//    OzoneConfiguration clientConf =
 //        getClientConfForOFS(hostPrefix, new OzoneConfiguration());
     FileSystem fs = FileSystem.get(clientConf);
 
@@ -579,8 +580,11 @@ public class TestOzoneShellHA {
           "-p", "/volumelof/buck1"};
       // TODO: Possible to make this work under volume level as well?
       execute(ozoneAdminShell, args);
-      // Check result
+      // Verify that result has key1
+
     }
+
+    // TODO: Test with hsync
 
     // TODO: Test pagination
 

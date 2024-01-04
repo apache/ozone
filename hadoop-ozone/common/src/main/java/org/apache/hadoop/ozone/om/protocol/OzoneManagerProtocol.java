@@ -409,6 +409,7 @@ public interface OzoneManagerProtocol
 
   ServiceInfoEx getServiceInfo() throws IOException;
 
+  // TODO: Rename arg list
   ListOpenFilesResult listOpenFiles(String path, long maxKeys, String contToken)
       throws IOException;
 
