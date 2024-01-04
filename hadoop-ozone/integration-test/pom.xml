@@ -261,6 +261,11 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <groupId>org.slf4j</groupId>
       <artifactId>jul-to-slf4j</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.awaitility</groupId>
+      <artifactId>awaitility</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
