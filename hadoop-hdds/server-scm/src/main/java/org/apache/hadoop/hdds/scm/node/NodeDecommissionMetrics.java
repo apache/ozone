@@ -71,6 +71,7 @@ public final class NodeDecommissionMetrics implements MetricsSource {
     private long underReplicatedContainers = 0;
     private String host = "";
     private long pipelinesWaitingToClose = 0;
+    private long startTime = 0;
 
     private static final MetricsInfo HOST_UNDER_REPLICATED = Interns.info(
         "UnderReplicatedDN",
@@ -94,16 +95,22 @@ public final class NodeDecommissionMetrics implements MetricsSource {
     private static final MetricsInfo HOST_UNCLOSED_CONTAINERS = Interns.info("UnclosedContainersDN",
         "Number of containers not fully closed for host in decommissioning and maintenance mode");
 
+    private static final MetricsInfo HOST_START_TIME = Interns.info("StartTimeDN",
+        "Time at which decommissioning was started");
+
+
     public ContainerStateInWorkflow(String host,
                                     long sufficiently,
                                     long under,
                                     long unclosed,
-                                    long pipelinesToClose) {
+                                    long pipelinesToClose,
+                                    long startTime) {
       this.host = host;
       sufficientlyReplicated = sufficiently;
       underReplicatedContainers = under;
       unclosedContainers = unclosed;
       pipelinesWaitingToClose = pipelinesToClose;
+      this.startTime = startTime;
     }
 
     public String getHost() {
@@ -124,6 +131,10 @@ public final class NodeDecommissionMetrics implements MetricsSource {
 
     public long getUnclosedContainers() {
       return unclosedContainers;
+    }
+
+    public long getStartTime() {
+      return startTime;
     }
   }
 
@@ -179,7 +190,9 @@ public final class NodeDecommissionMetrics implements MetricsSource {
           .addGauge(ContainerStateInWorkflow.HOST_SUFFICIENTLY_REPLICATED,
               e.getValue().getSufficientlyReplicated())
           .addGauge(ContainerStateInWorkflow.HOST_UNCLOSED_CONTAINERS,
-              e.getValue().getUnclosedContainers());
+              e.getValue().getUnclosedContainers())
+          .addGauge(ContainerStateInWorkflow.HOST_START_TIME,
+              e.getValue().getStartTime());
     }
     recordBuilder.endRecord();
   }

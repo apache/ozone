@@ -25,8 +25,10 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 
 import org.hamcrest.MatcherAssert;
 import org.hamcrest.Matchers;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test cases to test ReportPublisherFactory.
@@ -39,9 +41,9 @@ public class TestReportPublisherFactory {
     ReportPublisherFactory factory = new ReportPublisherFactory(conf);
     ReportPublisher publisher = factory
         .getPublisherFor(ContainerReportsProto.class);
-    Assertions.assertEquals(
+    assertEquals(
         ContainerReportPublisher.class, publisher.getClass());
-    Assertions.assertEquals(conf, publisher.getConf());
+    assertEquals(conf, publisher.getConf());
   }
 
   @Test
@@ -50,8 +52,8 @@ public class TestReportPublisherFactory {
     ReportPublisherFactory factory = new ReportPublisherFactory(conf);
     ReportPublisher publisher = factory
         .getPublisherFor(NodeReportProto.class);
-    Assertions.assertEquals(NodeReportPublisher.class, publisher.getClass());
-    Assertions.assertEquals(conf, publisher.getConf());
+    assertEquals(NodeReportPublisher.class, publisher.getClass());
+    assertEquals(conf, publisher.getConf());
   }
 
   @Test
@@ -60,16 +62,16 @@ public class TestReportPublisherFactory {
     ReportPublisherFactory factory = new ReportPublisherFactory(conf);
     ReportPublisher publisher = factory
         .getPublisherFor(CRLStatusReport.class);
-    Assertions.assertEquals(
+    assertEquals(
         CRLStatusReportPublisher.class, publisher.getClass());
-    Assertions.assertEquals(conf, publisher.getConf());
+    assertEquals(conf, publisher.getConf());
   }
 
   @Test
   public void testInvalidReportPublisher() {
     OzoneConfiguration conf = new OzoneConfiguration();
     ReportPublisherFactory factory = new ReportPublisherFactory(conf);
-    RuntimeException runtimeException = Assertions.assertThrows(
+    RuntimeException runtimeException = assertThrows(
         RuntimeException.class,
         () -> factory.getPublisherFor(HddsProtos.DatanodeDetailsProto.class)
     );

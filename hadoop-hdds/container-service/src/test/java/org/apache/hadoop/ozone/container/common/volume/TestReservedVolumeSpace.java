@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.container.common.volume;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -31,6 +30,8 @@ import java.util.UUID;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /**
  * To test the reserved volume space.
@@ -77,8 +78,8 @@ public class TestReservedVolumeSpace {
             .getReservedInBytes();
     long reservedCalculated = (long) Math.ceil(totalCapacity * percentage);
 
-    Assertions.assertEquals(reservedFromVolume, reservedCalculated);
-    Assertions.assertEquals(volumeCapacity, volumeCapacityReserved);
+    assertEquals(reservedFromVolume, reservedCalculated);
+    assertEquals(volumeCapacity, volumeCapacityReserved);
   }
 
   /**
@@ -96,7 +97,7 @@ public class TestReservedVolumeSpace {
 
     long reservedFromVolume = hddsVolume.getVolumeInfo().get()
             .getReservedInBytes();
-    Assertions.assertEquals(reservedFromVolume, 500);
+    assertEquals(reservedFromVolume, 500);
   }
 
   @Test
@@ -106,7 +107,7 @@ public class TestReservedVolumeSpace {
 
     long reservedFromVolume = hddsVolume.getVolumeInfo().get()
             .getReservedInBytes();
-    Assertions.assertEquals(reservedFromVolume, 0);
+    assertEquals(reservedFromVolume, 0);
   }
 
   @Test
@@ -120,14 +121,14 @@ public class TestReservedVolumeSpace {
 
     long reservedFromVolume = hddsVolume.getVolumeInfo().get()
             .getReservedInBytes();
-    Assertions.assertNotEquals(reservedFromVolume, 0);
+    assertNotEquals(reservedFromVolume, 0);
 
     long totalCapacity = hddsVolume.getVolumeInfo().get()
         .getUsageForTesting().getCapacity();
     float percentage = conf.getFloat(HDDS_DATANODE_DIR_DU_RESERVED_PERCENT,
         HDDS_DATANODE_DIR_DU_RESERVED_PERCENT_DEFAULT);
     long reservedCalculated = (long) Math.ceil(totalCapacity * percentage);
-    Assertions.assertEquals(reservedFromVolume, reservedCalculated);
+    assertEquals(reservedFromVolume, reservedCalculated);
   }
 
   @Test
@@ -141,7 +142,7 @@ public class TestReservedVolumeSpace {
 
     long reservedFromVolume1 = hddsVolume1.getVolumeInfo().get()
             .getReservedInBytes();
-    Assertions.assertEquals(reservedFromVolume1, 0);
+    assertEquals(reservedFromVolume1, 0);
 
     OzoneConfiguration conf2 = new OzoneConfiguration();
 
@@ -151,6 +152,6 @@ public class TestReservedVolumeSpace {
 
     long reservedFromVolume2 = hddsVolume2.getVolumeInfo().get()
             .getReservedInBytes();
-    Assertions.assertEquals(reservedFromVolume2, 0);
+    assertEquals(reservedFromVolume2, 0);
   }
 }

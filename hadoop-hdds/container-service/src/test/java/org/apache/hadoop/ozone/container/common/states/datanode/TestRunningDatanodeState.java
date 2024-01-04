@@ -20,7 +20,6 @@ import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachin
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +31,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointStates.SHUTDOWN;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -40,8 +40,7 @@ import static org.mockito.Mockito.when;
 public class TestRunningDatanodeState {
   @Test
   public void testAwait() throws InterruptedException {
-    SCMConnectionManager connectionManager =
-        Mockito.mock(SCMConnectionManager.class);
+    SCMConnectionManager connectionManager = mock(SCMConnectionManager.class);
     List<EndpointStateMachine> stateMachines = new ArrayList<>();
     when(connectionManager.getValues()).thenReturn(stateMachines);
 

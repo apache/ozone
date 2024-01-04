@@ -469,6 +469,106 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     return remainNum;
   }
 
+  /**
+   * To calculate Exclusive Size for current snapshot, Check
+   * the next snapshot deletedTable if the deleted key is
+   * referenced in current snapshot and not referenced in the
+   * previous snapshot then that key is exclusive to the current
+   * snapshot. Here since we are only iterating through
+   * deletedTable we can check the previous and previous to
+   * previous snapshot to achieve the same.
+   * previousSnapshot - Snapshot for which exclusive size is
+   *                    getting calculating.
+   * currSnapshot - Snapshot's deletedTable is used to calculate
+   *                previousSnapshot snapshot's exclusive size.
+   * previousToPrevSnapshot - Snapshot which is used to check
+   *                 if key is exclusive to previousSnapshot.
+   */
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public void calculateExclusiveSize(
+      SnapshotInfo previousSnapshot,
+      SnapshotInfo previousToPrevSnapshot,
+      OmKeyInfo keyInfo,
+      OmBucketInfo bucketInfo, long volumeId,
+      Table<String, String> snapRenamedTable,
+      Table<String, OmKeyInfo> previousKeyTable,
+      Table<String, String> prevRenamedTable,
+      Table<String, OmKeyInfo> previousToPrevKeyTable,
+      Map<String, Long> exclusiveSizeMap,
+      Map<String, Long> exclusiveReplicatedSizeMap) throws IOException {
+    String prevSnapKey = previousSnapshot.getTableKey();
+    long exclusiveReplicatedSize =
+        exclusiveReplicatedSizeMap.getOrDefault(
+            prevSnapKey, 0L) + keyInfo.getReplicatedSize();
+    long exclusiveSize = exclusiveSizeMap.getOrDefault(
+        prevSnapKey, 0L) + keyInfo.getDataSize();
+
+    // If there is no previous to previous snapshot, then
+    // the previous snapshot is the first snapshot.
+    if (previousToPrevSnapshot == null) {
+      exclusiveSizeMap.put(prevSnapKey, exclusiveSize);
+      exclusiveReplicatedSizeMap.put(prevSnapKey,
+          exclusiveReplicatedSize);
+    } else {
+      OmKeyInfo keyInfoPrevSnapshot = getPreviousSnapshotKeyName(
+          keyInfo, bucketInfo, volumeId,
+          snapRenamedTable, previousKeyTable);
+      OmKeyInfo keyInfoPrevToPrevSnapshot = getPreviousSnapshotKeyName(
+          keyInfoPrevSnapshot, bucketInfo, volumeId,
+          prevRenamedTable, previousToPrevKeyTable);
+      // If the previous to previous snapshot doesn't
+      // have the key, then it is exclusive size for the
+      // previous snapshot.
+      if (keyInfoPrevToPrevSnapshot == null) {
+        exclusiveSizeMap.put(prevSnapKey, exclusiveSize);
+        exclusiveReplicatedSizeMap.put(prevSnapKey,
+            exclusiveReplicatedSize);
+      }
+    }
+  }
+
+  private OmKeyInfo getPreviousSnapshotKeyName(
+      OmKeyInfo keyInfo, OmBucketInfo bucketInfo, long volumeId,
+      Table<String, String> snapRenamedTable,
+      Table<String, OmKeyInfo> previousKeyTable) throws IOException {
+
+    if (keyInfo == null) {
+      return null;
+    }
+
+    String dbKeyPrevSnap;
+    if (bucketInfo.getBucketLayout().isFileSystemOptimized()) {
+      dbKeyPrevSnap = getOzoneManager().getMetadataManager().getOzonePathKey(
+          volumeId,
+          bucketInfo.getObjectID(),
+          keyInfo.getParentObjectID(),
+          keyInfo.getFileName());
+    } else {
+      dbKeyPrevSnap = getOzoneManager().getMetadataManager().getOzoneKey(
+          keyInfo.getVolumeName(),
+          keyInfo.getBucketName(),
+          keyInfo.getKeyName());
+    }
+
+    String dbRenameKey = getOzoneManager().getMetadataManager().getRenameKey(
+        keyInfo.getVolumeName(),
+        keyInfo.getBucketName(),
+        keyInfo.getObjectID());
+
+    String renamedKey = snapRenamedTable.getIfExist(dbRenameKey);
+    OmKeyInfo prevKeyInfo = renamedKey != null ?
+        previousKeyTable.get(renamedKey) :
+        previousKeyTable.get(dbKeyPrevSnap);
+
+    if (prevKeyInfo == null ||
+        prevKeyInfo.getObjectID() != keyInfo.getObjectID()) {
+      return null;
+    }
+
+    return isBlockLocationInfoSame(prevKeyInfo, keyInfo) ?
+        prevKeyInfo : null;
+  }
+
   protected boolean isBufferLimitCrossed(
       int maxLimit, int cLimit, int increment) {
     return cLimit + increment >= maxLimit;

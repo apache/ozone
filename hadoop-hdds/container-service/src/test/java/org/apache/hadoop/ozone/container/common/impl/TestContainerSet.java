@@ -28,7 +28,6 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -49,6 +48,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Class used to test ContainerSet operations.
@@ -151,10 +152,10 @@ public class TestContainerSet {
   public void testIteratorPerVolume(ContainerLayoutVersion layout)
       throws StorageContainerException {
     setLayoutVersion(layout);
-    HddsVolume vol1 = Mockito.mock(HddsVolume.class);
-    Mockito.when(vol1.getStorageID()).thenReturn("uuid-1");
-    HddsVolume vol2 = Mockito.mock(HddsVolume.class);
-    Mockito.when(vol2.getStorageID()).thenReturn("uuid-2");
+    HddsVolume vol1 = mock(HddsVolume.class);
+    when(vol1.getStorageID()).thenReturn("uuid-1");
+    HddsVolume vol2 = mock(HddsVolume.class);
+    when(vol2.getStorageID()).thenReturn("uuid-2");
 
     ContainerSet containerSet = new ContainerSet(1000);
     for (int i = 0; i < 10; i++) {
@@ -196,8 +197,8 @@ public class TestContainerSet {
   public void iteratorIsOrderedByScanTime(ContainerLayoutVersion layout)
       throws StorageContainerException {
     setLayoutVersion(layout);
-    HddsVolume vol = Mockito.mock(HddsVolume.class);
-    Mockito.when(vol.getStorageID()).thenReturn("uuid-1");
+    HddsVolume vol = mock(HddsVolume.class);
+    when(vol.getStorageID()).thenReturn("uuid-1");
     Random random = new Random();
     ContainerSet containerSet = new ContainerSet(1000);
     int containerCount = 50;

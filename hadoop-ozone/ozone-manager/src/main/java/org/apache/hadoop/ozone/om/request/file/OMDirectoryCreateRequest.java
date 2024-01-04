@@ -45,8 +45,7 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,7 +114,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     CreateDirectoryRequest createDirectoryRequest =
-        getOmRequest().getCreateDirectoryRequest();
+        super.preExecute(ozoneManager).getCreateDirectoryRequest();
     Preconditions.checkNotNull(createDirectoryRequest);
 
     OmUtils.verifyKeyNameWithSnapshotReservedWord(
@@ -124,8 +123,10 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     KeyArgs.Builder newKeyArgs = createDirectoryRequest.getKeyArgs()
         .toBuilder().setModificationTime(Time.now());
 
+    KeyArgs resolvedKeyArgs = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
+        ozoneManager, ACLType.CREATE);
     CreateDirectoryRequest.Builder newCreateDirectoryRequest =
-        createDirectoryRequest.toBuilder().setKeyArgs(newKeyArgs);
+        createDirectoryRequest.toBuilder().setKeyArgs(resolvedKeyArgs);
 
     return getOmRequest().toBuilder().setCreateDirectoryRequest(
         newCreateDirectoryRequest).setUserInfo(getUserInfo()).build();
@@ -163,14 +164,6 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     int numMissingParents = 0;
 
     try {
-      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
-      volumeName = keyArgs.getVolumeName();
-      bucketName = keyArgs.getBucketName();
-
-      // check Acl
-      checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
-          IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
-
       // Check if this is the root of the filesystem.
       if (keyName.length() == 0) {
         throw new OMException("Directory create failed. Cannot create " +

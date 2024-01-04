@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -42,6 +41,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSIN
 import static org.apache.ozone.test.GenericTestUtils.getTestDir;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests {@link CapacityVolumeChoosingPolicy}.
@@ -105,9 +105,9 @@ public class TestCapacityVolumeChoosingPolicy {
     HddsVolume hddsVolume2 = volumes.get(1);
     HddsVolume hddsVolume3 = volumes.get(2);
 
-    Assertions.assertEquals(100L, hddsVolume1.getAvailable());
-    Assertions.assertEquals(200L, hddsVolume2.getAvailable());
-    Assertions.assertEquals(300L, hddsVolume3.getAvailable());
+    assertEquals(100L, hddsVolume1.getAvailable());
+    assertEquals(200L, hddsVolume2.getAvailable());
+    assertEquals(300L, hddsVolume3.getAvailable());
 
     Map<HddsVolume, Integer> chooseCount = new HashMap<>();
     chooseCount.put(hddsVolume1, 0);
@@ -126,7 +126,7 @@ public class TestCapacityVolumeChoosingPolicy {
 
   @Test
   public void throwsDiskOutOfSpaceIfRequestMoreThanAvailable() {
-    Exception e = Assertions.assertThrows(DiskOutOfSpaceException.class,
+    Exception e = assertThrows(DiskOutOfSpaceException.class,
         () -> policy.chooseVolume(volumes, 500));
 
     String msg = e.getMessage();

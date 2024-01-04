@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
@@ -79,6 +80,7 @@ import org.apache.hadoop.ozone.recon.common.CommonUtils;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
@@ -183,6 +185,8 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
   private ContainerHealthSchemaManager containerHealthSchemaManager;
   private CommonUtils commonUtils;
+  private PipelineManager pipelineManager;
+  private ReconPipelineManager reconPipelineManager;
 
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
@@ -293,6 +297,9 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     metricsProxyEndpoint =
         new MetricsProxyEndpoint(metricsServiceProviderFactory);
     dslContext = getDslContext();
+    pipelineManager = reconScm.getPipelineManager();
+    reconPipelineManager = (ReconPipelineManager) pipelineManager;
+    reconPipelineManager.addPipeline(pipeline);
   }
 
   @SuppressWarnings("checkstyle:MethodLength")
