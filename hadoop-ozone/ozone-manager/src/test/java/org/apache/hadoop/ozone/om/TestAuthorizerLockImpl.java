@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -68,9 +69,9 @@ public class TestAuthorizerLockImpl {
 
     // Case 2: Read lock is reentrant; Write lock is exclusive
     long readLockStamp1 = authorizerLock.tryReadLock(100);
-    assertTrue(readLockStamp1 > 0L);
+    assertThat(readLockStamp1).isGreaterThan(0L);
     long readLockStamp2 = authorizerLock.tryReadLock(100);
-    assertTrue(readLockStamp2 > 0L);
+    assertThat(readLockStamp2).isGreaterThan(0L);
 
     // Can't acquire write lock now, as read lock has been held
     long writeLockStamp1 = authorizerLock.tryWriteLock(100);
@@ -85,7 +86,7 @@ public class TestAuthorizerLockImpl {
     // Release the other read lock. And again. Should work
     authorizerLock.unlockRead(readLockStamp1);
     writeLockStamp1 = authorizerLock.tryWriteLock(100);
-    assertTrue(writeLockStamp1 > 0L);
+    assertThat(writeLockStamp1).isGreaterThan(0L);
 
     // But a second write lock won't work
     long writeLockStamp2 = authorizerLock.tryWriteLock(100);
@@ -162,7 +163,7 @@ public class TestAuthorizerLockImpl {
     // With only competing reads, an optimistic read should be valid.
     long optStamp = authorizerLock.tryOptimisticReadThrowOnTimeout();
     long readStamp = authorizerLock.tryReadLock(100);
-    assertTrue(readStamp > 0L);
+    assertThat(readStamp).isGreaterThan(0L);
     assertTrue(authorizerLock.validateOptimisticRead(optStamp));
     authorizerLock.unlockRead(readStamp);
     assertTrue(authorizerLock.validateOptimisticRead(optStamp));
@@ -178,7 +179,7 @@ public class TestAuthorizerLockImpl {
     // stamp should be invalidated.
     optStamp = authorizerLock.tryOptimisticReadThrowOnTimeout();
     writeStamp = authorizerLock.tryWriteLockThrowOnTimeout();
-    assertTrue(writeStamp > 0L);
+    assertThat(writeStamp).isGreaterThan(0L);
     assertFalse(authorizerLock.validateOptimisticRead(optStamp));
     authorizerLock.unlockWrite(writeStamp);
   }

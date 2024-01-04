@@ -44,6 +44,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPA
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
 import static org.apache.hadoop.ozone.om.OMMultiTenantManager.OZONE_TENANT_RANGER_ROLE_DESCRIPTION;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -249,14 +250,14 @@ public class TestMultiTenantAccessController {
     List<Policy> retrievedLabeledPolicies =
         controller.getLabeledPolicies(label);
     assertEquals(labeledPolicies.size(), retrievedLabeledPolicies.size());
-    assertTrue(retrievedLabeledPolicies.containsAll(labeledPolicies));
+    assertThat(retrievedLabeledPolicies).containsAll(labeledPolicies);
 
     // Get of a specific policy should also succeed.
     Policy retrievedPolicy = controller.getPolicy(unlabeledPolicy.getName());
     assertEquals(unlabeledPolicy, retrievedPolicy);
 
     // Get of policies with nonexistent label should give an empty list.
-    assertTrue(controller.getLabeledPolicies(label + "1").isEmpty());
+    assertThat(controller.getLabeledPolicies(label + "1")).isEmpty();
 
     // Cleanup
     for (Policy policy: labeledPolicies) {
@@ -322,7 +323,7 @@ public class TestMultiTenantAccessController {
     // get one of the roles to check it is there but empty.
     Role retrievedRole = controller.getRole(roleName);
     assertFalse(retrievedRole.getDescription().isPresent());
-    assertTrue(retrievedRole.getUsersMap().isEmpty());
+    assertThat(retrievedRole.getUsersMap()).isEmpty();
     assertTrue(retrievedRole.getId().isPresent());
 
     // Add a user to the role.

@@ -23,9 +23,10 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 
 import org.junit.jupiter.api.Test;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import org.mockito.Mockito;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -37,8 +38,8 @@ public class TestReportManager {
   @Test
   public void testReportManagerInit() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    StateContext dummyContext = Mockito.mock(StateContext.class);
-    ReportPublisher dummyPublisher = Mockito.mock(ReportPublisher.class);
+    StateContext dummyContext = mock(StateContext.class);
+    ReportPublisher dummyPublisher = mock(ReportPublisher.class);
     ReportManager.Builder builder = ReportManager.newBuilder(conf);
     builder.setStateContext(dummyContext);
     builder.addPublisher(dummyPublisher);

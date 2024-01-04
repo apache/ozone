@@ -65,7 +65,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.mockito.Mockito;
 
 import javax.annotation.Nonnull;
 
@@ -82,6 +81,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.LOW;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.NORMAL;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Test the replication supervisor.
@@ -115,15 +119,14 @@ public class TestReplicationSupervisor {
   public void setUp() throws Exception {
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
     set = new ContainerSet(1000);
-    DatanodeStateMachine stateMachine =
-        Mockito.mock(DatanodeStateMachine.class);
+    DatanodeStateMachine stateMachine = mock(DatanodeStateMachine.class);
     context = new StateContext(
         new OzoneConfiguration(),
         DatanodeStateMachine.DatanodeStates.getInitState(),
         stateMachine, "");
     context.setTermOfLeaderSCM(CURRENT_TERM);
     datanode = MockDatanodeDetails.randomDatanodeDetails();
-    Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanode);
+    when(stateMachine.getDatanodeDetails()).thenReturn(datanode);
   }
 
   @AfterEach
@@ -284,22 +287,22 @@ public class TestReplicationSupervisor {
 
     // Mock to fetch an exception in the importContainer method.
     SimpleContainerDownloader moc =
-        Mockito.mock(SimpleContainerDownloader.class);
+        mock(SimpleContainerDownloader.class);
     Path res = Paths.get("file:/tmp/no-such-file");
-    Mockito.when(
-        moc.getContainerDataFromReplicas(Mockito.anyLong(), Mockito.anyList(),
-            Mockito.any(Path.class), Mockito.any()))
+    when(
+        moc.getContainerDataFromReplicas(anyLong(), anyList(),
+            any(Path.class), any()))
         .thenReturn(res);
 
     final String testDir = GenericTestUtils.getTempPath(
         TestReplicationSupervisor.class.getSimpleName() +
             "-" + UUID.randomUUID());
-    MutableVolumeSet volumeSet = Mockito.mock(MutableVolumeSet.class);
-    Mockito.when(volumeSet.getVolumesList())
+    MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+    when(volumeSet.getVolumesList())
         .thenReturn(singletonList(
             new HddsVolume.Builder(testDir).conf(conf).build()));
     ContainerController mockedCC =
-        Mockito.mock(ContainerController.class);
+        mock(ContainerController.class);
     ContainerImporter importer =
         new ContainerImporter(conf, set, mockedCC, volumeSet);
     ContainerReplicator replicator =

@@ -66,6 +66,7 @@ import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.getINode;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileName;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -633,16 +634,16 @@ public class TestOmSnapshotManager {
     // Create first checkpoint for the snapshot checkpoint
     OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
         first);
-    assertFalse(logCapturer.getOutput().contains(
-        "for snapshot " + first.getName() + " already exists."));
+    assertThat(logCapturer.getOutput()).doesNotContain(
+        "for snapshot " + first.getName() + " already exists.");
     logCapturer.clearOutput();
 
     // Create checkpoint again for the same snapshot.
     OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
         first);
 
-    assertTrue(logCapturer.getOutput().contains(
-        "for snapshot " + first.getName() + " already exists."));
+    assertThat(logCapturer.getOutput()).contains(
+        "for snapshot " + first.getName() + " already exists.");
   }
 
   private SnapshotInfo createSnapshotInfo(String volumeName,

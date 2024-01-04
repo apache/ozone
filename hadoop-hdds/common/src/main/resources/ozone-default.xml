@@ -3119,6 +3119,32 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.scmclient.rpc.timeout</name>
+    <value>1m</value>
+    <tag>OZONE, RECON, SCM</tag>
+    <description>
+      RpcClient timeout on waiting for the response from SCM when Recon connects to SCM.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.scmclient.max.retry.timeout</name>
+    <value>6s</value>
+    <tag>OZONE, RECON, SCM</tag>
+    <description>
+      Max retry timeout for SCM Client when Recon connects to SCM. This config is used to
+      dynamically compute the max retry count for SCM Client when failover happens. Check the
+      SCMClientConfig class getRetryCount method.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.scmclient.failover.max.retry</name>
+    <value>3</value>
+    <tag>OZONE, RECON, SCM</tag>
+    <description>
+      Max retry count for SCM Client when failover happens.
+    </description>
+  </property>
+  <property>
     <name>ozone.recon.om.socket.timeout</name>
     <value>5s</value>
     <tag>OZONE, RECON, OM</tag>
@@ -3528,6 +3554,25 @@
     <tag>OZONE, PERFORMANCE, OM</tag>
     <description>
       The time interval between successive SnapshotDeletingService
+      thread run.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.snapshot.directory.service.timeout</name>
+    <value>300s</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>
+      Timeout value for SnapshotDirectoryCleaningService.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.snapshot.directory.service.interval</name>
+    <value>24h</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>
+      The time interval between successive SnapshotDirectoryCleaningService
       thread run.
     </description>
   </property>

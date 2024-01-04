@@ -18,10 +18,10 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OmUtils;
@@ -105,8 +105,8 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
   @Test
   public void testValidateAndUpdateCacheWithEmptyToKey() throws Exception {
     String emptyToKeyName = "";
-    OMRequest omRequest = doPreExecute(createRenameKeyRequest(volumeName,
-        bucketName, fromKeyName, emptyToKeyName));
+    OMRequest omRequest = createRenameKeyRequest(volumeName,
+        bucketName, fromKeyName, emptyToKeyName);
     assertEquals(omRequest.getRenameKeyRequest().getToKeyName(), "");
   }
 
@@ -121,14 +121,13 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
 
   @Test
   public void testPreExecuteWithUnNormalizedPath() throws Exception {
+    addKeyToTable(fromKeyInfo);
     String toKeyName =
         "///root" + OzoneConsts.OZONE_URI_DELIMITER +
             OzoneConsts.OZONE_URI_DELIMITER +
             UUID.randomUUID();
     String fromKeyName =
-        "///root/sub-dir" + OzoneConsts.OZONE_URI_DELIMITER +
-            OzoneConsts.OZONE_URI_DELIMITER +
-            UUID.randomUUID();
+        "///" + fromKeyInfo.getKeyName();
     OMRequest modifiedOmRequest =
         doPreExecute(createRenameKeyRequest(toKeyName, fromKeyName));
     String normalizedSrcName =
@@ -171,8 +170,8 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
     // set in KeyArgs.
     assertNotEquals(originalOmRequest, modifiedOmRequest);
 
-    assertTrue(modifiedOmRequest.getRenameKeyRequest()
-        .getKeyArgs().getModificationTime() > 0);
+    assertThat(modifiedOmRequest.getRenameKeyRequest()
+        .getKeyArgs().getModificationTime()).isGreaterThan(0);
 
     return modifiedOmRequest;
   }

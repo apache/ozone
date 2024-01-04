@@ -534,7 +534,7 @@ public class TestKeyValueContainerMetadataInspector
 
   private KeyValueContainer createOpenContainer(int normalBlocks)
       throws Exception {
-    return super.createContainerWithBlocks(CONTAINER_ID, normalBlocks, 0);
+    return super.createContainerWithBlocks(CONTAINER_ID, normalBlocks, 0, true);
   }
 
   private void containsAllStrings(String logOutput, String[] expectedMessages) {

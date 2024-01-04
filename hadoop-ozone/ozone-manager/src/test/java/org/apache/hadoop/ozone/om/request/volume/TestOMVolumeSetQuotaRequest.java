@@ -32,11 +32,11 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests set volume property request.
@@ -116,7 +116,7 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
     // millisecond - since there is no time-consuming operation between
     // OMRequestTestUtils.addVolumeToDB (sets creationTime) and
     // preExecute (sets modificationTime).
-    assertTrue(modificationTime >= creationTime);
+    assertThat(modificationTime).isGreaterThanOrEqualTo(creationTime);
   }
 
   @Test
@@ -194,15 +194,15 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
     OMClientResponse omClientResponse = omVolumeSetQuotaRequest
         .validateAndUpdateCache(ozoneManager, 1);
     //capture the error log
-    assertTrue(logs.getOutput().contains(
-        "Changing volume quota failed for volume"));
+    assertThat(logs.getOutput()).contains(
+        "Changing volume quota failed for volume");
 
     assertFalse(omClientResponse.getOMResponse().getSuccess());
     assertEquals(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
-    assertTrue(omClientResponse.getOMResponse().getMessage().
+    assertThat(omClientResponse.getOMResponse().getMessage()).
         contains("Total buckets quota in this volume " +
-            "should not be greater than volume quota"));
+            "should not be greater than volume quota");
   }
 
   @Test
@@ -279,8 +279,7 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
         .validateAndUpdateCache(ozoneManager, 1);
     assertEquals(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
-    assertTrue(omClientResponse.getOMResponse().getMessage()
-        .contains(
-        "this volume should not be greater than volume namespace quota"));
+    assertThat(omClientResponse.getOMResponse().getMessage())
+        .contains("this volume should not be greater than volume namespace quota");
   }
 }

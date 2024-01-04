@@ -69,6 +69,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -645,7 +646,7 @@ public class TestOmMetadataManager {
             numExpiredOpenKeys - 1, bucketLayout).getOpenKeyBuckets();
     List<String> names = getOpenKeyNames(someExpiredKeys);
     assertEquals(numExpiredOpenKeys - 1, names.size());
-    assertTrue(expiredKeys.containsAll(names));
+    assertThat(expiredKeys).containsAll(names);
 
     // Test attempting to retrieving more expired keys than actually exist.
     Collection<OpenKeyBucket.Builder> allExpiredKeys =
@@ -653,7 +654,7 @@ public class TestOmMetadataManager {
             numExpiredOpenKeys + 1, bucketLayout).getOpenKeyBuckets();
     names = getOpenKeyNames(allExpiredKeys);
     assertEquals(numExpiredOpenKeys, names.size());
-    assertTrue(expiredKeys.containsAll(names));
+    assertThat(expiredKeys).containsAll(names);
 
     // Test retrieving exact amount of expired keys that exist.
     allExpiredKeys =
@@ -661,7 +662,7 @@ public class TestOmMetadataManager {
             numExpiredOpenKeys, bucketLayout).getOpenKeyBuckets();
     names = getOpenKeyNames(allExpiredKeys);
     assertEquals(numExpiredOpenKeys, names.size());
-    assertTrue(expiredKeys.containsAll(names));
+    assertThat(expiredKeys).containsAll(names);
   }
 
   private void testGetExpiredOpenKeysExcludeMPUKeys(
@@ -810,7 +811,7 @@ public class TestOmMetadataManager {
         (numExpiredMPUs * numPartsPerMPU) - (numPartsPerMPU));
     List<String> names = getMultipartKeyNames(someExpiredMPUs);
     assertEquals(numExpiredMPUs - 1, names.size());
-    assertTrue(expiredMPUs.containsAll(names));
+    assertThat(expiredMPUs).containsAll(names);
 
     // Test retrieving fewer expire MPU parts than actually exist (round up).
     someExpiredMPUs = omMetadataManager.getExpiredMultipartUploads(
@@ -818,7 +819,7 @@ public class TestOmMetadataManager {
         (numExpiredMPUs * numPartsPerMPU) - (numPartsPerMPU + 1));
     names = getMultipartKeyNames(someExpiredMPUs);
     assertEquals(numExpiredMPUs - 1, names.size());
-    assertTrue(expiredMPUs.containsAll(names));
+    assertThat(expiredMPUs).containsAll(names);
 
     // Test attempting to retrieving more expire MPU parts than actually exist.
     List<ExpiredMultipartUploadsBucket> allExpiredMPUs =
@@ -826,7 +827,7 @@ public class TestOmMetadataManager {
             (numExpiredMPUs * numPartsPerMPU) + numPartsPerMPU);
     names = getMultipartKeyNames(allExpiredMPUs);
     assertEquals(numExpiredMPUs, names.size());
-    assertTrue(expiredMPUs.containsAll(names));
+    assertThat(expiredMPUs).containsAll(names);
 
     // Test retrieving exact amount of MPU parts than actually exist.
     allExpiredMPUs =
@@ -834,7 +835,7 @@ public class TestOmMetadataManager {
             (numExpiredMPUs * numPartsPerMPU));
     names = getMultipartKeyNames(allExpiredMPUs);
     assertEquals(numExpiredMPUs, names.size());
-    assertTrue(expiredMPUs.containsAll(names));
+    assertThat(expiredMPUs).containsAll(names);
   }
 
   private List<String> getOpenKeyNames(
@@ -926,7 +927,7 @@ public class TestOmMetadataManager {
       assertTrue(snapshotInfo.getName().startsWith(prefixA));
       assertEquals(snapshotInfo, snapshotsASnapshotIDMap.get(
           snapshotInfo.getName()));
-      assertTrue(snapshotInfo.getName().compareTo(startSnapshot) > 0);
+      assertThat(snapshotInfo.getName().compareTo(startSnapshot)).isGreaterThan(0);
     }
 
     startSnapshot = null;
