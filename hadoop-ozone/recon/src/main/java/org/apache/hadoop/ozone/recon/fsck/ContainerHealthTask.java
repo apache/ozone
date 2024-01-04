@@ -293,7 +293,7 @@ public class ContainerHealthTask extends ReconScmTask {
       ContainerHealthStatus h = new ContainerHealthStatus(container,
           containerReplicas, placementPolicy,
           reconContainerMetadataManager, conf);
-      if (h.isProperlyReplicated() || h.isDeleted()) {
+      if (h.isHealthilyReplicated() || h.isDeleted()) {
         return;
       }
       // For containers deleted in SCM, we sync the container state here.
@@ -406,7 +406,7 @@ public class ContainerHealthTask extends ReconScmTask {
         Map<UnHealthyContainerStates, Map<String, Long>>
             unhealthyContainerStateStatsMap) {
       List<UnhealthyContainers> records = new ArrayList<>();
-      if (container.isProperlyReplicated() || container.isDeleted()) {
+      if (container.isHealthilyReplicated() || container.isDeleted()) {
         return records;
       }
 

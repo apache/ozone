@@ -107,7 +107,7 @@ public class ContainerHealthStatus {
     return containerReplicaCount.isSufficientlyReplicated();
   }
 
-  public boolean isProperlyReplicated() {
+  public boolean isHealthilyReplicated() {
     return replicaDelta == 0 && !isMisReplicated();
   }
 

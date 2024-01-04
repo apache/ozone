@@ -92,7 +92,7 @@ public class TestContainerHealthStatus {
     ContainerHealthStatus status =
         new ContainerHealthStatus(container, replicas, placementPolicy,
             reconContainerMetadataManager, CONF);
-    assertTrue(status.isProperlyReplicated());
+    assertTrue(status.isHealthilyReplicated());
     assertFalse(status.isOverReplicated());
     assertFalse(status.isUnderReplicated());
     assertEquals(0, status.replicaDelta());
@@ -116,7 +116,7 @@ public class TestContainerHealthStatus {
     ContainerHealthStatus status =
         new ContainerHealthStatus(container, replicas, placementPolicy,
             reconContainerMetadataManager, CONF);
-    assertTrue(status.isProperlyReplicated());
+    assertTrue(status.isHealthilyReplicated());
     assertFalse(status.isOverReplicated());
     assertFalse(status.isUnderReplicated());
     assertEquals(0, status.replicaDelta());
@@ -131,7 +131,7 @@ public class TestContainerHealthStatus {
     ContainerHealthStatus status =
         new ContainerHealthStatus(container, replicas, placementPolicy,
             reconContainerMetadataManager, CONF);
-    assertFalse(status.isProperlyReplicated());
+    assertFalse(status.isHealthilyReplicated());
     assertFalse(status.isOverReplicated());
     assertFalse(status.isUnderReplicated());
     assertEquals(3, status.replicaDelta());
@@ -147,7 +147,7 @@ public class TestContainerHealthStatus {
     ContainerHealthStatus status =
         new ContainerHealthStatus(container, replicas, placementPolicy,
             reconContainerMetadataManager, CONF);
-    assertFalse(status.isProperlyReplicated());
+    assertFalse(status.isHealthilyReplicated());
     assertFalse(status.isMissing());
     assertFalse(status.isOverReplicated());
     assertTrue(status.isUnderReplicated());
@@ -166,7 +166,7 @@ public class TestContainerHealthStatus {
     ContainerHealthStatus status =
         new ContainerHealthStatus(container, replicas, placementPolicy,
             reconContainerMetadataManager, CONF);
-    assertFalse(status.isProperlyReplicated());
+    assertFalse(status.isHealthilyReplicated());
     assertFalse(status.isMissing());
     assertFalse(status.isUnderReplicated());
     assertTrue(status.isOverReplicated());
@@ -193,7 +193,7 @@ public class TestContainerHealthStatus {
     ContainerHealthStatus status =
         new ContainerHealthStatus(container, replicas, placementPolicy,
             reconContainerMetadataManager, CONF);
-    assertFalse(status.isProperlyReplicated());
+    assertFalse(status.isHealthilyReplicated());
     assertFalse(status.isMissing());
     assertFalse(status.isUnderReplicated());
     assertFalse(status.isMisReplicated());
@@ -208,7 +208,7 @@ public class TestContainerHealthStatus {
 
     status = new ContainerHealthStatus(container, replicas, placementPolicy,
         reconContainerMetadataManager, CONF);
-    assertTrue(status.isProperlyReplicated());
+    assertTrue(status.isHealthilyReplicated());
     assertFalse(status.isMissing());
     assertFalse(status.isUnderReplicated());
     assertFalse(status.isMisReplicated());
@@ -237,7 +237,7 @@ public class TestContainerHealthStatus {
             reconContainerMetadataManager, CONF);
     assertTrue(status.isHealthy());
     assertTrue(status.isSufficientlyReplicated());
-    assertTrue(status.isProperlyReplicated());
+    assertTrue(status.isHealthilyReplicated());
     assertFalse(status.isMissing());
     assertFalse(status.isUnderReplicated());
     assertFalse(status.isMisReplicated());
@@ -254,7 +254,7 @@ public class TestContainerHealthStatus {
     status = new ContainerHealthStatus(container, replicas, placementPolicy,
         reconContainerMetadataManager, CONF);
     assertTrue(status.isHealthy());
-    assertFalse(status.isProperlyReplicated());
+    assertFalse(status.isHealthilyReplicated());
     assertFalse(status.isMissing());
     assertFalse(status.isMisReplicated());
     assertFalse(status.isOverReplicated());
@@ -304,7 +304,7 @@ public class TestContainerHealthStatus {
             reconContainerMetadataManager, CONF);
     assertTrue(status.isHealthy());
     assertTrue(status.isSufficientlyReplicated());
-    assertTrue(status.isProperlyReplicated());
+    assertTrue(status.isHealthilyReplicated());
     assertFalse(status.isMissing());
     assertFalse(status.isUnderReplicated());
     assertFalse(status.isMisReplicated());
@@ -324,7 +324,7 @@ public class TestContainerHealthStatus {
         reconContainerMetadataManager, CONF);
     assertTrue(status.isHealthy());
     assertTrue(status.isSufficientlyReplicated());
-    assertFalse(status.isProperlyReplicated());
+    assertFalse(status.isHealthilyReplicated());
     assertFalse(status.isMissing());
     assertFalse(status.isUnderReplicated());
     assertFalse(status.isMisReplicated());
@@ -347,7 +347,7 @@ public class TestContainerHealthStatus {
         reconContainerMetadataManager, CONF);
     assertTrue(status.isHealthy());
     assertFalse(status.isSufficientlyReplicated());
-    assertFalse(status.isProperlyReplicated());
+    assertFalse(status.isHealthilyReplicated());
     assertFalse(status.isMissing());
     assertTrue(status.isUnderReplicated());
     assertFalse(status.isMisReplicated());
@@ -366,7 +366,7 @@ public class TestContainerHealthStatus {
     ContainerHealthStatus status =
         new ContainerHealthStatus(container, replicas, placementPolicy,
             reconContainerMetadataManager, CONF);
-    assertFalse(status.isProperlyReplicated());
+    assertFalse(status.isHealthilyReplicated());
     assertFalse(status.isMissing());
     assertFalse(status.isUnderReplicated());
     assertFalse(status.isOverReplicated());
