@@ -168,6 +168,23 @@ public final class  ReconServerConfigKeys {
 
   public static final String
       OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT = "1m";
+
+  public static final String OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_KEY =
+      "ozone.recon.scmclient.rpc.timeout";
+
+  public static final String OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_DEFAULT = "1m";
+
+  public static final String OZONE_RECON_SCM_CLIENT_MAX_RETRY_TIMEOUT_KEY =
+      "ozone.recon.scmclient.max.retry.timeout";
+
+  public static final String OZONE_RECON_SCM_CLIENT_MAX_RETRY_TIMEOUT_DEFAULT =
+      "6s";
+
+  public static final String OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_KEY =
+      "ozone.recon.scmclient.failover.max.retry";
+
+  public static final int
+      OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_DEFAULT = 3;
   /**
    * Private constructor for utility class.
    */
