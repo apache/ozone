@@ -79,7 +79,7 @@ public final class ManagedRocksObjectUtils {
   public static void waitForFileDelete(File file, Duration maxDuration)
       throws IOException {
     if (!RatisHelper.attemptUntilTrue(() -> !file.exists(), POLL_INTERVAL_DURATION, maxDuration)) {
-      String msg = String.format("File: %S didn't get deleted in %s secs.",
+      String msg = String.format("File: %s didn't get deleted in %s secs.",
           file.getAbsolutePath(), maxDuration.getSeconds());
       LOG.info(msg);
       throw new IOException(msg);
