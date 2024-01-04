@@ -21,7 +21,7 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.utils.LeakDetector;
-import org.apache.hadoop.hdds.utils.LeakTracker;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.RocksDB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,7 +45,7 @@ public final class ManagedRocksObjectUtils {
 
   private static final LeakDetector LEAK_DETECTOR = new LeakDetector("ManagedRocksObject");
 
-  static LeakTracker track(AutoCloseable object) {
+  static UncheckedAutoCloseable track(AutoCloseable object) {
     ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
     final Class<?> clazz = object.getClass();
     final StackTraceElement[] stackTrace = getStackTrace();

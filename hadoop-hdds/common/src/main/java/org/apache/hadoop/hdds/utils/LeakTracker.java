@@ -18,6 +18,8 @@
  */
 package org.apache.hadoop.hdds.utils;
 
+import org.apache.ratis.util.UncheckedAutoCloseable;
+
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.util.Set;
@@ -27,7 +29,7 @@ import java.util.Set;
  *
  * @see LeakDetector
  */
-public class LeakTracker extends WeakReference<Object> {
+final class LeakTracker extends WeakReference<Object> implements UncheckedAutoCloseable {
   private final Set<LeakTracker> allLeaks;
   private final Runnable leakReporter;
   LeakTracker(Object referent, ReferenceQueue<Object> referenceQueue,
@@ -40,6 +42,7 @@ public class LeakTracker extends WeakReference<Object> {
   /**
    * Called by the tracked resource when closing.
    */
+  @Override
   public void close() {
     allLeaks.remove(this);
   }

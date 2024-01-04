@@ -18,7 +18,7 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import org.apache.hadoop.hdds.utils.LeakTracker;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.EnvOptions;
 import org.rocksdb.Options;
 import org.rocksdb.SstFileWriter;
@@ -29,7 +29,7 @@ import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.tr
  * Managed SstFileWriter.
  */
 public class ManagedSstFileWriter extends SstFileWriter {
-  private final LeakTracker leakTracker = track(this);
+  private final UncheckedAutoCloseable leakTracker = track(this);
 
   public ManagedSstFileWriter(EnvOptions envOptions,
                               Options options) {

@@ -18,7 +18,7 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import org.apache.hadoop.hdds.utils.LeakTracker;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.Options;
 
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
@@ -27,7 +27,7 @@ import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.tr
  * Managed Options.
  */
 public class ManagedOptions extends Options {
-  private final LeakTracker leakTracker = track(this);
+  private final UncheckedAutoCloseable leakTracker = track(this);
 
   @Override
   public void close() {
