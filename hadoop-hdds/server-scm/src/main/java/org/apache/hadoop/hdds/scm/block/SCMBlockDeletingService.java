@@ -301,8 +301,8 @@ public class SCMBlockDeletingService extends BackgroundService
       List<DatanodeDetails> datanodes) throws NodeNotFoundException {
     final Set<DatanodeDetails> included = new HashSet<>();
     for (DatanodeDetails dn : datanodes) {
-      if (nodeManager.getTotalDatanodeCommandCount(dn,
-          Type.deleteBlocksCommand) < deleteBlocksPendingCommandLimit) {
+      if (nodeManager.getTotalDatanodeCommandCount(dn, Type.deleteBlocksCommand) < deleteBlocksPendingCommandLimit
+          && nodeManager.getCommandQueueCount(dn.getUuid(), Type.deleteBlocksCommand) < 2) {
         included.add(dn);
       }
     }
