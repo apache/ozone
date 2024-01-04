@@ -35,6 +35,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static org.mockito.Mockito.mock;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
@@ -345,7 +346,7 @@ public class TestNodeDecommissionMetrics {
     monitor.run();
     long startTime = monitor.getSingleTrackedNode(dn1.getIpAddress())
         .getStartTime();
-    Assertions.assertTrue(before <= startTime);
-    Assertions.assertTrue(after >= startTime);
+    assertTrue(before <= startTime);
+    assertTrue(after >= startTime);
   }
 }
