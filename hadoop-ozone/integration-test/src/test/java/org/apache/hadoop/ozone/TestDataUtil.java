@@ -52,7 +52,7 @@ public final class TestDataUtil {
   public static OzoneBucket createVolumeAndBucket(OzoneClient client,
       String volumeName, String bucketName) throws IOException {
     return createVolumeAndBucket(client, volumeName, bucketName,
-        BucketLayout.LEGACY);
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   public static OzoneBucket createVolumeAndBucket(OzoneClient client,
