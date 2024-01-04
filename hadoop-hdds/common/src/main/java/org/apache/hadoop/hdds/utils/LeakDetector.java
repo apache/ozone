@@ -18,6 +18,7 @@
  */
 package org.apache.hadoop.hdds.utils;
 
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,6 +26,7 @@ import java.lang.ref.ReferenceQueue;
 import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Simple general resource leak detector using {@link ReferenceQueue} and {@link java.lang.ref.WeakReference} to
@@ -37,7 +39,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * class MyResource implements AutoClosable {
  *   static final LeakDetector LEAK_DETECTOR = new LeakDetector("MyResource");
  *
- *   private final LeakTracker leakTracker = LEAK_DETECTOR.track(this, () -> {
+ *   private final UncheckedAutoCloseable leakTracker = LEAK_DETECTOR.track(this, () -> {
  *      // report leaks, don't refer to the original object (MyResource) here.
  *      System.out.println("MyResource is not closed before being discarded.");
  *   });
@@ -53,13 +55,14 @@ import java.util.concurrent.ConcurrentHashMap;
  * }</pre>
  */
 public class LeakDetector {
-  public static final Logger LOG = LoggerFactory.getLogger(LeakDetector.class);
+  private static final Logger LOG = LoggerFactory.getLogger(LeakDetector.class);
+  private static final AtomicLong COUNTER = new AtomicLong();
   private final ReferenceQueue<Object> queue = new ReferenceQueue<>();
   private final Set<LeakTracker> allLeaks = Collections.newSetFromMap(new ConcurrentHashMap<>());
   private final String name;
 
   public LeakDetector(String name) {
-    this.name = name;
+    this.name = name + COUNTER.getAndIncrement();
     start();
   }
 
@@ -89,7 +92,7 @@ public class LeakDetector {
     LOG.warn("Exiting leak detector {}.", name);
   }
 
-  public LeakTracker track(Object leakable, Runnable reportLeak) {
+  public UncheckedAutoCloseable track(Object leakable, Runnable reportLeak) {
     // A rate filter can be put here to only track a subset of all objects, e.g. 5%, 10%,
     // if we have proofs that leak tracking impacts performance, or a single LeakDetector
     // thread can't keep up with the pace of object allocation.
