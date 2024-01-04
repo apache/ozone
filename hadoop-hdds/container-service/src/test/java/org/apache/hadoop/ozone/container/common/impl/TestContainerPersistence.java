@@ -77,19 +77,20 @@ import org.apache.ozone.test.GenericTestUtils;
 
 import com.google.common.collect.Maps;
 import org.apache.commons.io.FileUtils;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Timeout;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BCSID_MISMATCH;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getChunk;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getData;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.setDataChecksum;
-
-import org.hamcrest.Matchers;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.AfterAll;
-
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
-import static org.hamcrest.MatcherAssert.assertThat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -100,12 +101,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Timeout;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Simple tests to verify that container persistence works as expected. Some of
@@ -290,8 +285,8 @@ public class TestContainerPersistence {
     someKey.setChunks(new LinkedList<>());
     Exception exception = assertThrows(StorageContainerException.class,
         () -> blockManager.putBlock(container, someKey));
-    assertThat(exception.getMessage(),
-        Matchers.containsString("Error opening DB."));
+    assertThat(exception.getMessage())
+        .contains("Error opening DB.");
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -327,9 +322,8 @@ public class TestContainerPersistence {
         () -> kvHandler.deleteContainer(container, false));
     assertThat(containerSet.getContainerMapCopy())
         .containsKey(testContainerID);
-    assertThat(exception.getMessage(),
-        Matchers.containsString(
-            "Non-force deletion of non-empty container is not allowed."));
+    assertThat(exception.getMessage())
+        .contains("Non-force deletion of non-empty container is not allowed.");
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -1016,7 +1010,7 @@ public class TestContainerPersistence {
     // Count must be >0
     Exception exception = assertThrows(IllegalArgumentException.class,
         () -> blockManager.listBlock(container, 0, -1));
-    assertThat(exception.getMessage(),
-        Matchers.containsString("Count must be a positive number."));
+    assertThat(exception.getMessage())
+        .contains("Count must be a positive number.");
   }
 }

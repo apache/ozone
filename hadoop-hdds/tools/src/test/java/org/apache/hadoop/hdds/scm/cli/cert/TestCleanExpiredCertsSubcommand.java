@@ -26,7 +26,6 @@ import static org.apache.hadoop.hdds.security.x509.CertificateTestUtils.createSe
 
 import org.apache.hadoop.hdds.security.x509.CertificateTestUtils;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
-import org.hamcrest.core.StringContains;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,7 +38,7 @@ import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 
-import static org.hamcrest.MatcherAssert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -81,6 +80,6 @@ class TestCleanExpiredCertsSubcommand {
     String certInfo = String.format(OUTPUT_FORMAT, cert.getSerialNumber(),
         cert.getNotBefore(), cert.getNotAfter(), cert.getSubjectDN(),
         cert.getIssuerDN());
-    assertThat(cliOutPut, new StringContains(true, certInfo));
+    assertThat(cliOutPut).contains(certInfo);
   }
 }
