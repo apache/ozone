@@ -69,9 +69,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest;
-import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequestWithFSO;
-import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
@@ -84,9 +81,10 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.event.Level;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_CHUNK_LIST_INCREMENTAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_CHUNK_LIST_INCREMENTAL_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
@@ -133,6 +131,9 @@ public class TestHSync {
     CONF.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     // Reduce KeyDeletingService interval
     CONF.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    CONF.setBoolean("ozone.client.incremental.chunk.list", true);
+    CONF.setBoolean(OZONE_CHUNK_LIST_INCREMENTAL,
+        OZONE_CHUNK_LIST_INCREMENTAL_DEFAULT);
     cluster = MiniOzoneCluster.newBuilder(CONF)
         .setNumDatanodes(5)
         .setTotalPipelineNumLimit(10)
@@ -152,9 +153,9 @@ public class TestHSync {
     bucket = TestDataUtil.createVolumeAndBucket(client, layout);
 
     // Enable DEBUG level logging for relevant classes
-    GenericTestUtils.setLogLevel(OMKeyRequest.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(OMKeyCommitRequest.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(OMKeyCommitRequestWithFSO.LOG, Level.DEBUG);
+    //GenericTestUtils.setLogLevel(OMKeyRequest.LOG, Level.DEBUG);
+    //GenericTestUtils.setLogLevel(OMKeyCommitRequest.LOG, Level.DEBUG);
+    //GenericTestUtils.setLogLevel(OMKeyCommitRequestWithFSO.LOG, Level.DEBUG);
   }
 
   @AfterAll
