@@ -83,6 +83,7 @@ import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.netty.NettyConfigKeys;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.proto.RaftProtos.RoleInfoProto;
+import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.protocol.ClientId;
@@ -622,6 +623,10 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     return server.getDivision(id);
   }
 
+  public boolean getShouldDeleteRatisLogDirectory() {
+    return this.shouldDeleteRatisLogDirectory;
+  }
+
   private void processReply(RaftClientReply reply) throws IOException {
     // NotLeader exception is thrown only when the raft server to which the
     // request is submitted is not the leader. The request will be rejected
@@ -917,6 +922,11 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         .getGroupInfo(createGroupInfoRequest(pipelineID.getProtobuf()));
     minIndex = RatisHelper.getMinReplicatedIndex(reply.getCommitInfos());
     return minIndex == null ? -1 : minIndex;
+  }
+
+  public Collection<RaftPeer> getRaftPeersInPipeline(PipelineID pipelineId) throws IOException {
+    final RaftGroupId groupId = RaftGroupId.valueOf(pipelineId.getId());
+    return server.getDivision(groupId).getGroup().getPeers();
   }
 
   public void notifyGroupRemove(RaftGroupId gid) {
