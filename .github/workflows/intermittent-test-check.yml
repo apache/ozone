@@ -121,7 +121,7 @@ jobs:
       - name: Execute tests
         run: |
           test_type=${{ needs.prepare-job.outputs.test_type }}
-          args="-DexcludedGroups=unhealthy,org.apache.ozone.test.UnhealthyTest"
+          args="-DexcludedGroups=unhealthy"
           if [ "$test_type" = "integration" ]; then
               args="$args -pl :ozone-integration-test,:mini-chaos-tests"
           fi
