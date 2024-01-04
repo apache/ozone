@@ -38,9 +38,6 @@ import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.RaftServer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mockito;
-import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -48,10 +45,18 @@ import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 /**
  * Test cases to verify ClosePipelineCommandHandler.
  */
-@ExtendWith(MockitoExtension.class)
 public class TestClosePipelineCommandHandler {
 
   private OzoneContainer ozoneContainer;
@@ -64,12 +69,12 @@ public class TestClosePipelineCommandHandler {
   @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
-    ozoneContainer = Mockito.mock(OzoneContainer.class);
-    connectionManager = Mockito.mock(SCMConnectionManager.class);
-    raftClient = Mockito.mock(RaftClient.class);
-    raftClientGroupManager = Mockito.mock(GroupManagementApi.class);
-    Mockito.lenient().when(raftClient.getGroupManagementApi(
-        Mockito.any(RaftPeerId.class))).thenReturn(raftClientGroupManager);
+    ozoneContainer = mock(OzoneContainer.class);
+    connectionManager = mock(SCMConnectionManager.class);
+    raftClient = mock(RaftClient.class);
+    raftClientGroupManager = mock(GroupManagementApi.class);
+    lenient().when(raftClient.getGroupManagementApi(
+        any(RaftPeerId.class))).thenReturn(raftClientGroupManager);
   }
 
   @Test
@@ -82,26 +87,26 @@ public class TestClosePipelineCommandHandler {
     stateContext = ContainerTestUtils.getMockContext(currentDatanode, conf);
 
     final boolean shouldDeleteRatisLogDirectory = true;
-    XceiverServerRatis writeChannel = Mockito.mock(XceiverServerRatis.class);
-    Mockito.when(ozoneContainer.getWriteChannel()).thenReturn(writeChannel);
-    Mockito.when(writeChannel.getShouldDeleteRatisLogDirectory()).thenReturn(shouldDeleteRatisLogDirectory);
-    Mockito.when(writeChannel.isExist(pipelineID.getProtobuf())).thenReturn(true);
+    XceiverServerRatis writeChannel = mock(XceiverServerRatis.class);
+    when(ozoneContainer.getWriteChannel()).thenReturn(writeChannel);
+    when(writeChannel.getShouldDeleteRatisLogDirectory()).thenReturn(shouldDeleteRatisLogDirectory);
+    when(writeChannel.isExist(pipelineID.getProtobuf())).thenReturn(true);
     Collection<RaftPeer> raftPeers = datanodes.stream()
         .map(RatisHelper::toRaftPeer)
         .collect(Collectors.toList());
-    Mockito.when(writeChannel.getServer()).thenReturn(Mockito.mock(RaftServer.class));
-    Mockito.when(writeChannel.getServer().getId()).thenReturn(RatisHelper.toRaftPeerId(currentDatanode));
-    Mockito.when(writeChannel.getRaftPeersInPipeline(pipelineID)).thenReturn(raftPeers);
+    when(writeChannel.getServer()).thenReturn(mock(RaftServer.class));
+    when(writeChannel.getServer().getId()).thenReturn(RatisHelper.toRaftPeerId(currentDatanode));
+    when(writeChannel.getRaftPeersInPipeline(pipelineID)).thenReturn(raftPeers);
 
     final ClosePipelineCommandHandler commandHandler =
         new ClosePipelineCommandHandler((leader, tls) -> raftClient, MoreExecutors.directExecutor());
     commandHandler.handle(command, ozoneContainer, stateContext, connectionManager);
 
-    Mockito.verify(writeChannel, Mockito.times(1))
+    verify(writeChannel, times(1))
         .removeGroup(pipelineID.getProtobuf());
 
-    Mockito.verify(raftClientGroupManager, Mockito.times(2))
-        .remove(Mockito.any(), Mockito.eq(shouldDeleteRatisLogDirectory), Mockito.eq(!shouldDeleteRatisLogDirectory));
+    verify(raftClientGroupManager, times(2))
+        .remove(any(), eq(shouldDeleteRatisLogDirectory), eq(!shouldDeleteRatisLogDirectory));
   }
 
   @Test
@@ -113,20 +118,20 @@ public class TestClosePipelineCommandHandler {
         new ClosePipelineCommand(pipelineID);
     stateContext = ContainerTestUtils.getMockContext(currentDatanode, conf);
 
-    XceiverServerRatis writeChannel = Mockito.mock(XceiverServerRatis.class);
-    Mockito.when(ozoneContainer.getWriteChannel()).thenReturn(writeChannel);
+    XceiverServerRatis writeChannel = mock(XceiverServerRatis.class);
+    when(ozoneContainer.getWriteChannel()).thenReturn(writeChannel);
     // When the pipeline has been closed earlier by other datanode that received a close pipeline command
-    Mockito.when(writeChannel.isExist(pipelineID.getProtobuf())).thenReturn(false);
+    when(writeChannel.isExist(pipelineID.getProtobuf())).thenReturn(false);
 
     final ClosePipelineCommandHandler commandHandler =
         new ClosePipelineCommandHandler(conf, MoreExecutors.directExecutor());
     commandHandler.handle(command, ozoneContainer, stateContext, connectionManager);
 
-    Mockito.verify(writeChannel, Mockito.times(0))
+    verify(writeChannel, times(0))
         .removeGroup(pipelineID.getProtobuf());
 
-    Mockito.verify(raftClientGroupManager, Mockito.times(0))
-        .remove(Mockito.any(), Mockito.anyBoolean(), Mockito.anyBoolean());
+    verify(raftClientGroupManager, times(0))
+        .remove(any(), anyBoolean(), anyBoolean());
   }
 
   private List<DatanodeDetails> getDatanodes() {
