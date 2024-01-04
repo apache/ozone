@@ -3198,8 +3198,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                            String contToken)
       throws IOException {
 
-//    metrics.incListOpenFiles();  // TODO: Do we want a counter for this?
+    metrics.incNumListOpenFiles();
 
+    // Admin check
+    // TODO: Dedup
     final UserGroupInformation ugi = getRemoteUser();
     if (!isAdmin(ugi)) {
       final OMException omEx = new OMException(
@@ -3207,6 +3209,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           PERMISSION_DENIED);
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           OMAction.LIST_OPEN_FILES, new LinkedHashMap<>(), omEx));
+      metrics.incNumListOpenFilesFails();
       throw omEx;
     }
 
@@ -3219,20 +3222,29 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       openKeyTable =
           metadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
     } else {
-      // path is bucket or prefix level, break it down into volume, bucket, pfx
+      // path is bucket or key prefix, break it down to volume, bucket, prefix
       StringTokenizer tokenizer = new StringTokenizer(path, OM_KEY_PREFIX);
 
       // Validate path to avoid NoSuchElementException
       if (tokenizer.countTokens() < 3) {
+        metrics.incNumListOpenFilesFails();
         throw new OMException("Invalid path: " + path + ". " +
-            "Path should either be at the root level or bucket level",
+            "Only root level or bucket level path is supported at this time",
             INVALID_PATH);
       }
+
       final String volumeName = tokenizer.nextToken();
       final String bucketName = tokenizer.nextToken();
 
-      // getBucketInfo throws when volume or bucket does not exist (as expected)
-      OmBucketInfo bucketInfo = getBucketInfo(volumeName, bucketName);
+      OmBucketInfo bucketInfo;
+      try {
+        // getBucketInfo throws when volume or bucket does not exist,
+        // as expected
+        bucketInfo = getBucketInfo(volumeName, bucketName);
+      } catch (Exception ex) {
+        metrics.incNumListOpenFilesFails();
+        throw ex;
+      }
 
       openKeyTable =
           metadataManager.getOpenKeyTable(bucketInfo.getBucketLayout());
@@ -3246,6 +3258,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
 
       if (contToken == null || contToken.isEmpty()) {
+        // TODO: Add helper method for this
         switch (bucketInfo.getBucketLayout()) {
         case FILE_SYSTEM_OPTIMIZED:
           final long volumeId = metadataManager.getVolumeId(volumeName);
@@ -3256,7 +3269,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
               Long.toString(volumeId),
               Long.toString(bucketId),
               keyPrefix);
-          // TODO: Add new helper method?
           break;
         case OBJECT_STORE:
         case LEGACY:
