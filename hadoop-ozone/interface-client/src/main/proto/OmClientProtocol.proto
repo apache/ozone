@@ -146,6 +146,8 @@ enum Type {
   SetSnapshotProperty = 128;
   ListStatusLight = 129;
   GetSnapshotInfo = 130;
+
+  ListOpenFiles = 132;
 }
 
 enum SafeMode {
@@ -281,6 +283,8 @@ message OMRequest {
   optional MultipartUploadsExpiredAbortRequest multipartUploadsExpiredAbortRequest = 126;
   optional SetSnapshotPropertyRequest       SetSnapshotPropertyRequest     = 127;
   optional SnapshotInfoRequest              SnapshotInfoRequest            = 128;
+
+  optional ListOpenFilesRequest             ListOpenFilesRequest           = 132;
 }
 
 message OMResponse {
@@ -403,6 +407,8 @@ message OMResponse {
   optional ListStatusLightResponse           listStatusLightResponse       = 129;
   optional SnapshotInfoResponse              SnapshotInfoResponse          = 130;
   optional OMLockDetailsProto                omLockDetails                 = 131;
+
+  optional ListOpenFilesResponse             ListOpenFilesResponse         = 132;
 }
 
 enum Status {
@@ -1522,6 +1528,32 @@ message CancelPrepareRequest {
 message CancelPrepareResponse {
 
 }
+
+message ListOpenFilesRequest {
+  optional string path = 1;
+  optional uint64 count = 2;
+  optional string token = 3;
+}
+
+message ListOpenFilesResponse {
+  // size of openKeyTable (may not be reliable due to how RocksDB returns count)
+  optional uint64 globalTotal = 1;
+  // if true, indicates that there are remaining entries under the path
+  optional bool hasMore = 2;
+  // result
+  repeated uint64 clientID = 3;
+  repeated KeyInfo keyInfo = 4;
+  // row count with the path prefix
+//  optional uint64 totalUnderPath = 2;
+  // remaining rows that are not returned after this batch of result
+//  optional uint64 remainingUnderPath = 3;
+//  repeated OpenKeyInfoWithClientID openFiles = 4;
+}
+
+//message OpenKeyInfoWithClientID {
+//  optional uint64 clientID = 1;
+//  optional KeyInfo keyInfo = 2;
+//}
 
 message ServicePort {
     enum Type {

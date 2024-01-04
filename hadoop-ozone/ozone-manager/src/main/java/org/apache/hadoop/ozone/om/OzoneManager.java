@@ -43,6 +43,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.StringTokenizer;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
@@ -88,6 +89,8 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
+import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
@@ -260,6 +263,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAU
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
@@ -298,7 +302,9 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETE
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_AUTH_METHOD;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_PATH;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.s3.S3SecretStoreConfigurationKeys.DEFAULT_SECRET_STORAGE_TYPE;
@@ -3184,6 +3190,132 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public ServiceInfoEx getServiceInfo() throws IOException {
     return serviceInfo.provide();
+  }
+
+  @Override
+  public ListOpenFilesResult listOpenFiles(String path,
+                                           long maxKeys,
+                                           String contToken)
+      throws IOException {
+
+//    metrics.incListOpenFiles();  // TODO: Do we want a counter for this?
+
+    final UserGroupInformation ugi = getRemoteUser();
+    if (!isAdmin(ugi)) {
+      final OMException omEx = new OMException(
+          "Only Ozone admins are allowed to list open files.",
+          PERMISSION_DENIED);
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          OMAction.LIST_OPEN_FILES, new LinkedHashMap<>(), omEx));
+      throw omEx;
+    }
+
+    final String dbOpenKeyPrefix;
+    final Table<String, OmKeyInfo> openKeyTable;
+    if (path == null || path.isEmpty() || path.equals(OM_KEY_PREFIX)) {
+      // path is root
+      dbOpenKeyPrefix = "";
+      // default to FSO. TODO: Add client option to pass OBS/LEGACY?
+      openKeyTable =
+          metadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    } else {
+      // path is bucket or prefix level, break it down into volume, bucket, pfx
+      StringTokenizer tokenizer = new StringTokenizer(path, OM_KEY_PREFIX);
+
+      // Validate path to avoid NoSuchElementException
+      if (tokenizer.countTokens() < 3) {
+        throw new OMException("Invalid path: " + path + ". " +
+            "Path should either be at the root level or bucket level",
+            INVALID_PATH);
+      }
+      final String volumeName = tokenizer.nextToken();
+      final String bucketName = tokenizer.nextToken();
+
+      // getBucketInfo throws when volume or bucket does not exist (as expected)
+      OmBucketInfo bucketInfo = getBucketInfo(volumeName, bucketName);
+
+      openKeyTable =
+          metadataManager.getOpenKeyTable(bucketInfo.getBucketLayout());
+
+      final String keyPrefix;
+      if (tokenizer.hasMoreTokens()) {
+        // Collect the rest but trim the leading "/"
+        keyPrefix = tokenizer.nextToken("").substring(1);
+      } else {
+        keyPrefix = "";
+      }
+
+      if (contToken == null || contToken.isEmpty()) {
+        switch (bucketInfo.getBucketLayout()) {
+        case FILE_SYSTEM_OPTIMIZED:
+          final long volumeId = metadataManager.getVolumeId(volumeName);
+          final long bucketId = metadataManager.getBucketId(volumeName,
+              bucketName);
+          // FSO keyPrefix could look like: -9223372036854774527/key1
+          dbOpenKeyPrefix = metadataManager.getOzoneKey(
+              Long.toString(volumeId),
+              Long.toString(bucketId),
+              keyPrefix);
+          // TODO: Add new helper method?
+          break;
+        case OBJECT_STORE:
+        case LEGACY:
+          dbOpenKeyPrefix = metadataManager.getOzoneKey(
+              volumeName,
+              bucketName,
+              keyPrefix);
+          break;
+        default:
+          throw new OMException("Unsupported bucket layout: " +
+              bucketInfo.getBucketLayout(), NOT_SUPPORTED_OPERATION);
+        }
+      } else {
+        dbOpenKeyPrefix = contToken;
+      }
+    }
+
+    // TODO: Move inner impl to OmMetadataManagerImpl?
+    List<OpenKeySession> openKeySessionList = new ArrayList<>();
+    int currentCount = 0;
+    final boolean hasMore;
+
+    // TODO: If we want better results, we may want to iterate cache like
+    //  {@link OmMetadataManagerImpl.listKeys} do. But that complicates the
+    //  iteration logic by quite a bit. If we do that, we would want to refactor
+    //  listKeys as well to share the common code.
+
+    // No lock needed since table iterator creates a "snapshot"
+    try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+             keyIter = openKeyTable.iterator()) {
+      keyIter.seek(dbOpenKeyPrefix);
+      KeyValue<String, OmKeyInfo> kv;
+      while (currentCount < maxKeys + 1 && keyIter.hasNext()) {
+        kv = keyIter.next();
+        if (kv != null && kv.getKey().startsWith(dbOpenKeyPrefix)) {
+          String dbKey = kv.getKey();
+          long clientID = OMMetadataManager.getClientIDFromOpenKeyDBKey(dbKey);
+          OmKeyInfo omKeyInfo = kv.getValue();
+          openKeySessionList.add(
+              new OpenKeySession(
+                  clientID,
+                  omKeyInfo,
+                  omKeyInfo.getLatestVersionLocations().getVersion()));
+        }
+      }
+
+      // Set hasMore flag as a hint for client-side pagination
+      if (keyIter.hasNext()) {
+        kv = keyIter.next();
+        hasMore = kv != null && kv.getKey().startsWith(dbOpenKeyPrefix);
+      } else {
+        hasMore = false;
+      }
+    }
+
+    return new ListOpenFilesResult(
+        openKeySessionList,
+        hasMore,
+        openKeyTable.getEstimatedKeyCount());
   }
 
   @Override

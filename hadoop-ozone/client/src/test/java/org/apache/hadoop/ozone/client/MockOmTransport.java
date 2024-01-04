@@ -45,6 +45,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVol
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocationList;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListOpenFilesRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListOpenFilesResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -125,6 +127,10 @@ public class MockOmTransport implements OmTransport {
       return response(payload,
           r -> r.setServiceListResponse(
               serviceList(payload.getServiceListRequest())));
+    case ListOpenFiles:
+      return response(payload,
+          r -> r.setListOpenFilesResponse(
+              listOpenFiles(payload.getListOpenFilesRequest())));
     case AllocateBlock:
       return response(payload, r -> r.setAllocateBlockResponse(
           allocateBlock(payload.getAllocateBlockRequest())));
@@ -322,6 +328,11 @@ public class MockOmTransport implements OmTransport {
       ServiceListRequest serviceListRequest) {
     return ServiceListResponse.newBuilder()
         .build();
+  }
+
+  private ListOpenFilesResponse listOpenFiles(
+      ListOpenFilesRequest listOpenFilesRequest) {
+    return ListOpenFilesResponse.newBuilder().build();
   }
 
   private OMResponse response(OMRequest payload,

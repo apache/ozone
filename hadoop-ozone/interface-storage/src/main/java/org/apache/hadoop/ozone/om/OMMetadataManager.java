@@ -55,6 +55,8 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+
 /**
  * OM metadata manager interface.
  */
@@ -148,6 +150,17 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @return bytes of DB key.
    */
   String getOpenKey(String volume, String bucket, String key, long id);
+
+  /**
+   * Returns client ID in Long of an OpenKeyTable DB Key String.
+   * @param dbOpenKeyName An OpenKeyTable DB Key String.
+   * @return Client ID (Long)
+   */
+  static long getClientIDFromOpenKeyDBKey(String dbOpenKeyName) {
+    final int lastPrefix = dbOpenKeyName.lastIndexOf(OM_KEY_PREFIX);
+    final String clientIdString = dbOpenKeyName.substring(lastPrefix + 1);
+    return Long.parseLong(clientIdString);
+  }
 
   /**
    * Given a volume, check if it is empty, i.e there are no buckets inside it.

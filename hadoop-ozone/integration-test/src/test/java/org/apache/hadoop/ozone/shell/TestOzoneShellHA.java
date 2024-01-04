@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
@@ -71,6 +72,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -547,6 +549,44 @@ public class TestOzoneShellHA {
         "localhost:" + cluster.getStorageContainerManager().getClientRpcPort(),
         factor, "--type=RATIS"};
     execute(ozoneAdminShell, args);
+  }
+
+  @Test
+  public void testOzoneAdminCmdListOpenFiles()
+      throws IOException, InterruptedException {
+    final String volumeName = "volumelof";
+
+    final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
+//    final String hostPrefix = OZONE_OFS_URI_SCHEME + "://localhost:9862";
+    OzoneConfiguration clientConf =
+        getClientConfForOFS(hostPrefix, cluster.getConf());
+//        getClientConfForOFS(hostPrefix, new OzoneConfiguration());
+    FileSystem fs = FileSystem.get(clientConf);
+
+    String dir1 = hostPrefix + OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX +
+        "buck1" + OM_KEY_PREFIX + "dir1";
+    assertTrue(fs.mkdirs(new Path(dir1)));
+    String key1 = dir1 + OM_KEY_PREFIX + "key1";
+
+    // Create key1
+    try (FSDataOutputStream out = fs.create(new Path(key1))) {
+      out.write(1);
+      // Wait for flush
+//      cluster.getOzoneManager().awaitDoubleBufferFlush();
+
+      // Hold the file open, run listopenfiles
+      String[] args = new String[] {"om", "listopenfiles", "-id", omServiceId,
+          "-p", "/volumelof/buck1"};
+      // TODO: Possible to make this work under volume level as well?
+      execute(ozoneAdminShell, args);
+      // Check result
+    }
+
+    // TODO: Test pagination
+
+    // TODO: Test with OBS/LEGACY bucket
+
+    // TODO: Cleanup
   }
 
   /**
