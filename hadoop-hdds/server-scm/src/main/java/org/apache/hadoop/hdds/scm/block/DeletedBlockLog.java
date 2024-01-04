@@ -20,18 +20,15 @@ package org.apache.hadoop.hdds.scm.block;
 import java.util.Set;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto
-    .DeleteBlockTransactionResult;
-import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 
 /**
  * The DeletedBlockLog is a persisted log in SCM to keep tracking
@@ -53,7 +50,7 @@ public interface DeletedBlockLog extends Closeable {
    */
   DatanodeDeletedBlockTransactions getTransactions(
       int blockDeletionLimit, Set<DatanodeDetails> dnList)
-      throws IOException, TimeoutException;
+      throws IOException;
 
   /**
    * Return the failed transactions in the log. A transaction is
@@ -77,7 +74,7 @@ public interface DeletedBlockLog extends Closeable {
    * @param txIDs - transaction ID.
    */
   void incrementCount(List<Long> txIDs)
-      throws IOException, TimeoutException;
+      throws IOException;
 
 
   /**
@@ -86,17 +83,36 @@ public interface DeletedBlockLog extends Closeable {
    * @param txIDs transactionId list to be reset
    * @return num of successful reset
    */
-  int resetCount(List<Long> txIDs) throws IOException, TimeoutException;
+  int resetCount(List<Long> txIDs) throws IOException;
 
   /**
-   * Commits a transaction means to delete all footprints of a transaction
-   * from the log. This method doesn't guarantee all transactions can be
-   * successfully deleted, it tolerate failures and tries best efforts to.
-   *  @param transactionResults - delete block transaction results.
-   * @param dnID - ID of datanode which acknowledges the delete block command.
+   * Records the creation of a transaction for a DataNode.
+   *
+   * @param dnId The identifier of the DataNode.
+   * @param scmCmdId The ID of the SCM command.
+   * @param dnTxSet Set of transaction IDs for the DataNode.
    */
-  void commitTransactions(List<DeleteBlockTransactionResult> transactionResults,
-      UUID dnID);
+  void recordTransactionCreated(
+      UUID dnId, long scmCmdId, Set<Long> dnTxSet);
+
+  /**
+   * Handles the cleanup process when a DataNode is reported dead. This method
+   * is responsible for updating or cleaning up the transaction records
+   * associated with the dead DataNode.
+   *
+   * @param dnId The identifier of the dead DataNode.
+   */
+  void onDatanodeDead(UUID dnId);
+
+  /**
+   * Records the event of sending a block deletion command to a DataNode. This
+   * method is called when a command is successfully dispatched to a DataNode,
+   * and it helps in tracking the status of the command.
+   *
+   * @param dnId Details of the DataNode.
+   * @param scmCommand The block deletion command sent.
+   */
+  void onSent(DatanodeDetails dnId, SCMCommand<?> scmCommand);
 
   /**
    * Creates block deletion transactions for a set of containers,
@@ -112,7 +128,7 @@ public interface DeletedBlockLog extends Closeable {
    * @throws IOException
    */
   void addTransactions(Map<Long, List<Long>> containerBlocksMap)
-      throws IOException, TimeoutException;
+      throws IOException;
 
   /**
    * Returns the total number of valid transactions. A transaction is

@@ -230,17 +230,22 @@ public class RocksDBStoreMetrics implements MetricsSource {
           cfPros[index][0], e);
     }
 
-    // Calculate number of files per level and size per level
-    Map<String, Map<Integer, Map<String, Long>>> data = computeSstFileStat();
+    try {
+      // Calculate number of files per level and size per level
+      Map<String, Map<Integer, Map<String, Long>>> data = computeSstFileStat();
 
-    // Export file number
-    exportSstFileStat(rb, data.get(NUM_FILES_AT_LEVEL), NUM_FILES_AT_LEVEL);
+      // Export file number
+      exportSstFileStat(rb, data.get(NUM_FILES_AT_LEVEL), NUM_FILES_AT_LEVEL);
 
-    // Export file total size
-    exportSstFileStat(rb, data.get(SIZE_AT_LEVEL), SIZE_AT_LEVEL);
+      // Export file total size
+      exportSstFileStat(rb, data.get(SIZE_AT_LEVEL), SIZE_AT_LEVEL);
+    } catch (IOException e) {
+      LOG.error("Failed to compute sst file stat", e);
+    }
   }
 
-  private Map<String, Map<Integer, Map<String, Long>>> computeSstFileStat() {
+  private Map<String, Map<Integer, Map<String, Long>>> computeSstFileStat()
+      throws IOException {
     // Calculate number of files per level and size per level
     List<LiveFileMetaData> liveFileMetaDataList =
         rocksDB.getLiveFilesMetaData();
@@ -292,7 +297,11 @@ public class RocksDBStoreMetrics implements MetricsSource {
   }
 
   private void getLatestSequenceNumber(MetricsRecordBuilder rb) {
-    rb.addCounter(Interns.info(LAST_SEQUENCE_NUMBER, "RocksDBStat"),
-        rocksDB.getLatestSequenceNumber());
+    try {
+      rb.addCounter(Interns.info(LAST_SEQUENCE_NUMBER, "RocksDBStat"),
+          rocksDB.getLatestSequenceNumber());
+    } catch (IOException e) {
+      LOG.error("Failed to get latest sequence number", e);
+    }
   }
 }

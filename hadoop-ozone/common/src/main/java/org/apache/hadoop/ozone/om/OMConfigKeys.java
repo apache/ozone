@@ -33,6 +33,10 @@ public final class OMConfigKeys {
       "ozone.om.snapshot.sst_dumptool.pool.size";
   public static final int
       OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE_DEFAULT = 1;
+
+  public static final String OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB =
+      "ozone.om.snapshot.load.native.lib";
+  public static final boolean OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT = true;
   public static final String
       OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE =
       "ozone.om.snapshot.sst_dumptool.buffer.size";
@@ -142,6 +146,26 @@ public final class OMConfigKeys {
   public static final int OZONE_OM_OPEN_KEY_CLEANUP_LIMIT_PER_TASK_DEFAULT =
       1000;
 
+  public static final String OZONE_OM_MPU_CLEANUP_SERVICE_INTERVAL =
+      "ozone.om.open.mpu.cleanup.service.interval";
+  public static final String
+      OZONE_OM_MPU_CLEANUP_SERVICE_INTERVAL_DEFAULT = "24h";
+
+  public static final String OZONE_OM_MPU_CLEANUP_SERVICE_TIMEOUT =
+      "ozone.om.open.mpu.cleanup.service.timeout";
+  public static final String OZONE_OM_MPU_CLEANUP_SERVICE_TIMEOUT_DEFAULT
+      = "300s";
+
+  public static final String OZONE_OM_MPU_EXPIRE_THRESHOLD =
+      "ozone.om.open.mpu.expire.threshold";
+  public static final String OZONE_OM_MPU_EXPIRE_THRESHOLD_DEFAULT =
+      "30d";
+
+  public static final String OZONE_OM_MPU_PARTS_CLEANUP_LIMIT_PER_TASK =
+      "ozone.om.open.mpu.parts.cleanup.limit.per.task";
+  public static final int OZONE_OM_MPU_PARTS_CLEANUP_LIMIT_PER_TASK_DEFAULT =
+      1000;
+
   public static final String OZONE_OM_METRICS_SAVE_INTERVAL =
       "ozone.om.save.metrics.interval";
   public static final String OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT = "5m";
@@ -201,6 +225,11 @@ public final class OMConfigKeys {
       = "ozone.om.ratis.snapshot.auto.trigger.threshold";
   public static final long
       OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_DEFAULT = 400000;
+
+  public static final String OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY
+      = "ozone.om.ratis.snapshot.max.total.sst.size";
+  public static final long
+      OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT = 100_000_000;
 
   // OM Ratis server configurations
   public static final String OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_KEY
@@ -361,9 +390,24 @@ public final class OMConfigKeys {
   public static final String OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT
       = "60s";
 
+  /**
+   * Configuration properties for Snapshot Directory Service.
+   */
+  public static final String OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL =
+      "ozone.snapshot.directory.service.interval";
+  public static final String OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL_DEFAULT
+      = "24h";
+  public static final String OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT =
+      "ozone.snapshot.directory.service.timeout";
+  public static final String
+      OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT_DEFAULT = "300s";
+
   public static final String OZONE_PATH_DELETING_LIMIT_PER_TASK =
       "ozone.path.deleting.limit.per.task";
-  public static final int OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT = 10000;
+  // default is 6000 taking account of 32MB buffer size, and assuming
+  // 4KB size (considering acls, key/file name, and other meata)  * 6000
+  // resulting 24MB
+  public static final int OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT = 6000;
 
   public static final String SNAPSHOT_SST_DELETING_LIMIT_PER_TASK =
       "ozone.snapshot.filtering.limit.per.task";
@@ -378,6 +422,12 @@ public final class OMConfigKeys {
   public static final String
       OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT = "60s";
 
+  public static final String
+      OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT =
+      "ozone.om.snapshot.checkpoint.dir.creation.poll.timeout";
+
+  public static final String
+      OZONE_SNAPSHOT_CHECKPOINT_DIR_CREATION_POLL_TIMEOUT_DEFAULT = "20s";
 
   public static final String OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH =
       "ozone.om.grpc.maximum.response.length";
@@ -489,11 +539,21 @@ public final class OMConfigKeys {
 
   public static final boolean OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT = false;
 
+  public static final String OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS =
+      "ozone.om.snapshot.diff.disable.native.libs";
+
+  public static final boolean
+      OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS_DEFAULT = false;
   public static final String OZONE_OM_SNAPSHOT_DIFF_DB_DIR
       = "ozone.om.snapshot.diff.db.dir";
 
   public static final String OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE
       = "ozone.om.snapshot.diff.max.page.size";
+
+  public static final String OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES
+      = "ozone.om.snapshot.db.max.open.files";
+  public static final int OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES_DEFAULT
+      = 100;
   public static final int OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT
       = 1000;
 
@@ -522,7 +582,7 @@ public final class OMConfigKeys {
       = "ozone.om.snapshot.diff.cleanup.service.run.internal";
   public static final long
       OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT
-      = TimeUnit.HOURS.toMillis(1);
+      = TimeUnit.MINUTES.toMillis(1);
 
   public static final String OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT
       = "ozone.om.snapshot.diff.cleanup.service.timeout";
@@ -536,4 +596,14 @@ public final class OMConfigKeys {
   public static final long
       OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB_DEFAULT
       = 10_000_000;
+
+  public static final String OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE
+      = "ozone.om.upgrade.quota.recalculate.enabled";
+
+  public static final boolean OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE_DEFAULT
+      = true;
+
+  public static final String OZONE_OM_MAX_BUCKET =
+      "ozone.om.max.buckets";
+  public static final int OZONE_OM_MAX_BUCKET_DEFAULT = 100000;
 }

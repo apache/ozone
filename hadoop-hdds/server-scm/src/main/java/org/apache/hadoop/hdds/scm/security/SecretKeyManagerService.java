@@ -21,19 +21,18 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.LocalSecretKeyStore;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyConfig;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyState;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyStore;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -45,6 +44,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_CERT_STORAGE_DIR;
 public class SecretKeyManagerService implements SCMService, Runnable {
   public static final Logger LOG =
       LoggerFactory.getLogger(SecretKeyManagerService.class);
+
+  private static final String SERVICE_NAME =
+      SecretKeyManagerService.class.getSimpleName();
 
   private final SCMContext scmContext;
   private final SecretKeyManager secretKeyManager;
@@ -78,7 +80,7 @@ public class SecretKeyManagerService implements SCMService, Runnable {
 
     scheduler = Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat(getServiceName())
+            .setNameFormat(scmContext.threadNamePrefix() + getServiceName())
             .build());
 
     start();
@@ -94,9 +96,9 @@ public class SecretKeyManagerService implements SCMService, Runnable {
           scheduler.schedule(() -> {
             try {
               secretKeyManager.checkAndInitialize();
-            } catch (TimeoutException e) {
+            } catch (Exception e) {
               throw new RuntimeException(
-                  "Timeout replicating initialized state.", e);
+                  "Error replicating initialized state.", e);
             }
           }, 0, TimeUnit.SECONDS);
         }
@@ -127,15 +129,15 @@ public class SecretKeyManagerService implements SCMService, Runnable {
     }
 
     try {
-      secretKeyManager.checkAndRotate();
-    } catch (TimeoutException e) {
+      secretKeyManager.checkAndRotate(false);
+    } catch (Exception e) {
       LOG.error("Error occurred when updating SecretKeys.", e);
     }
   }
 
   @Override
   public String getServiceName() {
-    return SecretKeyManagerService.class.getSimpleName();
+    return SERVICE_NAME;
   }
 
   @Override

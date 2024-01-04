@@ -42,7 +42,9 @@ public enum OMLayoutFeature implements LayoutFeature {
 
   HSYNC(4, "Support hsync"),
 
-  FILESYSTEM_SNAPSHOT(5, "Ozone version supporting snapshot");
+  FILESYSTEM_SNAPSHOT(5, "Ozone version supporting snapshot"),
+
+  QUOTA(6, "Ozone quota re-calculate");
 
   ///////////////////////////////  /////////////////////////////
   //    Example OM Layout Feature with Actions

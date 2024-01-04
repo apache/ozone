@@ -74,7 +74,7 @@ public class DatanodeSchemaTwoDBDefinition
           Long.class,
           LongCodec.get(),
           StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.class,
-          Proto2Codec.get(DeletedBlocksTransaction.class));
+          Proto2Codec.get(DeletedBlocksTransaction.getDefaultInstance()));
 
   public DatanodeSchemaTwoDBDefinition(String dbPath,
       ConfigurationSource config) {

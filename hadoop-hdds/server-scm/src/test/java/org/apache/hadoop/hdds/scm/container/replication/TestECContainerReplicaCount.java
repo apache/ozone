@@ -45,6 +45,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Tests for EcContainerReplicaCounts.
@@ -282,7 +283,7 @@ public class TestECContainerReplicaCount {
     Assertions.assertEquals(4, rcnt.additionalMaintenanceCopiesNeeded(false));
     Set<Integer> maintenanceOnly = rcnt.maintenanceOnlyIndexes(false);
     for (int i = 1; i <= repConfig.getRequiredNodes(); i++) {
-      Assertions.assertTrue(maintenanceOnly.contains(i));
+      assertThat(maintenanceOnly).contains(i);
     }
 
     // include pending adds but still have insufficient replication
@@ -320,7 +321,7 @@ public class TestECContainerReplicaCount {
     // Even though we don't need new copies, the following call will return
     // any indexes only have a maintenance copy.
     Assertions.assertEquals(1, rcnt.maintenanceOnlyIndexes(false).size());
-    Assertions.assertTrue(rcnt.maintenanceOnlyIndexes(false).contains(5));
+    assertThat(rcnt.maintenanceOnlyIndexes(false)).contains(5);
   }
 
   @Test
@@ -341,8 +342,8 @@ public class TestECContainerReplicaCount {
     // Even though we don't need new copies, the following call will return
     // any indexes only have a maintenance copy.
     Assertions.assertEquals(2, rcnt.maintenanceOnlyIndexes(false).size());
-    Assertions.assertTrue(rcnt.maintenanceOnlyIndexes(false).contains(1));
-    Assertions.assertTrue(rcnt.maintenanceOnlyIndexes(false).contains(5));
+    assertThat(rcnt.maintenanceOnlyIndexes(false)).contains(1);
+    assertThat(rcnt.maintenanceOnlyIndexes(false)).contains(5);
   }
 
   @Test
@@ -372,7 +373,7 @@ public class TestECContainerReplicaCount {
     // Even though we don't need new copies, the following call will return
     // any indexes only have a maintenance copy.
     Assertions.assertEquals(1, rcnt.maintenanceOnlyIndexes(false).size());
-    Assertions.assertTrue(rcnt.maintenanceOnlyIndexes(false).contains(5));
+    assertThat(rcnt.maintenanceOnlyIndexes(false)).contains(5);
   }
 
   @Test
@@ -417,8 +418,8 @@ public class TestECContainerReplicaCount {
     Assertions.assertEquals(0, rcnt.maintenanceOnlyIndexes(false).size());
 
     Assertions.assertEquals(2, rcnt.unavailableIndexes(true).size());
-    Assertions.assertTrue(rcnt.unavailableIndexes(true).contains(4));
-    Assertions.assertTrue(rcnt.unavailableIndexes(true).contains(5));
+    assertThat(rcnt.unavailableIndexes(true)).contains(4);
+    assertThat(rcnt.unavailableIndexes(true)).contains(5);
   }
 
   @Test
@@ -441,7 +442,7 @@ public class TestECContainerReplicaCount {
 
     Set<Integer> maintenanceOnly = rcnt.maintenanceOnlyIndexes(true);
     Assertions.assertEquals(1, maintenanceOnly.size());
-    Assertions.assertTrue(maintenanceOnly.contains(5));
+    assertThat(maintenanceOnly).contains(5);
   }
 
   @Test
@@ -483,8 +484,8 @@ public class TestECContainerReplicaCount {
     Assertions.assertFalse(rcnt.isOverReplicated(true));
 
     Assertions.assertEquals(2, rcnt.unavailableIndexes(true).size());
-    Assertions.assertTrue(rcnt.unavailableIndexes(true).contains(1));
-    Assertions.assertTrue(rcnt.unavailableIndexes(true).contains(5));
+    assertThat(rcnt.unavailableIndexes(true)).contains(1);
+    assertThat(rcnt.unavailableIndexes(true)).contains(5);
   }
 
   @Test
@@ -504,9 +505,7 @@ public class TestECContainerReplicaCount {
     Assertions.assertEquals(3, rcnt.additionalMaintenanceCopiesNeeded(true));
     Set<Integer> maintenanceOnly = rcnt.maintenanceOnlyIndexes(true);
     Assertions.assertEquals(4, maintenanceOnly.size());
-    Assertions.assertTrue(
-        maintenanceOnly.contains(2) && maintenanceOnly.contains(3) &&
-            maintenanceOnly.contains(4) && maintenanceOnly.contains(5));
+    assertThat(maintenanceOnly).contains(2, 3, 4, 5);
 
     Assertions.assertEquals(0, rcnt.unavailableIndexes(true).size());
   }
@@ -548,7 +547,7 @@ public class TestECContainerReplicaCount {
   }
 
   @Test
-  public void testMissing() {
+  public void testUnRecoverable() {
     ECContainerReplicaCount rcnt =
         new ECContainerReplicaCount(container, new HashSet<>(),
             Collections.emptyList(), 1);
@@ -557,6 +556,10 @@ public class TestECContainerReplicaCount {
 
     Set<ContainerReplica> replica = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_MAINTENANCE, 2));
+    // The unhealthy replica does not help with recovery even though we now
+    // have 3 replicas.
+    replica.addAll(ReplicationTestUtil.createReplicas(
+        UNHEALTHY, Pair.of(IN_SERVICE, 3)));
     rcnt = new ECContainerReplicaCount(container, replica,
         Collections.emptyList(), 1);
     Assertions.assertTrue(rcnt.isUnrecoverable());
@@ -572,6 +575,74 @@ public class TestECContainerReplicaCount {
     // Not missing as the decommission replicas are still online
     Assertions.assertFalse(rcnt.isUnrecoverable());
     Assertions.assertEquals(0, rcnt.unavailableIndexes(true).size());
+
+    // All unhealthy replicas is still un-recoverable.
+    replica = ReplicationTestUtil.createReplicas(
+        UNHEALTHY, Pair.of(IN_SERVICE, 1),
+        Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3),
+        Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5));
+    rcnt = new ECContainerReplicaCount(container, replica,
+        Collections.emptyList(), 1);
+    // Not missing as the decommission replicas are still online
+    Assertions.assertTrue(rcnt.isUnrecoverable());
+  }
+
+  @Test
+  public void testIsMissingAndUnhealthy() {
+    // No Replicas
+    ECContainerReplicaCount rcnt =
+        new ECContainerReplicaCount(container, new HashSet<>(),
+            Collections.emptyList(), 1);
+    Assertions.assertTrue(rcnt.isMissing());
+    Assertions.assertTrue(rcnt.isUnrecoverable());
+
+    // 1 unhealthy
+    Set<ContainerReplica> replica = ReplicationTestUtil
+        .createReplicas(UNHEALTHY, Pair.of(IN_SERVICE, 1));
+    rcnt = new ECContainerReplicaCount(container, replica,
+        Collections.emptyList(), 1);
+    Assertions.assertTrue(rcnt.isMissing());
+    Assertions.assertTrue(rcnt.isUnrecoverable());
+
+    // 2 unhealthy
+    replica = ReplicationTestUtil
+        .createReplicas(UNHEALTHY, Pair.of(IN_SERVICE, 1),
+            Pair.of(IN_SERVICE, 2));
+    rcnt = new ECContainerReplicaCount(container, replica,
+        Collections.emptyList(), 1);
+    Assertions.assertTrue(rcnt.isMissing());
+    Assertions.assertTrue(rcnt.isUnrecoverable());
+
+    // 3 unhealthy
+    replica = ReplicationTestUtil
+        .createReplicas(UNHEALTHY, Pair.of(IN_SERVICE, 1),
+            Pair.of(IN_SERVICE, 2), Pair.of(IN_SERVICE, 3));
+    rcnt = new ECContainerReplicaCount(container, replica,
+        Collections.emptyList(), 1);
+    Assertions.assertFalse(rcnt.isMissing());
+    Assertions.assertTrue(rcnt.isUnrecoverable());
+
+
+    // 3 replicas, with 1 unhealthy
+    replica = ReplicationTestUtil
+        .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2));
+    replica.addAll(ReplicationTestUtil.createReplicas(
+        UNHEALTHY, Pair.of(IN_SERVICE, 3)));
+    rcnt = new ECContainerReplicaCount(container, replica,
+        Collections.emptyList(), 1);
+    Assertions.assertFalse(rcnt.isMissing());
+    Assertions.assertTrue(rcnt.isUnrecoverable());
+
+    // 4 replicas, with 1 unhealthy
+    replica = ReplicationTestUtil
+        .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_SERVICE, 3));
+    replica.addAll(ReplicationTestUtil.createReplicas(
+        UNHEALTHY, Pair.of(IN_SERVICE, 4)));
+    rcnt = new ECContainerReplicaCount(container, replica,
+        Collections.emptyList(), 1);
+    Assertions.assertFalse(rcnt.isMissing());
+    Assertions.assertFalse(rcnt.isUnrecoverable());
   }
 
   @Test
@@ -616,18 +687,18 @@ public class TestECContainerReplicaCount {
             1);
     Assertions.assertFalse(rcnt.isSufficientlyReplicated(false));
     Assertions.assertTrue(rcnt.isSufficientlyReplicatedForOffline(
-        offlineReplica.getDatanodeDetails()));
+        offlineReplica.getDatanodeDetails(), null));
     Assertions.assertFalse(rcnt.isSufficientlyReplicatedForOffline(
-        offlineNotReplicated.getDatanodeDetails()));
+        offlineNotReplicated.getDatanodeDetails(), null));
 
     // A random DN not hosting a replica for this container should return false.
     Assertions.assertFalse(rcnt.isSufficientlyReplicatedForOffline(
-        MockDatanodeDetails.randomDatanodeDetails()));
+        MockDatanodeDetails.randomDatanodeDetails(), null));
 
     // Passing the IN_SERVICE node should return false even though the
     // replica is on a healthy node
     Assertions.assertFalse(rcnt.isSufficientlyReplicatedForOffline(
-        inServiceReplica.getDatanodeDetails()));
+        inServiceReplica.getDatanodeDetails(), null));
   }
 
   @Test

@@ -53,6 +53,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -78,6 +79,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
@@ -342,12 +344,11 @@ public class TestContainerBalancerTask {
 
     int number = percent * numberOfNodes / 100;
     ContainerBalancerMetrics metrics = containerBalancerTask.getMetrics();
-    Assertions.assertFalse(
-        containerBalancerTask.getCountDatanodesInvolvedPerIteration() > number);
-    Assertions.assertTrue(
-        metrics.getNumDatanodesInvolvedInLatestIteration() > 0);
-    Assertions.assertFalse(
-        metrics.getNumDatanodesInvolvedInLatestIteration() > number);
+    assertThat(containerBalancerTask.getCountDatanodesInvolvedPerIteration())
+        .isLessThanOrEqualTo(number);
+    assertThat(metrics.getNumDatanodesInvolvedInLatestIteration()).isGreaterThan(0);
+    assertThat(metrics.getNumDatanodesInvolvedInLatestIteration())
+        .isLessThanOrEqualTo(number);
     stopBalancer();
   }
 
@@ -443,14 +444,13 @@ public class TestContainerBalancerTask {
     startBalancer(balancerConfiguration);
 
     // balancer should not have moved more size than the limit
-    Assertions.assertFalse(
-        containerBalancerTask.getSizeScheduledForMoveInLatestIteration() >
-        10 * STORAGE_UNIT);
+    assertThat(containerBalancerTask.getSizeScheduledForMoveInLatestIteration())
+        .isLessThanOrEqualTo(10 * STORAGE_UNIT);
 
     long size = containerBalancerTask.getMetrics()
         .getDataSizeMovedGBInLatestIteration();
-    Assertions.assertTrue(size > 0);
-    Assertions.assertFalse(size > 10);
+    assertThat(size).isGreaterThan(0);
+    assertThat(size).isLessThanOrEqualTo(10);
     stopBalancer();
   }
 
@@ -603,7 +603,7 @@ public class TestContainerBalancerTask {
         balancerConfiguration.getExcludeContainers();
     for (ContainerID container :
         containerBalancerTask.getContainerToSourceMap().keySet()) {
-      Assertions.assertFalse(excludeContainers.contains(container));
+      assertThat(excludeContainers).doesNotContain(container);
     }
   }
 
@@ -683,14 +683,15 @@ public class TestContainerBalancerTask {
         .isEmpty());
     Assertions.assertFalse(containerBalancerTask.getContainerToSourceMap()
         .isEmpty());
-    Assertions.assertTrue(0 !=
+    Assertions.assertNotEquals(0,
         containerBalancerTask.getSizeScheduledForMoveInLatestIteration());
   }
 
   @Test
   public void testMetrics()
       throws IllegalContainerBalancerStateException, IOException,
-      InvalidContainerBalancerConfigurationException, TimeoutException {
+      InvalidContainerBalancerConfigurationException, TimeoutException,
+      NodeNotFoundException {
     conf.set("hdds.datanode.du.refresh.period", "1ms");
     balancerConfiguration.setBalancingInterval(Duration.ofMillis(2));
     balancerConfiguration.setThreshold(10);
@@ -699,6 +700,11 @@ public class TestContainerBalancerTask {
     // deliberately set max size per iteration to a low value, 6 GB
     balancerConfiguration.setMaxSizeToMovePerIteration(6 * STORAGE_UNIT);
     balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(100);
+    Mockito.when(moveManager.move(any(), any(), any()))
+           .thenReturn(CompletableFuture.completedFuture(
+               MoveManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY))
+           .thenReturn(CompletableFuture.completedFuture(
+               MoveManager.MoveResult.COMPLETED));
 
     startBalancer(balancerConfiguration);
     stopBalancer();
@@ -707,8 +713,18 @@ public class TestContainerBalancerTask {
     Assertions.assertEquals(determineExpectedUnBalancedNodes(
             balancerConfiguration.getThreshold()).size(),
         metrics.getNumDatanodesUnbalanced());
-    Assertions.assertTrue(metrics.getDataSizeMovedGBInLatestIteration() <= 6);
+    assertThat(metrics.getDataSizeMovedGBInLatestIteration()).isLessThanOrEqualTo(6);
+    assertThat(metrics.getDataSizeMovedGB()).isGreaterThan(0);
     Assertions.assertEquals(1, metrics.getNumIterations());
+    assertThat(metrics.getNumContainerMovesScheduledInLatestIteration()).isGreaterThan(0);
+    Assertions.assertEquals(metrics.getNumContainerMovesScheduled(),
+        metrics.getNumContainerMovesScheduledInLatestIteration());
+    Assertions.assertEquals(metrics.getNumContainerMovesScheduled(),
+        metrics.getNumContainerMovesCompleted() +
+            metrics.getNumContainerMovesFailed() +
+            metrics.getNumContainerMovesTimeout());
+    Assertions.assertEquals(0, metrics.getNumContainerMovesTimeout());
+    Assertions.assertEquals(1, metrics.getNumContainerMovesFailed());
   }
 
   /**
@@ -897,8 +913,8 @@ public class TestContainerBalancerTask {
     Assertions.assertEquals(1,
         containerBalancerTask.getMetrics()
             .getNumContainerMovesCompletedInLatestIteration());
-    Assertions.assertTrue(containerBalancerTask.getMetrics()
-            .getNumContainerMovesTimeoutInLatestIteration() > 1);
+    assertThat(containerBalancerTask.getMetrics()
+            .getNumContainerMovesTimeoutInLatestIteration()).isGreaterThan(1);
     stopBalancer();
 
     /*
@@ -920,8 +936,8 @@ public class TestContainerBalancerTask {
     Assertions.assertEquals(1,
         containerBalancerTask.getMetrics()
             .getNumContainerMovesCompletedInLatestIteration());
-    Assertions.assertTrue(containerBalancerTask.getMetrics()
-        .getNumContainerMovesTimeoutInLatestIteration() > 1);
+    assertThat(containerBalancerTask.getMetrics()
+        .getNumContainerMovesTimeoutInLatestIteration()).isGreaterThan(1);
     stopBalancer();
   }
 
@@ -950,8 +966,8 @@ public class TestContainerBalancerTask {
     rmConf.setEnableLegacy(true);
     startBalancer(balancerConfiguration);
 
-    Assertions.assertTrue(containerBalancerTask.getMetrics()
-        .getNumContainerMovesTimeoutInLatestIteration() > 0);
+    assertThat(containerBalancerTask.getMetrics()
+        .getNumContainerMovesTimeoutInLatestIteration()).isGreaterThan(0);
     Assertions.assertEquals(0, containerBalancerTask.getMetrics()
         .getNumContainerMovesCompletedInLatestIteration());
     stopBalancer();
@@ -966,8 +982,8 @@ public class TestContainerBalancerTask {
 
     rmConf.setEnableLegacy(false);
     startBalancer(balancerConfiguration);
-    Assertions.assertTrue(containerBalancerTask.getMetrics()
-        .getNumContainerMovesTimeoutInLatestIteration() > 0);
+    assertThat(containerBalancerTask.getMetrics()
+        .getNumContainerMovesTimeoutInLatestIteration()).isGreaterThan(0);
     Assertions.assertEquals(0, containerBalancerTask.getMetrics()
         .getNumContainerMovesCompletedInLatestIteration());
     stopBalancer();
@@ -1009,9 +1025,8 @@ public class TestContainerBalancerTask {
     Assertions.assertEquals(
         ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
         containerBalancerTask.getIterationResult());
-    Assertions.assertTrue(
-        containerBalancerTask.getMetrics()
-            .getNumContainerMovesFailed() >= 3);
+    assertThat(containerBalancerTask.getMetrics().getNumContainerMovesFailed())
+        .isGreaterThanOrEqualTo(3);
     stopBalancer();
 
     /*
@@ -1035,12 +1050,12 @@ public class TestContainerBalancerTask {
     Assertions.assertEquals(
         ContainerBalancerTask.IterationResult.ITERATION_COMPLETED,
         containerBalancerTask.getIterationResult());
-    Assertions.assertTrue(
-        containerBalancerTask.getMetrics()
-            .getNumContainerMovesFailed() >= 3);
+    assertThat(containerBalancerTask.getMetrics().getNumContainerMovesFailed())
+        .isGreaterThanOrEqualTo(3);
     stopBalancer();
   }
 
+  @Unhealthy("HDDS-8941")
   @Test
   public void testDelayedStart() throws InterruptedException, TimeoutException {
     conf.setTimeDuration("hdds.scm.wait.time.after.safemode.exit", 10,
@@ -1188,7 +1203,8 @@ public class TestContainerBalancerTask {
         datanodeCapacity = (long) (datanodeUsedSpace / nodeUtilizations.get(i));
       }
       SCMNodeStat stat = new SCMNodeStat(datanodeCapacity, datanodeUsedSpace,
-          datanodeCapacity - datanodeUsedSpace);
+          datanodeCapacity - datanodeUsedSpace, 0,
+          datanodeCapacity - datanodeUsedSpace - 1);
       nodesInCluster.get(i).setScmNodeStat(stat);
       clusterUsedSpace += datanodeUsedSpace;
       clusterCapacity += datanodeCapacity;

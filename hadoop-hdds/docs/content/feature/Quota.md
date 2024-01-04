@@ -90,6 +90,7 @@ Scenario 3:
 
 ### Note:
 - For FSO bucket with recursive deletion of directory, release of quota happens asynchronously after sub directories and files are removed (when directory is removed, recursive deletion can be in-progress in background).
+- When quota is about to reach the limit, and ozone clients (in parallel) commit the files, then file commit will be success for those files meeting the quota and verification will be in order of first come basis at backend.
 
 ## Client usage
 ### Storage Space level quota

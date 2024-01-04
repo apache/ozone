@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.container;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
@@ -30,6 +32,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
@@ -49,6 +52,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.OPEN;
 
 
@@ -118,66 +123,82 @@ public class TestContainerManagerImpl {
         RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), "admin");
     final ContainerID cid = container.containerID();
-    Assertions.assertEquals(HddsProtos.LifeCycleState.OPEN,
+    Assertions.assertEquals(LifeCycleState.OPEN,
         containerManager.getContainer(cid).getState());
     containerManager.updateContainerState(cid,
         HddsProtos.LifeCycleEvent.FINALIZE);
-    Assertions.assertEquals(HddsProtos.LifeCycleState.CLOSING,
+    Assertions.assertEquals(LifeCycleState.CLOSING,
         containerManager.getContainer(cid).getState());
     containerManager.updateContainerState(cid,
         HddsProtos.LifeCycleEvent.QUASI_CLOSE);
-    Assertions.assertEquals(HddsProtos.LifeCycleState.QUASI_CLOSED,
+    Assertions.assertEquals(LifeCycleState.QUASI_CLOSED,
         containerManager.getContainer(cid).getState());
     containerManager.updateContainerState(cid,
         HddsProtos.LifeCycleEvent.FORCE_CLOSE);
-    Assertions.assertEquals(HddsProtos.LifeCycleState.CLOSED,
+    Assertions.assertEquals(LifeCycleState.CLOSED,
         containerManager.getContainer(cid).getState());
   }
 
   @Test
   void testGetContainers() throws Exception {
-    Assertions.assertTrue(
-        containerManager.getContainers().isEmpty());
+    Assertions.assertEquals(emptyList(), containerManager.getContainers());
 
-    ContainerID[] cidArray = new ContainerID[10];
+    List<ContainerID> ids = new ArrayList<>();
     for (int i = 0; i < 10; i++) {
       ContainerInfo container = containerManager.allocateContainer(
-          RatisReplicationConfig.getInstance(
-              ReplicationFactor.THREE), "admin");
-      cidArray[i] = container.containerID();
+          RatisReplicationConfig.getInstance(ReplicationFactor.THREE), "admin");
+      ids.add(container.containerID());
     }
 
-    Assertions.assertEquals(10,
-        containerManager.getContainers(cidArray[0], 10).size());
-    Assertions.assertEquals(10,
-        containerManager.getContainers(cidArray[0], 100).size());
+    assertIds(ids,
+        containerManager.getContainers(ContainerID.MIN, 10));
+    assertIds(ids.subList(0, 5),
+        containerManager.getContainers(ContainerID.MIN, 5));
 
-    containerManager.updateContainerState(cidArray[0],
+    assertIds(ids, containerManager.getContainers(ids.get(0), 10));
+    assertIds(ids, containerManager.getContainers(ids.get(0), 100));
+    assertIds(ids.subList(5, ids.size()),
+        containerManager.getContainers(ids.get(5), 100));
+    assertIds(emptyList(),
+        containerManager.getContainers(ids.get(5), 100, LifeCycleState.CLOSED));
+
+    containerManager.updateContainerState(ids.get(0),
         HddsProtos.LifeCycleEvent.FINALIZE);
-    Assertions.assertEquals(9,
-        containerManager.getContainers(HddsProtos.LifeCycleState.OPEN).size());
-    Assertions.assertEquals(1, containerManager
-        .getContainers(HddsProtos.LifeCycleState.CLOSING).size());
-    containerManager.updateContainerState(cidArray[1],
+    assertIds(ids.subList(0, 1),
+        containerManager.getContainers(LifeCycleState.CLOSING));
+    assertIds(ids.subList(1, ids.size()),
+        containerManager.getContainers(LifeCycleState.OPEN));
+
+    containerManager.updateContainerState(ids.get(1),
         HddsProtos.LifeCycleEvent.FINALIZE);
-    Assertions.assertEquals(8,
-        containerManager.getContainers(HddsProtos.LifeCycleState.OPEN).size());
-    Assertions.assertEquals(2, containerManager
-        .getContainers(HddsProtos.LifeCycleState.CLOSING).size());
-    containerManager.updateContainerState(cidArray[1],
+    assertIds(ids.subList(0, 2),
+        containerManager.getContainers(LifeCycleState.CLOSING));
+    assertIds(ids.subList(2, ids.size()),
+        containerManager.getContainers(LifeCycleState.OPEN));
+
+    containerManager.updateContainerState(ids.get(1),
         HddsProtos.LifeCycleEvent.QUASI_CLOSE);
-    containerManager.updateContainerState(cidArray[2],
+    containerManager.updateContainerState(ids.get(2),
         HddsProtos.LifeCycleEvent.FINALIZE);
-    containerManager.updateContainerState(cidArray[2],
+    containerManager.updateContainerState(ids.get(2),
         HddsProtos.LifeCycleEvent.CLOSE);
     Assertions.assertEquals(7, containerManager.
-        getContainerStateCount(HddsProtos.LifeCycleState.OPEN));
+        getContainerStateCount(LifeCycleState.OPEN));
     Assertions.assertEquals(1, containerManager
-        .getContainerStateCount(HddsProtos.LifeCycleState.CLOSING));
+        .getContainerStateCount(LifeCycleState.CLOSING));
     Assertions.assertEquals(1, containerManager
-        .getContainerStateCount(HddsProtos.LifeCycleState.QUASI_CLOSED));
+        .getContainerStateCount(LifeCycleState.QUASI_CLOSED));
     Assertions.assertEquals(1, containerManager
-        .getContainerStateCount(HddsProtos.LifeCycleState.CLOSED));
+        .getContainerStateCount(LifeCycleState.CLOSED));
+  }
+
+  private static void assertIds(
+      List<ContainerID> expected,
+      List<ContainerInfo> containers
+  ) {
+    Assertions.assertEquals(expected, containers.stream()
+        .map(ContainerInfo::containerID)
+        .collect(toList()));
   }
 
   @Test

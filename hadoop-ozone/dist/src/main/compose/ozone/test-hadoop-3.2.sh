@@ -1,1 +1,0 @@
-../common/hadoop-3.2.sh

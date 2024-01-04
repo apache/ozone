@@ -22,7 +22,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.OutputStream;
 import java.io.PrintStream;
-import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.util.List;
@@ -31,31 +30,27 @@ import java.util.concurrent.TimeoutException;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.log4j.Appender;
 import org.apache.log4j.Layout;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
-import org.apache.log4j.PatternLayout;
-import org.apache.log4j.WriterAppender;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.Assert.assertTrue;
+import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
+import static org.apache.logging.log4j.util.StackLocatorUtil.getCallerClass;
 
 /**
  * Provides some very generic helpers which might be used across the tests.
  */
 public abstract class GenericTestUtils {
-
   public static final String SYSPROP_TEST_DATA_DIR = "test.build.data";
   public static final String DEFAULT_TEST_DATA_DIR;
   public static final String DEFAULT_TEST_DATA_PATH = "target/test/data/";
@@ -145,54 +140,16 @@ public abstract class GenericTestUtils {
    */
   @SuppressWarnings("java:S2245") // no need for secure random
   public static String getRandomizedTempPath() {
-    return getTempPath(RandomStringUtils.randomAlphanumeric(10));
-  }
-
-  /**
-   * Assert that a given file exists.
-   */
-  public static void assertExists(File f) {
-    assertTrue("File " + f + " should exist", f.exists());
+    return getTempPath(getCallerClass(GenericTestUtils.class).getSimpleName()
+        + "-" + randomAlphanumeric(10));
   }
 
   /**
    * Assert that a given dir can be created or it already exists.
    */
   public static void assertDirCreation(File f) {
-    assertTrue("Could not create dir " + f + ", nor does it exist",
-        f.mkdirs() || f.exists());
-  }
-
-  public static void assertExceptionContains(String expectedText, Throwable t) {
-    assertExceptionContains(expectedText, t, "");
-  }
-
-  public static void assertExceptionContains(String expectedText, Throwable t,
-      String message) {
-    Assert.assertNotNull("Null Throwable", t);
-    String msg = t.toString();
-    if (msg == null) {
-      throw new AssertionError("Null Throwable.toString() value", t);
-    } else if (expectedText != null && !msg.contains(expectedText)) {
-      String prefix = StringUtils.isEmpty(message) ? "" : message + ": ";
-      throw new AssertionError(String
-          .format("%s Expected to find '%s' %s: %s", prefix, expectedText,
-              "but got unexpected exception",
-              stringifyException(t)), t);
-    }
-  }
-
-  /**
-   * Make a string representation of the exception.
-   * @param e The exception to stringify
-   * @return A string with exception name and call stack.
-   */
-  public static String stringifyException(Throwable e) {
-    StringWriter stm = new StringWriter();
-    PrintWriter wrt = new PrintWriter(stm);
-    e.printStackTrace(wrt);
-    wrt.close();
-    return stm.toString();
+    Assertions.assertTrue(f.mkdirs() || f.exists(),
+        "Could not create dir " + f + ", nor does it exist");
   }
 
   /**
@@ -312,48 +269,40 @@ public abstract class GenericTestUtils {
   /**
    * Class to capture logs for doing assertions.
    */
-  public static final class LogCapturer {
-    private StringWriter sw = new StringWriter();
-    private WriterAppender appender;
-    private Logger logger;
+  public abstract static class LogCapturer {
+    private final StringWriter sw = new StringWriter();
+
+    public static LogCapturer captureLogs(Logger logger) {
+      return new Log4j1Capturer(logger);
+    }
+
+    public static LogCapturer captureLogs(Logger logger, Layout layout) {
+      return new Log4j1Capturer(logger, layout);
+    }
 
     public static LogCapturer captureLogs(org.slf4j.Logger logger) {
-      return new LogCapturer(toLog4j(logger), getDefaultLayout());
+      return new Log4j1Capturer(toLog4j(logger));
     }
 
-    public static LogCapturer captureLogs(org.slf4j.Logger logger,
-        Layout layout) {
-      return new LogCapturer(toLog4j(logger), layout);
-    }
-
-    private static Layout getDefaultLayout() {
-      Appender defaultAppender = Logger.getRootLogger().getAppender("stdout");
-      if (defaultAppender == null) {
-        defaultAppender = Logger.getRootLogger().getAppender("console");
-      }
-      return (defaultAppender == null) ? new PatternLayout() :
-          defaultAppender.getLayout();
-    }
-
-    private LogCapturer(Logger logger, Layout layout) {
-      this.logger = logger;
-      this.appender = new WriterAppender(layout, sw);
-      logger.addAppender(this.appender);
+    // TODO: let Log4j2Capturer capture only specific logger's logs
+    public static LogCapturer log4j2(String ignoredLoggerName) {
+      return Log4j2Capturer.getInstance();
     }
 
     public String getOutput() {
-      return sw.toString();
+      return writer().toString();
     }
 
-    public void stopCapturing() {
-      logger.removeAppender(appender);
+    public abstract void stopCapturing();
+
+    protected StringWriter writer() {
+      return sw;
     }
 
     public void clearOutput() {
-      sw.getBuffer().setLength(0);
+      writer().getBuffer().setLength(0);
     }
   }
-
   @Deprecated
   public static Logger toLog4j(org.slf4j.Logger logger) {
     return LogManager.getLogger(logger.getName());
@@ -470,6 +419,39 @@ public abstract class GenericTestUtils {
     public void write(byte[] buf, int off, int len) {
       super.write(buf, off, len);
       other.write(buf, off, len);
+    }
+  }
+
+  /**
+   * Helper class to get free port avoiding randomness.
+   */
+  public static final class PortAllocator {
+
+    public static final String HOSTNAME = "localhost";
+    public static final String HOST_ADDRESS = "127.0.0.1";
+    public static final int MIN_PORT = 15000;
+    public static final int MAX_PORT = 32000;
+    public static final AtomicInteger NEXT_PORT = new AtomicInteger(MIN_PORT);
+
+    private PortAllocator() {
+      // no instances
+    }
+
+    public static synchronized int getFreePort() {
+      int port = NEXT_PORT.getAndIncrement();
+      if (port > MAX_PORT) {
+        NEXT_PORT.set(MIN_PORT);
+        port = NEXT_PORT.getAndIncrement();
+      }
+      return port;
+    }
+
+    public static String localhostWithFreePort() {
+      return HOST_ADDRESS + ":" + getFreePort();
+    }
+
+    public static String anyHostWithFreePort() {
+      return "0.0.0.0:" + getFreePort();
     }
   }
 

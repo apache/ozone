@@ -28,11 +28,13 @@ ${VOLUME}    vol${PREFIX}
 *** Keywords ***
 Create Key In EC Bucket
     [arguments]    ${size}
-    ${key} =    Set Variable    /${VOLUME}/ecbucket/${size}
+    ${dir} =    Set Variable    /${VOLUME}/ecbucket/dir
+    ${key} =    Set Variable    ${dir}/${size}
     ${file} =    Set Variable    /tmp/${size}
     Create Key    ${key}    ${file}
     Key Should Match Local File    ${key}      ${file}
     Verify Key EC Replication Config    ${key}    RS    3    2    1048576
+    Verify Key EC Replication Config    ${dir}    RS    3    2    1048576
 
 Get Disk Usage of File with EC RS Replication
                                      [arguments]    ${fileLength}    ${dataChunkCount}    ${parityChunkCount}    ${ecChunkSize}
@@ -82,29 +84,45 @@ Create 3MB Key In EC Bucket
 Create 100MB Key In EC Bucket
     Create Key In EC Bucket    100mb
 
-Create Key in Ratis Bucket
+Create Key in Default Bucket
     ${size} =    Set Variable    1mb
-    ${key} =    Set Variable    /${VOLUME}/default/${size}
+    ${dir} =     Set Variable    /${VOLUME}/default/dir
+    ${key} =     Set Variable    ${dir}/${size}
     ${file} =    Set Variable    /tmp/${size}
     Create Key    ${key}    ${file}
     Key Should Match Local File    ${key}      ${file}
     Verify Key Replica Replication Config   ${key}     RATIS    THREE
+    Verify Key Replica Replication Config   ${dir}     RATIS    THREE
+
+Create Key in Ratis Bucket
+    ${size} =    Set Variable    1mb
+    ${dir} =     Set Variable    /${VOLUME}/ratis/dir
+    ${key} =     Set Variable    ${dir}/${size}
+    ${file} =    Set Variable    /tmp/${size}
+    Create Key    ${key}    ${file}
+    Key Should Match Local File    ${key}      ${file}
+    Verify Key Replica Replication Config   ${key}     RATIS    THREE
+    Verify Key Replica Replication Config   ${dir}     RATIS    THREE
 
 Create Ratis Key In EC Bucket
     ${size} =    Set Variable    1mb
-    ${key} =    Set Variable    /${VOLUME}/ecbucket/${size}Ratis
+    ${dir} =     Set Variable    /${VOLUME}/ecbucket/dir2
+    ${key} =     Set Variable    ${dir}/${size}Ratis
     ${file} =    Set Variable    /tmp/${size}
     Create Key    ${key}    ${file}    --replication=THREE --type=RATIS
     Key Should Match Local File   ${key}    ${file}
     Verify Key Replica Replication Config   ${key}    RATIS   THREE
+    Verify Key EC Replication Config    ${dir}    RS    3    2    1048576
 
 Create EC Key In Ratis Bucket
     ${size} =    Set Variable    1mb
-    ${key} =    Set Variable    /${VOLUME}/ratis/${size}EC
+    ${dir} =     Set Variable    /${VOLUME}/ratis/dir2
+    ${key} =     Set Variable    ${dir}/${size}EC
     ${file} =    Set Variable    /tmp/${size}
     Create Key    ${key}    ${file}    --replication=rs-3-2-1024k --type=EC 
     Key Should Match Local File    ${key}    ${file}
     Verify Key EC Replication Config    ${key}    RS    3    2    1048576
+    Verify Key Replica Replication Config   ${dir}     RATIS    THREE
 
 Test Invalid Replication Parameters
     ${message} =    Execute And Ignore Error    ozone sh bucket create --replication=rs-3-2-1024k --type=RATIS /${VOLUME}/foo

@@ -49,4 +49,4 @@ RpcClient without host
     Test ozone shell      o3://            ${EMPTY}    ${prefix}-without-host
 
 RpcClient Delete key
-   Test Delete key with and without Trash       o3://            om:9862      ${prefix}-with-del
+   Test Delete key with Trash       o3://            om:9862      ${prefix}-with-del

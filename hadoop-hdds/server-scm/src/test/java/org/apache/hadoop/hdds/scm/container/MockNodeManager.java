@@ -227,7 +227,7 @@ public class MockNodeManager implements NodeManager {
         NODES[x % NODES.length].capacity - NODES[x % NODES.length].used;
     newStat.set(
         (NODES[x % NODES.length].capacity),
-        (NODES[x % NODES.length].used), remaining);
+        (NODES[x % NODES.length].used), remaining, 0, 100000);
     this.nodeMetricMap.put(datanodeDetails, newStat);
     aggregateStat.add(newStat);
 
@@ -307,6 +307,10 @@ public class MockNodeManager implements NodeManager {
 
     if (nodestate == DEAD) {
       return deadNodes;
+    }
+
+    if (nodestate == null) {
+      return new ArrayList<>(nodeMetricMap.keySet());
     }
 
     return null;
@@ -916,6 +920,11 @@ public class MockNodeManager implements NodeManager {
   public int minPipelineLimit(List<DatanodeDetails> dn) {
     // by default 1 single node pipeline and 1 three node pipeline
     return numPipelinePerDatanode;
+  }
+
+  @Override
+  public long getLastHeartbeat(DatanodeDetails datanodeDetails) {
+    return -1;
   }
 
   public void setNumPipelinePerDatanode(int value) {

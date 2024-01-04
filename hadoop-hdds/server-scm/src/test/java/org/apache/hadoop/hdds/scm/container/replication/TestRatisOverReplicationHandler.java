@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -35,25 +36,30 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 import org.slf4j.event.Level;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainer;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicasWithSameOrigin;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -73,7 +79,7 @@ public class TestRatisOverReplicationHandler {
   private ReplicationManager replicationManager;
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
 
-  @Before
+  @BeforeEach
   public void setup() throws NodeNotFoundException, NotLeaderException,
       CommandTargetOverloadedException {
     container = createContainer(HddsProtos.LifeCycleState.CLOSED,
@@ -162,7 +168,7 @@ public class TestRatisOverReplicationHandler {
    */
   @Test
   public void testOverReplicatedQuasiClosedContainerWithDifferentOrigins()
-      throws IOException {
+      throws IOException, NodeNotFoundException {
     container = createContainer(HddsProtos.LifeCycleState.QUASI_CLOSED,
         RATIS_REPLICATION_CONFIG);
     Set<ContainerReplica> replicas = createReplicas(container.containerID(),
@@ -179,6 +185,68 @@ public class TestRatisOverReplicationHandler {
 
     testProcessing(replicas, Collections.emptyList(),
         getOverReplicatedHealthResult(), 0);
+
+    /*
+    Now, introduce two UNHEALTHY replicas that share the same origin node as
+    the existing UNHEALTHY replica. They're on decommissioning and stale
+    nodes, respectively. Still no replica should be deleted, because these are
+    likely going away soon anyway.
+     */
+    replicas.add(
+        createContainerReplica(container.containerID(), 0, DECOMMISSIONING,
+            State.UNHEALTHY, container.getNumberOfKeys(),
+            container.getUsedBytes(),
+            MockDatanodeDetails.randomDatanodeDetails(),
+            unhealthyReplica.getOriginDatanodeId()));
+    DatanodeDetails staleNode =
+        MockDatanodeDetails.randomDatanodeDetails();
+    replicas.add(
+        createContainerReplica(container.containerID(), 0, IN_SERVICE,
+            State.UNHEALTHY, container.getNumberOfKeys(),
+            container.getUsedBytes(), staleNode,
+            unhealthyReplica.getOriginDatanodeId()));
+    Mockito.when(replicationManager.getNodeStatus(eq(staleNode)))
+        .thenAnswer(invocation -> {
+          DatanodeDetails dd = invocation.getArgument(0);
+          return new NodeStatus(dd.getPersistedOpState(),
+              HddsProtos.NodeState.STALE, 0);
+        });
+
+    testProcessing(replicas, Collections.emptyList(),
+        getOverReplicatedHealthResult(), 0);
+  }
+
+  @Test
+  public void testClosedOverReplicatedWithAllUnhealthyReplicas()
+      throws IOException {
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        State.UNHEALTHY, 0, 0, 0, 0, 0);
+    List<ContainerReplicaOp> pendingOps = ImmutableList.of(
+        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
+            MockDatanodeDetails.randomDatanodeDetails(), 0));
+
+    // 1 replica is already pending delete, so only 1 new command should be
+    // created
+    testProcessing(replicas, pendingOps, getOverReplicatedHealthResult(),
+        1);
+  }
+
+  @Test
+  public void testClosedOverReplicatedWithExcessUnhealthy() throws IOException {
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        State.CLOSED, 0, 0, 0);
+    ContainerReplica unhealthyReplica =
+        createContainerReplica(container.containerID(), 0, IN_SERVICE,
+            State.UNHEALTHY);
+    replicas.add(unhealthyReplica);
+
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
+        testProcessing(replicas, Collections.emptyList(),
+            getOverReplicatedHealthResult(),
+            1);
+    Pair<DatanodeDetails, SCMCommand<?>> command = commands.iterator().next();
+    assertEquals(unhealthyReplica.getDatanodeDetails(),
+        command.getKey());
   }
 
   /**
@@ -199,6 +267,46 @@ public class TestRatisOverReplicationHandler {
 
     testProcessing(replicas, Collections.emptyList(),
         getOverReplicatedHealthResult(), 0);
+  }
+
+  @Test
+  public void testOverReplicatedAllUnhealthySameBCSID()
+      throws IOException {
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        ContainerReplicaProto.State.UNHEALTHY, 0, 0, 0, 0);
+
+    ContainerReplica shouldDelete = replicas.stream()
+        .sorted(Comparator.comparingLong(ContainerReplica::hashCode))
+        .findFirst().get();
+
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
+        testProcessing(replicas, Collections.emptyList(),
+        getOverReplicatedHealthResult(), 1);
+    Pair<DatanodeDetails, SCMCommand<?>> commandPair
+        = commands.iterator().next();
+    assertEquals(shouldDelete.getDatanodeDetails(),
+        commandPair.getKey());
+  }
+
+  @Test
+  public void testOverReplicatedAllUnhealthyPicksLowestBCSID()
+      throws IOException {
+    final long sequenceID = 20;
+    Set<ContainerReplica> replicas = new HashSet<>();
+    ContainerReplica lowestSequenceIDReplica = createContainerReplica(
+        container.containerID(), 0, IN_SERVICE, State.UNHEALTHY, sequenceID);
+    replicas.add(lowestSequenceIDReplica);
+    for (int i = 1; i < 4; i++) {
+      replicas.add(createContainerReplica(container.containerID(), 0,
+          IN_SERVICE, State.UNHEALTHY, sequenceID + i));
+    }
+    Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
+        testProcessing(replicas, Collections.emptyList(),
+            getOverReplicatedHealthResult(), 1);
+    Pair<DatanodeDetails, SCMCommand<?>> commandPair
+        = commands.iterator().next();
+    assertEquals(lowestSequenceIDReplica.getDatanodeDetails(),
+        commandPair.getKey());
   }
 
   /**
@@ -231,8 +339,7 @@ public class TestRatisOverReplicationHandler {
         replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 2);
     Set<DatanodeDetails> datanodes =
         commands.stream().map(Pair::getKey).collect(Collectors.toSet());
-    Assert.assertTrue(
-        datanodes.contains(quasiClosedReplica.getDatanodeDetails()));
+    assertThat(datanodes).contains(quasiClosedReplica.getDatanodeDetails());
   }
 
   @Test
@@ -255,10 +362,8 @@ public class TestRatisOverReplicationHandler {
         replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1);
     Set<DatanodeDetails> datanodes =
         commands.stream().map(Pair::getKey).collect(Collectors.toSet());
-    Assert.assertFalse(
-        datanodes.contains(decommissioningReplica.getDatanodeDetails()));
-    Assert.assertFalse(
-        datanodes.contains(maintenanceReplica.getDatanodeDetails()));
+    assertThat(datanodes).doesNotContain(decommissioningReplica.getDatanodeDetails());
+    assertThat(datanodes).doesNotContain(maintenanceReplica.getDatanodeDetails());
   }
 
   @Test
@@ -277,6 +382,34 @@ public class TestRatisOverReplicationHandler {
             MockDatanodeDetails.randomDatanodeDetails(), 0));
 
     testProcessing(replicas, pendingOps, getOverReplicatedHealthResult(), 0);
+  }
+  @Test
+  public void testOverReplicationOfQuasiClosedReplicaWithWrongSequenceID()
+      throws IOException {
+    final long sequenceID = 20;
+    container = ReplicationTestUtil.createContainerInfo(
+        RATIS_REPLICATION_CONFIG, 1,
+        HddsProtos.LifeCycleState.CLOSED, sequenceID);
+
+    final Set<ContainerReplica> replicas = new HashSet<>(2);
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.CLOSED, sequenceID));
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, State.CLOSED, sequenceID));
+
+    final ContainerReplica quasiClosedReplica =
+        createContainerReplica(container.containerID(), 0,
+            IN_SERVICE, State.QUASI_CLOSED, sequenceID - 1);
+    replicas.add(quasiClosedReplica);
+    testProcessing(replicas, Collections.emptyList(),
+        getOverReplicatedHealthResult(), 0);
+
+    // Add another CLOSED replica
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, ContainerReplicaProto.State.CLOSED, sequenceID));
+
+    testProcessing(replicas, Collections.emptyList(),
+        getOverReplicatedHealthResult(), 1);
   }
 
   @Test
@@ -314,9 +447,9 @@ public class TestRatisOverReplicationHandler {
     } catch (CommandTargetOverloadedException e) {
       // Expected
     }
-    Assert.assertEquals(1, commandsSent.size());
+    assertEquals(1, commandsSent.size());
     Pair<DatanodeDetails, SCMCommand<?>> cmd = commandsSent.iterator().next();
-    Assert.assertNotEquals(quasiClosedReplica.getDatanodeDetails(),
+    assertNotEquals(quasiClosedReplica.getDatanodeDetails(),
         cmd.getKey());
   }
 
@@ -350,7 +483,7 @@ public class TestRatisOverReplicationHandler {
 
     handler.processAndSendCommands(closedReplicas, Collections.emptyList(),
         getOverReplicatedHealthResult(), 2);
-    Assert.assertEquals(2, commandsSent.size());
+    assertEquals(2, commandsSent.size());
   }
 
   /**
@@ -374,7 +507,7 @@ public class TestRatisOverReplicationHandler {
 
     handler.processAndSendCommands(replicas, pendingOps,
             healthResult, 2);
-    Assert.assertEquals(expectNumCommands, commandsSent.size());
+    assertEquals(expectNumCommands, commandsSent.size());
 
     return commandsSent;
   }

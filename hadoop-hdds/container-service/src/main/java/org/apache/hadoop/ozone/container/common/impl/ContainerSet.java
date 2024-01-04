@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -194,13 +195,14 @@ public class ContainerSet implements Iterable<Container<?>> {
     AtomicBoolean failedVolume = new AtomicBoolean(false);
     AtomicInteger containerCount = new AtomicInteger(0);
     containerMap.values().forEach(c -> {
-      if (c.getContainerData().getVolume().isFailed()) {
-        removeContainer(c.getContainerData().getContainerID());
+      ContainerData data = c.getContainerData();
+      if (data.getVolume().isFailed()) {
+        removeContainer(data.getContainerID());
         LOG.debug("Removing Container {} as the Volume {} " +
-              "has failed", c.getContainerData().getContainerID(),
-            c.getContainerData().getVolume());
+              "has failed", data.getContainerID(), data.getVolume());
         failedVolume.set(true);
         containerCount.incrementAndGet();
+        ContainerLogger.logLost(data, "Volume failure");
       }
     });
 

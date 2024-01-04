@@ -23,6 +23,7 @@ import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +36,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+
+import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult.FailureType.DELETED_CONTAINER;
 
 /**
  * Class for performing on demand scans of containers.
@@ -129,9 +132,21 @@ public final class OnDemandContainerDataScanner {
     try {
       ContainerData containerData = container.getContainerData();
       logScanStart(containerData);
-      if (!container.scanData(instance.throttler, instance.canceler)) {
+
+      ScanResult result =
+          container.scanData(instance.throttler, instance.canceler);
+      // Metrics for skipped containers should not be updated.
+      if (result.getFailureType() == DELETED_CONTAINER) {
+        LOG.error("Container [{}] has been deleted.",
+            containerId, result.getException());
+        return;
+      }
+      if (!result.isHealthy()) {
+        LOG.error("Corruption detected in container [{}]." +
+                "Marking it UNHEALTHY.", containerId, result.getException());
         instance.metrics.incNumUnHealthyContainers();
-        instance.containerController.markContainerUnhealthy(containerId);
+        instance.containerController.markContainerUnhealthy(containerId,
+            result);
       }
 
       instance.metrics.incNumContainersScanned();
@@ -141,6 +156,10 @@ public final class OnDemandContainerDataScanner {
     } catch (IOException e) {
       LOG.warn("Unexpected exception while scanning container "
           + containerId, e);
+    } catch (InterruptedException ex) {
+      // This should only happen as part of shutdown, which will stop the
+      // ExecutorService.
+      LOG.info("On demand container scan interrupted.");
     }
   }
 

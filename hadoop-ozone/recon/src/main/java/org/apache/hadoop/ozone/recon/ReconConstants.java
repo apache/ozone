@@ -44,9 +44,12 @@ public final class ReconConstants {
   public static final String RECON_QUERY_PREVKEY = "prevKey";
   public static final String RECON_OPEN_KEY_INCLUDE_NON_FSO = "includeNonFso";
   public static final String RECON_OPEN_KEY_INCLUDE_FSO = "includeFso";
+  public static final String RECON_QUERY_FILTER = "missingIn";
   public static final String PREV_CONTAINER_ID_DEFAULT_VALUE = "0";
   public static final String PREV_DELETED_BLOCKS_TRANSACTION_ID_DEFAULT_VALUE =
       "0";
+  // Only include containers that are missing in OM by default
+  public static final String DEFAULT_FILTER_FOR_MISSING_CONTAINERS = "SCM";
   public static final String RECON_QUERY_LIMIT = "limit";
   public static final String RECON_QUERY_VOLUME = "volume";
   public static final String RECON_QUERY_BUCKET = "bucket";
@@ -55,6 +58,9 @@ public final class ReconConstants {
   public static final String RECON_ENTITY_PATH = "path";
   public static final String RECON_ENTITY_TYPE = "entityType";
   public static final String RECON_ACCESS_METADATA_START_DATE = "startDate";
+  public static final String CONTAINER_COUNT = "CONTAINER_COUNT";
+  public static final String TOTAL_KEYS = "TOTAL_KEYS";
+  public static final String TOTAL_USED_BYTES = "TOTAL_USED_BYTES";
 
   // 1125899906842624L = 1PB
   public static final long MAX_FILE_SIZE_UPPER_BOUND = 1125899906842624L;

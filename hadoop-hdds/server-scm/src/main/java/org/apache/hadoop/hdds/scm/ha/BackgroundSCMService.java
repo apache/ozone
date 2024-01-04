@@ -68,7 +68,7 @@ public final class BackgroundSCMService implements SCMService {
     log.info("Starting {} Service.", getServiceName());
 
     backgroundThread = new Thread(this::run);
-    backgroundThread.setName(serviceName + "Thread");
+    backgroundThread.setName(scmContext.threadNamePrefix() + serviceName);
     backgroundThread.setDaemon(true);
     backgroundThread.start();
   }

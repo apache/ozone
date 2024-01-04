@@ -17,9 +17,9 @@
  */
 package org.apache.hadoop.hdds.server.http;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -95,13 +95,13 @@ public class TestBaseHttpServer {
 
     conf.set("addresskey", "0.0.0.0:1234");
 
-    Assertions.assertEquals("/0.0.0.0:1234", baseHttpServer
+    assertEquals("/0.0.0.0:1234", baseHttpServer
         .getBindAddress("bindhostkey", "addresskey",
             "default", 65).toString());
 
     conf.set("bindhostkey", "1.2.3.4");
 
-    Assertions.assertEquals("/1.2.3.4:1234", baseHttpServer
+    assertEquals("/1.2.3.4:1234", baseHttpServer
         .getBindAddress("bindhostkey", "addresskey",
             "default", 65).toString());
   }

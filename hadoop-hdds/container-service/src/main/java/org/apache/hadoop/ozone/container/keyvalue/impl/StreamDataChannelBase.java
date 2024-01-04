@@ -139,6 +139,10 @@ abstract class StreamDataChannelBase
     }
   }
 
+  public ContainerMetrics getMetrics() {
+    return metrics;
+  }
+
   @Override
   public String toString() {
     return getClass().getSimpleName() + "{" +

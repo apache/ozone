@@ -42,11 +42,17 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -55,7 +61,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  */
 @Timeout(300)
 public class TestGetCommittedBlockLengthAndPutKey {
-
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestGetCommittedBlockLengthAndPutKey.class);
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration ozoneConfig;
   private static StorageContainerLocationProtocolClientSideTranslatorPB
@@ -85,7 +92,8 @@ public class TestGetCommittedBlockLengthAndPutKey {
 
   @Test
   public void tesGetCommittedBlockLength() throws Exception {
-    ContainerProtos.GetCommittedBlockLengthResponseProto response;
+    final AtomicReference<ContainerProtos.GetCommittedBlockLengthResponseProto>
+        response = new AtomicReference<>();
     ContainerWithPipeline container = storageContainerLocationClient
         .allocateContainer(SCMTestUtils.getReplicationType(ozoneConfig),
             HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
@@ -97,7 +105,7 @@ public class TestGetCommittedBlockLengthAndPutKey {
 
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
     byte[] data =
-        RandomStringUtils.random(RandomUtils.nextInt(0, 1024)).getBytes(UTF_8);
+        RandomStringUtils.random(RandomUtils.nextInt(1, 1024)).getBytes(UTF_8);
     ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
         ContainerTestHelper
             .getWriteChunkRequest(container.getPipeline(), blockID,
@@ -108,12 +116,20 @@ public class TestGetCommittedBlockLengthAndPutKey {
         ContainerTestHelper
             .getPutBlockRequest(pipeline, writeChunkRequest.getWriteChunk());
     client.sendCommand(putKeyRequest);
-    response = ContainerProtocolCalls
-        .getCommittedBlockLength(client, blockID, null);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        response.set(ContainerProtocolCalls
+            .getCommittedBlockLength(client, blockID, null));
+      } catch (IOException e) {
+        LOG.debug("Ignore the exception till wait: {}", e.getMessage());
+        return false;
+      }
+      return true;
+    }, 500, 5000);
     // make sure the block ids in the request and response are same.
-    Assertions.assertTrue(
-        BlockID.getFromProtobuf(response.getBlockID()).equals(blockID));
-    Assertions.assertTrue(response.getBlockLength() == data.length);
+    Assertions.assertEquals(blockID,
+        BlockID.getFromProtobuf(response.get().getBlockID()));
+    Assertions.assertEquals(data.length, response.get().getBlockLength());
     xceiverClientManager.releaseClient(client, false);
   }
 
@@ -154,7 +170,7 @@ public class TestGetCommittedBlockLengthAndPutKey {
 
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
     byte[] data =
-        RandomStringUtils.random(RandomUtils.nextInt(0, 1024)).getBytes(UTF_8);
+        RandomStringUtils.random(RandomUtils.nextInt(1, 1024)).getBytes(UTF_8);
     ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
         ContainerTestHelper
             .getWriteChunkRequest(container.getPipeline(), blockID,

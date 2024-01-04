@@ -33,6 +33,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
@@ -61,7 +62,7 @@ public final class Pipeline {
    * -- the creation time may change.
    */
   private static final Codec<Pipeline> CODEC = new DelegatedCodec<>(
-      Proto2Codec.get(HddsProtos.Pipeline.class),
+      Proto2Codec.get(HddsProtos.Pipeline.getDefaultInstance()),
       Pipeline::getFromProtobufSetCreationTimestamp,
       p -> p.getProtobufMessage(ClientVersion.CURRENT_VERSION),
       DelegatedCodec.CopyType.UNSUPPORTED);
@@ -86,10 +87,21 @@ public final class Pipeline {
   // suggested leader id with high priority
   private final UUID suggestedLeaderId;
 
+  private final Instant stateEnterTime;
+
   /**
    * The immutable properties of pipeline object is used in
    * ContainerStateManager#getMatchingContainerByPipeline to take a lock on
    * the container allocations for a particular pipeline.
+   * <br><br>
+   * Since the Pipeline class is immutable, if we want to change the state of
+   * the Pipeline we should create a new Pipeline object with the new state.
+   * Make sure that you set the value of <i>creationTimestamp</i> properly while
+   * creating the new Pipeline object.
+   * <br><br>
+   * There is no need to worry about the value of <i>stateEnterTime</i> as it's
+   * set to <i>Instant.now</i> when you crate the Pipeline object as part of
+   * state change.
    */
   private Pipeline(PipelineID id,
       ReplicationConfig replicationConfig, PipelineState state,
@@ -101,6 +113,7 @@ public final class Pipeline {
     this.creationTimestamp = Instant.now();
     this.suggestedLeaderId = suggestedLeaderId;
     this.replicaIndexes = new HashMap<>();
+    this.stateEnterTime = Instant.now();
   }
 
   /**
@@ -137,6 +150,10 @@ public final class Pipeline {
    */
   public Instant getCreationTimestamp() {
     return creationTimestamp;
+  }
+
+  public Instant getStateEnterTime() {
+    return stateEnterTime;
   }
 
   /**
@@ -191,6 +208,7 @@ public final class Pipeline {
    *
    * @return Set of DatanodeDetails
    */
+  @JsonIgnore
   public Set<DatanodeDetails> getNodeSet() {
     return Collections.unmodifiableSet(nodeStatus.keySet());
   }
@@ -282,10 +300,12 @@ public final class Pipeline {
         "All nodes are excluded: Pipeline=%s, excluded=%s", id, excluded));
   }
 
+  @JsonIgnore
   public boolean isClosed() {
     return state == PipelineState.CLOSED;
   }
 
+  @JsonIgnore
   public boolean isOpen() {
     return state == PipelineState.OPEN;
   }
@@ -317,7 +337,7 @@ public final class Pipeline {
 
   public boolean isHealthy() {
     // EC pipelines are not reported by the DN and do not have a leader. If a
-    // node goes stale or dead, EC pipelines will by closed like RATIS pipelines
+    // node goes stale or dead, EC pipelines will be closed like RATIS pipelines
     // but at the current time there are not other health metrics for EC.
     if (replicationConfig.getReplicationType() == ReplicationType.EC) {
       return true;
@@ -468,7 +488,7 @@ public final class Pipeline {
     return new EqualsBuilder()
         .append(id, that.id)
         .append(replicationConfig, that.replicationConfig)
-        .append(getNodes(), that.getNodes())
+        .append(nodeStatus.keySet(), that.nodeStatus.keySet())
         .isEquals();
   }
 

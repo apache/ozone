@@ -72,7 +72,7 @@ public class ListBucketHandler extends VolumeHandler {
     }
     printAsJsonArray(bucketList.iterator(), listOptions.getLimit());
     if (isVerbose()) {
-      out().printf("Found : %d buckets for volume : %s ", counter, volumeName);
+      err().printf("Found : %d buckets for volume : %s ", counter, volumeName);
     }
   }
 

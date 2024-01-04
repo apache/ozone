@@ -26,15 +26,17 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import java.util.HashSet;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -46,18 +48,20 @@ public class TestContainerHealthStatus {
 
   private PlacementPolicy placementPolicy;
   private ContainerInfo container;
+  private ReconContainerMetadataManager reconContainerMetadataManager;
 
   @BeforeEach
   public void setup() {
     placementPolicy = mock(PlacementPolicy.class);
     container = mock(ContainerInfo.class);
+    reconContainerMetadataManager = mock(ReconContainerMetadataManager.class);
     when(container.getReplicationConfig())
         .thenReturn(RatisReplicationConfig
             .getInstance(HddsProtos.ReplicationFactor.THREE));
     when(container.containerID()).thenReturn(ContainerID.valueOf(123456));
     when(container.getContainerID()).thenReturn((long)123456);
     when(placementPolicy.validateContainerPlacement(
-        Mockito.anyList(), Mockito.anyInt()))
+        anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(1, 1, 1));
   }
 
@@ -68,13 +72,14 @@ public class TestContainerHealthStatus {
         ContainerReplicaProto.State.CLOSED,
         ContainerReplicaProto.State.CLOSED);
     ContainerHealthStatus status =
-        new ContainerHealthStatus(container, replicas, placementPolicy);
+        new ContainerHealthStatus(container, replicas, placementPolicy,
+            reconContainerMetadataManager);
     assertTrue(status.isHealthy());
     assertFalse(status.isOverReplicated());
     assertFalse(status.isUnderReplicated());
     assertEquals(0, status.replicaDelta());
     assertFalse(status.isMissing());
-    assertEquals(false, status.isMisReplicated());
+    assertFalse(status.isMisReplicated());
     assertEquals(0, status.misReplicatedDelta());
 
     assertEquals(container, status.getContainer());
@@ -91,13 +96,14 @@ public class TestContainerHealthStatus {
         ContainerReplicaProto.State.CLOSED,
         ContainerReplicaProto.State.UNHEALTHY);
     ContainerHealthStatus status =
-        new ContainerHealthStatus(container, replicas, placementPolicy);
+        new ContainerHealthStatus(container, replicas, placementPolicy,
+            reconContainerMetadataManager);
     assertTrue(status.isHealthy());
     assertFalse(status.isOverReplicated());
     assertFalse(status.isUnderReplicated());
     assertEquals(0, status.replicaDelta());
     assertFalse(status.isMissing());
-    assertEquals(false, status.isMisReplicated());
+    assertFalse(status.isMisReplicated());
     assertEquals(0, status.misReplicatedDelta());
   }
 
@@ -105,13 +111,14 @@ public class TestContainerHealthStatus {
   public void testMissingContainer() {
     Set<ContainerReplica> replicas = new HashSet<>();
     ContainerHealthStatus status =
-        new ContainerHealthStatus(container, replicas, placementPolicy);
+        new ContainerHealthStatus(container, replicas, placementPolicy,
+            reconContainerMetadataManager);
     assertFalse(status.isHealthy());
     assertFalse(status.isOverReplicated());
     assertFalse(status.isUnderReplicated());
     assertEquals(3, status.replicaDelta());
     assertTrue(status.isMissing());
-    assertEquals(false, status.isMisReplicated());
+    assertFalse(status.isMisReplicated());
     assertEquals(0, status.misReplicatedDelta());
   }
 
@@ -120,13 +127,14 @@ public class TestContainerHealthStatus {
     Set<ContainerReplica> replicas = generateReplicas(container,
         ContainerReplicaProto.State.CLOSED);
     ContainerHealthStatus status =
-        new ContainerHealthStatus(container, replicas, placementPolicy);
+        new ContainerHealthStatus(container, replicas, placementPolicy,
+            reconContainerMetadataManager);
     assertFalse(status.isHealthy());
     assertFalse(status.isMissing());
     assertFalse(status.isOverReplicated());
     assertTrue(status.isUnderReplicated());
     assertEquals(2, status.replicaDelta());
-    assertEquals(false, status.isMisReplicated());
+    assertFalse(status.isMisReplicated());
     assertEquals(0, status.misReplicatedDelta());
   }
 
@@ -138,13 +146,14 @@ public class TestContainerHealthStatus {
         ContainerReplicaProto.State.CLOSED,
         ContainerReplicaProto.State.CLOSED);
     ContainerHealthStatus status =
-        new ContainerHealthStatus(container, replicas, placementPolicy);
+        new ContainerHealthStatus(container, replicas, placementPolicy,
+            reconContainerMetadataManager);
     assertFalse(status.isHealthy());
     assertFalse(status.isMissing());
     assertFalse(status.isUnderReplicated());
     assertTrue(status.isOverReplicated());
     assertEquals(-1, status.replicaDelta());
-    assertEquals(false, status.isMisReplicated());
+    assertFalse(status.isMisReplicated());
     assertEquals(0, status.misReplicatedDelta());
   }
 
@@ -155,10 +164,11 @@ public class TestContainerHealthStatus {
         ContainerReplicaProto.State.CLOSED,
         ContainerReplicaProto.State.CLOSED);
     when(placementPolicy.validateContainerPlacement(
-        Mockito.anyList(), Mockito.anyInt()))
+        anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(1, 2, 5));
     ContainerHealthStatus status =
-        new ContainerHealthStatus(container, replicas, placementPolicy);
+        new ContainerHealthStatus(container, replicas, placementPolicy,
+            reconContainerMetadataManager);
     assertFalse(status.isHealthy());
     assertFalse(status.isMissing());
     assertFalse(status.isUnderReplicated());

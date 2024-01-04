@@ -78,7 +78,7 @@ public class TestUnknownContainerReport {
     this.nodeManager = new MockNodeManager(true, 10);
     this.containerManager = Mockito.mock(ContainerManager.class);
     testDir = GenericTestUtils.getTestDir(
-        TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
+        TestUnknownContainerReport.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());

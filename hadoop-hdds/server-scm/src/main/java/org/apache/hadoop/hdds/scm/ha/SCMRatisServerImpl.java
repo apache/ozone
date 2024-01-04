@@ -38,7 +38,7 @@ import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.conf.Parameters;
@@ -56,6 +56,7 @@ import org.apache.ratis.protocol.SnapshotManagementRequest;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.protocol.SetConfigurationRequest;
 import org.apache.ratis.server.RaftServer;
+import org.apache.ratis.server.storage.RaftStorage;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -112,6 +113,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
     this.server = newRaftServer(scm.getScmId(), conf)
         .setStateMachineRegistry((gId) -> new SCMStateMachine(scm, buffer))
+        .setOption(RaftStorage.StartupOption.RECOVER)
         .setGroup(RaftGroup.valueOf(groupId))
         .setParameters(parameters).build();
 
@@ -129,6 +131,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     try {
       server = newRaftServer(scmId, conf).setGroup(group)
               .setStateMachineRegistry((groupId -> new SCMStateMachine()))
+              .setOption(RaftStorage.StartupOption.RECOVER)
               .build();
       server.start();
       waitForLeaderToBeReady(server, conf, group);

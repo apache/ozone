@@ -100,24 +100,26 @@ public final class OzoneAclUtils {
     // volume owner if current ugi user is volume owner else we need check
     //{OWNER} equals bucket owner for bucket/key/prefix.
     case PREFIX:
-      //OzoneNativeAuthorizer differs from Ranger Authorizer as Ranger requires
-      // only READ access on parent level access. OzoneNativeAuthorizer has
-      // different parent level access based on the child level access type
-      IAccessAuthorizer.ACLType parentAclRight = IAccessAuthorizer.ACLType.READ;
-      if (omMetadataReader.isNativeAuthorizerEnabled() && resType == BUCKET) {
-        parentAclRight = getParentNativeAcl(aclType, resType);
-      }
-      
-      omMetadataReader.checkAcls(OzoneObj.ResourceType.VOLUME, storeType,
-          parentAclRight, vol, bucket, key, user,
-          remoteAddress, hostName, true,
-          volOwner);
       if (isVolOwner) {
         omMetadataReader.checkAcls(resType, storeType,
             aclType, vol, bucket, key,
             user, remoteAddress, hostName, true,
             volOwner);
       } else {
+        IAccessAuthorizer.ACLType parentAclRight =
+            IAccessAuthorizer.ACLType.READ;
+        // OzoneNativeAuthorizer differs from Ranger Authorizer as Ranger
+        // requires only READ access on parent level access.
+        // OzoneNativeAuthorizer has different parent level access based on the
+        // child level access type.
+        if (omMetadataReader.isNativeAuthorizerEnabled() && resType == BUCKET) {
+          parentAclRight = getParentNativeAcl(aclType, resType);
+        }
+
+        omMetadataReader.checkAcls(OzoneObj.ResourceType.VOLUME, storeType,
+            parentAclRight, vol, bucket, key, user,
+            remoteAddress, hostName, true,
+            volOwner);
         omMetadataReader.checkAcls(resType, storeType,
             aclType, vol, bucket, key,
             user, remoteAddress, hostName, true,

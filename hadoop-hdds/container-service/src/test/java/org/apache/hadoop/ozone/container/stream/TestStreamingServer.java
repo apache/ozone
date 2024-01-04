@@ -21,15 +21,17 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 
 /**
@@ -42,10 +44,13 @@ public class TestStreamingServer {
   private static final byte[] CONTENT = "Stream it if you can"
       .getBytes(StandardCharsets.UTF_8);
 
+  @TempDir
+  private Path sourceDir;
+  @TempDir
+  private Path destDir;
+
   @Test
   public void simpleStream() throws Exception {
-    Path sourceDir = GenericTestUtils.getRandomizedTestDir().toPath();
-    Path destDir = GenericTestUtils.getRandomizedTestDir().toPath();
     Files.createDirectories(sourceDir.resolve(SUBDIR));
     Files.createDirectories(destDir.resolve(SUBDIR));
 
@@ -53,12 +58,12 @@ public class TestStreamingServer {
     Files.write(sourceDir.resolve(SUBDIR).resolve("file1"), CONTENT);
 
     //WHEN: stream subdir
-    streamDir(sourceDir, destDir, SUBDIR);
+    streamDir(SUBDIR);
 
     //THEN: compare the files
     final byte[] targetContent = Files
         .readAllBytes(destDir.resolve(SUBDIR).resolve("file1"));
-    Assertions.assertArrayEquals(CONTENT, targetContent);
+    assertArrayEquals(CONTENT, targetContent);
 
   }
 
@@ -75,8 +80,6 @@ public class TestStreamingServer {
         .trustManager(InsecureTrustManagerFactory.INSTANCE)
         .build();
 
-    Path sourceDir = GenericTestUtils.getRandomizedTestDir().toPath();
-    Path destDir = GenericTestUtils.getRandomizedTestDir().toPath();
     Files.createDirectories(sourceDir.resolve(SUBDIR));
     Files.createDirectories(destDir.resolve(SUBDIR));
 
@@ -104,13 +107,11 @@ public class TestStreamingServer {
     //THEN: compare the files
     final byte[] targetContent = Files
         .readAllBytes(destDir.resolve(SUBDIR).resolve("file1"));
-    Assertions.assertArrayEquals(CONTENT, targetContent);
+    assertArrayEquals(CONTENT, targetContent);
 
   }
   @Test
   public void failedStream() throws Exception {
-    Path sourceDir = GenericTestUtils.getRandomizedTestDir().toPath();
-    Path destDir = GenericTestUtils.getRandomizedTestDir().toPath();
     Files.createDirectories(sourceDir.resolve(SUBDIR));
     Files.createDirectories(destDir.resolve(SUBDIR));
 
@@ -118,8 +119,8 @@ public class TestStreamingServer {
     Files.write(sourceDir.resolve(SUBDIR).resolve("file1"), CONTENT);
 
     //WHEN: stream subdir
-    Assertions.assertThrows(RuntimeException.class, () ->
-        streamDir(sourceDir, destDir, "NO_SUCH_ID"));
+    assertThrows(RuntimeException.class,
+        () -> streamDir("NO_SUCH_ID"));
 
     //THEN: compare the files
     //exception is expected
@@ -128,8 +129,6 @@ public class TestStreamingServer {
 
   @Test
   public void timeout() throws Exception {
-    Path sourceDir = GenericTestUtils.getRandomizedTestDir().toPath();
-    Path destDir = GenericTestUtils.getRandomizedTestDir().toPath();
     Files.createDirectories(sourceDir.resolve(SUBDIR));
     Files.createDirectories(destDir.resolve(SUBDIR));
 
@@ -151,7 +150,7 @@ public class TestStreamingServer {
                new StreamingClient("localhost", server.getPort(),
                    new DirectoryServerDestination(
                        destDir))) {
-        Assertions.assertThrows(RuntimeException.class, () ->
+        assertThrows(RuntimeException.class, () ->
             client.stream(SUBDIR, 1L, TimeUnit.SECONDS));
       }
     }
@@ -161,8 +160,7 @@ public class TestStreamingServer {
 
   }
 
-  private void streamDir(Path sourceDir, Path destDir, String subdir)
-      throws InterruptedException {
+  private void streamDir(String subdir) {
     try (StreamingServer server = new StreamingServer(
         new DirectoryServerSource(sourceDir), 0)) {
       server.start();

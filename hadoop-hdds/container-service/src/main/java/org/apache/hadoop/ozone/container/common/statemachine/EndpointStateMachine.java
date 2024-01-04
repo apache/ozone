@@ -68,7 +68,7 @@ public class EndpointStateMachine
    */
   public EndpointStateMachine(InetSocketAddress address,
       StorageContainerDatanodeProtocolClientSideTranslatorPB endPoint,
-      ConfigurationSource conf) {
+      ConfigurationSource conf, String threadNamePrefix) {
     this.endPoint = endPoint;
     this.missedCount = new AtomicLong(0);
     this.address = address;
@@ -77,8 +77,8 @@ public class EndpointStateMachine
     this.conf = conf;
     executorService = Executors.newSingleThreadExecutor(
         new ThreadFactoryBuilder()
-            .setNameFormat("EndpointStateMachine task thread for "
-                + this.address + " - %d ")
+            .setNameFormat(threadNamePrefix + "EndpointStateMachineTaskThread-"
+                + this.address + "-%d ")
             .build());
   }
 

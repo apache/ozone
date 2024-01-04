@@ -119,7 +119,7 @@ run_test() {
 
   # The container to run test commands from. Use one of the SCM containers,
   # but SCM HA may or may not be used.
-  export SCM="$(docker compose --project-directory="$compose_dir" config --services | grep --max-count=1 scm)"
+  export SCM="$(docker-compose --project-directory="$compose_dir" config --services | grep --max-count=1 scm)"
 
   if ! run_test_script "$test_dir" ./driver.sh; then
     RESULT=1

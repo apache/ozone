@@ -19,7 +19,7 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
@@ -62,6 +62,7 @@ public interface CertificateApprover {
    * @param certificationRequest - Certification Request.
    * @param scmId - SCM id.
    * @param clusterId - Cluster id.
+   * @param certSerialId - the new certificate id.
    * @return Signed Certificate.
    * @throws IOException - On Error
    * @throws OperatorCreationException - on Error.
@@ -75,7 +76,8 @@ public interface CertificateApprover {
       Date validTill,
       PKCS10CertificationRequest certificationRequest,
       String scmId,
-      String clusterId)
+      String clusterId,
+      String certSerialId)
       throws IOException, OperatorCreationException;
 
 

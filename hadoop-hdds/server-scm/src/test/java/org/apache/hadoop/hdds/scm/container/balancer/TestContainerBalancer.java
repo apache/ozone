@@ -45,6 +45,8 @@ import org.slf4j.event.Level;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -127,31 +129,26 @@ public class TestContainerBalancer {
     startBalancer(balancerConfiguration);
     try {
       containerBalancer.startBalancer(balancerConfiguration);
-      Assertions.assertTrue(false,
-          "Exception should be thrown when startBalancer again");
+      Assertions.fail("Exception should be thrown when startBalancer again");
     } catch (IllegalContainerBalancerStateException e) {
       // start failed again, valid case
     }
 
     try {
       containerBalancer.start();
-      Assertions.assertTrue(false,
-          "Exception should be thrown when start again");
+      Assertions.fail("Exception should be thrown when start again");
     } catch (IllegalContainerBalancerStateException e) {
       // start failed again, valid case
     }
 
-    Assertions.assertTrue(containerBalancer.getBalancerStatus()
-        == ContainerBalancerTask.Status.RUNNING);
+    assertSame(ContainerBalancerTask.Status.RUNNING, containerBalancer.getBalancerStatus());
 
     stopBalancer();
-    Assertions.assertTrue(containerBalancer.getBalancerStatus()
-        == ContainerBalancerTask.Status.STOPPED);
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
 
     try {
       containerBalancer.stopBalancer();
-      Assertions.assertTrue(false,
-          "Exception should be thrown when stop again");
+      Assertions.fail("Exception should be thrown when stop again");
     } catch (Exception e) {
       // stop failed as already stopped, valid case
     }
@@ -161,23 +158,19 @@ public class TestContainerBalancer {
   public void testStartStopSCMCalls() throws Exception {
     containerBalancer.saveConfiguration(balancerConfiguration, true, 0);
     containerBalancer.start();
-    Assertions.assertTrue(containerBalancer.getBalancerStatus()
-        == ContainerBalancerTask.Status.RUNNING);
+    assertSame(ContainerBalancerTask.Status.RUNNING, containerBalancer.getBalancerStatus());
     containerBalancer.notifyStatusChanged();
     try {
       containerBalancer.start();
-      Assertions.assertTrue(false,
-          "Exception should be thrown when start again");
+      Assertions.fail("Exception should be thrown when start again");
     } catch (IllegalContainerBalancerStateException e) {
       // start failed when triggered again, valid case
     }
 
-    Assertions.assertTrue(containerBalancer.getBalancerStatus()
-        == ContainerBalancerTask.Status.RUNNING);
+    assertSame(ContainerBalancerTask.Status.RUNNING, containerBalancer.getBalancerStatus());
 
     containerBalancer.stop();
-    Assertions.assertTrue(containerBalancer.getBalancerStatus()
-        == ContainerBalancerTask.Status.STOPPED);
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
     containerBalancer.saveConfiguration(balancerConfiguration, false, 0);
   }
 
@@ -186,20 +179,16 @@ public class TestContainerBalancer {
     containerBalancer.startBalancer(balancerConfiguration);
 
     scm.getScmContext().updateLeaderAndTerm(false, 1);
-    Assertions.assertTrue(containerBalancer.getBalancerStatus()
-        == ContainerBalancerTask.Status.RUNNING);
+    assertSame(ContainerBalancerTask.Status.RUNNING, containerBalancer.getBalancerStatus());
     containerBalancer.notifyStatusChanged();
-    Assertions.assertTrue(containerBalancer.getBalancerStatus()
-        == ContainerBalancerTask.Status.STOPPED);
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
     scm.getScmContext().updateLeaderAndTerm(true, 2);
     scm.getScmContext().setLeaderReady();
     containerBalancer.notifyStatusChanged();
-    Assertions.assertTrue(containerBalancer.getBalancerStatus()
-        == ContainerBalancerTask.Status.RUNNING);
+    assertSame(ContainerBalancerTask.Status.RUNNING, containerBalancer.getBalancerStatus());
 
     containerBalancer.stop();
-    Assertions.assertTrue(containerBalancer.getBalancerStatus()
-        == ContainerBalancerTask.Status.STOPPED);
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
   }
 
   /**
@@ -270,7 +259,7 @@ public class TestContainerBalancer {
     Thread balancingThread = containerBalancer.getCurrentBalancingThread();
     GenericTestUtils.waitFor(
         () -> balancingThread.getState() == Thread.State.TIMED_WAITING, 2, 20);
-    Assertions.assertTrue(logCapturer.getOutput().contains(expectedLog));
+    assertThat(logCapturer.getOutput()).contains(expectedLog);
     stopBalancer();
   }
 
@@ -285,8 +274,7 @@ public class TestContainerBalancer {
       if (containerBalancer.isBalancerRunning()) {
         containerBalancer.stopBalancer();
       }
-    } catch (IOException | IllegalContainerBalancerStateException |
-             TimeoutException e) {
+    } catch (IOException | IllegalContainerBalancerStateException e) {
       LOG.warn("Failed to stop balancer", e);
     }
   }

@@ -20,13 +20,19 @@ package org.apache.hadoop.hdds.utils;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.PriorityQueue;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
+
+import static java.util.Comparator.naturalOrder;
 
 /** Utility methods for Java Collections. */
 public interface CollectionUtils {
@@ -88,5 +94,51 @@ public interface CollectionUtils {
         throw new NoSuchElementException();
       }
     };
+  }
+
+  static <T extends Comparable<T>> List<T> findTopN(Iterable<T> input, int n) {
+    return findTopN(input, n, any -> true);
+  }
+
+  static <T extends Comparable<T>> List<T> findTopN(
+      Iterable<T> input,
+      int n,
+      Predicate<? super T> filter
+  ) {
+    return findTopN(input, n, naturalOrder(), filter);
+  }
+
+  static <T> List<T> findTopN(
+      Iterable<T> input,
+      int n,
+      Comparator<T> comparator
+  ) {
+    return findTopN(input, n, comparator, any -> true);
+  }
+
+  static <T> List<T> findTopN(
+      Iterable<T> input,
+      int n,
+      Comparator<T> comparator,
+      Predicate<? super T> filter
+  ) {
+    PriorityQueue<T> heap = new PriorityQueue<>(comparator);
+
+    for (T item : input) {
+      if (filter.test(item)) {
+        heap.add(item);
+
+        if (heap.size() > n) {
+          heap.poll();
+        }
+      }
+    }
+
+    LinkedList<T> result = new LinkedList<>();
+    while (!heap.isEmpty()) {
+      result.addFirst(heap.poll());
+    }
+
+    return result;
   }
 }

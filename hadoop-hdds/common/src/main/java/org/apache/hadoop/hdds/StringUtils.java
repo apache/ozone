@@ -85,6 +85,10 @@ public final class StringUtils {
     return bytes2Hex(buffer, buffer.remaining());
   }
 
+  public static String bytes2Hex(byte[] array) {
+    return bytes2Hex(ByteBuffer.wrap(array));
+  }
+
   /**
    * Decode a specific range of bytes of the given byte array to a string
    * using UTF8.

@@ -18,8 +18,7 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.utils.BooleanTriFunction;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCheckpoint;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
@@ -31,9 +30,11 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
+import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.Holder;
@@ -47,7 +48,6 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -64,6 +64,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.StringUtils.bytes2String;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions.closeDeeply;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator.managed;
@@ -79,7 +80,11 @@ public final class RocksDatabase implements Closeable {
   static final Logger LOG = LoggerFactory.getLogger(RocksDatabase.class);
 
   public static final String ESTIMATE_NUM_KEYS = "rocksdb.estimate-num-keys";
-
+  static {
+    ManagedRocksObjectUtils.loadRocksDBLibrary();
+  }
+  private static final ManagedReadOptions DEFAULT_READ_OPTION =
+      new ManagedReadOptions();
   private static Map<String, List<ColumnFamilyHandle>> dbNameToCfHandleMap =
       new HashMap<>();
 
@@ -243,7 +248,7 @@ public final class RocksDatabase implements Closeable {
       }
     }
 
-    public long getLatestSequenceNumber() {
+    public long getLatestSequenceNumber() throws IOException {
       return RocksDatabase.this.getLatestSequenceNumber();
     }
 
@@ -508,9 +513,9 @@ public final class RocksDatabase implements Closeable {
 
   /**
    * @param cfName columnFamily on which flush will run.
-   * @throws IOException
    */
   public void flush(String cfName) throws IOException {
+    assertClose();
     ColumnFamilyHandle handle = getColumnFamilyHandle(cfName);
     try (ManagedFlushOptions options = new ManagedFlushOptions()) {
       options.setWaitForFlush(true);
@@ -555,6 +560,7 @@ public final class RocksDatabase implements Closeable {
 
   public void compactRangeDefault(final ManagedCompactRangeOptions options)
       throws IOException {
+    assertClose();
     try {
       counter.incrementAndGet();
       db.get().compactRange(null, null, null, options);
@@ -567,13 +573,15 @@ public final class RocksDatabase implements Closeable {
   }
 
   public void compactDB(ManagedCompactRangeOptions options) throws IOException {
+    assertClose();
     compactRangeDefault(options);
     for (RocksDatabase.ColumnFamily columnFamily : getExtraColumnFamilies()) {
       compactRange(columnFamily, null, null, options);
     }
   }
 
-  public int getLiveFilesMetaDataSize() {
+  public int getLiveFilesMetaDataSize() throws IOException {
+    assertClose();
     try {
       counter.incrementAndGet();
       return db.get().getLiveFilesMetaData().size();
@@ -584,9 +592,9 @@ public final class RocksDatabase implements Closeable {
 
   /**
    * @param cfName columnFamily on which compaction will run.
-   * @throws IOException
    */
   public void compactRange(String cfName) throws IOException {
+    assertClose();
     ColumnFamilyHandle handle = getColumnFamilyHandle(cfName);
     try {
       if (handle != null) {
@@ -604,9 +612,10 @@ public final class RocksDatabase implements Closeable {
 
   private ColumnFamilyHandle getColumnFamilyHandle(String cfName)
       throws IOException {
+    assertClose();
     for (ColumnFamilyHandle cf : getCfHandleMap().get(db.get().getName())) {
       try {
-        String table = new String(cf.getName(), StandardCharsets.UTF_8);
+        String table = new String(cf.getName(), UTF_8);
         if (cfName.equals(table)) {
           return cf;
         }
@@ -621,6 +630,7 @@ public final class RocksDatabase implements Closeable {
   public void compactRange(ColumnFamily family, final byte[] begin,
       final byte[] end, final ManagedCompactRangeOptions options)
       throws IOException {
+    assertClose();
     try {
       counter.incrementAndGet();
       db.get().compactRange(family.getHandle(), begin, end, options);
@@ -632,7 +642,8 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
-  public List<LiveFileMetaData> getLiveFilesMetaData() {
+  public List<LiveFileMetaData> getLiveFilesMetaData() throws IOException {
+    assertClose();
     try {
       counter.incrementAndGet();
       return db.get().getLiveFilesMetaData();
@@ -731,9 +742,10 @@ public final class RocksDatabase implements Closeable {
   Integer get(ColumnFamily family, ByteBuffer key, ByteBuffer outValue)
       throws IOException {
     assertClose();
-    try (ManagedReadOptions options = new ManagedReadOptions()) {
+    try {
       counter.incrementAndGet();
-      final int size = db.get().get(family.getHandle(), options, key, outValue);
+      final int size = db.get().get(family.getHandle(),
+          DEFAULT_READ_OPTION, key, outValue);
       LOG.debug("get: size={}, remaining={}",
           size, outValue.asReadOnlyBuffer().remaining());
       return size == ManagedRocksDB.NOT_FOUND ? null : size;
@@ -823,7 +835,8 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
-  public long getLatestSequenceNumber() {
+  public long getLatestSequenceNumber() throws IOException {
+    assertClose();
     try {
       counter.incrementAndGet();
       return db.get().getLatestSequenceNumber();
@@ -924,7 +937,8 @@ public final class RocksDatabase implements Closeable {
   }
 
   @VisibleForTesting
-  public List<LiveFileMetaData> getSstFileList() {
+  public List<LiveFileMetaData> getSstFileList() throws IOException {
+    assertClose();
     return db.get().getLiveFilesMetaData();
   }
 
@@ -932,7 +946,7 @@ public final class RocksDatabase implements Closeable {
    * return the max compaction level of sst files in the db.
    * @return level
    */
-  private int getLastLevel() {
+  private int getLastLevel() throws IOException {
     return getSstFileList().stream()
         .max(Comparator.comparing(LiveFileMetaData::level)).get().level();
   }
@@ -940,46 +954,45 @@ public final class RocksDatabase implements Closeable {
   /**
    * Deletes sst files which do not correspond to prefix
    * for given table.
-   * @param prefixPairs, a list of pair (TableName,prefixUsed).
-   * @throws RocksDBException
+   * @param prefixPairs, a map of TableName to prefixUsed.
    */
-  public void deleteFilesNotMatchingPrefix(
-      List<Pair<String, String>> prefixPairs,
-      BooleanTriFunction<String, String, String, Boolean> filterFunction)
-      throws RocksDBException {
+  public void deleteFilesNotMatchingPrefix(Map<String, String> prefixPairs)
+      throws IOException, RocksDBException {
+    assertClose();
     for (LiveFileMetaData liveFileMetaData : getSstFileList()) {
       String sstFileColumnFamily =
-          new String(liveFileMetaData.columnFamilyName(),
-              StandardCharsets.UTF_8);
+          new String(liveFileMetaData.columnFamilyName(), UTF_8);
       int lastLevel = getLastLevel();
-      for (Pair<String, String> prefixPair : prefixPairs) {
-        String columnFamily = prefixPair.getKey();
-        String prefixForColumnFamily = prefixPair.getValue();
-        if (!sstFileColumnFamily.equals(columnFamily)) {
-          continue;
-        }
-        // RocksDB #deleteFile API allows only to delete the last level of
-        // SST Files. Any level < last level won't get deleted and
-        // only last file of level 0 can be deleted
-        // and will throw warning in the rocksdb manifest.
-        // Instead, perform the level check here
-        // itself to avoid failed delete attempts for lower level files.
-        if (liveFileMetaData.level() != lastLevel || lastLevel == 0) {
-          continue;
-        }
-        String firstDbKey =
-            new String(liveFileMetaData.smallestKey(), StandardCharsets.UTF_8);
-        String lastDbKey =
-            new String(liveFileMetaData.largestKey(), StandardCharsets.UTF_8);
-        boolean isKeyWithPrefixPresent =
-            filterFunction.apply(firstDbKey, lastDbKey, prefixForColumnFamily);
-        if (!isKeyWithPrefixPresent) {
-          String sstFileName = liveFileMetaData.fileName();
-          LOG.info("Deleting sst file {} corresponding to column family"
-                  + " {} from db: {}", sstFileName,
-              liveFileMetaData.columnFamilyName(), db.get().getName());
-          db.get().deleteFile(sstFileName);
-        }
+
+      if (!prefixPairs.containsKey(sstFileColumnFamily)) {
+        continue;
+      }
+
+      // RocksDB #deleteFile API allows only to delete the last level of
+      // SST Files. Any level < last level won't get deleted and
+      // only last file of level 0 can be deleted
+      // and will throw warning in the rocksdb manifest.
+      // Instead, perform the level check here
+      // itself to avoid failed delete attempts for lower level files.
+      if (liveFileMetaData.level() != lastLevel || lastLevel == 0) {
+        continue;
+      }
+
+      String prefixForColumnFamily = prefixPairs.get(sstFileColumnFamily);
+      String firstDbKey = new String(liveFileMetaData.smallestKey(), UTF_8);
+      String lastDbKey = new String(liveFileMetaData.largestKey(), UTF_8);
+      boolean isKeyWithPrefixPresent = RocksDiffUtils.isKeyWithPrefixPresent(
+          prefixForColumnFamily, firstDbKey, lastDbKey);
+      if (!isKeyWithPrefixPresent) {
+        LOG.info("Deleting sst file: {} with start key: {} and end key: {} " +
+                "corresponding to column family {} from db: {}. " +
+                "Prefix for the column family: {}.",
+            liveFileMetaData.fileName(),
+            firstDbKey, lastDbKey,
+            StringUtils.bytes2String(liveFileMetaData.columnFamilyName()),
+            db.get().getName(),
+            prefixForColumnFamily);
+        db.deleteFile(liveFileMetaData);
       }
     }
   }
@@ -1000,5 +1013,9 @@ public final class RocksDatabase implements Closeable {
       LOG.warn(warning);
     }
     super.finalize();
+  }
+
+  public ManagedRocksDB getManagedRocksDb() {
+    return db;
   }
 }

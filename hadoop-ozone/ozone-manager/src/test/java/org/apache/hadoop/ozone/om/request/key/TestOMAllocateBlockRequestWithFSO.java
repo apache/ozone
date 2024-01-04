@@ -20,6 +20,8 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -31,7 +33,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
-import org.junit.Assert;
 
 /**
  * Tests OMAllocateBlockRequest class prefix layout.
@@ -111,7 +112,7 @@ public class TestOMAllocateBlockRequestWithFSO
             omMetadataManager.getOpenKeyTable(getBucketLayout())
                 .get(dbOpenFileName);
         if (doAssert) {
-          Assert.assertNotNull("Invalid key!", omKeyInfo);
+          assertNotNull(omKeyInfo, "Invalid key!");
         }
         return omKeyInfo;
       } else {
@@ -124,7 +125,7 @@ public class TestOMAllocateBlockRequestWithFSO
       }
     }
     if (doAssert) {
-      Assert.fail("Invalid key!");
+      fail("Invalid key!");
     }
     return  null;
   }

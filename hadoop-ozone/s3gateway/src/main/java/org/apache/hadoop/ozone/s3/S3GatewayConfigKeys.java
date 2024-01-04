@@ -73,6 +73,15 @@ public final class S3GatewayConfigKeys {
       true;
 
   /**
+   * Configuration key that enables shallow listing of Keys when results
+   * with delimiter by '/'.
+   */
+  public static final String OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED =
+      "ozone.s3g.list-keys.shallow.enabled";
+  public static final boolean OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED_DEFAULT =
+      true;
+
+  /**
    * Never constructed.
    */
   private S3GatewayConfigKeys() {

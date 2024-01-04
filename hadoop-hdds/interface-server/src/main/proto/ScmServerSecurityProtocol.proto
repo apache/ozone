@@ -56,6 +56,10 @@ message SCMSecurityRequest {
     optional SCMGetLatestCrlIdRequestProto getLatestCrlIdRequest = 11;
     optional SCMRevokeCertificatesRequestProto revokeCertificatesRequest = 12;
     optional SCMGetCertRequestProto getCertRequest = 13;
+    optional SCMGetAllRootCaCertificatesRequestProto
+        getAllRootCaCertificatesRequestProto = 14;
+    optional SCMRemoveExpiredCertificatesRequestProto
+        removeExpiredCertificatesRequestProto = 15;
 }
 
 message SCMSecurityResponse {
@@ -80,6 +84,10 @@ message SCMSecurityResponse {
     optional SCMGetLatestCrlIdResponseProto getLatestCrlIdResponseProto = 9;
 
     optional SCMRevokeCertificatesResponseProto revokeCertificatesResponseProto = 10;
+
+    optional SCMGetAllRootCaCertificatesResponseProto allRootCaCertificatesResponseProto = 11;
+
+    optional SCMRemoveExpiredCertificatesResponseProto removeExpiredCertificatesResponseProto = 12;
 }
 
 enum Type {
@@ -95,6 +103,8 @@ enum Type {
     GetLatestCrlId = 10;
     RevokeCertificates = 11;
     GetCert = 12;
+    GetAllRootCaCertificates = 13;
+    RemoveExpiredCertificates = 14;
 }
 
 enum Status {
@@ -142,6 +152,7 @@ message SCMGetCertRequestProto {
 message SCMGetSCMCertRequestProto {
     required ScmNodeDetailsProto scmDetails = 1;
     required string CSR = 2;
+    optional bool renew = 3[default = false];
 }
 
 /**
@@ -195,6 +206,14 @@ message SCMListCertificateResponseProto {
     repeated string certificates = 2;
 }
 
+message SCMGetAllRootCaCertificatesResponseProto {
+    repeated string allX509RootCaCertificates = 1;
+}
+
+message SCMRemoveExpiredCertificatesResponseProto {
+    repeated string removedExpiredCertificates = 1;
+}
+
 message SCMGetRootCACertificateRequestProto {
 }
 
@@ -241,8 +260,14 @@ message SCMRevokeCertificatesRequestProto {
     optional uint64 revokeTime = 3;
 }
 
+message SCMGetAllRootCaCertificatesRequestProto {
+}
+
 message SCMRevokeCertificatesResponseProto {
     optional int64 crlId = 1;
+}
+
+message SCMRemoveExpiredCertificatesRequestProto {
 }
 
 service SCMSecurityProtocolService {

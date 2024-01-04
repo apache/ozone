@@ -29,8 +29,12 @@ import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 
 import java.util.Arrays;
+
+import org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys;
 import org.junit.Rule;
+import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
+import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * Tests if configuration constants documented in ozone-defaults.xml.
@@ -41,7 +45,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
     * Set a timeout for each test.
     */
   @Rule
-  public Timeout timeout = Timeout.seconds(300);
+  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   @Override
   public void initializeMemberVariables() {
@@ -51,6 +55,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
             OMConfigKeys.class, HddsConfigKeys.class,
             ReconConfigKeys.class, ReconServerConfigKeys.class,
             S3GatewayConfigKeys.class,
+            S3SecretConfigKeys.class,
             SCMHTTPServerConfig.class,
             SCMHTTPServerConfig.ConfigStrings.class,
             ScmConfig.ConfigStrings.class
@@ -102,7 +107,6 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OMConfigKeys.OZONE_FS_TRASH_CHECKPOINT_INTERVAL_KEY,
         OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED,
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE,
-        OzoneConfigKeys.OZONE_S3_AUTHINFO_MAX_LIFETIME_KEY,
         OzoneConfigKeys.OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY,
         OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_WORKERS,
         OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_SCRUBBING_SERVICE_TIMEOUT,
@@ -135,8 +139,12 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER,
         OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD,
         ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY,
+        ScmConfigKeys.OZONE_SCM_HA_PREFIX,
         S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
-        HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT
+        HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
+        OzoneConfigKeys.HDDS_SCM_CLIENT_RPC_TIME_OUT,
+        OzoneConfigKeys.HDDS_SCM_CLIENT_MAX_RETRY_TIMEOUT,
+        OzoneConfigKeys.HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY
     ));
   }
 }

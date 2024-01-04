@@ -18,15 +18,12 @@
 
 package org.apache.ozone.rocksdb.util;
 
-import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import com.google.common.collect.Sets;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
-import org.rocksdb.ColumnFamilyDescriptor;
-import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDBException;
+import org.rocksdb.LiveFileMetaData;
 
 import java.io.File;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -40,23 +37,19 @@ public final class RdbUtil {
 
   private RdbUtil() { }
 
-  public static Set<String> getSSTFilesForComparison(final String dbLocation,
-      List<String> cfs) throws RocksDBException {
-    final List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
-    final List<ColumnFamilyDescriptor> cfd = new ArrayList<>();
-    for (String columnFamily : cfs) {
-      cfd.add(new ColumnFamilyDescriptor(
-          columnFamily.getBytes(StandardCharsets.UTF_8)));
-    }
-    cfd.add(
-        new ColumnFamilyDescriptor("default".getBytes(StandardCharsets.UTF_8)));
-    try (ManagedDBOptions options = new ManagedDBOptions();
-         ManagedRocksDB rocksDB = ManagedRocksDB.openReadOnly(options,
-             dbLocation, cfd, columnFamilyHandles)) {
-      return rocksDB.get().getLiveFilesMetaData().stream()
-          .map(lfm -> new File(lfm.path(), lfm.fileName()).getPath())
-          .collect(Collectors.toCollection(HashSet::new));
-    }
+  public static List<LiveFileMetaData> getLiveSSTFilesForCFs(
+      final ManagedRocksDB rocksDB, List<String> cfs) {
+    final Set<String> cfSet = Sets.newHashSet(cfs);
+    return rocksDB.get().getLiveFilesMetaData().stream()
+        .filter(lfm -> cfSet.contains(
+            StringUtils.bytes2String(lfm.columnFamilyName())))
+        .collect(Collectors.toList());
   }
 
+  public static Set<String> getSSTFilesForComparison(
+      final ManagedRocksDB rocksDB, List<String> cfs) {
+    return getLiveSSTFilesForCFs(rocksDB, cfs).stream()
+        .map(lfm -> new File(lfm.path(), lfm.fileName()).getPath())
+        .collect(Collectors.toCollection(HashSet::new));
+  }
 }

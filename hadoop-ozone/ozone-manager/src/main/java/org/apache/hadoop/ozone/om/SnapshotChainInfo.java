@@ -53,6 +53,14 @@ public class SnapshotChainInfo {
     return nextSnapshotId;
   }
 
+  public boolean hasNextSnapshotId() {
+    return Objects.nonNull(getNextSnapshotId());
+  }
+
+  public boolean hasPreviousSnapshotId() {
+    return Objects.nonNull(getPreviousSnapshotId());
+  }
+
   public UUID getPreviousSnapshotId() {
     return previousSnapshotId;
   }

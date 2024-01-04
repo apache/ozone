@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -47,12 +48,13 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.util.Lists;
 import org.apache.ozone.test.TestClock;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
@@ -82,11 +84,16 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicasWithSameOrigin;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.getNoNodesTestPlacementPolicy;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 
 /**
@@ -113,7 +120,7 @@ public class TestReplicationManager {
   private ReplicationQueue repQueue;
   private Set<Pair<UUID, SCMCommand<?>>> commandsSent;
 
-  @Before
+  @BeforeEach
   public void setup() throws IOException {
     configuration = new OzoneConfiguration();
     configuration.set(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "0s");
@@ -296,13 +303,16 @@ public class TestReplicationManager {
     assertEquals(0, repQueue.overReplicatedQueueSize());
   }
 
-  @Test
-  public void testUnderReplicatedClosedContainerWithOnlyUnhealthyReplicas()
+  @ParameterizedTest
+  @EnumSource(value = HddsProtos.LifeCycleState.class,
+      names = {"CLOSED", "QUASI_CLOSED"})
+  public void testUnderReplicatedClosedContainerWithOnlyUnhealthyReplicas(
+      HddsProtos.LifeCycleState state)
       throws ContainerNotFoundException {
     RatisReplicationConfig ratisRepConfig =
         RatisReplicationConfig.getInstance(THREE);
     ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
-        HddsProtos.LifeCycleState.CLOSED);
+        state);
     // Container is closed but replicas are UNHEALTHY
     Set<ContainerReplica> replicas =
         addReplicas(container, ContainerReplicaProto.State.UNHEALTHY, 0, 0);
@@ -328,6 +338,8 @@ public class TestReplicationManager {
   @Test
   public void testQuasiClosedContainerWithExcessUnhealthyReplica()
       throws IOException, NodeNotFoundException {
+    Mockito.when(nodeManager.getNodeStatus(any(DatanodeDetails.class)))
+        .thenReturn(NodeStatus.inServiceHealthy());
     RatisReplicationConfig ratisRepConfig =
         RatisReplicationConfig.getInstance(THREE);
     ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
@@ -354,11 +366,9 @@ public class TestReplicationManager {
     RatisOverReplicationHandler handler = new RatisOverReplicationHandler(
         ratisPlacementPolicy, replicationManager);
 
-    Mockito.when(nodeManager.getNodeStatus(any(DatanodeDetails.class)))
-        .thenReturn(NodeStatus.inServiceHealthy());
     handler.processAndSendCommands(replicas, Collections.emptyList(),
             repQueue.dequeueOverReplicatedContainer(), 2);
-    Assert.assertTrue(commandsSent.iterator().hasNext());
+    assertTrue(commandsSent.iterator().hasNext());
     assertEquals(unhealthy.getDatanodeDetails().getUuid(),
         commandsSent.iterator().next().getKey());
     assertEquals(SCMCommandProto.Type.deleteContainerCommand,
@@ -367,8 +377,54 @@ public class TestReplicationManager {
   }
 
   @Test
+  public void testClosedContainerWithOverReplicatedAllUnhealthy()
+      throws ContainerNotFoundException {
+    RatisReplicationConfig ratisRepConfig =
+        RatisReplicationConfig.getInstance(THREE);
+    ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas =
+        createReplicas(container.containerID(),
+            ContainerReplicaProto.State.UNHEALTHY, 0, 0, 0, 0);
+    storeContainerAndReplicas(container, replicas);
+
+    replicationManager.processContainer(container, repQueue, repReport);
+    assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(1, repQueue.overReplicatedQueueSize());
+  }
+
+  @Test
+  public void testClosedContainerWithExcessUnhealthy()
+      throws ContainerNotFoundException {
+    RatisReplicationConfig ratisRepConfig =
+        RatisReplicationConfig.getInstance(THREE);
+    ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas =
+        createReplicas(container.containerID(),
+            ContainerReplicaProto.State.CLOSED, 0, 0, 0);
+    ContainerReplica unhealthyReplica =
+        createContainerReplica(container.containerID(), 0, IN_SERVICE,
+            ContainerReplicaProto.State.UNHEALTHY);
+    replicas.add(unhealthyReplica);
+    storeContainerAndReplicas(container, replicas);
+
+    replicationManager.processContainer(container, repQueue, repReport);
+    assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(1, repQueue.overReplicatedQueueSize());
+  }
+
+  @Test
   public void testQuasiClosedContainerWithUnhealthyReplicaOnUniqueOrigin()
-      throws IOException, NodeNotFoundException {
+      throws IOException {
     RatisReplicationConfig ratisRepConfig =
         RatisReplicationConfig.getInstance(THREE);
     ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
@@ -385,25 +441,122 @@ public class TestReplicationManager {
     replicationManager.processContainer(container, repQueue, repReport);
     assertEquals(0, repReport.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(1, repReport.getStat(
+    assertEquals(0, repReport.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
     assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+  }
+
+  @Test
+  public void testQuasiClosedContainerWithVulnerableUnhealthyReplica()
+      throws IOException, NodeNotFoundException {
+    RatisReplicationConfig ratisRepConfig =
+        RatisReplicationConfig.getInstance(THREE);
+    long sequenceID = 10;
+    ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
+        HddsProtos.LifeCycleState.QUASI_CLOSED, sequenceID);
+
+    // this method creates replicas with same origin id and zero sequence id
+    Set<ContainerReplica> replicas =
+        createReplicasWithSameOrigin(container.containerID(),
+            ContainerReplicaProto.State.QUASI_CLOSED, 0, 0, 0);
+    replicas.add(createContainerReplica(container.containerID(), 0,
+        IN_SERVICE, ContainerReplicaProto.State.UNHEALTHY, sequenceID));
+    ContainerReplica decommissioning =
+        createContainerReplica(container.containerID(), 0, DECOMMISSIONING,
+            ContainerReplicaProto.State.UNHEALTHY, sequenceID);
+    replicas.add(decommissioning);
+    storeContainerAndReplicas(container, replicas);
+    Mockito.when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
+        .thenAnswer(invocation -> {
+          DatanodeDetails dn = invocation.getArgument(0);
+          if (dn.equals(decommissioning.getDatanodeDetails())) {
+            return new NodeStatus(DECOMMISSIONING, HddsProtos.NodeState.HEALTHY);
+          }
+
+          return NodeStatus.inServiceHealthy();
+        });
+
+    replicationManager.processContainer(container, repQueue, repReport);
+    assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    assertEquals(1, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+
+    Mockito.when(ratisPlacementPolicy.chooseDatanodes(anyList(), anyList(), eq(null), eq(1), anyLong(),
+        anyLong())).thenAnswer(invocation -> ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()));
+    Mockito.when(nodeManager.getTotalDatanodeCommandCounts(any(DatanodeDetails.class), any(), any()))
+        .thenAnswer(invocation -> {
+          Map<SCMCommandProto.Type, Integer> map = new HashMap<>();
+          map.put(SCMCommandProto.Type.replicateContainerCommand, 0);
+          map.put(SCMCommandProto.Type.reconstructECContainersCommand, 0);
+          return map;
+        });
+    RatisUnderReplicationHandler handler =
+        new RatisUnderReplicationHandler(ratisPlacementPolicy, configuration, replicationManager);
+
+    handler.processAndSendCommands(replicas, Collections.emptyList(), repQueue.dequeueUnderReplicatedContainer(), 2);
+    assertEquals(1, commandsSent.size());
+    Pair<UUID, SCMCommand<?>> command = commandsSent.iterator().next();
+    assertEquals(SCMCommandProto.Type.replicateContainerCommand, command.getValue().getType());
+    assertEquals(decommissioning.getDatanodeDetails().getUuid(), command.getKey());
+  }
+
+  /**
+   * When there is Quasi Closed Replica with incorrect sequence id
+   * for a Closed container, it's treated as unhealthy and deleted.
+   * The deletion should happen only after we re-replicate a healthy
+   * replica.
+   */
+  @Test
+  public void testClosedContainerWithQuasiClosedReplicaWithWrongSequence()
+      throws IOException, NodeNotFoundException {
+    final RatisReplicationConfig ratisRepConfig =
+        RatisReplicationConfig.getInstance(THREE);
+    final long sequenceId = 101;
+
+    final ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    final ContainerReplica replicaOne = createContainerReplica(
+        ContainerID.valueOf(1), 0, IN_SERVICE,
+        ContainerReplicaProto.State.CLOSED, sequenceId);
+    final ContainerReplica replicaTwo = createContainerReplica(
+        ContainerID.valueOf(1), 0, IN_SERVICE,
+        ContainerReplicaProto.State.CLOSED, sequenceId);
+
+    final ContainerReplica quasiCloseReplica = createContainerReplica(
+        ContainerID.valueOf(1), 0, IN_SERVICE,
+        ContainerReplicaProto.State.QUASI_CLOSED, sequenceId - 5);
+
+    Set<ContainerReplica> replicas = new HashSet<>();
+    replicas.add(replicaOne);
+    replicas.add(replicaTwo);
+    replicas.add(quasiCloseReplica);
+    storeContainerAndReplicas(container, replicas);
+
+    replicationManager.processContainer(container, repQueue, repReport);
+    assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    assertEquals(1, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+
+    // Add the third CLOSED replica
+    replicas.add(createContainerReplica(
+        ContainerID.valueOf(1), 0, IN_SERVICE,
+        ContainerReplicaProto.State.CLOSED, sequenceId));
+    storeContainerAndReplicas(container, replicas);
+
+    replicationManager.processContainer(container, repQueue, repReport);
+    assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(1, repQueue.overReplicatedQueueSize());
-
-    RatisOverReplicationHandler handler = new RatisOverReplicationHandler(
-        ratisPlacementPolicy, replicationManager);
-
-    Mockito.when(nodeManager.getNodeStatus(any(DatanodeDetails.class)))
-        .thenReturn(NodeStatus.inServiceHealthy());
-    handler.processAndSendCommands(replicas, Collections.emptyList(),
-        repQueue.dequeueOverReplicatedContainer(), 2);
-    Assert.assertTrue(commandsSent.iterator().hasNext());
-
-    // unhealthy replica can't be deleted because it has a unique origin DN
-    Assert.assertNotEquals(unhealthy.getDatanodeDetails().getUuid(),
-        commandsSent.iterator().next().getKey());
-    assertEquals(SCMCommandProto.Type.deleteContainerCommand,
-        commandsSent.iterator().next().getValue().getType());
   }
 
   @Test
@@ -419,6 +572,17 @@ public class TestReplicationManager {
   }
 
   @Test
+  public void testHealthyContainerStatus() throws ContainerNotFoundException {
+    ContainerInfo container = createContainerInfo(repConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
+
+    boolean result = replicationManager.checkContainerStatus(
+        container, repReport);
+    assertFalse(result);
+  }
+
+  @Test
   public void testUnderReplicatedContainer() throws ContainerNotFoundException {
     ContainerInfo container = createContainerInfo(repConfig, 1,
         HddsProtos.LifeCycleState.CLOSED);
@@ -430,6 +594,20 @@ public class TestReplicationManager {
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, repReport.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+  }
+
+  @Test
+  public void testUnderReplicatedContainerStatus()
+      throws ContainerNotFoundException {
+    ContainerInfo container = createContainerInfo(repConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
+
+    boolean result = replicationManager.checkContainerStatus(
+        container, repReport);
+    assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    assertTrue(result);
   }
 
   /**
@@ -591,8 +769,43 @@ public class TestReplicationManager {
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(0, repReport.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(1, repReport.getStat(
+    assertEquals(0, repReport.getStat(
         ReplicationManagerReport.HealthState.MISSING));
+    assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNHEALTHY));
+  }
+
+  /**
+   * A closed EC container with all healthy replicas and 1 extra unhealthy
+   * replica. It should be logged as over replicated, but not added to the over
+   * replication queue, as the unhealthy replica will be removed by the handler
+   * directly.
+   */
+  @Test
+  public void testPerfectlyReplicatedWithUnhealthyReplica()
+      throws ContainerNotFoundException {
+    ContainerInfo container = createContainerInfo(repConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas = addReplicas(container,
+        ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
+    ContainerReplica unhealthyReplica =
+        createContainerReplica(container.containerID(), 1,
+            IN_SERVICE, ContainerReplicaProto.State.UNHEALTHY);
+    replicas.add(unhealthyReplica);
+
+    replicationManager.processContainer(
+        container, repQueue, repReport);
+
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.MISSING));
+    assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNHEALTHY));
   }
 
   @Test
@@ -692,7 +905,7 @@ public class TestReplicationManager {
     // index 1
     assertEquals(1, commandsSent.size());
     Pair<UUID, SCMCommand<?>> command = commandsSent.iterator().next();
-    Assertions.assertEquals(SCMCommandProto.Type.deleteContainerCommand,
+    assertEquals(SCMCommandProto.Type.deleteContainerCommand,
         command.getValue().getType());
     DeleteContainerCommand deleteCommand =
         (DeleteContainerCommand) command.getValue();
@@ -735,6 +948,104 @@ public class TestReplicationManager {
     // to the over replication list.
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+  }
+
+  @Test
+  public void testMisReplicatedECContainer() throws IOException {
+    Mockito.when(ecPlacementPolicy.validateContainerPlacement(
+            anyList(), anyInt()))
+        .thenReturn(new ContainerPlacementStatusDefault(4, 5, 5));
+
+    ContainerInfo container = createContainerInfo(repConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
+
+    replicationManager.processContainer(container, repQueue, repReport);
+    assertEquals(1, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.MIS_REPLICATED));
+    assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+  }
+
+  /**
+   * Consider an EC container with 5 closed and 1 unhealthy replica.
+   * Assume this container is also mis replicated because it's on
+   * insufficient racks. For such EC containers, RM should first delete the
+   * unhealthy replica and then solve mis replication.
+   */
+  @Test
+  public void testMisReplicatedECContainerWithUnhealthyReplica()
+      throws ContainerNotFoundException {
+    Mockito.when(ecPlacementPolicy.validateContainerPlacement(
+            anyList(), anyInt()))
+        .thenReturn(new ContainerPlacementStatusDefault(5, 5, 5, 1,
+            Lists.newArrayList(2, 1, 1, 1, 1)));
+
+    ContainerInfo container = createContainerInfo(repConfig, 1,
+        HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas =
+        addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4,
+            5);
+    ContainerReplica unhealthyReplica =
+        createContainerReplica(container.containerID(), 1, IN_SERVICE,
+            ContainerReplicaProto.State.UNHEALTHY);
+    replicas.add(unhealthyReplica);
+    storeContainerAndReplicas(container, replicas);
+
+    replicationManager.processContainer(container, repQueue, repReport);
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    /*
+     Does not get queued as over replicated because a delete command is sent
+     directly for the unhealthy replica.
+     */
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.MIS_REPLICATED));
+    assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    List<ContainerReplicaOp> ops =
+        containerReplicaPendingOps.getPendingOps(container.containerID());
+    Mockito.verify(nodeManager).addDatanodeCommand(any(), any());
+    assertEquals(1, ops.size());
+    assertEquals(ContainerReplicaOp.PendingOpType.DELETE,
+        ops.get(0).getOpType());
+    assertEquals(unhealthyReplica.getDatanodeDetails(),
+        ops.get(0).getTarget());
+    assertEquals(1, ops.get(0).getReplicaIndex());
+    assertEquals(1, replicationManager.getMetrics()
+        .getEcDeletionCmdsSentTotal());
+    assertEquals(0, replicationManager.getMetrics()
+        .getDeletionCmdsSentTotal());
+
+    /*
+    Now, remove the unhealthy replica. This leaves 5 replicas on 4 racks,
+    which is mis replication. RM should queue this container as mis
+    replicated now.
+     */
+    replicas.remove(unhealthyReplica);
+    containerReplicaPendingOps.completeDeleteReplica(container.containerID(),
+        unhealthyReplica.getDatanodeDetails(), 1);
+    Mockito.when(ecPlacementPolicy.validateContainerPlacement(
+            anyList(), anyInt()))
+        .thenReturn(new ContainerPlacementStatusDefault(4, 5, 5, 1,
+            Lists.newArrayList(2, 1, 1, 1)));
+
+    repReport = new ReplicationManagerReport();
+    replicationManager.processContainer(container, repQueue, repReport);
+    assertEquals(1, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(1, repReport.getStat(
+        ReplicationManagerReport.HealthState.MIS_REPLICATED));
+    assertEquals(0, repReport.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+    assertEquals(0, repReport.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
   }
 
@@ -806,7 +1117,7 @@ public class TestReplicationManager {
     assertEquals(misRep, res.getContainerInfo());
 
     res = queue.dequeueUnderReplicatedContainer();
-    Assert.assertNull(res);
+    assertNull(res);
   }
 
   @Test
@@ -827,14 +1138,14 @@ public class TestReplicationManager {
     List<ContainerReplicaOp> ops = containerReplicaPendingOps.getPendingOps(
         containerInfo.containerID());
     Mockito.verify(nodeManager).addDatanodeCommand(any(), any());
-    Assertions.assertEquals(1, ops.size());
-    Assertions.assertEquals(ContainerReplicaOp.PendingOpType.DELETE,
+    assertEquals(1, ops.size());
+    assertEquals(ContainerReplicaOp.PendingOpType.DELETE,
         ops.get(0).getOpType());
-    Assertions.assertEquals(target, ops.get(0).getTarget());
-    Assertions.assertEquals(1, ops.get(0).getReplicaIndex());
-    Assertions.assertEquals(1, replicationManager.getMetrics()
+    assertEquals(target, ops.get(0).getTarget());
+    assertEquals(1, ops.get(0).getReplicaIndex());
+    assertEquals(1, replicationManager.getMetrics()
             .getEcDeletionCmdsSentTotal());
-    Assertions.assertEquals(0, replicationManager.getMetrics()
+    assertEquals(0, replicationManager.getMetrics()
         .getDeletionCmdsSentTotal());
 
     // Repeat with Ratis container, as different metrics should be incremented
@@ -851,16 +1162,16 @@ public class TestReplicationManager {
 
     ops = containerReplicaPendingOps.getPendingOps(containerInfo.containerID());
     Mockito.verify(nodeManager).addDatanodeCommand(any(), any());
-    Assertions.assertEquals(1, ops.size());
-    Assertions.assertEquals(ContainerReplicaOp.PendingOpType.DELETE,
+    assertEquals(1, ops.size());
+    assertEquals(ContainerReplicaOp.PendingOpType.DELETE,
         ops.get(0).getOpType());
-    Assertions.assertEquals(target, ops.get(0).getTarget());
-    Assertions.assertEquals(0, ops.get(0).getReplicaIndex());
-    Assertions.assertEquals(1, replicationManager.getMetrics()
+    assertEquals(target, ops.get(0).getTarget());
+    assertEquals(0, ops.get(0).getReplicaIndex());
+    assertEquals(1, replicationManager.getMetrics()
         .getEcDeletionCmdsSentTotal());
-    Assertions.assertEquals(1, replicationManager.getMetrics()
+    assertEquals(1, replicationManager.getMetrics()
         .getDeletionCmdsSentTotal());
-    Assertions.assertEquals(20, replicationManager.getMetrics()
+    assertEquals(20, replicationManager.getMetrics()
         .getDeletionBytesTotal());
   }
 
@@ -894,24 +1205,24 @@ public class TestReplicationManager {
     List<ContainerReplicaOp> ops = containerReplicaPendingOps.getPendingOps(
         containerInfo.containerID());
     Mockito.verify(nodeManager).addDatanodeCommand(any(), any());
-    Assertions.assertEquals(2, ops.size());
+    assertEquals(2, ops.size());
     Set<DatanodeDetails> cmdTargets = new HashSet<>();
     Set<Integer> cmdIndexes = new HashSet<>();
     for (ContainerReplicaOp op : ops) {
-      Assertions.assertEquals(ADD, op.getOpType());
+      assertEquals(ADD, op.getOpType());
       cmdTargets.add(op.getTarget());
       cmdIndexes.add(op.getReplicaIndex());
     }
-    Assertions.assertEquals(2, cmdTargets.size());
+    assertEquals(2, cmdTargets.size());
     for (DatanodeDetails dn : targetNodes) {
-      Assertions.assertTrue(cmdTargets.contains(dn));
+      assertThat(cmdTargets).contains(dn);
     }
 
-    Assertions.assertEquals(2, cmdIndexes.size());
+    assertEquals(2, cmdIndexes.size());
     for (int i : missingIndexes) {
-      Assertions.assertTrue(cmdIndexes.contains(i));
+      assertThat(cmdIndexes).contains(i);
     }
-    Assertions.assertEquals(1, replicationManager.getMetrics()
+    assertEquals(1, replicationManager.getMetrics()
         .getEcReconstructionCmdsSentTotal());
   }
 
@@ -945,14 +1256,14 @@ public class TestReplicationManager {
     List<ContainerReplicaOp> ops = containerReplicaPendingOps.getPendingOps(
         containerInfo.containerID());
     Mockito.verify(nodeManager).addDatanodeCommand(any(), any());
-    Assertions.assertEquals(1, ops.size());
-    Assertions.assertEquals(ContainerReplicaOp.PendingOpType.ADD,
+    assertEquals(1, ops.size());
+    assertEquals(ContainerReplicaOp.PendingOpType.ADD,
         ops.get(0).getOpType());
-    Assertions.assertEquals(target, ops.get(0).getTarget());
-    Assertions.assertEquals(1, ops.get(0).getReplicaIndex());
-    Assertions.assertEquals(1, replicationManager.getMetrics()
+    assertEquals(target, ops.get(0).getTarget());
+    assertEquals(1, ops.get(0).getReplicaIndex());
+    assertEquals(1, replicationManager.getMetrics()
         .getEcReplicationCmdsSentTotal());
-    Assertions.assertEquals(0, replicationManager.getMetrics()
+    assertEquals(0, replicationManager.getMetrics()
         .getReplicationCmdsSentTotal());
 
     // Repeat with Ratis container, as different metrics should be incremented
@@ -968,14 +1279,14 @@ public class TestReplicationManager {
 
     ops = containerReplicaPendingOps.getPendingOps(containerInfo.containerID());
     Mockito.verify(nodeManager).addDatanodeCommand(any(), any());
-    Assertions.assertEquals(1, ops.size());
-    Assertions.assertEquals(ContainerReplicaOp.PendingOpType.ADD,
+    assertEquals(1, ops.size());
+    assertEquals(ContainerReplicaOp.PendingOpType.ADD,
         ops.get(0).getOpType());
-    Assertions.assertEquals(target, ops.get(0).getTarget());
-    Assertions.assertEquals(0, ops.get(0).getReplicaIndex());
-    Assertions.assertEquals(1, replicationManager.getMetrics()
+    assertEquals(target, ops.get(0).getTarget());
+    assertEquals(0, ops.get(0).getReplicaIndex());
+    assertEquals(1, replicationManager.getMetrics()
         .getEcReplicationCmdsSentTotal());
-    Assertions.assertEquals(1, replicationManager.getMetrics()
+    assertEquals(1, replicationManager.getMetrics()
         .getReplicationCmdsSentTotal());
   }
 
@@ -1011,14 +1322,14 @@ public class TestReplicationManager {
     List<ContainerReplicaOp> ops = containerReplicaPendingOps.getPendingOps(
         containerInfo.containerID());
     Mockito.verify(nodeManager).addDatanodeCommand(any(), any());
-    Assertions.assertEquals(1, ops.size());
-    Assertions.assertEquals(ContainerReplicaOp.PendingOpType.ADD,
+    assertEquals(1, ops.size());
+    assertEquals(ContainerReplicaOp.PendingOpType.ADD,
         ops.get(0).getOpType());
-    Assertions.assertEquals(target, ops.get(0).getTarget());
-    Assertions.assertEquals(1, ops.get(0).getReplicaIndex());
-    Assertions.assertEquals(1, replicationManager.getMetrics()
+    assertEquals(target, ops.get(0).getTarget());
+    assertEquals(1, ops.get(0).getReplicaIndex());
+    assertEquals(1, replicationManager.getMetrics()
         .getEcReplicationCmdsSentTotal());
-    Assertions.assertEquals(0, replicationManager.getMetrics()
+    assertEquals(0, replicationManager.getMetrics()
         .getReplicationCmdsSentTotal());
   }
 
@@ -1048,10 +1359,10 @@ public class TestReplicationManager {
 
     ReplicateContainerCommand sentCommand =
         (ReplicateContainerCommand)command.getValue();
-    Assertions.assertEquals(datanodeDeadline, sentCommand.getDeadline());
-    Assertions.assertEquals(LOW, sentCommand.getPriority());
-    Assertions.assertEquals(src.getUuid(), targetUUID.getValue());
-    Assertions.assertEquals(target, sentCommand.getTargetDatanode());
+    assertEquals(datanodeDeadline, sentCommand.getDeadline());
+    assertEquals(LOW, sentCommand.getPriority());
+    assertEquals(src.getUuid(), targetUUID.getValue());
+    assertEquals(target, sentCommand.getTargetDatanode());
   }
 
   @Test
@@ -1104,15 +1415,15 @@ public class TestReplicationManager {
     replicationManager.sendThrottledReplicationCommand(
         container, new ArrayList<>(sourceNodes), destination, replicaIndex);
 
-    Assertions.assertEquals(1, commandsSent.size());
+    assertEquals(1, commandsSent.size());
     Pair<UUID, SCMCommand<?>> cmdWithTarget = commandsSent.iterator().next();
-    Assertions.assertEquals(expectedTarget.getUuid(), cmdWithTarget.getLeft());
-    Assertions.assertEquals(ReplicateContainerCommand.class,
+    assertEquals(expectedTarget.getUuid(), cmdWithTarget.getLeft());
+    assertEquals(ReplicateContainerCommand.class,
         cmdWithTarget.getRight().getClass());
     ReplicateContainerCommand cmd =
         (ReplicateContainerCommand) cmdWithTarget.getRight();
-    Assertions.assertEquals(destination, cmd.getTargetDatanode());
-    Assertions.assertEquals(replicaIndex, cmd.getReplicaIndex());
+    assertEquals(destination, cmd.getTargetDatanode());
+    assertEquals(replicaIndex, cmd.getReplicaIndex());
   }
 
   @Test
@@ -1166,9 +1477,9 @@ public class TestReplicationManager {
 
     replicationManager.sendThrottledReconstructionCommand(container, command);
 
-    Assertions.assertEquals(1, commandsSent.size());
+    assertEquals(1, commandsSent.size());
     Pair<UUID, SCMCommand<?>> cmd = commandsSent.iterator().next();
-    Assertions.assertEquals(cmdTarget.getUuid(), cmd.getLeft());
+    assertEquals(cmdTarget.getUuid(), cmd.getLeft());
     assertEquals(0, replicationManager.getMetrics()
         .getEcReconstructionCmdsDeferredTotal());
   }
@@ -1284,7 +1595,7 @@ public class TestReplicationManager {
     assertEquals(1, excluded.size());
     // dn 3 was at the limit already, so should be added when filtering the
     // nodes
-    Assert.assertTrue(excluded.contains(dn3));
+    assertThat(excluded).contains(dn3);
 
     // Trigger an update for dn3, but it should stay in the excluded list as its
     // count is still at the limit.
@@ -1306,7 +1617,7 @@ public class TestReplicationManager {
     excluded = replicationManager.getExcludedNodes();
     assertEquals(1, excluded.size());
     // dn 2 reached the limit from the reconstruction command
-    Assert.assertTrue(excluded.contains(dn2));
+    assertThat(excluded).contains(dn2);
 
     // Update received for DN2, it should be cleared from the excluded list.
     replicationManager.datanodeCommandCountUpdated(dn2);
@@ -1331,19 +1642,19 @@ public class TestReplicationManager {
     config.setInflightReplicationLimitFactor(0.0);
     configuration.setFromObject(config);
     ReplicationManager rm = createReplicationManager();
-    Assertions.assertEquals(0, rm.getReplicationInFlightLimit());
+    assertEquals(0, rm.getReplicationInFlightLimit());
 
     config.setInflightReplicationLimitFactor(1);
     configuration.setFromObject(config);
     rm = createReplicationManager();
-    Assertions.assertEquals(
+    assertEquals(
         healthyNodes * config.getDatanodeReplicationLimit(),
         rm.getReplicationInFlightLimit());
 
     config.setInflightReplicationLimitFactor(0.75);
     configuration.setFromObject(config);
     rm = createReplicationManager();
-    Assertions.assertEquals(
+    assertEquals(
         (int) Math.ceil(healthyNodes
             * config.getDatanodeReplicationLimit() * 0.75),
         rm.getReplicationInFlightLimit());

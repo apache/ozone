@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.request.key;
 
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -26,8 +27,8 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.key.OMKeySetTimesResponseWithFSO;
@@ -38,6 +39,7 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -61,13 +63,13 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long trxnLogIndex = termIndex.getIndex();
     OmKeyInfo omKeyInfo = null;
 
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse = onInit();
     OMClientResponse omClientResponse = null;
-    IOException exception = null;
+    Exception exception = null;
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean lockAcquired = false;
@@ -87,14 +89,18 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
             volume, bucket, key);
       }
-      lockAcquired = omMetadataManager.getLock()
-          .acquireWriteLock(BUCKET_LOCK, volume, bucket);
-      OzoneFileStatus keyStatus = OMFileRequest
-          .getOMKeyInfoIfExists(omMetadataManager, volume, bucket, key, 0);
+      mergeOmLockDetails(omMetadataManager.getLock()
+          .acquireWriteLock(BUCKET_LOCK, volume, bucket));
+      lockAcquired = getOmLockDetails().isLockAcquired();
+      OzoneFileStatus keyStatus = OMFileRequest.getOMKeyInfoIfExists(
+          omMetadataManager, volume, bucket, key, 0,
+          ozoneManager.getDefaultReplicationConfig());
       if (keyStatus == null) {
         throw new OMException("Key not found. Key:" + key, KEY_NOT_FOUND);
       }
       omKeyInfo = keyStatus.getKeyInfo();
+      // setting Key name back to Ozone Key before updating cache value.
+      omKeyInfo.setKeyName(OzoneFSUtils.getFileName(key));
       final long volumeId = omMetadataManager.getVolumeId(volume);
       final long bucketId = omMetadataManager.getBucketId(volume, bucket);
       final String dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
@@ -119,16 +125,17 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
       omClientResponse = onSuccess(omResponse, omKeyInfo, operationResult,
           isDirectory, volumeId, bucketId);
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
-      omClientResponse = onFailure(omResponse, ex);
+      omClientResponse = onFailure(omResponse, exception);
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
       if (lockAcquired) {
-        omMetadataManager.getLock()
-            .releaseWriteLock(BUCKET_LOCK, volume, bucket);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volume, bucket));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 
@@ -155,7 +162,7 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
 
   @Override
   protected OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException exception) {
+      Exception exception) {
     return new OMKeySetTimesResponseWithFSO(createErrorOMResponse(
         omResponse, exception), getBucketLayout());
   }

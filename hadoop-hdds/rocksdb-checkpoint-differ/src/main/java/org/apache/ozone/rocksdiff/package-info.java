@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone;
+package org.apache.ozone.rocksdiff;
 
 /**
  * Generic ozone specific classes.

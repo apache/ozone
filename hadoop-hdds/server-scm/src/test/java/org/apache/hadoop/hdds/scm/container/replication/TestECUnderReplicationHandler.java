@@ -81,6 +81,7 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -297,7 +298,7 @@ public class TestECUnderReplicationHandler {
       List<DatanodeDetails> usedNodes) {
     assertEquals(replicas.size(), usedNodes.size());
     for (ContainerReplica r : replicas) {
-      assertTrue(usedNodes.contains(r.getDatanodeDetails()));
+      assertThat(usedNodes).contains(r.getDatanodeDetails());
     }
   }
 
@@ -481,6 +482,10 @@ public class TestECUnderReplicationHandler {
         availableReplicas, 1, 2, policy);
   }
 
+  /**
+   * The expectation is that an under replicated container should recover
+   * even if datanodes hosting new replicas don't satisfy placement policy.
+   */
   @Test
   public void testUnderReplicationWithInvalidPlacement()
           throws IOException {
@@ -505,8 +510,8 @@ public class TestECUnderReplicationHandler {
               .allMatch(dns::contains));
           return mockedContainerPlacementStatus;
         });
-    testUnderReplicationWithMissingIndexes(emptyList(),
-            availableReplicas, 0, 0, mockedPolicy);
+    testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
+            availableReplicas, 2, 0, mockedPolicy);
   }
 
   @Test

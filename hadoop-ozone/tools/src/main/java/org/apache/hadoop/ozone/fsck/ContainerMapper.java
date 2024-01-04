@@ -78,7 +78,7 @@ public class ContainerMapper {
       throw new IOException(OZONE_OM_DB_DIRS + "should be set ");
     }
     OmMetadataManagerImpl metadataManager =
-        new OmMetadataManagerImpl(configuration);
+        new OmMetadataManagerImpl(configuration, null);
     try {
       Table<String, OmKeyInfo> keyTable =
           metadataManager.getKeyTable(getBucketLayout());

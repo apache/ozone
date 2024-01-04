@@ -20,12 +20,12 @@ package org.apache.hadoop.ozone.om.helpers;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests for the QuotaUtil class.
@@ -39,7 +39,7 @@ public class TestQuotaUtil {
     ReplicationConfig repConfig = RatisReplicationConfig.getInstance(THREE);
     long replicatedSize =
         QuotaUtil.getReplicatedSize(123 * ONE_MB, repConfig);
-    Assert.assertEquals(123 * ONE_MB * 3, replicatedSize);
+    assertEquals(123 * ONE_MB * 3, replicatedSize);
   }
 
   @Test
@@ -47,7 +47,7 @@ public class TestQuotaUtil {
     ReplicationConfig repConfig = RatisReplicationConfig.getInstance(ONE);
     long replicatedSize =
         QuotaUtil.getReplicatedSize(123 * ONE_MB, repConfig);
-    Assert.assertEquals(123 * ONE_MB, replicatedSize);
+    assertEquals(123 * ONE_MB, replicatedSize);
   }
 
   @Test
@@ -55,7 +55,7 @@ public class TestQuotaUtil {
     ECReplicationConfig repConfig = new ECReplicationConfig(3, 2, RS, ONE_MB);
     long dataSize = ONE_MB * 3 * 123; // 123 full stripe
     long replicatedSize = QuotaUtil.getReplicatedSize(dataSize, repConfig);
-    Assert.assertEquals(dataSize + 123 * ONE_MB * 2, replicatedSize);
+    assertEquals(dataSize + 123 * ONE_MB * 2, replicatedSize);
   }
 
   @Test
@@ -64,7 +64,8 @@ public class TestQuotaUtil {
     long dataSize = ONE_MB * 3 * 123 + 10; // 123 full stripes, plus 10 bytes
     long replicatedSize = QuotaUtil.getReplicatedSize(dataSize, repConfig);
     // Expected is 123 parity stripes, plus another 10 bytes in each parity
-    Assert.assertEquals(dataSize + 123 * ONE_MB * 2 + 10 * 2, replicatedSize);
+    assertEquals(dataSize + 123 * ONE_MB * 2 + 10 * 2,
+        replicatedSize);
   }
 
   @Test
@@ -74,7 +75,7 @@ public class TestQuotaUtil {
     long dataSize = ONE_MB * 3 * 123 + ONE_MB + 10;
     long replicatedSize = QuotaUtil.getReplicatedSize(dataSize, repConfig);
     // Expected is 123 parity stripes, plus another 1MB in each parity
-    Assert.assertEquals(
+    assertEquals(
         dataSize + 123 * ONE_MB * 2 + ONE_MB * 2, replicatedSize);
   }
 
@@ -84,7 +85,7 @@ public class TestQuotaUtil {
     long dataSize = 10;
     long replicatedSize = QuotaUtil.getReplicatedSize(dataSize, repConfig);
     // Expected is 123 parity stripes, plus another 1MB in each parity
-    Assert.assertEquals(dataSize + 10 * 2, replicatedSize);
+    assertEquals(dataSize + 10 * 2, replicatedSize);
   }
 
   @Test
@@ -93,7 +94,7 @@ public class TestQuotaUtil {
     long dataSize = 2 * ONE_MB + 10;
     long replicatedSize = QuotaUtil.getReplicatedSize(dataSize, repConfig);
     // Expected is 123 parity stripes, plus another 1MB in each parity
-    Assert.assertEquals(dataSize + ONE_MB * 2, replicatedSize);
+    assertEquals(dataSize + ONE_MB * 2, replicatedSize);
   }
 
 }

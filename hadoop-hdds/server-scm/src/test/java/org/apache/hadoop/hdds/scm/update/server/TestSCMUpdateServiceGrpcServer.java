@@ -25,10 +25,10 @@ import org.apache.hadoop.hdds.scm.update.client.SCMUpdateClientConfiguration;
 import org.apache.hadoop.hdds.scm.update.client.SCMUpdateServiceGrpcClient;
 import org.apache.hadoop.hdds.scm.update.client.UpdateServiceConfig;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -46,6 +46,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeoutException;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Tests for SCM update Service.
@@ -97,7 +99,7 @@ public class TestSCMUpdateServiceGrpcServer {
   }
 
 
-  @Disabled("HDDS-5319")
+  @Unhealthy("HDDS-5319")
   @Test
   public void testClientUpdateWithRevoke() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -140,7 +142,7 @@ public class TestSCMUpdateServiceGrpcServer {
     }
   }
 
-  @Disabled("HDDS-5319")
+  @Unhealthy("HDDS-5319")
   @Test
   public void testClientUpdateWithDelayedRevoke() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -182,9 +184,9 @@ public class TestSCMUpdateServiceGrpcServer {
       server.notifyCrlUpdate();
       GenericTestUtils.waitFor(() -> client.getUpdateCount() > 1,
           100, 2000);
-      Assertions.assertTrue(2 <= client.getUpdateCount());
+      assertThat(2L).isLessThanOrEqualTo(client.getUpdateCount());
       Assertions.assertEquals(0, client.getErrorCount());
-      Assertions.assertTrue(1 >= client.getClientCRLStore()
+      assertThat(1).isGreaterThanOrEqualTo(client.getClientCRLStore()
           .getPendingCrlIds().size());
 
       GenericTestUtils.waitFor(() -> client.getPendingCrlRemoveCount() == 1,
@@ -213,7 +215,7 @@ public class TestSCMUpdateServiceGrpcServer {
     return crlId.get();
   }
 
-  @Disabled("HDDS-5319")
+  @Unhealthy("HDDS-5319")
   @Test
   public void testClientUpdateWithRestart() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -286,7 +288,7 @@ public class TestSCMUpdateServiceGrpcServer {
 
       GenericTestUtils.waitFor(() -> client.getUpdateCount() > 6,
           100, 2000);
-      Assertions.assertTrue(client.getUpdateCount() >= 6);
+      assertThat(client.getUpdateCount()).isGreaterThanOrEqualTo(6);
       Assertions.assertEquals(2, client.getErrorCount());
       Assertions.assertEquals(6, clientCRLStore.getLatestCrlId());
     } catch (Exception e) {

@@ -33,7 +33,3 @@ execute_robot_test om compatibility/om.robot
 execute_robot_test recon compatibility/recon.robot
 execute_robot_test scm compatibility/scm.robot
 execute_robot_test datanode compatibility/dn-one-rocksdb.robot
-
-stop_docker_env
-
-generate_report

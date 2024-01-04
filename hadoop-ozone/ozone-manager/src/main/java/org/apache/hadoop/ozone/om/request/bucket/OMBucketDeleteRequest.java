@@ -19,16 +19,18 @@
 package org.apache.hadoop.ozone.om.request.bucket;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
@@ -79,9 +81,8 @@ public class OMBucketDeleteRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long transactionLogIndex = termIndex.getIndex();
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumBucketDeletes();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
@@ -101,7 +102,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
     auditMap.put(OzoneConsts.BUCKET, bucketName);
 
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
-    IOException exception = null;
+    Exception exception = null;
 
     boolean acquiredBucketLock = false, acquiredVolumeLock = false;
     boolean success = true;
@@ -115,11 +116,13 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       }
 
       // acquire lock
-      acquiredVolumeLock =
-          omMetadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName);
-      acquiredBucketLock =
-          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          volumeName, bucketName);
+      mergeOmLockDetails(
+          omMetadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName));
+      acquiredVolumeLock = getOmLockDetails().isLockAcquired();
+      mergeOmLockDetails(
+          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
+              bucketName));
+      acquiredBucketLock = getOmLockDetails().isLockAcquired();
 
       // No need to check volume exists here, as bucket cannot be created
       // with out volume creation. Check if bucket exists
@@ -138,6 +141,16 @@ public class OMBucketDeleteRequest extends OMClientRequest {
         LOG.debug("bucket: {} is not empty ", bucketName);
         throw new OMException("Bucket is not empty",
             OMException.ResultCodes.BUCKET_NOT_EMPTY);
+      }
+
+      // Check if bucket does not contain incomplete MPUs
+      if (omMetadataManager.containsIncompleteMPUs(volumeName, bucketName)) {
+        LOG.debug("Volume '{}', Bucket '{}' can't be deleted when it has " +
+                "incomplete multipart uploads", volumeName, bucketName);
+        throw new OMException(
+            String.format("Volume %s, Bucket %s can't be deleted when it " +
+                "has incomplete multipart uploads", volumeName, bucketName),
+            ResultCodes.BUCKET_NOT_EMPTY);
       }
 
       // appending '/' to end to eliminate cases where 2 buckets start with same
@@ -182,20 +195,22 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       // Add to double buffer.
       omClientResponse = new OMBucketDeleteResponse(omResponse.build(),
           volumeName, bucketName, omVolumeArgs.copyObject());
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       success = false;
       exception = ex;
       omClientResponse = new OMBucketDeleteResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
       }
       if (acquiredVolumeLock) {
-        omMetadataManager.getLock().releaseReadLock(VOLUME_LOCK, volumeName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseReadLock(VOLUME_LOCK, volumeName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

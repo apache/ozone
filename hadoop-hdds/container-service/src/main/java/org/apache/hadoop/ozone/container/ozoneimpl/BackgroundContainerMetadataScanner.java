@@ -57,7 +57,8 @@ public class BackgroundContainerMetadataScanner extends
 
   @VisibleForTesting
   @Override
-  public void scanContainer(Container<?> container) throws IOException {
+  public void scanContainer(Container<?> container)
+      throws IOException, InterruptedException {
     // There is one background container metadata scanner per datanode.
     // If this container's volume has failed, skip the container.
     // The iterator returned by getContainerIterator may have stale results.
@@ -70,23 +71,32 @@ public class BackgroundContainerMetadataScanner extends
       return;
     }
 
-    // Full data scan also does a metadata scan. If a full data scan was done
-    // recently, we can skip this metadata scan.
-    if (ContainerUtils.recentlyScanned(container, minScanGap, LOG)) {
+    if (!shouldScan(container)) {
       return;
     }
 
-    // Do not update the scan timestamp since this was just a metadata scan,
-    // not a full scan.
-    if (!container.scanMetaData()) {
+    Container.ScanResult result = container.scanMetaData();
+    if (!result.isHealthy()) {
+      LOG.error("Corruption detected in container [{}]. Marking it UNHEALTHY.",
+          containerID, result.getException());
       metrics.incNumUnHealthyContainers();
-      controller.markContainerUnhealthy(containerID);
+      controller.markContainerUnhealthy(containerID, result);
     }
+
+    // Do not update the scan timestamp after the scan since this was just a
+    // metadata scan, not a full data scan.
     metrics.incNumContainersScanned();
   }
 
   @Override
   public ContainerMetadataScannerMetrics getMetrics() {
     return this.metrics;
+  }
+
+  private boolean shouldScan(Container<?> container) {
+    // Full data scan also does a metadata scan. If a full data scan was done
+    // recently, we can skip this metadata scan.
+    return container.shouldScanMetadata() &&
+        !ContainerUtils.recentlyScanned(container, minScanGap, LOG);
   }
 }

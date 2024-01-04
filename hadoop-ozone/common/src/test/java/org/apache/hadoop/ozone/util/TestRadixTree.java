@@ -18,12 +18,14 @@
 
 package org.apache.hadoop.ozone.util;
 
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test Ozone Radix tree operations.
@@ -32,10 +34,10 @@ public class TestRadixTree {
 
   static final RadixTree<Integer> ROOT = new RadixTree<>();
 
-  @BeforeClass
+  @BeforeAll
   public static void setupRadixTree() {
     // Test prefix paths with an empty tree
-    assertEquals(true, ROOT.isEmpty());
+    assertTrue(ROOT.isEmpty());
     assertEquals("/", ROOT.getLongestPrefix("/a/b/c"));
     assertEquals("/", RadixTree.radixPathToString(
         ROOT.getLongestPrefixPath("/a/g")));
@@ -99,7 +101,7 @@ public class TestRadixTree {
 
   @Test
   public void testGetLastNoeInPrefixPath() {
-    assertEquals(null, ROOT.getLastNodeInPrefixPath("/a/g"));
+    assertNull(ROOT.getLastNodeInPrefixPath("/a/g"));
     RadixNode<Integer> ln = ROOT.getLastNodeInPrefixPath("/a/b/e/dir1");
     assertEquals("dir1", ln.getName());
   }

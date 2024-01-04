@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
@@ -52,14 +53,17 @@ import org.mockito.Mockito;
 import org.apache.commons.lang3.StringUtils;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -339,8 +343,8 @@ public class TestSCMContainerPlacementRackAware {
     // verify metrics
     Assertions.assertEquals(totalRequest, nodeNum);
     Assertions.assertEquals(successCount, nodeNum);
-    Assertions.assertTrue(tryCount > nodeNum);
-    Assertions.assertTrue(compromiseCount >= 1);
+    assertThat(tryCount).isGreaterThan(nodeNum);
+    assertThat(compromiseCount).isGreaterThanOrEqualTo(1);
   }
 
   @ParameterizedTest
@@ -365,8 +369,10 @@ public class TestSCMContainerPlacementRackAware {
     long compromiseCount = metrics.getDatanodeChooseFallbackCount();
 
     Assertions.assertEquals(nodeNum, totalRequest);
-    Assertions.assertTrue(successCount >= 1, "Not enough success count");
-    Assertions.assertTrue(tryCount >= 1, "Not enough try count");
+    assertThat(successCount).withFailMessage("Not enough success count")
+        .isGreaterThanOrEqualTo(1);
+    assertThat(tryCount).withFailMessage("Not enough try count")
+        .isGreaterThanOrEqualTo(1);
     Assertions.assertEquals(0, compromiseCount);
   }
 
@@ -423,7 +429,7 @@ public class TestSCMContainerPlacementRackAware {
       policy.chooseDatanodes(null, null, nodeNum, STORAGE_CAPACITY + 0, 15);
       fail("Storage requested exceeds capacity, this call should fail");
     } catch (Exception e) {
-      assertTrue(e.getClass().getSimpleName().equals("SCMException"));
+      assertEquals("SCMException", e.getClass().getSimpleName());
     }
 
     // get metrics
@@ -434,7 +440,7 @@ public class TestSCMContainerPlacementRackAware {
 
     Assertions.assertEquals(totalRequest, nodeNum);
     Assertions.assertEquals(successCount, 0);
-    Assertions.assertTrue(tryCount >= nodeNum, "Not enough try");
+    assertThat(tryCount).withFailMessage("Not enough try").isGreaterThanOrEqualTo(nodeNum);
     Assertions.assertEquals(compromiseCount, 0);
   }
 
@@ -561,6 +567,50 @@ public class TestSCMContainerPlacementRackAware {
     stat = policy.validateContainerPlacement(dns, 1);
     assertTrue(stat.isPolicySatisfied());
     assertEquals(0, stat.misReplicationCount());
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.hadoop.hdds.scm.node.NodeStatus#outOfServiceStates")
+  public void testOverReplicationAndOutOfServiceNodes(HddsProtos.NodeOperationalState state) {
+    setup(7);
+    //    7 datanodes, all nodes are used.
+    //    /rack0/node0  -> IN_SERVICE
+    //    /rack0/node1  -> IN_SERVICE
+    //    /rack0/node2  -> OFFLINE
+    //    /rack0/node3  -> OFFLINE
+    //    /rack0/node4  -> OFFLINE
+    //    /rack1/node5  -> IN_SERVICE
+    //    /rack1/node6  -> OFFLINE
+    datanodes.get(2).setPersistedOpState(state);
+    datanodes.get(3).setPersistedOpState(state);
+    datanodes.get(4).setPersistedOpState(state);
+    datanodes.get(6).setPersistedOpState(state);
+    List<DatanodeDetails> dns = new ArrayList<>(datanodes);
+
+    ContainerPlacementStatus status = policy.validateContainerPlacement(dns, 3);
+    assertTrue(status.isPolicySatisfied());
+    assertEquals(2, status.actualPlacementCount());
+    assertEquals(2, status.expectedPlacementCount());
+    assertEquals(0, status.misReplicationCount());
+    assertNull(status.misReplicatedReason());
+
+    //    /rack0/node0  -> IN_SERVICE
+    //    /rack0/node1  -> IN_SERVICE
+    //    /rack0/node2  -> OFFLINE > IN_SERVICE
+    //    /rack0/node3  -> OFFLINE
+    //    /rack0/node4  -> OFFLINE
+    //    /rack1/node5  -> IN_SERVICE
+    //    /rack1/node6  -> OFFLINE > IN_SERVICE
+    datanodes.get(2).setPersistedOpState(IN_SERVICE);
+    datanodes.get(6).setPersistedOpState(IN_SERVICE);
+    dns = new ArrayList<>(datanodes);
+
+    status = policy.validateContainerPlacement(dns, 3);
+    assertTrue(status.isPolicySatisfied());
+    assertEquals(2, status.actualPlacementCount());
+    assertEquals(2, status.expectedPlacementCount());
+    assertEquals(0, status.misReplicationCount());
+    assertNull(status.misReplicatedReason());
   }
 
   @ParameterizedTest
@@ -793,8 +843,49 @@ public class TestSCMContainerPlacementRackAware {
     long compromiseCount = metrics.getDatanodeChooseFallbackCount();
 
     Assertions.assertEquals(nodeNum, totalRequest);
-    Assertions.assertTrue(successCount >= 1, "Not enough success count");
-    Assertions.assertTrue(tryCount >= 1, "Not enough try count");
+    assertThat(successCount).withFailMessage("Not enough success count")
+        .isGreaterThanOrEqualTo(1);
+    assertThat(tryCount).withFailMessage("Not enough try count")
+        .isGreaterThanOrEqualTo(1);
     Assertions.assertEquals(0, compromiseCount);
+  }
+
+  @Test
+  public void chooseNodeWithUsedAndFavouredNodesMultipleRack()
+      throws SCMException {
+    int datanodeCount = 12;
+    setup(datanodeCount);
+    int nodeNum = 1;
+    List<DatanodeDetails> usedNodes = new ArrayList<>();
+    List<DatanodeDetails> favouredNodes = new ArrayList<>();
+
+    // 2 replica
+    usedNodes.add(datanodes.get(0));
+    usedNodes.add(datanodes.get(1));
+    // 1 favoured node
+    favouredNodes.add(datanodes.get(2));
+
+    List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(usedNodes,
+        null, favouredNodes, nodeNum, 0, 5);
+
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+    // Favoured node should not be returned,
+    // Returned node should be on the different rack than the favoured node.
+    Assertions.assertFalse(cluster.isSameParent(
+        favouredNodes.get(0), datanodeDetails.get(0)));
+
+    favouredNodes.clear();
+    // 1 favoured node
+    favouredNodes.add(datanodes.get(6));
+
+    datanodeDetails = policy.chooseDatanodes(usedNodes,
+        null, favouredNodes, nodeNum, 0, 5);
+
+    Assertions.assertEquals(nodeNum, datanodeDetails.size());
+
+    // Favoured node should be returned,
+    // as favoured node is in the different rack as used nodes.
+    Assertions.assertSame(favouredNodes.get(0).getUuid(), datanodeDetails.get(0).getUuid());
+
   }
 }

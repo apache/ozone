@@ -23,18 +23,17 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CRLStatusReport;
 
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
+import org.hamcrest.MatcherAssert;
+import org.hamcrest.Matchers;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test cases to test ReportPublisherFactory.
  */
 public class TestReportPublisherFactory {
-
-  @Rule
-  public ExpectedException exception = ExpectedException.none();
 
   @Test
   public void testGetContainerReportPublisher() {
@@ -42,8 +41,9 @@ public class TestReportPublisherFactory {
     ReportPublisherFactory factory = new ReportPublisherFactory(conf);
     ReportPublisher publisher = factory
         .getPublisherFor(ContainerReportsProto.class);
-    Assert.assertEquals(ContainerReportPublisher.class, publisher.getClass());
-    Assert.assertEquals(conf, publisher.getConf());
+    assertEquals(
+        ContainerReportPublisher.class, publisher.getClass());
+    assertEquals(conf, publisher.getConf());
   }
 
   @Test
@@ -52,8 +52,8 @@ public class TestReportPublisherFactory {
     ReportPublisherFactory factory = new ReportPublisherFactory(conf);
     ReportPublisher publisher = factory
         .getPublisherFor(NodeReportProto.class);
-    Assert.assertEquals(NodeReportPublisher.class, publisher.getClass());
-    Assert.assertEquals(conf, publisher.getConf());
+    assertEquals(NodeReportPublisher.class, publisher.getClass());
+    assertEquals(conf, publisher.getConf());
   }
 
   @Test
@@ -62,16 +62,20 @@ public class TestReportPublisherFactory {
     ReportPublisherFactory factory = new ReportPublisherFactory(conf);
     ReportPublisher publisher = factory
         .getPublisherFor(CRLStatusReport.class);
-    Assert.assertEquals(CRLStatusReportPublisher.class, publisher.getClass());
-    Assert.assertEquals(conf, publisher.getConf());
+    assertEquals(
+        CRLStatusReportPublisher.class, publisher.getClass());
+    assertEquals(conf, publisher.getConf());
   }
 
   @Test
   public void testInvalidReportPublisher() {
     OzoneConfiguration conf = new OzoneConfiguration();
     ReportPublisherFactory factory = new ReportPublisherFactory(conf);
-    exception.expect(RuntimeException.class);
-    exception.expectMessage("No publisher found for report");
-    factory.getPublisherFor(HddsProtos.DatanodeDetailsProto.class);
+    RuntimeException runtimeException = assertThrows(
+        RuntimeException.class,
+        () -> factory.getPublisherFor(HddsProtos.DatanodeDetailsProto.class)
+    );
+    MatcherAssert.assertThat(runtimeException.getMessage(),
+        Matchers.containsString("No publisher found for report"));
   }
 }

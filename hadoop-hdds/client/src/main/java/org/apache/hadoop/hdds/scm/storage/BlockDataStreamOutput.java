@@ -166,10 +166,10 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         BlockData.newBuilder().setBlockID(blockID.getDatanodeBlockIDProtobuf())
             .addMetadata(keyValue);
     this.xceiverClient =
-        (XceiverClientRatis)xceiverClientManager.acquireClient(pipeline);
+        (XceiverClientRatis)xceiverClientManager.acquireClient(pipeline, true);
+    this.token = token;
     // Alternatively, stream setup can be delayed till the first chunk write.
     this.out = setupStream(pipeline);
-    this.token = token;
     this.bufferList = bufferList;
     flushPeriod = (int) (config.getStreamBufferFlushSize() / config
         .getStreamBufferSize());
@@ -198,7 +198,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         ContainerProtos.WriteChunkRequestProto.newBuilder()
             .setBlockID(blockID.get().getDatanodeBlockIDProtobuf());
 
-    String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
+    // TODO: The datanode UUID is not used meaningfully, consider deprecating
+    //  it or remove it completely if possible
+    String id = pipeline.getFirstNode().getUuidString();
     ContainerProtos.ContainerCommandRequestProto.Builder builder =
         ContainerProtos.ContainerCommandRequestProto.newBuilder()
             .setCmdType(ContainerProtos.Type.StreamInit)
@@ -376,8 +378,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     checkOpen();
     try {
       XceiverClientReply reply = bufferFull ?
-          commitWatcher.streamWatchOnFirstIndex() :
-          commitWatcher.streamWatchOnLastIndex();
+          commitWatcher.watchOnFirstIndex() :
+          commitWatcher.watchOnLastIndex();
       if (reply != null) {
         List<DatanodeDetails> dnList = reply.getDatanodes();
         if (!dnList.isEmpty()) {
@@ -454,7 +456,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
               if (LOG.isDebugEnabled()) {
                 LOG.debug("Adding index " + asyncReply.getLogIndex() +
                     " commitMap size "
-                    + commitWatcher.getCommitInfoMapSize() + " flushLength "
+                    + commitWatcher.getCommitIndexMap().size() + " flushLength "
                     + flushPos + " blockID " + blockID);
               }
               // for standalone protocol, logIndex will always be 0.
@@ -607,7 +609,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
 
   public void cleanup(boolean invalidateClient) {
     if (xceiverClientFactory != null) {
-      xceiverClientFactory.releaseClient(xceiverClient, invalidateClient);
+      xceiverClientFactory.releaseClient(xceiverClient, invalidateClient,
+          true);
     }
     xceiverClientFactory = null;
     xceiverClient = null;

@@ -56,44 +56,36 @@ import org.apache.hadoop.util.Timer;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import org.apache.commons.io.FileUtils;
-import static org.hamcrest.CoreMatchers.is;
-import org.junit.After;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.Timeout;
+import org.hamcrest.MatcherAssert;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.hamcrest.CoreMatchers.is;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Verify that {@link MutableVolumeSet} correctly checks for failed disks
  * during initialization.
  */
+@Timeout(30)
 public class TestVolumeSetDiskChecks {
   public static final Logger LOG = LoggerFactory.getLogger(
       TestVolumeSetDiskChecks.class);
-
-  @Rule
-  public Timeout globalTimeout = Timeout.seconds(30);
-
-  @Rule
-  public ExpectedException thrown = ExpectedException.none();
 
   private OzoneConfiguration conf = null;
 
   /**
    * Cleanup volume directories.
    */
-  @After
+  @AfterEach
   public void cleanup() {
     final Collection<String> dirs = conf.getTrimmedStringCollection(
         DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY);
@@ -116,8 +108,9 @@ public class TestVolumeSetDiskChecks {
         new MutableVolumeSet(UUID.randomUUID().toString(), conf,
             null, StorageVolume.VolumeType.DATA_VOLUME, null);
 
-    assertThat(volumeSet.getVolumesList().size(), is(numVolumes));
-    assertThat(volumeSet.getFailedVolumesList().size(), is(0));
+    MatcherAssert.assertThat(volumeSet.getVolumesList().size(), is(numVolumes));
+    MatcherAssert.assertThat(
+        volumeSet.getFailedVolumesList().size(), is(0));
 
     // Verify that the Ozone dirs were created during initialization.
     Collection<String> dirs = conf.getTrimmedStringCollection(
@@ -154,17 +147,22 @@ public class TestVolumeSetDiskChecks {
         StorageVolume.VolumeType.DB_VOLUME,
         dummyChecker);
 
-    Assert.assertEquals(volumeSet.getFailedVolumesList().size(),
+    volumeSet.checkAllVolumes();
+    assertEquals(volumeSet.getFailedVolumesList().size(),
         numBadVolumes);
-    Assert.assertEquals(volumeSet.getVolumesList().size(),
+    assertEquals(volumeSet.getVolumesList().size(),
         numVolumes - numBadVolumes);
-    Assert.assertEquals(metaVolumeSet.getFailedVolumesList().size(),
+
+    metaVolumeSet.checkAllVolumes();
+    assertEquals(metaVolumeSet.getFailedVolumesList().size(),
         numBadVolumes);
-    Assert.assertEquals(metaVolumeSet.getVolumesList().size(),
+    assertEquals(metaVolumeSet.getVolumesList().size(),
         numVolumes - numBadVolumes);
-    Assert.assertEquals(dbVolumeSet.getFailedVolumesList().size(),
+
+    dbVolumeSet.checkAllVolumes();
+    assertEquals(dbVolumeSet.getFailedVolumesList().size(),
         numBadVolumes);
-    Assert.assertEquals(dbVolumeSet.getVolumesList().size(),
+    assertEquals(dbVolumeSet.getVolumesList().size(),
         numVolumes - numBadVolumes);
 
     volumeSet.shutdown();
@@ -197,10 +195,13 @@ public class TestVolumeSetDiskChecks {
         StorageVolume.VolumeType.DB_VOLUME,
         dummyChecker);
 
+    volumeSet.checkAllVolumes();
     assertEquals(volumeSet.getFailedVolumesList().size(), numVolumes);
     assertEquals(volumeSet.getVolumesList().size(), 0);
+    metaVolumeSet.checkAllVolumes();
     assertEquals(metaVolumeSet.getFailedVolumesList().size(), numVolumes);
     assertEquals(metaVolumeSet.getVolumesList().size(), 0);
+    dbVolumeSet.checkAllVolumes();
     assertEquals(dbVolumeSet.getFailedVolumesList().size(), numVolumes);
     assertEquals(dbVolumeSet.getVolumesList().size(), 0);
 
@@ -315,7 +316,7 @@ public class TestVolumeSetDiskChecks {
     StateContext stateContext = new StateContext(
         new OzoneConfiguration(), DatanodeStateMachine
         .DatanodeStates.getInitState(),
-        datanodeStateMachineMock);
+        datanodeStateMachineMock, "");
     InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
     stateContext.addEndpoint(scm1);
     when(datanodeStateMachineMock.getContainer()).thenReturn(ozoneContainer);
@@ -330,9 +331,9 @@ public class TestVolumeSetDiskChecks {
 
     conSet.handleVolumeFailures(stateContext);
     // ContainerID1 should be removed belonging to failed volume
-    Assert.assertNull(conSet.getContainer(containerID1));
+    assertNull(conSet.getContainer(containerID1));
     // ContainerID should exist belonging to normal volume
-    Assert.assertNotNull(conSet.getContainer(containerID));
+    assertNotNull(conSet.getContainer(containerID));
     expectedReportCount.put(
         StorageContainerDatanodeProtocolProtos.ContainerReportsProto
             .getDescriptor().getFullName(), 1);
@@ -351,7 +352,7 @@ public class TestVolumeSetDiskChecks {
       reportCount.put(reportName, reportCount.getOrDefault(reportName, 0) + 1);
     }
     // Verify
-    Assertions.assertEquals(expectedReportCount, reportCount);
+    assertEquals(expectedReportCount, reportCount);
   }
 
   /**
@@ -363,7 +364,7 @@ public class TestVolumeSetDiskChecks {
 
     DummyChecker(ConfigurationSource conf, Timer timer, int numBadVolumes)
         throws DiskErrorException {
-      super(conf, timer);
+      super(conf, timer, "");
       this.numBadVolumes = numBadVolumes;
     }
 

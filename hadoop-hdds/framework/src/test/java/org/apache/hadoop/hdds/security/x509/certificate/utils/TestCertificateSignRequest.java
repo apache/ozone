@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.security.x509.certificate.utils;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.bouncycastle.asn1.ASN1Encodable;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
@@ -37,7 +37,6 @@ import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentVerifierProviderBuilder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.pkcs.PKCSException;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -53,17 +52,21 @@ import java.util.UUID;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getDistinguishedNameFormat;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getPkcs9Extensions;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Certificate Signing Request.
  */
 public class TestCertificateSignRequest {
 
-  private static OzoneConfiguration conf = new OzoneConfiguration();
   private SecurityConfig securityConfig;
 
   @BeforeEach
   public void init(@TempDir Path tempDir) throws IOException {
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_METADATA_DIRS, tempDir.toString());
     securityConfig = new SecurityConfig(conf);
   }
@@ -76,7 +79,7 @@ public class TestCertificateSignRequest {
     String scmID = UUID.randomUUID().toString();
     String subject = "DN001";
     HDDSKeyGenerator keyGen =
-        new HDDSKeyGenerator(securityConfig.getConfiguration());
+        new HDDSKeyGenerator(securityConfig);
     KeyPair keyPair = keyGen.generateKey();
 
     CertificateSignRequest.Builder builder =
@@ -85,39 +88,38 @@ public class TestCertificateSignRequest {
             .setScmID(scmID)
             .setClusterID(clusterID)
             .setKey(keyPair)
-            .setConfiguration(conf);
+            .setConfiguration(securityConfig);
     PKCS10CertificationRequest csr = builder.build();
 
     // Check the Subject Name is in the expected format.
     String dnName = String.format(getDistinguishedNameFormat(),
         subject, scmID, clusterID);
-    Assertions.assertEquals(dnName, csr.getSubject().toString());
+    assertEquals(dnName, csr.getSubject().toString());
 
     // Verify the public key info match
     byte[] encoded = keyPair.getPublic().getEncoded();
     SubjectPublicKeyInfo subjectPublicKeyInfo =
         SubjectPublicKeyInfo.getInstance(ASN1Sequence.getInstance(encoded));
     SubjectPublicKeyInfo csrPublicKeyInfo = csr.getSubjectPublicKeyInfo();
-    Assertions.assertEquals(subjectPublicKeyInfo, csrPublicKeyInfo);
+    assertEquals(subjectPublicKeyInfo, csrPublicKeyInfo);
 
     // Verify CSR with attribute for extensions
-    Assertions.assertEquals(1, csr.getAttributes().length);
+    assertEquals(1, csr.getAttributes().length);
     Extensions extensions = getPkcs9Extensions(csr);
 
     // Verify key usage extension
     Extension keyUsageExt = extensions.getExtension(Extension.keyUsage);
-    Assertions.assertTrue(keyUsageExt.isCritical());
+    assertTrue(keyUsageExt.isCritical());
 
 
     // Verify San extension not set
-    Assertions.assertNull(
-        extensions.getExtension(Extension.subjectAlternativeName));
+    assertNull(extensions.getExtension(Extension.subjectAlternativeName));
 
     // Verify signature in CSR
     ContentVerifierProvider verifierProvider =
         new JcaContentVerifierProviderBuilder().setProvider(securityConfig
             .getProvider()).build(csr.getSubjectPublicKeyInfo());
-    Assertions.assertTrue(csr.isSignatureValid(verifierProvider));
+    assertTrue(csr.isSignatureValid(verifierProvider));
   }
 
   @Test
@@ -128,7 +130,7 @@ public class TestCertificateSignRequest {
     String scmID = UUID.randomUUID().toString();
     String subject = "DN001";
     HDDSKeyGenerator keyGen =
-        new HDDSKeyGenerator(securityConfig.getConfiguration());
+        new HDDSKeyGenerator(securityConfig);
     KeyPair keyPair = keyGen.generateKey();
 
     CertificateSignRequest.Builder builder =
@@ -137,7 +139,7 @@ public class TestCertificateSignRequest {
             .setScmID(scmID)
             .setClusterID(clusterID)
             .setKey(keyPair)
-            .setConfiguration(conf);
+            .setConfiguration(securityConfig);
 
     // Multi-home
     builder.addIpAddress("192.168.1.1");
@@ -151,22 +153,22 @@ public class TestCertificateSignRequest {
     // Check the Subject Name is in the expected format.
     String dnName = String.format(getDistinguishedNameFormat(),
         subject, scmID, clusterID);
-    Assertions.assertEquals(dnName, csr.getSubject().toString());
+    assertEquals(dnName, csr.getSubject().toString());
 
     // Verify the public key info match
     byte[] encoded = keyPair.getPublic().getEncoded();
     SubjectPublicKeyInfo subjectPublicKeyInfo =
         SubjectPublicKeyInfo.getInstance(ASN1Sequence.getInstance(encoded));
     SubjectPublicKeyInfo csrPublicKeyInfo = csr.getSubjectPublicKeyInfo();
-    Assertions.assertEquals(subjectPublicKeyInfo, csrPublicKeyInfo);
+    assertEquals(subjectPublicKeyInfo, csrPublicKeyInfo);
 
     // Verify CSR with attribute for extensions
-    Assertions.assertEquals(1, csr.getAttributes().length);
+    assertEquals(1, csr.getAttributes().length);
     Extensions extensions = getPkcs9Extensions(csr);
 
     // Verify key usage extension
     Extension sanExt = extensions.getExtension(Extension.keyUsage);
-    Assertions.assertTrue(sanExt.isCritical());
+    assertTrue(sanExt.isCritical());
 
     verifyServiceId(extensions);
 
@@ -174,7 +176,7 @@ public class TestCertificateSignRequest {
     ContentVerifierProvider verifierProvider =
         new JcaContentVerifierProviderBuilder().setProvider(securityConfig
             .getProvider()).build(csr.getSubjectPublicKeyInfo());
-    Assertions.assertTrue(csr.isSignatureValid(verifierProvider));
+    assertTrue(csr.isSignatureValid(verifierProvider));
   }
 
   @Test
@@ -184,7 +186,7 @@ public class TestCertificateSignRequest {
     String scmID = UUID.randomUUID().toString();
     String subject = "DN001";
     HDDSKeyGenerator keyGen =
-        new HDDSKeyGenerator(securityConfig.getConfiguration());
+        new HDDSKeyGenerator(securityConfig);
     KeyPair keyPair = keyGen.generateKey();
 
     CertificateSignRequest.Builder builder =
@@ -193,12 +195,12 @@ public class TestCertificateSignRequest {
             .setScmID(scmID)
             .setClusterID(clusterID)
             .setKey(keyPair)
-            .setConfiguration(conf);
+            .setConfiguration(securityConfig);
 
     try {
       builder.setKey(null);
       builder.build();
-      Assertions.fail("Null Key should have failed.");
+      fail("Null Key should have failed.");
     } catch (NullPointerException | IllegalArgumentException e) {
       builder.setKey(keyPair);
     }
@@ -207,7 +209,7 @@ public class TestCertificateSignRequest {
     try {
       builder.setSubject(null);
       builder.build();
-      Assertions.fail("Null/Blank Subject should have thrown.");
+      fail("Null/Blank Subject should have thrown.");
     } catch (IllegalArgumentException e) {
       builder.setSubject(subject);
     }
@@ -215,7 +217,7 @@ public class TestCertificateSignRequest {
     try {
       builder.setSubject("");
       builder.build();
-      Assertions.fail("Null/Blank Subject should have thrown.");
+      fail("Null/Blank Subject should have thrown.");
     } catch (IllegalArgumentException e) {
       builder.setSubject(subject);
     }
@@ -224,7 +226,7 @@ public class TestCertificateSignRequest {
     try {
       builder.addIpAddress("255.255.255.*");
       builder.build();
-      Assertions.fail("Invalid ip address");
+      fail("Invalid ip address");
     } catch (IllegalArgumentException e) {
     }
 
@@ -233,17 +235,17 @@ public class TestCertificateSignRequest {
     // Check the Subject Name is in the expected format.
     String dnName = String.format(getDistinguishedNameFormat(),
         subject, scmID, clusterID);
-    Assertions.assertEquals(dnName, csr.getSubject().toString());
+    assertEquals(dnName, csr.getSubject().toString());
 
     // Verify the public key info match
     byte[] encoded = keyPair.getPublic().getEncoded();
     SubjectPublicKeyInfo subjectPublicKeyInfo =
         SubjectPublicKeyInfo.getInstance(ASN1Sequence.getInstance(encoded));
     SubjectPublicKeyInfo csrPublicKeyInfo = csr.getSubjectPublicKeyInfo();
-    Assertions.assertEquals(subjectPublicKeyInfo, csrPublicKeyInfo);
+    assertEquals(subjectPublicKeyInfo, csrPublicKeyInfo);
 
     // Verify CSR with attribute for extensions
-    Assertions.assertEquals(1, csr.getAttributes().length);
+    assertEquals(1, csr.getAttributes().length);
   }
 
   @Test
@@ -253,7 +255,7 @@ public class TestCertificateSignRequest {
     String scmID = UUID.randomUUID().toString();
     String subject = "DN001";
     HDDSKeyGenerator keyGen =
-        new HDDSKeyGenerator(securityConfig.getConfiguration());
+        new HDDSKeyGenerator(securityConfig);
     KeyPair keyPair = keyGen.generateKey();
 
     CertificateSignRequest.Builder builder =
@@ -262,14 +264,14 @@ public class TestCertificateSignRequest {
             .setScmID(scmID)
             .setClusterID(clusterID)
             .setKey(keyPair)
-            .setConfiguration(conf);
+            .setConfiguration(securityConfig);
 
     PKCS10CertificationRequest csr = builder.build();
     byte[] csrBytes = csr.getEncoded();
 
     // Verify de-serialized CSR matches with the original CSR
     PKCS10CertificationRequest dsCsr = new PKCS10CertificationRequest(csrBytes);
-    Assertions.assertEquals(csr, dsCsr);
+    assertEquals(csr, dsCsr);
   }
 
   private void verifyServiceId(Extensions extensions) {
@@ -285,11 +287,11 @@ public class TestCertificateSignRequest {
           Object o = iterator.next();
           if (o instanceof ASN1ObjectIdentifier) {
             String oid = o.toString();
-            Assertions.assertEquals("2.16.840.1.113730.3.1.34", oid);
+            assertEquals("2.16.840.1.113730.3.1.34", oid);
           }
           if (o instanceof DERTaggedObject) {
             String serviceName = ((DERTaggedObject)o).getObject().toString();
-            Assertions.assertEquals("OzoneMarketingCluster003", serviceName);
+            assertEquals("OzoneMarketingCluster003", serviceName);
           }
         }
       }

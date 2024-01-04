@@ -40,7 +40,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.Comparator;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -65,6 +64,7 @@ import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BIND_HOST_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DECOMMISSIONED_NODES_KEY;
@@ -241,12 +241,14 @@ public final class OmUtils {
     case ListBuckets:
     case LookupKey:
     case ListKeys:
+    case ListKeysLight:
     case ListTrash:
     case ServiceList:
     case ListMultiPartUploadParts:
     case GetFileStatus:
     case LookupFile:
     case ListStatus:
+    case ListStatusLight:
     case GetAcl:
     case DBUpdates:
     case ListMultipartUploads:
@@ -257,7 +259,6 @@ public final class OmUtils {
     case TenantGetUserInfo:
     case TenantListUser:
     case ListSnapshot:
-    case EchoRPC:
     case RefetchSecretKey:
     case RangerBGSync:
       // RangerBGSync is a read operation in the sense that it doesn't directly
@@ -266,7 +267,12 @@ public final class OmUtils {
       // operation SetRangerServiceVersion.
     case GetKeyInfo:
     case SnapshotDiff:
+    case CancelSnapshotDiff:
+    case ListSnapshotDiffJobs:
     case TransferLeadership:
+    case SetSafeMode:
+    case PrintCompactionLogDag:
+    case GetSnapshotInfo:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -317,7 +323,12 @@ public final class OmUtils {
     case SnapshotPurge:
     case RecoverLease:
     case SetTimes:
+    case AbortExpiredMultiPartUploads:
+    case SetSnapshotProperty:
+    case UnknownCommand:
       return false;
+    case EchoRPC:
+      return omRequest.getEchoRPCRequest().getReadOnly();
     default:
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);
       return false;
@@ -611,13 +622,45 @@ public final class OmUtils {
    * ozone.om.keyname.character.check.enabled sets to false
    */
   public static void verifyKeyNameWithSnapshotReservedWord(String keyName)
-          throws OMException {
-    if (keyName != null && 
-        keyName.startsWith(OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX)) {
-      throw new OMException(
-          "Cannot create key under path reserved for "
-              + "snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
+      throws OMException {
+    if (keyName != null &&
+        keyName.startsWith(OM_SNAPSHOT_INDICATOR)) {
+      if (keyName.length() > OM_SNAPSHOT_INDICATOR.length()) {
+        if (keyName.substring(OM_SNAPSHOT_INDICATOR.length())
+            .startsWith(OM_KEY_PREFIX)) {
+          throw new OMException(
+              "Cannot create key under path reserved for snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
               OMException.ResultCodes.INVALID_KEY_NAME);
+        }
+      } else {
+        // We checked for startsWith OM_SNAPSHOT_INDICATOR, and the length is
+        // the same, so it must be equal OM_SNAPSHOT_INDICATOR.
+        throw new OMException("Cannot create key with reserved name: " + OM_SNAPSHOT_INDICATOR,
+            OMException.ResultCodes.INVALID_KEY_NAME);
+      }
+    }
+  }
+
+  /**
+   * Verify if key name contains snapshot reserved word.
+   * This is similar to verifyKeyNameWithSnapshotReservedWord. The only difference is exception message.
+   */
+  public static void verifyKeyNameWithSnapshotReservedWordForDeletion(String keyName)  throws OMException {
+    if (keyName != null &&
+        keyName.startsWith(OM_SNAPSHOT_INDICATOR)) {
+      if (keyName.length() > OM_SNAPSHOT_INDICATOR.length()) {
+        if (keyName.substring(OM_SNAPSHOT_INDICATOR.length())
+            .startsWith(OM_KEY_PREFIX)) {
+          throw new OMException(
+              "Cannot delete key under path reserved for snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
+              OMException.ResultCodes.INVALID_KEY_NAME);
+        }
+      } else {
+        // We checked for startsWith OM_SNAPSHOT_INDICATOR, and the length is
+        // the same, so it must be equal OM_SNAPSHOT_INDICATOR.
+        throw new OMException("Cannot delete key with reserved name: " + OM_SNAPSHOT_INDICATOR,
+            OMException.ResultCodes.INVALID_KEY_NAME);
+      }
     }
   }
 
@@ -674,7 +717,6 @@ public final class OmUtils {
    * does not preserve.
    * @return normalized key name.
    */
-  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
   public static String normalizeKey(String keyName,
       boolean preserveTrailingSlash) {
     // For empty strings do nothing, just return the same.
@@ -691,8 +733,8 @@ public final class OmUtils {
         LOG.debug("Normalized key {} to {} ", keyName,
             normalizedKeyName.substring(1));
       }
-      if (preserveTrailingSlash && keyName.endsWith("/")) {
-        return normalizedKeyName.substring(1) + "/";
+      if (preserveTrailingSlash && keyName.endsWith(OZONE_URI_DELIMITER)) {
+        return normalizedKeyName.substring(1) + OZONE_URI_DELIMITER;
       }
       return normalizedKeyName.substring(1);
     }
@@ -792,39 +834,29 @@ public final class OmUtils {
   public static boolean isBucketSnapshotIndicator(String key) {
     return key.startsWith(OM_SNAPSHOT_INDICATOR) && key.split("/").length == 2;
   }
-
-  public static String format(List<ServiceInfo> nodes, int port,
-                              String leaderId) {
-    StringBuilder sb = new StringBuilder();
+  
+  public static List<List<String>> format(
+          List<ServiceInfo> nodes, int port, String leaderId) {
+    List<List<String>> omInfoList = new ArrayList<>();
     // Ensuring OM's are printed in correct order
     List<ServiceInfo> omNodes = nodes.stream()
         .filter(node -> node.getNodeType() == HddsProtos.NodeType.OM)
         .sorted(Comparator.comparing(ServiceInfo::getHostname))
         .collect(Collectors.toList());
-    int count = 0;
     for (ServiceInfo info : omNodes) {
       // Printing only the OM's running
       if (info.getNodeType() == HddsProtos.NodeType.OM) {
-        String role =
-            info.getOmRoleInfo().getNodeId().equals(leaderId) ? "LEADER" :
-                "FOLLOWER";
-        sb.append(
-            String.format(
-                " { HostName: %s | Node-Id: %s | Ratis-Port : %d | Role: %s} ",
-                info.getHostname(),
-                info.getOmRoleInfo().getNodeId(),
-                port,
-                role
-            ));
-        count++;
+        String role = info.getOmRoleInfo().getNodeId().equals(leaderId)
+                      ? "LEADER" : "FOLLOWER";
+        List<String> omInfo = new ArrayList<>();
+        omInfo.add(info.getHostname());
+        omInfo.add(info.getOmRoleInfo().getNodeId());
+        omInfo.add(String.valueOf(port));
+        omInfo.add(role);
+        omInfoList.add(omInfo);
       }
     }
-    // Print Stand-alone if only one OM exists
-    if (count == 1) {
-      return "STANDALONE";
-    } else {
-      return sb.toString();
-    }
+    return omInfoList;
   }
 
   /**

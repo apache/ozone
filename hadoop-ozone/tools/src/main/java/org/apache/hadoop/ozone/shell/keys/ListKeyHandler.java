@@ -85,7 +85,7 @@ public class ListKeyHandler extends VolumeBucketHandler {
 
     // More keys were returned notify about max length
     if (keyIterator.hasNext()) {
-      out().println("Listing first " + maxKeyLimit + " entries of the " +
+      err().println("Listing first " + maxKeyLimit + " entries of the " +
           "result. Use --length (-l) to override max returned keys.");
     } else if (isVerbose()) {
       if (!Strings.isNullOrEmpty(snapshotNameWithIndicator)) {
@@ -93,11 +93,11 @@ public class ListKeyHandler extends VolumeBucketHandler {
         // snapshotValues[1] = snapshot name
         String[] snapshotValues = snapshotNameWithIndicator.split("/");
 
-        out().printf("Found : %d keys for snapshot %s " +
+        err().printf("Found : %d keys for snapshot %s " +
                 "under bucket %s in volume : %s ",
             counter, snapshotValues[1], bucketName, volumeName);
       } else {
-        out().printf("Found : %d keys for bucket %s in volume : %s ",
+        err().printf("Found : %d keys for bucket %s in volume : %s ",
             counter, bucketName, volumeName);
       }
     }
@@ -129,13 +129,13 @@ public class ListKeyHandler extends VolumeBucketHandler {
       // More keys were returned notify about max length
       if (keyIterator.hasNext() || (bucketIterator.hasNext()
           && maxKeyLimit <= 0)) {
-        out().println("Listing first " + totalKeys + " entries of the " +
+        err().println("Listing first " + totalKeys + " entries of the " +
             "result. Use --length (-l) to override max returned keys.");
         return;
       }
     }
     if (isVerbose()) {
-      out().printf("Found : %d keys in volume : %s %n",
+      err().printf("Found : %d keys in volume : %s %n",
           totalKeys, volumeName);
     }
   }

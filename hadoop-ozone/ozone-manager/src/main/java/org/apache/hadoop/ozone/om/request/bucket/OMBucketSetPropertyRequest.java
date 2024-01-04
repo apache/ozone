@@ -19,15 +19,16 @@
 package org.apache.hadoop.ozone.om.request.bucket;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.List;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
@@ -94,9 +95,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long transactionLogIndex = termIndex.getIndex();
 
     SetBucketPropertyRequest setBucketPropertyRequest =
         getOmRequest().getSetBucketPropertyRequest();
@@ -118,7 +118,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
-    IOException exception = null;
+    Exception exception = null;
     boolean acquiredBucketLock = false, success = true;
     OMClientResponse omClientResponse = null;
     try {
@@ -128,8 +128,9 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       }
 
       // acquire lock.
-      acquiredBucketLock =  omMetadataManager.getLock().acquireWriteLock(
-          BUCKET_LOCK, volumeName, bucketName);
+      mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
+          BUCKET_LOCK, volumeName, bucketName));
+      acquiredBucketLock = getOmLockDetails().isLockAcquired();
 
       String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
       OmBucketInfo dbBucketInfo =
@@ -146,15 +147,12 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
       }
 
-      OmBucketInfo.Builder bucketInfoBuilder = OmBucketInfo.newBuilder();
-      bucketInfoBuilder.setVolumeName(dbBucketInfo.getVolumeName())
-          .setBucketName(dbBucketInfo.getBucketName())
-          .setObjectID(dbBucketInfo.getObjectID())
-          .setBucketLayout(dbBucketInfo.getBucketLayout())
-          .setBucketEncryptionKey(dbBucketInfo.getEncryptionKeyInfo())
-          .setUpdateID(transactionLogIndex);
+      OmBucketInfo.Builder bucketInfoBuilder = dbBucketInfo.toBuilder();
+      bucketInfoBuilder.setUpdateID(transactionLogIndex);
       bucketInfoBuilder.addAllMetadata(KeyValueUtil
           .getFromProtobuf(bucketArgs.getMetadataList()));
+      bucketInfoBuilder.setModificationTime(
+          setBucketPropertyRequest.getModificationTime());
 
       //Check StorageType to update
       StorageType storageType = omBucketArgs.getStorageType();
@@ -162,8 +160,6 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
         bucketInfoBuilder.setStorageType(storageType);
         LOG.debug("Updating bucket storage type for bucket: {} in volume: {}",
             bucketName, volumeName);
-      } else {
-        bucketInfoBuilder.setStorageType(dbBucketInfo.getStorageType());
       }
 
       //Check Versioning to update
@@ -172,9 +168,6 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
         bucketInfoBuilder.setIsVersionEnabled(versioning);
         LOG.debug("Updating bucket versioning for bucket: {} in volume: {}",
             bucketName, volumeName);
-      } else {
-        bucketInfoBuilder
-            .setIsVersionEnabled(dbBucketInfo.getIsVersionEnabled());
       }
 
       //Check quotaInBytes and quotaInNamespace to update
@@ -184,15 +177,10 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       if (checkQuotaBytesValid(omMetadataManager, omVolumeArgs, omBucketArgs,
           dbBucketInfo)) {
         bucketInfoBuilder.setQuotaInBytes(omBucketArgs.getQuotaInBytes());
-      } else {
-        bucketInfoBuilder.setQuotaInBytes(dbBucketInfo.getQuotaInBytes());
       }
       if (checkQuotaNamespaceValid(omVolumeArgs, omBucketArgs, dbBucketInfo)) {
         bucketInfoBuilder.setQuotaInNamespace(
             omBucketArgs.getQuotaInNamespace());
-      } else {
-        bucketInfoBuilder.setQuotaInNamespace(
-            dbBucketInfo.getQuotaInNamespace());
       }
 
       DefaultReplicationConfig defaultReplicationConfig =
@@ -200,30 +188,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       if (defaultReplicationConfig != null) {
         // Resetting the default replication config.
         bucketInfoBuilder.setDefaultReplicationConfig(defaultReplicationConfig);
-      } else if (dbBucketInfo.getDefaultReplicationConfig() != null) {
-        // Retaining existing default replication config
-        bucketInfoBuilder.setDefaultReplicationConfig(
-                  dbBucketInfo.getDefaultReplicationConfig());
       }
-
-      bucketInfoBuilder.setCreationTime(dbBucketInfo.getCreationTime());
-      bucketInfoBuilder.setModificationTime(
-          setBucketPropertyRequest.getModificationTime());
-      // Set acls from dbBucketInfo if it has any.
-      if (dbBucketInfo.getAcls() != null) {
-        bucketInfoBuilder.setAcls(dbBucketInfo.getAcls());
-      }
-
-      // Set the objectID to dbBucketInfo objectID, if present
-      if (dbBucketInfo.getObjectID() != 0) {
-        bucketInfoBuilder.setObjectID(dbBucketInfo.getObjectID());
-      }
-
-      // Set the updateID to current transaction log index
-      bucketInfoBuilder.setUpdateID(transactionLogIndex);
-      // Quota used remains unchanged
-      bucketInfoBuilder.setUsedBytes(dbBucketInfo.getUsedBytes());
-      bucketInfoBuilder.setUsedNamespace(dbBucketInfo.getUsedNamespace());
 
       omBucketInfo = bucketInfoBuilder.build();
 
@@ -236,17 +201,18 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
           SetBucketPropertyResponse.newBuilder().build());
       omClientResponse = new OMBucketSetPropertyResponse(
           omResponse.build(), omBucketInfo);
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       success = false;
       exception = ex;
       omClientResponse = new OMBucketSetPropertyResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 
@@ -270,8 +236,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
   private void checkAclPermission(
       OzoneManager ozoneManager, String volumeName, String bucketName)
       throws IOException {
-    if (ozoneManager.getOmMetadataReader().isNativeAuthorizerEnabled()) {
-      UserGroupInformation ugi = createUGI();
+    if (ozoneManager.getAccessAuthorizer().isNative()) {
+      UserGroupInformation ugi = createUGIForApi();
       String bucketOwner = ozoneManager.getBucketOwner(volumeName, bucketName,
           IAccessAuthorizer.ACLType.READ, OzoneObj.ResourceType.BUCKET);
       if (!ozoneManager.isAdmin(ugi) &&

@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -63,6 +62,9 @@ import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaO
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -267,9 +269,9 @@ public class TestECOverReplicationHandler {
     ecORH.processAndSendCommands(availableReplicas, ImmutableList.of(),
         health, 1);
 
-    Assert.assertEquals(1, commandsSent.size());
+    assertEquals(1, commandsSent.size());
     SCMCommand<?> cmd = commandsSent.iterator().next().getValue();
-    Assert.assertEquals(1, ((DeleteContainerCommand)cmd).getReplicaIndex());
+    assertEquals(1, ((DeleteContainerCommand)cmd).getReplicaIndex());
   }
 
   @Test
@@ -316,7 +318,7 @@ public class TestECOverReplicationHandler {
     } catch (CommandTargetOverloadedException e) {
       // This is expected.
     }
-    Assert.assertEquals(1, commandsSent.size());
+    assertEquals(1, commandsSent.size());
   }
 
   private void testOverReplicationWithIndexes(
@@ -337,10 +339,10 @@ public class TestECOverReplicationHandler {
     // the excess nums
     int totalDeleteCommandNum =
         index2excessNum.values().stream().reduce(0, Integer::sum);
-    Assert.assertEquals(totalDeleteCommandNum, commandsSent.size());
+    assertEquals(totalDeleteCommandNum, commandsSent.size());
 
     // Each command should have a non-zero replica index
-    commandsSent.forEach(pair -> Assert.assertNotEquals(0,
+    commandsSent.forEach(pair -> assertNotEquals(0,
         ((DeleteContainerCommand) pair.getValue()).getReplicaIndex()));
 
     // command num of each index should be equal to the excess num
@@ -355,8 +357,8 @@ public class TestECOverReplicationHandler {
     );
 
     index2commandNum.keySet().forEach(i -> {
-      Assert.assertTrue(index2excessNum.containsKey(i));
-      Assert.assertEquals(index2commandNum.get(i), index2excessNum.get(i));
+      assertThat(index2excessNum).containsKey(i);
+      assertEquals(index2commandNum.get(i), index2excessNum.get(i));
     });
   }
 }

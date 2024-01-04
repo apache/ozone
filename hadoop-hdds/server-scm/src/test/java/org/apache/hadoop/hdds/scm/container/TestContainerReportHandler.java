@@ -49,7 +49,6 @@ import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionExcepti
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -98,7 +97,7 @@ public class TestContainerReportHandler {
     nodeManager = new MockNodeManager(true, 10);
     containerManager = Mockito.mock(ContainerManager.class);
     testDir = GenericTestUtils.getTestDir(
-        TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
+        TestContainerReportHandler.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
@@ -177,7 +176,7 @@ public class TestContainerReportHandler {
     final ContainerReportHandler reportHandler = new ContainerReportHandler(
             nodeManager, containerManager);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
-    Assert.assertEquals(containerStateManager
+    assertEquals(containerStateManager
             .getContainerReplicas(container.containerID()).stream()
             .collect(Collectors.toMap(ContainerReplica::getDatanodeDetails,
                     ContainerReplica::getReplicaIndex)), expectedReplicaMap);

@@ -19,7 +19,8 @@ package org.apache.hadoop.hdds.scm.protocol;
 import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
-import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMGetCheckAndRotateResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMGetCurrentSecretKeyResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMGetSecretKeyRequest;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMGetSecretKeyResponse;
@@ -52,13 +53,13 @@ public class SecretKeyProtocolServerSideTranslatorPB
   private static final Logger LOG =
       LoggerFactory.getLogger(SecretKeyProtocolServerSideTranslatorPB.class);
 
-  private final SecretKeyProtocol impl;
+  private final SecretKeyProtocolScm impl;
   private final StorageContainerManager scm;
 
   private OzoneProtocolMessageDispatcher<SCMSecretKeyRequest,
       SCMSecretKeyResponse, ProtocolMessageEnum> dispatcher;
 
-  public SecretKeyProtocolServerSideTranslatorPB(SecretKeyProtocol impl,
+  public SecretKeyProtocolServerSideTranslatorPB(SecretKeyProtocolScm impl,
       StorageContainerManager storageContainerManager,
       ProtocolMessageMetrics messageMetrics) {
     this.impl = impl;
@@ -100,6 +101,12 @@ public class SecretKeyProtocolServerSideTranslatorPB
       case GetAllSecretKeys:
         return scmSecurityResponse
             .setSecretKeysListResponseProto(getAllSecretKeys())
+            .build();
+
+      case CheckAndRotate:
+        return scmSecurityResponse
+            .setCheckAndRotateResponseProto(
+                checkAndRotate(request.getCheckAndRotateRequest().getForce()))
             .build();
 
       default:
@@ -151,6 +158,12 @@ public class SecretKeyProtocolServerSideTranslatorPB
     return SCMGetCurrentSecretKeyResponse.newBuilder()
         .setSecretKey(impl.getCurrentSecretKey().toProtobuf())
         .build();
+  }
+
+  private SCMGetCheckAndRotateResponse checkAndRotate(boolean force)
+      throws IOException {
+    return SCMGetCheckAndRotateResponse.newBuilder()
+        .setStatus(impl.checkAndRotate(force)).build();
   }
 
   private Status exceptionToResponseStatus(IOException ex) {

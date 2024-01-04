@@ -37,8 +37,7 @@ import java.util.function.Predicate;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 
 /**
- * Public API for Ozone ACLs. Security providers providing support for Ozone
- * ACLs should implement this.
+ * Native (internal) implementation of {@link IAccessAuthorizer}.
  */
 @InterfaceAudience.LimitedPrivate({"HDFS", "Yarn", "Ranger", "Hive", "HBase"})
 @InterfaceStability.Evolving
@@ -69,6 +68,11 @@ public class OzoneNativeAuthorizer implements IAccessAuthorizer {
     this.keyManager = keyManager;
     this.prefixManager = prefixManager;
     this.adminCheck = ozoneAdmins::isAdmin;
+  }
+
+  @Override
+  public boolean isNative() {
+    return true;
   }
 
   /**

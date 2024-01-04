@@ -19,13 +19,13 @@
 package org.apache.hadoop.ozone.upgrade;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.function.Supplier;
 
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -38,7 +38,7 @@ public class TestLayoutVersionInstanceFactory {
 
 
   @Test
-  public void testRegister() throws Exception {
+  public void testRegister() {
     LayoutVersionManager lvm = getMockLvm(1, 2);
     LayoutVersionInstanceFactory<MockInterface> factory =
         new LayoutVersionInstanceFactory<>();
@@ -51,20 +51,22 @@ public class TestLayoutVersionInstanceFactory {
     assertEquals(2, factory.getInstances().get("key").size());
 
     // Should fail on re-registration.
-    LambdaTestUtils.intercept(IllegalArgumentException.class,
-        "existing entry already",
-        () -> factory.register(lvm, getKey("key", 1), new MockClassV1()));
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class,
+            () -> factory.register(lvm, getKey("key", 1), new MockClassV1()));
+
+    assertTrue(exception.getMessage().contains("existing entry already"));
     assertEquals(1, factory.getInstances().size());
 
     // Verify SLV check.
-    LambdaTestUtils.intercept(IllegalArgumentException.class,
-        "version is greater",
+    exception = assertThrows(IllegalArgumentException.class,
         () -> factory.register(lvm, getKey("key2", 4), new MockClassV2()));
+    assertTrue(exception.getMessage().contains("version is greater"));
 
   }
 
   @Test
-  public void testGet() throws Exception {
+  public void testGet() {
     LayoutVersionManager lvm = getMockLvm(2, 3);
     LayoutVersionInstanceFactory<MockInterface> factory =
         new LayoutVersionInstanceFactory<>();
@@ -80,14 +82,15 @@ public class TestLayoutVersionInstanceFactory {
     assertTrue(val instanceof MockClassV1);
 
     // MLV check.
-    LambdaTestUtils.intercept(IllegalArgumentException.class,
-        "version is greater",
-        () -> factory.get(lvm, getKey("key", 3)));
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class,
+            () -> factory.get(lvm, getKey("key", 3)));
+    assertTrue(exception.getMessage().contains("version is greater"));
 
     // Verify failure on Unknown request.
-    LambdaTestUtils.intercept(IllegalArgumentException.class,
-        "No suitable instance found",
+    exception = assertThrows(IllegalArgumentException.class,
         () -> factory.get(lvm, getKey("key1", 1)));
+    assertTrue(exception.getMessage().contains("No suitable instance found"));
   }
 
   @Test

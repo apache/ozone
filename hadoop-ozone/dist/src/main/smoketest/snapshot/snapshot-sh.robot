@@ -53,6 +53,13 @@ Snapshot Diff
                     Should contain      ${result}       +    ${KEY_TWO}
                     Should contain      ${result}       +    ${KEY_THREE}
 
+List Snapshot Diff Jobs
+    ${result} =     Execute             ozone sh snapshot listDiff /${VOLUME}/${BUCKET} --all
+                    Should contain      ${result}        ${VOLUME}
+                    Should contain      ${result}        ${BUCKET}
+                    Should contain      ${result}        ${SNAPSHOT_ONE}
+                    Should contain      ${result}        ${SNAPSHOT_TWO}
+
 Read Snapshot
     Key Should Match Local File         /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_ONE}/${KEY_ONE}       /etc/hosts
     Key Should Match Local File         /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_TWO}/${KEY_TWO}       /etc/passwd

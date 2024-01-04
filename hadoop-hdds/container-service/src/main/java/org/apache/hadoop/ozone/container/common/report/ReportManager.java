@@ -49,17 +49,18 @@ public final class ReportManager {
    * Construction of {@link ReportManager} should be done via
    * {@link ReportManager.Builder}.
    *
-   * @param context StateContext which holds the report
+   * @param context    StateContext which holds the report
    * @param publishers List of publishers which generates report
    */
-  private ReportManager(StateContext context,
-                        List<ReportPublisher> publishers) {
+  private ReportManager(StateContext context, List<ReportPublisher> publishers,
+      String threadNamePrefix) {
     this.context = context;
     this.publishers = publishers;
     this.executorService = HadoopExecutors.newScheduledThreadPool(
         publishers.size(),
         new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("Datanode ReportManager Thread - %d").build());
+            .setNameFormat(threadNamePrefix +
+                "DatanodeReportManager-%d").build());
   }
 
   /**
@@ -103,6 +104,7 @@ public final class ReportManager {
     private StateContext stateContext;
     private List<ReportPublisher> reportPublishers;
     private ReportPublisherFactory publisherFactory;
+    private String threadNamePrefix = "";
 
 
     private Builder(ConfigurationSource conf) {
@@ -146,6 +148,11 @@ public final class ReportManager {
       return this;
     }
 
+    public Builder addThreadNamePrefix(String threadPrefix) {
+      this.threadNamePrefix = threadPrefix;
+      return this;
+    }
+
     /**
      * Build and returns ReportManager.
      *
@@ -153,7 +160,8 @@ public final class ReportManager {
      */
     public ReportManager build() {
       Preconditions.checkNotNull(stateContext);
-      return new ReportManager(stateContext, reportPublishers);
+      return new ReportManager(
+          stateContext, reportPublishers, threadNamePrefix);
     }
 
   }

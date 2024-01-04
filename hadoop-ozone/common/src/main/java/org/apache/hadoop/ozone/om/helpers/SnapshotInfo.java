@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.helpers;
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -52,28 +53,23 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
  * snapshot checkpoint directory, previous snapshotid
  * for the snapshot path & global amongst other necessary fields.
  */
-public final class SnapshotInfo implements Auditable {
+public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   private static final Codec<SnapshotInfo> CODEC = new DelegatedCodec<>(
-      Proto2Codec.get(OzoneManagerProtocolProtos.SnapshotInfo.class),
+      Proto2Codec.get(
+          OzoneManagerProtocolProtos.SnapshotInfo.getDefaultInstance()),
       SnapshotInfo::getFromProtobuf,
-      SnapshotInfo::getProtobuf,
-      // FIXME: HDDS-8665 Deep copy will cause failures
-      //        - TestOMSnapshotDeleteRequest           NullPointerException
-      //        - TestOMSnapshotPurgeRequestAndResponse AssertionFailedError
-      DelegatedCodec.CopyType.SHALLOW);
+      SnapshotInfo::getProtobuf);
 
   public static Codec<SnapshotInfo> getCodec() {
     return CODEC;
   }
 
   /**
-   * SnapshotStatus enum composed of
-   * active, deleted and reclaimed statues.
+   * SnapshotStatus enum composed of active and deleted statuses.
    */
   public enum SnapshotStatus {
     SNAPSHOT_ACTIVE,
-    SNAPSHOT_DELETED,
-    SNAPSHOT_RECLAIMED;
+    SNAPSHOT_DELETED;
 
     public static final SnapshotStatus DEFAULT = SNAPSHOT_ACTIVE;
 
@@ -83,8 +79,6 @@ public final class SnapshotInfo implements Auditable {
         return SnapshotStatusProto.SNAPSHOT_ACTIVE;
       case SNAPSHOT_DELETED:
         return SnapshotStatusProto.SNAPSHOT_DELETED;
-      case SNAPSHOT_RECLAIMED:
-        return SnapshotStatusProto.SNAPSHOT_RECLAIMED;
       default:
         throw new IllegalStateException(
             "BUG: missing valid SnapshotStatus, found status=" + this);
@@ -97,8 +91,6 @@ public final class SnapshotInfo implements Auditable {
         return SNAPSHOT_ACTIVE;
       case SNAPSHOT_DELETED:
         return SNAPSHOT_DELETED;
-      case SNAPSHOT_RECLAIMED:
-        return SNAPSHOT_RECLAIMED;
       default:
         throw new IllegalStateException(
             "BUG: missing valid SnapshotStatus, found status=" + status);
@@ -125,6 +117,13 @@ public final class SnapshotInfo implements Auditable {
    * RocksDB's transaction sequence number at the time of checkpoint creation.
    */
   private long dbTxSequenceNumber;
+  private boolean deepClean;
+  private boolean sstFiltered;
+  private long referencedSize;
+  private long referencedReplicatedSize;
+  private long exclusiveSize;
+  private long exclusiveReplicatedSize;
+  private boolean deepCleanedDeletedDir;
 
   /**
    * Private constructor, constructed via builder.
@@ -132,14 +131,19 @@ public final class SnapshotInfo implements Auditable {
    * @param name - snapshot name.
    * @param volumeName - volume name.
    * @param bucketName - bucket name.
-   * @param snapshotStatus - status: SNAPSHOT_ACTIVE, SNAPSHOT_DELETED,
-   *                      SNAPSHOT_RECLAIMED
+   * @param snapshotStatus - status: SNAPSHOT_ACTIVE, SNAPSHOT_DELETED
    * @param creationTime - Snapshot creation time.
    * @param deletionTime - Snapshot deletion time.
    * @param pathPreviousSnapshotId - Snapshot path previous snapshot id.
    * @param globalPreviousSnapshotId - Snapshot global previous snapshot id.
    * @param snapshotPath - Snapshot path, bucket .snapshot path.
    * @param checkpointDir - Snapshot checkpoint directory.
+   * @param dbTxSequenceNumber - RDB latest transaction sequence number.
+   * @param deepCleaned - To be deep cleaned status for snapshot.
+   * @param referencedSize - Snapshot referenced size.
+   * @param referencedReplicatedSize - Snapshot referenced size w/ replication.
+   * @param exclusiveSize - Snapshot exclusive size.
+   * @param exclusiveReplicatedSize - Snapshot exclusive size w/ replication.
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   private SnapshotInfo(UUID snapshotId,
@@ -153,7 +157,14 @@ public final class SnapshotInfo implements Auditable {
                        UUID globalPreviousSnapshotId,
                        String snapshotPath,
                        String checkpointDir,
-                       long dbTxSequenceNumber) {
+                       long dbTxSequenceNumber,
+                       boolean deepCleaned,
+                       boolean sstFiltered,
+                       long referencedSize,
+                       long referencedReplicatedSize,
+                       long exclusiveSize,
+                       long exclusiveReplicatedSize,
+                       boolean deepCleanedDeletedDir) {
     this.snapshotId = snapshotId;
     this.name = name;
     this.volumeName = volumeName;
@@ -166,6 +177,13 @@ public final class SnapshotInfo implements Auditable {
     this.snapshotPath = snapshotPath;
     this.checkpointDir = checkpointDir;
     this.dbTxSequenceNumber = dbTxSequenceNumber;
+    this.deepClean = deepCleaned;
+    this.sstFiltered = sstFiltered;
+    this.referencedSize = referencedSize;
+    this.referencedReplicatedSize = referencedReplicatedSize;
+    this.exclusiveSize = exclusiveSize;
+    this.exclusiveReplicatedSize = exclusiveReplicatedSize;
+    this.deepCleanedDeletedDir = deepCleanedDeletedDir;
   }
 
   public void setName(String name) {
@@ -202,6 +220,14 @@ public final class SnapshotInfo implements Auditable {
 
   public void setCheckpointDir(String checkpointDir) {
     this.checkpointDir = checkpointDir;
+  }
+
+  public boolean getDeepClean() {
+    return deepClean;
+  }
+
+  public void setDeepClean(boolean deepClean) {
+    this.deepClean = deepClean;
   }
 
   public UUID getSnapshotId() {
@@ -248,13 +274,21 @@ public final class SnapshotInfo implements Auditable {
     return checkpointDir;
   }
 
+  public boolean isSstFiltered() {
+    return sstFiltered;
+  }
+
+  public void setSstFiltered(boolean sstFiltered) {
+    this.sstFiltered = sstFiltered;
+  }
+
   public static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.Builder
       newBuilder() {
     return new org.apache.hadoop.ozone.om.helpers.SnapshotInfo.Builder();
   }
 
   public SnapshotInfo.Builder toBuilder() {
-    return new SnapshotInfo.Builder()
+    return new Builder()
         .setSnapshotId(snapshotId)
         .setName(name)
         .setVolumeName(volumeName)
@@ -265,7 +299,14 @@ public final class SnapshotInfo implements Auditable {
         .setPathPreviousSnapshotId(pathPreviousSnapshotId)
         .setGlobalPreviousSnapshotId(globalPreviousSnapshotId)
         .setSnapshotPath(snapshotPath)
-        .setCheckpointDir(checkpointDir);
+        .setCheckpointDir(checkpointDir)
+        .setDeepClean(deepClean)
+        .setSstFiltered(sstFiltered)
+        .setReferencedSize(referencedSize)
+        .setReferencedReplicatedSize(referencedReplicatedSize)
+        .setExclusiveSize(exclusiveSize)
+        .setExclusiveReplicatedSize(exclusiveReplicatedSize)
+        .setDeepCleanedDeletedDir(deepCleanedDeletedDir);
   }
 
   /**
@@ -284,6 +325,13 @@ public final class SnapshotInfo implements Auditable {
     private String snapshotPath;
     private String checkpointDir;
     private long dbTxSequenceNumber;
+    private boolean deepClean;
+    private boolean sstFiltered;
+    private long referencedSize;
+    private long referencedReplicatedSize;
+    private long exclusiveSize;
+    private long exclusiveReplicatedSize;
+    private boolean deepCleanedDeletedDir;
 
     public Builder() {
       // default values
@@ -350,6 +398,41 @@ public final class SnapshotInfo implements Auditable {
       return this;
     }
 
+    public Builder setDeepClean(boolean deepClean) {
+      this.deepClean = deepClean;
+      return this;
+    }
+
+    public Builder setSstFiltered(boolean sstFiltered) {
+      this.sstFiltered = sstFiltered;
+      return this;
+    }
+
+    public Builder setReferencedSize(long referencedSize) {
+      this.referencedSize = referencedSize;
+      return this;
+    }
+
+    public Builder setReferencedReplicatedSize(long referencedReplicatedSize) {
+      this.referencedReplicatedSize = referencedReplicatedSize;
+      return this;
+    }
+
+    public Builder setExclusiveSize(long exclusiveSize) {
+      this.exclusiveSize = exclusiveSize;
+      return this;
+    }
+
+    public Builder setExclusiveReplicatedSize(long exclusiveReplicatedSize) {
+      this.exclusiveReplicatedSize = exclusiveReplicatedSize;
+      return this;
+    }
+
+    public Builder setDeepCleanedDeletedDir(boolean deepCleanedDeletedDir) {
+      this.deepCleanedDeletedDir = deepCleanedDeletedDir;
+      return this;
+    }
+
     public SnapshotInfo build() {
       Preconditions.checkNotNull(name);
       return new SnapshotInfo(
@@ -364,7 +447,14 @@ public final class SnapshotInfo implements Auditable {
           globalPreviousSnapshotId,
           snapshotPath,
           checkpointDir,
-          dbTxSequenceNumber
+          dbTxSequenceNumber,
+          deepClean,
+          sstFiltered,
+          referencedSize,
+          referencedReplicatedSize,
+          exclusiveSize,
+          exclusiveReplicatedSize,
+          deepCleanedDeletedDir
       );
     }
   }
@@ -375,13 +465,19 @@ public final class SnapshotInfo implements Auditable {
   public OzoneManagerProtocolProtos.SnapshotInfo getProtobuf() {
     OzoneManagerProtocolProtos.SnapshotInfo.Builder sib =
         OzoneManagerProtocolProtos.SnapshotInfo.newBuilder()
-        .setSnapshotID(toProtobuf(snapshotId))
-        .setName(name)
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setSnapshotStatus(snapshotStatus.toProto())
-        .setCreationTime(creationTime)
-        .setDeletionTime(deletionTime);
+            .setSnapshotID(toProtobuf(snapshotId))
+            .setName(name)
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setSnapshotStatus(snapshotStatus.toProto())
+            .setCreationTime(creationTime)
+            .setDeletionTime(deletionTime)
+            .setSstFiltered(sstFiltered)
+            .setReferencedSize(referencedSize)
+            .setReferencedReplicatedSize(referencedReplicatedSize)
+            .setExclusiveSize(exclusiveSize)
+            .setExclusiveReplicatedSize(exclusiveReplicatedSize)
+            .setDeepCleanedDeletedDir(deepCleanedDeletedDir);
 
     if (pathPreviousSnapshotId != null) {
       sib.setPathPreviousSnapshotID(toProtobuf(pathPreviousSnapshotId));
@@ -393,7 +489,8 @@ public final class SnapshotInfo implements Auditable {
 
     sib.setSnapshotPath(snapshotPath)
         .setCheckpointDir(checkpointDir)
-        .setDbTxSequenceNumber(dbTxSequenceNumber);
+        .setDbTxSequenceNumber(dbTxSequenceNumber)
+        .setDeepClean(deepClean);
     return sib.build();
   }
 
@@ -423,6 +520,39 @@ public final class SnapshotInfo implements Auditable {
     if (snapshotInfoProto.hasGlobalPreviousSnapshotID()) {
       osib.setGlobalPreviousSnapshotId(
           fromProtobuf(snapshotInfoProto.getGlobalPreviousSnapshotID()));
+    }
+
+    if (snapshotInfoProto.hasDeepClean()) {
+      osib.setDeepClean(snapshotInfoProto.getDeepClean());
+    }
+
+    if (snapshotInfoProto.hasSstFiltered()) {
+      osib.setSstFiltered(snapshotInfoProto.getSstFiltered());
+    }
+
+    if (snapshotInfoProto.hasReferencedSize()) {
+      osib.setReferencedSize(
+          snapshotInfoProto.getReferencedSize());
+    }
+
+    if (snapshotInfoProto.hasReferencedReplicatedSize()) {
+      osib.setReferencedReplicatedSize(
+          snapshotInfoProto.getReferencedReplicatedSize());
+    }
+
+    if (snapshotInfoProto.hasExclusiveSize()) {
+      osib.setExclusiveSize(
+          snapshotInfoProto.getExclusiveSize());
+    }
+
+    if (snapshotInfoProto.hasExclusiveReplicatedSize()) {
+      osib.setExclusiveReplicatedSize(
+          snapshotInfoProto.getExclusiveReplicatedSize());
+    }
+
+    if (snapshotInfoProto.hasDeepCleanedDeletedDir()) {
+      osib.setDeepCleanedDeletedDir(
+          snapshotInfoProto.getDeepCleanedDeletedDir());
     }
 
     osib.setSnapshotPath(snapshotInfoProto.getSnapshotPath())
@@ -477,6 +607,46 @@ public final class SnapshotInfo implements Auditable {
         + OM_KEY_PREFIX + snapshotName;
   }
 
+  public void setReferencedSize(long referencedSize) {
+    this.referencedSize = referencedSize;
+  }
+
+  public long getReferencedSize() {
+    return referencedSize;
+  }
+
+  public void setReferencedReplicatedSize(long referencedReplicatedSize) {
+    this.referencedReplicatedSize = referencedReplicatedSize;
+  }
+
+  public long getReferencedReplicatedSize() {
+    return referencedReplicatedSize;
+  }
+
+  public void setExclusiveSize(long exclusiveSize) {
+    this.exclusiveSize = exclusiveSize;
+  }
+
+  public long getExclusiveSize() {
+    return exclusiveSize;
+  }
+
+  public void setExclusiveReplicatedSize(long exclusiveReplicatedSize) {
+    this.exclusiveReplicatedSize = exclusiveReplicatedSize;
+  }
+
+  public long getExclusiveReplicatedSize() {
+    return exclusiveReplicatedSize;
+  }
+
+  public boolean getDeepCleanedDeletedDir() {
+    return deepCleanedDeletedDir;
+  }
+
+  public void setDeepCleanedDeletedDir(boolean deepCleanedDeletedDir) {
+    this.deepCleanedDeletedDir = deepCleanedDeletedDir;
+  }
+
   /**
    * Generate default name of snapshot, (used if user doesn't provide one).
    */
@@ -509,7 +679,9 @@ public final class SnapshotInfo implements Auditable {
         .setGlobalPreviousSnapshotId(INITIAL_SNAPSHOT_ID)
         .setSnapshotPath(volumeName + OM_KEY_PREFIX + bucketName)
         .setVolumeName(volumeName)
-        .setBucketName(bucketName);
+        .setBucketName(bucketName)
+        .setDeepClean(false)
+        .setDeepCleanedDeletedDir(false);
 
     if (snapshotId != null) {
       builder.setCheckpointDir(getCheckpointDirName(snapshotId));
@@ -536,7 +708,14 @@ public final class SnapshotInfo implements Auditable {
         Objects.equals(
             globalPreviousSnapshotId, that.globalPreviousSnapshotId) &&
         snapshotPath.equals(that.snapshotPath) &&
-        checkpointDir.equals(that.checkpointDir);
+        checkpointDir.equals(that.checkpointDir) &&
+        deepClean == that.deepClean &&
+        sstFiltered == that.sstFiltered &&
+        referencedSize == that.referencedSize &&
+        referencedReplicatedSize == that.referencedReplicatedSize &&
+        exclusiveSize == that.exclusiveSize &&
+        exclusiveReplicatedSize == that.exclusiveReplicatedSize &&
+        deepCleanedDeletedDir == that.deepCleanedDeletedDir;
   }
 
   @Override
@@ -544,6 +723,37 @@ public final class SnapshotInfo implements Auditable {
     return Objects.hash(snapshotId, name, volumeName, bucketName,
         snapshotStatus,
         creationTime, deletionTime, pathPreviousSnapshotId,
-        globalPreviousSnapshotId, snapshotPath, checkpointDir);
+        globalPreviousSnapshotId, snapshotPath, checkpointDir,
+        deepClean, sstFiltered,
+        referencedSize, referencedReplicatedSize,
+        exclusiveSize, exclusiveReplicatedSize, deepCleanedDeletedDir);
+  }
+
+  /**
+   * Return a new copy of the object.
+   */
+  @Override
+  public SnapshotInfo copyObject() {
+    return new Builder()
+        .setSnapshotId(snapshotId)
+        .setName(name)
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setSnapshotStatus(snapshotStatus)
+        .setCreationTime(creationTime)
+        .setDeletionTime(deletionTime)
+        .setPathPreviousSnapshotId(pathPreviousSnapshotId)
+        .setGlobalPreviousSnapshotId(globalPreviousSnapshotId)
+        .setSnapshotPath(snapshotPath)
+        .setCheckpointDir(checkpointDir)
+        .setDbTxSequenceNumber(dbTxSequenceNumber)
+        .setDeepClean(deepClean)
+        .setSstFiltered(sstFiltered)
+        .setReferencedSize(referencedSize)
+        .setReferencedReplicatedSize(referencedReplicatedSize)
+        .setExclusiveSize(exclusiveSize)
+        .setExclusiveReplicatedSize(exclusiveReplicatedSize)
+        .setDeepCleanedDeletedDir(deepCleanedDeletedDir)
+        .build();
   }
 }

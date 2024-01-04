@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:secure
+#suite:cert-rotation
 
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
@@ -31,7 +31,3 @@ export COMPOSE_FILE=docker-compose.yaml:certificate-rotation.yaml
 start_docker_env
 
 execute_robot_test scm certrotation
-
-stop_docker_env
-
-generate_report

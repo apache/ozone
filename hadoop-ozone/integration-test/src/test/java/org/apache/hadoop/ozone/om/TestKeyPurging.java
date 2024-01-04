@@ -33,10 +33,11 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -44,8 +45,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import org.junit.Rule;
-import org.junit.rules.Timeout;
+import static org.assertj.core.api.Assertions.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
@@ -53,13 +53,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 /**
  * Test OM's {@link KeyDeletingService}.
  */
+@Timeout(300)
 public class TestKeyPurging {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
 
   private MiniOzoneCluster cluster;
   private ObjectStore store;
@@ -69,7 +64,7 @@ public class TestKeyPurging {
   private static final int KEY_SIZE = 100;
   private OzoneClient client;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
@@ -90,7 +85,7 @@ public class TestKeyPurging {
     om = cluster.getOzoneManager();
   }
 
-  @After
+  @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -98,7 +93,7 @@ public class TestKeyPurging {
     }
   }
 
-  @Test(timeout = 30000)
+  @Test
   public void testKeysPurgingByKeyDeletingService() throws Exception {
     // Create Volume and Bucket
     String volumeName = UUID.randomUUID().toString();
@@ -139,7 +134,7 @@ public class TestKeyPurging {
         () -> keyDeletingService.getDeletedKeyCount().get() >= NUM_KEYS,
         1000, 10000);
 
-    Assert.assertTrue(keyDeletingService.getRunCount().get() > 1);
+    assertThat(keyDeletingService.getRunCount().get()).isGreaterThan(1);
 
     GenericTestUtils.waitFor(
         () -> {

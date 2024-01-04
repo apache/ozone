@@ -18,31 +18,57 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .DeleteKeyRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests OmKeyDelete request.
  */
 public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
 
-  @Test
-  public void testPreExecute() throws Exception {
-    doPreExecute(createDeleteKeyRequest());
+  @ParameterizedTest
+  @ValueSource(strings = {"keyName", "a/b/keyName", "a/.snapshot/keyName", "a.snapshot/b/keyName"})
+  public void testPreExecute(String testKeyName) throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    String ozoneKey = addKeyToTable(testKeyName);
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+    Assertions.assertNotNull(omKeyInfo);
+
+    doPreExecute(createDeleteKeyRequest(testKeyName));
+  }
+
+  @ParameterizedTest
+  @CsvSource(value = {".snapshot,Cannot delete key with reserved name: .snapshot",
+      ".snapshot/snapName,Cannot delete key under path reserved for snapshot: .snapshot/",
+      ".snapshot/snapName/keyName,Cannot delete key under path reserved for snapshot: .snapshot/"})
+  public void testPreExecuteFailure(String testKeyName,
+                                    String expectedExceptionMessage) {
+    OMKeyDeleteRequest deleteKeyRequest =
+        getOmKeyDeleteRequest(createDeleteKeyRequest(testKeyName));
+    OMException omException = assertThrows(OMException.class,
+        () -> deleteKeyRequest.preExecute(ozoneManager));
+    assertEquals(expectedExceptionMessage, omException.getMessage());
+    assertEquals(OMException.ResultCodes.INVALID_KEY_NAME, omException.getResult());
   }
 
   @Test
@@ -57,7 +83,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
         omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
 
     // As we added manually to key table.
-    Assert.assertNotNull(omKeyInfo);
+    assertNotNull(omKeyInfo);
 
     OMRequest modifiedOmRequest =
             doPreExecute(createDeleteKeyRequest());
@@ -66,73 +92,59 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
             getOmKeyDeleteRequest(modifiedOmRequest);
 
     OMClientResponse omClientResponse =
-        omKeyDeleteRequest.validateAndUpdateCache(ozoneManager,
-        100L, ozoneManagerDoubleBufferHelper);
+        omKeyDeleteRequest.validateAndUpdateCache(ozoneManager, 100L);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
     // Now after calling validateAndUpdateCache, it should be deleted.
 
     omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
 
-    Assert.assertNull(omKeyInfo);
+    assertNull(omKeyInfo);
   }
 
   @Test
   public void testValidateAndUpdateCacheWithKeyNotFound() throws Exception {
-    OMRequest modifiedOmRequest =
-        doPreExecute(createDeleteKeyRequest());
-
-    OMKeyDeleteRequest omKeyDeleteRequest =
-            getOmKeyDeleteRequest(modifiedOmRequest);
-
     // Add only volume and bucket entry to DB.
     // In actual implementation we don't check for bucket/volume exists
     // during delete key.
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
 
-    OMClientResponse omClientResponse =
-        omKeyDeleteRequest.validateAndUpdateCache(ozoneManager,
-            100L, ozoneManagerDoubleBufferHelper);
+    OMKeyDeleteRequest omKeyDeleteRequest =
+        getOmKeyDeleteRequest(createDeleteKeyRequest());
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND,
+    OMClientResponse omClientResponse =
+        omKeyDeleteRequest.validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
   }
 
   @Test
   public void testValidateAndUpdateCacheWithVolumeNotFound() throws Exception {
-    OMRequest modifiedOmRequest =
-        doPreExecute(createDeleteKeyRequest());
 
-    OMKeyDeleteRequest omKeyDeleteRequest =
-            getOmKeyDeleteRequest(modifiedOmRequest);
+    OMKeyDeleteRequest omKeyDeleteRequest = getOmKeyDeleteRequest(
+        createDeleteKeyRequest());
 
     OMClientResponse omClientResponse = omKeyDeleteRequest
-        .validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper,
-            omKeyDeleteRequest.getBucketLayout());
+        .validateAndUpdateCache(ozoneManager, 100L);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
+    assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
   }
 
   @Test
   public void testValidateAndUpdateCacheWithBucketNotFound() throws Exception {
-    OMRequest modifiedOmRequest =
-        doPreExecute(createDeleteKeyRequest());
-
     OMKeyDeleteRequest omKeyDeleteRequest =
-            getOmKeyDeleteRequest(modifiedOmRequest);
+            getOmKeyDeleteRequest(createDeleteKeyRequest());
 
     OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
 
     OMClientResponse omClientResponse = omKeyDeleteRequest
-        .validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper,
-            omKeyDeleteRequest.getBucketLayout());
+        .validateAndUpdateCache(ozoneManager, 100L);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
+    assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
             omClientResponse.getOMResponse().getStatus());
   }
 
@@ -142,7 +154,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
    * @return OMRequest - modified request returned from preExecute.
    * @throws Exception
    */
-  private OMRequest doPreExecute(OMRequest originalOmRequest) throws Exception {
+  protected OMRequest doPreExecute(OMRequest originalOmRequest) throws Exception {
 
     OMKeyDeleteRequest omKeyDeleteRequest =
             getOmKeyDeleteRequest(originalOmRequest);
@@ -150,7 +162,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
     OMRequest modifiedOmRequest = omKeyDeleteRequest.preExecute(ozoneManager);
 
     // Will not be equal, as UserInfo will be set.
-    Assert.assertNotEquals(originalOmRequest, modifiedOmRequest);
+    assertNotEquals(originalOmRequest, modifiedOmRequest);
 
     return modifiedOmRequest;
   }
@@ -159,9 +171,13 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
    * Create OMRequest which encapsulates DeleteKeyRequest.
    * @return OMRequest
    */
-  private OMRequest createDeleteKeyRequest() {
+  protected OMRequest createDeleteKeyRequest() {
+    return createDeleteKeyRequest(keyName);
+  }
+
+  private OMRequest createDeleteKeyRequest(String testKeyName) {
     KeyArgs keyArgs = KeyArgs.newBuilder().setBucketName(bucketName)
-        .setVolumeName(volumeName).setKeyName(keyName).build();
+        .setVolumeName(volumeName).setKeyName(testKeyName).build();
 
     DeleteKeyRequest deleteKeyRequest =
         DeleteKeyRequest.newBuilder().setKeyArgs(keyArgs).build();
@@ -172,12 +188,15 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
   }
 
   protected String addKeyToTable() throws Exception {
+    return addKeyToTable(keyName);
+  }
+
+  protected String addKeyToTable(String key) throws Exception {
     OMRequestTestUtils.addKeyToTable(false, volumeName,
-            bucketName, keyName, clientID, replicationType, replicationFactor,
+            bucketName, key, clientID, replicationType, replicationFactor,
             omMetadataManager);
 
-    return omMetadataManager.getOzoneKey(volumeName, bucketName,
-            keyName);
+    return omMetadataManager.getOzoneKey(volumeName, bucketName, key);
   }
 
   protected OMKeyDeleteRequest getOmKeyDeleteRequest(

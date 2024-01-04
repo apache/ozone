@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
 import org.apache.ratis.thirdparty.io.netty.buffer.Unpooled;
@@ -163,8 +164,14 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
   @Override
   public int write(ReferenceCountedObject<ByteBuffer> referenceCounted)
       throws IOException {
+    getMetrics().incContainerOpsMetrics(getType());
     assertOpen();
-    return writeBuffers(referenceCounted, buffers, super::writeFileChannel);
+
+    final long l = Time.monotonicNow();
+    int len = writeBuffers(referenceCounted, buffers, super::writeFileChannel);
+    getMetrics()
+        .incContainerOpsLatencies(getType(), Time.monotonicNow() - l);
+    return len;
   }
 
   static int writeBuffers(ReferenceCountedObject<ByteBuffer> src,

@@ -170,13 +170,12 @@ public class ChunkManagerDiskWrite extends BaseFreonGenerator implements
     ChunkInfo chunkInfo = new ChunkInfo(chunkName, offset, chunkSize);
     LOG.debug("Writing chunk {}: containerID:{} localID:{} offset:{} " +
             "bytesWritten:{}", l, containerID, localID, offset, bytesWritten);
-    DispatcherContext context =
-        new DispatcherContext.Builder()
-            .setStage(WriteChunkStage.WRITE_DATA)
-            .setTerm(1L)
-            .setLogIndex(l)
-            .setReadFromTmpFile(false)
-            .build();
+    final DispatcherContext context = DispatcherContext
+        .newBuilder(DispatcherContext.Op.WRITE_STATE_MACHINE_DATA)
+        .setStage(WriteChunkStage.WRITE_DATA)
+        .setTerm(1L)
+        .setLogIndex(l)
+        .build();
     ByteBuffer buffer = ByteBuffer.wrap(data);
 
     timer.time(() -> {

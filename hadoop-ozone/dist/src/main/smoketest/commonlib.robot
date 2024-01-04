@@ -28,7 +28,7 @@ ${OM_SERVICE_ID}     om
 *** Keywords ***
 Get test user principal
     [arguments]         ${user}
-    ${instance} =       Execute                    hostname | sed 's/scm[0-9].org/scm/'
+    ${instance} =       Execute                    hostname | sed 's/scm[0-9].org/scm/;s/scm[0-9]/scm/;s/om[0-9]/om/'
     [return]            ${user}/${instance}@EXAMPLE.COM
 
 Kinit HTTP user

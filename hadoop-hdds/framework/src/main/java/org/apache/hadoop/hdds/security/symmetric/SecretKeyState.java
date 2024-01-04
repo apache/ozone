@@ -18,11 +18,11 @@
 
 package org.apache.hadoop.hdds.security.symmetric;
 
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 
 /**
  * This component holds the state of managed SecretKeys, including the
@@ -51,7 +51,7 @@ public interface SecretKeyState {
    * This method replicates SecretKeys across all SCM instances.
    */
   @Replicate
-  void updateKeys(List<ManagedSecretKey> newKeys) throws TimeoutException;
+  void updateKeys(List<ManagedSecretKey> newKeys) throws SCMException;
 
   /**
    * Update SecretKeys from a snapshot from SCM leader.

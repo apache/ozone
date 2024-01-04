@@ -42,7 +42,6 @@ spec:
       containers:
       - name: om
         image: '@docker.image@'
-        imagePullPolicy: Always
         args:
         - ozone
         - om
@@ -70,4 +69,4 @@ spec:
       - ReadWriteOnce
       resources:
         requests:
-          storage: 2Gi
+          storage: 20Gi

@@ -39,6 +39,8 @@ public final class ContainerID implements Comparable<ContainerID> {
       LongCodec.get(), ContainerID::valueOf, c -> c.id,
       DelegatedCodec.CopyType.SHALLOW);
 
+  public static final ContainerID MIN = ContainerID.valueOf(0);
+
   public static Codec<ContainerID> getCodec() {
     return CODEC;
   }

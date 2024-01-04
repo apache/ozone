@@ -126,5 +126,3 @@ for cluster_version in ${old_versions}; do
 done
 
 test_ec_cross_compatibility
-
-generate_report

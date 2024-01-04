@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
-import org.apache.hadoop.hdds.scm.container.TestContainerManagerImpl;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
@@ -40,7 +40,6 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,6 +54,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /**
  * Test for PipelineStateManagerImpl.
  */
@@ -68,7 +69,7 @@ public class TestPipelineStateManagerImpl {
   public void init() throws Exception {
     final OzoneConfiguration conf = SCMTestUtils.getConf();
     testDir = GenericTestUtils.getTestDir(
-        TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
+        TestPipelineStateManagerImpl.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
@@ -115,37 +116,33 @@ public class TestPipelineStateManagerImpl {
 
   @Test
   public void testAddAndGetPipeline() throws IOException, TimeoutException {
-    Pipeline pipeline = createDummyPipeline(0);
-    HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
-    try {
-      stateManager.addPipeline(pipelineProto);
-      Assertions.fail("Pipeline should not have been added");
-    } catch (StateMachineException e) {
-      // replication factor and number of nodes in the pipeline do not match
-      Assertions.assertTrue(e.getMessage().contains("do not match"));
-    }
+    Exception e = Assertions.assertThrows(SCMException.class,
+        () -> stateManager.addPipeline(createDummyPipeline(0)
+            .getProtobufMessage(ClientVersion.CURRENT_VERSION)));
+    // replication factor and number of nodes in the pipeline do not match
+    assertThat(e.getMessage()).contains("do not match");
 
     // add a pipeline
-    pipeline = createDummyPipeline(1);
-    pipelineProto = pipeline.getProtobufMessage(ClientVersion.CURRENT_VERSION);
-    stateManager.addPipeline(pipelineProto);
+    Pipeline pipeline = createDummyPipeline(1);
+    HddsProtos.Pipeline pipelineProto = pipeline
+        .getProtobufMessage(ClientVersion.CURRENT_VERSION);
 
     try {
       stateManager.addPipeline(pipelineProto);
-      Assertions.fail("Pipeline should not have been added");
-    } catch (IOException e) {
-      // Can not add a pipeline twice
-      Assertions.assertTrue(e.getMessage().contains("Duplicate pipeline ID"));
+
+      // Cannot add a pipeline twice
+      e = Assertions.assertThrows(SCMException.class,
+          () -> stateManager.addPipeline(pipelineProto));
+      assertThat(e.getMessage()).contains("Duplicate pipeline ID");
+
+      // verify pipeline returned is same
+      Assertions.assertEquals(pipeline.getId(),
+          stateManager.getPipeline(pipeline.getId()).getId());
+    } finally {
+      // clean up
+      finalizePipeline(pipelineProto);
+      removePipeline(pipelineProto);
     }
-
-    // verify pipeline returned is same
-    Pipeline pipeline1 = stateManager.getPipeline(pipeline.getId());
-    Assertions.assertTrue(pipeline.getId().equals(pipeline1.getId()));
-
-    // clean up
-    finalizePipeline(pipelineProto);
-    removePipeline(pipelineProto);
   }
 
   @Test
@@ -329,7 +326,7 @@ public class TestPipelineStateManagerImpl {
       Assertions.fail("Container should not have been added");
     } catch (IOException e) {
       // Can not add a container to removed pipeline
-      Assertions.assertTrue(e.getMessage().contains("not found"));
+      assertThat(e.getMessage()).contains("not found");
     }
   }
 
@@ -349,7 +346,7 @@ public class TestPipelineStateManagerImpl {
       Assertions.fail("Pipeline should not have been removed");
     } catch (IOException e) {
       // can not remove a pipeline which already has containers
-      Assertions.assertTrue(e.getMessage().contains("not yet closed"));
+      assertThat(e.getMessage()).contains("not yet closed");
     }
 
     // close the pipeline

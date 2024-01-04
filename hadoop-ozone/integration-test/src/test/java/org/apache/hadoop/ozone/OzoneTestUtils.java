@@ -34,9 +34,9 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils.VoidCallable;
-
 import org.apache.ratis.util.function.CheckedConsumer;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
+
 
 /**
  * Helper class for Tests.
@@ -92,7 +92,7 @@ public final class OzoneTestUtils {
             .updateContainerState(ContainerID.valueOf(blockID.getContainerID()),
                 HddsProtos.LifeCycleEvent.CLOSE);
       }
-      Assert.assertFalse(scm.getContainerManager()
+      Assertions.assertFalse(scm.getContainerManager()
           .getContainer(ContainerID.valueOf(blockID.getContainerID()))
           .isOpen());
     }, omKeyLocationInfoGroups);
@@ -144,9 +144,9 @@ public final class OzoneTestUtils {
       throws Exception {
     try {
       eval.call();
-      Assert.fail("OMException is expected");
+      Assertions.fail("OMException is expected");
     } catch (OMException ex) {
-      Assert.assertEquals(code, ex.getResult());
+      Assertions.assertEquals(code, ex.getResult());
     }
   }
 

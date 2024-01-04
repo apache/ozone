@@ -48,6 +48,8 @@ execute_robot_test scm freon
 execute_robot_test scm cli
 execute_robot_test scm admincli
 
+execute_robot_test scm debug/ozone-debug-lease-recovery.robot
+
 execute_robot_test scm -v USERNAME:httpfs httpfs
 execute_debug_tests
 
@@ -56,7 +58,3 @@ execute_robot_test scm -v SCHEME:o3fs -v BUCKET_TYPE:bucket -N ozonefs-o3fs-buck
 execute_robot_test s3g grpc/grpc-om-s3-metrics.robot
 
 execute_robot_test scm --exclude pre-finalized-snapshot-tests snapshot
-
-stop_docker_env
-
-generate_report

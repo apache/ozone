@@ -55,6 +55,7 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -206,8 +207,8 @@ public abstract class TestMisReplicationHandler {
               .thenAnswer(invocation -> {
                 List<DatanodeDetails> datanodeDetails =
                         invocation.getArgument(0);
-                Assertions.assertTrue(remainingReplicasAfterCopy
-                        .containsAll(datanodeDetails));
+                assertThat(remainingReplicasAfterCopy)
+                    .containsAll(datanodeDetails);
                 return targetNodes;
               });
     }
@@ -228,8 +229,8 @@ public abstract class TestMisReplicationHandler {
             container.getContainerID());
         DatanodeDetails replicateSrcDn = pair.getKey();
         DatanodeDetails target = replicateContainerCommand.getTargetDatanode();
-        Assertions.assertTrue(sourceDns.contains(replicateSrcDn));
-        Assertions.assertTrue(targetNodes.contains(target));
+        assertThat(sourceDns).contains(replicateSrcDn);
+        assertThat(targetNodes).contains(target);
         int replicaIndex = replicateContainerCommand.getReplicaIndex();
         assertReplicaIndex(replicaIndexMap, replicateSrcDn, replicaIndex);
       }

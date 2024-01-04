@@ -38,6 +38,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
@@ -96,9 +97,11 @@ public class OmMetadataGenerator extends BaseFreonGenerator
   private String bucketName;
 
   @Option(names = {"-s", "--size"},
-      description = "The size in byte of a file for the Create File/Key op.",
-      defaultValue = "0")
-  private int dataSize;
+      description = "The size in byte of a file for the Create File/Key op. " +
+          StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
+      defaultValue = "0",
+      converter = StorageSizeConverter.class)
+  private StorageSize dataSize;
 
   @Option(names = {"--buffer"},
       description = "Size of buffer used to generated the key content.",
@@ -165,7 +168,7 @@ public class OmMetadataGenerator extends BaseFreonGenerator
       mixedOperation = true;
     }
     init();
-    contentGenerator = new ContentGenerator(dataSize, bufferSize);
+    contentGenerator = new ContentGenerator(dataSize.toBytes(), bufferSize);
     omKeyArgsBuilder = ThreadLocal.withInitial(this::createKeyArgsBuilder);
     OzoneConfiguration conf = createOzoneConfiguration();
     replicationConfig = ReplicationConfig.getDefault(conf);
@@ -323,7 +326,8 @@ public class OmMetadataGenerator extends BaseFreonGenerator
     case CREATE_KEY:
       keyName = getPath(counter);
       getMetrics().timer(operation.name()).time(() -> {
-        try (OutputStream stream = bucket.createKey(keyName, dataSize)) {
+        try (OutputStream stream = bucket.createStreamKey(keyName,
+            dataSize.toBytes(), replicationConfig, new HashMap<>())) {
           contentGenerator.write(stream);
         }
         return null;
@@ -377,8 +381,9 @@ public class OmMetadataGenerator extends BaseFreonGenerator
     case CREATE_FILE:
       keyName = getPath(counter);
       getMetrics().timer(operation.name()).time(() -> {
-        try (OutputStream stream = bucket.createFile(
-            keyName, dataSize, replicationConfig, true, false)) {
+        try (
+            OutputStream stream = bucket.createFile(keyName, dataSize.toBytes(),
+                replicationConfig, true, false)) {
           contentGenerator.write(stream);
         }
         return null;
@@ -396,8 +401,9 @@ public class OmMetadataGenerator extends BaseFreonGenerator
       threadSeqId = getThreadSequenceId();
       startKeyName = getPath(threadSeqId * batchSize);
       getMetrics().timer(operation.name()).time(() -> {
-        List<OmKeyInfo> keyInfoList = ozoneManagerClient.listKeys(
-            volumeName, bucketName, startKeyName, "", batchSize);
+        List<OmKeyInfo> keyInfoList =
+            ozoneManagerClient.listKeys(volumeName, bucketName, startKeyName,
+                "", batchSize).getKeys();
         if (keyInfoList.size() + 1 < batchSize) {
           throw new NoSuchFileException(
               "There are not enough files for testing you should use "

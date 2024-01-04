@@ -34,7 +34,3 @@ source "$COMPOSE_DIR/../testlib.sh"
 start_docker_env 3
 
 execute_robot_test scm -v BUCKET_LAYOUT:LEGACY recon/recon-nssummary.robot
-
-stop_docker_env
-
-generate_report

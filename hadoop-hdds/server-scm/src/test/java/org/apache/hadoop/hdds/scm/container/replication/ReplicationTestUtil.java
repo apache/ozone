@@ -24,12 +24,14 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.TestContainerInfo;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -199,6 +201,17 @@ public final class ReplicationTestUtil {
 
   public static ContainerInfo createContainerInfo(
       ReplicationConfig replicationConfig, long containerID,
+      HddsProtos.LifeCycleState containerState, long sequenceID) {
+    return TestContainerInfo.newBuilderForTest()
+        .setContainerID(containerID)
+        .setReplicationConfig(replicationConfig)
+        .setState(containerState)
+        .setSequenceId(sequenceID)
+        .build();
+  }
+
+  public static ContainerInfo createContainerInfo(
+      ReplicationConfig replicationConfig, long containerID,
       HddsProtos.LifeCycleState containerState, long keyCount, long bytesUsed) {
     return TestContainerInfo.newBuilderForTest()
         .setContainerID(containerID)
@@ -264,6 +277,12 @@ public final class ReplicationTestUtil {
       protected Node getPlacementGroup(DatanodeDetails dn) {
         // Make it look like a single rack cluster
         return rackNode;
+      }
+
+      @Override
+      public ContainerPlacementStatus
+          validateContainerPlacement(List<DatanodeDetails> dns, int replicas) {
+        return new ContainerPlacementStatusDefault(2, 2, 3);
       }
     };
   }

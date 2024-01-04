@@ -28,6 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.google.common.base.Preconditions;
 
+import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -295,7 +296,7 @@ public class ContainerStateMap {
   }
 
   public Set<ContainerID> getAllContainerIDs() {
-    return Collections.unmodifiableSet(containerMap.keySet());
+    return ImmutableSet.copyOf(containerMap.keySet());
   }
 
   /**

@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -41,6 +42,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipelineManager;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
@@ -54,7 +56,6 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -82,6 +83,7 @@ import java.util.stream.IntStream;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
@@ -127,7 +129,8 @@ public class TestIncrementalContainerReportHandler {
             scmContext, versionManager);
     scmhaManager = SCMHAManagerStub.getInstance(true);
     testDir = GenericTestUtils.getTestDir(
-        TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
+        TestIncrementalContainerReportHandler.class.getSimpleName()
+            + UUID.randomUUID());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
 
@@ -426,6 +429,47 @@ public class TestIncrementalContainerReportHandler {
   }
 
   @Test
+  public void testOpenWithUnhealthyReplica() throws IOException {
+    final IncrementalContainerReportHandler reportHandler =
+        new IncrementalContainerReportHandler(
+            nodeManager, containerManager, scmContext);
+
+    RatisReplicationConfig replicationConfig =
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+    Pipeline pipeline = pipelineManager.createPipeline(replicationConfig);
+    List<DatanodeDetails> nodes = pipeline.getNodes();
+
+    final DatanodeDetails datanodeOne = nodes.get(0);
+    final DatanodeDetails datanodeTwo = nodes.get(1);
+    final DatanodeDetails datanodeThree = nodes.get(2);
+
+    final ContainerInfo container = getContainer(LifeCycleState.OPEN,
+        pipeline.getId());
+
+    nodeManager.register(datanodeOne, null, null);
+    nodeManager.register(datanodeTwo, null, null);
+    nodeManager.register(datanodeThree, null, null);
+    final Set<ContainerReplica> containerReplicas = getReplicas(
+        container.containerID(), ContainerReplicaProto.State.OPEN,
+        datanodeOne, datanodeTwo, datanodeThree);
+
+    containerStateManager.addContainer(container.getProtobuf());
+    containerReplicas.forEach(r -> containerStateManager.updateContainerReplica(
+        container.containerID(), r));
+
+    final IncrementalContainerReportProto containerReport =
+        getIncrementalContainerReportProto(container.containerID(),
+            UNHEALTHY,
+            datanodeThree.getUuidString());
+    final IncrementalContainerReportFromDatanode icr =
+        new IncrementalContainerReportFromDatanode(
+            datanodeThree, containerReport);
+    reportHandler.onMessage(icr, publisher);
+    Assertions.assertEquals(LifeCycleState.CLOSING,
+        containerManager.getContainer(container.containerID()).getState());
+  }
+
+  @Test
   public void testDeleteContainer() throws IOException, TimeoutException,
       NodeNotFoundException {
     final IncrementalContainerReportHandler reportHandler =
@@ -609,7 +653,7 @@ public class TestIncrementalContainerReportHandler {
             new IncrementalContainerReportHandler(nodeManager,
                     containerManager, scmContext);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
-    Assert.assertEquals(containerStateManager
+    Assertions.assertEquals(containerStateManager
             .getContainerReplicas(container.containerID()).stream()
             .collect(Collectors.toMap(ContainerReplica::getDatanodeDetails,
                     ContainerReplica::getReplicaIndex)), expectedReplicaMap);
