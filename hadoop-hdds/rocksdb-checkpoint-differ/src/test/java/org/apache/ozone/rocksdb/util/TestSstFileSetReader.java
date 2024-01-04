@@ -31,6 +31,7 @@ import org.apache.ozone.test.tag.Native;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.rocksdb.RocksDBException;
@@ -47,6 +48,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -56,7 +58,12 @@ import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LI
 /**
  * ManagedSstFileReader tests.
  */
-class TestManagedSstFileReader {
+class TestSstFileSetReader {
+
+  @TempDir
+  private File tempDir;
+
+  private final AtomicInteger fileCounter = new AtomicInteger();
 
   // Key prefix containing all characters, to check if all characters can be
   // written & read from rocksdb through SSTDumptool
@@ -65,9 +72,8 @@ class TestManagedSstFileReader {
       .collect(Collectors.joining(""));
 
   private String createRandomSSTFile(TreeMap<String, Integer> keys)
-      throws IOException, RocksDBException {
-    File file = File.createTempFile("tmp_sst_file", ".sst");
-    file.deleteOnExit();
+      throws RocksDBException {
+    File file = new File(tempDir, "tmp_sst_file" + fileCounter.incrementAndGet() + ".sst");
 
     try (ManagedOptions managedOptions = new ManagedOptions();
          ManagedEnvOptions managedEnvOptions = new ManagedEnvOptions();
@@ -84,6 +90,7 @@ class TestManagedSstFileReader {
       }
       sstFileWriter.finish();
     }
+    Assertions.assertTrue(file.exists());
     return file.getAbsolutePath();
   }
 
@@ -139,10 +146,10 @@ class TestManagedSstFileReader {
                 .collect(Collectors.toMap(Map.Entry::getKey,
                     Map.Entry::getValue));
         try (Stream<String> keyStream =
-                 new ManagedSstFileReader(files).getKeyStream(
+                 new SstFileSetReader(files).getKeyStream(
                      lowerBound.orElse(null), upperBound.orElse(null))) {
           keyStream.forEach(key -> {
-            Assertions.assertEquals(keysInBoundary.get(key), 1);
+            Assertions.assertEquals(1, keysInBoundary.get(key));
             Assertions.assertNotNull(keysInBoundary.remove(key));
           });
           keysInBoundary.values()
@@ -187,7 +194,7 @@ class TestManagedSstFileReader {
                           .orElse(true))
                   .collect(Collectors.toMap(Map.Entry::getKey,
                       Map.Entry::getValue));
-          try (Stream<String> keyStream = new ManagedSstFileReader(files)
+          try (Stream<String> keyStream = new SstFileSetReader(files)
               .getKeyStreamWithTombstone(sstDumpTool, lowerBound.orElse(null),
                   upperBound.orElse(null))) {
             keyStream.forEach(

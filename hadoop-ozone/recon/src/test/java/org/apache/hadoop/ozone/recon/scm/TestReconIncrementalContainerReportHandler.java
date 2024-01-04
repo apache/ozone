@@ -56,7 +56,6 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 /**
  * Test Recon ICR handler.
@@ -87,11 +86,10 @@ public class TestReconIncrementalContainerReportHandler
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
     SCMStorageConfig storageConfig = new SCMStorageConfig(conf);
-    this.versionManager =
-        Mockito.mock(HDDSLayoutVersionManager.class);
-    Mockito.when(versionManager.getMetadataLayoutVersion())
+    this.versionManager = mock(HDDSLayoutVersionManager.class);
+    when(versionManager.getMetadataLayoutVersion())
         .thenReturn(maxLayoutVersion());
-    Mockito.when(versionManager.getSoftwareLayoutVersion())
+    when(versionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
 
     NodeManager nodeManager = new SCMNodeManager(conf, storageConfig,

@@ -68,7 +68,6 @@ import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import com.google.protobuf.Message;
@@ -580,7 +579,7 @@ public class TestStateContext {
     }
     executorService.submit((Callable<String>) futureTwo::get);
 
-    Assertions.assertFalse(stateContext.isThreadPoolAvailable(executorService));
+    assertFalse(stateContext.isThreadPoolAvailable(executorService));
 
     futureOne.complete("futureOne");
     LambdaTestUtils.await(1000, 100, () ->
@@ -710,11 +709,11 @@ public class TestStateContext {
     ctx.addCommand(new CloseContainerCommand(1, PipelineID.randomId()));
 
     Map<SCMCommandProto.Type, Integer> summary = ctx.getCommandQueueSummary();
-    Assertions.assertEquals(3,
+    assertEquals(3,
         summary.get(SCMCommandProto.Type.replicateContainerCommand).intValue());
-    Assertions.assertEquals(2,
+    assertEquals(2,
         summary.get(SCMCommandProto.Type.closePipelineCommand).intValue());
-    Assertions.assertEquals(1,
+    assertEquals(1,
         summary.get(SCMCommandProto.Type.closeContainerCommand).intValue());
   }
 

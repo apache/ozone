@@ -55,8 +55,8 @@ import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -150,12 +150,12 @@ class TestSCMHAManagerImpl {
       IOException ex;
       ex = assertThrows(IOException.class, () ->
           scm2.removePeerFromHARing(randomScmId));
-      assertTrue(ex.getMessage().contains("Peer"));
+      assertThat(ex.getMessage()).contains("Peer");
 
       // try removing leader scm from ratis ring
       ex = assertThrows(IOException.class, () ->
           scm2.removePeerFromHARing(scm2.getScmId()));
-      assertTrue(ex.getMessage().contains("leader"));
+      assertThat(ex.getMessage()).contains("leader");
     } finally {
       scm2.getScmHAManager().getRatisServer().stop();
     }

@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.ozone.om.request.bucket.acl;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.bucket.TestBucketRequest;
@@ -26,7 +30,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -51,13 +54,13 @@ public class TestOMBucketAddAclRequest extends TestBucketRequest {
         new OMBucketAddAclRequest(originalRequest);
     OMRequest preExecuteRequest = omBucketAddAclRequest
         .preExecute(ozoneManager);
-    Assertions.assertNotEquals(originalRequest, preExecuteRequest);
+    assertNotEquals(originalRequest, preExecuteRequest);
 
     long newModTime = preExecuteRequest.getAddAclRequest()
         .getModificationTime();
     // When preExecute() of adding acl,
     // the new modification time is greater than origin one.
-    Assertions.assertTrue(newModTime > originModTime);
+    assertThat(newModTime).isGreaterThan(originModTime);
   }
 
   @Test
@@ -81,8 +84,8 @@ public class TestOMBucketAddAclRequest extends TestBucketRequest {
     OMClientResponse omClientResponse = omBucketAddAclRequest
         .validateAndUpdateCache(ozoneManager, 1);
     OMResponse omResponse = omClientResponse.getOMResponse();
-    Assertions.assertNotNull(omResponse.getAddAclResponse());
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertNotNull(omResponse.getAddAclResponse());
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omResponse.getStatus());
 
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
@@ -90,8 +93,8 @@ public class TestOMBucketAddAclRequest extends TestBucketRequest {
         .get(bucketKey).getAcls();
 
     // Acl is added.
-    Assertions.assertEquals(1, bucketAcls.size());
-    Assertions.assertEquals(acl, bucketAcls.get(0));
+    assertEquals(1, bucketAcls.size());
+    assertEquals(acl, bucketAcls.get(0));
   }
 
   @Test
@@ -109,9 +112,9 @@ public class TestOMBucketAddAclRequest extends TestBucketRequest {
     OMClientResponse omClientResponse = omBucketAddAclRequest
         .validateAndUpdateCache(ozoneManager, 1);
     OMResponse omResponse = omClientResponse.getOMResponse();
-    Assertions.assertNotNull(omResponse.getAddAclResponse());
+    assertNotNull(omResponse.getAddAclResponse());
     // The bucket is not created.
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
+    assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
         omResponse.getStatus());
   }
 }

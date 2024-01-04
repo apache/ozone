@@ -32,9 +32,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Iterator;
 
 /**
  * Handle Multipart upload commit upload part file.
@@ -53,12 +50,12 @@ public class S3MultipartUploadCommitPartRequestWithFSO
       throws IOException {
 
     String fileName = OzoneFSUtils.getFileName(keyName);
-    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
+
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omMetadataManager.getBucketId(volumeName,
             bucketName);
     long parentID = OMFileRequest
-        .getParentID(volumeId, bucketId, pathComponents, keyName,
+        .getParentID(volumeId, bucketId, keyName,
                 omMetadataManager);
 
     return omMetadataManager.getOpenFileName(volumeId, bucketId,

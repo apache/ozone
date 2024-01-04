@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
     OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
     OMResponse;
+import org.apache.ratis.server.protocol.TermIndex;
 
 import java.io.IOException;
 
@@ -53,12 +54,12 @@ public interface RequestHandler {
    * OzoneManagerStateMachine applyTransaction method. In non-HA this will be
    * called from {@link OzoneManagerProtocolServerSideTranslatorPB} for write
    * requests.
+   *
    * @param omRequest
-   * @param transactionLogIndex - ratis transaction log index
+   * @param termIndex - ratis transaction log (term, index)
    * @return OMClientResponse
    */
-  OMClientResponse handleWriteRequest(OMRequest omRequest,
-      long transactionLogIndex) throws IOException;
+  OMClientResponse handleWriteRequest(OMRequest omRequest, TermIndex termIndex) throws IOException;
 
   /**
    * Update the OzoneManagerDoubleBuffer. This will be called when

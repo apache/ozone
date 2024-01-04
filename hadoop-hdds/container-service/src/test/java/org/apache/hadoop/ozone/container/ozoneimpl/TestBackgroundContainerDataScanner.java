@@ -27,7 +27,6 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
@@ -48,6 +47,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -70,7 +70,7 @@ public class TestBackgroundContainerDataScanner extends
   public void testRecentlyScannedContainerIsSkipped() throws Exception {
     setScannedTimestampRecent(healthy);
     scanner.runIteration();
-    Mockito.verify(healthy, never()).scanData(any(), any());
+    verify(healthy, never()).scanData(any(), any());
   }
 
   @Test
@@ -80,17 +80,17 @@ public class TestBackgroundContainerDataScanner extends
     // should be scanned.
     setScannedTimestampOld(healthy);
     scanner.runIteration();
-    Mockito.verify(healthy, atLeastOnce()).scanData(any(), any());
+    verify(healthy, atLeastOnce()).scanData(any(), any());
   }
 
   @Test
   @Override
   public void testUnscannedContainerIsScanned() throws Exception {
     // If there is no last scanned time, the container should be scanned.
-    Mockito.when(healthy.getContainerData().lastDataScanTime())
+    when(healthy.getContainerData().lastDataScanTime())
         .thenReturn(Optional.empty());
     scanner.runIteration();
-    Mockito.verify(healthy, atLeastOnce()).scanData(any(), any());
+    verify(healthy, atLeastOnce()).scanData(any(), any());
   }
 
   @Test
@@ -125,25 +125,31 @@ public class TestBackgroundContainerDataScanner extends
     verifyContainerMarkedUnhealthy(corruptData, atLeastOnce());
     verifyContainerMarkedUnhealthy(openCorruptMetadata, never());
     verifyContainerMarkedUnhealthy(openContainer, never());
+    // Deleted containers should not be marked unhealthy
+    verifyContainerMarkedUnhealthy(deletedContainer, never());
   }
 
   @Test
   public void testScanTimestampUpdated() throws Exception {
     scanner.runIteration();
     // Open containers should not be scanned.
-    Mockito.verify(controller, never())
+    verify(controller, never())
         .updateDataScanTimestamp(
             eq(openContainer.getContainerData().getContainerID()), any());
-    Mockito.verify(controller, never())
+    verify(controller, never())
         .updateDataScanTimestamp(
             eq(openCorruptMetadata.getContainerData().getContainerID()), any());
     // All other containers should have been scanned.
-    Mockito.verify(controller, atLeastOnce())
+    verify(controller, atLeastOnce())
         .updateDataScanTimestamp(
             eq(healthy.getContainerData().getContainerID()), any());
-    Mockito.verify(controller, atLeastOnce())
+    verify(controller, atLeastOnce())
         .updateDataScanTimestamp(
             eq(corruptData.getContainerData().getContainerID()), any());
+    // Metrics for Deleted container should not be updated.
+    verify(controller, never())
+        .updateDataScanTimestamp(
+            eq(deletedContainer.getContainerData().getContainerID()), any());
   }
 
   @Test
@@ -165,10 +171,10 @@ public class TestBackgroundContainerDataScanner extends
     assertEquals(1, metrics.getNumUnHealthyContainers());
 
     // The unhealthy container should have been moved to the unhealthy state.
-    Mockito.verify(unhealthy.getContainerData(), atMostOnce())
+    verify(unhealthy.getContainerData(), atMostOnce())
         .setState(UNHEALTHY);
     // Update the mock to reflect this.
-    Mockito.when(unhealthy.getContainerState()).thenReturn(UNHEALTHY);
+    when(unhealthy.getContainerState()).thenReturn(UNHEALTHY);
     assertFalse(unhealthy.shouldScanData());
 
     // Clear metrics to check the next run.
@@ -192,7 +198,7 @@ public class TestBackgroundContainerDataScanner extends
   @Test
   @Override
   public void testWithVolumeFailure() throws Exception {
-    Mockito.when(vol.isFailed()).thenReturn(true);
+    when(vol.isFailed()).thenReturn(true);
     // Run the scanner thread in the background. It should be terminated on
     // the first iteration because the volume is unhealthy.
     ContainerDataScannerMetrics metrics = scanner.getMetrics();
@@ -200,17 +206,17 @@ public class TestBackgroundContainerDataScanner extends
     GenericTestUtils.waitFor(() -> !scanner.isAlive(), 1000, 5000);
 
     // Volume health should have been checked.
-    Mockito.verify(vol, atLeastOnce()).isFailed();
+    verify(vol, atLeastOnce()).isFailed();
     // No iterations should have been run.
     assertEquals(0, metrics.getNumScanIterations());
     assertEquals(0, metrics.getNumContainersScanned());
     assertEquals(0, metrics.getNumUnHealthyContainers());
     // All containers were on the unhealthy volume, so they should not have
     // been scanned.
-    Mockito.verify(healthy, never()).scanData(any(), any());
-    Mockito.verify(openContainer, never()).scanData(any(), any());
-    Mockito.verify(corruptData, never()).scanData(any(), any());
-    Mockito.verify(openCorruptMetadata, never()).scanData(any(), any());
+    verify(healthy, never()).scanData(any(), any());
+    verify(openContainer, never()).scanData(any(), any());
+    verify(corruptData, never()).scanData(any(), any());
+    verify(openCorruptMetadata, never()).scanData(any(), any());
   }
 
 
@@ -220,7 +226,7 @@ public class TestBackgroundContainerDataScanner extends
     CountDownLatch latch = new CountDownLatch(1);
 
     // Make the data scan block until interrupt.
-    Mockito.when(healthy.scanData(any(), any())).then(i -> {
+    when(healthy.scanData(any(), any())).then(i -> {
       latch.countDown();
       Thread.sleep(Duration.ofDays(1).toMillis());
       return null;

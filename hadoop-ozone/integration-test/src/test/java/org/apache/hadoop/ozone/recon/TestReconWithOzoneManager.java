@@ -36,9 +36,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
@@ -191,7 +189,7 @@ public class TestReconWithOzoneManager {
         cluster.getReconServer().getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
     OzoneManagerSyncMetrics metrics = impl.getMetrics();
-    
+
     // HTTP call to /api/task/status
     long omLatestSeqNumber = ((RDBStore) metadataManager.getStore())
         .getDb().getLatestSequenceNumber();
@@ -307,19 +305,16 @@ public class TestReconWithOzoneManager {
     long omLatestSeqNumber = ((RDBStore) metadataManager.getStore())
         .getDb().getLatestSequenceNumber();
 
-    String taskStatusResponse = makeHttpCall(taskStatusURL);
-    long reconLatestSeqNumber = getReconTaskAttributeFromJson(
-        taskStatusResponse,
-        OmDeltaRequest.name(),
-        "lastUpdatedSeqNumber");
+    OMMetadataManager reconMetadataManagerInstance =
+        cluster.getReconServer().getOzoneManagerServiceProvider()
+            .getOMMetadataManagerInstance();
+    long reconLatestSeqNumber =
+        ((RDBStore) reconMetadataManagerInstance.getStore()).getDb()
+            .getLatestSequenceNumber();
 
     // verify sequence number after incremental delta snapshot
     assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
     assertEquals(0, metrics.getSequenceNumberLag().value());
-
-    OMMetadataManager reconMetadataManagerInstance =
-        cluster.getReconServer().getOzoneManagerServiceProvider()
-            .getOMMetadataManagerInstance();
 
     String volume = "vol15";
     String bucket = "bucket15";
@@ -363,13 +358,10 @@ public class TestReconWithOzoneManager {
             .getLatestSequenceNumber();
     assertEquals(0, metrics.getSequenceNumberLag().value());
     assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
-    reconLatestSeqNumber = getReconTaskAttributeFromJson(
-        taskStatusResponse,
-        OmDeltaRequest.name(),
-        "lastUpdatedSeqNumber");
+    reconLatestSeqNumber =
+        ((RDBStore) reconMetadataManagerInstance.getStore()).getDb()
+            .getLatestSequenceNumber();
     assertEquals(omLatestSeqNumber, reconLatestSeqNumber);
-    assertEquals(17, omLatestSeqNumber);
-    assertEquals(17, reconLatestSeqNumber);
     impl.syncDataFromOM();
     assertTrue(omServiceProviderImplLogs.getOutput()
         .contains("isDBUpdateSuccess: true"));
@@ -388,7 +380,8 @@ public class TestReconWithOzoneManager {
   }
 
   private long getReconTaskAttributeFromJson(String taskStatusResponse,
-       String taskName, String entityAttribute) {
+                                             String taskName,
+                                             String entityAttribute) {
     ArrayList<LinkedTreeMap> taskStatusList = new Gson()
         .fromJson(taskStatusResponse, ArrayList.class);
     Optional<LinkedTreeMap> taskEntity =
@@ -397,21 +390,7 @@ public class TestReconWithOzoneManager {
             .filter(task -> task.get("taskName").equals(taskName))
             .findFirst();
     assertTrue(taskEntity.isPresent());
-    return (long)(double) taskEntity.get().get(entityAttribute);
-  }
-
-  private long getReconContainerCount(String containerResponse) {
-    Map map = new Gson().fromJson(containerResponse, HashMap.class);
-    LinkedTreeMap linkedTreeMap = (LinkedTreeMap) map.get("data");
-    return (long)(double) linkedTreeMap.get("totalCount");
-  }
-
-  private LinkedTreeMap getContainerResponseMap(String containerResponse,
-      int expectedContainerID) {
-    Map map = new Gson().fromJson(containerResponse, HashMap.class);
-    LinkedTreeMap linkedTreeMap = (LinkedTreeMap) map.get("data");
-    ArrayList containers = (ArrayList) linkedTreeMap.get("containers");
-    return (LinkedTreeMap)containers.get(expectedContainerID);
+    return (long) (double) taskEntity.get().get(entityAttribute);
   }
 
   /**
@@ -444,7 +423,7 @@ public class TestReconWithOzoneManager {
   }
 
   private static OmKeyLocationInfo getOmKeyLocationInfo(BlockID blockID,
-      Pipeline pipeline) {
+                                                        Pipeline pipeline) {
     return new OmKeyLocationInfo.Builder()
         .setBlockID(blockID)
         .setPipeline(pipeline)
@@ -452,8 +431,8 @@ public class TestReconWithOzoneManager {
   }
 
   private static void writeDataToOm(String key, String bucket, String volume,
-      List<OmKeyLocationInfoGroup>
-          omKeyLocationInfoGroupList)
+                                    List<OmKeyLocationInfoGroup>
+                                        omKeyLocationInfoGroupList)
       throws IOException {
 
     String omKey = metadataManager.getOzoneKey(volume,

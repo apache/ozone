@@ -16,29 +16,29 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.ratis.helpers;
+package org.apache.hadoop.ozone.om.response;
 
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+
+import javax.annotation.Nonnull;
+import java.io.IOException;
 
 /**
- * Entry in OzoneManagerDouble Buffer.
- * @param <Response>
+ * A dummy OMClientResponse implementation.
  */
-public class DoubleBufferEntry<Response extends OMClientResponse> {
+@CleanupTableInfo
+public class DummyOMClientResponse extends OMClientResponse {
 
-  private long trxLogIndex;
-  private Response response;
-
-  public DoubleBufferEntry(long trxLogIndex, Response response) {
-    this.trxLogIndex = trxLogIndex;
-    this.response = response;
+  public DummyOMClientResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
   }
 
-  public long getTrxLogIndex() {
-    return trxLogIndex;
-  }
-
-  public Response getResponse() {
-    return response;
+  @Override
+  public void addToDBBatch(OMMetadataManager omMetadataManager,
+      BatchOperation batchOperation) throws IOException {
+    // do nothing
   }
 }
+

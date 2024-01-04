@@ -63,8 +63,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -147,9 +147,8 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline1, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     // New pipeline should not overlap with the previous created pipeline
-    assertTrue(
-        intersection(pipeline.getNodes(), pipeline1.getNodes())
-            .size() < factor.getNumber());
+    assertThat(intersection(pipeline.getNodes(), pipeline1.getNodes()).size())
+        .isLessThan(factor.getNumber());
     if (pipeline.getReplicationConfig().getRequiredNodes() == 3) {
       assertNotEquals(pipeline.getNodeSet(), pipeline1.getNodeSet());
     }
@@ -310,7 +309,7 @@ public class TestRatisPipelineProvider {
         excludedNodes, Collections.EMPTY_LIST);
 
     for (DatanodeDetails dn : pipeline1.getNodes()) {
-      assertFalse(excludedNodes.contains(dn));
+      assertThat(excludedNodes).doesNotContain(dn);
     }
   }
 
@@ -351,7 +350,7 @@ public class TestRatisPipelineProvider {
         Assertions.fail("Expected SCMException for large container size with " +
             "replication factor " + factor.toString());
       } catch (SCMException ex) {
-        Assertions.assertTrue(ex.getMessage().contains(expectedErrorSubstring));
+        assertThat(ex.getMessage()).contains(expectedErrorSubstring);
       }
     }
 
@@ -367,7 +366,7 @@ public class TestRatisPipelineProvider {
         Assertions.fail("Expected SCMException for large metadata size with " +
             "replication factor " + factor.toString());
       } catch (SCMException ex) {
-        Assertions.assertTrue(ex.getMessage().contains(expectedErrorSubstring));
+        assertThat(ex.getMessage()).contains(expectedErrorSubstring);
       }
     }
   }

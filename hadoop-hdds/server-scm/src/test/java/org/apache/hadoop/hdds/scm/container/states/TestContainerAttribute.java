@@ -26,6 +26,8 @@ import org.junit.jupiter.api.Test;
 import java.util.Arrays;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 /**
  * Test ContainerAttribute management.
  */
@@ -38,7 +40,7 @@ public class TestContainerAttribute {
     containerAttribute.insert(1, id);
     Assertions.assertEquals(1,
         containerAttribute.getCollection(1).size());
-    Assertions.assertTrue(containerAttribute.getCollection(1).contains(id));
+    assertThat(containerAttribute.getCollection(1)).contains(id);
 
     // Insert again and verify that the new ContainerId is inserted.
     ContainerID newId =
@@ -46,7 +48,7 @@ public class TestContainerAttribute {
     containerAttribute.insert(1, newId);
     Assertions.assertEquals(1,
         containerAttribute.getCollection(1).size());
-    Assertions.assertTrue(containerAttribute.getCollection(1).contains(newId));
+    assertThat(containerAttribute.getCollection(1)).contains(newId);
   }
 
   @Test

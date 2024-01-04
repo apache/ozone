@@ -40,7 +40,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.util.ClosableIterator;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -224,8 +223,7 @@ public class TestRocksDbPersistentMap {
       int idx = 0;
       while (iterator.hasNext()) {
         Map.Entry<String, String> e = iterator.next();
-        Assertions.assertEquals(Pair.of(e.getKey(), e.getValue()),
-            expectedKeys.get(idx));
+        assertEquals(Pair.of(e.getKey(), e.getValue()), expectedKeys.get(idx));
         idx += 1;
       }
 

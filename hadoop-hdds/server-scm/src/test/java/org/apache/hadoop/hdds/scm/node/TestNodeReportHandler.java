@@ -96,9 +96,9 @@ public class TestNodeReportHandler implements EventPublisher {
         Arrays.asList(metaStorageOne)).getReport(), null);
     nodeMetric = nodeManager.getNodeStat(dn);
 
-    Assertions.assertTrue(nodeMetric.get().getCapacity().get() == 100);
-    Assertions.assertTrue(nodeMetric.get().getRemaining().get() == 90);
-    Assertions.assertTrue(nodeMetric.get().getScmUsed().get() == 10);
+    Assertions.assertEquals(100, (long) nodeMetric.get().getCapacity().get());
+    Assertions.assertEquals(90, (long) nodeMetric.get().getRemaining().get());
+    Assertions.assertEquals(10, (long) nodeMetric.get().getScmUsed().get());
 
     StorageReportProto storageTwo = HddsTestUtils
         .createStorageReport(dn.getUuid(), storagePath, 100, 10, 90, null);
@@ -107,9 +107,9 @@ public class TestNodeReportHandler implements EventPublisher {
             Arrays.asList(metaStorageOne)), this);
     nodeMetric = nodeManager.getNodeStat(dn);
 
-    Assertions.assertTrue(nodeMetric.get().getCapacity().get() == 200);
-    Assertions.assertTrue(nodeMetric.get().getRemaining().get() == 180);
-    Assertions.assertTrue(nodeMetric.get().getScmUsed().get() == 20);
+    Assertions.assertEquals(200, (long) nodeMetric.get().getCapacity().get());
+    Assertions.assertEquals(180, (long) nodeMetric.get().getRemaining().get());
+    Assertions.assertEquals(20, (long) nodeMetric.get().getScmUsed().get());
 
   }
 

@@ -36,6 +36,7 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Tests for ContainerReplicaPendingOps.
@@ -114,9 +115,9 @@ public class TestContainerReplicaPendingOps {
     }
     List<DatanodeDetails> allDns = ops.stream()
         .map(ContainerReplicaOp::getTarget).collect(Collectors.toList());
-    Assertions.assertTrue(allDns.contains(dn1));
-    Assertions.assertTrue(allDns.contains(dn2));
-    Assertions.assertTrue(allDns.contains(dn3));
+    assertThat(allDns).contains(dn1);
+    assertThat(allDns).contains(dn2);
+    assertThat(allDns).contains(dn3);
 
     ops = pendingOps.getPendingOps(new ContainerID(2));
     Assertions.assertEquals(1, ops.size());
@@ -141,9 +142,9 @@ public class TestContainerReplicaPendingOps {
     }
     List<DatanodeDetails> allDns = ops.stream()
         .map(ContainerReplicaOp::getTarget).collect(Collectors.toList());
-    Assertions.assertTrue(allDns.contains(dn1));
-    Assertions.assertTrue(allDns.contains(dn2));
-    Assertions.assertTrue(allDns.contains(dn3));
+    assertThat(allDns).contains(dn1);
+    assertThat(allDns).contains(dn2);
+    assertThat(allDns).contains(dn3);
 
     ops = pendingOps.getPendingOps(new ContainerID(2));
     Assertions.assertEquals(1, ops.size());
@@ -239,9 +240,9 @@ public class TestContainerReplicaPendingOps {
     List<DatanodeDetails> dns = ops.stream()
         .map(ContainerReplicaOp::getTarget)
         .collect(Collectors.toList());
-    Assertions.assertFalse(dns.contains(dn1));
-    Assertions.assertTrue(dns.contains(dn2));
-    Assertions.assertTrue(dns.contains(dn3));
+    assertThat(dns).doesNotContain(dn1);
+    assertThat(dns).contains(dn2);
+    assertThat(dns).contains(dn3);
 
     clock.fastForward(1000);
     pendingOps.removeExpiredEntries();

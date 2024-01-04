@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.HttpHeaders;
@@ -45,6 +44,7 @@ import static java.net.HttpURLConnection.HTTP_NOT_IMPLEMENTED;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -66,9 +66,9 @@ public class TestBucketAcl {
     client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket(BUCKET_NAME);
 
-    servletRequest = Mockito.mock(HttpServletRequest.class);
-    parameterMap = Mockito.mock(Map.class);
-    headers = Mockito.mock(HttpHeaders.class);
+    servletRequest = mock(HttpServletRequest.class);
+    parameterMap = mock(Map.class);
+    headers = mock(HttpHeaders.class);
     when(servletRequest.getParameterMap()).thenReturn(parameterMap);
 
     bucketEndpoint = new BucketEndpoint();

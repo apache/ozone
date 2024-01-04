@@ -344,4 +344,26 @@ public class TestNodeDecommissionMetrics {
     Assertions.assertEquals(3,
         metrics.getPipelinesWaitingToCloseTotal());
   }
+
+  @Test
+  public void testDecommMonitorStartTimeForHost() {
+    // test metric aggregation over several datanodes
+    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+
+    nodeManager.register(dn1,
+        new NodeStatus(DECOMMISSIONING,
+            HddsProtos.NodeState.HEALTHY));
+
+    nodeManager.setPipelines(dn1, 2);
+
+    long before = System.currentTimeMillis();
+    monitor.startMonitoring(dn1);
+    long after = System.currentTimeMillis();
+
+    monitor.run();
+    long startTime = monitor.getSingleTrackedNode(dn1.getIpAddress())
+        .getStartTime();
+    Assertions.assertTrue(before <= startTime);
+    Assertions.assertTrue(after >= startTime);
+  }
 }

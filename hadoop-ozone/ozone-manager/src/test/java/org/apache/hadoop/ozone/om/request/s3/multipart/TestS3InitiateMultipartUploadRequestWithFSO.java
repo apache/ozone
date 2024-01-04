@@ -19,6 +19,9 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -29,7 +32,6 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -72,7 +74,7 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     OMClientResponse omClientResponse =
         s3InitiateMultipartUploadReqFSO.validateAndUpdateCache(ozoneManager, 100L);
 
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
 
     long parentID = verifyDirectoriesInDB(dirs, volumeId, bucketId);
@@ -90,35 +92,35 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     OmKeyInfo omKeyInfo = omMetadataManager
         .getOpenKeyTable(s3InitiateMultipartUploadReqFSO.getBucketLayout())
         .get(multipartOpenFileKey);
-    Assertions.assertNotNull(omKeyInfo, "Failed to find the fileInfo");
-    Assertions.assertNotNull(omKeyInfo.getLatestVersionLocations(),
+    assertNotNull(omKeyInfo, "Failed to find the fileInfo");
+    assertNotNull(omKeyInfo.getLatestVersionLocations(),
         "Key Location is null!");
-    Assertions.assertTrue(
+    assertTrue(
         omKeyInfo.getLatestVersionLocations().isMultipartKey(),
         "isMultipartKey is false!");
-    Assertions.assertEquals(fileName, omKeyInfo.getKeyName(),
+    assertEquals(fileName, omKeyInfo.getKeyName(),
         "FileName mismatches!");
-    Assertions.assertEquals(parentID, omKeyInfo.getParentObjectID(),
+    assertEquals(parentID, omKeyInfo.getParentObjectID(),
         "ParentId mismatches!");
 
     OmMultipartKeyInfo omMultipartKeyInfo = omMetadataManager
             .getMultipartInfoTable().get(multipartFileKey);
-    Assertions.assertNotNull(omMultipartKeyInfo,
+    assertNotNull(omMultipartKeyInfo,
         "Failed to find the multipartFileInfo");
-    Assertions.assertEquals(parentID,
+    assertEquals(parentID,
             omMultipartKeyInfo.getParentID(),
         "ParentId mismatches!");
 
-    Assertions.assertEquals(modifiedRequest.getInitiateMultiPartUploadRequest()
+    assertEquals(modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getMultipartUploadID(),
         omMultipartKeyInfo
             .getUploadID());
 
-    Assertions.assertEquals(modifiedRequest.getInitiateMultiPartUploadRequest()
+    assertEquals(modifiedRequest.getInitiateMultiPartUploadRequest()
         .getKeyArgs().getModificationTime(),
         omKeyInfo
         .getModificationTime());
-    Assertions.assertEquals(modifiedRequest.getInitiateMultiPartUploadRequest()
+    assertEquals(modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getModificationTime(),
         omKeyInfo
             .getCreationTime());
@@ -137,10 +139,10 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
               parentID, dirName);
       OmDirectoryInfo omDirInfo =
               omMetadataManager.getDirectoryTable().get(dbKey);
-      Assertions.assertNotNull(omDirInfo, "Invalid directory!");
-      Assertions.assertEquals(dirName, omDirInfo.getName(),
+      assertNotNull(omDirInfo, "Invalid directory!");
+      assertEquals(dirName, omDirInfo.getName(),
           "Invalid directory!");
-      Assertions.assertEquals(parentID + "/" + dirName, omDirInfo.getPath(),
+      assertEquals(parentID + "/" + dirName, omDirInfo.getPath(),
           "Invalid dir path!");
       parentID = omDirInfo.getObjectID();
     }
@@ -183,7 +185,7 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     List<OzoneAcl> bucketAcls = omMetadataManager.getBucketTable()
         .get(bucketKey).getAcls();
-    Assertions.assertEquals(acls, bucketAcls);
+    assertEquals(acls, bucketAcls);
 
     // create dir with acls inherited from parent DEFAULT acls
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
@@ -209,7 +211,7 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
         .getOpenKeyTable(s3InitiateMultipartUploadReqFSO.getBucketLayout())
         .get(multipartOpenFileKey);
 
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
 
     verifyKeyInheritAcls(dirs, omKeyInfo, volumeId, bucketId, bucketAcls);
@@ -239,7 +241,7 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
       List<OzoneAcl> omDirAcls = omDirInfo.getAcls();
 
       System.out.println("  subdir acls : " + omDirInfo + " ==> " + omDirAcls);
-      Assertions.assertEquals(expectedInheritAcls, omDirAcls,
+      assertEquals(expectedInheritAcls, omDirAcls,
           "Failed to inherit parent DEFAULT acls!");
 
       parentID = omDirInfo.getObjectID();
@@ -249,11 +251,11 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
       // [user:newUser:rw[ACCESS], group:newGroup:rwl[ACCESS]]
       if (indx == dirs.size() - 1) {
         // verify file acls
-        Assertions.assertEquals(fileInfo.getParentObjectID(),
+        assertEquals(fileInfo.getParentObjectID(),
             omDirInfo.getObjectID());
         List<OzoneAcl> fileAcls = fileInfo.getAcls();
         System.out.println("  file acls : " + fileInfo + " ==> " + fileAcls);
-        Assertions.assertEquals(expectedInheritAcls.stream()
+        assertEquals(expectedInheritAcls.stream()
                 .map(acl -> acl.setAclScope(OzoneAcl.AclScope.ACCESS))
                 .collect(Collectors.toList()), fileAcls,
             "Failed to inherit parent DEFAULT acls!");

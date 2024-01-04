@@ -56,33 +56,26 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
 import org.apache.ratis.protocol.exceptions.NotReplicatedException;
 import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
 import org.apache.ratis.protocol.exceptions.TimeoutIOException;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Class to test CommitWatcher functionality.
  */
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
 public class TestCommitWatcher {
 
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
   private OzoneClient client;
@@ -104,7 +97,7 @@ public class TestCommitWatcher {
    *
    * @throws IOException
    */
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     chunkSize = (int)(1 * OzoneConsts.MB);
     flushSize = (long) 2 * chunkSize;
@@ -165,7 +158,7 @@ public class TestCommitWatcher {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -324,11 +317,12 @@ public class TestCommitWatcher {
           // can itself get AlreadyClosedException from the Ratis Server
           // and the write may fail with RaftRetryFailureException
           Throwable t = HddsClientUtils.checkForException(ioe);
-          assertTrue("Unexpected exception: " + t.getClass(),
+          assertTrue(
               t instanceof RaftRetryFailureException ||
                   t instanceof TimeoutIOException ||
                   t instanceof AlreadyClosedException ||
-                  t instanceof NotReplicatedException);
+                  t instanceof NotReplicatedException,
+              "Unexpected exception: " + t.getClass());
         }
         if (ratisClient.getReplicatedMinCommitIndex() < replies.get(1)
             .getLogIndex()) {

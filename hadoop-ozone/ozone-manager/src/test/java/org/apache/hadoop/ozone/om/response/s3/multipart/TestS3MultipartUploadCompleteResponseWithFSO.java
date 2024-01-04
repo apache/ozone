@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -30,7 +34,6 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.util.Time;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -104,9 +107,8 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
     OmBucketInfo omBucketInfo =
         omMetadataManager.getBucketTable().get(bucketKey);
 
-    Assertions.assertNotNull(
-        omMetadataManager.getMultipartInfoTable().get(dbMultipartKey));
-    Assertions.assertNotNull(omMetadataManager.getOpenKeyTable(
+    assertNotNull(omMetadataManager.getMultipartInfoTable().get(dbMultipartKey));
+    assertNotNull(omMetadataManager.getOpenKeyTable(
         getBucketLayout()).get(dbMultipartOpenKey));
 
     List<OmKeyInfo> unUsedParts = new ArrayList<>();
@@ -121,15 +123,13 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
 
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assertions.assertNotNull(
-        omMetadataManager.getKeyTable(getBucketLayout()).get(dbKey));
-    Assertions.assertNull(
-        omMetadataManager.getMultipartInfoTable().get(dbMultipartKey));
-    Assertions.assertNull(omMetadataManager.getOpenKeyTable(getBucketLayout())
+    assertNotNull(omMetadataManager.getKeyTable(getBucketLayout()).get(dbKey));
+    assertNull(omMetadataManager.getMultipartInfoTable().get(dbMultipartKey));
+    assertNull(omMetadataManager.getOpenKeyTable(getBucketLayout())
         .get(dbMultipartOpenKey));
 
     // As no parts are created, so no entries should be there in delete table.
-    Assertions.assertEquals(0, omMetadataManager.countRowsInTable(
+    assertEquals(0, omMetadataManager.countRowsInTable(
             omMetadataManager.getDeletedTable()));
   }
 
@@ -188,9 +188,9 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
     addS3MultipartUploadCommitPartResponseFSO(volumeName, bucketName, keyName,
         multipartUploadID, dbOpenKey);
 
-    Assertions.assertNotNull(
+    assertNotNull(
         omMetadataManager.getMultipartInfoTable().get(dbMultipartKey));
-    Assertions.assertNotNull(omMetadataManager.getOpenKeyTable(
+    assertNotNull(omMetadataManager.getOpenKeyTable(
         getBucketLayout()).get(dbMultipartOpenKey));
 
     // S3MultipartUploadCompleteResponseWithFSO should accept null bucketInfo
@@ -206,15 +206,15 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
 
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assertions.assertNotNull(
+    assertNotNull(
         omMetadataManager.getKeyTable(getBucketLayout()).get(dbKey));
-    Assertions.assertNull(
+    assertNull(
         omMetadataManager.getMultipartInfoTable().get(dbMultipartKey));
-    Assertions.assertNull(omMetadataManager.getOpenKeyTable(getBucketLayout())
+    assertNull(omMetadataManager.getOpenKeyTable(getBucketLayout())
         .get(dbMultipartOpenKey));
 
     // As no parts are created, so no entries should be there in delete table.
-    Assertions.assertEquals(0, omMetadataManager.countRowsInTable(
+    assertEquals(0, omMetadataManager.countRowsInTable(
         omMetadataManager.getDeletedTable()));
   }
 
@@ -232,7 +232,7 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
 
     // As 1 unused parts exists, so 1 unused entry should be there in delete
     // table.
-    Assertions.assertEquals(2, omMetadataManager.countRowsInTable(
+    assertEquals(2, omMetadataManager.countRowsInTable(
             omMetadataManager.getDeletedTable()));
   }
 
@@ -265,12 +265,12 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
     // Make sure new object isn't in delete table
     RepeatedOmKeyInfo ds = omMetadataManager.getDeletedTable().get(ozoneKey);
     for (OmKeyInfo omKeyInfo : ds.getOmKeyInfoList()) {
-      Assertions.assertNotEquals(oId, omKeyInfo.getObjectID());
+      assertNotEquals(oId, omKeyInfo.getObjectID());
     }
 
     // As 1 unused parts and 1 previously put-and-deleted object exist,
     // so 2 entries should be there in delete table.
-    Assertions.assertEquals(3, omMetadataManager.countRowsInTable(
+    assertEquals(3, omMetadataManager.countRowsInTable(
             omMetadataManager.getDeletedTable()));
   }
 
@@ -331,11 +331,11 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
     String dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
             parentID, omKeyInfoFSO.getFileName());
-    Assertions.assertNotNull(
+    assertNotNull(
         omMetadataManager.getKeyTable(getBucketLayout()).get(dbKey));
-    Assertions.assertNull(
+    assertNull(
             omMetadataManager.getMultipartInfoTable().get(dbMultipartKey));
-    Assertions.assertNull(omMetadataManager.getOpenKeyTable(getBucketLayout())
+    assertNull(omMetadataManager.getOpenKeyTable(getBucketLayout())
         .get(dbMultipartOpenKey));
 
     return omKeyInfoFSO.getObjectID();
@@ -371,15 +371,15 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
     s3MultipartUploadCommitPartResponse.checkAndUpdateDB(omMetadataManager,
             batchOperation);
 
-    Assertions.assertNull(
+    assertNull(
         omMetadataManager.getOpenKeyTable(getBucketLayout()).get(multipartKey));
-    Assertions.assertNull(
+    assertNull(
         omMetadataManager.getMultipartInfoTable().get(multipartKey));
 
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     // As 1 parts are created, so 1 entry should be there in delete table.
-    Assertions.assertEquals(deleteEntryCount,
+    assertEquals(deleteEntryCount,
         omMetadataManager.countRowsInTable(
         omMetadataManager.getDeletedTable()));
 
@@ -387,13 +387,13 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
         omMultipartKeyInfo.getPartKeyInfo(1).getPartKeyInfo().getObjectID(),
         multipartKey);
 
-    Assertions.assertNotNull(omMetadataManager.getDeletedTable().get(
+    assertNotNull(omMetadataManager.getDeletedTable().get(
         part1DeletedKeyName));
 
     RepeatedOmKeyInfo ro =
         omMetadataManager.getDeletedTable().get(part1DeletedKeyName);
     OmKeyInfo omPartKeyInfo = OmKeyInfo.getFromProtobuf(part1.getPartKeyInfo());
-    Assertions.assertEquals(omPartKeyInfo, ro.getOmKeyInfoList().get(0));
+    assertEquals(omPartKeyInfo, ro.getOmKeyInfoList().get(0));
 
     return omPartKeyInfo;
   }
