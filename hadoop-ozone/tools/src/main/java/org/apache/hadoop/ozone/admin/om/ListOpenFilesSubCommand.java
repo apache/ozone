@@ -182,20 +182,20 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
   private String getCmdForNextBatch(String lastElementFullPath) {
     String nextBatchCmd = "ozone admin om lof";
     if (!omServiceId.isEmpty()) {
-      nextBatchCmd += " -id " + omServiceId;
+      nextBatchCmd += " -id=" + omServiceId;
     }
     if (!omHost.isEmpty()) {
-      nextBatchCmd += " -host " + omHost;
+      nextBatchCmd += " -host=" + omHost;
     }
     if (json) {
       nextBatchCmd += " --json";
     }
-    nextBatchCmd += " -n " + limit;
+    nextBatchCmd += " --length=" + limit;
     if (!pathPrefix.isEmpty()) {
-      nextBatchCmd += " -p " + pathPrefix;
+      nextBatchCmd += " --prefix=" + pathPrefix;
     }
     if (!startItem.isEmpty()) {
-      nextBatchCmd += " -t " + lastElementFullPath;
+      nextBatchCmd += " --start=" + lastElementFullPath;
     }
     return nextBatchCmd;
   }
