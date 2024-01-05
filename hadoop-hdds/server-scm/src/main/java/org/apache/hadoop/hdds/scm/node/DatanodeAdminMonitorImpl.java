@@ -488,6 +488,54 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     return underReplicated == 0 && unclosed == 0;
   }
 
+  public Map<String, List<ContainerID>> containersReplicatedOnNode(DatanodeDetails dn)
+      throws NodeNotFoundException {
+    List<ContainerID> underReplicatedIDs = new ArrayList<>();
+    List<ContainerID> unClosedIDs = new ArrayList<>();
+    Set<ContainerID> containers =
+        nodeManager.getContainers(dn);
+    for (ContainerID cid : containers) {
+      try {
+        ContainerReplicaCount replicaSet =
+            replicationManager.getContainerReplicaCount(cid);
+
+        HddsProtos.LifeCycleState containerState
+            = replicaSet.getContainer().getState();
+        if (containerState == HddsProtos.LifeCycleState.DELETED
+            || containerState == HddsProtos.LifeCycleState.DELETING) {
+          continue;
+        }
+
+        boolean isHealthy = replicaSet.isHealthyEnoughForOffline();
+        if (!isHealthy) {
+          unClosedIDs.add(cid);
+          continue;
+        }
+
+        boolean legacyEnabled = conf.getBoolean("hdds.scm.replication.enable" +
+            ".legacy", false);
+        boolean replicatedOK;
+        if (legacyEnabled) {
+          replicatedOK = replicaSet.isSufficientlyReplicatedForOffline(dn, nodeManager);
+        } else {
+          ReplicationManagerReport report = new ReplicationManagerReport();
+          replicationManager.checkContainerStatus(replicaSet.getContainer(), report);
+          replicatedOK = report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED) == 0;
+        }
+
+        if (!replicatedOK) {
+          underReplicatedIDs.add(cid);
+        }
+      } catch (ContainerNotFoundException e) {
+        LOG.warn("ContainerID {} present in node list for {} but not found in containerManager", cid, dn);
+      }
+    }
+    Map<String, List<ContainerID>> containerList = new HashMap<>();
+    containerList.put("UnderReplicated", underReplicatedIDs);
+    containerList.put("UnClosed", unClosedIDs);
+    return containerList;
+  }
+
   private String replicaDetails(Collection<ContainerReplica> replicas) {
     StringBuilder sb = new StringBuilder();
     sb.append("Replicas{");

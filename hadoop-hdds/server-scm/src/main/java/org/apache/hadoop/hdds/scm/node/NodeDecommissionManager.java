@@ -308,7 +308,6 @@ public class NodeDecommissionManager {
         TimeUnit.SECONDS);
   }
 
-  @VisibleForTesting
   public DatanodeAdminMonitor getMonitor() {
     return monitor;
   }

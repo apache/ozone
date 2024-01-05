@@ -81,6 +81,7 @@ message ScmContainerLocationRequest {
   optional TransferLeadershipRequestProto  transferScmLeadershipRequest = 42;
   optional GetFailedDeletedBlocksTxnRequestProto getFailedDeletedBlocksTxnRequest = 43;
   optional DecommissionScmRequestProto decommissionScmRequest = 44;
+  optional GetContainersOnDecomNodeRequestProto getContainersOnDecomNodeRequest = 45;
 }
 
 message ScmContainerLocationResponse {
@@ -133,6 +134,7 @@ message ScmContainerLocationResponse {
   optional TransferLeadershipResponseProto  transferScmLeadershipResponse = 42;
   optional GetFailedDeletedBlocksTxnResponseProto getFailedDeletedBlocksTxnResponse = 43;
   optional DecommissionScmResponseProto decommissionScmResponse = 44;
+  optional GetContainersOnDecomNodeResponseProto getContainersOnDecomNodeResponse = 45;
 
   enum Status {
     OK = 1;
@@ -184,6 +186,7 @@ enum Type {
   TransferLeadership = 38;
   GetFailedDeletedBlocksTransaction = 39;
   DecommissionScm = 40;
+  GetContainersOnDecomNode = 41;
 }
 
 /**
@@ -589,6 +592,19 @@ message DecommissionScmRequestProto {
 message DecommissionScmResponseProto {
   required bool success = 1;
   optional string errorMsg = 2;
+}
+
+message GetContainersOnDecomNodeRequestProto {
+  required DatanodeDetailsProto datanodeDetails = 1;
+}
+
+message ContainersOnDecomNodeProto {
+  required string name = 1;
+  repeated ContainerID id = 2;
+}
+
+message GetContainersOnDecomNodeResponseProto {
+  repeated ContainersOnDecomNodeProto containersOnDecomNode = 1;
 }
 
 /**

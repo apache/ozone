@@ -24,6 +24,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
@@ -51,6 +52,9 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ForceExitSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerReplicasRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerReplicasResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersOnDecomNodeRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainersOnDecomNodeProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersOnDecomNodeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerTokenRequestProto;
@@ -604,6 +608,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setDecommissionNodesResponse(decommissionNodes(
                 request.getDecommissionNodesRequest()))
             .build();
+      case GetContainersOnDecomNode:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetContainersOnDecomNodeResponse(getContainersOnDecomNode(request.getGetContainersOnDecomNodeRequest()))
+            .build();
       case RecommissionNodes:
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
@@ -1138,6 +1148,22 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       response.addFailedHosts(error);
     }
     return response.build();
+  }
+
+  public GetContainersOnDecomNodeResponseProto getContainersOnDecomNode(GetContainersOnDecomNodeRequestProto request)
+      throws IOException {
+    Map<String, List<ContainerID>> containerMap = impl.getContainersOnDecomNode(
+        DatanodeDetails.getFromProtoBuf(request.getDatanodeDetails()));
+    List<ContainersOnDecomNodeProto> containersProtoList = new ArrayList<>();
+    for (Map.Entry<String, List<ContainerID>> containerList : containerMap.entrySet()) {
+      List<HddsProtos.ContainerID> containerIdsProto = new ArrayList<>();
+      for (ContainerID id : containerList.getValue()) {
+        containerIdsProto.add(id.getProtobuf());
+      }
+      containersProtoList.add(ContainersOnDecomNodeProto.newBuilder().setName(containerList.getKey())
+          .addAllId(containerIdsProto).build());
+    }
+    return GetContainersOnDecomNodeResponseProto.newBuilder().addAllContainersOnDecomNode(containersProtoList).build();
   }
 
   public RecommissionNodesResponseProto recommissionNodes(

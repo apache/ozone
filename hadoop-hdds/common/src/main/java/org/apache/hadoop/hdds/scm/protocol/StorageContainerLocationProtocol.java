@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.protocol;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
@@ -218,6 +219,14 @@ public interface StorageContainerLocationProtocol extends Closeable {
    *   or container doesn't exist.
    */
   void deleteContainer(long containerID) throws IOException;
+
+  /**
+   * Gets the list of underReplicated and unClosed containers on a decommissioning node
+   *
+   * @param dn - Datanode detail
+   * @return Lists of underReplicated and unClosed containers
+   */
+  Map<String, List<ContainerID>> getContainersOnDecomNode(DatanodeDetails dn) throws IOException;
 
   /**
    *  Queries a list of Node Statuses. Passing a null for either opState or
