@@ -294,13 +294,16 @@ class TestOzoneFsSnapshot {
       Assertions.assertEquals(0, res);
 
       // Wait for the snapshot to be marked deleted.
-      SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager()
-          .getSnapshotInfoTable()
-          .get(SnapshotInfo.getTableKey(VOLUME, BUCKET, snapshotName1));
-
-      GenericTestUtils.waitFor(() -> snapshotInfo.getSnapshotStatus().equals(
-              SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED),
-          200, 10000);
+      GenericTestUtils.waitFor(() -> {
+        try {
+          SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager()
+              .getSnapshotInfoTable()
+              .get(SnapshotInfo.getTableKey(VOLUME, BUCKET, snapshotName1));
+          return snapshotInfo.getSnapshotStatus() == SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED;
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }, 200, 10000);
 
       // Check for snapshot with "ozone fs -ls"
       String listSnapOut = execShellCommandAndGetOutput(0,
@@ -366,13 +369,16 @@ class TestOzoneFsSnapshot {
     Assertions.assertEquals(0, res);
 
     // Wait for the snapshot to be marked deleted.
-    SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager()
-        .getSnapshotInfoTable()
-        .get(SnapshotInfo.getTableKey(VOLUME, BUCKET, snapshotName));
-
-    GenericTestUtils.waitFor(() -> snapshotInfo.getSnapshotStatus().equals(
-            SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED),
-        200, 10000);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        SnapshotInfo snapshotInfo = ozoneManager.getMetadataManager()
+            .getSnapshotInfoTable()
+            .get(SnapshotInfo.getTableKey(VOLUME, BUCKET, snapshotName));
+        return snapshotInfo.getSnapshotStatus() == SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED;
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 200, 10000);
   }
 
   private static Stream<Arguments> deleteSnapshotFailureScenarios() {

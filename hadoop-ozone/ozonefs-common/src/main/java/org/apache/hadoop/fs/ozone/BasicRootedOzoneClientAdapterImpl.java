@@ -824,7 +824,7 @@ public class BasicRootedOzoneClientAdapterImpl
 
     while (snapshotIter.hasNext()) {
       OzoneSnapshot ozoneSnapshot = snapshotIter.next();
-      if (SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE.name().equalsIgnoreCase(ozoneSnapshot.getSnapshotStatus())) {
+      if (SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE.name().equals(ozoneSnapshot.getSnapshotStatus())) {
         res.add(getFileStatusAdapterForBucketSnapshot(
             ozoneBucket, ozoneSnapshot, uri, owner, group));
       }
