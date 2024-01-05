@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Map;
 
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -30,8 +31,7 @@ import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,7 +73,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    DeleteKeyRequest deleteKeyRequest = getOmRequest().getDeleteKeyRequest();
+    DeleteKeyRequest deleteKeyRequest = super.preExecute(ozoneManager)
+        .getDeleteKeyRequest();
     Preconditions.checkNotNull(deleteKeyRequest);
 
     OzoneManagerProtocolProtos.KeyArgs keyArgs = deleteKeyRequest.getKeyArgs();
@@ -86,16 +87,23 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs =
         keyArgs.toBuilder().setModificationTime(Time.now()).setKeyName(keyPath);
 
+    KeyArgs resolvedArgs = resolveBucketAndCheckAcls(ozoneManager, newKeyArgs);
     return getOmRequest().toBuilder()
         .setDeleteKeyRequest(deleteKeyRequest.toBuilder()
-            .setKeyArgs(newKeyArgs))
+            .setKeyArgs(resolvedArgs))
         .setUserInfo(getUserIfNotExists(ozoneManager)).build();
+  }
+
+  protected KeyArgs resolveBucketAndCheckAcls(OzoneManager ozoneManager,
+      KeyArgs.Builder newKeyArgs) throws IOException {
+    return resolveBucketAndCheckKeyAcls(newKeyArgs.build(), ozoneManager,
+        ACLType.DELETE);
   }
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long trxnLogIndex = termIndex.getIndex();
     DeleteKeyRequest deleteKeyRequest = getOmRequest().getDeleteKeyRequest();
 
     OzoneManagerProtocolProtos.KeyArgs keyArgs = deleteKeyRequest.getKeyArgs();
@@ -120,14 +128,6 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
     Result result = null;
 
     try {
-      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
-      volumeName = keyArgs.getVolumeName();
-      bucketName = keyArgs.getBucketName();
-
-      // check Acl
-      checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
-          IAccessAuthorizer.ACLType.DELETE, OzoneObj.ResourceType.KEY);
-
       String objectKey =
           omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
 

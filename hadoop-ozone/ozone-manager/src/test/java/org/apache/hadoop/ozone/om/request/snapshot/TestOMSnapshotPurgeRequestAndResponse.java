@@ -49,7 +49,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -95,12 +94,12 @@ public class TestOMSnapshotPurgeRequestAndResponse {
 
   @BeforeEach
   void setup(@TempDir File testDir) throws Exception {
-    ozoneManager = Mockito.mock(OzoneManager.class);
+    ozoneManager = mock(OzoneManager.class);
     OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
     when(lvm.isAllowed(anyString())).thenReturn(true);
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
     when(ozoneManager.isRatisEnabled()).thenReturn(true);
-    auditLogger = Mockito.mock(AuditLogger.class);
+    auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     omMetrics = OMMetrics.create();
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
@@ -117,7 +116,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
     when(ozoneManager.isFilesystemSnapshotEnabled()).thenReturn(true);
 
     ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmMetadataReader =
-        Mockito.mock(ReferenceCounted.class);
+        mock(ReferenceCounted.class);
     when(ozoneManager.getOmMetadataReader()).thenReturn(rcOmMetadataReader);
     omSnapshotManager = new OmSnapshotManager(ozoneManager);
     when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);

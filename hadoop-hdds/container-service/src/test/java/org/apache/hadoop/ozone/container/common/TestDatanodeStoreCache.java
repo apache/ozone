@@ -22,13 +22,16 @@ import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.RawDB;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test DatanodeStoreCache.
@@ -54,28 +57,28 @@ public class TestDatanodeStoreCache {
     // test normal add
     cache.addDB(dbPath1, new RawDB(store1, dbPath1));
     cache.addDB(dbPath2, new RawDB(store2, dbPath2));
-    Assertions.assertEquals(2, cache.size());
+    assertEquals(2, cache.size());
 
     // test duplicate add
     cache.addDB(dbPath1, new RawDB(store1, dbPath1));
-    Assertions.assertEquals(2, cache.size());
+    assertEquals(2, cache.size());
 
     // test get, test reference the same object using ==
-    Assertions.assertSame(store1, cache.getDB(dbPath1, conf).getStore());
+    assertSame(store1, cache.getDB(dbPath1, conf).getStore());
 
     // test remove
     cache.removeDB(dbPath1);
-    Assertions.assertEquals(1, cache.size());
+    assertEquals(1, cache.size());
 
     // test remove non-exist
     try {
       cache.removeDB(dbPath1);
     } catch (Exception e) {
-      Assertions.fail("Should not throw " + e);
+      fail("Should not throw " + e);
     }
 
     // test shutdown
     cache.shutdownCache();
-    Assertions.assertEquals(0, cache.size());
+    assertEquals(0, cache.size());
   }
 }

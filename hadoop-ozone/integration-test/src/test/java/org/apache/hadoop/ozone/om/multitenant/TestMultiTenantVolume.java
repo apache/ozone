@@ -49,6 +49,7 @@ import java.util.concurrent.TimeoutException;
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isDone;
 import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isStarting;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -94,8 +95,8 @@ public class TestMultiTenantVolume {
 
   private static void expectFailurePreFinalization(VoidCallable eval) {
     OMException omException = assertThrows(OMException.class, eval::call);
-    assertTrue(omException.getMessage()
-        .contains("cannot be invoked before finalization"));
+    assertThat(omException.getMessage())
+        .contains("cannot be invoked before finalization");
   }
 
   /**
@@ -310,7 +311,7 @@ public class TestMultiTenantVolume {
           OMException.class,
           () -> store.createTenant(tenantId));
 
-      assertTrue(e.getMessage().contains("Invalid volume name: " + tenantId));
+      assertThat(e.getMessage()).contains("Invalid volume name: " + tenantId);
     }
   }
 }

@@ -284,7 +284,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       throws IOException {
     if (snapshot == null) {
       TermIndex empty = TermIndex.valueOf(0, RaftLog.INVALID_LOG_INDEX);
-      LOG.info("{}: The snapshot info is null. Setting the last applied index" +
+      LOG.info("{}: The snapshot info is null. Setting the last applied index " +
               "to:{}", gid, empty);
       setLastAppliedTermIndex(empty);
       return empty.getIndex();

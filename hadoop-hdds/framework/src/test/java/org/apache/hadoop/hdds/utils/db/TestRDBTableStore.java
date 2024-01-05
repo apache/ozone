@@ -46,8 +46,10 @@ import org.rocksdb.StatsLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -472,7 +474,7 @@ public class TestRDBTableStore {
       }
       long keyCount = testTable.getEstimatedKeyCount();
       // The result should be larger than zero but not exceed(?) numKeys
-      assertTrue(keyCount > 0 && keyCount <= numKeys);
+      assertThat(keyCount).isGreaterThan(0).isLessThanOrEqualTo(numKeys);
     }
   }
 
@@ -692,7 +694,7 @@ public class TestRDBTableStore {
 
       // check dump file exist
       assertTrue(dumpFile.exists());
-      assertTrue(dumpFile.length() != 0);
+      assertNotEquals(0, dumpFile.length());
     }
 
     // load dump file into another table

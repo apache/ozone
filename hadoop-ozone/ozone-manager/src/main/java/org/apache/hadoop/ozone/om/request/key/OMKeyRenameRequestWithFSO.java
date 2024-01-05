@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -75,8 +76,8 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long trxnLogIndex = termIndex.getIndex();
 
     RenameKeyRequest renameKeyRequest = getOmRequest().getRenameKeyRequest();
     KeyArgs keyArgs = renameKeyRequest.getKeyArgs();
@@ -105,27 +106,6 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       if (fromKeyName.length() == 0) {
         throw new OMException("Source key name is empty",
                 OMException.ResultCodes.INVALID_KEY_NAME);
-      }
-
-      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
-      volumeName = keyArgs.getVolumeName();
-      bucketName = keyArgs.getBucketName();
-
-      // check Acls to see if user has access to perform delete operation on
-      // old key and create operation on new key
-
-      // check Acl fromKeyName
-      checkACLsWithFSO(ozoneManager, volumeName, bucketName, fromKeyName,
-          IAccessAuthorizer.ACLType.DELETE);
-
-      // check Acl toKeyName
-      if (toKeyName.isEmpty()) {
-        // if the toKeyName is empty we are checking the ACLs of the bucket
-        checkBucketAcls(ozoneManager, volumeName, bucketName, toKeyName,
-            IAccessAuthorizer.ACLType.CREATE);
-      } else {
-        checkKeyAcls(ozoneManager, volumeName, bucketName, toKeyName,
-            IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
       }
 
       mergeOmLockDetails(omMetadataManager.getLock()
@@ -260,6 +240,34 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     return omClientResponse;
   }
 
+  @Override
+  protected KeyArgs resolveBucketAndCheckAcls(KeyArgs keyArgs,
+      OzoneManager ozoneManager, String fromKeyName, String toKeyName)
+      throws IOException {
+    KeyArgs resolvedArgs = resolveBucketLink(ozoneManager, keyArgs);
+    // check Acl
+    String volumeName = resolvedArgs.getVolumeName();
+    String bucketName = resolvedArgs.getBucketName();
+    // check Acls to see if user has access to perform delete operation on
+    // old key and create operation on new key
+
+    // check Acl fromKeyName
+    checkACLsWithFSO(ozoneManager, volumeName, bucketName, fromKeyName,
+        IAccessAuthorizer.ACLType.DELETE);
+
+    // check Acl toKeyName
+    if (toKeyName.isEmpty()) {
+      // if the toKeyName is empty we are checking the ACLs of the bucket
+      checkBucketAcls(ozoneManager, volumeName, bucketName, toKeyName,
+          IAccessAuthorizer.ACLType.CREATE);
+    } else {
+      checkKeyAcls(ozoneManager, volumeName, bucketName, toKeyName,
+          IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
+    }
+
+    return resolvedArgs;
+  }
+
   @SuppressWarnings("parameternumber")
   private OMClientResponse renameKey(OmKeyInfo toKeyParent, String toKeyName,
       OmKeyInfo fromKeyValue, String fromKeyName, boolean isRenameDirectory,
@@ -340,6 +348,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
         omBucketInfo, isRenameDirectory, getBucketLayout());
     return omClientResponse;
   }
+
   @SuppressWarnings("checkstyle:ParameterNumber")
   private void setModificationTime(OMMetadataManager omMetadataManager,
       OmBucketInfo bucketInfo, OmKeyInfo keyParent,

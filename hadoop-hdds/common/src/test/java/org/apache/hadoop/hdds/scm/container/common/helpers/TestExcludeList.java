@@ -19,12 +19,13 @@ package org.apache.hadoop.hdds.scm.container.common.helpers;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.ozone.test.TestClock;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests the exclude nodes list behavior at client.
@@ -39,9 +40,9 @@ public class TestExcludeList {
         .setIpAddress("127.0.0.1").setHostName("localhost").addPort(
             DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 2001))
         .build());
-    Assertions.assertEquals(1, list.getDatanodes().size());
+    assertEquals(1, list.getDatanodes().size());
     clock.fastForward(11);
-    Assertions.assertEquals(0, list.getDatanodes().size());
+    assertEquals(0, list.getDatanodes().size());
     list.addDatanode(DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
         .setIpAddress("127.0.0.2").setHostName("localhost").addPort(
             DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 2001))
@@ -50,7 +51,7 @@ public class TestExcludeList {
         .setIpAddress("127.0.0.3").setHostName("localhost").addPort(
             DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 2001))
         .build());
-    Assertions.assertEquals(2, list.getDatanodes().size());
+    assertEquals(2, list.getDatanodes().size());
   }
 
   @Test
@@ -60,8 +61,8 @@ public class TestExcludeList {
         .setIpAddress("127.0.0.1").setHostName("localhost").addPort(
             DatanodeDetails.newPort(DatanodeDetails.Port.Name.STANDALONE, 2001))
         .build());
-    Assertions.assertEquals(1, list.getDatanodes().size());
+    assertEquals(1, list.getDatanodes().size());
     clock.fastForward(1);
-    Assertions.assertEquals(1, list.getDatanodes().size());
+    assertEquals(1, list.getDatanodes().size());
   }
 }

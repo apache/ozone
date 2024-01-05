@@ -19,6 +19,8 @@
 
 package org.apache.hadoop.ozone.om.request.bucket;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -26,7 +28,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .DeleteBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
@@ -42,7 +43,7 @@ public class TestOMBucketDeleteRequestWithFSO
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    Assertions.assertEquals(0, omMetrics.getNumFSOBucketDeletes());
+    assertEquals(0, omMetrics.getNumFSOBucketDeletes());
 
     OzoneManagerProtocolProtos.OMRequest omRequest =
         createDeleteBucketRequest(volumeName, bucketName);
@@ -56,10 +57,10 @@ public class TestOMBucketDeleteRequestWithFSO
 
     omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, 1);
 
-    Assertions.assertNull(omMetadataManager.getBucketTable().get(
+    assertNull(omMetadataManager.getBucketTable().get(
         omMetadataManager.getBucketKey(volumeName, bucketName)));
 
-    Assertions.assertEquals(1, omMetrics.getNumFSOBucketDeletes());
+    assertEquals(1, omMetrics.getNumFSOBucketDeletes());
   }
 
   private OMRequest createDeleteBucketRequest(

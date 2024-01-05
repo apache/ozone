@@ -57,10 +57,9 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicasWithSameOrigin;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -340,7 +339,7 @@ public class TestRatisOverReplicationHandler {
         replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 2);
     Set<DatanodeDetails> datanodes =
         commands.stream().map(Pair::getKey).collect(Collectors.toSet());
-    assertTrue(datanodes.contains(quasiClosedReplica.getDatanodeDetails()));
+    assertThat(datanodes).contains(quasiClosedReplica.getDatanodeDetails());
   }
 
   @Test
@@ -363,10 +362,8 @@ public class TestRatisOverReplicationHandler {
         replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1);
     Set<DatanodeDetails> datanodes =
         commands.stream().map(Pair::getKey).collect(Collectors.toSet());
-    assertFalse(
-        datanodes.contains(decommissioningReplica.getDatanodeDetails()));
-    assertFalse(
-        datanodes.contains(maintenanceReplica.getDatanodeDetails()));
+    assertThat(datanodes).doesNotContain(decommissioningReplica.getDatanodeDetails());
+    assertThat(datanodes).doesNotContain(maintenanceReplica.getDatanodeDetails());
   }
 
   @Test

@@ -30,9 +30,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclR
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 
 /**
@@ -64,7 +64,7 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
     // Execute original request
     OMClientResponse omClientResponse = omKeyPrefixAclRequest
         .validateAndUpdateCache(ozoneManager, 2);
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
   }
 
@@ -97,7 +97,7 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
     omPrefixRemoveAclRequest1.preExecute(ozoneManager);
     OMClientResponse omClientResponse1 = omPrefixRemoveAclRequest1
         .validateAndUpdateCache(ozoneManager, 3);
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse1.getOMResponse().getStatus());
 
     // Remove non-existing prefix acl.
@@ -107,7 +107,7 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
     omPrefixRemoveAclRequest1.preExecute(ozoneManager);
     OMClientResponse omClientResponse2 = omPrefixRemoveAclRequest2
         .validateAndUpdateCache(ozoneManager, 4);
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.PREFIX_NOT_FOUND,
+    assertEquals(OzoneManagerProtocolProtos.Status.PREFIX_NOT_FOUND,
         omClientResponse2.getOMResponse().getStatus());
   }
 

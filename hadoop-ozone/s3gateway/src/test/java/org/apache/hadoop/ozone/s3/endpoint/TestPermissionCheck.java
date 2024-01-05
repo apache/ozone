@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.HttpHeaders;
@@ -48,6 +47,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -73,18 +73,18 @@ public class TestPermissionCheck {
     conf = new OzoneConfiguration();
     conf.set(OzoneConfigKeys.OZONE_S3_VOLUME_NAME,
         OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT);
-    client = Mockito.mock(OzoneClient.class);
-    objectStore = Mockito.mock(ObjectStore.class);
-    bucket = Mockito.mock(OzoneBucket.class);
-    volume = Mockito.mock(OzoneVolume.class);
+    client = mock(OzoneClient.class);
+    objectStore = mock(ObjectStore.class);
+    bucket = mock(OzoneBucket.class);
+    volume = mock(OzoneVolume.class);
     when(volume.getName()).thenReturn("s3Volume");
     exception = new OMException("Permission Denied",
         OMException.ResultCodes.PERMISSION_DENIED);
-    Mockito.when(client.getObjectStore()).thenReturn(objectStore);
-    Mockito.when(client.getConfiguration()).thenReturn(conf);
-    headers = Mockito.mock(HttpHeaders.class);
-    clientProtocol = Mockito.mock(ClientProtocol.class);
-    Mockito.when(client.getProxy()).thenReturn(clientProtocol);
+    when(client.getObjectStore()).thenReturn(objectStore);
+    when(client.getConfiguration()).thenReturn(conf);
+    headers = mock(HttpHeaders.class);
+    clientProtocol = mock(ClientProtocol.class);
+    when(client.getProxy()).thenReturn(clientProtocol);
   }
 
   /**
@@ -114,7 +114,7 @@ public class TestPermissionCheck {
 
   @Test
   public void testCreateBucket() throws IOException {
-    Mockito.when(objectStore.getVolume(anyString())).thenReturn(volume);
+    when(objectStore.getVolume(anyString())).thenReturn(volume);
     doThrow(exception).when(objectStore).createS3Bucket(anyString());
     BucketEndpoint bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(client);
@@ -135,7 +135,7 @@ public class TestPermissionCheck {
   }
   @Test
   public void testListMultiUpload() throws IOException {
-    Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
+    when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket).listMultipartUploads(anyString());
     BucketEndpoint bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(client);
@@ -147,8 +147,8 @@ public class TestPermissionCheck {
 
   @Test
   public void testListKey() throws IOException {
-    Mockito.when(objectStore.getVolume(anyString())).thenReturn(volume);
-    Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
+    when(objectStore.getVolume(anyString())).thenReturn(volume);
+    when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket).listKeys(anyString(), isNull(),
         anyBoolean());
     BucketEndpoint bucketEndpoint = new BucketEndpoint();
@@ -162,8 +162,8 @@ public class TestPermissionCheck {
 
   @Test
   public void testDeleteKeys() throws IOException, OS3Exception {
-    Mockito.when(objectStore.getVolume(anyString())).thenReturn(volume);
-    Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
+    when(objectStore.getVolume(anyString())).thenReturn(volume);
+    when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket).deleteKey(any());
     BucketEndpoint bucketEndpoint = new BucketEndpoint();
     bucketEndpoint.setClient(client);
@@ -181,12 +181,12 @@ public class TestPermissionCheck {
 
   @Test
   public void testGetAcl() throws Exception {
-    Mockito.when(objectStore.getS3Volume()).thenReturn(volume);
-    Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
+    when(objectStore.getS3Volume()).thenReturn(volume);
+    when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket).getAcls();
 
-    HttpServletRequest servletRequest = Mockito.mock(HttpServletRequest.class);
-    Map<String, String[]> parameterMap = Mockito.mock(Map.class);
+    HttpServletRequest servletRequest = mock(HttpServletRequest.class);
+    Map<String, String[]> parameterMap = mock(Map.class);
     when(servletRequest.getParameterMap()).thenReturn(parameterMap);
 
     when(parameterMap.containsKey("acl")).thenReturn(true);
@@ -202,12 +202,12 @@ public class TestPermissionCheck {
 
   @Test
   public void testSetAcl() throws Exception {
-    Mockito.when(objectStore.getS3Volume()).thenReturn(volume);
-    Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
+    when(objectStore.getS3Volume()).thenReturn(volume);
+    when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket).addAcl(any());
 
-    HttpServletRequest servletRequest = Mockito.mock(HttpServletRequest.class);
-    Map<String, String[]> parameterMap = Mockito.mock(Map.class);
+    HttpServletRequest servletRequest = mock(HttpServletRequest.class);
+    Map<String, String[]> parameterMap = mock(Map.class);
     when(servletRequest.getParameterMap()).thenReturn(parameterMap);
 
     when(parameterMap.containsKey("acl")).thenReturn(true);
@@ -228,7 +228,7 @@ public class TestPermissionCheck {
    */
   @Test
   public void testGetKey() throws IOException {
-    Mockito.when(client.getProxy()).thenReturn(clientProtocol);
+    when(client.getProxy()).thenReturn(clientProtocol);
     doThrow(exception).when(clientProtocol)
         .getS3KeyDetails(anyString(), anyString());
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
@@ -243,8 +243,8 @@ public class TestPermissionCheck {
 
   @Test
   public void testPutKey() throws IOException {
-    Mockito.when(objectStore.getS3Volume()).thenReturn(volume);
-    Mockito.when(volume.getBucket("bucketName")).thenReturn(bucket);
+    when(objectStore.getS3Volume()).thenReturn(volume);
+    when(volume.getBucket("bucketName")).thenReturn(bucket);
     doThrow(exception).when(clientProtocol).createKey(
             anyString(), anyString(), anyString(), anyLong(), any(), any());
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
@@ -260,7 +260,7 @@ public class TestPermissionCheck {
 
   @Test
   public void testDeleteKey() throws IOException {
-    Mockito.when(objectStore.getS3Volume()).thenReturn(volume);
+    when(objectStore.getS3Volume()).thenReturn(volume);
     doThrow(exception).when(clientProtocol).deleteKey(anyString(), anyString(),
         anyString(), anyBoolean());
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
@@ -275,7 +275,7 @@ public class TestPermissionCheck {
 
   @Test
   public void testMultiUploadKey() throws IOException {
-    Mockito.when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
+    when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket).initiateMultipartUpload(anyString(), any());
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setClient(client);
