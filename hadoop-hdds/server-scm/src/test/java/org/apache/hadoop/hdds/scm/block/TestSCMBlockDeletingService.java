@@ -19,10 +19,12 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
@@ -97,8 +99,8 @@ public class TestSCMBlockDeletingService {
 
     service = spy(new SCMBlockDeletingService(
         mockDeletedBlockLog, nodeManager, eventPublisher, scmContext,
-        scmServiceManager, conf, metrics, Clock.system(
-        ZoneOffset.UTC)));
+        scmServiceManager, conf, conf.getObject(ScmConfig.class), metrics, Clock.system(
+        ZoneOffset.UTC), mock(ReconfigurationHandler.class)));
     when(service.shouldRun()).thenReturn(true);
   }
 
