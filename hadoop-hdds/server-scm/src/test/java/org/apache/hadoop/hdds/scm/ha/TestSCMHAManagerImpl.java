@@ -46,7 +46,6 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.DivisionInfo;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -56,6 +55,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -111,7 +111,7 @@ class TestSCMHAManagerImpl {
 
   @Test
   public void testAddSCM() throws IOException, InterruptedException {
-    Assertions.assertEquals(1, primarySCMHAManager.getRatisServer()
+    assertEquals(1, primarySCMHAManager.getRatisServer()
         .getDivision().getGroup().getPeers().size());
 
     final StorageContainerManager scm2 = getMockStorageContainerManager(
@@ -124,7 +124,7 @@ class TestSCMHAManagerImpl {
               .getDivision().getRaftServer().getServerRpc()
               .getInetSocketAddress().getPort());
       primarySCMHAManager.addSCM(request);
-      Assertions.assertEquals(2, primarySCMHAManager.getRatisServer()
+      assertEquals(2, primarySCMHAManager.getRatisServer()
           .getDivision().getGroup().getPeers().size());
     } finally {
       scm2.getScmHAManager().getRatisServer().stop();
@@ -162,7 +162,7 @@ class TestSCMHAManagerImpl {
   }
   @Test
   public void testRemoveSCM() throws IOException, InterruptedException {
-    Assertions.assertEquals(1, primarySCMHAManager.getRatisServer()
+    assertEquals(1, primarySCMHAManager.getRatisServer()
         .getDivision().getGroup().getPeers().size());
 
     final StorageContainerManager scm2 = getMockStorageContainerManager(
@@ -175,7 +175,7 @@ class TestSCMHAManagerImpl {
               .getDivision().getRaftServer().getServerRpc()
               .getInetSocketAddress().getPort());
       primarySCMHAManager.addSCM(addSCMRequest);
-      Assertions.assertEquals(2, primarySCMHAManager.getRatisServer()
+      assertEquals(2, primarySCMHAManager.getRatisServer()
           .getDivision().getGroup().getPeers().size());
 
       final RemoveSCMRequest removeSCMRequest = new RemoveSCMRequest(
@@ -183,7 +183,7 @@ class TestSCMHAManagerImpl {
           scm2.getScmHAManager().getRatisServer().getDivision()
               .getRaftServer().getServerRpc().getInetSocketAddress().getPort());
       primarySCMHAManager.removeSCM(removeSCMRequest);
-      Assertions.assertEquals(1, primarySCMHAManager.getRatisServer()
+      assertEquals(1, primarySCMHAManager.getRatisServer()
           .getDivision().getGroup().getPeers().size());
     } finally {
       scm2.getScmHAManager().getRatisServer().stop();
