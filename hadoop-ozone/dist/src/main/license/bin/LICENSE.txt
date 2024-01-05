@@ -423,7 +423,7 @@ Apache License 2.0
    org.eclipse.jetty:jetty-util-ajax
    org.eclipse.jetty:jetty-webapp
    org.eclipse.jetty:jetty-xml
-   org.hamcrest:hamcrest-all
+   org.hamcrest:hamcrest
    org.javassist:javassist
    org.jetbrains:annotations
    org.jetbrains.kotlin:kotlin-stdlib

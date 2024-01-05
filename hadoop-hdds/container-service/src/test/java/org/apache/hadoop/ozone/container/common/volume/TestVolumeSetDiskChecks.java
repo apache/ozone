@@ -56,14 +56,13 @@ import org.apache.hadoop.util.Timer;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import org.apache.commons.io.FileUtils;
-import org.hamcrest.MatcherAssert;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.hamcrest.CoreMatchers.is;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -108,9 +107,8 @@ public class TestVolumeSetDiskChecks {
         new MutableVolumeSet(UUID.randomUUID().toString(), conf,
             null, StorageVolume.VolumeType.DATA_VOLUME, null);
 
-    MatcherAssert.assertThat(volumeSet.getVolumesList().size(), is(numVolumes));
-    MatcherAssert.assertThat(
-        volumeSet.getFailedVolumesList().size(), is(0));
+    assertThat(volumeSet.getVolumesList().size()).isEqualTo(numVolumes);
+    assertThat(volumeSet.getFailedVolumesList().size()).isEqualTo(0);
 
     // Verify that the Ozone dirs were created during initialization.
     Collection<String> dirs = conf.getTrimmedStringCollection(

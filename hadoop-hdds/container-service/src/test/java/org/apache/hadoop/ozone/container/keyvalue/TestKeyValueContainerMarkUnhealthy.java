@@ -41,8 +41,7 @@ import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.OPEN;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.core.Is.is;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -122,16 +121,16 @@ public class TestKeyValueContainerMarkUnhealthy {
   @ContainerLayoutTestInfo.ContainerTest
   public void testMarkContainerUnhealthy(ContainerLayoutVersion layoutVersion) throws Exception {
     initTestData(layoutVersion);
-    assertThat(keyValueContainerData.getState(), is(OPEN));
+    assertThat(keyValueContainerData.getState()).isEqualTo(OPEN);
     keyValueContainer.markContainerUnhealthy();
-    assertThat(keyValueContainerData.getState(), is(UNHEALTHY));
+    assertThat(keyValueContainerData.getState()).isEqualTo(UNHEALTHY);
 
     // Check metadata in the .container file
     File containerFile = keyValueContainer.getContainerFile();
 
     keyValueContainerData = (KeyValueContainerData) ContainerDataYaml
         .readContainerFile(containerFile);
-    assertThat(keyValueContainerData.getState(), is(UNHEALTHY));
+    assertThat(keyValueContainerData.getState()).isEqualTo(UNHEALTHY);
   }
 
   /**
@@ -159,7 +158,7 @@ public class TestKeyValueContainerMarkUnhealthy {
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
     keyValueContainer.close();
     keyValueContainer.markContainerUnhealthy();
-    assertThat(keyValueContainerData.getState(), is(UNHEALTHY));
+    assertThat(keyValueContainerData.getState()).isEqualTo(UNHEALTHY);
   }
 
   /**
@@ -173,7 +172,7 @@ public class TestKeyValueContainerMarkUnhealthy {
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
     keyValueContainer.quasiClose();
     keyValueContainer.markContainerUnhealthy();
-    assertThat(keyValueContainerData.getState(), is(UNHEALTHY));
+    assertThat(keyValueContainerData.getState()).isEqualTo(UNHEALTHY);
   }
 
   /**
@@ -184,6 +183,6 @@ public class TestKeyValueContainerMarkUnhealthy {
     initTestData(layoutVersion);
     keyValueContainer.markContainerForClose();
     keyValueContainer.markContainerUnhealthy();
-    assertThat(keyValueContainerData.getState(), is(UNHEALTHY));
+    assertThat(keyValueContainerData.getState()).isEqualTo(UNHEALTHY);
   }
 }
