@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.Assertions;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -43,6 +42,7 @@ import java.util.UUID;
 import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -232,7 +232,7 @@ public class TestCloseContainerCommandHandler {
     initLayoutVersion(layout);
     long containerID = 1L;
 
-    IOException ioe = Assertions.assertThrows(IOException.class, () -> controller.markContainerForClose(containerID));
+    IOException ioe = assertThrows(IOException.class, () -> controller.markContainerForClose(containerID));
     assertThat(ioe).hasMessage("The Container is not found. ContainerID: " + containerID);
   }
 
@@ -243,7 +243,7 @@ public class TestCloseContainerCommandHandler {
     long containerID = 2L;
     containerSet.getMissingContainerSet().add(containerID);
 
-    IOException ioe = Assertions.assertThrows(IOException.class, () -> controller.markContainerForClose(containerID));
+    IOException ioe = assertThrows(IOException.class, () -> controller.markContainerForClose(containerID));
     assertThat(ioe)
         .hasMessage("The Container is in the MissingContainerSet hence we can't close it. ContainerID: " + containerID);
   }

@@ -26,10 +26,7 @@ import org.junit.jupiter.api.Test;
 
 import java.security.cert.X509Certificate;
 
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.arrayContaining;
-import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.hasItemInArray;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
@@ -53,17 +50,16 @@ public class TestReloadingX509TrustManager {
         (ReloadingX509TrustManager) caClient.getServerKeyStoresFactory()
             .getTrustManagers()[0];
     X509Certificate cert1 = caClient.getRootCACertificate();
-    assertThat(tm.getAcceptedIssuers(), arrayContaining(cert1));
+    assertThat(tm.getAcceptedIssuers()).containsOnly(cert1);
 
     caClient.renewRootCA();
     caClient.renewKey();
     X509Certificate cert2 = caClient.getRootCACertificate();
     assertNotEquals(cert1, cert2);
 
-    assertThat(tm.getAcceptedIssuers(), hasItemInArray(cert1));
-    assertThat(tm.getAcceptedIssuers(), hasItemInArray(cert2));
-    assertThat(reloaderLog.getOutput(),
-        containsString("ReloadingX509TrustManager is reloaded"));
+    assertThat(tm.getAcceptedIssuers()).contains(cert1, cert2);
+    assertThat(reloaderLog.getOutput())
+        .contains("ReloadingX509TrustManager is reloaded");
 
     // Make sure there are two reload happened, one for server, one for client
     assertEquals(2, StringUtils.countMatches(reloaderLog.getOutput(),

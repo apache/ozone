@@ -390,7 +390,8 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     final RaftProperties p = getCluster()
         .getOzoneManager()
         .getOmRatisServer()
-        .getServer()
+        .getServerDivision()
+        .getRaftServer()
         .getProperties();
     final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);
     assertEquals(TimeDuration.ZERO, t,

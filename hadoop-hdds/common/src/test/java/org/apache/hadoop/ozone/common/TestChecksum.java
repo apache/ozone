@@ -19,10 +19,12 @@ package org.apache.hadoop.ozone.common;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for {@link Checksum} class.
@@ -54,11 +56,10 @@ public class TestChecksum {
     // A checksum is calculate for each bytesPerChecksum number of bytes in
     // the data. Since that value is 10 here and the data length is 55, we
     // should have 6 checksums in checksumData.
-    Assertions.assertEquals(6, checksumData.getChecksums().size());
+    assertEquals(6, checksumData.getChecksums().size());
 
     // Checksum verification should pass
-    Assertions.assertTrue(Checksum.verifyChecksum(data, checksumData),
-        "Checksum mismatch");
+    assertTrue(Checksum.verifyChecksum(data, checksumData), "Checksum mismatch");
   }
 
   /**
@@ -75,8 +76,7 @@ public class TestChecksum {
     // mismatch
     data[50] = (byte) (data[50] + 1);
     ChecksumData newChecksumData = checksum.computeChecksum(data);
-    Assertions.assertNotEquals(originalChecksumData, newChecksumData,
-        "Checksums should not match for different data");
+    assertNotEquals(originalChecksumData, newChecksumData, "Checksums should not match for different data");
   }
 
   /**
@@ -92,7 +92,6 @@ public class TestChecksum {
     Checksum checksum2 = getChecksum(ContainerProtos.ChecksumType.CRC32);
 
     // The two checksums should not match as they have different types
-    Assertions.assertNotEquals(checksum1, checksum2,
-        "Checksums should not match for different checksum types");
+    assertNotEquals(checksum1, checksum2, "Checksums should not match for different checksum types");
   }
 }

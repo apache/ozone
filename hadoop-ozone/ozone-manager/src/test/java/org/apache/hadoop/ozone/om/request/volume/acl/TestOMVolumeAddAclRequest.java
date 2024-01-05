@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.ozone.om.request.volume.acl;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -27,7 +31,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -52,12 +55,12 @@ public class TestOMVolumeAddAclRequest extends TestOMVolumeRequest {
 
     OMRequest modifiedRequest = omVolumeAddAclRequest.preExecute(
         ozoneManager);
-    Assertions.assertNotEquals(modifiedRequest, originalRequest);
+    assertNotEquals(modifiedRequest, originalRequest);
 
     long newModTime = modifiedRequest.getAddAclRequest().getModificationTime();
     // When preExecute() of adding acl,
     // the new modification time is greater than origin one.
-    Assertions.assertTrue(newModTime > originModTime);
+    assertThat(newModTime).isGreaterThan(originModTime);
   }
 
   @Test
@@ -84,22 +87,21 @@ public class TestOMVolumeAddAclRequest extends TestOMVolumeRequest {
     OmVolumeArgs omVolumeArgs =
         omMetadataManager.getVolumeTable().get(volumeKey);
     // As request is valid volume table should have entry.
-    Assertions.assertNotNull(omVolumeArgs);
+    assertNotNull(omVolumeArgs);
 
     OMClientResponse omClientResponse =
         omVolumeAddAclRequest.validateAndUpdateCache(ozoneManager, 1);
 
     OMResponse omResponse = omClientResponse.getOMResponse();
-    Assertions.assertNotNull(omResponse.getAddAclResponse());
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
-        omResponse.getStatus());
+    assertNotNull(omResponse.getAddAclResponse());
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, omResponse.getStatus());
 
     List<OzoneAcl> aclsAfterSet = omMetadataManager
         .getVolumeTable().get(volumeKey).getAcls();
 
     // acl is added to aclMapAfterSet
-    Assertions.assertEquals(1, aclsAfterSet.size());
-    Assertions.assertEquals(acl, aclsAfterSet.get(0));
+    assertEquals(1, aclsAfterSet.size());
+    assertEquals(acl, aclsAfterSet.get(0));
   }
 
   @Test
@@ -119,8 +121,8 @@ public class TestOMVolumeAddAclRequest extends TestOMVolumeRequest {
         omVolumeAddAclRequest.validateAndUpdateCache(ozoneManager, 1);
 
     OMResponse omResponse = omClientResponse.getOMResponse();
-    Assertions.assertNotNull(omResponse.getAddAclResponse());
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
+    assertNotNull(omResponse.getAddAclResponse());
+    assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omResponse.getStatus());
   }
 }

@@ -27,7 +27,6 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -37,11 +36,12 @@ import static org.apache.hadoop.ozone.om.OMStorage.ERROR_UNEXPECTED_OM_NODE_ID_T
 import static org.apache.hadoop.ozone.om.OMStorage.OM_CERT_SERIAL_ID;
 import static org.apache.hadoop.ozone.om.OMStorage.OM_ID;
 import static org.apache.hadoop.ozone.om.OMStorage.OM_NODE_ID;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.not;
-import static org.hamcrest.Matchers.nullValue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -81,9 +81,9 @@ public class TestOMStorage {
     final File metaDir = new File(testDir, "metaDir");
     OzoneConfiguration conf = confWithHDDSMetaAndOMDBDir(metaDir, dbDir);
 
-    assertThat(dbDir, equalTo(OMStorage.getOmDbDir(conf)));
-    assertThat(dbDir.exists(), is(true));
-    assertThat(metaDir.exists(), is(false));
+    assertEquals(dbDir, OMStorage.getOmDbDir(conf));
+    assertTrue(dbDir.exists());
+    assertFalse(metaDir.exists());
   }
 
   @Test
@@ -91,13 +91,13 @@ public class TestOMStorage {
     File metaDir = tmpFolder.toFile();
     OzoneConfiguration conf = confWithHDDSMetadataDir(metaDir);
 
-    assertThat(metaDir, equalTo(OMStorage.getOmDbDir(conf)));
-    assertThat(metaDir.exists(), is(true));
+    assertEquals(metaDir, OMStorage.getOmDbDir(conf));
+    assertTrue(metaDir.exists());
   }
 
   @Test
   public void testNoOmDbDirConfigured() {
-    Assertions.assertThrows(IllegalArgumentException.class, () -> {
+    assertThrows(IllegalArgumentException.class, () -> {
       OMStorage.getOmDbDir(new OzoneConfiguration());
     });
   }
@@ -105,7 +105,7 @@ public class TestOMStorage {
   @Test
   public void testSetOmIdOnNotInitializedStorage() throws Exception {
     OMStorage storage = new OMStorage(configWithOMDBDir());
-    assertThat(storage.getState(), is(not(INITIALIZED)));
+    assertNotEquals(INITIALIZED, storage.getState());
 
     String omId = "omId";
     try {
@@ -113,7 +113,7 @@ public class TestOMStorage {
     } catch (IOException e) {
       fail("Can not set OmId on a Storage that is not initialized.");
     }
-    assertThat(storage.getOmId(), is(omId));
+    assertEquals(omId, storage.getOmId());
     assertGetNodeProperties(storage, omId);
   }
 
@@ -121,11 +121,11 @@ public class TestOMStorage {
   public void testSetOmIdOnInitializedStorage() throws Exception {
     OzoneConfiguration conf = configWithOMDBDir();
     setupAPersistedVersionFile(conf);
-    Throwable exception = Assertions.assertThrows(IOException.class, () -> {
+    Throwable exception = assertThrows(IOException.class, () -> {
       OMStorage storage = new OMStorage(conf);
       storage.setOmId("omId");
     });
-    Assertions.assertEquals(ERROR_OM_IS_ALREADY_INITIALIZED,
+    assertEquals(ERROR_OM_IS_ALREADY_INITIALIZED,
         exception.getMessage());
   }
 
@@ -134,20 +134,20 @@ public class TestOMStorage {
     OzoneConfiguration conf = configWithOMDBDir();
     OMStorage storage = new OMStorage(conf);
 
-    assertThat(storage.getState(), is(not(INITIALIZED)));
+    assertNotEquals(INITIALIZED, storage.getState());
     assertCertOps(storage);
     storage.initialize();
     storage.persistCurrentState();
 
     storage = new OMStorage(conf);
-    assertThat(storage.getState(), is(INITIALIZED));
+    assertEquals(INITIALIZED, storage.getState());
     assertCertOps(storage);
   }
 
   @Test
   public void testSetOmNodeIdOnNotInitializedStorage() throws Exception {
     OMStorage storage = new OMStorage(configWithOMDBDir());
-    assertThat(storage.getState(), is(not(INITIALIZED)));
+    assertNotEquals(INITIALIZED, storage.getState());
 
     String nodeId = "nodeId";
     try {
@@ -155,7 +155,7 @@ public class TestOMStorage {
     } catch (IOException e) {
       fail("Can not set OmNodeId on a Storage that is not initialized.");
     }
-    assertThat(storage.getOmNodeId(), is(nodeId));
+    assertEquals(nodeId, storage.getOmNodeId());
     assertGetNodeProperties(storage, null, nodeId);
   }
 
@@ -164,11 +164,11 @@ public class TestOMStorage {
       throws Exception {
     OzoneConfiguration conf = configWithOMDBDir();
     setupAPersistedVersionFile(conf);
-    Throwable exception = Assertions.assertThrows(IOException.class, () -> {
+    Throwable exception = assertThrows(IOException.class, () -> {
       OMStorage storage = new OMStorage(conf);
       storage.setOmNodeId("nodeId");
     });
-    Assertions.assertEquals(ERROR_OM_IS_ALREADY_INITIALIZED,
+    assertEquals(ERROR_OM_IS_ALREADY_INITIALIZED,
         exception.getMessage());
   }
 
@@ -176,11 +176,11 @@ public class TestOMStorage {
   public void testSetOMNodeIdOnInitializedStorageWithNodeID() throws Exception {
     OzoneConfiguration conf = configWithOMDBDir();
     setupAPersistedVersionFileWithNodeId(conf, "nodeId");
-    Throwable exception = Assertions.assertThrows(IOException.class, () -> {
+    Throwable exception = assertThrows(IOException.class, () -> {
       OMStorage storage = new OMStorage(conf);
       storage.setOmNodeId("nodeId");
     });
-    Assertions.assertEquals(ERROR_OM_IS_ALREADY_INITIALIZED,
+    assertEquals(ERROR_OM_IS_ALREADY_INITIALIZED,
         exception.getMessage());
   }
 
@@ -192,15 +192,15 @@ public class TestOMStorage {
     setupAPersistedVersionFile(conf);
 
     OMStorage storage = new OMStorage(conf);
-    assertThat(storage.getState(), is(INITIALIZED));
-    assertThat(storage.getOmNodeId(), is(nullValue()));
+    assertEquals(INITIALIZED, storage.getState());
+    assertNull(storage.getOmNodeId());
 
     storage.validateOrPersistOmNodeId(nodeId);
-    assertThat(storage.getOmNodeId(), is(nodeId));
+    assertEquals(nodeId, storage.getOmNodeId());
     assertGetNodeProperties(storage, OM_ID_STR, nodeId);
 
     storage = new OMStorage(conf);
-    assertThat(storage.getOmNodeId(), is(nodeId));
+    assertEquals(nodeId, storage.getOmNodeId());
     assertGetNodeProperties(storage, OM_ID_STR, nodeId);
   }
 
@@ -212,13 +212,13 @@ public class TestOMStorage {
     setupAPersistedVersionFileWithNodeId(conf, nodeId);
 
     OMStorage storage = new OMStorage(conf);
-    assertThat(storage.getState(), is(INITIALIZED));
-    assertThat(storage.getOmNodeId(), is(nodeId));
+    assertEquals(INITIALIZED, storage.getState());
+    assertEquals(nodeId, storage.getOmNodeId());
     assertGetNodeProperties(storage, OM_ID_STR, nodeId);
 
     storage.validateOrPersistOmNodeId(nodeId);
 
-    assertThat(storage.getOmNodeId(), is(nodeId));
+    assertEquals(nodeId, storage.getOmNodeId());
     assertGetNodeProperties(storage, OM_ID_STR, nodeId);
   }
 
@@ -231,30 +231,30 @@ public class TestOMStorage {
     setupAPersistedVersionFileWithNodeId(conf, nodeId);
 
     OMStorage storage = new OMStorage(conf);
-    assertThat(storage.getState(), is(INITIALIZED));
-    assertThat(storage.getOmNodeId(), is(nodeId));
+    assertEquals(INITIALIZED, storage.getState());
+    assertEquals(nodeId, storage.getOmNodeId());
 
     String expectedMsg =
         String.format(ERROR_UNEXPECTED_OM_NODE_ID_TEMPLATE, newId, nodeId);
-    Throwable exception = Assertions.assertThrows(IOException.class, () -> {
+    Throwable exception = assertThrows(IOException.class, () -> {
       storage.validateOrPersistOmNodeId(newId);
     });
-    Assertions.assertEquals(expectedMsg, exception.getMessage());
+    assertEquals(expectedMsg, exception.getMessage());
   }
 
   private void assertCertOps(OMStorage storage) throws IOException {
     String certSerialId = "12345";
     String certSerialId2 = "54321";
     storage.setOmCertSerialId(certSerialId);
-    assertThat(storage.getOmCertSerialId(), is(certSerialId));
+    assertEquals(certSerialId, storage.getOmCertSerialId());
     assertGetNodeProperties(storage, null, null, certSerialId);
 
     storage.setOmCertSerialId(certSerialId2);
-    assertThat(storage.getOmCertSerialId(), is(certSerialId2));
+    assertEquals(certSerialId2, storage.getOmCertSerialId());
     assertGetNodeProperties(storage, null, null, certSerialId2);
 
     storage.unsetOmCertSerialId();
-    assertThat(storage.getOmCertSerialId(), is(nullValue()));
+    assertNull(storage.getOmCertSerialId());
     assertGetNodeProperties(storage, null, null, null);
   }
 
@@ -263,13 +263,13 @@ public class TestOMStorage {
     Map<String, String> e = toExpectedPropertyMapping(values);
 
     if (e.get(OM_ID) != null) {
-      assertThat(p.getProperty(OM_ID), is(e.get(OM_ID)));
+      assertEquals(e.get(OM_ID), p.getProperty(OM_ID));
     }
     if (e.get(OM_NODE_ID) != null) {
-      assertThat(p.get(OM_NODE_ID), is(e.get(OM_NODE_ID)));
+      assertEquals(e.get(OM_NODE_ID), p.get(OM_NODE_ID));
     }
     if (e.get(OM_CERT_SERIAL_ID) != null) {
-      assertThat(p.get(OM_CERT_SERIAL_ID), is(e.get(OM_CERT_SERIAL_ID)));
+      assertEquals(e.get(OM_CERT_SERIAL_ID), p.get(OM_CERT_SERIAL_ID));
     }
   }
 

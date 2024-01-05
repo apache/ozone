@@ -44,7 +44,6 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.TestClock;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -70,6 +69,9 @@ import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
 import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * This class tests the replication manager using a set of scenarios defined in
@@ -115,7 +117,7 @@ public class TestReplicationManagerScenarios {
         .getResource(TEST_RESOURCE_PATH)
         .toURI())).listFiles();
     if (fileList == null) {
-      Assertions.fail("No test file resources found");
+      fail("No test file resources found");
       // Make findbugs happy.
       return Collections.emptyList();
     }
@@ -152,7 +154,7 @@ public class TestReplicationManagerScenarios {
       Set<String> names = new HashSet<>();
       for (Scenario scenario : scenarios) {
         if (!names.add(scenario.getDescription())) {
-          Assertions.fail("Duplicate test name: " + scenario.getDescription() + " in file: " + file);
+          fail("Duplicate test name: " + scenario.getDescription() + " in file: " + file);
         }
         scenario.setResourceName(file.toString());
       }
@@ -287,9 +289,9 @@ public class TestReplicationManagerScenarios {
     // Check the results in the report and queue against the expected results.
     assertExpectations(scenario, repReport);
     Expectation expectation = scenario.getExpectation();
-    Assertions.assertEquals(expectation.getUnderReplicatedQueue(), repQueue.underReplicatedQueueSize(),
+    assertEquals(expectation.getUnderReplicatedQueue(), repQueue.underReplicatedQueueSize(),
         "Test: " + scenario + ": Unexpected count for underReplicatedQueue");
-    Assertions.assertEquals(expectation.getOverReplicatedQueue(), repQueue.overReplicatedQueueSize(),
+    assertEquals(expectation.getOverReplicatedQueue(), repQueue.overReplicatedQueueSize(),
         "Test: " + scenario + ": Unexpected count for overReplicatedQueue");
 
     assertExpectedCommands(scenario, scenario.getCheckCommands());
@@ -297,7 +299,7 @@ public class TestReplicationManagerScenarios {
 
     ReplicationManagerReport roReport = new ReplicationManagerReport();
     replicationManager.checkContainerStatus(containerInfo, roReport);
-    Assertions.assertEquals(0, commandsSent.size());
+    assertEquals(0, commandsSent.size());
     assertExpectations(scenario, roReport);
 
     // Now run the replication manager execute phase, where we expect commands
@@ -315,14 +317,14 @@ public class TestReplicationManagerScenarios {
     Expectation expectation = scenario.getExpectation();
     for (ReplicationManagerReport.HealthState state :
         ReplicationManagerReport.HealthState.values()) {
-      Assertions.assertEquals(expectation.getExpected(state), report.getStat(state),
+      assertEquals(expectation.getExpected(state), report.getStat(state),
           "Test: " + scenario + ": Unexpected count for " + state);
     }
   }
 
   private void assertExpectedCommands(Scenario scenario,
       List<ExpectedCommands> expectedCommands) {
-    Assertions.assertEquals(expectedCommands.size(), commandsSent.size(),
+    assertEquals(expectedCommands.size(), commandsSent.size(),
         "Test: " + scenario + ": Unexpected count for commands sent");
     // Iterate the expected commands and check that they were all sent. If we
     // have a target datanode, then we need to check that the command was sent
@@ -349,7 +351,7 @@ public class TestReplicationManagerScenarios {
           }
         }
       }
-      Assertions.assertTrue(found, "Test: " + scenario + ": Expected command not sent: " + expectedCommand.getType());
+      assertTrue(found, "Test: " + scenario + ": Expected command not sent: " + expectedCommand.getType());
     }
   }
 
@@ -570,7 +572,7 @@ public class TestReplicationManagerScenarios {
       }
       DatanodeDetails datanodeDetails = DATANODE_ALIASES.get(this.datanode);
       if (datanodeDetails == null) {
-        Assertions.fail("Unable to find a datanode for the alias: " + datanode + " in the expected commands.");
+        fail("Unable to find a datanode for the alias: " + datanode + " in the expected commands.");
       }
       return datanodeDetails;
     }

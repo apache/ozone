@@ -1893,7 +1893,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       resp =
           handleError(submitRequest(omRequest)).getGetDelegationTokenResponse();
       return resp.getResponse().hasToken() ?
-          OMPBHelper.convertToDelegationToken(resp.getResponse().getToken())
+          OMPBHelper.tokenFromProto(resp.getResponse().getToken())
           : null;
     } catch (IOException e) {
       if (e instanceof OMException) {
@@ -1915,7 +1915,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       throws OMException {
     RenewDelegationTokenRequestProto req =
         RenewDelegationTokenRequestProto.newBuilder().
-            setToken(OMPBHelper.convertToTokenProto(token)).
+            setToken(OMPBHelper.protoFromToken(token)).
             build();
 
     OMRequest omRequest = createOMRequest(Type.RenewDelegationToken)
@@ -1946,7 +1946,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       throws OMException {
     CancelDelegationTokenRequestProto req = CancelDelegationTokenRequestProto
         .newBuilder()
-        .setToken(OMPBHelper.convertToTokenProto(token))
+        .setToken(OMPBHelper.protoFromToken(token))
         .build();
 
     OMRequest omRequest = createOMRequest(Type.CancelDelegationToken)

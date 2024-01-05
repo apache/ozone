@@ -25,7 +25,6 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -36,6 +35,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.R
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * Class to test OMKeysDeleteResponse.
@@ -88,14 +89,13 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
 
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
     for (String ozKey : ozoneKeys) {
-      Assertions.assertNull(
-          omMetadataManager.getKeyTable(getBucketLayout()).get(ozKey));
+      assertNull(omMetadataManager.getKeyTable(getBucketLayout()).get(ozKey));
 
       // ozKey had no block information associated with it, so it should have
       // been removed from the key table but not added to the delete table.
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           omMetadataManager.getDeletedTable().get(ozKey);
-      Assertions.assertNull(repeatedOmKeyInfo);
+      assertNull(repeatedOmKeyInfo);
     }
 
   }
@@ -122,12 +122,11 @@ public class TestOMKeysDeleteResponse extends TestOMKeyResponse {
     omKeysDeleteResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
 
     for (String ozKey : ozoneKeys) {
-      Assertions.assertNotNull(
-          omMetadataManager.getKeyTable(getBucketLayout()).get(ozKey));
+      assertNotNull(omMetadataManager.getKeyTable(getBucketLayout()).get(ozKey));
 
       RepeatedOmKeyInfo repeatedOmKeyInfo =
           omMetadataManager.getDeletedTable().get(ozKey);
-      Assertions.assertNull(repeatedOmKeyInfo);
+      assertNull(repeatedOmKeyInfo);
 
     }
 

@@ -24,11 +24,9 @@ import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.verification.VerificationMode;
 import org.mockito.stubbing.Answer;
@@ -44,18 +42,19 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.ALREADY_FI
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.STARTING_FINALIZATION;
-import static org.hamcrest.CoreMatchers.containsString;
-import static org.hamcrest.CoreMatchers.instanceOf;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.hamcrest.MatcherAssert.assertThat;
 
 /**
  * {@link OMUpgradeFinalizer} tests.
@@ -142,11 +141,11 @@ public class TestOMUpgradeFinalizer {
     OMUpgradeFinalizer finalizer = new OMUpgradeFinalizer(versionManager);
     finalizer.finalize(CLIENT_ID, mockOzoneManager(2));
 
-    Throwable exception = Assertions.assertThrows(
+    Throwable exception = assertThrows(
         UpgradeException.class, () -> {
           finalizer.reportStatus(OTHER_CLIENT_ID, false);
         });
-    assertThat(exception.getMessage(), containsString("Unknown client"));
+    assertThat(exception.getMessage()).contains("Unknown client");
   }
 
   @Test
@@ -200,8 +199,8 @@ public class TestOMUpgradeFinalizer {
       finalizer.finalize(CLIENT_ID, om);
       fail();
     } catch (Exception e) {
-      assertThat(e, instanceOf(UpgradeException.class));
-      assertThat(e.getMessage(), containsString(lfs.iterator().next().name()));
+      assertInstanceOf(UpgradeException.class, e);
+      assertThat(e.getMessage()).contains(lfs.iterator().next().name());
       assertEquals(
           ((UpgradeException) e).getResult(),
           LAYOUT_FEATURE_FINALIZATION_FAILED
@@ -245,7 +244,7 @@ public class TestOMUpgradeFinalizer {
 
   private OMLayoutFeature mockFeature(String name, int version) {
     OMLayoutFeature f = mock(OMLayoutFeature.class);
-    Mockito.lenient().when(f.name()).thenReturn(name);
+    lenient().when(f.name()).thenReturn(name);
     when(f.layoutVersion()).thenReturn(version);
     return f;
   }
@@ -273,13 +272,13 @@ public class TestOMUpgradeFinalizer {
     OMStorage st = mock(OMStorage.class);
     storedLayoutVersion = initialLayoutVersion;
 
-    Mockito.lenient().doAnswer(
+    lenient().doAnswer(
         (Answer<Void>) inv -> {
           storedLayoutVersion = inv.getArgument(0, Integer.class);
           return null;
         }).when(st).setLayoutVersion(anyInt());
 
-    Mockito.lenient().when(st.getLayoutVersion())
+    lenient().when(st.getLayoutVersion())
         .thenAnswer((Answer<Integer>) ignore -> storedLayoutVersion);
 
     when(mock.getOmStorage()).thenReturn(st);

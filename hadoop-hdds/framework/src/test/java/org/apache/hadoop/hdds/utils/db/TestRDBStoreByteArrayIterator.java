@@ -33,7 +33,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -306,29 +305,5 @@ public class TestRDBStoreByteArrayIterator {
     }
 
     iter.close();
-  }
-
-  @Test
-  public void testGetStackTrace() {
-    ManagedRocksIterator iterator = mock(ManagedRocksIterator.class);
-    RocksIterator mock = mock(RocksIterator.class);
-    when(iterator.get()).thenReturn(mock);
-    when(mock.isOwningHandle()).thenReturn(true);
-    ManagedRocksObjectUtils.assertClosed(iterator);
-    verify(iterator, times(1)).getStackTrace();
-
-    iterator = new ManagedRocksIterator(rocksDBIteratorMock);
-
-    // construct the expected trace.
-    StackTraceElement[] traceElements = Thread.currentThread().getStackTrace();
-    StringBuilder sb = new StringBuilder();
-    // first 2 lines will differ.
-    for (int i = 2; i < traceElements.length; i++) {
-      sb.append(traceElements[i]);
-      sb.append("\n");
-    }
-    String expectedTrace = sb.toString();
-    String fromObjectInit = iterator.getStackTrace();
-    assertThat(fromObjectInit).contains(expectedTrace);
   }
 }

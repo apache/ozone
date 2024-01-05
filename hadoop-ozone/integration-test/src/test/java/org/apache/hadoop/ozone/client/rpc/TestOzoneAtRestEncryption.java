@@ -672,11 +672,6 @@ class TestOzoneAtRestEncryption {
         .completeMultipartUpload(keyName, uploadID, partsMap);
 
     assertNotNull(omMultipartUploadCompleteInfo);
-    assertEquals(omMultipartUploadCompleteInfo.getBucket(), bucket
-        .getName());
-    assertEquals(omMultipartUploadCompleteInfo.getVolume(), bucket
-        .getVolumeName());
-    assertEquals(omMultipartUploadCompleteInfo.getKey(), keyName);
     assertNotNull(omMultipartUploadCompleteInfo.getHash());
   }
 

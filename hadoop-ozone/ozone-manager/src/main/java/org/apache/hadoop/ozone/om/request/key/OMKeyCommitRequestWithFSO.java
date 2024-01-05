@@ -22,6 +22,7 @@ import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -45,7 +46,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,8 +72,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long trxnLogIndex = termIndex.getIndex();
 
     CommitKeyRequest commitKeyRequest = getOmRequest().getCommitKeyRequest();
 
@@ -113,16 +113,6 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     try {
-      commitKeyArgs = resolveBucketLink(ozoneManager, commitKeyArgs, auditMap);
-      volumeName = commitKeyArgs.getVolumeName();
-      bucketName = commitKeyArgs.getBucketName();
-
-      // check Acl
-      checkKeyAclsInOpenKeyTable(ozoneManager, volumeName, bucketName,
-              keyName, IAccessAuthorizer.ACLType.WRITE,
-              commitKeyRequest.getClientID());
-
-
       String dbOpenFileKey = null;
 
       List<OmKeyLocationInfo>

@@ -43,20 +43,19 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.commons.io.FileUtils;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_CHUNK;
-
-import org.junit.jupiter.api.Assertions;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_FIND_CHUNK;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for {@link ChunkUtils}.
@@ -102,7 +101,7 @@ class TestChunkUtils {
           final ChunkBuffer chunk = readData(file, offset, len);
           // There should be only one element in readBuffers
           final List<ByteBuffer> buffers = chunk.asByteBufferList();
-          Assertions.assertEquals(1, buffers.size());
+          assertEquals(1, buffers.size());
           final ByteBuffer readBuffer = buffers.get(0);
 
           LOG.info("Read data ({}): {}", threadNumber,
@@ -176,7 +175,7 @@ class TestChunkUtils {
     final ChunkBuffer chunk = readData(file, offset, len);
     // There should be only one element in readBuffers
     final List<ByteBuffer> buffers = chunk.asByteBufferList();
-    Assertions.assertEquals(1, buffers.size());
+    assertEquals(1, buffers.size());
     final ByteBuffer readBuffer = buffers.get(0);
 
     assertArrayEquals(array, readBuffer.array());
@@ -189,21 +188,21 @@ class TestChunkUtils {
     Path tempFile = tempDir.resolve("overwrite");
     FileUtils.write(tempFile.toFile(), "test", UTF_8);
 
-    Assertions.assertTrue(
+    assertTrue(
         ChunkUtils.validateChunkForOverwrite(tempFile.toFile(),
             new ChunkInfo("chunk", 3, 5)));
 
-    Assertions.assertFalse(
+    assertFalse(
         ChunkUtils.validateChunkForOverwrite(tempFile.toFile(),
             new ChunkInfo("chunk", 5, 5)));
 
     try (FileChannel fileChannel =
              FileChannel.open(tempFile, StandardOpenOption.READ)) {
-      Assertions.assertTrue(
+      assertTrue(
           ChunkUtils.validateChunkForOverwrite(fileChannel,
               new ChunkInfo("chunk", 3, 5)));
 
-      Assertions.assertFalse(
+      assertFalse(
           ChunkUtils.validateChunkForOverwrite(fileChannel,
               new ChunkInfo("chunk", 5, 5)));
     }
@@ -222,23 +221,23 @@ class TestChunkUtils {
         () -> readData(nonExistentFile, offset, len));
 
     // then
-    Assertions.assertEquals(UNABLE_TO_FIND_CHUNK, e.getResult());
+    assertEquals(UNABLE_TO_FIND_CHUNK, e.getResult());
   }
 
   @Test
   void testReadData() throws Exception {
     final File dir = GenericTestUtils.getTestDir("testReadData");
     try {
-      Assertions.assertTrue(dir.mkdirs());
+      assertTrue(dir.mkdirs());
 
       // large file
       final int large = 10 << 20; // 10MB
-      Assertions.assertTrue(large > MAPPED_BUFFER_THRESHOLD);
+      assertThat(large).isGreaterThan(MAPPED_BUFFER_THRESHOLD);
       runTestReadFile(large, dir, true);
 
       // small file
       final int small = 30 << 10; // 30KB
-      Assertions.assertTrue(small <= MAPPED_BUFFER_THRESHOLD);
+      assertThat(small).isLessThanOrEqualTo(MAPPED_BUFFER_THRESHOLD);
       runTestReadFile(small, dir, false);
 
       // boundary case
@@ -283,22 +282,22 @@ class TestChunkUtils {
         written += toWrite;
       }
     }
-    Assertions.assertEquals(length, file.length());
+    assertEquals(length, file.length());
 
     // read the file back
     final ChunkBuffer chunk = readData(file, 0, length);
-    Assertions.assertEquals(length, chunk.remaining());
+    assertEquals(length, chunk.remaining());
 
     final List<ByteBuffer> buffers = chunk.asByteBufferList();
     LOG.info("buffers.size(): {}", buffers.size());
-    Assertions.assertEquals((length - 1) / BUFFER_CAPACITY + 1, buffers.size());
+    assertEquals((length - 1) / BUFFER_CAPACITY + 1, buffers.size());
     LOG.info("buffer class: {}", buffers.get(0).getClass());
 
     RANDOM.setSeed(seed);
     for (ByteBuffer b : buffers) {
-      Assertions.assertEquals(isMapped, b instanceof MappedByteBuffer);
+      assertEquals(isMapped, b instanceof MappedByteBuffer);
       RANDOM.nextBytes(array);
-      Assertions.assertEquals(ByteBuffer.wrap(array, 0, b.remaining()), b);
+      assertEquals(ByteBuffer.wrap(array, 0, b.remaining()), b);
     }
   }
 }

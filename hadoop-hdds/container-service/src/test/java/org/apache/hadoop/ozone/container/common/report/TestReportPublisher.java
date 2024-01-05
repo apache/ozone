@@ -41,16 +41,18 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -94,8 +96,8 @@ public class TestReportPublisher {
   @Test
   public void testReportPublisherInit() {
     ReportPublisher publisher = new DummyReportPublisher(0);
-    StateContext dummyContext = Mockito.mock(StateContext.class);
-    ScheduledExecutorService dummyExecutorService = Mockito.mock(
+    StateContext dummyContext = mock(StateContext.class);
+    ScheduledExecutorService dummyExecutorService = mock(
         ScheduledExecutorService.class);
     publisher.init(dummyContext, dummyExecutorService);
     verify(dummyExecutorService, times(1)).scheduleAtFixedRate(publisher,
@@ -105,29 +107,29 @@ public class TestReportPublisher {
   @Test
   public void testScheduledReport() throws InterruptedException {
     ReportPublisher publisher = new DummyReportPublisher(100);
-    StateContext dummyContext = Mockito.mock(StateContext.class);
+    StateContext dummyContext = mock(StateContext.class);
     ScheduledExecutorService executorService = HadoopExecutors
         .newScheduledThreadPool(1,
             new ThreadFactoryBuilder().setDaemon(true)
                 .setNameFormat("TestReportManagerThread-%d").build());
     publisher.init(dummyContext, executorService);
     Thread.sleep(150);
-    Assertions.assertEquals(1,
+    assertEquals(1,
         ((DummyReportPublisher) publisher).getReportCount);
     Thread.sleep(100);
-    Assertions.assertEquals(2,
+    assertEquals(2,
         ((DummyReportPublisher) publisher).getReportCount);
     executorService.shutdown();
     // After executor shutdown, no new reports should be published
     Thread.sleep(100);
-    Assertions.assertEquals(2,
+    assertEquals(2,
         ((DummyReportPublisher) publisher).getReportCount);
   }
 
   @Test
   public void testPublishReport() throws InterruptedException {
     ReportPublisher publisher = new DummyReportPublisher(100);
-    StateContext dummyContext = Mockito.mock(StateContext.class);
+    StateContext dummyContext = mock(StateContext.class);
     ScheduledExecutorService executorService = HadoopExecutors
         .newScheduledThreadPool(1,
             new ThreadFactoryBuilder().setDaemon(true)
@@ -135,18 +137,18 @@ public class TestReportPublisher {
     publisher.init(dummyContext, executorService);
     Thread.sleep(150);
     executorService.shutdown();
-    Assertions.assertEquals(1,
+    assertEquals(1,
         ((DummyReportPublisher) publisher).getReportCount);
     verify(dummyContext, times(1)).refreshFullReport(null);
     // After executor shutdown, no new reports should be published
     Thread.sleep(100);
-    Assertions.assertEquals(1,
+    assertEquals(1,
         ((DummyReportPublisher) publisher).getReportCount);
   }
 
   @Test
   public void testCommandStatusPublisher() throws InterruptedException {
-    StateContext dummyContext = Mockito.mock(StateContext.class);
+    StateContext dummyContext = mock(StateContext.class);
     ReportPublisher publisher = new CommandStatusReportPublisher();
     final Map<Long, CommandStatus> cmdStatusMap = new ConcurrentHashMap<>();
     when(dummyContext.getCommandStatusMap()).thenReturn(cmdStatusMap);
@@ -157,7 +159,7 @@ public class TestReportPublisher {
             new ThreadFactoryBuilder().setDaemon(true)
                 .setNameFormat("TestReportManagerThread-%d").build());
     publisher.init(dummyContext, executorService);
-    Assertions.assertNull(
+    assertNull(
         ((CommandStatusReportPublisher) publisher).getReport());
 
     // Insert to status object to state context map and then get the report.
@@ -174,7 +176,7 @@ public class TestReportPublisher {
     cmdStatusMap.put(obj1.getCmdId(), obj1);
     cmdStatusMap.put(obj2.getCmdId(), obj2);
     // We will sending the commands whose status is PENDING and EXECUTED
-    Assertions.assertEquals(2,
+    assertEquals(2,
         ((CommandStatusReportPublisher) publisher).getReport()
             .getCmdStatusCount(),
         "Should publish report with 2 status objects");
@@ -183,15 +185,15 @@ public class TestReportPublisher {
 
   @Test
   public void testCRLStatusReportPublisher() throws IOException {
-    StateContext dummyContext = Mockito.mock(StateContext.class);
+    StateContext dummyContext = mock(StateContext.class);
     DatanodeStateMachine dummyStateMachine =
-        Mockito.mock(DatanodeStateMachine.class);
+        mock(DatanodeStateMachine.class);
     ReportPublisher publisher = new CRLStatusReportPublisher();
-    DatanodeCRLStore dnCrlStore = Mockito.mock(DatanodeCRLStore.class);
+    DatanodeCRLStore dnCrlStore = mock(DatanodeCRLStore.class);
     when(dnCrlStore.getLatestCRLSequenceID()).thenReturn(3L);
     List<CRLInfo> pendingCRLs = new ArrayList<>();
-    pendingCRLs.add(Mockito.mock(CRLInfo.class));
-    pendingCRLs.add(Mockito.mock(CRLInfo.class));
+    pendingCRLs.add(mock(CRLInfo.class));
+    pendingCRLs.add(mock(CRLInfo.class));
     when(dnCrlStore.getPendingCRLs()).thenReturn(pendingCRLs);
     when(dummyStateMachine.getDnCRLStore()).thenReturn(dnCrlStore);
     when(dummyContext.getParent()).thenReturn(dummyStateMachine);
@@ -204,12 +206,12 @@ public class TestReportPublisher {
     publisher.init(dummyContext, executorService);
     Message report =
         ((CRLStatusReportPublisher) publisher).getReport();
-    Assertions.assertNotNull(report);
+    assertNotNull(report);
     for (Descriptors.FieldDescriptor descriptor :
         report.getDescriptorForType().getFields()) {
       if (descriptor.getNumber() ==
           CRLStatusReport.RECEIVEDCRLID_FIELD_NUMBER) {
-        Assertions.assertEquals(3L, report.getField(descriptor));
+        assertEquals(3L, report.getField(descriptor));
       }
     }
     executorService.shutdown();

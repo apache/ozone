@@ -18,29 +18,24 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.LRUCache;
 
-import javax.annotation.Nullable;
-
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.assertClosed;
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.formatStackTrace;
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.getStackTrace;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * Managed LRUCache.
  */
 public class ManagedLRUCache extends LRUCache {
-
-  @Nullable
-  private final StackTraceElement[] elements = getStackTrace();
+  private final UncheckedAutoCloseable leakTracker = track(this);
 
   public ManagedLRUCache(long capacity) {
     super(capacity);
   }
 
   @Override
-  protected void finalize() throws Throwable {
-    assertClosed(this, formatStackTrace(elements));
-    super.finalize();
+  public void close() {
+    super.close();
+    leakTracker.close();
   }
 }

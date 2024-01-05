@@ -46,10 +46,11 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.ozone.test.GenericTestUtils;
-
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * This class tests HealthyPipelineSafeMode rule.
@@ -102,7 +103,7 @@ public class TestHealthyPipelineSafeModeRule {
           scmSafeModeManager.getHealthyPipelineSafeModeRule();
 
       // This should be immediately satisfied, as no pipelines are there yet.
-      Assertions.assertTrue(healthyPipelineSafeModeRule.validate());
+      assertTrue(healthyPipelineSafeModeRule.validate());
     } finally {
       scmMetadataStore.getStore().close();
       FileUtil.fullyDelete(new File(storageDir));
@@ -183,7 +184,7 @@ public class TestHealthyPipelineSafeModeRule {
           scmSafeModeManager.getHealthyPipelineSafeModeRule();
 
       // No datanodes have sent pipelinereport from datanode
-      Assertions.assertFalse(healthyPipelineSafeModeRule.validate());
+      assertFalse(healthyPipelineSafeModeRule.validate());
 
       // Fire pipeline report from all datanodes in first pipeline, as here we
       // have 3 pipelines, 10% is 0.3, when doing ceil it is 1. So, we should
@@ -283,7 +284,7 @@ public class TestHealthyPipelineSafeModeRule {
 
 
       // No pipeline event have sent to SCMSafemodeManager
-      Assertions.assertFalse(healthyPipelineSafeModeRule.validate());
+      assertFalse(healthyPipelineSafeModeRule.validate());
 
 
       GenericTestUtils.LogCapturer logCapturer =
@@ -297,7 +298,7 @@ public class TestHealthyPipelineSafeModeRule {
       GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains(
           "reported count is 1"),
           1000, 5000);
-      Assertions.assertFalse(healthyPipelineSafeModeRule.validate());
+      assertFalse(healthyPipelineSafeModeRule.validate());
 
       firePipelineEvent(pipeline2, eventQueue);
       firePipelineEvent(pipeline3, eventQueue);

@@ -39,7 +39,6 @@ import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -68,7 +67,7 @@ public abstract class CommonChunkManagerTestCases extends AbstractTestChunkManag
     KeyValueContainer container = getKeyValueContainer();
     int tooLarge = OZONE_SCM_CHUNK_MAX_SIZE + 1;
     byte[] array = RandomStringUtils.randomAscii(tooLarge).getBytes(UTF_8);
-    assertTrue(array.length >= tooLarge);
+    assertThat(array.length).isGreaterThanOrEqualTo(tooLarge);
 
     BlockID blockID = getBlockID();
     ChunkInfo chunkInfo = new ChunkInfo(

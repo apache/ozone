@@ -36,6 +36,7 @@ import java.io.IOException;
 
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -99,7 +100,7 @@ class TestSnapshotCache {
         snapshotCache.get(dbKey1);
     assertNotNull(omSnapshot);
     assertNotNull(omSnapshot.get());
-    assertTrue(omSnapshot.get() instanceof OmSnapshot);
+    assertInstanceOf(OmSnapshot.class, omSnapshot.get());
     assertEquals(1, snapshotCache.size());
     assertTrue(snapshotCache.isConsistent());
   }

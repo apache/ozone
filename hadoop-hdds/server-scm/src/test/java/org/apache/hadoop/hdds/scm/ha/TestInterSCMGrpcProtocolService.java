@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.ozone.test.GenericTestUtils.PortAllocator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
@@ -49,13 +50,11 @@ import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
-import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.security.x509.CertificateTestUtils.createSelfSignedCert;
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doNothing;
@@ -90,7 +89,7 @@ class TestInterSCMGrpcProtocolService {
 
   @Test
   void testMTLSOnInterScmGrpcProtocolServiceAccess() throws Exception {
-    int port = new Random().nextInt(1000) + 45000;
+    int port = PortAllocator.getFreePort();
     OzoneConfiguration conf = setupConfiguration(port);
     SCMCertificateClient
         scmCertClient = setupCertificateClientForMTLS(conf);
@@ -120,8 +119,8 @@ class TestInterSCMGrpcProtocolService {
     verify(serverTrustManager, never()).checkServerTrusted(any(), any());
     verify(serverTrustManager, times(1))
         .checkClientTrusted(capturedCerts.capture(), any());
-    assertThat(capturedCerts.getValue().length, is(1));
-    assertThat(capturedCerts.getValue()[0], is(clientCert));
+    assertThat(capturedCerts.getValue().length).isEqualTo(1);
+    assertThat(capturedCerts.getValue()[0]).isEqualTo(clientCert);
   }
 
   private void verifyClientUsedItsCertAndValidatedServerCert()
@@ -132,8 +131,8 @@ class TestInterSCMGrpcProtocolService {
     verify(clientTrustManager, times(1))
         .checkServerTrusted(capturedCerts.capture(), any());
     verify(clientTrustManager, never()).checkClientTrusted(any(), any());
-    assertThat(capturedCerts.getValue().length, is(1));
-    assertThat(capturedCerts.getValue()[0], is(serviceCert));
+    assertThat(capturedCerts.getValue().length).isEqualTo(1);
+    assertThat(capturedCerts.getValue()[0]).isEqualTo(serviceCert);
   }
 
   private void verifyDownloadedCheckPoint(Path downloaded) throws IOException {
@@ -143,8 +142,8 @@ class TestInterSCMGrpcProtocolService {
          BufferedReader reader =
              new BufferedReader(new InputStreamReader(in, UTF_8))
     ) {
-      assertThat(in.getNextTarEntry().getName(), is(CP_FILE_NAME));
-      assertThat(reader.readLine(), is(CP_CONTENTS));
+      assertThat(in.getNextTarEntry().getName()).isEqualTo(CP_FILE_NAME);
+      assertThat(reader.readLine()).isEqualTo(CP_CONTENTS);
     }
   }
 

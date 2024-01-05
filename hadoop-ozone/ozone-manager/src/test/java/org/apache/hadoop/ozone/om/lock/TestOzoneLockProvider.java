@@ -20,17 +20,17 @@ package org.apache.hadoop.ozone.om.lock;
 
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.Collection;
 
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -56,7 +56,7 @@ public class TestOzoneLockProvider {
 
   @BeforeEach
   public void setup() throws Exception {
-    ozoneManager = Mockito.mock(OzoneManager.class);
+    ozoneManager = mock(OzoneManager.class);
   }
 
   @ParameterizedTest
@@ -83,16 +83,13 @@ public class TestOzoneLockProvider {
 
     if (keyPathLockEnabled) {
       if (bucketLayout == BucketLayout.OBJECT_STORE) {
-        Assertions.assertTrue(
-            ozoneLockStrategy instanceof OBSKeyPathLockStrategy);
+        assertInstanceOf(OBSKeyPathLockStrategy.class, ozoneLockStrategy);
       } else if (!enableFileSystemPaths &&
           bucketLayout == BucketLayout.LEGACY) {
-        Assertions.assertTrue(
-            ozoneLockStrategy instanceof OBSKeyPathLockStrategy);
+        assertInstanceOf(OBSKeyPathLockStrategy.class, ozoneLockStrategy);
       }
     } else {
-      Assertions.assertTrue(
-          ozoneLockStrategy instanceof RegularBucketLockStrategy);
+      assertInstanceOf(RegularBucketLockStrategy.class, ozoneLockStrategy);
     }
   }
 }

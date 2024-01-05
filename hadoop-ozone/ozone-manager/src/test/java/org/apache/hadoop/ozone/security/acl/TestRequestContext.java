@@ -16,8 +16,9 @@
  */
 package org.apache.hadoop.ozone.security.acl;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -32,49 +33,49 @@ public class TestRequestContext {
     RequestContext context = getUserRequestContext("om",
             IAccessAuthorizer.ACLType.CREATE, false, "volume1",
             true);
-    Assertions.assertTrue(context.isRecursiveAccessCheck(),
+    assertTrue(context.isRecursiveAccessCheck(),
         "Wrongly sets recursiveAccessCheck flag value");
 
     context = getUserRequestContext("om",
             IAccessAuthorizer.ACLType.CREATE, false, "volume1",
             false);
-    Assertions.assertFalse(context.isRecursiveAccessCheck(),
+    assertFalse(context.isRecursiveAccessCheck(),
         "Wrongly sets recursiveAccessCheck flag value");
 
     context = getUserRequestContext(
             "user1", IAccessAuthorizer.ACLType.CREATE,
             true, "volume1");
-    Assertions.assertFalse(context.isRecursiveAccessCheck(),
+    assertFalse(context.isRecursiveAccessCheck(),
         "Wrongly sets recursiveAccessCheck flag value");
 
     RequestContext.Builder builder = new RequestContext.Builder();
 
-    Assertions.assertFalse(builder.build().isRecursiveAccessCheck(),
+    assertFalse(builder.build().isRecursiveAccessCheck(),
         "Wrongly sets recursive flag value");
 
     builder.setRecursiveAccessCheck(true);
-    Assertions.assertTrue(builder.build().isRecursiveAccessCheck(),
+    assertTrue(builder.build().isRecursiveAccessCheck(),
         "Wrongly sets recursive flag value");
 
     context = new RequestContext("host", null,
             null, "serviceId",
             IAccessAuthorizer.ACLIdentityType.GROUP,
             IAccessAuthorizer.ACLType.CREATE, "owner");
-    Assertions.assertFalse(context.isRecursiveAccessCheck(),
+    assertFalse(context.isRecursiveAccessCheck(),
         "Wrongly sets recursive flag value");
 
     context = new RequestContext("host", null,
             null, "serviceId",
             IAccessAuthorizer.ACLIdentityType.GROUP,
             IAccessAuthorizer.ACLType.CREATE, "owner", false);
-    Assertions.assertFalse(context.isRecursiveAccessCheck(),
+    assertFalse(context.isRecursiveAccessCheck(),
         "Wrongly sets recursive flag value");
 
     context = new RequestContext("host", null,
             null, "serviceId",
             IAccessAuthorizer.ACLIdentityType.GROUP,
             IAccessAuthorizer.ACLType.CREATE, "owner", true);
-    Assertions.assertTrue(context.isRecursiveAccessCheck(),
+    assertTrue(context.isRecursiveAccessCheck(),
         "Wrongly sets recursive flag value");
   }
 
