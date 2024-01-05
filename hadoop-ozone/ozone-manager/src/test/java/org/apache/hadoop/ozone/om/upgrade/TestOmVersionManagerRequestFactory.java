@@ -70,10 +70,6 @@ public class TestOmVersionManagerRequestFactory {
       if (Modifier.isAbstract(requestClass.getModifiers())) {
         continue;
       }
-      Method getRequestTypeMethod = requestClass.getMethod(
-          "getRequestType");
-      Assertions.assertNotNull(getRequestTypeMethod);
-
       Constructor<? extends OMClientRequest> constructorWithOmRequestArg =
           requestClass.getDeclaredConstructor(OMRequest.class);
       Assertions.assertNotNull(constructorWithOmRequestArg);

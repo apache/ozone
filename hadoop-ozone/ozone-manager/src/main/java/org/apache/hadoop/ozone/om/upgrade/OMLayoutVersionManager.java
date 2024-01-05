@@ -127,35 +127,6 @@ public final class OMLayoutVersionManager
     });
   }
 
-  private void registerOzoneManagerRequests(String packageName) {
-    try {
-      for (Class<? extends OMClientRequest> reqClass :
-          getRequestClasses(packageName)) {
-        try {
-          Method getRequestTypeMethod = reqClass.getMethod(
-              "getRequestType");
-          String type = (String) getRequestTypeMethod.invoke(null);
-          LOG.debug("Registering {} with OmVersionFactory.",
-              reqClass.getSimpleName());
-          BelongsToLayoutVersion annotation =
-              reqClass.getAnnotation(BelongsToLayoutVersion.class);
-          if (annotation == null) {
-            registerRequestType(type, INITIAL_VERSION.layoutVersion(),
-                reqClass);
-          } else {
-            registerRequestType(type, annotation.value().layoutVersion(),
-                reqClass);
-          }
-        } catch (NoSuchMethodException nsmEx) {
-          LOG.warn("Found a class {} with request type not defined. ",
-              reqClass.getSimpleName());
-        }
-      }
-    } catch (Exception ex) {
-      LOG.error("Exception registering OM client request.", ex);
-    }
-  }
-
   @VisibleForTesting
   public static Set<Class<? extends OMClientRequest>> getRequestClasses(
       String packageName) {

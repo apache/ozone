@@ -104,40 +104,6 @@ public class TestOMVersionManager {
   }
 
   @Test
-  @Unhealthy("Since there is no longer a need to enforce the getRequestType " +
-      "method in OM request classes, disabling the " +
-      "test. Potentially revisit later.")
-  public void testAllOMRequestClassesHaveRequestType()
-      throws InvocationTargetException, IllegalAccessException {
-
-    Set<Class<? extends OMClientRequest>> requestClasses =
-        getRequestClasses(OM_REQUEST_CLASS_PACKAGE);
-    Set<String> requestTypes = new HashSet<>();
-
-    for (Class<? extends OMClientRequest> requestClass : requestClasses) {
-      try {
-        Method getRequestTypeMethod = requestClass.getMethod(
-            "getRequestType");
-        String type = (String) getRequestTypeMethod.invoke(null);
-
-        int lVersion = INITIAL_VERSION.layoutVersion();
-        BelongsToLayoutVersion annotation =
-            requestClass.getAnnotation(BelongsToLayoutVersion.class);
-        if (annotation != null) {
-          lVersion = annotation.value().layoutVersion();
-        }
-        if (requestTypes.contains(type + "-" + lVersion)) {
-          Assertions.fail("Duplicate request/version type found : " + type);
-        }
-        requestTypes.add(type + "-" + lVersion);
-      } catch (NoSuchMethodException nsmEx) {
-        Assertions.fail("getRequestType method not defined in a class." +
-            nsmEx.getMessage());
-      }
-    }
-  }
-
-  @Test
   /*
    * The OMLayoutFeatureAspect relies on the fact that the OM client
    * request handler class has a preExecute method with first argument as
