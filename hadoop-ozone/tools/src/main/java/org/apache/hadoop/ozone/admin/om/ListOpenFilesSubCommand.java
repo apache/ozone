@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.admin.om;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
@@ -126,7 +127,7 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
 
     List<OpenKeySession> openFileList = res.getOpenFiles();
 
-    // TODO: Conform to HDFS style output
+    // TODO: Conform to HDFS style output?
     String msg = res.getGlobalTotal() + " global open files (estimated). " +
         "Showing " + openFileList.size() + " open files (limit " + limit + ") " +
         "under path prefix:\n  " + pathPrefix;
@@ -134,13 +135,31 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
     if (startItem != null && !startItem.isEmpty()) {
       msg += "\nafter continuation token:\n  " + startItem;
     }
-    msg += "\nClient ID\t\tPath";
+    msg += "\nClient ID\t\tHsync'ed\t\tPath";
     System.out.println(msg);
 
     for (OpenKeySession e : openFileList) {
-      System.out.println(e.getId() +
-          "\t" + getFullPathFromKeyInfo(e.getKeyInfo()) +
-          "\t" + e.getKeyInfo().toString());  // TODO: Remove full KeyInfo print
+      long clientId = e.getId();
+      String line = clientId + "\t";
+      OmKeyInfo omKeyInfo = e.getKeyInfo();
+
+      if (omKeyInfo.isHsync()) {
+        String hsyncClientIdStr =
+            omKeyInfo.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
+        long hsyncClientId = Long.parseLong(hsyncClientIdStr);
+        if (clientId == hsyncClientId) {
+          line += "Yes\t\t";
+        } else {
+          // last hsync'ed with a different client ID than the client that
+          // initially opens the file (!)
+          line += "Yes w/ cid " + hsyncClientIdStr + "\t";
+        }
+      } else {
+        line += "No\t\t";
+      }
+
+      System.out.println(line + getFullPathFromKeyInfo(omKeyInfo) +
+          "\t" + omKeyInfo);  // TODO: Remove full KeyInfo print
     }
 
     // Compose next batch's command

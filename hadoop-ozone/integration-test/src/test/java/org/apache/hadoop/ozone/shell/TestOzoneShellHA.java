@@ -582,9 +582,11 @@ public class TestOzoneShellHA {
       execute(ozoneAdminShell, args);
       // Verify that result has key1
 
-    }
+      // TODO: Test hsync
+      out.hsync();
 
-    // TODO: Test with hsync
+      out.hsync();
+    }
 
     // TODO: Test pagination
 
