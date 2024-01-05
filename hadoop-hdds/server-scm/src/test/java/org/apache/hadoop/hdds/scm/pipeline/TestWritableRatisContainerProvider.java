@@ -27,12 +27,16 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -49,6 +53,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class TestWritableRatisContainerProvider {
 
   private static final ReplicationConfig REPLICATION_CONFIG =
@@ -80,7 +85,7 @@ class TestWritableRatisContainerProvider {
     verifyPipelineNotCreated();
   }
 
-  @Test
+  @RepeatedTest(100)
   void skipsPipelineWithoutContainer() throws Exception {
     Pipeline pipeline = MockPipeline.createPipeline(3);
     ContainerInfo existingContainer = pipelineHasContainer(pipeline);
@@ -115,7 +120,7 @@ class TestWritableRatisContainerProvider {
   }
 
   private void existingPipelines(Pipeline... pipelines) {
-    existingPipelines(asList(pipelines));
+    existingPipelines(new ArrayList<>(asList(pipelines)));
   }
 
   private void existingPipelines(List<Pipeline> pipelines) {
@@ -142,7 +147,7 @@ class TestWritableRatisContainerProvider {
 
     when(pipelineManager.getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet()))
         .thenReturn(emptyList())
-        .thenReturn(singletonList(newPipeline));
+        .thenReturn(new ArrayList<>(singletonList(newPipeline)));
 
     return pipelineHasContainer(newPipeline);
   }
