@@ -262,6 +262,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
+import static org.apache.hadoop.ozone.OzoneConsts.HSYNC_CLIENT_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
@@ -3214,19 +3215,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     final String dbOpenKeyPrefix;
-    final Table<String, OmKeyInfo> openKeyTable;
+    final BucketLayout bucketLayout;
     if (path == null || path.isEmpty() || path.equals(OM_KEY_PREFIX)) {
       // path is root
       dbOpenKeyPrefix = "";
       // default to FSO. TODO: Add client option to pass OBS/LEGACY?
-      openKeyTable =
-          metadataManager.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+      bucketLayout = BucketLayout.FILE_SYSTEM_OPTIMIZED;
     } else {
       // path is bucket or key prefix, break it down to volume, bucket, prefix
       StringTokenizer tokenizer = new StringTokenizer(path, OM_KEY_PREFIX);
 
       // Validate path to avoid NoSuchElementException
-      if (tokenizer.countTokens() < 3) {
+      if (tokenizer.countTokens() < 2) {
         metrics.incNumListOpenFilesFails();
         throw new OMException("Invalid path: " + path + ". " +
             "Only root level or bucket level path is supported at this time",
@@ -3238,16 +3238,14 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
       OmBucketInfo bucketInfo;
       try {
-        // getBucketInfo throws when volume or bucket does not exist,
-        // as expected
+        // as expected, getBucketInfo throws if volume or bucket does not exist
         bucketInfo = getBucketInfo(volumeName, bucketName);
       } catch (Exception ex) {
         metrics.incNumListOpenFilesFails();
         throw ex;
       }
 
-      openKeyTable =
-          metadataManager.getOpenKeyTable(bucketInfo.getBucketLayout());
+      bucketLayout = bucketInfo.getBucketLayout();
 
       final String keyPrefix;
       if (tokenizer.hasMoreTokens()) {
@@ -3296,17 +3294,30 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     //  iteration logic by quite a bit. If we do that, we would want to refactor
     //  listKeys as well to share the common code.
 
+    final Table<String, OmKeyInfo> openKeyTable, keyTable;
+    openKeyTable = metadataManager.getOpenKeyTable(bucketLayout);
+    keyTable = metadataManager.getKeyTable(bucketLayout);
     // No lock needed since table iterator creates a "snapshot"
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-             keyIter = openKeyTable.iterator()) {
-      keyIter.seek(dbOpenKeyPrefix);
+             openKeyIter = openKeyTable.iterator();
+         TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+             keyIter = keyTable.iterator()
+    ) {
+      openKeyIter.seek(dbOpenKeyPrefix);
       KeyValue<String, OmKeyInfo> kv;
-      while (currentCount < maxKeys + 1 && keyIter.hasNext()) {
-        kv = keyIter.next();
+      while (currentCount < maxKeys + 1 && openKeyIter.hasNext()) {
+        kv = openKeyIter.next();
         if (kv != null && kv.getKey().startsWith(dbOpenKeyPrefix)) {
           String dbKey = kv.getKey();
           long clientID = OMMetadataManager.getClientIDFromOpenKeyDBKey(dbKey);
           OmKeyInfo omKeyInfo = kv.getValue();
+
+          // Trim client ID to get the keyTable dbKey
+          int lastSlashIdx = dbKey.lastIndexOf(OM_KEY_PREFIX);
+          String ktDbKey = dbKey.substring(0, lastSlashIdx);
+          // Check whether the key has been hsync'ed by seeking keyTable
+          checkAndUpdateKeyHsyncStatus(omKeyInfo, ktDbKey, keyIter);
+
           openKeySessionList.add(
               new OpenKeySession(
                   clientID,
@@ -3316,8 +3327,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
 
       // Set hasMore flag as a hint for client-side pagination
-      if (keyIter.hasNext()) {
-        kv = keyIter.next();
+      if (openKeyIter.hasNext()) {
+        kv = openKeyIter.next();
         hasMore = kv != null && kv.getKey().startsWith(dbOpenKeyPrefix);
       } else {
         hasMore = false;
@@ -3328,6 +3339,26 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         openKeySessionList,
         hasMore,
         openKeyTable.getEstimatedKeyCount());
+  }
+
+  /**
+   * Check and update OmKeyInfo from OpenKeyTable with hsync status in KeyTable.
+   */
+  private void checkAndUpdateKeyHsyncStatus(OmKeyInfo omKeyInfo,
+                                            String dbKey,
+                                            TableIterator<String, ? extends
+                                                KeyValue<String, OmKeyInfo>>
+                                                keyIter)
+      throws IOException {
+    KeyValue<String, OmKeyInfo> kv = keyIter.seek(dbKey);
+    if (kv != null && kv.getKey().equals(dbKey)) {
+      // The same key in OpenKeyTable also exists in KeyTable, indicating
+      // the key has been hsync'ed
+      OmKeyInfo ktOmKeyInfo = kv.getValue();
+      String hsyncClientId = ktOmKeyInfo.getMetadata().get(HSYNC_CLIENT_ID);
+      // Append HSYNC_CLIENT_ID to OmKeyInfo to be returned to the client
+      omKeyInfo.getMetadata().put(HSYNC_CLIENT_ID, hsyncClientId);
+    }
   }
 
   @Override

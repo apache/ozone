@@ -37,7 +37,7 @@ import java.util.concurrent.Callable;
 @CommandLine.Command(
     name = "listopenfiles",
     aliases = {"listopenkeys", "lof", "lok"},
-    description = "Lists open keys in Ozone Manager.",
+    description = "Lists open files (keys) in Ozone Manager.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
@@ -135,7 +135,7 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
     if (startItem != null && !startItem.isEmpty()) {
       msg += "\nafter continuation token:\n  " + startItem;
     }
-    msg += "\nClient ID\t\tHsync'ed\t\tPath";
+    msg += "\n\nClient ID\t\tHsync'ed\tPath";  // TODO: Add creation time
     System.out.println(msg);
 
     for (OpenKeySession e : openFileList) {
@@ -158,8 +158,9 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
         line += "No\t\t";
       }
 
-      System.out.println(line + getFullPathFromKeyInfo(omKeyInfo) +
-          "\t" + omKeyInfo);  // TODO: Remove full KeyInfo print
+      System.out.println(line + getFullPathFromKeyInfo(omKeyInfo)
+//          + "\t" + omKeyInfo  // TODO: Remove full KeyInfo print
+      );
     }
 
     // Compose next batch's command

@@ -45,6 +45,7 @@ import org.apache.hadoop.fs.ozone.OzoneFsShell;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -142,6 +143,7 @@ public class TestOzoneShellHA {
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     startCluster(conf);
   }
 
@@ -556,12 +558,13 @@ public class TestOzoneShellHA {
       throws IOException, InterruptedException {
     final String volumeName = "volumelof";
 
+    OzoneConfiguration conf = cluster.getConf();
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
-    OzoneConfiguration clientConf =
-        getClientConfForOFS(hostPrefix, cluster.getConf());
+//    OzoneConfiguration conf = new OzoneConfiguration();
+//    conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
 //    final String hostPrefix = OZONE_OFS_URI_SCHEME + "://localhost:9862";
-//    OzoneConfiguration clientConf =
-//        getClientConfForOFS(hostPrefix, new OzoneConfiguration());
+
+    OzoneConfiguration clientConf = getClientConfForOFS(hostPrefix, conf);
     FileSystem fs = FileSystem.get(clientConf);
 
     String dir1 = hostPrefix + OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX +
@@ -569,23 +572,29 @@ public class TestOzoneShellHA {
     assertTrue(fs.mkdirs(new Path(dir1)));
     String key1 = dir1 + OM_KEY_PREFIX + "key1";
 
+    String[] args = new String[] {"om", "listopenfiles",
+        "-id", omServiceId,
+        "-p", "/volumelof/buck1"};
+
     // Create key1
-    try (FSDataOutputStream out = fs.create(new Path(key1))) {
-      out.write(1);
+    try (FSDataOutputStream stream = fs.create(new Path(key1))) {
+      stream.write(1);
+
+      // Run listopenfiles
+      execute(ozoneAdminShell, args);
+      String res1 = out.toString();
+      out.reset();
+
+      // Try hsync
+      stream.hsync();
       // Wait for flush
 //      cluster.getOzoneManager().awaitDoubleBufferFlush();
 
-      // Hold the file open, run listopenfiles
-      String[] args = new String[] {"om", "listopenfiles", "-id", omServiceId,
-          "-p", "/volumelof/buck1"};
-      // TODO: Possible to make this work under volume level as well?
+      // Run listopenfiles again
       execute(ozoneAdminShell, args);
+      String res2 = out.toString();
+      out.reset();
       // Verify that result has key1
-
-      // TODO: Test hsync
-      out.hsync();
-
-      out.hsync();
     }
 
     // TODO: Test pagination
