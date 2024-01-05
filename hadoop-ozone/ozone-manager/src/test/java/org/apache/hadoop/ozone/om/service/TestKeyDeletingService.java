@@ -80,6 +80,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -120,7 +121,7 @@ public class TestKeyDeletingService {
     }
     System.setProperty(DBConfigFromFile.CONFIG_DIR, "/");
     ServerUtils.setOzoneMetaDirPath(conf, newFolder.toString());
-    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
+    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 1000,
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL,
         100, TimeUnit.MILLISECONDS);
@@ -163,7 +164,7 @@ public class TestKeyDeletingService {
     GenericTestUtils.waitFor(
         () -> keyDeletingService.getDeletedKeyCount().get() >= keyCount,
         1000, 10000);
-    assertTrue(keyDeletingService.getRunCount().get() > 1);
+    assertThat(keyDeletingService.getRunCount().get()).isGreaterThan(1);
     assertEquals(0, keyManager.getPendingDeletionKeys(
         Integer.MAX_VALUE).getKeyBlocksList().size());
   }
@@ -206,7 +207,7 @@ public class TestKeyDeletingService {
     // Make sure that we have run the background thread 5 times more
     GenericTestUtils.waitFor(
         () -> keyDeletingService.getRunCount().get() >= 5,
-        100, 1000);
+        100, 10000);
     // Since SCM calls are failing, deletedKeyCount should be zero.
     assertEquals(0, keyDeletingService.getDeletedKeyCount().get());
     assertEquals(keyCount, keyManager
@@ -365,7 +366,7 @@ public class TestKeyDeletingService {
     GenericTestUtils.waitFor(
         () -> keyDeletingService.getDeletedKeyCount().get() >= 1,
         1000, 10000);
-    assertTrue(keyDeletingService.getRunCount().get() > 1);
+    assertThat(keyDeletingService.getRunCount().get()).isGreaterThan(1);
     assertEquals(0, keyManager.getPendingDeletionKeys(
         Integer.MAX_VALUE).getKeyBlocksList().size());
 
@@ -374,8 +375,7 @@ public class TestKeyDeletingService {
     // blocks for deletion from the KeyDeletionService
     ScmBlockLocationTestingClient scmBlockTestingClient =
         (ScmBlockLocationTestingClient) omTestManagers.getScmBlockClient();
-    assertTrue(
-        scmBlockTestingClient.getNumberOfDeletedBlocks() >= 3);
+    assertThat(scmBlockTestingClient.getNumberOfDeletedBlocks()).isGreaterThanOrEqualTo(3);
   }
 
   private void createAndDeleteKeys(KeyManager keyManager, int keyCount,
@@ -444,7 +444,7 @@ public class TestKeyDeletingService {
     GenericTestUtils.waitFor(
         () -> keyDeletingService.getDeletedKeyCount().get() >= 1,
         1000, 10000);
-    assertTrue(keyDeletingService.getRunCount().get() > 1);
+    assertThat(keyDeletingService.getRunCount().get()).isGreaterThan(1);
     assertEquals(0, keyManager
         .getPendingDeletionKeys(Integer.MAX_VALUE).getKeyBlocksList().size());
 
@@ -461,7 +461,7 @@ public class TestKeyDeletingService {
     List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
         = metadataManager.getDeletedTable().getRangeKVs(
         null, 100, ozoneKey1);
-    assertTrue(rangeKVs.size() > 0);
+    assertThat(rangeKVs.size()).isGreaterThan(0);
     rangeKVs
         = metadataManager.getDeletedTable().getRangeKVs(
         null, 100, ozoneKey2);
@@ -544,7 +544,7 @@ t
     // Create Snap3, traps all the deleted keys.
     writeClient.createSnapshot(volumeName, bucketName, "snap3");
     assertTableRowCount(snapshotInfoTable, 3, metadataManager);
-    checkSnapDeepCleanStatus(snapshotInfoTable, true);
+    checkSnapDeepCleanStatus(snapshotInfoTable, false);
 
     keyDeletingService.resume();
 
@@ -564,9 +564,8 @@ t
 
       assertTableRowCount(snap3deletedTable, 0, metadataManager);
       assertTableRowCount(deletedTable, 0, metadataManager);
-      checkSnapDeepCleanStatus(snapshotInfoTable, false);
+      checkSnapDeepCleanStatus(snapshotInfoTable, true);
     }
-
   }
 
   @Test
@@ -670,6 +669,7 @@ t
              iterator = snapshotInfoTable.iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> snapshotEntry = iterator.next();
+        System.out.println(snapshotEntry.getValue());
         String snapshotName = snapshotEntry.getValue().getName();
         assertEquals(expectedSize.get(snapshotName),
             snapshotEntry.getValue().

@@ -19,7 +19,7 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -98,7 +98,8 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
     // creationTime was assigned at OMRequestTestUtils.addKeyToTable
     // modificationTime was assigned at
     // doPreExecute(createAllocateBlockRequest())
-    assertTrue(omKeyInfo.getCreationTime() <= omKeyInfo.getModificationTime());
+    assertThat(omKeyInfo.getCreationTime())
+        .isLessThanOrEqualTo(omKeyInfo.getModificationTime());
 
     // Check data of the block
     OzoneManagerProtocolProtos.KeyLocation keyLocation =
@@ -210,8 +211,8 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
     AllocateBlockRequest allocateBlockRequest =
         modifiedOmRequest.getAllocateBlockRequest();
     // Time should be set
-    assertTrue(allocateBlockRequest.getKeyArgs()
-        .getModificationTime() > 0);
+    assertThat(allocateBlockRequest.getKeyArgs().getModificationTime())
+        .isGreaterThan(0);
 
     // KeyLocation should be set.
     assertTrue(allocateBlockRequest.hasKeyLocation());

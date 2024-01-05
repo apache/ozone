@@ -23,8 +23,8 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.om.request.OMClientRequest.validateAndNormalizeKey;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -79,7 +79,7 @@ public class TestNormalizePaths {
       validateAndNormalizeKey(true, keyName);
       fail("checkInvalidPath failed for path " + keyName);
     } catch (OMException ex) {
-      assertTrue(ex.getMessage().contains("Invalid KeyPath"));
+      assertThat(ex.getMessage()).contains("Invalid KeyPath");
     }
   }
 

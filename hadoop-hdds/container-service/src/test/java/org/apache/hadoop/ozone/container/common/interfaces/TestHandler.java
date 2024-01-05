@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.container.common.interfaces;
 
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -36,11 +35,13 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 
 import com.google.common.collect.Maps;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.mockito.Mockito;
+
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.mock;
 
 /**
  * Tests Handler interface.
@@ -56,9 +57,9 @@ public class TestHandler {
   @BeforeEach
   public void setup() throws Exception {
     this.conf = new OzoneConfiguration();
-    this.containerSet = Mockito.mock(ContainerSet.class);
-    this.volumeSet = Mockito.mock(MutableVolumeSet.class);
-    DatanodeDetails datanodeDetails = Mockito.mock(DatanodeDetails.class);
+    this.containerSet = mock(ContainerSet.class);
+    this.volumeSet = mock(MutableVolumeSet.class);
+    DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
     StateContext context = ContainerTestUtils.getMockContext(
         datanodeDetails, conf);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
@@ -97,11 +98,11 @@ public class TestHandler {
     ContainerProtos.ContainerType invalidContainerType =
         ContainerProtos.ContainerType.forNumber(2);
 
-    Assertions.assertNull(invalidContainerType,
+    assertNull(invalidContainerType,
         "New ContainerType detected. Not an invalid containerType");
 
     Handler dispatcherHandler = dispatcher.getHandler(invalidContainerType);
-    Assertions.assertNull(dispatcherHandler,
+    assertNull(dispatcherHandler,
         "Get Handler for Invalid ContainerType should return null.");
   }
 }

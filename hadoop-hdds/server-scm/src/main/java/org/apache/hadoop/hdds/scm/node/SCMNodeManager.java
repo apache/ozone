@@ -1044,6 +1044,8 @@ public class SCMNodeManager implements NodeManager {
         nodeInfo.put(s.label + stat.name(), 0L);
       }
     }
+    nodeInfo.put("TotalCapacity", 0L);
+    nodeInfo.put("TotalUsed", 0L);
 
     for (DatanodeInfo node : nodeStateManager.getAllNodes()) {
       String keyPrefix = "";
@@ -1078,6 +1080,8 @@ public class SCMNodeManager implements NodeManager {
           nodeInfo.compute(keyPrefix + UsageMetrics.SSDUsed.name(),
               (k, v) -> v + reportProto.getScmUsed());
         }
+        nodeInfo.compute("TotalCapacity", (k, v) -> v + reportProto.getCapacity());
+        nodeInfo.compute("TotalUsed", (k, v) -> v + reportProto.getScmUsed());
       }
     }
     return nodeInfo;

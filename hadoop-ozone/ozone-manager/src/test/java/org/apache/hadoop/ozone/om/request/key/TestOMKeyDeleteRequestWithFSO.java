@@ -33,7 +33,10 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.security.acl.OzonePrefixPath;
 import org.apache.hadoop.util.Time;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.util.Iterator;
@@ -100,6 +103,18 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
             parentId, 100, Time.now());
     omKeyInfo.setKeyName(key);
     return omKeyInfo.getPath();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"keyName"})
+  @Override
+  public void testPreExecute(String testKeyName) throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    String ozoneKey = addKeyToTable();
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+    Assertions.assertNotNull(omKeyInfo);
+
+    doPreExecute(createDeleteKeyRequest());
   }
 
   @Test

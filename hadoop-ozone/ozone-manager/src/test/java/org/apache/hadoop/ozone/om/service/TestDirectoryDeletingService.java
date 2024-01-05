@@ -48,6 +48,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -155,6 +156,6 @@ public class TestDirectoryDeletingService {
         () -> dirDeletingService.getMovedFilesCount() >= 1000
             && dirDeletingService.getMovedFilesCount() < 2000,
         500, 60000);
-    assertTrue(dirDeletingService.getRunCount().get() >= 1);
+    assertThat(dirDeletingService.getRunCount().get()).isGreaterThanOrEqualTo(1);
   }
 }

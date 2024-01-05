@@ -37,8 +37,8 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,9 +82,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-
     AllocateBlockRequest allocateBlockRequest =
-        getOmRequest().getAllocateBlockRequest();
+        super.preExecute(ozoneManager).getAllocateBlockRequest();
 
     Preconditions.checkNotNull(allocateBlockRequest);
 
@@ -126,10 +125,14 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     KeyArgs.Builder newKeyArgs =
         keyArgs.toBuilder().setModificationTime(Time.now()).setKeyName(keyPath);
 
+    KeyArgs resolvedKeyArgs =
+        resolveBucketAndCheckOpenKeyAcls(newKeyArgs.build(), ozoneManager,
+            ACLType.WRITE, allocateBlockRequest.getClientID());
+
     AllocateBlockRequest.Builder newAllocatedBlockRequest =
         AllocateBlockRequest.newBuilder()
             .setClientID(allocateBlockRequest.getClientID())
-            .setKeyArgs(newKeyArgs);
+            .setKeyArgs(resolvedKeyArgs);
 
     if (allocateBlockRequest.hasExcludeList()) {
       newAllocatedBlockRequest.setExcludeList(
@@ -185,14 +188,6 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     boolean acquiredLock = false;
 
     try {
-      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
-      volumeName = keyArgs.getVolumeName();
-      bucketName = keyArgs.getBucketName();
-
-      // check Acl
-      checkKeyAclsInOpenKeyTable(ozoneManager, volumeName, bucketName, keyName,
-          IAccessAuthorizer.ACLType.WRITE, allocateBlockRequest.getClientID());
-
       validateBucketAndVolume(omMetadataManager, volumeName,
           bucketName);
 

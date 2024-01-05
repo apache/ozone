@@ -34,11 +34,11 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeI
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 /**
@@ -79,7 +79,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     try {
       OMClientResponse omClientResponse =
           omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, txLogIndex);
-      assertTrue(omClientResponse instanceof OMVolumeCreateResponse);
+      assertInstanceOf(OMVolumeCreateResponse.class, omClientResponse);
       OMVolumeCreateResponse response = (OMVolumeCreateResponse) omClientResponse;
       assertEquals(expectedObjId, response.getOmVolumeArgs().getObjectID());
       assertEquals(txLogIndex, response.getOmVolumeArgs().getUpdateID());

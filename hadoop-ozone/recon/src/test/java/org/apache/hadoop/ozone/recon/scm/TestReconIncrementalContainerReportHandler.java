@@ -30,7 +30,9 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
@@ -65,18 +67,28 @@ public class TestReconIncrementalContainerReportHandler
   private HDDSLayoutVersionManager versionManager;
 
   @Test
-  public void testProcessICR() throws IOException, NodeNotFoundException {
+  public void testProcessICR()
+      throws IOException, NodeNotFoundException, TimeoutException {
 
     ContainerID containerID = ContainerID.valueOf(100L);
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
     IncrementalContainerReportFromDatanode reportMock =
         mock(IncrementalContainerReportFromDatanode.class);
     when(reportMock.getDatanodeDetails()).thenReturn(datanodeDetails);
+
+    ContainerWithPipeline containerWithPipeline = getTestContainer(
+        containerID.getId(), OPEN);
+    List<ContainerWithPipeline> containerWithPipelineList = new ArrayList<>();
+    containerWithPipelineList.add(containerWithPipeline);
+    ReconContainerManager containerManager = getContainerManager();
     IncrementalContainerReportProto containerReport =
         getIncrementalContainerReportProto(containerID,
             State.OPEN,
             datanodeDetails.getUuidString());
     when(reportMock.getReport()).thenReturn(containerReport);
+    when(getContainerManager().getScmClient()
+        .getExistContainerWithPipelinesInBatch(any(
+            ArrayList.class))).thenReturn(containerWithPipelineList);
 
     final String path =
         GenericTestUtils.getTempPath(UUID.randomUUID().toString());
@@ -97,7 +109,6 @@ public class TestReconIncrementalContainerReportHandler
 
     nodeManager.register(datanodeDetails, null, null);
 
-    ReconContainerManager containerManager = getContainerManager();
     ReconIncrementalContainerReportHandler reconIcr =
         new ReconIncrementalContainerReportHandler(nodeManager,
             containerManager, SCMContext.emptyContext());

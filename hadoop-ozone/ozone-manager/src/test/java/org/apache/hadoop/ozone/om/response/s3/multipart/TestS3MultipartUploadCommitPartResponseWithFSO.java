@@ -18,10 +18,10 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -235,7 +235,7 @@ public class TestS3MultipartUploadCommitPartResponseWithFSO
     List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
         = omMetadataManager.getDeletedTable().getRangeKVs(
         null, 100, deletedKey);
-    assertTrue(rangeKVs.size() > 0);
+    assertThat(rangeKVs.size()).isGreaterThan(0);
   }
 
   private String getKeyName() {
