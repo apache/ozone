@@ -44,15 +44,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Recover
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockRequest;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -60,9 +57,6 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB.setReplicationConfig;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.when;
 
 /**
  * Tests OMRecoverLeaseRequest.
@@ -83,14 +77,6 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
    */
   @Test
   public void testRecoverHsyncFile() throws Exception {
-    when(ozoneManager.getAclsEnabled()).thenReturn(true);
-    when(ozoneManager.getVolumeOwner(
-        anyString(),
-        any(IAccessAuthorizer.ACLType.class), any(
-        OzoneObj.ResourceType.class)))
-        .thenReturn("user");
-    InetSocketAddress address = new InetSocketAddress("localhost", 10000);
-    when(ozoneManager.getOmRpcServerAddr()).thenReturn(address);
     populateNamespace(true, true, true, true);
 
     OMClientResponse omClientResponse = validateAndUpdateCache();
@@ -114,14 +100,6 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
    */
   @Test
   public void testInitStageIdempotent() throws Exception {
-    when(ozoneManager.getAclsEnabled()).thenReturn(true);
-    when(ozoneManager.getVolumeOwner(
-        anyString(),
-        any(IAccessAuthorizer.ACLType.class), any(
-            OzoneObj.ResourceType.class)))
-        .thenReturn("user");
-    InetSocketAddress address = new InetSocketAddress("localhost", 10000);
-    when(ozoneManager.getOmRpcServerAddr()).thenReturn(address);
     populateNamespace(true, true, true, true);
 
     // call recovery first time
@@ -148,14 +126,6 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
    */
   @Test
   public void testCommitStageNotIdempotent() throws Exception {
-    when(ozoneManager.getAclsEnabled()).thenReturn(true);
-    when(ozoneManager.getVolumeOwner(
-        anyString(),
-        any(IAccessAuthorizer.ACLType.class), any(
-            OzoneObj.ResourceType.class)))
-        .thenReturn("user");
-    InetSocketAddress address = new InetSocketAddress("localhost", 10000);
-    when(ozoneManager.getOmRpcServerAddr()).thenReturn(address);
     populateNamespace(true, true, true, true);
 
     // call recovery
@@ -186,14 +156,6 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
    */
   @Test
   public void testRecoverWithNewFileLength() throws Exception {
-    when(ozoneManager.getAclsEnabled()).thenReturn(true);
-    when(ozoneManager.getVolumeOwner(
-        anyString(),
-        any(IAccessAuthorizer.ACLType.class), any(
-            OzoneObj.ResourceType.class)))
-        .thenReturn("user");
-    InetSocketAddress address = new InetSocketAddress("localhost", 10000);
-    when(ozoneManager.getOmRpcServerAddr()).thenReturn(address);
     populateNamespace(true, true, true, true);
 
     // call recovery
@@ -235,14 +197,6 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
    */
   @Test
   public void testRecoverWithNewClientID() throws Exception {
-    when(ozoneManager.getAclsEnabled()).thenReturn(true);
-    when(ozoneManager.getVolumeOwner(
-        anyString(),
-        any(IAccessAuthorizer.ACLType.class), any(
-            OzoneObj.ResourceType.class)))
-        .thenReturn("user");
-    InetSocketAddress address = new InetSocketAddress("localhost", 10000);
-    when(ozoneManager.getOmRpcServerAddr()).thenReturn(address);
     populateNamespace(true, true, true, true);
 
     // call recovery
@@ -267,14 +221,6 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
    */
   @Test
   public void testRejectAllocateBlockAndHsync() throws Exception {
-    when(ozoneManager.getAclsEnabled()).thenReturn(true);
-    when(ozoneManager.getVolumeOwner(
-        anyString(),
-        any(IAccessAuthorizer.ACLType.class), any(
-            OzoneObj.ResourceType.class)))
-        .thenReturn("user");
-    InetSocketAddress address = new InetSocketAddress("localhost", 10000);
-    when(ozoneManager.getOmRpcServerAddr()).thenReturn(address);
     populateNamespace(true, true, true, true);
 
     // call recovery
@@ -455,7 +401,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
   @NotNull
   protected OMRequest createKeyCommitRequest(KeyArgs keyArgs, boolean newClientID, boolean recovery) {
     CommitKeyRequest.Builder rb =
-        CommitKeyRequest.newBuilder().setKeyArgs(keyArgs).setRecovery(recovery).setHsync(true);
+        CommitKeyRequest.newBuilder().setKeyArgs(keyArgs).setRecovery(recovery);
     rb.setClientID(newClientID ? clientID + 1 : clientID);
     return OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.CommitKey)

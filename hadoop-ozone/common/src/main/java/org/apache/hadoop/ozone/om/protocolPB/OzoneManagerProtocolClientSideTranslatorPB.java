@@ -789,7 +789,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @Override
   public void recoverKey(OmKeyArgs args, long clientId)
       throws IOException {
-    updateKey(args, clientId, true, true);
+    updateKey(args, clientId, false, true);
   }
 
   public static void setReplicationConfig(ReplicationConfig replication,
@@ -2444,21 +2444,20 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public List<OmKeyInfo> recoverLease(String volumeName, String bucketName,
-                                                 String keyName) throws IOException {
+  public List<OmKeyInfo> recoverLease(String volumeName, String bucketName, String keyName) throws IOException {
     RecoverLeaseRequest recoverLeaseRequest =
-            RecoverLeaseRequest.newBuilder()
-                    .setVolumeName(volumeName)
-                    .setBucketName(bucketName)
-                    .setKeyName(keyName)
-                    .build();
+        RecoverLeaseRequest.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(keyName)
+            .build();
 
     OMRequest omRequest = createOMRequest(Type.RecoverLease)
-            .setRecoverLeaseRequest(recoverLeaseRequest).build();
+        .setRecoverLeaseRequest(recoverLeaseRequest).build();
 
     RecoverLeaseResponse recoverLeaseResponse =
-            handleError(submitRequest(omRequest)).getRecoverLeaseResponse();
-    ArrayList list = new ArrayList();
+        handleError(submitRequest(omRequest)).getRecoverLeaseResponse();
+    ArrayList<OmKeyInfo> list = new ArrayList();
     list.add(OmKeyInfo.getFromProtobuf(recoverLeaseResponse.getKeyInfo()));
     list.add(OmKeyInfo.getFromProtobuf(recoverLeaseResponse.getOpenKeyInfo()));
     return list;

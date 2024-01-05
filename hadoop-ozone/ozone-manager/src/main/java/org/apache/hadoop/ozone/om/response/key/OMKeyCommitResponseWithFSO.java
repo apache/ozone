@@ -54,9 +54,9 @@ public class OMKeyCommitResponseWithFSO extends OMKeyCommitResponse {
       String ozoneKeyName, String openKeyName,
       @Nonnull OmBucketInfo omBucketInfo,
       Map<String, RepeatedOmKeyInfo> deleteKeyMap, long volumeId,
-      boolean realCommit) {
+      boolean isHSync) {
     super(omResponse, omKeyInfo, ozoneKeyName, openKeyName,
-            omBucketInfo, deleteKeyMap, realCommit);
+            omBucketInfo, deleteKeyMap, isHSync);
     this.volumeId = volumeId;
   }
 
@@ -75,7 +75,7 @@ public class OMKeyCommitResponseWithFSO extends OMKeyCommitResponse {
                            BatchOperation batchOperation) throws IOException {
 
     // Delete from OpenKey table if commit
-    if (this.isRealCommit()) {
+    if (!this.isHSync()) {
       omMetadataManager.getOpenKeyTable(getBucketLayout())
           .deleteWithBatch(batchOperation, getOpenKeyName());
     }

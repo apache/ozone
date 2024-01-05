@@ -65,7 +65,6 @@ import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,7 +83,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyArgs;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
@@ -660,25 +658,6 @@ public abstract class OMKeyRequest extends OMClientRequest {
         .getCacheValue(new CacheKey<>(bucketKey));
 
     return value != null ? value.getCacheValue() : null;
-  }
-
-  @NotNull
-  protected List<OmKeyLocationInfo> getOmKeyLocationInfos(
-      OzoneManager ozoneManager, KeyArgs commitKeyArgs) {
-    List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();
-    for (KeyLocation keyLocation : commitKeyArgs.getKeyLocationsList()) {
-      OmKeyLocationInfo locationInfo =
-          OmKeyLocationInfo.getFromProtobuf(keyLocation);
-
-      // Strip out tokens before adding to cache.
-      // This way during listStatus token information does not pass on to
-      // client when returning from cache.
-      if (ozoneManager.isGrpcBlockTokenEnabled()) {
-        locationInfo.setToken(null);
-      }
-      locationInfoList.add(locationInfo);
-    }
-    return locationInfoList;
   }
 
   /**

@@ -1405,7 +1405,7 @@ public class BasicRootedOzoneClientAdapterImpl
 
   @Override
   public List<OmKeyInfo> recoverFilePrepare(final String pathStr) throws IOException {
-    incrementCounter(Statistic.INVOCATION_RECOVER_LEASE, 1);
+    incrementCounter(Statistic.INVOCATION_RECOVER_FILE_PREPARE, 1);
     OFSPath ofsPath = new OFSPath(pathStr, config);
 
     OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
@@ -1416,7 +1416,7 @@ public class BasicRootedOzoneClientAdapterImpl
 
   @Override
   public void recoverFile(OmKeyArgs keyArgs) throws IOException {
-    incrementCounter(Statistic.INVOCATION_COMMIT, 1);
+    incrementCounter(Statistic.INVOCATION_RECOVER_FILE, 1);
 
     ozoneClient.getProxy().getOzoneManagerClient().recoverKey(keyArgs, 0L);
   }

@@ -134,7 +134,6 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
    */
   @Override
   public boolean recoverLease(final Path f) throws IOException {
-    incrementCounter(Statistic.INVOCATION_RECOVER_LEASE, 1);
     statistics.incrementWriteOps(1);
     LOG.trace("recoverLease() path:{}", f);
     Path qualifiedPath = makeQualified(f);
@@ -153,7 +152,6 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
 
   @Override
   public boolean isFileClosed(Path f) throws IOException {
-    incrementCounter(Statistic.INVOCATION_IS_FILE_CLOSED, 1);
     statistics.incrementReadOps(1);
     LOG.trace("isFileClosed() path:{}", f);
     Path qualifiedPath = makeQualified(f);

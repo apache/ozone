@@ -106,8 +106,11 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
     Result result;
     boolean isHSync = commitKeyRequest.hasHsync() && commitKeyRequest.getHsync();
     boolean isRecovery = commitKeyRequest.hasRecovery() && commitKeyRequest.getRecovery();
-    boolean realCommit = (!isHSync) || (isHSync && isRecovery);
-    if (!realCommit) {
+    // isHsync = true, a commit request as a result of client side hsync call
+    // isRecovery = true, a commit request as a result of client side recoverLease call
+    // none of isHsync and isRecovery is true, a commit request as a result of client side normal
+    // outputStream#close call.
+    if (isHSync) {
       omMetrics.incNumKeyHSyncs();
     } else {
       omMetrics.incNumKeyCommits();
@@ -183,7 +186,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       omKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
           commitKeyArgs.getMetadataList()));
-      if (!realCommit) {
+      if (isHSync) {
         omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID, String.valueOf(writerClientId));
       } else if (isRecovery) {
         omKeyInfo.getMetadata().remove(OzoneConsts.HSYNC_CLIENT_ID);
@@ -218,7 +221,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       // if keyToDelete isn't null, usedNamespace shouldn't check and
       // increase.
-      if (keyToDelete != null && (!realCommit || isPreviousCommitHsync)) {
+      if (keyToDelete != null && (isHSync || isPreviousCommitHsync)) {
         correctedSpace -= keyToDelete.getReplicatedSize();
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
             correctedSpace);
@@ -255,7 +258,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       // let the uncommitted blocks pretend as key's old version blocks
       // which will be deleted as RepeatedOmKeyInfo
-      final OmKeyInfo pseudoKeyInfo = !realCommit ? null
+      final OmKeyInfo pseudoKeyInfo = isHSync ? null
           : wrapUncommittedBlocksAsPseudoKey(uncommitted, omKeyInfo);
       if (pseudoKeyInfo != null) {
         String delKeyName = omMetadataManager
@@ -271,7 +274,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       }
 
       // Add to cache of open key table and key table.
-      if (realCommit) {
+      if (!isHSync) {
         // If isHSync = false, put a tombstone in OpenKeyTable cache,
         // indicating the key is removed from OpenKeyTable.
         // So that this key can't be committed again.
@@ -286,7 +289,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       omClientResponse = new OMKeyCommitResponseWithFSO(omResponse.build(),
               omKeyInfo, dbFileKey, dbOpenFileKey, omBucketInfo.copyObject(),
-          oldKeyVersionsToDeleteMap, volumeId, realCommit);
+          oldKeyVersionsToDeleteMap, volumeId, isHSync);
 
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {
@@ -311,7 +314,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
     LOG.debug("Key commit {} with isHSync = {}, omKeyInfo = {}",
         result == Result.SUCCESS ? "succeeded" : "failed", isHSync, omKeyInfo);
 
-    if (realCommit) {
+    if (!isHSync) {
       auditLog(auditLogger, buildAuditMessage(OMAction.COMMIT_KEY, auditMap,
               exception, getOmRequest().getUserInfo()));
       processResult(commitKeyRequest, volumeName, bucketName, keyName,
