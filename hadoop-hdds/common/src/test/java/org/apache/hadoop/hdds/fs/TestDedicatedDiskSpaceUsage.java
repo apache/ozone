@@ -27,12 +27,13 @@ import java.io.IOException;
 
 import static org.apache.hadoop.hdds.fs.TestDU.createFile;
 import static org.apache.ozone.test.GenericTestUtils.getTestDir;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for {@link DedicatedDiskSpaceUsage}.
  */
-public class TestDedicatedDiskSpaceUsage {
+class TestDedicatedDiskSpaceUsage {
 
   private static final File DIR =
       getTestDir(TestDedicatedDiskSpaceUsage.class.getSimpleName());
@@ -40,24 +41,24 @@ public class TestDedicatedDiskSpaceUsage {
   private static final int FILE_SIZE = 1024;
 
   @BeforeEach
-  public void setUp() {
+  void setUp() {
     FileUtil.fullyDelete(DIR);
     assertTrue(DIR.mkdirs());
   }
 
   @AfterEach
-  public void tearDown() throws IOException {
+  void tearDown() {
     FileUtil.fullyDelete(DIR);
   }
 
   @Test
-  public void testGetUsed() throws IOException {
+  void testGetUsed() throws IOException {
     File file = new File(DIR, "data");
     createFile(file, FILE_SIZE);
     SpaceUsageSource subject = new DedicatedDiskSpaceUsage(DIR);
 
     // condition comes from TestDFCachingGetSpaceUsed in Hadoop Common
-    assertTrue(subject.getUsedSpace() >= FILE_SIZE - 20);
+    assertThat(subject.getUsedSpace()).isGreaterThanOrEqualTo(FILE_SIZE - 20);
   }
 
 }
