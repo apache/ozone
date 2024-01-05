@@ -253,15 +253,13 @@ class TestNetworkTopologyImpl {
   void testInitWithConfigFile() {
     ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
     OzoneConfiguration conf = new OzoneConfiguration();
-    try {
-      String filePath = classLoader.getResource(
-          "./networkTopologyTestFiles/good.xml").getPath();
-      conf.set(ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE, filePath);
-      NetworkTopology newCluster = new NetworkTopologyImpl(conf);
-      LOG.info("network topology max level = {}", newCluster.getMaxLevel());
-    } catch (Throwable e) {
-      fail("should succeed");
-    }
+    String filePath = classLoader
+        .getResource("./networkTopologyTestFiles/good.xml")
+        .getPath();
+    conf.set(ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE, filePath);
+    NetworkTopology newCluster = new NetworkTopologyImpl(conf);
+    LOG.info("network topology max level = {}", newCluster.getMaxLevel());
+    assertEquals(4, newCluster.getMaxLevel());
   }
 
   @ParameterizedTest
@@ -313,53 +311,32 @@ class TestNetworkTopologyImpl {
     // Inner nodes are created automatically
     assertThat(cluster.getNumOfNodes(2)).isPositive();
 
-    Exception e = assertThrows(Exception.class,
+    Exception e = assertThrows(IllegalArgumentException.class,
         () -> cluster.add(cluster.chooseRandom(null).getParent()));
     assertThat(e).hasMessageStartingWith("Not allowed to add an inner node");
 
-    Exception e2 = assertThrows(Exception.class,
+    Exception e2 = assertThrows(IllegalArgumentException.class,
         () -> cluster.remove(cluster.chooseRandom(null).getParent()));
     assertThat(e2).hasMessageStartingWith("Not allowed to remove an inner node");
   }
 
   @ParameterizedTest
   @MethodSource("topologies")
-  void testGetNumOfNodesWithLevel(NodeSchema[] schemas,
-      Node[] nodeArray) {
+  void testGetNumOfNodesWithLevel(NodeSchema[] schemas, Node[] nodeArray) {
     initNetworkTopology(schemas, nodeArray);
     int maxLevel = cluster.getMaxLevel();
-    try {
-      assertEquals(1, cluster.getNumOfNodes(0));
-      fail("level 0 is not supported");
-    } catch (IllegalArgumentException e) {
-      assertThat(e).hasMessageStartingWith("Invalid level");
-    }
 
-    try {
-      assertEquals(1, cluster.getNumOfNodes(0));
-      fail("level 0 is not supported");
-    } catch (IllegalArgumentException e) {
-      assertThat(e).hasMessageStartingWith("Invalid level");
-    }
+    Exception e = assertThrows(IllegalArgumentException.class,
+        () -> cluster.getNumOfNodes(0));
+    assertThat(e).hasMessageStartingWith("Invalid level");
 
-    try {
-      assertEquals(1, cluster.getNumOfNodes(maxLevel + 1));
-      fail("level out of scope");
-    } catch (IllegalArgumentException e) {
-      assertThat(e).hasMessageStartingWith("Invalid level");
-    }
+    Exception e2 = assertThrows(IllegalArgumentException.class,
+        () -> cluster.getNumOfNodes(maxLevel + 1));
+    assertThat(e2).hasMessageStartingWith("Invalid level");
 
-    try {
-      assertEquals(1, cluster.getNumOfNodes(maxLevel + 1));
-      fail("level out of scope");
-    } catch (IllegalArgumentException e) {
-      assertThat(e).hasMessageStartingWith("Invalid level");
-    }
     // root node
     assertEquals(1, cluster.getNumOfNodes(1));
-    assertEquals(1, cluster.getNumOfNodes(1));
     // leaf nodes
-    assertEquals(dataNodes.length, cluster.getNumOfNodes(maxLevel));
     assertEquals(dataNodes.length, cluster.getNumOfNodes(maxLevel));
   }
 
@@ -368,19 +345,14 @@ class TestNetworkTopologyImpl {
   void testGetNodesWithLevel(NodeSchema[] schemas, Node[] nodeArray) {
     initNetworkTopology(schemas, nodeArray);
     int maxLevel = cluster.getMaxLevel();
-    try {
-      assertNotNull(cluster.getNodes(0));
-      fail("level 0 is not supported");
-    } catch (IllegalArgumentException e) {
-      assertThat(e).hasMessageStartingWith("Invalid level");
-    }
 
-    try {
-      assertNotNull(cluster.getNodes(maxLevel + 1));
-      fail("level out of scope");
-    } catch (IllegalArgumentException e) {
-      assertThat(e).hasMessageStartingWith("Invalid level");
-    }
+    Exception e = assertThrows(IllegalArgumentException.class,
+        () -> cluster.getNodes(0));
+    assertThat(e).hasMessageStartingWith("Invalid level");
+
+    Exception e2 = assertThrows(IllegalArgumentException.class,
+        () -> cluster.getNodes(maxLevel + 1));
+    assertThat(e2).hasMessageStartingWith("Invalid level");
 
     // root node
     assertEquals(1, cluster.getNodes(1).size());
@@ -755,16 +727,13 @@ class TestNetworkTopologyImpl {
         ancestorGen--;
       }
     }
+
     // check invalid ancestor generation
-    try {
-      cluster.chooseRandom(null, null, null, dataNodes[0],
-          cluster.getMaxLevel());
-      fail("ancestor generation exceeds max level, should fail");
-    } catch (Exception e) {
-      assertThat(e.getMessage()).startsWith("ancestorGen " +
-          cluster.getMaxLevel() +
-          " exceeds this network topology acceptable level");
-    }
+    Exception e = assertThrows(IllegalArgumentException.class,
+        () -> cluster.chooseRandom(null, null, null, dataNodes[0],
+            cluster.getMaxLevel()));
+    assertThat(e.getMessage()).startsWith("ancestorGen " + cluster.getMaxLevel() +
+        " exceeds this network topology acceptable level");
   }
 
   @Test
