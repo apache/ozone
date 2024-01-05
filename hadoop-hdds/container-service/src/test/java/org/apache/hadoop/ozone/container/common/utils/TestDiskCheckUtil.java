@@ -17,11 +17,15 @@
  */
 package org.apache.hadoop.ozone.container.common.utils;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests {@link DiskCheckUtil} does not incorrectly identify an unhealthy
@@ -37,44 +41,44 @@ public class TestDiskCheckUtil {
   @Test
   public void testPermissions() {
     // Ensure correct test setup before testing the disk check.
-    Assertions.assertTrue(testDir.canRead());
-    Assertions.assertTrue(testDir.canWrite());
-    Assertions.assertTrue(testDir.canExecute());
-    Assertions.assertTrue(DiskCheckUtil.checkPermissions(testDir));
+    assertTrue(testDir.canRead());
+    assertTrue(testDir.canWrite());
+    assertTrue(testDir.canExecute());
+    assertTrue(DiskCheckUtil.checkPermissions(testDir));
 
     // Test failure without read permissiosns.
-    Assertions.assertTrue(testDir.setReadable(false));
-    Assertions.assertFalse(DiskCheckUtil.checkPermissions(testDir));
-    Assertions.assertTrue(testDir.setReadable(true));
+    assertTrue(testDir.setReadable(false));
+    assertFalse(DiskCheckUtil.checkPermissions(testDir));
+    assertTrue(testDir.setReadable(true));
 
     // Test failure without write permissiosns.
-    Assertions.assertTrue(testDir.setWritable(false));
-    Assertions.assertFalse(DiskCheckUtil.checkPermissions(testDir));
-    Assertions.assertTrue(testDir.setWritable(true));
+    assertTrue(testDir.setWritable(false));
+    assertFalse(DiskCheckUtil.checkPermissions(testDir));
+    assertTrue(testDir.setWritable(true));
 
     // Test failure without execute permissiosns.
-    Assertions.assertTrue(testDir.setExecutable(false));
-    Assertions.assertFalse(DiskCheckUtil.checkPermissions(testDir));
-    Assertions.assertTrue(testDir.setExecutable(true));
+    assertTrue(testDir.setExecutable(false));
+    assertFalse(DiskCheckUtil.checkPermissions(testDir));
+    assertTrue(testDir.setExecutable(true));
   }
 
   @Test
   public void testExistence() {
     // Ensure correct test setup before testing the disk check.
-    Assertions.assertTrue(testDir.exists());
-    Assertions.assertTrue(DiskCheckUtil.checkExistence(testDir));
+    assertTrue(testDir.exists());
+    assertTrue(DiskCheckUtil.checkExistence(testDir));
 
-    Assertions.assertTrue(testDir.delete());
-    Assertions.assertFalse(DiskCheckUtil.checkExistence(testDir));
+    assertTrue(testDir.delete());
+    assertFalse(DiskCheckUtil.checkExistence(testDir));
   }
 
   @Test
   public void testReadWrite() {
-    Assertions.assertTrue(DiskCheckUtil.checkReadWrite(testDir, testDir, 10));
+    assertTrue(DiskCheckUtil.checkReadWrite(testDir, testDir, 10));
 
     // Test file should have been deleted.
     File[] children = testDir.listFiles();
-    Assertions.assertNotNull(children);
-    Assertions.assertEquals(0, children.length);
+    assertNotNull(children);
+    assertEquals(0, children.length);
   }
 }

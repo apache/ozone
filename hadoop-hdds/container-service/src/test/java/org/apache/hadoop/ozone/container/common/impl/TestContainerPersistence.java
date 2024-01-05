@@ -87,14 +87,16 @@ import static org.apache.hadoop.ozone.container.ContainerTestHelper.setDataCheck
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -163,7 +165,7 @@ public class TestContainerPersistence {
         volumeSet.getVolumesList())) {
       boolean success = StorageVolumeUtil.checkVolume(volume, SCM_ID, SCM_ID,
           conf, null, null);
-      Assertions.assertTrue(success);
+      assertTrue(success);
     }
     blockManager = new BlockManagerImpl(conf);
     chunkManager = ChunkManagerFactory.createChunkManager(conf, blockManager,
@@ -231,16 +233,16 @@ public class TestContainerPersistence {
         (KeyValueContainerData) containerSet.getContainer(testContainerID)
             .getContainerData();
 
-    Assertions.assertNotNull(kvData);
-    Assertions.assertTrue(new File(kvData.getMetadataPath()).exists());
-    Assertions.assertTrue(new File(kvData.getChunksPath()).exists());
-    Assertions.assertTrue(kvData.getDbFile().exists());
+    assertNotNull(kvData);
+    assertTrue(new File(kvData.getMetadataPath()).exists());
+    assertTrue(new File(kvData.getChunksPath()).exists());
+    assertTrue(kvData.getDbFile().exists());
 
     Path meta = kvData.getDbFile().toPath().getParent();
-    Assertions.assertTrue(meta != null && Files.exists(meta));
+    assertTrue(meta != null && Files.exists(meta));
 
     try (DBHandle store = BlockUtils.getDB(kvData, conf)) {
-      Assertions.assertNotNull(store);
+      assertNotNull(store);
     }
   }
 
@@ -255,7 +257,7 @@ public class TestContainerPersistence {
       containerSet.addContainer(container);
       fail("Expected Exception not thrown.");
     } catch (IOException ex) {
-      Assertions.assertNotNull(ex);
+      assertNotNull(ex);
     }
   }
 
@@ -320,7 +322,7 @@ public class TestContainerPersistence {
         datanodeId, containerSet, volumeSet, metrics,
         c -> icrReceived.incrementAndGet());
 
-    Exception exception = Assertions.assertThrows(
+    Exception exception = assertThrows(
         StorageContainerException.class,
         () -> kvHandler.deleteContainer(container, false));
     assertThat(containerSet.getContainerMapCopy())
@@ -373,9 +375,9 @@ public class TestContainerPersistence {
       Table<String, Long> metadataTable = store.getMetadataTable();
 
       // Block data and metadata tables should have data.
-      Assertions.assertNotNull(blockTable
+      assertNotNull(blockTable
           .getIfExist(containerData.getBlockKey(testBlock.getLocalID())));
-      Assertions.assertNotNull(metadataTable
+      assertNotNull(metadataTable
           .getIfExist(containerData.getBlockCountKey()));
     }
   }
@@ -395,9 +397,9 @@ public class TestContainerPersistence {
       Table<String, Long> metadataTable = store.getMetadataTable();
 
       // Block data and metadata tables should have data.
-      Assertions.assertNull(blockTable
+      assertNull(blockTable
           .getIfExist(containerData.getBlockKey(testBlock.getLocalID())));
-      Assertions.assertNull(metadataTable
+      assertNull(metadataTable
           .getIfExist(containerData.getBlockCountKey()));
     }
   }
@@ -456,10 +458,10 @@ public class TestContainerPersistence {
     // Volume setup should have created the tmp directory for container
     // deletion.
     File volumeTmpDir = hddsVolume.getTmpDir();
-    Assertions.assertTrue(volumeTmpDir.exists(), String.format("Volume level " +
+    assertTrue(volumeTmpDir.exists(), String.format("Volume level " +
         "tmp dir %s not created.", volumeTmpDir));
     File deletedContainerDir = hddsVolume.getDeletedContainerDir();
-    Assertions.assertTrue(deletedContainerDir.exists(),
+    assertTrue(deletedContainerDir.exists(),
         String.format("Volume level container deleted directory" +
             " %s not created.", deletedContainerDir));
 
@@ -471,7 +473,7 @@ public class TestContainerPersistence {
 
     // Both containers should be present in the deleted directory.
     File[] deleteDirFilesArray = deletedContainerDir.listFiles();
-    Assertions.assertNotNull(deleteDirFilesArray);
+    assertNotNull(deleteDirFilesArray);
     Set<File> deleteDirFiles = Arrays.stream(deleteDirFilesArray)
         .collect(Collectors.toSet());
     assertEquals(2, deleteDirFiles.size());
@@ -494,7 +496,7 @@ public class TestContainerPersistence {
 
     // Check the delete directory again. Only container 2 should remain.
     deleteDirFilesArray = deletedContainerDir.listFiles();
-    Assertions.assertNotNull(deleteDirFilesArray);
+    assertNotNull(deleteDirFilesArray);
     assertEquals(1, deleteDirFilesArray.length);
     assertEquals(deleteDirFilesArray[0], container2Dir);
 
@@ -516,7 +518,7 @@ public class TestContainerPersistence {
 
     // Deleted containers directory should now be empty.
     deleteDirFilesArray = deletedContainerDir.listFiles();
-    Assertions.assertNotNull(deleteDirFilesArray);
+    assertNotNull(deleteDirFilesArray);
     assertEquals(0, deleteDirFilesArray.length);
   }
 
@@ -546,9 +548,9 @@ public class TestContainerPersistence {
     for (StorageContainerDatanodeProtocolProtos.ContainerReplicaProto report :
         reports) {
       long actualContainerID = report.getContainerID();
-      Assertions.assertTrue(containerIDs.remove(actualContainerID));
+      assertTrue(containerIDs.remove(actualContainerID));
     }
-    Assertions.assertTrue(containerIDs.isEmpty());
+    assertTrue(containerIDs.isEmpty());
   }
 
   /**
@@ -589,7 +591,7 @@ public class TestContainerPersistence {
     }
     // Assert that we listed all the keys that we had put into
     // container.
-    Assertions.assertTrue(testMap.isEmpty());
+    assertTrue(testMap.isEmpty());
   }
 
   private ChunkInfo writeChunkHelper(BlockID blockID) throws IOException {
@@ -667,7 +669,7 @@ public class TestContainerPersistence {
 
     KeyValueContainerData cNewData =
         (KeyValueContainerData) container.getContainerData();
-    Assertions.assertNotNull(cNewData);
+    assertNotNull(cNewData);
     Path dataDir = Paths.get(cNewData.getChunksPath());
 
     // Read chunk via file system and verify.
@@ -741,7 +743,7 @@ public class TestContainerPersistence {
     chunkManager.writeChunk(container, blockID, info, data,
         DispatcherContext.getHandleWriteChunk());
     chunkManager.deleteChunk(container, blockID, info);
-    Assertions.assertThrows(StorageContainerException.class,
+    assertThrows(StorageContainerException.class,
         () -> chunkManager.readChunk(
             container, blockID, info, DispatcherContext.getHandleReadChunk()));
   }
@@ -808,7 +810,7 @@ public class TestContainerPersistence {
       // read with bcsId higher than container bcsId
       blockManager.
           getBlock(container, blockID1);
-      Assertions.fail("Expected exception not thrown");
+      fail("Expected exception not thrown");
     } catch (StorageContainerException sce) {
       assertSame(UNKNOWN_BCSID, sce.getResult());
     }
@@ -819,7 +821,7 @@ public class TestContainerPersistence {
       // bcsId.
       blockManager.
           getBlock(container, blockID1);
-      Assertions.fail("Expected exception not thrown");
+      fail("Expected exception not thrown");
     } catch (StorageContainerException sce) {
       assertSame(BCSID_MISMATCH, sce.getResult());
     }
@@ -898,7 +900,7 @@ public class TestContainerPersistence {
         (KeyValueContainer) addContainer(containerSet, testContainerID);
 
     File orgContainerFile = container.getContainerFile();
-    Assertions.assertTrue(orgContainerFile.exists());
+    assertTrue(orgContainerFile.exists());
 
     Map<String, String> newMetadata = Maps.newHashMap();
     newMetadata.put("VOLUME", "shire_new");
@@ -922,7 +924,7 @@ public class TestContainerPersistence {
     File containerBaseDir = new File(actualNewData.getMetadataPath())
         .getParentFile();
     File newContainerFile = ContainerUtils.getContainerFile(containerBaseDir);
-    Assertions.assertTrue(newContainerFile.exists(),
+    assertTrue(newContainerFile.exists(),
         "Container file should exist.");
     assertEquals(
         orgContainerFile.getAbsolutePath(), newContainerFile.getAbsolutePath(),

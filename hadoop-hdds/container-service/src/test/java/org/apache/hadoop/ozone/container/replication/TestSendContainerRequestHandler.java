@@ -29,11 +29,11 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -70,7 +70,7 @@ class TestSendContainerRequestHandler {
     doAnswer(invocation -> {
       Object arg = invocation.getArgument(0);
       assertInstanceOf(StorageContainerException.class, arg);
-      Assertions.assertEquals(ContainerProtos.Result.CONTAINER_EXISTS,
+      assertEquals(ContainerProtos.Result.CONTAINER_EXISTS,
           ((StorageContainerException) arg).getResult());
       return null;
     }).when(observer).onError(any());

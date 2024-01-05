@@ -44,8 +44,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
         .OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
         .Status;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -110,14 +108,6 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
     List<OmDirectoryInfo> missingParentInfos;
 
     try {
-      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
-      volumeName = keyArgs.getVolumeName();
-      bucketName = keyArgs.getBucketName();
-
-      // check Acl
-      checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
-          IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
-
       // Check if this is the root of the filesystem.
       if (keyName.length() == 0) {
         throw new OMException("Directory create failed. Cannot create " +

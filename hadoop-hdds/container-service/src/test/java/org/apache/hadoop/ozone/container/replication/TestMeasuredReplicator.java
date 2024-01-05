@@ -23,12 +23,12 @@ import java.time.temporal.ChronoUnit;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.forTest;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test replicator metric measurement.
@@ -72,13 +72,13 @@ public class TestMeasuredReplicator {
 
     //THEN
     //even containers should be failed
-    Assertions.assertEquals(2, measuredReplicator.getSuccess().value());
-    Assertions.assertEquals(1, measuredReplicator.getFailure().value());
+    assertEquals(2, measuredReplicator.getSuccess().value());
+    assertEquals(1, measuredReplicator.getFailure().value());
 
     //sum of container ids (success) in kb
-    Assertions.assertEquals((1 + 3) * 1024,
+    assertEquals((1 + 3) * 1024,
         measuredReplicator.getTransferredBytes().value());
-    Assertions.assertEquals(2 * 1024,
+    assertEquals(2 * 1024,
         measuredReplicator.getFailureBytes().value());
   }
 
@@ -111,7 +111,7 @@ public class TestMeasuredReplicator {
 
     //THEN
     //even containers should be failed, supposed to be zero
-    Assertions.assertEquals(0, measuredReplicator.getFailureTime().value());
+    assertEquals(0, measuredReplicator.getFailureTime().value());
   }
 
   @Test
@@ -123,7 +123,7 @@ public class TestMeasuredReplicator {
 
     //THEN
     //even containers should be failed, supposed to be zero
-    Assertions.assertEquals(0, measuredReplicator.getSuccessTime().value());
+    assertEquals(0, measuredReplicator.getSuccessTime().value());
   }
 
   @Test

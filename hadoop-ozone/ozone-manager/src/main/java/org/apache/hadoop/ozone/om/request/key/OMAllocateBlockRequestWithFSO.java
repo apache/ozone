@@ -44,7 +44,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Allocat
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -111,14 +110,6 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
     boolean acquiredLock = false;
 
     try {
-      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
-      volumeName = keyArgs.getVolumeName();
-      bucketName = keyArgs.getBucketName();
-
-      // check Acl
-      checkKeyAclsInOpenKeyTable(ozoneManager, volumeName, bucketName, keyName,
-          IAccessAuthorizer.ACLType.WRITE, allocateBlockRequest.getClientID());
-
       validateBucketAndVolume(omMetadataManager, volumeName,
           bucketName);
 
