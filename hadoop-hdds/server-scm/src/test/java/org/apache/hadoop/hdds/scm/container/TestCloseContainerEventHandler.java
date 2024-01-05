@@ -48,7 +48,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doAnswer;
@@ -154,7 +153,6 @@ public class TestCloseContainerEventHandler {
     closeHandler.onMessage(container.containerID(), eventPublisher);
     verify(mockLeaseManager, atLeastOnce()).acquire(any(), anyLong(), any());
     assertThat(leaseList.size()).isGreaterThan(0);
-    assertTrue(leaseList.size() > 0);
     // immediate check if event is published
     verify(eventPublisher, never()).fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
     // wait for event to happen
