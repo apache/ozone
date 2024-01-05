@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.ratis;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -27,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.BiFunction;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -64,11 +66,16 @@ import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
+import org.apache.ratis.util.JavaUtils;
 import org.apache.ratis.util.JvmPauseMonitor;
+import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.TrustManager;
+
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.apache.ratis.util.Preconditions.assertTrue;
 
 /**
  * Ratis helper methods.
@@ -603,4 +610,32 @@ public final class RatisHelper {
       // Not re-thrown in order to keep the main exception, if there is any.
     }
   }
+
+  /**
+   * Similar to {@link JavaUtils#attemptUntilTrue(BooleanSupplier, int, TimeDuration, String, Logger)},
+   * but:
+   * <li>takes max. {@link Duration} instead of number of attempts</li>
+   * <li>accepts {@link Duration} instead of {@link TimeDuration} for sleep time</li>
+   *
+   * @return true if attempt was successful,
+   * false if wait for condition to become true timed out or was interrupted
+   */
+  public static boolean attemptUntilTrue(BooleanSupplier condition, Duration pollInterval, Duration timeout) {
+    try {
+      final int attempts = calculateAttempts(pollInterval, timeout);
+      final TimeDuration sleepTime = TimeDuration.valueOf(pollInterval.toMillis(), MILLISECONDS);
+      JavaUtils.attemptUntilTrue(condition, attempts, sleepTime, null, null);
+      return true;
+    } catch (InterruptedException | IllegalStateException exception) {
+      return false;
+    }
+  }
+
+  public static int calculateAttempts(Duration pollInterval, Duration maxDuration) {
+    final long max = maxDuration.toMillis();
+    final long interval = pollInterval.toMillis();
+    assertTrue(max >= interval, () -> "max: " + maxDuration + " < interval:" + pollInterval);
+    return (int) (max / interval);
+  }
+
 }
