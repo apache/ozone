@@ -35,12 +35,13 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.container.common.volume.HddsVolume
     .HDDS_VOLUME_DIR;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -153,7 +154,7 @@ public class TestVolumeSet {
         "Failed Volume list did not match");
 
     // Failed volume should not exist in VolumeMap
-    assertFalse(volumeSet.getVolumeMap().containsKey(volume1));
+    assertThat(volumeSet.getVolumeMap()).doesNotContainKey(volume1);
   }
 
   @Test
@@ -173,9 +174,7 @@ public class TestVolumeSet {
     assertEquals(1, volumeSet.getVolumesList().size());
     String expectedLogMessage = "Volume : " +
         HddsVolumeUtil.getHddsRoot(volume1) + " does not exist in VolumeSet";
-    assertTrue(logs.getOutput().contains(expectedLogMessage),
-        "Log output does not contain expected log message: " +
-            expectedLogMessage);
+    assertThat(logs.getOutput()).contains(expectedLogMessage);
   }
 
   @Test
@@ -217,7 +216,7 @@ public class TestVolumeSet {
 
     // Verify that volume usage can be queried during shutdown.
     for (StorageVolume volume : volumesList) {
-      Assertions.assertNotNull(volume.getVolumeInfo().get()
+      assertNotNull(volume.getVolumeInfo().get()
               .getUsageForTesting());
       volume.getAvailable();
     }

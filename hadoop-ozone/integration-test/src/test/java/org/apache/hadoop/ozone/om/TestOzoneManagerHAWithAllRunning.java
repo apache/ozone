@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import com.google.protobuf.ServiceException;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -28,6 +29,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMProxyInfo;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
@@ -73,6 +75,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentity
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.apache.ratis.metrics.RatisMetrics.RATIS_APPLICATION_NAME_METRICS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -385,10 +388,10 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
 
     OzoneManagerProtocolServerSideTranslatorPB omServerProtocol =
         followerOM.getOmServerProtocol();
-    Exception ex = assertThrows(Exception.class,
+    ServiceException ex = assertThrows(ServiceException.class,
         () -> omServerProtocol.submitRequest(null, writeRequest));
-    GenericTestUtils.assertExceptionContains("Suggested leader is OM:" +
-        leaderOMNodeId + "[" + leaderOMAddress + "]", ex);
+    assertThat(ex).hasCauseInstanceOf(OMNotLeaderException.class)
+        .hasMessageEndingWith("Suggested leader is OM:" + leaderOMNodeId + "[" + leaderOMAddress + "].");
   }
 
   @Test
@@ -458,7 +461,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
     OzoneManagerRatisServer ozoneManagerRatisServer =
         getCluster().getOzoneManager(currentLeaderNodeId).getOmRatisServer();
 
-    RaftServer raftServer = ozoneManagerRatisServer.getServer();
+    final RaftServer raftServer = ozoneManagerRatisServer.getServerDivision().getRaftServer();
 
     ClientId clientId = ClientId.randomId();
     long callId = 2000L;

@@ -27,12 +27,12 @@ import io.grpc.Metadata;
 import io.grpc.MethodDescriptor;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
-import org.mockito.Mockito;
 
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mockStatic;
 
 /**
  * Test OM GRPC client interceptor to define client ip and hostname headers.
@@ -42,7 +42,7 @@ public class TestClientAddressClientInterceptor {
   @Test
   public void testClientAddressEntriesInRequestHeaders() {
     try (MockedStatic<Context> grpcContextStaticMock =
-             Mockito.mockStatic(Context.class)) {
+             mockStatic(Context.class)) {
       // given
       Context.Key<String> ipAddressContextKey = mock(Context.Key.class);
       when(ipAddressContextKey.get()).thenReturn("172.43.3.2");

@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -46,10 +45,10 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * This class is used to test key related operations on the container.
@@ -94,7 +93,7 @@ public class TestBlockManagerImpl {
     volumeSet = mock(MutableVolumeSet.class);
 
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
-    Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenReturn(hddsVolume);
 
     keyValueContainerData = new KeyValueContainerData(1L,
@@ -202,7 +201,7 @@ public class TestBlockManagerImpl {
     List<BlockData> listBlockData = blockManager.listBlock(
         keyValueContainer, 1, 10);
     assertNotNull(listBlockData);
-    assertTrue(listBlockData.size() == 1);
+    assertEquals(1, listBlockData.size());
 
     for (long i = 2; i <= 10; i++) {
       blockID = new BlockID(1L, i);
@@ -221,6 +220,6 @@ public class TestBlockManagerImpl {
     listBlockData = blockManager.listBlock(
         keyValueContainer, 1, 10);
     assertNotNull(listBlockData);
-    assertTrue(listBlockData.size() == 10);
+    assertEquals(10, listBlockData.size());
   }
 }

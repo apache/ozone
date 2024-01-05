@@ -133,6 +133,46 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return keyArgs;
   }
 
+  protected KeyArgs resolveBucketLink(
+      OzoneManager ozoneManager, KeyArgs keyArgs) throws IOException {
+    ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs, this);
+    keyArgs = bucket.update(keyArgs);
+    return keyArgs;
+  }
+
+  protected KeyArgs resolveBucketAndCheckKeyAcls(KeyArgs keyArgs,
+      OzoneManager ozoneManager, IAccessAuthorizer.ACLType aclType)
+      throws IOException {
+    KeyArgs resolvedArgs = resolveBucketLink(ozoneManager, keyArgs);
+    // check Acl
+    checkKeyAcls(ozoneManager, resolvedArgs.getVolumeName(),
+        resolvedArgs.getBucketName(), keyArgs.getKeyName(),
+        aclType, OzoneObj.ResourceType.KEY);
+    return resolvedArgs;
+  }
+
+  protected KeyArgs resolveBucketAndCheckKeyAclsWithFSO(KeyArgs keyArgs,
+      OzoneManager ozoneManager, IAccessAuthorizer.ACLType aclType)
+      throws IOException {
+    KeyArgs resolvedArgs = resolveBucketLink(ozoneManager, keyArgs);
+    // check Acl
+    checkACLsWithFSO(ozoneManager, resolvedArgs.getVolumeName(),
+        resolvedArgs.getBucketName(), keyArgs.getKeyName(), aclType);
+    return resolvedArgs;
+  }
+
+  protected KeyArgs resolveBucketAndCheckOpenKeyAcls(KeyArgs keyArgs,
+      OzoneManager ozoneManager, IAccessAuthorizer.ACLType aclType,
+      long clientId)
+      throws IOException {
+    KeyArgs resolvedArgs = resolveBucketLink(ozoneManager, keyArgs);
+    // check Acl
+    checkKeyAclsInOpenKeyTable(ozoneManager, resolvedArgs.getVolumeName(),
+        resolvedArgs.getBucketName(), keyArgs.getKeyName(),
+        aclType, clientId);
+    return resolvedArgs;
+  }
+
   /**
    * This methods avoids multiple rpc calls to SCM by allocating multiple blocks
    * in one rpc call.

@@ -51,11 +51,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 
 /**
  * This class test string to sign generation.
@@ -309,21 +310,21 @@ public class TestAuthorizationFilter {
     headerMap.putSingle(X_AMAZ_DATE, date);
     headerMap.putSingle(CONTENT_TYPE, contentType);
 
-    UriInfo uriInfo = Mockito.mock(UriInfo.class);
-    ContainerRequestContext context = Mockito.mock(
+    UriInfo uriInfo = mock(UriInfo.class);
+    ContainerRequestContext context = mock(
         ContainerRequestContext.class);
-    Mockito.when(uriInfo.getQueryParameters()).thenReturn(queryMap);
-    Mockito.when(uriInfo.getRequestUri()).thenReturn(
+    when(uriInfo.getQueryParameters()).thenReturn(queryMap);
+    when(uriInfo.getRequestUri()).thenReturn(
         new URI("http://" + host + path));
 
-    Mockito.when(context.getMethod()).thenReturn(method);
-    Mockito.when(context.getUriInfo()).thenReturn(uriInfo);
-    Mockito.when(context.getHeaders()).thenReturn(headerMap);
-    Mockito.when(context.getHeaderString(AUTHORIZATION_HEADER))
+    when(context.getMethod()).thenReturn(method);
+    when(context.getUriInfo()).thenReturn(uriInfo);
+    when(context.getHeaders()).thenReturn(headerMap);
+    when(context.getHeaderString(AUTHORIZATION_HEADER))
         .thenReturn(authHeader);
-    Mockito.when(context.getUriInfo().getQueryParameters())
+    when(context.getUriInfo().getQueryParameters())
         .thenReturn(queryMap);
-    Mockito.when(context.getUriInfo().getPathParameters())
+    when(context.getUriInfo().getPathParameters())
         .thenReturn(pathParamsMap);
 
     return context;

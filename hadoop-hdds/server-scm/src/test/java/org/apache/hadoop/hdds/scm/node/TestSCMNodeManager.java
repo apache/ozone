@@ -42,8 +42,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
@@ -81,7 +80,6 @@ import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.test.PathUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -111,20 +109,22 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND_COUNT_UPDATED;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.NEW_NODE;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.eq;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -468,8 +468,8 @@ public class TestSCMNodeManager {
       scm.getPipelineManager().createPipeline(ratisThree);
       fail("3 nodes should not have been found for a pipeline.");
     } catch (SCMException ex) {
-      assertTrue(ex.getMessage().contains("Required 3. Found " +
-          actualNodeCount));
+      assertThat(ex.getMessage()).contains("Required 3. Found " +
+          actualNodeCount);
     }
   }
 
@@ -601,8 +601,7 @@ public class TestSCMNodeManager {
       }
       //TODO: wait for heartbeat to be processed
       Thread.sleep(4 * 1000);
-      assertEquals(count, nodeManager.getNodeCount(
-          NodeStatus.inServiceHealthy()));
+      assertEquals(count, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
 
       Map<String, Map<String, Integer>> nodeCounts = nodeManager.getNodeCount();
       assertEquals(count,
@@ -864,8 +863,9 @@ public class TestSCMNodeManager {
       // Step 3 : wait for 1 iteration of health check
       try {
         schedFuture.get();
-        assertTrue(nodeManager.getSkippedHealthChecks() > 0,
-            "We did not skip any heartbeat checks");
+        assertThat(nodeManager.getSkippedHealthChecks())
+            .withFailMessage("We did not skip any heartbeat checks")
+            .isGreaterThan(0);
       } catch (ExecutionException e) {
         fail("Unexpected exception waiting for Scheduled Health Check");
       }
@@ -936,8 +936,8 @@ public class TestSCMNodeManager {
             .setMetadataLayoutVersion(scmMlv + 1)
             .setSoftwareLayoutVersion(scmSlv + 1)
             .build());
-    assertTrue(logCapturer.getOutput()
-        .contains("Invalid data node in the cluster"));
+    assertThat(logCapturer.getOutput())
+        .contains("Invalid data node in the cluster");
     nodeManager.close();
   }
 
@@ -973,7 +973,7 @@ public class TestSCMNodeManager {
       // If the mlv equals slv checkpoint passed, datanodes with older mlvs
       // should be instructed to finalize.
       verify(eventPublisher, times(1))
-          .fireEvent(Mockito.eq(DATANODE_COMMAND), captor.capture());
+          .fireEvent(eq(DATANODE_COMMAND), captor.capture());
       assertEquals(captor.getValue().getDatanodeId(), node1.getUuid());
       assertEquals(captor.getValue().getCommand().getType(),
           finalizeNewLayoutVersionCommand);
@@ -981,7 +981,7 @@ public class TestSCMNodeManager {
       // SCM has not finished finalizing its mlv, so datanodes with older
       // mlvs should not be instructed to finalize yet.
       verify(eventPublisher, times(0))
-          .fireEvent(Mockito.eq(DATANODE_COMMAND), captor.capture());
+          .fireEvent(eq(DATANODE_COMMAND), captor.capture());
     }
   }
 
@@ -1014,9 +1014,9 @@ public class TestSCMNodeManager {
           new DeleteBlocksCommand(emptyList()));
     }
 
-    Assertions.assertEquals(3, nodeManager.getTotalDatanodeCommandCount(
+    assertEquals(3, nodeManager.getTotalDatanodeCommandCount(
         node1, SCMCommandProto.Type.replicateContainerCommand));
-    Assertions.assertEquals(5, nodeManager.getTotalDatanodeCommandCount(
+    assertEquals(5, nodeManager.getTotalDatanodeCommandCount(
         node1, SCMCommandProto.Type.deleteBlocksCommand));
 
     nodeManager.processHeartbeat(node1, layoutInfo,
@@ -1035,15 +1035,15 @@ public class TestSCMNodeManager {
     assertEquals(5, nodeManager.getNodeQueuedCommandCount(
         node1, SCMCommandProto.Type.deleteBlocksCommand));
 
-    Assertions.assertEquals(126, nodeManager.getTotalDatanodeCommandCount(
+    assertEquals(126, nodeManager.getTotalDatanodeCommandCount(
         node1, SCMCommandProto.Type.replicateContainerCommand));
-    Assertions.assertEquals(5, nodeManager.getTotalDatanodeCommandCount(
+    assertEquals(5, nodeManager.getTotalDatanodeCommandCount(
         node1, SCMCommandProto.Type.deleteBlocksCommand));
 
     ArgumentCaptor<DatanodeDetails> captor =
         ArgumentCaptor.forClass(DatanodeDetails.class);
     verify(eventPublisher, times(1))
-        .fireEvent(Mockito.eq(DATANODE_COMMAND_COUNT_UPDATED),
+        .fireEvent(eq(DATANODE_COMMAND_COUNT_UPDATED),
             captor.capture());
     assertEquals(node1, captor.getValue());
 
@@ -1060,7 +1060,7 @@ public class TestSCMNodeManager {
         node1, SCMCommandProto.Type.closeContainerCommand));
 
     verify(eventPublisher, times(2))
-        .fireEvent(Mockito.eq(DATANODE_COMMAND_COUNT_UPDATED),
+        .fireEvent(eq(DATANODE_COMMAND_COUNT_UPDATED),
             captor.capture());
     assertEquals(node1, captor.getValue());
 
@@ -1069,17 +1069,17 @@ public class TestSCMNodeManager {
       nodeManager.addDatanodeCommand(node1.getUuid(),
           new CloseContainerCommand(1, PipelineID.randomId()));
     }
-    Assertions.assertEquals(0, nodeManager.getTotalDatanodeCommandCount(
+    assertEquals(0, nodeManager.getTotalDatanodeCommandCount(
         node1, SCMCommandProto.Type.replicateContainerCommand));
-    Assertions.assertEquals(16, nodeManager.getTotalDatanodeCommandCount(
+    assertEquals(16, nodeManager.getTotalDatanodeCommandCount(
         node1, SCMCommandProto.Type.closeContainerCommand));
     Map<SCMCommandProto.Type, Integer> counts =
         nodeManager.getTotalDatanodeCommandCounts(node1,
             SCMCommandProto.Type.replicateContainerCommand,
             SCMCommandProto.Type.closeContainerCommand);
-    Assertions.assertEquals(0,
+    assertEquals(0,
         counts.get(SCMCommandProto.Type.replicateContainerCommand));
-    Assertions.assertEquals(16,
+    assertEquals(16,
         counts.get(SCMCommandProto.Type.closeContainerCommand));
   }
 
@@ -1123,13 +1123,11 @@ public class TestSCMNodeManager {
    * @throws IOException
    */
   @Test
-  public void testScmCheckForErrorOnNullDatanodeDetails()
-      throws IOException, AuthenticationException {
+  public void testScmCheckForErrorOnNullDatanodeDetails() throws IOException, AuthenticationException {
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
-      nodeManager.processHeartbeat(null, null);
-    } catch (NullPointerException npe) {
-      GenericTestUtils.assertExceptionContains("Heartbeat is missing " +
-          "DatanodeDetails.", npe);
+      NullPointerException npe = assertThrows(NullPointerException.class,
+          () -> nodeManager.processHeartbeat(null, null));
+      assertThat(npe).hasMessage("Heartbeat is missing DatanodeDetails.");
     }
   }
 
@@ -1434,8 +1432,8 @@ public class TestSCMNodeManager {
       // Assert all healthy nodes are healthy now, this has to be a greater
       // than check since Stale nodes can be healthy when we check the state.
 
-      assertTrue(nodeManager.getNodeCount(NodeStatus.inServiceHealthy())
-          >= healthyCount);
+      assertThat(nodeManager.getNodeCount(NodeStatus.inServiceHealthy()))
+          .isGreaterThanOrEqualTo(healthyCount);
 
       assertEquals(deadCount,
           nodeManager.getNodeCount(NodeStatus.inServiceDead()));
@@ -1444,7 +1442,7 @@ public class TestSCMNodeManager {
           nodeManager.getNodes(NodeStatus.inServiceDead());
 
       for (DatanodeDetails node : deadList) {
-        assertTrue(deadNodeList.contains(node));
+        assertThat(deadNodeList).contains(node);
       }
 
 
@@ -1565,14 +1563,10 @@ public class TestSCMNodeManager {
       //TODO: wait for EventQueue to be processed
       eventQueue.processAll(8000L);
 
-      assertEquals(nodeCount, nodeManager.getNodeCount(
-          NodeStatus.inServiceHealthy()));
-      assertEquals(capacity * nodeCount, (long) nodeManager.getStats()
-          .getCapacity().get());
-      assertEquals(used * nodeCount, (long) nodeManager.getStats()
-          .getScmUsed().get());
-      assertEquals(remaining * nodeCount, (long) nodeManager.getStats()
-          .getRemaining().get());
+      assertEquals(nodeCount, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
+      assertEquals(capacity * nodeCount, (long) nodeManager.getStats().getCapacity().get());
+      assertEquals(used * nodeCount, (long) nodeManager.getStats().getScmUsed().get());
+      assertEquals(remaining * nodeCount, (long) nodeManager.getStats().getRemaining().get());
       assertEquals(1, nodeManager.minHealthyVolumeNum(dnList));
       dnList.clear();
     }
@@ -1622,10 +1616,8 @@ public class TestSCMNodeManager {
       //TODO: wait for EventQueue to be processed
       eventQueue.processAll(8000L);
 
-      assertEquals(1, nodeManager
-          .getNodeCount(NodeStatus.inServiceHealthy()));
-      assertEquals(volumeCount / 2,
-          nodeManager.minHealthyVolumeNum(dnList));
+      assertEquals(1, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
+      assertEquals(volumeCount / 2, nodeManager.minHealthyVolumeNum(dnList));
       dnList.clear();
     }
   }
@@ -1817,7 +1809,7 @@ public class TestSCMNodeManager {
       List<SCMCommand> command =
           nodemanager.processHeartbeat(datanodeDetails, layoutInfo);
       // With dh registered, SCM will send create pipeline command to dn
-      assertTrue(command.size() >= 1);
+      assertThat(command.size()).isGreaterThanOrEqualTo(1);
       assertTrue(command.get(0).getClass().equals(
           CloseContainerCommand.class) ||
           command.get(1).getClass().equals(CloseContainerCommand.class));
@@ -1861,8 +1853,7 @@ public class TestSCMNodeManager {
       // verify network topology cluster has all the registered nodes
       Thread.sleep(4 * 1000);
       NetworkTopology clusterMap = scm.getClusterMap();
-      assertEquals(nodeCount,
-          nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
+      assertEquals(nodeCount, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(nodeCount, clusterMap.getNumOfLeafNode(""));
       assertEquals(4, clusterMap.getMaxLevel());
       List<DatanodeDetails> nodeList = nodeManager.getAllNodes();
@@ -1982,6 +1973,10 @@ public class TestSCMNodeManager {
     assertEquals(2000, stats.get("MaintenanceDiskCapacity").longValue());
     assertEquals(100, stats.get("MaintenanceDiskUsed").longValue());
     assertEquals(1900, stats.get("MaintenanceDiskRemaining").longValue());
+
+    // All nodes
+    assertEquals(12000, stats.get("TotalCapacity").longValue());
+    assertEquals(600, stats.get("TotalUsed").longValue());
   }
 
   /**
@@ -2074,8 +2069,7 @@ public class TestSCMNodeManager {
               nodeUuid, updatedHostName, updatedIpAddress, null);
       nodeManager.register(updatedNode, null, null);
 
-      assertEquals(1,
-              nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
+      assertEquals(1, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(1, clusterMap.getNumOfLeafNode(""));
       assertEquals(4, clusterMap.getMaxLevel());
       List<DatanodeDetails> updatedNodeList = nodeManager.getAllNodes();

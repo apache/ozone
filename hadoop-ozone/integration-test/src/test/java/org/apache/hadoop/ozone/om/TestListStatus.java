@@ -35,8 +35,8 @@ import org.junit.jupiter.api.Timeout;
 import java.io.IOException;
 import java.util.UUID;
 import java.util.List;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.
     OZONE_FS_ITERATE_BATCH_SIZE;
 
@@ -198,7 +198,7 @@ public class TestListStatus {
       OzoneFileStatus stNext = statuses.get(i + 1);
 
       System.out.println("status:"  + stCurr);
-      assertTrue(stCurr.getPath().compareTo(stNext.getPath()) < 0);
+      assertThat(stCurr.getPath().compareTo(stNext.getPath())).isLessThan(0);
     }
 
     if (!statuses.isEmpty()) {

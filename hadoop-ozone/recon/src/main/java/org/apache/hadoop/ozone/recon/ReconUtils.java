@@ -29,6 +29,9 @@ import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.BlockingQueue;
 
 import com.google.common.base.Preconditions;
 import com.google.inject.Singleton;
@@ -36,7 +39,9 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.io.IOUtils;
@@ -44,6 +49,9 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_CONTAINER_REPORT_QUEUE_SIZE_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.getDirectoryFromConfig;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
@@ -51,9 +59,11 @@ import static org.jooq.impl.DSL.currentTimestamp;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
 
+import org.apache.hadoop.ozone.recon.scm.ReconContainerReportQueue;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
+import org.jetbrains.annotations.NotNull;
 import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,6 +84,25 @@ public class ReconUtils {
 
   public static File getReconScmDbDir(ConfigurationSource conf) {
     return new ReconUtils().getReconDbDir(conf, OZONE_RECON_SCM_DB_DIR);
+  }
+
+  @NotNull
+  public static List<BlockingQueue<SCMDatanodeHeartbeatDispatcher
+      .ContainerReport>> initContainerReportQueue(
+      OzoneConfiguration configuration) {
+    int threadPoolSize =
+        configuration.getInt(ScmUtils.getContainerReportConfPrefix()
+                + ".thread.pool.size",
+            OZONE_SCM_EVENT_THREAD_POOL_SIZE_DEFAULT);
+    int queueSize = configuration.getInt(
+        ScmUtils.getContainerReportConfPrefix() + ".queue.size",
+        OZONE_SCM_EVENT_CONTAINER_REPORT_QUEUE_SIZE_DEFAULT);
+    List<BlockingQueue<SCMDatanodeHeartbeatDispatcher.ContainerReport>> queues =
+        new ArrayList<>();
+    for (int i = 0; i < threadPoolSize; ++i) {
+      queues.add(new ReconContainerReportQueue(queueSize));
+    }
+    return queues;
   }
 
   /**

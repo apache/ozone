@@ -28,10 +28,11 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 
 import java.nio.file.Path;
 
+import static org.mockito.Mockito.framework;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -50,7 +51,7 @@ public class TestOMDelegationTokenRequest {
 
   @BeforeEach
   public void setup() throws Exception {
-    ozoneManager = Mockito.mock(OzoneManager.class);
+    ozoneManager = mock(OzoneManager.class);
 
     conf = new OzoneConfiguration();
     ((OzoneConfiguration) conf)
@@ -62,6 +63,6 @@ public class TestOMDelegationTokenRequest {
 
   @AfterEach
   public void stop() {
-    Mockito.framework().clearInlineMocks();
+    framework().clearInlineMocks();
   }
 }

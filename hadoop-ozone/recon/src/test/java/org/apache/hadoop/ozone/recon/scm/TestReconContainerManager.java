@@ -281,4 +281,28 @@ public class TestReconContainerManager
     assertEquals(uuid2,
         repHistMap.get(cIDlong1).keySet().iterator().next());
   }
+
+  @Test
+  public void testAddNewContainerWithMissingPipeline()
+      throws IOException, TimeoutException {
+    // Create a container with a pipeline that Recon does not know about yet
+    Pipeline newPipeline = getRandomPipeline();
+    ContainerInfo containerInfo = newContainerInfo(101L, newPipeline);
+    ContainerWithPipeline containerWithPipeline =
+        new ContainerWithPipeline(containerInfo, newPipeline);
+
+    // Ensure pipeline is not present
+    ReconContainerManager containerManager = getContainerManager();
+    assertFalse(getPipelineManager().containsPipeline(
+        newPipeline.getId()));
+
+    // Add a new container, and it should add the missing pipeline first
+    containerManager.addNewContainer(containerWithPipeline);
+
+    // Pipeline should be added now
+    assertTrue(getPipelineManager().containsPipeline(
+        newPipeline.getId()));
+    assertTrue(containerManager.containerExist(containerInfo.containerID()));
+  }
+
 }

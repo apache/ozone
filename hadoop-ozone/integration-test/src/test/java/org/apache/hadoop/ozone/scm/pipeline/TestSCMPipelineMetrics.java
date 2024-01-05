@@ -109,7 +109,7 @@ public class TestSCMPipelineMetrics {
     Pipeline pipeline = block.getPipeline();
     long numBlocksAllocated = getLongCounter(
         SCMPipelineMetrics.getBlockAllocationMetricName(pipeline), metrics);
-    Assertions.assertEquals(numBlocksAllocated, 1);
+    Assertions.assertEquals(1, numBlocksAllocated);
 
     // destroy the pipeline
     Assertions.assertDoesNotThrow(() ->

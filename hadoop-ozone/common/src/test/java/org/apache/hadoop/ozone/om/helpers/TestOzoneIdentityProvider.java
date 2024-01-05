@@ -20,11 +20,13 @@ package org.apache.hadoop.ozone.om.helpers;
 import org.apache.hadoop.ipc.CallerContext;
 import org.apache.hadoop.ipc.Schedulable;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_S3_CALLER_CONTEXT_PREFIX;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test class for {@link OzoneIdentityProvider}.
@@ -104,7 +106,7 @@ public class TestOzoneIdentityProvider {
     String identity = identityProvider
         .makeIdentity(CALLER_CONTEXT_SCHEDULABLE);
 
-    Assertions.assertEquals(ACCESS_ID, identity);
+    assertEquals(ACCESS_ID, identity);
   }
 
   /**
@@ -116,11 +118,11 @@ public class TestOzoneIdentityProvider {
     String identity = identityProvider
         .makeIdentity(NO_PREFIX_CALLER_CONTEXT_SCHEDULABLE);
 
-    Assertions.assertFalse(
+    assertFalse(
         NO_PREFIX_CALLER_CONTEXT_SCHEDULABLE
             .getCallerContext().getContext()
             .startsWith(OM_S3_CALLER_CONTEXT_PREFIX));
-    Assertions.assertEquals(
+    assertEquals(
         NO_PREFIX_CALLER_CONTEXT_SCHEDULABLE
             .getUserGroupInformation()
             .getShortUserName(), identity);
@@ -132,14 +134,13 @@ public class TestOzoneIdentityProvider {
 
     // DEFAULT_SCHEDULABLE doesn't override CallerContext and
     // accessing it should throw an exception.
-    UnsupportedOperationException uoex = Assertions
-        .assertThrows(UnsupportedOperationException.class,
+    UnsupportedOperationException uoex = assertThrows(UnsupportedOperationException.class,
             DEFAULT_SCHEDULABLE::getCallerContext);
-    Assertions.assertEquals("Invalid operation.",
+    assertEquals("Invalid operation.",
         uoex.getMessage());
 
     String usernameFromUGI = DEFAULT_SCHEDULABLE
         .getUserGroupInformation().getShortUserName();
-    Assertions.assertEquals(usernameFromUGI, identity);
+    assertEquals(usernameFromUGI, identity);
   }
 }

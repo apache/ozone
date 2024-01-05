@@ -107,6 +107,7 @@ import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.create
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask.LOG;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -591,7 +592,7 @@ public class TestBlockDeletingService {
 
       // Container contains 3 blocks. So, space used by the container
       // should be greater than zero.
-      assertTrue(containerSpace > 0);
+      assertThat(containerSpace).isGreaterThan(0);
 
       // An interval will delete 1 * 2 blocks
       deleteAndWait(svc, 1);
@@ -602,7 +603,7 @@ public class TestBlockDeletingService {
       // After first interval 2 blocks will be deleted. Hence, current space
       // used by the container should be less than the space used by the
       // container initially(before running deletion services).
-      assertTrue(containerData.get(0).getBytesUsed() < containerSpace);
+      assertThat(containerData.get(0).getBytesUsed()).isLessThan(containerSpace);
       assertEquals(2,
           deletingServiceMetrics.getSuccessCount()
               - deleteSuccessCount);
@@ -864,8 +865,8 @@ public class TestBlockDeletingService {
 
       // The block deleting successfully and shouldn't catch timed
       // out warning log.
-      assertFalse(newLog.getOutput().contains(
-          "Background task executes timed out, retrying in next interval"));
+      assertThat(newLog.getOutput())
+          .doesNotContain("Background task executes timed out, retrying in next interval");
     }
     svc.shutdown();
   }

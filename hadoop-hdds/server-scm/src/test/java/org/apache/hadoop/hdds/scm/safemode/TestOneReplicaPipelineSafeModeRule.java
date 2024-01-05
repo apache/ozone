@@ -53,10 +53,11 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.ozone.test.TestClock;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * This class tests OneReplicaPipelineSafeModeRule.
@@ -145,7 +146,7 @@ public class TestOneReplicaPipelineSafeModeRule {
     GenericTestUtils.waitFor(() -> logCapturer.getOutput().contains(
         "reported count is 6"), 1000, 5000);
 
-    Assertions.assertFalse(rule.validate());
+    assertFalse(rule.validate());
 
     //Fire last pipeline event from datanode.
     firePipelineEvent(pipelines.subList(pipelineFactorThreeCount - 1,
@@ -179,7 +180,7 @@ public class TestOneReplicaPipelineSafeModeRule {
         "reported count is 0"), 1000, 5000);
 
     // fired events for one node ratis pipeline, so we will be still false.
-    Assertions.assertFalse(rule.validate());
+    assertFalse(rule.validate());
 
     pipelines =
         pipelineManager.getPipelines(

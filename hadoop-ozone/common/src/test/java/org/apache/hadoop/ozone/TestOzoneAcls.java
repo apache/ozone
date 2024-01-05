@@ -35,6 +35,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.REA
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ_ACL;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE_ACL;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -44,10 +45,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 /**
  * This class is to test acl storage and retrieval in ozone store.
  */
-public class TestOzoneAcls {
+class TestOzoneAcls {
 
   @Test
-  public void testAclParse() {
+  void testAclParse() {
     HashMap<String, Boolean> testMatrix;
     testMatrix = new HashMap<>();
 
@@ -134,7 +135,7 @@ public class TestOzoneAcls {
   }
 
   @Test
-  public void testAclValues() throws Exception {
+  void testAclValues() {
     OzoneAcl acl = OzoneAcl.parseAcl("user:bilbo:rw");
     assertEquals(acl.getName(), "bilbo");
     assertTrue(acl.getAclBitSet().get(READ.ordinal()));
@@ -269,11 +270,11 @@ public class TestOzoneAcls {
     IllegalArgumentException exception = assertThrows(
         IllegalArgumentException.class,
         () -> OzoneAcl.parseAcl("world::rwdlncxncxdfsfgbny"));
-    assertTrue(exception.getMessage().contains("ACL right is not"));
+    assertThat(exception).hasMessageContaining("ACL right is not");
   }
 
   @Test
-  public void testBitSetToListConversion() throws Exception {
+  void testBitSetToListConversion() {
     OzoneAcl acl = OzoneAcl.parseAcl("user:bilbo:rw");
 
     List<ACLType> rights = acl.getAclList();

@@ -36,7 +36,6 @@ import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -60,6 +59,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.DATANODE
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.OM;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore.CertType.VALID_CERTS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -143,8 +143,9 @@ public class TestSCMCertStore {
 
     assertNotNull(certInfo);
     assertNotNull(certInfo.getX509Certificate());
-    assertTrue(certInfo.getTimestamp() > 0L,
-        "Timestamp should be greater than 0");
+    assertThat(certInfo.getTimestamp())
+        .withFailMessage("Timestamp should be greater than 0")
+        .isGreaterThan(0L);
 
     long crlId = scmCertStore.getLatestCrlId();
     assertEquals(sequenceId.get().longValue(), crlId);
@@ -340,6 +341,6 @@ public class TestSCMCertStore {
   private void checkListCerts(NodeType role, int expected) throws Exception {
     List<X509Certificate> certificateList = scmCertStore.listCertificate(role,
         BigInteger.valueOf(0), 10, VALID_CERTS);
-    Assertions.assertEquals(expected, certificateList.size());
+    assertEquals(expected, certificateList.size());
   }
 }

@@ -149,6 +149,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_TRANSPORT_CLASS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_EXPIRED;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.USER_MISMATCH;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 
 import org.apache.ozone.test.LambdaTestUtils;
@@ -176,6 +177,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -838,21 +840,12 @@ final class TestSecureOzoneCluster {
           OmTransportFactory.create(conf, ugiNonAdmin, null),
           RandomStringUtils.randomAscii(5));
 
-      try {
-        omClientNonAdmin.getS3Secret("HADOOP/JOHN");
-        // Expected to fail because current ugi isn't an admin
-        fail("non-admin getS3Secret didn't fail as intended");
-      } catch (IOException ex) {
-        GenericTestUtils.assertExceptionContains("USER_MISMATCH", ex);
-      }
-
-      try {
-        omClientNonAdmin.revokeS3Secret("HADOOP/DOE");
-        // Expected to fail because current ugi isn't an admin
-        fail("non-admin revokeS3Secret didn't fail as intended");
-      } catch (IOException ex) {
-        GenericTestUtils.assertExceptionContains("USER_MISMATCH", ex);
-      }
+      OMException omException = assertThrows(OMException.class,
+          () -> omClientNonAdmin.getS3Secret("HADOOP/JOHN"));
+      assertSame(USER_MISMATCH, omException.getResult());
+      omException = assertThrows(OMException.class,
+          () -> omClientNonAdmin.revokeS3Secret("HADOOP/DOE"));
+      assertSame(USER_MISMATCH, omException.getResult());
 
     } finally {
       if (scm != null) {

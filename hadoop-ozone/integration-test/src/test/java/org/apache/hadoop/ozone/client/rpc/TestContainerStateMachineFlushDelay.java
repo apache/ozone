@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.rpc;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -38,14 +39,11 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.File;
 import java.io.IOException;
@@ -63,14 +61,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 /**
  * Tests the containerStateMachine failure handling by set flush delay.
  */
+@Timeout(300)
 public class TestContainerStateMachineFlushDelay {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
-
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
   private OzoneClient client;
@@ -89,7 +81,7 @@ public class TestContainerStateMachineFlushDelay {
    *
    * @throws IOException
    */
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     chunkSize = 100;
     flushSize = 2 * chunkSize;
@@ -140,7 +132,7 @@ public class TestContainerStateMachineFlushDelay {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -152,14 +144,15 @@ public class TestContainerStateMachineFlushDelay {
   public void testContainerStateMachineFailures() throws Exception {
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
-            .createKey("ratis", 1024, ReplicationType.RATIS,
-                ReplicationFactor.ONE, new HashMap<>());
+            .createKey("ratis", 1024,
+                ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+                    ReplicationFactor.ONE), new HashMap<>());
     // Now ozone.client.stream.buffer.flush.delay is currently enabled
     // by default. Here we  written data(length 110) greater than chunk
     // Size(length 100), make sure flush will sync data.
     byte[] data =
         ContainerTestHelper.getFixedLengthString(keyString, 110)
-        .getBytes(UTF_8);
+            .getBytes(UTF_8);
     // First write and flush creates a container in the datanode
     key.write(data);
     key.flush();
@@ -171,7 +164,7 @@ public class TestContainerStateMachineFlushDelay {
 
     List<OmKeyLocationInfo> locationInfoList =
         groupOutputStream.getLocationInfoList();
-    Assert.assertEquals(1, locationInfoList.size());
+    Assertions.assertEquals(1, locationInfoList.size());
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
 
     // delete the container dir
@@ -183,12 +176,12 @@ public class TestContainerStateMachineFlushDelay {
 
     key.close();
     // Make sure the container is marked unhealthy
-    Assert.assertTrue(
+    Assertions.assertSame(
         cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
             .getContainer().getContainerSet()
             .getContainer(omKeyLocationInfo.getContainerID())
-            .getContainerState()
-            == ContainerProtos.ContainerDataProto.State.UNHEALTHY);
+            .getContainerState(),
+        ContainerProtos.ContainerDataProto.State.UNHEALTHY);
   }
 
 }

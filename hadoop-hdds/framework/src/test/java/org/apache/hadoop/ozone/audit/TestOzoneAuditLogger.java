@@ -27,20 +27,13 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.audit.AuditEventStatus.FAILURE;
 import static org.apache.hadoop.ozone.audit.AuditEventStatus.SUCCESS;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.core.StringContains.containsString;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import org.hamcrest.Matcher;
-import org.hamcrest.collection.IsIterableContainingInOrder;
+import static org.assertj.core.api.Assertions.assertThat;
 
 
 /**
@@ -183,11 +176,11 @@ public class TestOzoneAuditLogger {
   @Test
   public void messageIncludesAllParts() {
     String message = WRITE_FAIL_MSG.getFormattedMessage();
-    assertTrue(message.contains(USER), message);
-    assertTrue(message.contains(IP_ADDRESS), message);
-    assertTrue(message.contains(DummyAction.CREATE_VOLUME.name()), message);
-    assertTrue(message.contains(PARAMS.toString()), message);
-    assertTrue(message.contains(FAILURE.getStatus()), message);
+    assertThat(message).contains(USER);
+    assertThat(message).contains(IP_ADDRESS);
+    assertThat(message).contains(DummyAction.CREATE_VOLUME.name());
+    assertThat(message).contains(PARAMS.toString());
+    assertThat(message).contains(FAILURE.getStatus());
   }
 
   /**
@@ -235,8 +228,7 @@ public class TestOzoneAuditLogger {
     File file = new File("audit.log");
     List<String> lines = FileUtils.readLines(file, (String)null);
     final int retry = 5;
-    int i = 0;
-    while (lines.isEmpty() && i < retry) {
+    for (int i = 0; lines.isEmpty() && i < retry; i++) {
       lines = FileUtils.readLines(file, (String)null);
       try {
         Thread.sleep(500 * (i + 1));
@@ -244,13 +236,12 @@ public class TestOzoneAuditLogger {
         Thread.currentThread().interrupt();
         break;
       }
-      i++;
     }
     //check if every expected string can be found in the log entry
-    assertThat(
-        lines.subList(0, expectedStrings.length),
-        containsInOrder(expectedStrings)
-    );
+    for (int i = 0; i < expectedStrings.length; i++) {
+      String line = lines.get(i);
+      assertThat(line).contains(expectedStrings[i]);
+    }
     //empty the file
     lines.clear();
     FileUtils.writeLines(file, lines, false);
@@ -260,21 +251,12 @@ public class TestOzoneAuditLogger {
     File file = new File("audit.log");
     List<String> lines = FileUtils.readLines(file, (String)null);
     // When no log entry is expected, the log file must be empty
-    assertEquals(0, lines.size());
+    assertThat(lines).isEmpty();
   }
 
   private static class TestException extends Exception {
     TestException(String message) {
       super(message);
     }
-  }
-
-  private Matcher<Iterable<? extends String>> containsInOrder(
-      String[] expectedStrings) {
-    return IsIterableContainingInOrder.contains(
-        Arrays.stream(expectedStrings)
-            .map(str -> containsString(str))
-            .collect(Collectors.toList())
-    );
   }
 }

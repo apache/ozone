@@ -42,13 +42,7 @@ import static org.apache.hadoop.hdds.security.x509.CertificateTestUtils.aKeyPair
 import static org.apache.hadoop.hdds.security.x509.CertificateTestUtils.createSelfSignedCert;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getPEMEncodedString;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
-import static org.hamcrest.CoreMatchers.equalTo;
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.CoreMatchers.nullValue;
-import static org.hamcrest.CoreMatchers.sameInstance;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.empty;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -88,9 +82,9 @@ public class TestServiceInfoProvider {
     public void test() throws Exception {
       ServiceInfoEx info = provider.provide();
 
-      assertThat(info.getServiceInfoList(), sameInstance(emptyList()));
-      assertThat(info.getCaCertificate(), is(nullValue()));
-      assertThat(info.getCaCertPemList(), is(empty()));
+      assertThat(info.getServiceInfoList()).isSameAs(emptyList());
+      assertThat(info.getCaCertificate()).isNull();
+      assertThat(info.getCaCertPemList()).isEmpty();
     }
   }
 
@@ -125,24 +119,24 @@ public class TestServiceInfoProvider {
     public void withoutRootCARenew() throws Exception {
       ServiceInfoEx info = provider.provide();
 
-      assertThat(info.getServiceInfoList(), sameInstance(emptyList()));
-      assertThat(info.getCaCertificate(), is(equalTo(pem2)));
-      assertThat(info.getCaCertPemList(), containsInAnyOrder(pem1, pem2));
+      assertThat(info.getServiceInfoList()).isSameAs(emptyList());
+      assertThat(info.getCaCertificate()).isEqualTo(pem2);
+      assertThat(info.getCaCertPemList()).contains(pem1, pem2);
 
       info = provider.provide();
 
-      assertThat(info.getServiceInfoList(), sameInstance(emptyList()));
-      assertThat(info.getCaCertificate(), is(equalTo(pem2)));
-      assertThat(info.getCaCertPemList(), containsInAnyOrder(pem1, pem2));
+      assertThat(info.getServiceInfoList()).isSameAs(emptyList());
+      assertThat(info.getCaCertificate()).isEqualTo(pem2);
+      assertThat(info.getCaCertPemList()).contains(pem1, pem2);
     }
 
     @Test
     public void withRootCARenew() throws Exception {
       ServiceInfoEx info = provider.provide();
 
-      assertThat(info.getServiceInfoList(), sameInstance(emptyList()));
-      assertThat(info.getCaCertificate(), is(equalTo(pem2)));
-      assertThat(info.getCaCertPemList(), containsInAnyOrder(pem1, pem2));
+      assertThat(info.getServiceInfoList()).isSameAs(emptyList());
+      assertThat(info.getCaCertificate()).isEqualTo(pem2);
+      assertThat(info.getCaCertPemList()).contains(pem1, pem2);
 
       X509Certificate cert3 =
           createSelfSignedCert(aKeyPair(conf), "cn", Duration.ofDays(3));
@@ -155,9 +149,9 @@ public class TestServiceInfoProvider {
 
       info = provider.provide();
 
-      assertThat(info.getServiceInfoList(), sameInstance(emptyList()));
-      assertThat(info.getCaCertificate(), is(equalTo(pem3)));
-      assertThat(info.getCaCertPemList(), containsInAnyOrder(pem2, pem3));
+      assertThat(info.getServiceInfoList()).isSameAs(emptyList());
+      assertThat(info.getCaCertificate()).isEqualTo(pem3);
+      assertThat(info.getCaCertPemList()).contains(pem2, pem3);
     }
   }
 }

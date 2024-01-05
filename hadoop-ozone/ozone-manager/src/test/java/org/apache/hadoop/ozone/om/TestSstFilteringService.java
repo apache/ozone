@@ -64,6 +64,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.awaitility.Awaitility.with;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -178,7 +179,7 @@ public class TestSstFilteringService {
       }
     }
 
-    assertTrue(nonLevel0FilesCountAfterCompact > 0);
+    assertThat(nonLevel0FilesCountAfterCompact).isGreaterThan(0);
 
     String bucketName2 = "buck2";
     createVolumeAndBucket(volumeName, bucketName2);

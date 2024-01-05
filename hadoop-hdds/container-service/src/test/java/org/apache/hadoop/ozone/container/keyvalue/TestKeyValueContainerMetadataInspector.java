@@ -43,6 +43,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.apache.ozone.test.GenericTestUtils.toLog4j;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -533,13 +534,14 @@ public class TestKeyValueContainerMetadataInspector
 
   private KeyValueContainer createOpenContainer(int normalBlocks)
       throws Exception {
-    return super.createContainerWithBlocks(CONTAINER_ID, normalBlocks, 0);
+    return super.createContainerWithBlocks(CONTAINER_ID, normalBlocks, 0, true);
   }
 
   private void containsAllStrings(String logOutput, String[] expectedMessages) {
     for (String expectedMessage : expectedMessages) {
-      assertTrue(logOutput.contains(expectedMessage),
-          "Log output did not contain \"" + expectedMessage + "\"");
+      assertThat(logOutput)
+          .withFailMessage("Log output did not contain \"" + expectedMessage + "\"")
+          .contains(expectedMessage);
     }
   }
 }

@@ -19,10 +19,8 @@
 package org.apache.hadoop.ozone.om.upgrade;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
 
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.HashSet;
 import java.util.Set;
@@ -125,35 +123,6 @@ public final class OMLayoutVersionManager
             actionClass.getName());
       }
     });
-  }
-
-  private void registerOzoneManagerRequests(String packageName) {
-    try {
-      for (Class<? extends OMClientRequest> reqClass :
-          getRequestClasses(packageName)) {
-        try {
-          Method getRequestTypeMethod = reqClass.getMethod(
-              "getRequestType");
-          String type = (String) getRequestTypeMethod.invoke(null);
-          LOG.debug("Registering {} with OmVersionFactory.",
-              reqClass.getSimpleName());
-          BelongsToLayoutVersion annotation =
-              reqClass.getAnnotation(BelongsToLayoutVersion.class);
-          if (annotation == null) {
-            registerRequestType(type, INITIAL_VERSION.layoutVersion(),
-                reqClass);
-          } else {
-            registerRequestType(type, annotation.value().layoutVersion(),
-                reqClass);
-          }
-        } catch (NoSuchMethodException nsmEx) {
-          LOG.warn("Found a class {} with request type not defined. ",
-              reqClass.getSimpleName());
-        }
-      }
-    } catch (Exception ex) {
-      LOG.error("Exception registering OM client request.", ex);
-    }
   }
 
   @VisibleForTesting

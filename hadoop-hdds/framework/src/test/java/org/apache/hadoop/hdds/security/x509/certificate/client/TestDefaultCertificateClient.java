@@ -66,8 +66,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getPEMEncodedString;
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -186,7 +185,7 @@ public class TestDefaultCertificateClient {
     cert = dnCertClient.getCertificate(
         x509Certificate.getSerialNumber().toString());
     assertNotNull(cert);
-    assertTrue(cert.getEncoded().length > 0);
+    assertThat(cert.getEncoded().length).isGreaterThan(0);
     assertEquals(x509Certificate, cert);
 
     // TODO: test verifyCertificate once implemented.
@@ -213,8 +212,8 @@ public class TestDefaultCertificateClient {
     // Expect error when there is no private key to sign.
     IOException ioException = assertThrows(IOException.class,
         () -> dnCertClient.signData(data.getBytes(UTF_8)));
-    assertTrue(ioException.getMessage()
-        .contains("Error while signing the stream"));
+    assertThat(ioException.getMessage())
+        .contains("Error while signing the stream");
 
     generateKeyPairFiles();
     byte[] sign = dnCertClient.signData(data.getBytes(UTF_8));
@@ -288,17 +287,17 @@ public class TestDefaultCertificateClient {
     CertificateException certException = assertThrows(
         CertificateException.class,
         () -> dnCertClient.getCertificate(cert1.getSerialNumber().toString()));
-    assertTrue(certException.getMessage()
-        .contains("Error while getting certificate"));
+    assertThat(certException.getMessage())
+        .contains("Error while getting certificate");
     certException = assertThrows(CertificateException.class,
         () -> dnCertClient.getCertificate(cert2.getSerialNumber().toString()));
-    assertTrue(certException.getMessage()
-        .contains("Error while getting certificate"));
+    assertThat(certException.getMessage())
+        .contains("Error while getting certificate");
     certException = assertThrows(CertificateException.class,
         () -> dnCertClient.getCertificate(cert3.getSerialNumber()
             .toString()));
-    assertTrue(certException.getMessage()
-        .contains("Error while getting certificate"));
+    assertThat(certException.getMessage())
+        .contains("Error while getting certificate");
     codec.writeCertificate(certPath, "1.crt",
         getPEMEncodedString(cert1));
     codec.writeCertificate(certPath, "2.crt",
@@ -334,11 +333,11 @@ public class TestDefaultCertificateClient {
         .toString()));
 
     assertEquals(2, dnCertClient.getAllCaCerts().size());
-    assertTrue(dnCertClient.getAllCaCerts().contains(subCa1));
-    assertTrue(dnCertClient.getAllCaCerts().contains(subCa2));
+    assertThat(dnCertClient.getAllCaCerts()).contains(subCa1);
+    assertThat(dnCertClient.getAllCaCerts()).contains(subCa2);
     assertEquals(2, dnCertClient.getAllRootCaCerts().size());
-    assertTrue(dnCertClient.getAllRootCaCerts().contains(rootCa1));
-    assertTrue(dnCertClient.getAllRootCaCerts().contains(rootCa2));
+    assertThat(dnCertClient.getAllRootCaCerts()).contains(rootCa1);
+    assertThat(dnCertClient.getAllRootCaCerts()).contains(rootCa2);
   }
 
   @Test
@@ -399,7 +398,7 @@ public class TestDefaultCertificateClient {
 
     // Check for DN.
     assertEquals(FAILURE, dnCertClient.init());
-    assertTrue(dnClientLog.getOutput().contains("Keypair validation failed"));
+    assertThat(dnClientLog.getOutput()).contains("Keypair validation failed");
     dnClientLog.clearOutput();
 
     // Case 2. Expect failure when certificate is generated from different
@@ -415,7 +414,7 @@ public class TestDefaultCertificateClient {
         x509Certificate.getEncoded()));
     // Check for DN.
     assertEquals(FAILURE, dnCertClient.init());
-    assertTrue(dnClientLog.getOutput().contains("Keypair validation failed"));
+    assertThat(dnClientLog.getOutput()).contains("Keypair validation failed");
     dnClientLog.clearOutput();
 
     // Case 3. Expect failure when certificate is generated from different
@@ -430,8 +429,8 @@ public class TestDefaultCertificateClient {
 
     // Check for DN.
     assertEquals(FAILURE, dnCertClient.init());
-    assertTrue(dnClientLog.getOutput()
-        .contains("Stored certificate is generated with different"));
+    assertThat(dnClientLog.getOutput())
+        .contains("Stored certificate is generated with different");
     dnClientLog.clearOutput();
 
     // Case 4. Failure when public key recovery fails.
@@ -442,7 +441,7 @@ public class TestDefaultCertificateClient {
 
     // Check for DN.
     assertEquals(FAILURE, dnCertClient.init());
-    assertTrue(dnClientLog.getOutput().contains("Can't recover public key"));
+    assertThat(dnClientLog.getOutput()).contains("Can't recover public key");
   }
 
   @Test
@@ -464,8 +463,8 @@ public class TestDefaultCertificateClient {
     dnCertClient.storeCertificate(
         getPEMEncodedString(cert), CAType.SUBORDINATE);
     duration = dnCertClient.timeBeforeExpiryGracePeriod(cert);
-    assertTrue(duration.toMillis() < Duration.ofDays(1).toMillis() &&
-        duration.toMillis() > Duration.ofHours(23).plusMinutes(59).toMillis());
+    assertThat(duration.toMillis()).isLessThan(Duration.ofDays(1).toMillis())
+        .isGreaterThan(Duration.ofHours(23).plusMinutes(59).toMillis());
   }
 
   @Test
@@ -596,7 +595,7 @@ public class TestDefaultCertificateClient {
     long monitorThreadCount = Arrays.stream(threads)
         .filter(monitorFilterPredicate)
         .count();
-    assertThat(monitorThreadCount, is(1L));
+    assertThat(monitorThreadCount).isEqualTo(1L);
     Thread monitor = Arrays.stream(threads)
         .filter(monitorFilterPredicate)
         .findFirst()
@@ -609,6 +608,6 @@ public class TestDefaultCertificateClient {
     monitorThreadCount = Arrays.stream(threads)
         .filter(monitorFilterPredicate)
         .count();
-    assertThat(monitorThreadCount, is(0L));
+    assertThat(monitorThreadCount).isEqualTo(0L);
   }
 }
