@@ -17,7 +17,6 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
@@ -29,6 +28,7 @@ import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -55,11 +55,11 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.metrics2.MetricsRecord;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -84,6 +84,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.Mockito;
 
 /**
@@ -397,44 +399,38 @@ public class TestOmMetrics {
 
   }
 
-  @Test
-  public void testFsoOps() throws Exception {
-    /*
-    create volume
-
-    Create fso bucket
-    - create directories only. Key count should be updated.
-    - create keys. key count should be updated.
-    - delete dir with child dirs and keys. key count should go down by dir and key count.
-
-    create obs bucket
-    - Create keys with prefixes. dir count should not be updated.
-
-    Create legacy bucket with fso enabled.
-    - Run same tests as FSO bucket and metrics should be updated.
-
-    Delete all buckets recursively.
-    */
-
+  @ParameterizedTest
+  @EnumSource(value = BucketLayout.class, names = {"FILE_SYSTEM_OPTIMIZED", "LEGACY"})
+  public void testFilesystemOps(BucketLayout bucketLayout) throws Exception {
     clusterBuilder.setNumDatanodes(3);
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, true);
     conf.setTimeDuration(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
-
+    conf.set(OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT, bucketLayout.name());
+    // For testing fs operations with legacy buckets.
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
     startCluster();
+
+    // How long to wait for directory deleting service to clean up the files before aborting the test.
+    final int timeoutMillis =
+        (int)conf.getTimeDuration(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 0, TimeUnit.MILLISECONDS) * 3;
+    assertTrue(timeoutMillis > 0, "Failed to read directory deleting service interval. Retrieved " + timeoutMillis +
+        " milliseconds");
+
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
     // Cluster should be empty.
     assertCounter("NumKeys", 0L, getMetrics("OMMetrics"));
 
-    // Create FSO bucket with 2 nested directories.
+    // Create bucket with 2 nested directories.
     String rootPath = String.format("%s://%s/",
         OzoneConsts.OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     FileSystem fs = FileSystem.get(conf);
-    Path dirPath = new Path(OZONE_ROOT, String.join(OZONE_URI_DELIMITER, volumeName, bucketName, "dir1", "dir2"));
+    Path bucketPath = new Path(OZONE_ROOT, String.join(OZONE_URI_DELIMITER, volumeName, bucketName));
+    Path dirPath = new Path(bucketPath, String.join(OZONE_URI_DELIMITER, "dir1", "dir2"));
     fs.mkdirs(dirPath);
-    assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+    assertEquals(bucketLayout,
         client.getObjectStore().getVolume(volumeName).getBucket(bucketName).getBucketLayout());
     assertCounter("NumKeys", 2L, getMetrics("OMMetrics"));
 
@@ -444,11 +440,24 @@ public class TestOmMetrics {
     assertCounter("NumKeys", 4L, getMetrics("OMMetrics"));
     fs.delete(dirPath.getParent(), true);
 
-    // Metric should be decremented by dir deleting service
+    // Metric should be decremented by directory deleting service in the background.
     GenericTestUtils.waitFor(() -> {
       long keyCount = MetricsAsserts.getLongCounter("NumKeys", getMetrics("OMMetrics"));
       return keyCount == 0;
-    }, 500, 5000);
+    }, timeoutMillis / 5, timeoutMillis);
+    assertCounter("NumKeys", 0L, getMetrics("OMMetrics"));
+
+    // Re-create the same tree as before, but this time delete the bucket recursively.
+    // All metrics should still be properly updated.
+    fs.mkdirs(dirPath);
+    ContractTestUtils.touch(fs, new Path(dirPath, "file1"));
+    ContractTestUtils.touch(fs, new Path(dirPath.getParent(), "file2"));
+    assertCounter("NumKeys", 4L, getMetrics("OMMetrics"));
+    fs.delete(bucketPath, true);
+    GenericTestUtils.waitFor(() -> {
+      long keyCount = MetricsAsserts.getLongCounter("NumKeys", getMetrics("OMMetrics"));
+      return keyCount == 0;
+    }, timeoutMillis / 5, timeoutMillis);
     assertCounter("NumKeys", 0L, getMetrics("OMMetrics"));
   }
 
