@@ -312,7 +312,7 @@ public class TestContainerReader {
   }
 
   @ContainerTestVersionInfo.ContainerTest
-  public void testContainerReaderWithRemovindDbPath(
+  public void testContainerReaderWithInvalidDbPath(
       ContainerTestVersionInfo versionInfo) throws Exception {
     setLayoutAndSchemaVersion(versionInfo);
     setup(versionInfo);
