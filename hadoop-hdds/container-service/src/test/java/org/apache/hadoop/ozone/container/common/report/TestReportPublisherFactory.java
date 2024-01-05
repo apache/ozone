@@ -23,10 +23,9 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CRLStatusReport;
 
-import org.hamcrest.MatcherAssert;
-import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -75,7 +74,7 @@ public class TestReportPublisherFactory {
         RuntimeException.class,
         () -> factory.getPublisherFor(HddsProtos.DatanodeDetailsProto.class)
     );
-    MatcherAssert.assertThat(runtimeException.getMessage(),
-        Matchers.containsString("No publisher found for report"));
+    assertThat(runtimeException.getMessage())
+        .contains("No publisher found for report");
   }
 }

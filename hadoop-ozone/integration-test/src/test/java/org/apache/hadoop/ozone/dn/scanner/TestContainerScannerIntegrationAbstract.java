@@ -69,8 +69,7 @@ import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
-import static org.hamcrest.CoreMatchers.containsString;
-import static org.hamcrest.MatcherAssert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -326,8 +325,8 @@ public abstract class TestContainerScannerIntegrationAbstract {
      * Check that the correct corruption type was written to the container log.
      */
     public void assertLogged(LogCapturer logCapturer) {
-      assertThat(logCapturer.getOutput(),
-          containsString(expectedResult.toString()));
+      assertThat(logCapturer.getOutput())
+          .contains(expectedResult.toString());
     }
 
     /**

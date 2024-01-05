@@ -65,8 +65,6 @@ import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAI
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.matchesPattern;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -767,8 +765,8 @@ public class TestSCMContainerPlacementRackScatter {
     SCMException exception = Assertions.assertThrows(SCMException.class, () ->
         policy.chooseDatanodes(usedDns, excludedDns,
             null, 3, 0, 5));
-    assertThat(exception.getMessage(),
-        matchesPattern("^No enough datanodes to choose.*"));
+    assertThat(exception.getMessage())
+        .matches("^No enough datanodes to choose.*");
     assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
         exception.getResult());
   }

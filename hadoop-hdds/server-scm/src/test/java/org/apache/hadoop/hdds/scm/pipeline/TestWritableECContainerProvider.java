@@ -59,8 +59,6 @@ import java.util.Set;
 
 import static org.apache.hadoop.hdds.conf.StorageUnit.BYTES;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
-import static org.hamcrest.CoreMatchers.containsString;
-import static org.hamcrest.MatcherAssert.assertThat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -312,8 +310,8 @@ public class TestWritableECContainerProvider {
 
     IOException ioException = assertThrows(IOException.class,
         () -> provider.getContainer(1, repConfig, OWNER, new ExcludeList()));
-    assertThat(ioException.getMessage(),
-        containsString("Cannot create pipelines"));
+    assertThat(ioException.getMessage())
+        .contains("Cannot create pipelines");
   }
 
   @ParameterizedTest
@@ -341,14 +339,14 @@ public class TestWritableECContainerProvider {
 
     IOException ioException = assertThrows(IOException.class,
         () -> provider.getContainer(1, repConfig, OWNER, new ExcludeList()));
-    assertThat(ioException.getMessage(),
-        containsString("Cannot create pipelines"));
+    assertThat(ioException.getMessage())
+        .contains("Cannot create pipelines");
 
     for (int i = 0; i < 5; i++) {
       ioException = assertThrows(IOException.class,
           () -> provider.getContainer(1, repConfig, OWNER, new ExcludeList()));
-      assertThat(ioException.getMessage(),
-          containsString("Cannot create pipelines"));
+      assertThat(ioException.getMessage())
+          .contains("Cannot create pipelines");
     }
   }
 
