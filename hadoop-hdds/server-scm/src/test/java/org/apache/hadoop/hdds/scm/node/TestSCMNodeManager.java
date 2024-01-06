@@ -1593,7 +1593,7 @@ public class TestSCMNodeManager {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
         MILLISECONDS);
-    List<DatanodeDetails> dnList = new ArrayList<>(4);
+    List<DatanodeDetails> dnList = new ArrayList<>();
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       EventQueue eventQueue = (EventQueue) scm.getEventQueue();
       LayoutVersionManager versionManager =
