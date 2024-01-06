@@ -69,7 +69,9 @@ import org.slf4j.LoggerFactory;
 
 import javax.management.ObjectName;
 import java.io.IOException;
+import java.math.RoundingMode;
 import java.net.InetAddress;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -141,6 +143,7 @@ public class SCMNodeManager implements NodeManager {
   private final String opeState = "OPSTATE";
   private final String comState = "COMSTATE";
   private final String lastHeartbeat = "LASTHEARTBEAT";
+  private final String usedPercent = "USEDPERCENT";
   /**
    * Constructs SCM machine Manager.
    */
@@ -1113,9 +1116,35 @@ public class SCMNodeManager implements NodeManager {
         map.put(httpsPort.getName().toString(),
                   httpsPort.getValue().toString());
       }
+      double usedPec = calculateStoragePercentage(dni);
+      map.put(usedPercent, usedPec + "%");
       nodes.put(hostName, map);
     }
     return nodes;
+  }
+
+  /**
+   * Calculate the storage usage percentage of a DataNode node.
+   * @param dni DataNode node that needs to be calculated
+   * @return
+   */
+  public double calculateStoragePercentage(DatanodeInfo dni) {
+    double usedPec = 0;
+    List<StorageReportProto> storageReports = dni.getStorageReports();
+    if (storageReports != null && !storageReports.isEmpty()) {
+      long capacity = 0;
+      long scmUsed = 0;
+      for (StorageReportProto storageReport : storageReports) {
+        capacity = capacity + storageReport.getCapacity();
+        scmUsed = scmUsed + storageReport.getScmUsed();
+      }
+      double percent = (double) scmUsed / capacity;
+      percent = percent > 1.0 ? 1.0 : percent;
+      DecimalFormat decimalFormat = new DecimalFormat("#0.0000");
+      decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
+      usedPec = Double.valueOf(decimalFormat.format(percent)) * 100;
+    }
+    return usedPec;
   }
 
   /**

@@ -1572,6 +1572,89 @@ public class TestSCMNodeManager {
     }
   }
 
+  private List<StorageReportProto> generateStorageReportProto(
+      int volumeCount, UUID dnId, long capacity, long used) {
+    List<StorageReportProto> reports = new ArrayList<>(volumeCount);
+    boolean failed = true;
+    for (int x = 0; x < volumeCount; x++) {
+      long free = capacity - used;
+      String storagePath = testDir.getAbsolutePath() + "/" + dnId;
+      reports.add(HddsTestUtils
+          .createStorageReport(dnId, storagePath, capacity,
+              used, free, null, failed));
+      failed = !failed;
+    }
+    return reports;
+  }
+
+  @Test
+  public void testCalculateStoragePercentage()
+      throws IOException, AuthenticationException {
+    OzoneConfiguration conf = getConf();
+    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
+        MILLISECONDS);
+    List<DatanodeDetails> dnList = new ArrayList<>(4);
+    try (SCMNodeManager nodeManager = createNodeManager(conf)) {
+      EventQueue eventQueue = (EventQueue) scm.getEventQueue();
+      LayoutVersionManager versionManager =
+          nodeManager.getLayoutVersionManager();
+      LayoutVersionProto layoutInfo = toLayoutVersionProto(
+          versionManager.getMetadataLayoutVersion(),
+          versionManager.getSoftwareLayoutVersion());
+      // Generate the first DataNode
+      DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+      dnList.add(dn1);
+      UUID dnId1 = dn1.getUuid();
+      int volumeCount = 10;
+      List<StorageReportProto> reports1 = generateStorageReportProto(
+          volumeCount, dnId1, 1000, 600);
+      nodeManager.register(dn1, HddsTestUtils.createNodeReport(reports1,
+          emptyList()), null);
+      nodeManager.processHeartbeat(dn1, layoutInfo);
+      // Generate the 2nd DataNode
+      DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
+      dnList.add(dn2);
+      UUID dnId2 = dn2.getUuid();
+      List<StorageReportProto> reports2 = generateStorageReportProto(
+          volumeCount, dnId2, 1000, 1000);
+      nodeManager.register(dn2, HddsTestUtils.createNodeReport(reports2,
+          emptyList()), null);
+      nodeManager.processHeartbeat(dn2, layoutInfo);
+      // Generate the 3rd DataNode
+      DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
+      dnList.add(dn3);
+      UUID dnId3 = dn3.getUuid();
+      List<StorageReportProto> reports3 = generateStorageReportProto(
+          volumeCount, dnId3, 1000, 1001);
+      nodeManager.register(dn3, HddsTestUtils.createNodeReport(reports3,
+          emptyList()), null);
+      nodeManager.processHeartbeat(dn3, layoutInfo);
+      // Generate the 4th DataNode
+      DatanodeDetails dn4 = MockDatanodeDetails.randomDatanodeDetails();
+      dnList.add(dn4);
+      UUID dnId4 = dn4.getUuid();
+      nodeManager.register(dn4, null, null);
+      nodeManager.processHeartbeat(dn4, layoutInfo);
+
+      eventQueue.processAll(8000L);
+      NodeStateManager nodeStateManager = nodeManager.getNodeStateManager();
+      List<DatanodeInfo> dataNodeInfoList = nodeStateManager.getAllNodes();
+      for (DatanodeInfo datanodeInfo : dataNodeInfoList) {
+        double usedPerc = nodeManager.calculateStoragePercentage(datanodeInfo);
+        if (datanodeInfo.getUuid().toString().equals(dnId1.toString())) {
+          assertEquals(usedPerc, 60);
+        } else if (datanodeInfo.getUuid().toString().equals(dnId2.toString())) {
+          assertEquals(usedPerc, 100);
+        } else if (datanodeInfo.getUuid().toString().equals(dnId3.toString())) {
+          assertEquals(usedPerc, 100);
+        } else if (datanodeInfo.getUuid().toString().equals(dnId4.toString())) {
+          assertEquals(usedPerc, 0);
+        }
+      }
+      dnList.clear();
+    }
+  }
+
   /**
    * Test multiple nodes sending initial heartbeat with their node report
    * with multiple volumes.

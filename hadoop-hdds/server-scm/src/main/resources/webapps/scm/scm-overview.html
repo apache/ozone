@@ -48,6 +48,8 @@
         <tr>
             <th ng-click = "columnSort('hostname')" class="nodeStatusInfo"><span ng-class = "{'sorting' : (columnName != 'hostname'), 'sortasc' : (columnName == 'hostname' && !reverse),
                                         'sortdesc':(columnName == 'hostname' && !reverse)}">HostName</span></th>
+            <th ng-click = "columnSort('usedpercent')" class="nodeStatusInfo" ><span ng-class="{'sorting' : (columnName != 'usedpercent'), 'sortasc' : (columnName == 'usedpercent' && !reverse),
+                                        'sortdesc':(columnName == 'usedpercent' && !reverse)}">Used Percent</span></th>
             <th ng-click = "columnSort('opstate')" class="nodeStatusInfo" ><span ng-class="{'sorting' : (columnName != 'opstate'), 'sortasc' : (columnName == 'opstate' && !reverse),
                                         'sortdesc':(columnName == 'opstate' && !reverse)}">Operational State</span></th>
             <th ng-click = "columnSort('comstate')" class="nodeStatusInfo">  <span ng-class="{'sorting' : (columnName != 'comstate'), 'sortasc' : (columnName == 'comstate' && !reverse),
@@ -66,6 +68,7 @@
                     {{typestat.hostname}}
                 </span>
             </td>
+            <td>{{typestat.usedpercent}}</td>
             <td>{{typestat.opstate}}</td>
             <td>{{typestat.comstate}}</td>
             <td>{{typestat.lastheartbeat}}</td>
