@@ -186,6 +186,7 @@ public class SnapshotCache implements ReferenceCountedCallback {
               throw new IllegalStateException(ex);
             }
           }
+          LOG.info("Getting Snapshot {} from Snapshot Cache", k);
           return v;
         });
 
@@ -304,30 +305,28 @@ public class SnapshotCache implements ReferenceCountedCallback {
       OmSnapshot omSnapshot = (OmSnapshot) rcOmSnapshot.get();
       LOG.debug("Evicting OmSnapshot instance {} with table key {}",
           rcOmSnapshot, omSnapshot.getSnapshotTableKey());
-      // Sanity check
-      Preconditions.checkState(rcOmSnapshot.getTotalRefCount() == 0L,
-          "Illegal state: OmSnapshot reference count non-zero ("
-              + rcOmSnapshot.getTotalRefCount() + ") but shows up in the "
-              + "clean up list");
 
       final String key = omSnapshot.getSnapshotTableKey();
-      final ReferenceCounted<IOmMetadataReader, SnapshotCache> result =
-          dbMap.remove(key);
-      // Sanity check
-      Preconditions.checkState(rcOmSnapshot == result,
-          "Cache map entry removal failure. The cache is in an inconsistent "
-              + "state. Expected OmSnapshot instance: " + rcOmSnapshot
-              + ", actual: " + result + " for key: " + key);
+      dbMap.computeIfPresent(key, (k, v) -> {
+        // Sanity check
+        Preconditions.checkState(rcOmSnapshot == v,
+            "Cache map entry removal failure. The cache is in an inconsistent "
+                + "state. Expected OmSnapshot instance: " + rcOmSnapshot
+                + ", actual: " + v + " for key: " + key);
 
-      pendingEvictionList.remove(result);
+        // Close the instance, which also closes its DB handle.
+        if (rcOmSnapshot.getTotalRefCount() == 0L) {
+          try {
+            ((OmSnapshot) rcOmSnapshot.get()).close();
+          } catch (IOException ex) {
+            throw new IllegalStateException("Error while closing snapshot DB", ex);
+          }
+          return null;
+        }
+        return v;
+      });
 
-      // Close the instance, which also closes its DB handle.
-      try {
-        ((OmSnapshot) rcOmSnapshot.get()).close();
-      } catch (IOException ex) {
-        throw new IllegalStateException("Error while closing snapshot DB", ex);
-      }
-
+      pendingEvictionList.remove(rcOmSnapshot);
       --numEntriesToEvict;
     }
 
