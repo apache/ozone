@@ -401,9 +401,10 @@ public class TestOmMetrics {
 
   @ParameterizedTest
   @EnumSource(value = BucketLayout.class, names = {"FILE_SYSTEM_OPTIMIZED", "LEGACY"})
-  public void testFilesystemOps(BucketLayout bucketLayout) throws Exception {
+  public void testDirectoryOps(BucketLayout bucketLayout) throws Exception {
     clusterBuilder.setNumDatanodes(3);
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, true);
+    // Speed up background directory deletion for this test.
     conf.setTimeDuration(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
     conf.set(OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT, bucketLayout.name());
     // For testing fs operations with legacy buckets.
@@ -420,7 +421,12 @@ public class TestOmMetrics {
     String bucketName = UUID.randomUUID().toString();
 
     // Cluster should be empty.
-    assertCounter("NumKeys", 0L, getMetrics("OMMetrics"));
+    MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
+    assertCounter("NumKeys", 0L, omMetrics);
+    assertCounter("NumCreateDirectory", 0L, omMetrics);
+    // These key operations include directory operations.
+    assertCounter("NumKeyDeletes", 0L, omMetrics);
+    assertCounter("NumKeyRenames", 0L, omMetrics);
 
     // Create bucket with 2 nested directories.
     String rootPath = String.format("%s://%s/",
@@ -432,20 +438,48 @@ public class TestOmMetrics {
     fs.mkdirs(dirPath);
     assertEquals(bucketLayout,
         client.getObjectStore().getVolume(volumeName).getBucket(bucketName).getBucketLayout());
-    assertCounter("NumKeys", 2L, getMetrics("OMMetrics"));
+    omMetrics = getMetrics("OMMetrics");
+    assertCounter("NumKeys", 2L, omMetrics);
+    // Only one directory create command is given, even though it created two directories.
+    assertCounter("NumCreateDirectory", 1L, omMetrics);
+    assertCounter("NumKeyDeletes", 0L, omMetrics);
+    assertCounter("NumKeyRenames", 0L, omMetrics);
 
     // Add 2 files at different parts of the tree.
     ContractTestUtils.touch(fs, new Path(dirPath, "file1"));
     ContractTestUtils.touch(fs, new Path(dirPath.getParent(), "file2"));
-    assertCounter("NumKeys", 4L, getMetrics("OMMetrics"));
-    fs.delete(dirPath.getParent(), true);
+    omMetrics = getMetrics("OMMetrics");
+    assertCounter("NumKeys", 4L, omMetrics);
+    assertCounter("NumCreateDirectory", 1L, omMetrics);
+    assertCounter("NumKeyDeletes", 0L, omMetrics);
+    assertCounter("NumKeyRenames", 0L, omMetrics);
 
-    // Metric should be decremented by directory deleting service in the background.
+    // Rename the child directory.
+    fs.rename(dirPath, new Path(dirPath.getParent(), "new-name"));
+    omMetrics = getMetrics("OMMetrics");
+    assertCounter("NumKeys", 4L, omMetrics);
+    assertCounter("NumCreateDirectory", 1L, omMetrics);
+    assertCounter("NumKeyDeletes", 0L, omMetrics);
+    long expectedRenames = 1;
+    if (bucketLayout == BucketLayout.LEGACY) {
+      // Legacy bucket must rename keys individually.
+      expectedRenames = 2;
+    }
+    assertCounter("NumKeyRenames", expectedRenames, omMetrics);
+
+    // Delete metric should be decremented by directory deleting service in the background.
+    fs.delete(dirPath.getParent(), true);
     GenericTestUtils.waitFor(() -> {
       long keyCount = MetricsAsserts.getLongCounter("NumKeys", getMetrics("OMMetrics"));
       return keyCount == 0;
     }, timeoutMillis / 5, timeoutMillis);
-    assertCounter("NumKeys", 0L, getMetrics("OMMetrics"));
+    omMetrics = getMetrics("OMMetrics");
+    assertCounter("NumKeys", 0L, omMetrics);
+    // This is the number of times the create directory command was given, not the current number of directories.
+    assertCounter("NumCreateDirectory", 1L, omMetrics);
+    // Directory delete counts as key delete. One command was given so the metric is incremented once.
+    assertCounter("NumKeyDeletes", 1L, omMetrics);
+    assertCounter("NumKeyRenames", expectedRenames, omMetrics);
 
     // Re-create the same tree as before, but this time delete the bucket recursively.
     // All metrics should still be properly updated.
@@ -458,7 +492,12 @@ public class TestOmMetrics {
       long keyCount = MetricsAsserts.getLongCounter("NumKeys", getMetrics("OMMetrics"));
       return keyCount == 0;
     }, timeoutMillis / 5, timeoutMillis);
-    assertCounter("NumKeys", 0L, getMetrics("OMMetrics"));
+    omMetrics = getMetrics("OMMetrics");
+    assertCounter("NumKeys", 0L, omMetrics);
+    assertCounter("NumCreateDirectory", 2L, omMetrics);
+    // One more keys delete request is given as part of the bucket delete to do a batch delete of its keys.
+    assertCounter("NumKeyDeletes", 2L, omMetrics);
+    assertCounter("NumKeyRenames", expectedRenames, omMetrics);
   }
 
   @Test
