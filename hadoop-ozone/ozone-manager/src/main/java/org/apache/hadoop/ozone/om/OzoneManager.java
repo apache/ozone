@@ -90,7 +90,6 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
-import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
@@ -262,7 +261,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
-import static org.apache.hadoop.ozone.OzoneConsts.HSYNC_CLIENT_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
@@ -3200,19 +3198,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException {
 
     metrics.incNumListOpenFiles();
-
-    // Admin check
-    // TODO: Dedup
-    final UserGroupInformation ugi = getRemoteUser();
-    if (!isAdmin(ugi)) {
-      final OMException omEx = new OMException(
-          "Only Ozone admins are allowed to list open files.",
-          PERMISSION_DENIED);
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(
-          OMAction.LIST_OPEN_FILES, new LinkedHashMap<>(), omEx));
-      metrics.incNumListOpenFilesFails();
-      throw omEx;
-    }
+    checkAdminUserPrivilege("list open files.");
 
     // Mark as final to make sure they are assigned once and only once in
     // every branch.
@@ -3250,7 +3236,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         metrics.incNumListOpenFilesFails();
         throw ex;
       }
-
 
       final String keyPrefix;
       if (tokenizer.hasMoreTokens()) {
@@ -3295,7 +3280,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
       final String ctVolumeName = tokenizer.nextToken();
       final String ctBucketName = tokenizer.nextToken();
-      // Validate that path and cont. token is in the same bucket
+      // Validate that path and cont. token refers to the same bucket
       Preconditions.checkArgument(volumeName.equals(ctVolumeName),
           "Path volume name '" + volumeName +
               "' and token volume name '" + ctVolumeName + "' does not match");
@@ -3313,66 +3298,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       }
     }
 
-    // TODO: Move inner impl to OmMetadataManagerImpl?
-    List<OpenKeySession> openKeySessionList = new ArrayList<>();
-    int currentCount = 0;
-    final boolean hasMore;
-
-    // TODO: If we want better results, we may want to iterate cache like
-    //  {@link OmMetadataManagerImpl.listKeys} do. But that complicates the
-    //  iteration logic by quite a bit. If we do that, we would want to refactor
-    //  listKeys as well to share the common code.
-
-    final Table<String, OmKeyInfo> openKeyTable, keyTable;
-    openKeyTable = metadataManager.getOpenKeyTable(bucketLayout);
-    keyTable = metadataManager.getKeyTable(bucketLayout);
-    // No lock needed since table iterator creates a "snapshot"
-    try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-             openKeyIter = openKeyTable.iterator();
-         TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-             keyIter = keyTable.iterator()
-    ) {
-      KeyValue<String, OmKeyInfo> kv;
-      kv = openKeyIter.seek(dbContTokenPrefix);
-      if (contToken != null && !contToken.isEmpty() &&
-          kv.getKey().startsWith(dbContTokenPrefix + OM_KEY_PREFIX)) {
-        // Skip one entry when cont token is specified and the current entry
-        // has the same prefix (less the client ID) as cont token.
-        openKeyIter.next();
-      }
-      while (currentCount < maxKeys && openKeyIter.hasNext()) {
-        kv = openKeyIter.next();
-        if (kv != null && kv.getKey().startsWith(dbOpenKeyPrefix)) {
-          String dbKey = kv.getKey();
-          long clientID = OMMetadataManager.getClientIDFromOpenKeyDBKey(dbKey);
-          OmKeyInfo omKeyInfo = kv.getValue();
-
-          // Trim client ID to get the keyTable dbKey
-          int lastSlashIdx = dbKey.lastIndexOf(OM_KEY_PREFIX);
-          String ktDbKey = dbKey.substring(0, lastSlashIdx);
-          // Check whether the key has been hsync'ed by seeking keyTable
-          checkAndUpdateKeyHsyncStatus(omKeyInfo, ktDbKey, keyIter);
-
-          openKeySessionList.add(
-              new OpenKeySession(clientID, omKeyInfo,
-                  omKeyInfo.getLatestVersionLocations().getVersion()));
-          currentCount++;
-        }
-      }
-
-      // Set hasMore flag as a hint for client-side pagination
-      if (openKeyIter.hasNext()) {
-        kv = openKeyIter.next();
-        hasMore = kv != null && kv.getKey().startsWith(dbOpenKeyPrefix);
-      } else {
-        hasMore = false;
-      }
-    }
-
-    return new ListOpenFilesResult(
-        openKeySessionList,
-        hasMore,
-        metadataManager.getOpenKeyCount());
+    // arg processing done. call inner impl (table iteration)
+    return metadataManager.listOpenFiles(
+        bucketLayout, maxKeys, dbOpenKeyPrefix,
+        !StringUtils.isEmpty(contToken), dbContTokenPrefix);
   }
 
   /**
@@ -3390,35 +3319,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         Long.toString(volumeId), Long.toString(bucketId), keyPrefix);
   }
 
-  /**
-   * Check and update OmKeyInfo from OpenKeyTable with hsync status in KeyTable.
-   */
-  private void checkAndUpdateKeyHsyncStatus(OmKeyInfo omKeyInfo,
-                                            String dbKey,
-                                            TableIterator<String, ? extends
-                                                KeyValue<String, OmKeyInfo>>
-                                                keyIter)
-      throws IOException {
-    KeyValue<String, OmKeyInfo> kv = keyIter.seek(dbKey);
-    if (kv != null && kv.getKey().equals(dbKey)) {
-      // The same key in OpenKeyTable also exists in KeyTable, indicating
-      // the key has been hsync'ed
-      OmKeyInfo ktOmKeyInfo = kv.getValue();
-      String hsyncClientId = ktOmKeyInfo.getMetadata().get(HSYNC_CLIENT_ID);
-      // Append HSYNC_CLIENT_ID to OmKeyInfo to be returned to the client
-      omKeyInfo.getMetadata().put(HSYNC_CLIENT_ID, hsyncClientId);
-    }
-  }
-
   @Override
   public void transferLeadership(String newLeaderId)
       throws IOException {
-    final UserGroupInformation ugi = getRemoteUser();
-    if (!isAdmin(ugi)) {
-      throw new OMException(
-          "Only Ozone admins are allowed to transfer raft leadership.",
-          PERMISSION_DENIED);
-    }
+    checkAdminUserPrivilege("transfer raft leadership.");
     if (!isRatisEnabled) {
       throw new IOException("OM HA not enabled.");
     }
@@ -3535,7 +3439,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (!isAdmin(ugi)) {
       final OMException omEx = new OMException(
           "Only Ozone admins are allowed to list tenants.", PERMISSION_DENIED);
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
           OMAction.LIST_TENANT, new LinkedHashMap<>(), omEx));
       throw omEx;
     }
@@ -5006,13 +4910,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public String printCompactionLogDag(String fileNamePrefix,
                                       String graphType)
       throws IOException {
-
-    final UserGroupInformation ugi = getRemoteUser();
-    if (!isAdmin(ugi)) {
-      throw new OMException(
-          "Only Ozone admins are allowed to print compaction DAG.",
-          PERMISSION_DENIED);
-    }
+    checkAdminUserPrivilege("print compaction DAG.");
 
     if (StringUtils.isBlank(fileNamePrefix)) {
       fileNamePrefix = "dag-";
