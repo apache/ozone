@@ -158,9 +158,9 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
         line += "No\t\t";
       }
 
-      System.out.println(line + getFullPathFromKeyInfo(omKeyInfo)
-//          + "\t" + omKeyInfo  // TODO: Remove full KeyInfo print
-      );
+      line += getFullPathFromKeyInfo(omKeyInfo);
+
+      System.out.println(line);
     }
 
     // Compose next batch's command
@@ -181,22 +181,20 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
    */
   private String getCmdForNextBatch(String lastElementFullPath) {
     String nextBatchCmd = "ozone admin om lof";
-    if (!omServiceId.isEmpty()) {
+    if (omServiceId != null && !omServiceId.isEmpty()) {
       nextBatchCmd += " -id=" + omServiceId;
     }
-    if (!omHost.isEmpty()) {
+    if (omHost != null && !omHost.isEmpty()) {
       nextBatchCmd += " -host=" + omHost;
     }
     if (json) {
       nextBatchCmd += " --json";
     }
     nextBatchCmd += " --length=" + limit;
-    if (!pathPrefix.isEmpty()) {
+    if (pathPrefix != null && !pathPrefix.isEmpty()) {
       nextBatchCmd += " --prefix=" + pathPrefix;
     }
-    if (!startItem.isEmpty()) {
-      nextBatchCmd += " --start=" + lastElementFullPath;
-    }
+    nextBatchCmd += " --start=" + lastElementFullPath;
     return nextBatchCmd;
   }
 

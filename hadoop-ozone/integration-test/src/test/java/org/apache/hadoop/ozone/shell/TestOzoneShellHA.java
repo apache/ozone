@@ -556,52 +556,120 @@ public class TestOzoneShellHA {
   @Test
   public void testOzoneAdminCmdListOpenFiles()
       throws IOException, InterruptedException {
-    final String volumeName = "volumelof";
 
     OzoneConfiguration conf = cluster.getConf();
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
-//    OzoneConfiguration conf = new OzoneConfiguration();
-//    conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
-//    final String hostPrefix = OZONE_OFS_URI_SCHEME + "://localhost:9862";
 
     OzoneConfiguration clientConf = getClientConfForOFS(hostPrefix, conf);
     FileSystem fs = FileSystem.get(clientConf);
 
+    final String volumeName = "volumelof";
     String dir1 = hostPrefix + OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX +
         "buck1" + OM_KEY_PREFIX + "dir1";
+    // Create volume, bucket, dir
     assertTrue(fs.mkdirs(new Path(dir1)));
-    String key1 = dir1 + OM_KEY_PREFIX + "key1";
+    String keyPrefix = OM_KEY_PREFIX + "key";
 
-    String[] args = new String[] {"om", "listopenfiles",
-        "-id", omServiceId,
-        "-p", "/volumelof/buck1"};
+    final int numKeys = 5;
+    String[] keys = new String[numKeys];
 
-    // Create key1
-    try (FSDataOutputStream stream = fs.create(new Path(key1))) {
-      stream.write(1);
-
-      // Run listopenfiles
-      execute(ozoneAdminShell, args);
-      String res1 = out.toString();
-      out.reset();
-
-      // Try hsync
-      stream.hsync();
-      // Wait for flush
-//      cluster.getOzoneManager().awaitDoubleBufferFlush();
-
-      // Run listopenfiles again
-      execute(ozoneAdminShell, args);
-      String res2 = out.toString();
-      out.reset();
-      // Verify that result has key1
+    for (int i = 0; i < numKeys; i++) {
+      keys[i] = dir1 + keyPrefix + i;
     }
 
-    // TODO: Test pagination
+    int pageSize = 3;
 
-    // TODO: Test with OBS/LEGACY bucket
+    FSDataOutputStream[] streams = new FSDataOutputStream[numKeys];
+    // Create multiple keys and hold them open
+    for (int i = 0; i < numKeys; i++) {
+      streams[i] = fs.create(new Path(keys[i]));
+      streams[i].write(1);
+    }
 
-    // TODO: Cleanup
+    try {
+      // Wait for flush to DB table
+      cluster.getOzoneManager().awaitDoubleBufferFlush();
+
+      String[] args = new String[] {"om", "listopenfiles",
+          "-id", omServiceId,
+          "-l", String.valueOf(numKeys + 1),  // pagination
+          "-p", "/volumelof/buck1"};
+      // Run listopenfiles
+      execute(ozoneAdminShell, args);
+      String cmdRes = getStdOut();
+      // Should have retrieved all 5 open keys
+      for (int i = 0; i < numKeys; i++) {
+        assertTrue(cmdRes.contains(keyPrefix + i));
+      }
+
+      // Try pagination
+      args = new String[] {"om", "listopenfiles",
+          "-id", omServiceId,
+          "-l", String.valueOf(pageSize),  // pagination
+          "-p", "/volumelof/buck1"};
+      execute(ozoneAdminShell, args);
+      cmdRes = getStdOut();
+
+      // Should have retrieved the 1st page only (3 keys)
+      for (int i = 0; i < pageSize; i++) {
+        assertTrue(cmdRes.contains(keyPrefix + i));
+      }
+      for (int i = pageSize; i < numKeys; i++) {
+        assertFalse(cmdRes.contains(keyPrefix + i));
+      }
+      // No hsync'ed file/key at this point
+      assertFalse(cmdRes.contains("\tYes\t"));
+
+      // Get last line of the output which has the continuation token
+      String[] lines = cmdRes.split("\n");
+      String nextCmd = lines[lines.length - 1].trim();
+      String kw = "--start=";
+      String contToken =
+          nextCmd.substring(nextCmd.lastIndexOf(kw) + kw.length());
+
+      args = new String[] {"om", "listopenfiles",
+          "-id", omServiceId,
+          "-l", String.valueOf(pageSize),  // pagination
+          "-p", "/volumelof/buck1",
+          "-s", contToken};
+      execute(ozoneAdminShell, args);
+      cmdRes = getStdOut();
+
+      // Should have retrieved the 2nd page only (2 keys)
+      for (int i = 0; i < pageSize - 1; i++) {
+        assertFalse(cmdRes.contains(keyPrefix + i));
+      }
+      // Note: key2 is shown in the continuation token prompt
+      for (int i = pageSize - 1; i < numKeys; i++) {
+        assertTrue(cmdRes.contains(keyPrefix + i));
+      }
+
+      // hsync last key
+      streams[numKeys - 1].hsync();
+
+      execute(ozoneAdminShell, args);
+      cmdRes = getStdOut();
+
+      // Verify that only one key is hsync'ed
+      assertTrue(cmdRes.contains("\tYes\t"));
+      assertTrue(cmdRes.contains("\tNo\t"));
+    } finally {
+      // Cleanup
+      for (int i = 0; i < numKeys; i++) {
+        streams[i].close();
+      }
+    }
+
+    // TODO: In UT, test with OBS/LEGACY bucket
+  }
+
+  /**
+   * Return stdout as a String, then clears exising output.
+   */
+  private String getStdOut() throws UnsupportedEncodingException {
+    String res = out.toString(UTF_8.name());
+    out.reset();
+    return res;
   }
 
   /**

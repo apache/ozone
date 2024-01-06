@@ -1733,6 +1733,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
+  public long getOpenKeyCount() throws IOException {
+    // Get an estimated key count of OpenKeyTable + OpenFileTable
+    return openKeyTable.getEstimatedKeyCount()
+        + openFileTable.getEstimatedKeyCount();
+  }
+
+  @Override
   public ExpiredOpenKeys getExpiredOpenKeys(Duration expireThreshold,
       int count, BucketLayout bucketLayout) throws IOException {
     final ExpiredOpenKeys expiredKeys = new ExpiredOpenKeys();

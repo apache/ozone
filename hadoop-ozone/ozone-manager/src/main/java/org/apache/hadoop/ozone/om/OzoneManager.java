@@ -3214,17 +3214,23 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw omEx;
     }
 
-    final String dbOpenKeyPrefix;
+    // Mark as final to make sure they are assigned once and only once in
+    // every branch.
+    final String dbOpenKeyPrefix, dbContTokenPrefix;
+    final String volumeName, bucketName;
     final BucketLayout bucketLayout;
+
+    // Process path prefix
     if (path == null || path.isEmpty() || path.equals(OM_KEY_PREFIX)) {
       // path is root
       dbOpenKeyPrefix = "";
-      // default to FSO. TODO: Add client option to pass OBS/LEGACY?
+      volumeName = "";
+      bucketName = "";
+      // default to FSO's OpenFileTable. TODO: client option to pass OBS/LEGACY?
       bucketLayout = BucketLayout.FILE_SYSTEM_OPTIMIZED;
     } else {
       // path is bucket or key prefix, break it down to volume, bucket, prefix
       StringTokenizer tokenizer = new StringTokenizer(path, OM_KEY_PREFIX);
-
       // Validate path to avoid NoSuchElementException
       if (tokenizer.countTokens() < 2) {
         metrics.incNumListOpenFilesFails();
@@ -3233,8 +3239,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             INVALID_PATH);
       }
 
-      final String volumeName = tokenizer.nextToken();
-      final String bucketName = tokenizer.nextToken();
+      volumeName = tokenizer.nextToken();
+      bucketName = tokenizer.nextToken();
 
       OmBucketInfo bucketInfo;
       try {
@@ -3245,7 +3251,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         throw ex;
       }
 
-      bucketLayout = bucketInfo.getBucketLayout();
 
       final String keyPrefix;
       if (tokenizer.hasMoreTokens()) {
@@ -3255,32 +3260,56 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         keyPrefix = "";
       }
 
-      if (contToken == null || contToken.isEmpty()) {
-        // TODO: Add helper method for this
-        switch (bucketInfo.getBucketLayout()) {
-        case FILE_SYSTEM_OPTIMIZED:
-          final long volumeId = metadataManager.getVolumeId(volumeName);
-          final long bucketId = metadataManager.getBucketId(volumeName,
-              bucketName);
-          // FSO keyPrefix could look like: -9223372036854774527/key1
-          dbOpenKeyPrefix = metadataManager.getOzoneKey(
-              Long.toString(volumeId),
-              Long.toString(bucketId),
-              keyPrefix);
-          break;
-        case OBJECT_STORE:
-        case LEGACY:
-          dbOpenKeyPrefix = metadataManager.getOzoneKey(
-              volumeName,
-              bucketName,
-              keyPrefix);
-          break;
-        default:
-          throw new OMException("Unsupported bucket layout: " +
-              bucketInfo.getBucketLayout(), NOT_SUPPORTED_OPERATION);
-        }
+      // Determine dbKey prefix based on the bucket type
+      bucketLayout = bucketInfo.getBucketLayout();
+      switch (bucketLayout) {
+      case FILE_SYSTEM_OPTIMIZED:
+        dbOpenKeyPrefix = getDbKeyFSO(volumeName, bucketName, keyPrefix);
+        break;
+      case OBJECT_STORE:
+      case LEGACY:
+        dbOpenKeyPrefix =
+            metadataManager.getOzoneKey(volumeName, bucketName, keyPrefix);
+        break;
+      default:
+        metrics.incNumListOpenFilesFails();
+        throw new OMException("Unsupported bucket layout: " +
+            bucketInfo.getBucketLayout(), NOT_SUPPORTED_OPERATION);
+      }
+    }
+
+    // Process cont. token
+    if (contToken == null || contToken.isEmpty()) {
+      // if a continuation token is not specified
+      dbContTokenPrefix = dbOpenKeyPrefix;
+    } else {
+      // need to translate FSO bucket cont. token's volume and bucket names
+      // into object IDs
+
+      StringTokenizer tokenizer = new StringTokenizer(contToken, OM_KEY_PREFIX);
+      // Validate cont. token to avoid NoSuchElementException
+      if (tokenizer.countTokens() < 2) {
+        metrics.incNumListOpenFilesFails();
+        throw new OMException("Invalid continuation token: " + contToken,
+            INVALID_PATH);
+      }
+      final String ctVolumeName = tokenizer.nextToken();
+      final String ctBucketName = tokenizer.nextToken();
+      // Validate that path and cont. token is in the same bucket
+      Preconditions.checkArgument(volumeName.equals(ctVolumeName),
+          "Path volume name '" + volumeName +
+              "' and token volume name '" + ctVolumeName + "' does not match");
+      Preconditions.checkArgument(bucketName.equals(ctBucketName),
+          "Path bucket name '" + bucketName +
+              "' and token bucket name '" + ctBucketName + "' does not match");
+
+      if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+        final String ctKeyPrefix = tokenizer.hasMoreTokens() ?
+            tokenizer.nextToken("").substring(1) : "";
+        dbContTokenPrefix =
+            getDbKeyFSO(ctVolumeName, ctBucketName, ctKeyPrefix);
       } else {
-        dbOpenKeyPrefix = contToken;
+        dbContTokenPrefix = contToken;
       }
     }
 
@@ -3303,9 +3332,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
          TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
              keyIter = keyTable.iterator()
     ) {
-      openKeyIter.seek(dbOpenKeyPrefix);
       KeyValue<String, OmKeyInfo> kv;
-      while (currentCount < maxKeys + 1 && openKeyIter.hasNext()) {
+      kv = openKeyIter.seek(dbContTokenPrefix);
+      if (contToken != null && !contToken.isEmpty() &&
+          kv.getKey().startsWith(dbContTokenPrefix + OM_KEY_PREFIX)) {
+        // Skip one entry when cont token is specified and the current entry
+        // has the same prefix (less the client ID) as cont token.
+        openKeyIter.next();
+      }
+      while (currentCount < maxKeys && openKeyIter.hasNext()) {
         kv = openKeyIter.next();
         if (kv != null && kv.getKey().startsWith(dbOpenKeyPrefix)) {
           String dbKey = kv.getKey();
@@ -3319,10 +3354,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           checkAndUpdateKeyHsyncStatus(omKeyInfo, ktDbKey, keyIter);
 
           openKeySessionList.add(
-              new OpenKeySession(
-                  clientID,
-                  omKeyInfo,
+              new OpenKeySession(clientID, omKeyInfo,
                   omKeyInfo.getLatestVersionLocations().getVersion()));
+          currentCount++;
         }
       }
 
@@ -3338,7 +3372,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return new ListOpenFilesResult(
         openKeySessionList,
         hasMore,
-        openKeyTable.getEstimatedKeyCount());
+        metadataManager.getOpenKeyCount());
+  }
+
+  /**
+   * For FSO buckets, retrieve object ID for volume name and bucket name,
+   * and return the dbKey prefixed by volume and bucket object ID.
+   */
+  private String getDbKeyFSO(String volumeName,
+                             String bucketName,
+                             String keyPrefix)
+      throws IOException {
+    final long volumeId = metadataManager.getVolumeId(volumeName);
+    final long bucketId = metadataManager.getBucketId(volumeName, bucketName);
+    // FSO keyPrefix could look like: -9223372036854774527/key1
+    return metadataManager.getOzoneKey(
+        Long.toString(volumeId), Long.toString(bucketId), keyPrefix);
   }
 
   /**
