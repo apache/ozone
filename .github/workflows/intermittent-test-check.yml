@@ -68,14 +68,6 @@ jobs:
               if [[ "$found_file" == *"integration-test"* ]]; then
                   test_type=integration
               fi 
-              if [ "$TEST_METHOD" != "ALL" ]; then
-                  if grep -q "public void $TEST_METHOD(" "$found_file"; then
-                      echo "Test method $TEST_METHOD exists in $filename"
-                  else
-                      echo "Test method $TEST_METHOD does not exist in $filename.Stopping!"
-                      exit 1
-                  fi
-              fi
               echo "Test file $filename found. Continuing.."
           else
               echo "Test file $filename not found.Stopping!"
