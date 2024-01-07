@@ -87,9 +87,7 @@ public abstract class AbstractContractUnbufferTest extends AbstractFSContractTes
         stream.close();
       }
     }
-    if (stream != null) {
-      unbuffer(stream);
-    }
+    unbuffer(stream);
   }
 
   @Test

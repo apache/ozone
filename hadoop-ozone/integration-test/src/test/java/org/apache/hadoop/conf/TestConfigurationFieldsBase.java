@@ -306,13 +306,7 @@ public abstract class TestConfigurationFieldsBase {
 
     HashMap<String, String> retVal = new HashMap<String, String>();
 
-    // Setup regexp for valid properties
-    String propRegex = "^[A-Za-z][A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)+$";
-    Pattern p = Pattern.compile(propRegex);
-
     // Iterate through class member variables
-    int totalFields = 0;
-    String value;
     for (Field f : fields) {
       // Filter out anything that isn't "public static final"
       if (!Modifier.isStatic(f.getModifiers()) ||

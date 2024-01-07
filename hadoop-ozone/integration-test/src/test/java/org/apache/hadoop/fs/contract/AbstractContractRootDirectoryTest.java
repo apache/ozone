@@ -109,7 +109,7 @@ public abstract class AbstractContractRootDirectoryTest extends AbstractFSContra
             if (children.length > 0) {
               fail(String.format(
                   "After %d attempts: listing after rm /* not empty"
-                      + "\n%s\n%s\n%s",
+                      + "%n%s%n%s%n%s",
                   iterations.incrementAndGet(),
                   dumpStats("final", children),
                   dumpStats("deleted", deleted),
