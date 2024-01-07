@@ -1593,7 +1593,6 @@ public class TestSCMNodeManager {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
         MILLISECONDS);
-    List<DatanodeDetails> dnList = new ArrayList<>();
     try (SCMNodeManager nodeManager = createNodeManager(conf)) {
       EventQueue eventQueue = (EventQueue) scm.getEventQueue();
       LayoutVersionManager versionManager =
@@ -1603,7 +1602,6 @@ public class TestSCMNodeManager {
           versionManager.getSoftwareLayoutVersion());
       // Generate the first DataNode
       DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
-      dnList.add(dn1);
       UUID dnId1 = dn1.getUuid();
       int volumeCount = 10;
       List<StorageReportProto> reports1 = generateStorageReportProto(
@@ -1613,7 +1611,6 @@ public class TestSCMNodeManager {
       nodeManager.processHeartbeat(dn1, layoutInfo);
       // Generate the 2nd DataNode
       DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
-      dnList.add(dn2);
       UUID dnId2 = dn2.getUuid();
       List<StorageReportProto> reports2 = generateStorageReportProto(
           volumeCount, dnId2, 1000, 1000);
@@ -1622,7 +1619,6 @@ public class TestSCMNodeManager {
       nodeManager.processHeartbeat(dn2, layoutInfo);
       // Generate the 3rd DataNode
       DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
-      dnList.add(dn3);
       UUID dnId3 = dn3.getUuid();
       List<StorageReportProto> reports3 = generateStorageReportProto(
           volumeCount, dnId3, 1000, 1001);
@@ -1631,7 +1627,6 @@ public class TestSCMNodeManager {
       nodeManager.processHeartbeat(dn3, layoutInfo);
       // Generate the 4th DataNode
       DatanodeDetails dn4 = MockDatanodeDetails.randomDatanodeDetails();
-      dnList.add(dn4);
       UUID dnId4 = dn4.getUuid();
       nodeManager.register(dn4, null, null);
       nodeManager.processHeartbeat(dn4, layoutInfo);
@@ -1651,7 +1646,6 @@ public class TestSCMNodeManager {
           assertEquals(usedPerc, 0);
         }
       }
-      dnList.clear();
     }
   }
 
