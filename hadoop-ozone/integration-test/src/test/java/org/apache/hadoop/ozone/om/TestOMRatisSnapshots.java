@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.assertj.core.api.Fail;
 import org.junit.jupiter.api.AfterEach;
@@ -202,6 +203,7 @@ public class TestOMRatisSnapshots {
   @ValueSource(ints = {100})
   // tried up to 1000 snapshots and this test works, but some of the
   //  timeouts have to be increased.
+  @Unhealthy("HDDS-10059")
   void testInstallSnapshot(int numSnapshotsToCreate, @TempDir Path tempDir) throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
