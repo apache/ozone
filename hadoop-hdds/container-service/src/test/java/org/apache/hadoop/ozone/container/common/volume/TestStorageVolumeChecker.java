@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.FakeTimer;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -61,8 +60,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult.FAILED;
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.any;
@@ -151,11 +150,11 @@ public class TestStorageVolumeChecker {
           numCallbackInvocations.incrementAndGet();
           if (expectedVolumeHealth != null &&
               expectedVolumeHealth != FAILED) {
-            assertThat(healthyVolumes.size(), is(1));
-            assertThat(failedVolumes.size(), is(0));
+            assertThat(healthyVolumes.size()).isEqualTo(1);
+            assertThat(failedVolumes.size()).isEqualTo(0);
           } else {
-            assertThat(healthyVolumes.size(), is(0));
-            assertThat(failedVolumes.size(), is(1));
+            assertThat(healthyVolumes.size()).isEqualTo(0);
+            assertThat(failedVolumes.size()).isEqualTo(1);
           }
         });
 
@@ -164,7 +163,7 @@ public class TestStorageVolumeChecker {
     // Ensure that the check was invoked at least once.
     verify(volume, times(1)).check(anyObject());
     if (result) {
-      assertThat(numCallbackInvocations.get(), is(1L));
+      assertThat(numCallbackInvocations.get()).isEqualTo(1L);
     }
 
     checker.shutdownAndWait(0, TimeUnit.SECONDS);
@@ -194,7 +193,7 @@ public class TestStorageVolumeChecker {
     LOG.info("Got back {} failed volumes", failedVolumes.size());
 
     if (expectedVolumeHealth == null || expectedVolumeHealth == FAILED) {
-      assertThat(failedVolumes.size(), is(NUM_VOLUMES));
+      assertThat(failedVolumes.size()).isEqualTo(NUM_VOLUMES);
     } else {
       assertTrue(failedVolumes.isEmpty());
     }
@@ -258,14 +257,14 @@ public class TestStorageVolumeChecker {
     // delete the volume directory
     FileUtils.deleteDirectory(volParentDir);
 
-    Assertions.assertEquals(2, volumeSet.getVolumesList().size());
+    assertEquals(2, volumeSet.getVolumesList().size());
     volumeSet.checkAllVolumes();
     // failed volume should be removed from volumeSet volume list
-    Assertions.assertEquals(1, volumeSet.getVolumesList().size());
-    Assertions.assertEquals(1, volumeSet.getFailedVolumesList().size());
+    assertEquals(1, volumeSet.getVolumesList().size());
+    assertEquals(1, volumeSet.getFailedVolumesList().size());
 
     // All containers should be removed from containerSet
-    Assertions.assertEquals(0, containerSet.getContainerMap().size());
+    assertEquals(0, containerSet.getContainerMap().size());
 
     ozoneContainer.stop();
   }

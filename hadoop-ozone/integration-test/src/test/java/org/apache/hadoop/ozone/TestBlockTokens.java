@@ -47,13 +47,10 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,6 +61,7 @@ import java.net.InetAddress;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 
@@ -92,14 +90,15 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPA
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration test to verify block tokens in a secure cluster.
  */
 @InterfaceAudience.Private
+@Timeout(value = 180, unit = TimeUnit.SECONDS)
 public final class TestBlockTokens {
   private static final Logger LOG = LoggerFactory.getLogger(TestBlockTokens.class);
   private static final String TEST_VOLUME = "testvolume";
@@ -108,9 +107,6 @@ public final class TestBlockTokens {
   private static final int ROTATE_DURATION_IN_MS = 3000;
   private static final int EXPIRY_DURATION_IN_MS = 10000;
   private static final int ROTATION_CHECK_DURATION_IN_MS = 100;
-
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(180));
 
   private static MiniKdc miniKdc;
   private static OzoneConfiguration conf;
@@ -127,7 +123,7 @@ public final class TestBlockTokens {
   private static BlockInputStreamFactory blockInputStreamFactory =
       new BlockInputStreamFactoryImpl();
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
@@ -159,7 +155,7 @@ public final class TestBlockTokens {
     }
   }
 
-  @AfterClass
+  @AfterAll
   public static void stop() {
     miniKdc.stop();
     IOUtils.close(LOG, client);

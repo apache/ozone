@@ -168,6 +168,7 @@ public class TestBlockDeletion {
         0,
         TimeUnit.MILLISECONDS);
     conf.setInt("hdds.datanode.block.delete.threads.max", 5);
+    conf.setInt("hdds.datanode.block.delete.queue.limit", 32);
     ReplicationManager.ReplicationManagerConfiguration replicationConf = conf
         .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
     replicationConf.setInterval(Duration.ofSeconds(300));
@@ -293,11 +294,6 @@ public class TestBlockDeletion {
     Assertions.assertFalse(containerIdsWithDeletedBlocks.isEmpty());
     // Containers in the DN and SCM should have same delete transactionIds
     matchContainerTransactionIds();
-    // Containers in the DN and SCM should have same delete transactionIds
-    // after DN restart. The assertion is just to verify that the state of
-    // containerInfos in dn and scm is consistent after dn restart.
-    cluster.restartHddsDatanode(0, true);
-    matchContainerTransactionIds();
 
     // Verify transactions committed
     GenericTestUtils.waitFor(() -> {
@@ -309,6 +305,13 @@ public class TestBlockDeletion {
         return false;
       }
     }, 500, 10000);
+
+    // Containers in the DN and SCM should have same delete transactionIds
+    // after DN restart. The assertion is just to verify that the state of
+    // containerInfos in dn and scm is consistent after dn restart.
+    cluster.restartHddsDatanode(0, true);
+    matchContainerTransactionIds();
+
     Assertions.assertEquals(metrics.getNumBlockDeletionTransactionCreated(),
         metrics.getNumBlockDeletionTransactionCompleted());
     Assertions.assertTrue(metrics.getNumBlockDeletionCommandSent() >=

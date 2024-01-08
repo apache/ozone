@@ -42,7 +42,6 @@ import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -61,6 +60,7 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -68,6 +68,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
 
 /**
@@ -90,24 +94,24 @@ public class TestRatisUnderReplicationHandler {
     container = ReplicationTestUtil.createContainer(
         HddsProtos.LifeCycleState.CLOSED, RATIS_REPLICATION_CONFIG);
 
-    nodeManager = Mockito.mock(NodeManager.class);
+    nodeManager = mock(NodeManager.class);
     conf = SCMTestUtils.getConf();
     policy = ReplicationTestUtil
         .getSimpleTestPlacementPolicy(nodeManager, conf);
-    replicationManager = Mockito.mock(ReplicationManager.class);
+    replicationManager = mock(ReplicationManager.class);
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.setBoolean("hdds.scm.replication.push", true);
-    Mockito.when(replicationManager.getConfig())
+    when(replicationManager.getConfig())
         .thenReturn(ozoneConfiguration.getObject(
             ReplicationManagerConfiguration.class));
     metrics = ReplicationManagerMetrics.create(replicationManager);
-    Mockito.when(replicationManager.getMetrics()).thenReturn(metrics);
+    when(replicationManager.getMetrics()).thenReturn(metrics);
 
     /*
       Return NodeStatus with NodeOperationalState as specified in
       DatanodeDetails, and NodeState as HEALTHY.
     */
-    Mockito.when(
+    when(
         replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocationOnMock -> {
           DatanodeDetails dn = invocationOnMock.getArgument(0);
@@ -456,16 +460,14 @@ public class TestRatisUnderReplicationHandler {
         getUnderReplicatedHealthResult(), 2, 1);
 
     // Ensure that the replica with SEQ=2 is the only source sent
-    Mockito.verify(replicationManager).sendThrottledReplicationCommand(
-        any(ContainerInfo.class),
-        Mockito.eq(Collections.singletonList(valid.getDatanodeDetails())),
-        any(DatanodeDetails.class), anyInt());
+    verify(replicationManager).sendThrottledReplicationCommand(any(ContainerInfo.class),
+        eq(Collections.singletonList(valid.getDatanodeDetails())), any(DatanodeDetails.class), anyInt());
   }
 
   @Test
   public void testCorrectUsedAndExcludedNodesPassed() throws IOException {
-    PlacementPolicy mockPolicy = Mockito.mock(PlacementPolicy.class);
-    Mockito.when(mockPolicy.chooseDatanodes(any(), any(), any(),
+    PlacementPolicy mockPolicy = mock(PlacementPolicy.class);
+    when(mockPolicy.chooseDatanodes(any(), any(), any(),
         anyInt(), anyLong(), anyLong()))
         .thenReturn(Collections.singletonList(
             MockDatanodeDetails.randomDatanodeDetails()));
@@ -510,19 +512,19 @@ public class TestRatisUnderReplicationHandler {
         getUnderReplicatedHealthResult(), 2);
 
 
-    Mockito.verify(mockPolicy, times(1)).chooseDatanodes(
+    verify(mockPolicy, times(1)).chooseDatanodes(
         usedNodesCaptor.capture(), excludedNodesCaptor.capture(), any(),
         anyInt(), anyLong(), anyLong());
 
     List<DatanodeDetails> usedNodes = usedNodesCaptor.getValue();
     List<DatanodeDetails> excludedNodes = excludedNodesCaptor.getValue();
 
-    assertTrue(usedNodes.contains(good.getDatanodeDetails()));
-    assertTrue(usedNodes.contains(maintenance.getDatanodeDetails()));
-    assertTrue(usedNodes.contains(pendingAdd));
-    assertTrue(excludedNodes.contains(unhealthy.getDatanodeDetails()));
-    assertTrue(excludedNodes.contains(decommissioning.getDatanodeDetails()));
-    assertTrue(excludedNodes.contains(pendingRemove));
+    assertThat(usedNodes).contains(good.getDatanodeDetails());
+    assertThat(usedNodes).contains(maintenance.getDatanodeDetails());
+    assertThat(usedNodes).contains(pendingAdd);
+    assertThat(excludedNodes).contains(unhealthy.getDatanodeDetails());
+    assertThat(excludedNodes).contains(decommissioning.getDatanodeDetails());
+    assertThat(excludedNodes).contains(pendingRemove);
   }
 
   @Test
@@ -572,7 +574,7 @@ public class TestRatisUnderReplicationHandler {
             DECOMMISSIONING, State.UNHEALTHY, sequenceID);
     replicas.add(unhealthyReplica);
     UnderReplicatedHealthResult result = getUnderReplicatedHealthResult();
-    Mockito.when(result.hasVulnerableUnhealthy()).thenReturn(true);
+    when(result.hasVulnerableUnhealthy()).thenReturn(true);
 
     final Set<Pair<DatanodeDetails, SCMCommand<?>>> commands = testProcessing(replicas, Collections.emptyList(),
         result, 2, 1);
@@ -610,7 +612,7 @@ public class TestRatisUnderReplicationHandler {
     replicas.add(unhealthyReplica);
     replicas.add(unhealthyReplica2);
     UnderReplicatedHealthResult result = getUnderReplicatedHealthResult();
-    Mockito.when(result.hasVulnerableUnhealthy()).thenReturn(true);
+    when(result.hasVulnerableUnhealthy()).thenReturn(true);
     ReplicationTestUtil.mockRMSendThrottleReplicateCommand(replicationManager, commandsSent, new AtomicBoolean(true));
 
     RatisUnderReplicationHandler handler = new RatisUnderReplicationHandler(policy, conf, replicationManager);
@@ -717,9 +719,8 @@ public class TestRatisUnderReplicationHandler {
   }
 
   private UnderReplicatedHealthResult getUnderReplicatedHealthResult() {
-    UnderReplicatedHealthResult healthResult =
-        Mockito.mock(UnderReplicatedHealthResult.class);
-    Mockito.when(healthResult.getContainerInfo()).thenReturn(container);
+    UnderReplicatedHealthResult healthResult = mock(UnderReplicatedHealthResult.class);
+    when(healthResult.getContainerInfo()).thenReturn(container);
     return healthResult;
   }
 }

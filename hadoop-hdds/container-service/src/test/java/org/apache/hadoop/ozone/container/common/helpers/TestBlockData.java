@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.common.helpers;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.ozone.common.Checksum;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
@@ -98,9 +97,9 @@ public class TestBlockData {
   static void assertChunks(List<ContainerProtos.ChunkInfo> expected,
       BlockData computed) {
     final List<ContainerProtos.ChunkInfo> computedChunks = computed.getChunks();
-    Assertions.assertEquals(expected, computedChunks,
+    assertEquals(expected, computedChunks,
         "expected=" + expected + "\ncomputed=" + computedChunks);
-    Assertions.assertEquals(expected.stream().mapToLong(i -> i.getLen()).sum(),
+    assertEquals(expected.stream().mapToLong(i -> i.getLen()).sum(),
         computed.getSize());
   }
 

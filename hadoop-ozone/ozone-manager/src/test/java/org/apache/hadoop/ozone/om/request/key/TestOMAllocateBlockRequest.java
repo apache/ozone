@@ -19,7 +19,10 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,7 +30,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.jetbrains.annotations.NotNull;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -76,12 +78,12 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
     List<OmKeyLocationInfo> omKeyLocationInfo =
         omKeyInfo.getLatestVersionLocations().getLocationList();
 
-    Assertions.assertEquals(0, omKeyLocationInfo.size());
+    assertEquals(0, omKeyLocationInfo.size());
 
     OMClientResponse omAllocateBlockResponse =
         omAllocateBlockRequest.validateAndUpdateCache(ozoneManager, 100L);
 
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omAllocateBlockResponse.getOMResponse().getStatus());
 
     // Check open table whether new block is added or not.
@@ -90,14 +92,14 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
             true);
 
     // Check modification time
-    Assertions.assertEquals(modifiedOmRequest.getAllocateBlockRequest()
+    assertEquals(modifiedOmRequest.getAllocateBlockRequest()
         .getKeyArgs().getModificationTime(), omKeyInfo.getModificationTime());
 
     // creationTime was assigned at OMRequestTestUtils.addKeyToTable
     // modificationTime was assigned at
     // doPreExecute(createAllocateBlockRequest())
-    Assertions.assertTrue(
-        omKeyInfo.getCreationTime() <= omKeyInfo.getModificationTime());
+    assertThat(omKeyInfo.getCreationTime())
+        .isLessThanOrEqualTo(omKeyInfo.getModificationTime());
 
     // Check data of the block
     OzoneManagerProtocolProtos.KeyLocation keyLocation =
@@ -106,12 +108,12 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
     omKeyLocationInfo =
         omKeyInfo.getLatestVersionLocations().getLocationList();
 
-    Assertions.assertEquals(1, omKeyLocationInfo.size());
+    assertEquals(1, omKeyLocationInfo.size());
 
-    Assertions.assertEquals(keyLocation.getBlockID().getContainerBlockID()
+    assertEquals(keyLocation.getBlockID().getContainerBlockID()
         .getContainerID(), omKeyLocationInfo.get(0).getContainerID());
 
-    Assertions.assertEquals(keyLocation.getBlockID().getContainerBlockID()
+    assertEquals(keyLocation.getBlockID().getContainerBlockID()
             .getLocalID(), omKeyLocationInfo.get(0).getLocalID());
 
   }
@@ -135,7 +137,7 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
     OMClientResponse omAllocateBlockResponse =
         omAllocateBlockRequest.validateAndUpdateCache(ozoneManager, 100L);
 
-    Assertions.assertSame(omAllocateBlockResponse.getOMResponse().getStatus(),
+    assertSame(omAllocateBlockResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND);
 
   }
@@ -157,7 +159,7 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
     OMClientResponse omAllocateBlockResponse =
         omAllocateBlockRequest.validateAndUpdateCache(ozoneManager, 100L);
 
-    Assertions.assertSame(omAllocateBlockResponse.getOMResponse().getStatus(),
+    assertSame(omAllocateBlockResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND);
 
   }
@@ -179,7 +181,7 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
     OMClientResponse omAllocateBlockResponse =
         omAllocateBlockRequest.validateAndUpdateCache(ozoneManager, 100L);
 
-    Assertions.assertSame(omAllocateBlockResponse.getOMResponse().getStatus(),
+    assertSame(omAllocateBlockResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND);
 
   }
@@ -200,29 +202,29 @@ public class TestOMAllocateBlockRequest extends TestOMKeyRequest {
         omAllocateBlockRequest.preExecute(ozoneManager);
 
 
-    Assertions.assertEquals(originalOMRequest.getCmdType(),
+    assertEquals(originalOMRequest.getCmdType(),
         modifiedOmRequest.getCmdType());
-    Assertions.assertEquals(originalOMRequest.getClientId(),
+    assertEquals(originalOMRequest.getClientId(),
         modifiedOmRequest.getClientId());
 
-    Assertions.assertTrue(modifiedOmRequest.hasAllocateBlockRequest());
+    assertTrue(modifiedOmRequest.hasAllocateBlockRequest());
     AllocateBlockRequest allocateBlockRequest =
         modifiedOmRequest.getAllocateBlockRequest();
     // Time should be set
-    Assertions.assertTrue(allocateBlockRequest.getKeyArgs()
-        .getModificationTime() > 0);
+    assertThat(allocateBlockRequest.getKeyArgs().getModificationTime())
+        .isGreaterThan(0);
 
     // KeyLocation should be set.
-    Assertions.assertTrue(allocateBlockRequest.hasKeyLocation());
-    Assertions.assertEquals(CONTAINER_ID,
+    assertTrue(allocateBlockRequest.hasKeyLocation());
+    assertEquals(CONTAINER_ID,
         allocateBlockRequest.getKeyLocation().getBlockID()
             .getContainerBlockID().getContainerID());
-    Assertions.assertEquals(LOCAL_ID,
+    assertEquals(LOCAL_ID,
         allocateBlockRequest.getKeyLocation().getBlockID()
             .getContainerBlockID().getLocalID());
-    Assertions.assertTrue(allocateBlockRequest.getKeyLocation().hasPipeline());
+    assertTrue(allocateBlockRequest.getKeyLocation().hasPipeline());
 
-    Assertions.assertEquals(allocateBlockRequest.getClientID(),
+    assertEquals(allocateBlockRequest.getClientID(),
         allocateBlockRequest.getClientID());
 
     return modifiedOmRequest;

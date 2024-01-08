@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.migrationsupport.rules.EnableRuleMigrationSupport;
 
 import java.io.File;
 import java.util.HashMap;
@@ -55,7 +54,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Tests ozone containers.
  */
-@EnableRuleMigrationSupport
 @Timeout(300)
 public class TestOzoneContainer {
 

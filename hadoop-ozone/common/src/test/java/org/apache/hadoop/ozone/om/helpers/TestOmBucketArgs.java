@@ -20,10 +20,13 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.hdds.client.ReplicationType.EC;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * Tests for the OmBucketArgs class.
@@ -37,14 +40,14 @@ public class TestOmBucketArgs {
         .setVolumeName("volume")
         .build();
 
-    Assertions.assertFalse(bucketArgs.hasQuotaInBytes());
-    Assertions.assertFalse(bucketArgs.hasQuotaInNamespace());
+    assertFalse(bucketArgs.hasQuotaInBytes());
+    assertFalse(bucketArgs.hasQuotaInNamespace());
 
     OmBucketArgs argsFromProto = OmBucketArgs.getFromProtobuf(
         bucketArgs.getProtobuf());
 
-    Assertions.assertFalse(argsFromProto.hasQuotaInBytes());
-    Assertions.assertFalse(argsFromProto.hasQuotaInNamespace());
+    assertFalse(argsFromProto.hasQuotaInBytes());
+    assertFalse(argsFromProto.hasQuotaInNamespace());
 
     bucketArgs = OmBucketArgs.newBuilder()
         .setBucketName("bucket")
@@ -53,14 +56,14 @@ public class TestOmBucketArgs {
         .setQuotaInBytes(456)
         .build();
 
-    Assertions.assertTrue(bucketArgs.hasQuotaInBytes());
-    Assertions.assertTrue(bucketArgs.hasQuotaInNamespace());
+    assertTrue(bucketArgs.hasQuotaInBytes());
+    assertTrue(bucketArgs.hasQuotaInNamespace());
 
     argsFromProto = OmBucketArgs.getFromProtobuf(
         bucketArgs.getProtobuf());
 
-    Assertions.assertTrue(argsFromProto.hasQuotaInBytes());
-    Assertions.assertTrue(argsFromProto.hasQuotaInNamespace());
+    assertTrue(argsFromProto.hasQuotaInBytes());
+    assertTrue(argsFromProto.hasQuotaInNamespace());
   }
 
   @Test
@@ -73,7 +76,7 @@ public class TestOmBucketArgs {
     OmBucketArgs argsFromProto = OmBucketArgs.getFromProtobuf(
         bucketArgs.getProtobuf());
 
-    Assertions.assertNull(argsFromProto.getDefaultReplicationConfig());
+    assertNull(argsFromProto.getDefaultReplicationConfig());
 
     bucketArgs = OmBucketArgs.newBuilder()
         .setBucketName("bucket")
@@ -85,7 +88,7 @@ public class TestOmBucketArgs {
     argsFromProto = OmBucketArgs.getFromProtobuf(
         bucketArgs.getProtobuf());
 
-    Assertions.assertEquals(EC,
+    assertEquals(EC,
         argsFromProto.getDefaultReplicationConfig().getType());
   }
 }

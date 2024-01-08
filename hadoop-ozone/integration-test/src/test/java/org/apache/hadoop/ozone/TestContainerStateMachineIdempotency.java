@@ -37,37 +37,28 @@ import org.apache.hadoop.hdds.scm.protocolPB.
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
-
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.Assertions;
 import java.io.IOException;
-
-import org.junit.Rule;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import java.util.concurrent.TimeUnit;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Tests the idempotent operations in ContainerStateMachine.
  */
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
 public class TestContainerStateMachineIdempotency {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration ozoneConfig;
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
   private static XceiverClientManager xceiverClientManager;
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     ozoneConfig = new OzoneConfiguration();
     ozoneConfig.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
@@ -80,7 +71,7 @@ public class TestContainerStateMachineIdempotency {
     xceiverClientManager = new XceiverClientManager(ozoneConfig);
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -124,7 +115,7 @@ public class TestContainerStateMachineIdempotency {
       ContainerProtocolCalls.closeContainer(client, containerID, null);
       ContainerProtocolCalls.closeContainer(client, containerID, null);
     } catch (IOException ioe) {
-      Assert.fail("Container operation failed" + ioe);
+      Assertions.fail("Container operation failed" + ioe);
     }
     xceiverClientManager.releaseClient(client, false);
   }

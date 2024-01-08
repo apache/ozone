@@ -18,11 +18,11 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -65,10 +65,10 @@ public class TestOMDBDefinition {
       }
     }
 
-    Assertions.assertEquals(0, missingDBDefTables.size(),
+    assertEquals(0, missingDBDefTables.size(),
         "Tables in OmMetadataManagerImpl are:" + missingDBDefTables);
-    Assertions.assertEquals(0, missingOmDBTables.size(),
+    assertEquals(0, missingOmDBTables.size(),
         "Tables missing in OMDBDefinition are:" + missingOmDBTables);
-    Assertions.assertEquals(countOmDBTables, countOmDefTables);
+    assertEquals(countOmDBTables, countOmDefTables);
   }
 }

@@ -41,7 +41,6 @@ import java.util.UUID;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -184,8 +183,9 @@ public class TestContainerDataYaml {
     final String content =
         FileUtils.readFileToString(containerFile, Charset.defaultCharset());
 
-    assertFalse(content.contains("replicaIndex"),
-        "ReplicaIndex shouldn't be persisted if zero");
+    assertThat(content)
+        .withFailMessage("ReplicaIndex shouldn't be persisted if zero")
+        .doesNotContain("replicaIndex");
     cleanup();
   }
 

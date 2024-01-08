@@ -37,8 +37,8 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.http.HttpStatus;
@@ -100,8 +100,8 @@ public class TestObjectHead {
       Response response =  keyEndpoint.head(bucketName, "badKeyName");
       assertEquals(404, response.getStatus());
     } catch (OS3Exception ex) {
-      assertTrue(ex.getCode().contains("NoSuchObject"));
-      assertTrue(ex.getErrorMessage().contains("object does not exist"));
+      assertThat(ex.getCode()).contains("NoSuchObject");
+      assertThat(ex.getErrorMessage()).contains("object does not exist");
       assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
     }
   }

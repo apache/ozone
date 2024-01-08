@@ -70,11 +70,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -191,9 +188,6 @@ public class TestOzoneClientMultipartUploadWithFSO {
 
     Assertions.assertNotNull(multipartInfo);
     String uploadID = multipartInfo.getUploadID();
-    Assertions.assertEquals(volumeName, multipartInfo.getVolumeName());
-    Assertions.assertEquals(bucketName, multipartInfo.getBucketName());
-    Assertions.assertEquals(keyName, multipartInfo.getKeyName());
     Assertions.assertNotNull(multipartInfo.getUploadID());
 
     // Call initiate multipart upload for the same key again, this should
@@ -201,9 +195,6 @@ public class TestOzoneClientMultipartUploadWithFSO {
     multipartInfo = bucket.initiateMultipartUpload(keyName);
 
     Assertions.assertNotNull(multipartInfo);
-    Assertions.assertEquals(volumeName, multipartInfo.getVolumeName());
-    Assertions.assertEquals(bucketName, multipartInfo.getBucketName());
-    Assertions.assertEquals(keyName, multipartInfo.getKeyName());
     Assertions.assertNotEquals(multipartInfo.getUploadID(), uploadID);
     Assertions.assertNotNull(multipartInfo.getUploadID());
   }
@@ -908,11 +899,10 @@ public class TestOzoneClientMultipartUploadWithFSO {
 
   private long getParentID(String volName, String buckName,
                            String kName, OMMetadataManager omMetadataManager) throws IOException {
-    Iterator<Path> pathComponents = Paths.get(kName).iterator();
     final long volumeId = omMetadataManager.getVolumeId(volName);
     final long bucketId = omMetadataManager.getBucketId(volName,
         buckName);
-    return OMFileRequest.getParentID(volumeId, bucketId, pathComponents,
+    return OMFileRequest.getParentID(volumeId, bucketId,
         kName, omMetadataManager);
   }
 
@@ -924,9 +914,6 @@ public class TestOzoneClientMultipartUploadWithFSO {
 
     Assertions.assertNotNull(multipartInfo);
     String uploadID = multipartInfo.getUploadID();
-    Assertions.assertEquals(volumeName, multipartInfo.getVolumeName());
-    Assertions.assertEquals(bucketName, multipartInfo.getBucketName());
-    Assertions.assertEquals(kName, multipartInfo.getKeyName());
     Assertions.assertNotNull(multipartInfo.getUploadID());
 
     return uploadID;
@@ -956,11 +943,6 @@ public class TestOzoneClientMultipartUploadWithFSO {
         .completeMultipartUpload(kName, uploadID, partsMap);
 
     Assertions.assertNotNull(omMultipartUploadCompleteInfo);
-    Assertions.assertEquals(omMultipartUploadCompleteInfo.getBucket(), oBucket
-        .getName());
-    Assertions.assertEquals(omMultipartUploadCompleteInfo.getVolume(), oBucket
-        .getVolumeName());
-    Assertions.assertEquals(omMultipartUploadCompleteInfo.getKey(), kName);
     Assertions.assertNotNull(omMultipartUploadCompleteInfo.getHash());
   }
 

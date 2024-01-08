@@ -105,6 +105,7 @@ import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.DATA_SUFFIX;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileName;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COMPACTION_LOG_FILE_NAME_SUFFIX;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -275,15 +276,13 @@ public class TestOMDbCheckpointServlet {
 
     doEndpoint();
 
-    Assertions.assertTrue(tempFile.length() > 0);
-    Assertions.assertTrue(
-        omMetrics.getDBCheckpointMetrics().
-            getLastCheckpointCreationTimeTaken() > 0);
-    Assertions.assertTrue(
-        omMetrics.getDBCheckpointMetrics().
-            getLastCheckpointStreamingTimeTaken() > 0);
-    Assertions.assertTrue(omMetrics.getDBCheckpointMetrics().
-        getNumCheckpoints() > initialCheckpointCount);
+    assertThat(tempFile.length()).isGreaterThan(0);
+    assertThat(omMetrics.getDBCheckpointMetrics().getLastCheckpointCreationTimeTaken())
+        .isGreaterThan(0);
+    assertThat(omMetrics.getDBCheckpointMetrics().getLastCheckpointStreamingTimeTaken())
+        .isGreaterThan(0);
+    assertThat(omMetrics.getDBCheckpointMetrics().getNumCheckpoints())
+        .isGreaterThan(initialCheckpointCount);
 
     Mockito.verify(omDbCheckpointServletMock).writeDbDataToStream(any(),
         any(), any(), eq(toExcludeList), any(), any());
@@ -383,7 +382,7 @@ public class TestOMDbCheckpointServlet {
 
     // Recon user should be able to access the servlet and download the
     // snapshot
-    Assertions.assertTrue(tempFile.length() > 0);
+    assertThat(tempFile.length()).isGreaterThan(0);
   }
 
   @Test
@@ -483,8 +482,8 @@ public class TestOMDbCheckpointServlet {
     Set<String> finalCheckpointSet = getFiles(finalCheckpointLocation,
         newDbDirLength);
 
-    Assertions.assertTrue(finalCheckpointSet.contains(OM_HARDLINK_FILE),
-        "hardlink file exists in checkpoint dir");
+    assertThat(finalCheckpointSet).withFailMessage("hardlink file exists in checkpoint dir")
+        .contains(OM_HARDLINK_FILE);
     finalCheckpointSet.remove(OM_HARDLINK_FILE);
     Assertions.assertEquals(initialCheckpointSet, finalCheckpointSet);
 
@@ -522,10 +521,10 @@ public class TestOMDbCheckpointServlet {
 
     Set<String> initialFullSet =
         getFiles(Paths.get(metaDir.toString(), OM_SNAPSHOT_DIR), metaDirLength);
-    Assertions.assertTrue(finalFullSet.contains(expectedLogStr));
-    Assertions.assertTrue(finalFullSet.contains(expectedSstStr));
-    Assertions.assertTrue(initialFullSet.contains(unExpectedLogStr));
-    Assertions.assertTrue(initialFullSet.contains(unExpectedSstStr));
+    assertThat(finalFullSet).contains(expectedLogStr);
+    assertThat(finalFullSet).contains(expectedSstStr);
+    assertThat(initialFullSet).contains(unExpectedLogStr);
+    assertThat(initialFullSet).contains(unExpectedSstStr);
 
     // Remove the dummy files that should not have been copied over
     // from the expected data.
@@ -628,7 +627,7 @@ public class TestOMDbCheckpointServlet {
         testDirLength);
 
     initialCheckpointSet.removeAll(finalCheckpointSet);
-    Assertions.assertTrue(initialCheckpointSet.contains(dummyFile.getName()));
+    assertThat(initialCheckpointSet).contains(dummyFile.getName());
   }
 
   /**
