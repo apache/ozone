@@ -60,7 +60,7 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
     OMRequestTestUtils.addPrefixToTable(volumeName, bucketName, prefixName,
-    1L, omMetadataManager);
+      1L, omMetadataManager);
 
     OzoneAcl acl = OzoneAcl.parseAcl("user:bilbo:rwdlncxy[ACCESS]");
 
