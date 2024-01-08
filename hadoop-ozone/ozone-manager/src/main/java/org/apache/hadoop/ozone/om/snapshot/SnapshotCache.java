@@ -186,7 +186,7 @@ public class SnapshotCache implements ReferenceCountedCallback {
               throw new IllegalStateException(ex);
             }
           }
-          LOG.info("Getting Snapshot {} from Snapshot Cache", k);
+          LOG.debug("Got snapshot {} from SnapshotCache", k);
           return v;
         });
 
@@ -323,6 +323,8 @@ public class SnapshotCache implements ReferenceCountedCallback {
           }
           return null;
         }
+        LOG.warn("Snapshot {} is still being referenced ({}), skipping its clean up",
+            k, rcOmSnapshot.getTotalRefCount());
         return v;
       });
 
