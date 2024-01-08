@@ -235,7 +235,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <rocksdb.version>7.7.3</rocksdb.version>
     <sqlite.version>3.44.1.0</sqlite.version>
-    <weld-servlet.version>3.1.9.Final</weld-servlet.version>
+    <weld-servlet.version>5.1.2.Final</weld-servlet.version>
 
     <!-- define the Java language version used by the compiler -->
     <javac.version>1.8</javac.version>
