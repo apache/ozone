@@ -260,23 +260,23 @@ public class PrefixManagerImpl implements PrefixManager {
   public OMPrefixAclOpResult removeAcl(OzoneObj ozoneObj, OzoneAcl ozoneAcl,
       OmPrefixInfo prefixInfo) throws IOException {
     boolean removed = false;
-    if (prefixInfo != null) {
-      removed = prefixInfo.removeAcl(ozoneAcl);
+    if (prefixInfo == null) {
+      return new OMPrefixAclOpResult(prefixInfo, removed);
     }
 
-    // Nothing is matching to remove.
-    if (removed) {
-      // Update in-memory prefix tree.
-      if (prefixInfo.getAcls().isEmpty()) {
-        prefixTree.removePrefixPath(ozoneObj.getPath());
-        if (!isRatisEnabled) {
-          metadataManager.getPrefixTable().delete(ozoneObj.getPath());
-        }
-      } else {
-        prefixTree.insert(ozoneObj.getPath(), prefixInfo);
-        if (!isRatisEnabled) {
-          metadataManager.getPrefixTable().put(ozoneObj.getPath(), prefixInfo);
-        }
+    removed = prefixInfo.removeAcl(ozoneAcl);
+
+    // Update in-memory prefix tree regardless whether the ACL is changed.
+    // Under OM HA, update ID of the prefix info is updated for every request.
+    if (prefixInfo.getAcls().isEmpty()) {
+      prefixTree.removePrefixPath(ozoneObj.getPath());
+      if (!isRatisEnabled) {
+        metadataManager.getPrefixTable().delete(ozoneObj.getPath());
+      }
+    } else {
+      prefixTree.insert(ozoneObj.getPath(), prefixInfo);
+      if (!isRatisEnabled) {
+        metadataManager.getPrefixTable().put(ozoneObj.getPath(), prefixInfo);
       }
     }
     return new OMPrefixAclOpResult(prefixInfo, removed);

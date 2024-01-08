@@ -163,22 +163,38 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
     OMClientResponse createResponse = omPrefixAddAclRequest.validateAndUpdateCache(ozoneManager, 1L);
     assertEquals(OzoneManagerProtocolProtos.Status.OK, createResponse.getOMResponse().getStatus());
 
+    // Check update ID
+    OmPrefixInfo prefixInfo = prefixManager.getPrefixInfo(prefixObj);
+    assertEquals(1L, prefixInfo.getUpdateID());
+
+    // Remove acl that does not exist
+    OzoneAcl notExistAcl = OzoneAcl.parseAcl("user:nonexist:r[ACCESS]");
+    OMRequest notExistRemoveAclRequest = createRemoveAclPrefixRequest(prefixName, notExistAcl);
+    OMPrefixRemoveAclRequest omPrefixRemoveAclRequest =
+        new OMPrefixRemoveAclRequest(notExistRemoveAclRequest);
+    omPrefixRemoveAclRequest.preExecute(ozoneManager);
+    OMClientResponse omClientResponse = omPrefixRemoveAclRequest
+        .validateAndUpdateCache(ozoneManager, 2L);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse.getOMResponse().getStatus());
+
+    // Check that the update ID is updated
+    prefixInfo = prefixManager.getPrefixInfo(prefixObj);
+    assertEquals(2L, prefixInfo.getUpdateID());
+
     // Remove existing prefix acl.
     OMRequest validRemoveAclRequest = createRemoveAclPrefixRequest(prefixName, acl);
     OMPrefixRemoveAclRequest omPrefixRemoveAclRequest1 =
         new OMPrefixRemoveAclRequest(validRemoveAclRequest);
     omPrefixRemoveAclRequest1.preExecute(ozoneManager);
     OMClientResponse omClientResponse1 = omPrefixRemoveAclRequest1
-        .validateAndUpdateCache(ozoneManager, 2L);
+        .validateAndUpdateCache(ozoneManager, 3L);
     assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse1.getOMResponse().getStatus());
 
     // Check that the entry is deleted in Prefix tree (PrefixManagerImpl)
-    List<OmPrefixInfo> prefixInfoList = prefixManager
-        .getLongestPrefixPath(prefixObj.getPath());
-    assertEquals(1, prefixInfoList.size());
-    assertNull(prefixInfoList.get(0));
-    assertNull(prefixManager.getPrefixInfo(prefixObj));
+    prefixInfo = prefixManager.getPrefixInfo(prefixObj);
+    assertNull(prefixInfo);
     // Non-existent prefix should return empty ACL
     List<OzoneAcl> ozoneAcls = prefixManager.getAcl(prefixObj);
     assertTrue(ozoneAcls.isEmpty());
@@ -194,7 +210,7 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
         new OMPrefixRemoveAclRequest(invalidRemoveAclRequest);
     omPrefixRemoveAclRequest1.preExecute(ozoneManager);
     OMClientResponse omClientResponse2 = omPrefixRemoveAclRequest2
-        .validateAndUpdateCache(ozoneManager, 3L);
+        .validateAndUpdateCache(ozoneManager, 4L);
     assertEquals(OzoneManagerProtocolProtos.Status.PREFIX_NOT_FOUND,
         omClientResponse2.getOMResponse().getStatus());
   }
