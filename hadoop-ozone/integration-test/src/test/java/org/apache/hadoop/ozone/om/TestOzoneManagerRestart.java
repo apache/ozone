@@ -116,7 +116,7 @@ public class TestOzoneManagerRestart {
     objectStore.createVolume(volumeName);
 
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
-    assertEquals(ozoneVolume.getName(), volumeName);
+    assertEquals(volumeName, ozoneVolume.getName());
 
     cluster.restartOzoneManager();
     cluster.restartStorageContainerManager(true);
@@ -127,7 +127,7 @@ public class TestOzoneManagerRestart {
 
     // Get Volume.
     ozoneVolume = objectStore.getVolume(volumeName);
-    assertEquals(ozoneVolume.getName(), volumeName);
+    assertEquals(volumeName, ozoneVolume.getName());
 
   }
 
