@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.concurrent.CompletableFuture;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCheckpoint;
@@ -238,13 +239,13 @@ public final class RocksDatabase implements Closeable {
     public void createCheckpoint(Path path) throws IOException {
       assertClose();
       try {
-        counter.incrementAndGet();
+        incrementCounter();
         checkpoint.get().createCheckpoint(path.toString());
       } catch (RocksDBException e) {
-        closeOnError(e, true);
+        closeOnError(e);
         throw toIOException(this, "createCheckpoint " + path, e);
       } finally {
-        counter.decrementAndGet();
+        decrementCounter();
       }
     }
 
@@ -301,6 +302,7 @@ public final class RocksDatabase implements Closeable {
       assertClosed();
       try {
         counter.incrementAndGet();
+        assertClosed();
         writeBatch.delete(getHandle(), key);
       } catch (RocksDBException e) {
         throw toIOException(this, "batchDelete key " + bytes2String(key), e);
@@ -319,6 +321,7 @@ public final class RocksDatabase implements Closeable {
       assertClosed();
       try {
         counter.incrementAndGet();
+        assertClosed();
         writeBatch.put(getHandle(), key, value);
       } catch (RocksDBException e) {
         throw toIOException(this, "batchPut key " + bytes2String(key), e);
@@ -337,6 +340,7 @@ public final class RocksDatabase implements Closeable {
       assertClosed();
       try {
         counter.incrementAndGet();
+        assertClosed();
         writeBatch.put(getHandle(), key.duplicate(), value);
       } catch (RocksDBException e) {
         throw toIOException(this, "batchPut ByteBuffer key "
@@ -389,6 +393,10 @@ public final class RocksDatabase implements Closeable {
 
   @Override
   public void close() {
+    close(true);
+  }
+
+  private void close(boolean isSync) {
     if (isClosed.compareAndSet(false, true)) {
       // Wait for all background work to be cancelled first. e.g. RDB compaction
       db.get().cancelAllBackgroundWork(true);
@@ -399,37 +407,38 @@ public final class RocksDatabase implements Closeable {
       if (columnFamilies != null) {
         columnFamilies.values().stream().forEach(f -> f.markClosed());
       }
-      // wait till all access to rocks db is process to avoid crash while close
-      while (true) {
-        if (counter.get() == 0) {
-          break;
-        }
-        try {
-          Thread.currentThread().sleep(1);
-        } catch (InterruptedException e) {
-          close(columnFamilies, db, descriptors, writeOptions, dbOptions);
-          Thread.currentThread().interrupt();
-          return;
-        }
+      if (isSync) {
+        waitAndClose();
+        return;
       }
-      
-      // close when counter is 0, no more operation
-      close(columnFamilies, db, descriptors, writeOptions, dbOptions);
+      CompletableFuture.runAsync(() -> {
+        waitAndClose();
+      });
     }
   }
 
-  private void closeOnError(RocksDBException e, boolean isCounted) {
-    if (shouldClose(e)) {
-      try {
-        if (isCounted) {
-          counter.decrementAndGet();
-        }
-        close();
-      } finally {
-        if (isCounted) {
-          counter.incrementAndGet();
-        }
+  private void waitAndClose() {
+    // wait till all access to rocks db is process to avoid crash while close
+    while (true) {
+      if (counter.get() == 0) {
+        break;
       }
+      try {
+        Thread.currentThread().sleep(1);
+      } catch (InterruptedException e) {
+        close(columnFamilies, db, descriptors, writeOptions, dbOptions);
+        Thread.currentThread().interrupt();
+        return;
+      }
+    }
+
+    // close when counter is 0, no more operation
+    close(columnFamilies, db, descriptors, writeOptions, dbOptions);
+  }
+
+  private void closeOnError(RocksDBException e) {
+    if (shouldClose(e)) {
+      close(false);
     }
   }
 
@@ -449,20 +458,29 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
+  private void incrementCounter() throws IOException {
+    counter.incrementAndGet();
+    assertClose();
+  }
+
+  private void decrementCounter() {
+    counter.decrementAndGet();
+  }
+
   public void ingestExternalFile(ColumnFamily family, List<String> files,
       ManagedIngestExternalFileOptions ingestOptions) throws IOException {
     assertClose();
     try {
-      counter.incrementAndGet();
+      incrementCounter();
       db.get().ingestExternalFile(family.getHandle(), files, ingestOptions);
     } catch (RocksDBException e) {
-      closeOnError(e, true);
+      closeOnError(e);
       String msg = "Failed to ingest external files " +
           files.stream().collect(Collectors.joining(", ")) + " of " +
           family.getName();
       throw toIOException(this, msg, e);
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
@@ -470,13 +488,13 @@ public final class RocksDatabase implements Closeable {
       throws IOException {
     assertClose();
     try {
-      counter.incrementAndGet();
+      incrementCounter();
       db.get().put(family.getHandle(), writeOptions, key, value);
     } catch (RocksDBException e) {
-      closeOnError(e, true);
+      closeOnError(e);
       throw toIOException(this, "put " + bytes2String(key), e);
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
@@ -484,30 +502,30 @@ public final class RocksDatabase implements Closeable {
       throws IOException {
     assertClose();
     try {
-      counter.incrementAndGet();
+      incrementCounter();
       db.get().put(family.getHandle(), writeOptions, key, value);
     } catch (RocksDBException e) {
-      closeOnError(e, true);
+      closeOnError(e);
       throw toIOException(this, "put " + bytes2String(key), e);
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
   public void flush() throws IOException {
     assertClose();
     try (ManagedFlushOptions options = new ManagedFlushOptions()) {
-      counter.incrementAndGet();
+      incrementCounter();
       options.setWaitForFlush(true);
       db.get().flush(options);
       for (RocksDatabase.ColumnFamily columnFamily : getExtraColumnFamilies()) {
         db.get().flush(options, columnFamily.handle);
       }
     } catch (RocksDBException e) {
-      closeOnError(e, true);
+      closeOnError(e);
       throw toIOException(this, "flush", e);
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
@@ -516,45 +534,50 @@ public final class RocksDatabase implements Closeable {
    */
   public void flush(String cfName) throws IOException {
     assertClose();
-    ColumnFamilyHandle handle = getColumnFamilyHandle(cfName);
-    try (ManagedFlushOptions options = new ManagedFlushOptions()) {
-      options.setWaitForFlush(true);
-      if (handle != null) {
-        db.get().flush(options, handle);
-      } else {
-        LOG.error("Provided column family doesn't exist."
-            + " Calling flush on null columnFamily");
-        flush();
+    try {
+      incrementCounter();
+      ColumnFamilyHandle handle = getColumnFamilyHandle(cfName);
+      try (ManagedFlushOptions options = new ManagedFlushOptions()) {
+        options.setWaitForFlush(true);
+        if (handle != null) {
+          db.get().flush(options, handle);
+        } else {
+          LOG.error("Provided column family doesn't exist."
+              + " Calling flush on null columnFamily");
+          flush();
+        }
+      } catch (RocksDBException e) {
+        closeOnError(e);
+        throw toIOException(this, "flush", e);
       }
-    } catch (RocksDBException e) {
-      closeOnError(e, true);
-      throw toIOException(this, "flush", e);
+    } finally {
+      decrementCounter();
     }
   }
 
   public void flushWal(boolean sync) throws IOException {
     assertClose();
     try {
-      counter.incrementAndGet();
+      incrementCounter();
       db.get().flushWal(sync);
     } catch (RocksDBException e) {
-      closeOnError(e, true);
+      closeOnError(e);
       throw toIOException(this, "flushWal with sync=" + sync, e);
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
   public void compactRange() throws IOException {
     assertClose();
     try {
-      counter.incrementAndGet();
+      incrementCounter();
       db.get().compactRange();
     } catch (RocksDBException e) {
-      closeOnError(e, true);
+      closeOnError(e);
       throw toIOException(this, "compactRange", e);
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
@@ -562,31 +585,37 @@ public final class RocksDatabase implements Closeable {
       throws IOException {
     assertClose();
     try {
-      counter.incrementAndGet();
+      incrementCounter();
       db.get().compactRange(null, null, null, options);
     } catch (RocksDBException e) {
-      closeOnError(e, true);
+      closeOnError(e);
       throw toIOException(this, "compactRange", e);
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
   public void compactDB(ManagedCompactRangeOptions options) throws IOException {
     assertClose();
-    compactRangeDefault(options);
-    for (RocksDatabase.ColumnFamily columnFamily : getExtraColumnFamilies()) {
-      compactRange(columnFamily, null, null, options);
+    try {
+      incrementCounter();
+      compactRangeDefault(options);
+      for (RocksDatabase.ColumnFamily columnFamily
+          : getExtraColumnFamilies()) {
+        compactRange(columnFamily, null, null, options);
+      }
+    } finally {
+      decrementCounter();
     }
   }
 
   public int getLiveFilesMetaDataSize() throws IOException {
     assertClose();
     try {
-      counter.incrementAndGet();
+      incrementCounter();
       return db.get().getLiveFilesMetaData().size();
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
@@ -595,24 +624,28 @@ public final class RocksDatabase implements Closeable {
    */
   public void compactRange(String cfName) throws IOException {
     assertClose();
-    ColumnFamilyHandle handle = getColumnFamilyHandle(cfName);
     try {
-      if (handle != null) {
-        db.get().compactRange(handle);
-      } else {
-        LOG.error("Provided column family doesn't exist."
-            + " Calling compactRange on null columnFamily");
-        db.get().compactRange();
+      incrementCounter();
+      ColumnFamilyHandle handle = getColumnFamilyHandle(cfName);
+      try {
+        if (handle != null) {
+          db.get().compactRange(handle);
+        } else {
+          LOG.error("Provided column family doesn't exist."
+              + " Calling compactRange on null columnFamily");
+          db.get().compactRange();
+        }
+      } catch (RocksDBException e) {
+        closeOnError(e);
+        throw toIOException(this, "compactRange", e);
       }
-    } catch (RocksDBException e) {
-      closeOnError(e, true);
-      throw toIOException(this, "compactRange", e);
+    } finally {
+      decrementCounter();
     }
   }
 
   private ColumnFamilyHandle getColumnFamilyHandle(String cfName)
       throws IOException {
-    assertClose();
     for (ColumnFamilyHandle cf : getCfHandleMap().get(db.get().getName())) {
       try {
         String table = new String(cf.getName(), UTF_8);
@@ -620,7 +653,7 @@ public final class RocksDatabase implements Closeable {
           return cf;
         }
       } catch (RocksDBException e) {
-        closeOnError(e, true);
+        closeOnError(e);
         throw toIOException(this, "columnFamilyHandle.getName", e);
       }
     }
@@ -632,23 +665,23 @@ public final class RocksDatabase implements Closeable {
       throws IOException {
     assertClose();
     try {
-      counter.incrementAndGet();
+      incrementCounter();
       db.get().compactRange(family.getHandle(), begin, end, options);
     } catch (RocksDBException e) {
-      closeOnError(e, true);
+      closeOnError(e);
       throw toIOException(this, "compactRange", e);
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
   public List<LiveFileMetaData> getLiveFilesMetaData() throws IOException {
     assertClose();
     try {
-      counter.incrementAndGet();
+      incrementCounter();
       return db.get().getLiveFilesMetaData();
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
@@ -674,12 +707,12 @@ public final class RocksDatabase implements Closeable {
       throws IOException {
     assertClose();
     try {
-      counter.incrementAndGet();
+      incrementCounter();
       final Holder<byte[]> out = new Holder<>();
       return db.get().keyMayExist(family.getHandle(), key, out) ?
           out::getValue : null;
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
@@ -687,7 +720,7 @@ public final class RocksDatabase implements Closeable {
       ByteBuffer key, ByteBuffer out) throws IOException {
     assertClose();
     try {
-      counter.incrementAndGet();
+      incrementCounter();
       final KeyMayExist result = db.get().keyMayExist(
           family.getHandle(), key, out);
       switch (result.exists) {
@@ -699,7 +732,7 @@ public final class RocksDatabase implements Closeable {
             "Unexpected KeyMayExistEnum case " + result.exists);
       }
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
@@ -714,14 +747,14 @@ public final class RocksDatabase implements Closeable {
   byte[] get(ColumnFamily family, byte[] key) throws IOException {
     assertClose();
     try {
-      counter.incrementAndGet();
+      incrementCounter();
       return db.get().get(family.getHandle(), key);
     } catch (RocksDBException e) {
-      closeOnError(e, true);
+      closeOnError(e);
       final String message = "get " + bytes2String(key) + " from " + family;
       throw toIOException(this, message, e);
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
@@ -743,18 +776,18 @@ public final class RocksDatabase implements Closeable {
       throws IOException {
     assertClose();
     try {
-      counter.incrementAndGet();
+      incrementCounter();
       final int size = db.get().get(family.getHandle(),
           DEFAULT_READ_OPTION, key, outValue);
       LOG.debug("get: size={}, remaining={}",
           size, outValue.asReadOnlyBuffer().remaining());
       return size == ManagedRocksDB.NOT_FOUND ? null : size;
     } catch (RocksDBException e) {
-      closeOnError(e, true);
+      closeOnError(e);
       final String message = "get " + bytes2String(key) + " from " + family;
       throw toIOException(this, message, e);
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
@@ -769,13 +802,13 @@ public final class RocksDatabase implements Closeable {
   private long getLongProperty(String key) throws IOException {
     assertClose();
     try {
-      counter.incrementAndGet();
+      incrementCounter();
       return db.get().getLongProperty(key);
     } catch (RocksDBException e) {
-      closeOnError(e, true);
+      closeOnError(e);
       throw toIOException(this, "getLongProperty " + key, e);
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
@@ -783,27 +816,27 @@ public final class RocksDatabase implements Closeable {
       throws IOException {
     assertClose();
     try {
-      counter.incrementAndGet();
+      incrementCounter();
       return db.get().getLongProperty(family.getHandle(), key);
     } catch (RocksDBException e) {
-      closeOnError(e, true);
+      closeOnError(e);
       final String message = "getLongProperty " + key + " from " + family;
       throw toIOException(this, message, e);
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
   public String getProperty(String key) throws IOException {
     assertClose();
     try {
-      counter.incrementAndGet();
+      incrementCounter();
       return db.get().getProperty(key);
     } catch (RocksDBException e) {
-      closeOnError(e, true);
+      closeOnError(e);
       throw toIOException(this, "getProperty " + key, e);
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
@@ -811,13 +844,13 @@ public final class RocksDatabase implements Closeable {
       throws IOException {
     assertClose();
     try {
-      counter.incrementAndGet();
+      incrementCounter();
       return db.get().getProperty(family.getHandle(), key);
     } catch (RocksDBException e) {
-      closeOnError(e, true);
+      closeOnError(e);
       throw toIOException(this, "getProperty " + key + " from " + family, e);
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
@@ -825,23 +858,23 @@ public final class RocksDatabase implements Closeable {
       throws IOException {
     assertClose();
     try {
-      counter.incrementAndGet();
+      incrementCounter();
       return managed(db.get().getUpdatesSince(sequenceNumber));
     } catch (RocksDBException e) {
-      closeOnError(e, true);
+      closeOnError(e);
       throw toIOException(this, "getUpdatesSince " + sequenceNumber, e);
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
   public long getLatestSequenceNumber() throws IOException {
     assertClose();
     try {
-      counter.incrementAndGet();
+      incrementCounter();
       return db.get().getLatestSequenceNumber();
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
@@ -849,10 +882,10 @@ public final class RocksDatabase implements Closeable {
       throws IOException {
     assertClose();
     try {
-      counter.incrementAndGet();
+      incrementCounter();
       return managed(db.get().newIterator(family.getHandle()));
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
@@ -860,11 +893,11 @@ public final class RocksDatabase implements Closeable {
       boolean fillCache) throws IOException {
     assertClose();
     try (ManagedReadOptions readOptions = new ManagedReadOptions()) {
-      counter.incrementAndGet();
+      incrementCounter();
       readOptions.setFillCache(fillCache);
       return managed(db.get().newIterator(family.getHandle(), readOptions));
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
@@ -873,13 +906,13 @@ public final class RocksDatabase implements Closeable {
       throws IOException {
     assertClose();
     try {
-      counter.incrementAndGet();
+      incrementCounter();
       db.get().write(options, writeBatch);
     } catch (RocksDBException e) {
-      closeOnError(e, true);
+      closeOnError(e);
       throw toIOException(this, "batchWrite", e);
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
@@ -890,28 +923,28 @@ public final class RocksDatabase implements Closeable {
   public void delete(ColumnFamily family, byte[] key) throws IOException {
     assertClose();
     try {
-      counter.incrementAndGet();
+      incrementCounter();
       db.get().delete(family.getHandle(), key);
     } catch (RocksDBException e) {
-      closeOnError(e, true);
+      closeOnError(e);
       final String message = "delete " + bytes2String(key) + " from " + family;
       throw toIOException(this, message, e);
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
   public void delete(ColumnFamily family, ByteBuffer key) throws IOException {
     assertClose();
     try {
-      counter.incrementAndGet();
+      incrementCounter();
       db.get().delete(family.getHandle(), writeOptions, key);
     } catch (RocksDBException e) {
-      closeOnError(e, true);
+      closeOnError(e);
       final String message = "delete " + bytes2String(key) + " from " + family;
       throw toIOException(this, message, e);
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
@@ -919,15 +952,15 @@ public final class RocksDatabase implements Closeable {
       throws IOException {
     assertClose();
     try {
-      counter.incrementAndGet();
+      incrementCounter();
       db.get().deleteRange(family.getHandle(), beginKey, endKey);
     } catch (RocksDBException e) {
-      closeOnError(e, true);
+      closeOnError(e);
       final String message = "delete range " + bytes2String(beginKey) +
           " to " + bytes2String(endKey) + " from " + family;
       throw toIOException(this, message, e);
     } finally {
-      counter.decrementAndGet();
+      decrementCounter();
     }
   }
 
@@ -939,7 +972,12 @@ public final class RocksDatabase implements Closeable {
   @VisibleForTesting
   public List<LiveFileMetaData> getSstFileList() throws IOException {
     assertClose();
-    return db.get().getLiveFilesMetaData();
+    try {
+      incrementCounter();
+      return db.get().getLiveFilesMetaData();
+    } finally {
+      decrementCounter();
+    }
   }
 
   /**
@@ -959,41 +997,46 @@ public final class RocksDatabase implements Closeable {
   public void deleteFilesNotMatchingPrefix(Map<String, String> prefixPairs)
       throws IOException, RocksDBException {
     assertClose();
-    for (LiveFileMetaData liveFileMetaData : getSstFileList()) {
-      String sstFileColumnFamily =
-          new String(liveFileMetaData.columnFamilyName(), UTF_8);
-      int lastLevel = getLastLevel();
+    try {
+      incrementCounter();
+      for (LiveFileMetaData liveFileMetaData : getSstFileList()) {
+        String sstFileColumnFamily =
+            new String(liveFileMetaData.columnFamilyName(), UTF_8);
+        int lastLevel = getLastLevel();
 
-      if (!prefixPairs.containsKey(sstFileColumnFamily)) {
-        continue;
-      }
+        if (!prefixPairs.containsKey(sstFileColumnFamily)) {
+          continue;
+        }
 
-      // RocksDB #deleteFile API allows only to delete the last level of
-      // SST Files. Any level < last level won't get deleted and
-      // only last file of level 0 can be deleted
-      // and will throw warning in the rocksdb manifest.
-      // Instead, perform the level check here
-      // itself to avoid failed delete attempts for lower level files.
-      if (liveFileMetaData.level() != lastLevel || lastLevel == 0) {
-        continue;
-      }
+        // RocksDB #deleteFile API allows only to delete the last level of
+        // SST Files. Any level < last level won't get deleted and
+        // only last file of level 0 can be deleted
+        // and will throw warning in the rocksdb manifest.
+        // Instead, perform the level check here
+        // itself to avoid failed delete attempts for lower level files.
+        if (liveFileMetaData.level() != lastLevel || lastLevel == 0) {
+          continue;
+        }
 
-      String prefixForColumnFamily = prefixPairs.get(sstFileColumnFamily);
-      String firstDbKey = new String(liveFileMetaData.smallestKey(), UTF_8);
-      String lastDbKey = new String(liveFileMetaData.largestKey(), UTF_8);
-      boolean isKeyWithPrefixPresent = RocksDiffUtils.isKeyWithPrefixPresent(
-          prefixForColumnFamily, firstDbKey, lastDbKey);
-      if (!isKeyWithPrefixPresent) {
-        LOG.info("Deleting sst file: {} with start key: {} and end key: {} " +
-                "corresponding to column family {} from db: {}. " +
-                "Prefix for the column family: {}.",
-            liveFileMetaData.fileName(),
-            firstDbKey, lastDbKey,
-            StringUtils.bytes2String(liveFileMetaData.columnFamilyName()),
-            db.get().getName(),
-            prefixForColumnFamily);
-        db.deleteFile(liveFileMetaData);
+        String prefixForColumnFamily = prefixPairs.get(sstFileColumnFamily);
+        String firstDbKey = new String(liveFileMetaData.smallestKey(), UTF_8);
+        String lastDbKey = new String(liveFileMetaData.largestKey(), UTF_8);
+        boolean isKeyWithPrefixPresent = RocksDiffUtils.isKeyWithPrefixPresent(
+            prefixForColumnFamily, firstDbKey, lastDbKey);
+        if (!isKeyWithPrefixPresent) {
+          LOG.info("Deleting sst file: {} with start key: {} and end key: {} "
+                  + "corresponding to column family {} from db: {}. "
+                  + "Prefix for the column family: {}.",
+              liveFileMetaData.fileName(),
+              firstDbKey, lastDbKey,
+              StringUtils.bytes2String(liveFileMetaData.columnFamilyName()),
+              db.get().getName(),
+              prefixForColumnFamily);
+          db.deleteFile(liveFileMetaData);
+        }
       }
+    } finally {
+      decrementCounter();
     }
   }
 
