@@ -65,7 +65,7 @@ public class VolumeUsage implements SpaceUsageSource {
     return source.getAvailable() - getRemainingReserved();
   }
 
-  public long getAvailable(PrecomputedVolumeSpace precomputedVolumeSpace) {
+  public long getAvailable(SpaceUsageSource precomputedVolumeSpace) {
     long available = precomputedVolumeSpace.getAvailable();
     return available - getRemainingReserved(precomputedVolumeSpace);
   }
@@ -73,6 +73,11 @@ public class VolumeUsage implements SpaceUsageSource {
   @Override
   public long getUsedSpace() {
     return source.getUsedSpace();
+  }
+
+  @Override
+  public SpaceUsageSource snapshot() {
+    return source.snapshot();
   }
 
   public void incrementUsedSpace(long usedSpace) {
@@ -94,7 +99,7 @@ public class VolumeUsage implements SpaceUsageSource {
     return Math.max(totalUsed - source.getUsedSpace(), 0L);
   }
 
-  private long getOtherUsed(PrecomputedVolumeSpace precomputedVolumeSpace) {
+  private long getOtherUsed(SpaceUsageSource precomputedVolumeSpace) {
     long totalUsed = precomputedVolumeSpace.getCapacity() -
         precomputedVolumeSpace.getAvailable();
     return Math.max(totalUsed - source.getUsedSpace(), 0L);
@@ -105,7 +110,7 @@ public class VolumeUsage implements SpaceUsageSource {
   }
 
   private long getRemainingReserved(
-      PrecomputedVolumeSpace precomputedVolumeSpace) {
+      SpaceUsageSource precomputedVolumeSpace) {
     return Math.max(reservedInBytes - getOtherUsed(precomputedVolumeSpace), 0L);
   }
 
@@ -168,34 +173,5 @@ public class VolumeUsage implements SpaceUsageSource {
                                              long volumeFreeSpaceToSpare) {
     return (volumeAvailableSpace - volumeCommittedBytesCount) >
         Math.max(requiredSpace, volumeFreeSpaceToSpare);
-  }
-
-  /**
-   * Class representing precomputed space values of a volume.
-   * This class is intended to store precomputed values, such as capacity
-   * and available space of a volume, to avoid recalculating these
-   * values multiple times and to make method signatures simpler.
-   */
-  public static class PrecomputedVolumeSpace {
-    private final long capacity;
-    private final long available;
-
-    public PrecomputedVolumeSpace(long capacity, long available) {
-      this.capacity = capacity;
-      this.available = available;
-    }
-
-    public long getCapacity() {
-      return capacity;
-    }
-
-    public long getAvailable() {
-      return available;
-    }
-  }
-
-  public PrecomputedVolumeSpace getPrecomputedVolumeSpace() {
-    return new PrecomputedVolumeSpace(source.getCapacity(),
-        source.getAvailable());
   }
 }

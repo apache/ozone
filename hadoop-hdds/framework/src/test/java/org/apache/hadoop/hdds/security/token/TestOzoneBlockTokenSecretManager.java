@@ -48,8 +48,7 @@ import static org.apache.hadoop.ozone.container.ContainerTestHelper.getBlockRequ
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getReadChunkRequest;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.newPutBlockRequestBuilder;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.newWriteChunkRequestBuilder;
-import static org.hamcrest.CoreMatchers.containsString;
-import static org.hamcrest.MatcherAssert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -174,10 +173,10 @@ public class TestOzoneBlockTokenSecretManager {
     BlockTokenException e = assertThrows(BlockTokenException.class,
         () -> tokenVerifier.verify("testUser", token, writeChunkRequest));
 
-    assertThat(e.getMessage(), containsString("Token for ID: " +
+    assertThat(e.getMessage()).contains("Token for ID: " +
         OzoneBlockTokenIdentifier.getTokenService(blockID) +
         " can't be used to access: " +
-        OzoneBlockTokenIdentifier.getTokenService(otherBlockID)));
+        OzoneBlockTokenIdentifier.getTokenService(otherBlockID));
   }
 
   @Test
@@ -202,8 +201,8 @@ public class TestOzoneBlockTokenSecretManager {
     BlockTokenException e = assertThrows(BlockTokenException.class,
         () -> tokenVerifier.verify(testUser1, token, putBlockCommand));
 
-    assertThat(e.getMessage(),
-        containsString("doesn't have WRITE permission"));
+    assertThat(e.getMessage())
+        .contains("doesn't have WRITE permission");
 
     tokenVerifier.verify(testUser1, token, getBlockCommand);
   }
@@ -227,8 +226,8 @@ public class TestOzoneBlockTokenSecretManager {
 
     BlockTokenException e = assertThrows(BlockTokenException.class,
         () -> tokenVerifier.verify(testUser2, token, readChunkRequest));
-    assertThat(e.getMessage(),
-        containsString("doesn't have READ permission"));
+    assertThat(e.getMessage())
+        .contains("doesn't have READ permission");
   }
 
   @Test
@@ -251,8 +250,8 @@ public class TestOzoneBlockTokenSecretManager {
 
     BlockTokenException e = assertThrows(BlockTokenException.class,
         () -> tokenVerifier.verify(user, token, writeChunkRequest));
-    assertThat(e.getMessage(),
-        containsString("Token can't be verified due to expired secret key"));
+    assertThat(e.getMessage())
+        .contains("Token can't be verified due to expired secret key");
   }
 
   private ManagedSecretKey generateValidSecretKey()

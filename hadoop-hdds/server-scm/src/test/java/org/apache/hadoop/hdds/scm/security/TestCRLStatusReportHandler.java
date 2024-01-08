@@ -32,11 +32,9 @@ import org.apache.hadoop.hdds.security.x509.crl.CRLStatus;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,6 +44,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 
 /**
@@ -67,8 +68,8 @@ public class TestCRLStatusReportHandler implements EventPublisher {
         tempDir.toAbsolutePath().toString());
     config.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
 
-    SCMStorageConfig storageConfig = Mockito.mock(SCMStorageConfig.class);
-    Mockito.when(storageConfig.getClusterID()).thenReturn("cluster1");
+    SCMStorageConfig storageConfig = mock(SCMStorageConfig.class);
+    when(storageConfig.getClusterID()).thenReturn("cluster1");
     scmMetadataStore = new SCMMetadataStoreImpl(config);
     certificateStore = new SCMCertStore.Builder()
         .setRatisServer(null)
@@ -102,21 +103,21 @@ public class TestCRLStatusReportHandler implements EventPublisher {
     crlStatusReportHandler.onMessage(reportFromDatanode1, this);
     CRLStatus crlStatus = certificateStore.getCRLStatusForDN(dn1.getUuid());
     assertThat(crlStatus.getPendingCRLIds()).containsAll(pendingCRLIds1);
-    Assertions.assertEquals(5L, crlStatus.getReceivedCRLId());
+    assertEquals(5L, crlStatus.getReceivedCRLId());
 
     pendingCRLIds1.remove(0);
     reportFromDatanode1 = getCRLStatusReport(dn1, pendingCRLIds1, 6L);
     crlStatusReportHandler.onMessage(reportFromDatanode1, this);
     crlStatus = certificateStore.getCRLStatusForDN(dn1.getUuid());
-    Assertions.assertEquals(1, crlStatus.getPendingCRLIds().size());
-    Assertions.assertEquals(4L,
+    assertEquals(1, crlStatus.getPendingCRLIds().size());
+    assertEquals(4L,
         crlStatus.getPendingCRLIds().get(0).longValue());
-    Assertions.assertEquals(6L, crlStatus.getReceivedCRLId());
+    assertEquals(6L, crlStatus.getReceivedCRLId());
 
     crlStatusReportHandler.onMessage(reportFromDatanode2, this);
     crlStatus = certificateStore.getCRLStatusForDN(dn2.getUuid());
     assertThat(crlStatus.getPendingCRLIds()).containsAll(pendingCRLIds2);
-    Assertions.assertEquals(2L, crlStatus.getReceivedCRLId());
+    assertEquals(2L, crlStatus.getReceivedCRLId());
   }
 
   private CRLStatusReportFromDatanode getCRLStatusReport(

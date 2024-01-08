@@ -80,7 +80,6 @@ import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.test.PathUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -118,14 +117,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.eq;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -602,8 +601,7 @@ public class TestSCMNodeManager {
       }
       //TODO: wait for heartbeat to be processed
       Thread.sleep(4 * 1000);
-      assertEquals(count, nodeManager.getNodeCount(
-          NodeStatus.inServiceHealthy()));
+      assertEquals(count, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
 
       Map<String, Map<String, Integer>> nodeCounts = nodeManager.getNodeCount();
       assertEquals(count,
@@ -975,7 +973,7 @@ public class TestSCMNodeManager {
       // If the mlv equals slv checkpoint passed, datanodes with older mlvs
       // should be instructed to finalize.
       verify(eventPublisher, times(1))
-          .fireEvent(Mockito.eq(DATANODE_COMMAND), captor.capture());
+          .fireEvent(eq(DATANODE_COMMAND), captor.capture());
       assertEquals(captor.getValue().getDatanodeId(), node1.getUuid());
       assertEquals(captor.getValue().getCommand().getType(),
           finalizeNewLayoutVersionCommand);
@@ -983,7 +981,7 @@ public class TestSCMNodeManager {
       // SCM has not finished finalizing its mlv, so datanodes with older
       // mlvs should not be instructed to finalize yet.
       verify(eventPublisher, times(0))
-          .fireEvent(Mockito.eq(DATANODE_COMMAND), captor.capture());
+          .fireEvent(eq(DATANODE_COMMAND), captor.capture());
     }
   }
 
@@ -1016,9 +1014,9 @@ public class TestSCMNodeManager {
           new DeleteBlocksCommand(emptyList()));
     }
 
-    Assertions.assertEquals(3, nodeManager.getTotalDatanodeCommandCount(
+    assertEquals(3, nodeManager.getTotalDatanodeCommandCount(
         node1, SCMCommandProto.Type.replicateContainerCommand));
-    Assertions.assertEquals(5, nodeManager.getTotalDatanodeCommandCount(
+    assertEquals(5, nodeManager.getTotalDatanodeCommandCount(
         node1, SCMCommandProto.Type.deleteBlocksCommand));
 
     nodeManager.processHeartbeat(node1, layoutInfo,
@@ -1037,15 +1035,15 @@ public class TestSCMNodeManager {
     assertEquals(5, nodeManager.getNodeQueuedCommandCount(
         node1, SCMCommandProto.Type.deleteBlocksCommand));
 
-    Assertions.assertEquals(126, nodeManager.getTotalDatanodeCommandCount(
+    assertEquals(126, nodeManager.getTotalDatanodeCommandCount(
         node1, SCMCommandProto.Type.replicateContainerCommand));
-    Assertions.assertEquals(5, nodeManager.getTotalDatanodeCommandCount(
+    assertEquals(5, nodeManager.getTotalDatanodeCommandCount(
         node1, SCMCommandProto.Type.deleteBlocksCommand));
 
     ArgumentCaptor<DatanodeDetails> captor =
         ArgumentCaptor.forClass(DatanodeDetails.class);
     verify(eventPublisher, times(1))
-        .fireEvent(Mockito.eq(DATANODE_COMMAND_COUNT_UPDATED),
+        .fireEvent(eq(DATANODE_COMMAND_COUNT_UPDATED),
             captor.capture());
     assertEquals(node1, captor.getValue());
 
@@ -1062,7 +1060,7 @@ public class TestSCMNodeManager {
         node1, SCMCommandProto.Type.closeContainerCommand));
 
     verify(eventPublisher, times(2))
-        .fireEvent(Mockito.eq(DATANODE_COMMAND_COUNT_UPDATED),
+        .fireEvent(eq(DATANODE_COMMAND_COUNT_UPDATED),
             captor.capture());
     assertEquals(node1, captor.getValue());
 
@@ -1071,17 +1069,17 @@ public class TestSCMNodeManager {
       nodeManager.addDatanodeCommand(node1.getUuid(),
           new CloseContainerCommand(1, PipelineID.randomId()));
     }
-    Assertions.assertEquals(0, nodeManager.getTotalDatanodeCommandCount(
+    assertEquals(0, nodeManager.getTotalDatanodeCommandCount(
         node1, SCMCommandProto.Type.replicateContainerCommand));
-    Assertions.assertEquals(16, nodeManager.getTotalDatanodeCommandCount(
+    assertEquals(16, nodeManager.getTotalDatanodeCommandCount(
         node1, SCMCommandProto.Type.closeContainerCommand));
     Map<SCMCommandProto.Type, Integer> counts =
         nodeManager.getTotalDatanodeCommandCounts(node1,
             SCMCommandProto.Type.replicateContainerCommand,
             SCMCommandProto.Type.closeContainerCommand);
-    Assertions.assertEquals(0,
+    assertEquals(0,
         counts.get(SCMCommandProto.Type.replicateContainerCommand));
-    Assertions.assertEquals(16,
+    assertEquals(16,
         counts.get(SCMCommandProto.Type.closeContainerCommand));
   }
 
@@ -1565,14 +1563,10 @@ public class TestSCMNodeManager {
       //TODO: wait for EventQueue to be processed
       eventQueue.processAll(8000L);
 
-      assertEquals(nodeCount, nodeManager.getNodeCount(
-          NodeStatus.inServiceHealthy()));
-      assertEquals(capacity * nodeCount, (long) nodeManager.getStats()
-          .getCapacity().get());
-      assertEquals(used * nodeCount, (long) nodeManager.getStats()
-          .getScmUsed().get());
-      assertEquals(remaining * nodeCount, (long) nodeManager.getStats()
-          .getRemaining().get());
+      assertEquals(nodeCount, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
+      assertEquals(capacity * nodeCount, (long) nodeManager.getStats().getCapacity().get());
+      assertEquals(used * nodeCount, (long) nodeManager.getStats().getScmUsed().get());
+      assertEquals(remaining * nodeCount, (long) nodeManager.getStats().getRemaining().get());
       assertEquals(1, nodeManager.minHealthyVolumeNum(dnList));
       dnList.clear();
     }
@@ -1622,10 +1616,8 @@ public class TestSCMNodeManager {
       //TODO: wait for EventQueue to be processed
       eventQueue.processAll(8000L);
 
-      assertEquals(1, nodeManager
-          .getNodeCount(NodeStatus.inServiceHealthy()));
-      assertEquals(volumeCount / 2,
-          nodeManager.minHealthyVolumeNum(dnList));
+      assertEquals(1, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
+      assertEquals(volumeCount / 2, nodeManager.minHealthyVolumeNum(dnList));
       dnList.clear();
     }
   }
@@ -1861,8 +1853,7 @@ public class TestSCMNodeManager {
       // verify network topology cluster has all the registered nodes
       Thread.sleep(4 * 1000);
       NetworkTopology clusterMap = scm.getClusterMap();
-      assertEquals(nodeCount,
-          nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
+      assertEquals(nodeCount, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(nodeCount, clusterMap.getNumOfLeafNode(""));
       assertEquals(4, clusterMap.getMaxLevel());
       List<DatanodeDetails> nodeList = nodeManager.getAllNodes();
@@ -2078,8 +2069,7 @@ public class TestSCMNodeManager {
               nodeUuid, updatedHostName, updatedIpAddress, null);
       nodeManager.register(updatedNode, null, null);
 
-      assertEquals(1,
-              nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
+      assertEquals(1, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
       assertEquals(1, clusterMap.getNumOfLeafNode(""));
       assertEquals(4, clusterMap.getMaxLevel());
       List<DatanodeDetails> updatedNodeList = nodeManager.getAllNodes();

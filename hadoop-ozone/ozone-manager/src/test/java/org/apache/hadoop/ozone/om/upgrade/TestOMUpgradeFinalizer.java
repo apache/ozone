@@ -42,10 +42,10 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.ALREADY_FI
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_REQUIRED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.STARTING_FINALIZATION;
-import static org.hamcrest.CoreMatchers.containsString;
-import static org.hamcrest.CoreMatchers.instanceOf;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -55,7 +55,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.hamcrest.MatcherAssert.assertThat;
 
 /**
  * {@link OMUpgradeFinalizer} tests.
@@ -146,7 +145,7 @@ public class TestOMUpgradeFinalizer {
         UpgradeException.class, () -> {
           finalizer.reportStatus(OTHER_CLIENT_ID, false);
         });
-    assertThat(exception.getMessage(), containsString("Unknown client"));
+    assertThat(exception.getMessage()).contains("Unknown client");
   }
 
   @Test
@@ -200,8 +199,8 @@ public class TestOMUpgradeFinalizer {
       finalizer.finalize(CLIENT_ID, om);
       fail();
     } catch (Exception e) {
-      assertThat(e, instanceOf(UpgradeException.class));
-      assertThat(e.getMessage(), containsString(lfs.iterator().next().name()));
+      assertInstanceOf(UpgradeException.class, e);
+      assertThat(e.getMessage()).contains(lfs.iterator().next().name());
       assertEquals(
           ((UpgradeException) e).getResult(),
           LAYOUT_FEATURE_FINALIZATION_FAILED

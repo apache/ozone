@@ -18,7 +18,7 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import org.apache.hadoop.hdds.utils.LeakTracker;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.TableFormatConfig;
 
@@ -33,7 +33,7 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
    * instances.
    */
   private boolean reused = false;
-  private final LeakTracker leakTracker = track(this);
+  private final UncheckedAutoCloseable leakTracker = track(this);
 
   public ManagedColumnFamilyOptions() {
   }

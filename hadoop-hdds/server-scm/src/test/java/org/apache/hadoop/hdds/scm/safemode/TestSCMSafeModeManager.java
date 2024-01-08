@@ -64,13 +64,13 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.mockito.Mockito;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 
 /** Test class for SCMSafeModeManager.
  */
@@ -421,7 +421,7 @@ public class TestSCMSafeModeManager {
   public void testDisableSafeMode() {
     OzoneConfiguration conf = new OzoneConfiguration(config);
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, false);
-    PipelineManager pipelineManager = Mockito.mock(PipelineManager.class);
+    PipelineManager pipelineManager = mock(PipelineManager.class);
     scmSafeModeManager = new SCMSafeModeManager(
         conf, containers, null, pipelineManager, queue, serviceManager,
         scmContext);

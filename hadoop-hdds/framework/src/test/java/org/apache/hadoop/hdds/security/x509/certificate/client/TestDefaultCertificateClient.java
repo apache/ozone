@@ -66,8 +66,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METADATA_DIR_NAME;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getPEMEncodedString;
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -597,7 +595,7 @@ public class TestDefaultCertificateClient {
     long monitorThreadCount = Arrays.stream(threads)
         .filter(monitorFilterPredicate)
         .count();
-    assertThat(monitorThreadCount, is(1L));
+    assertThat(monitorThreadCount).isEqualTo(1L);
     Thread monitor = Arrays.stream(threads)
         .filter(monitorFilterPredicate)
         .findFirst()
@@ -610,6 +608,6 @@ public class TestDefaultCertificateClient {
     monitorThreadCount = Arrays.stream(threads)
         .filter(monitorFilterPredicate)
         .count();
-    assertThat(monitorThreadCount, is(0L));
+    assertThat(monitorThreadCount).isEqualTo(0L);
   }
 }

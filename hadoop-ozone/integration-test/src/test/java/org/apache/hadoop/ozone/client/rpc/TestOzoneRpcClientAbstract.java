@@ -1513,7 +1513,7 @@ public abstract class TestOzoneRpcClientAbstract {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    String value = RandomStringUtils.random(RandomUtils.nextInt(0, 1024));
+    String value = RandomStringUtils.random(RandomUtils.nextInt(1, 1024));
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);

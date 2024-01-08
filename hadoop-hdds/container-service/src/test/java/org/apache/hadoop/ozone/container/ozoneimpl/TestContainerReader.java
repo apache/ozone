@@ -45,6 +45,8 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.util.FileUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -56,6 +58,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.DELETED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
@@ -306,6 +309,56 @@ public class TestContainerReader {
         hddsVolume1, containerSet1, conf, true);
     containerReader.readVolume(hddsVolume1.getHddsRootDir());
     assertEquals(containerCount - 1, containerSet1.containerCount());
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testContainerReaderWithInvalidDbPath(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaVersion(versionInfo);
+    setup(versionInfo);
+    MutableVolumeSet volumeSet1;
+    HddsVolume hddsVolume1;
+    ContainerSet containerSet1 = new ContainerSet(1000);
+    File volumeDir1 =
+        Files.createDirectory(tempDir.resolve("volumeDirDbDelete")).toFile();
+    RoundRobinVolumeChoosingPolicy volumeChoosingPolicy1;
+
+    volumeSet1 = mock(MutableVolumeSet.class);
+    UUID datanode = UUID.randomUUID();
+    hddsVolume1 = new HddsVolume.Builder(volumeDir1
+        .getAbsolutePath()).conf(conf).datanodeUuid(datanode
+        .toString()).clusterID(clusterId).build();
+    StorageVolumeUtil.checkVolume(hddsVolume1, clusterId, clusterId, conf,
+        null, null);
+    volumeChoosingPolicy1 = mock(RoundRobinVolumeChoosingPolicy.class);
+    when(volumeChoosingPolicy1.chooseVolume(anyList(), anyLong()))
+        .thenReturn(hddsVolume1);
+
+    List<File> dbPathList = new ArrayList<>();
+    int containerCount = 3;
+    for (int i = 0; i < containerCount; i++) {
+      KeyValueContainerData keyValueContainerData = new KeyValueContainerData(i,
+          layout,
+          (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
+          datanodeId.toString());
+      KeyValueContainer keyValueContainer =
+          new KeyValueContainer(keyValueContainerData, conf);
+      keyValueContainer.create(volumeSet1, volumeChoosingPolicy1, clusterId);
+      dbPathList.add(keyValueContainerData.getDbFile());
+    }
+    ContainerCache.getInstance(conf).shutdownCache();
+    for (File dbPath : dbPathList) {
+      FileUtils.deleteFully(dbPath.toPath());
+    }
+
+    GenericTestUtils.LogCapturer dnLogs = GenericTestUtils.LogCapturer.captureLogs(
+        LoggerFactory.getLogger(ContainerReader.class));
+    dnLogs.clearOutput();
+    ContainerReader containerReader = new ContainerReader(volumeSet1,
+        hddsVolume1, containerSet1, conf, true);
+    containerReader.readVolume(hddsVolume1.getHddsRootDir());
+    assertEquals(0, containerSet1.containerCount());
+    assertTrue(dnLogs.getOutput().contains("Container DB file is missing"));
   }
 
   @ContainerTestVersionInfo.ContainerTest
