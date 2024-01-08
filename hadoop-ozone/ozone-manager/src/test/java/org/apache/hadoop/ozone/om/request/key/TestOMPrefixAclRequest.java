@@ -166,6 +166,9 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
     // Check update ID
     OmPrefixInfo prefixInfo = prefixManager.getPrefixInfo(prefixObj);
     assertEquals(1L, prefixInfo.getUpdateID());
+    OmPrefixInfo prefixInfoFromTable = omMetadataManager.getPrefixTable().get(
+        prefixObj.getPath());
+    assertEquals(1L, prefixInfoFromTable.getUpdateID());
 
     // Remove acl that does not exist
     OzoneAcl notExistAcl = OzoneAcl.parseAcl("user:nonexist:r[ACCESS]");
@@ -181,6 +184,9 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
     // Check that the update ID is updated
     prefixInfo = prefixManager.getPrefixInfo(prefixObj);
     assertEquals(2L, prefixInfo.getUpdateID());
+    prefixInfoFromTable = omMetadataManager.getPrefixTable().get(
+        prefixObj.getPath());
+    assertEquals(2L, prefixInfoFromTable.getUpdateID());
 
     // Remove existing prefix acl.
     OMRequest validRemoveAclRequest = createRemoveAclPrefixRequest(prefixName, acl);
@@ -200,7 +206,7 @@ public class TestOMPrefixAclRequest extends TestOMKeyRequest {
     assertTrue(ozoneAcls.isEmpty());
 
     // Check that it is also deleted in Prefix table (cache)
-    OmPrefixInfo prefixInfoFromTable = omMetadataManager.getPrefixTable().get(
+    prefixInfoFromTable = omMetadataManager.getPrefixTable().get(
         prefixObj.getPath());
     assertNull(prefixInfoFromTable);
 
