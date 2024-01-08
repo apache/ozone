@@ -38,8 +38,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.hamcrest.CoreMatchers.containsString;
-import static org.hamcrest.MatcherAssert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -132,7 +131,7 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
     Token<T> token = secretManager.generateToken(tokenId);
     BlockTokenException ex = assertThrows(BlockTokenException.class, () ->
         subject.verify("anyUser", token, cmd));
-    assertThat(ex.getMessage(), containsString("expired secret key"));
+    assertThat(ex.getMessage()).contains("expired secret key");
   }
 
   @Test
@@ -151,8 +150,8 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
     Token<T> token = secretManager.generateToken(tokenId);
     BlockTokenException ex = assertThrows(BlockTokenException.class, () ->
         subject.verify("anyUser", token, cmd));
-    assertThat(ex.getMessage(),
-        containsString("Can't find the signing secret key"));
+    assertThat(ex.getMessage())
+        .contains("Can't find the signing secret key");
   }
 
   @Test
@@ -171,8 +170,8 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
     BlockTokenException ex =
         assertThrows(BlockTokenException.class, () ->
             subject.verify("anyUser", invalidToken, cmd));
-    assertThat(ex.getMessage(),
-        containsString("Invalid token for user"));
+    assertThat(ex.getMessage())
+        .contains("Invalid token for user");
   }
 
   @NotNull
@@ -203,8 +202,8 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
     BlockTokenException ex =
         assertThrows(BlockTokenException.class, () ->
             subject.verify("anyUser", token, cmd));
-    assertThat(ex.getMessage(),
-        containsString("Expired token for user"));
+    assertThat(ex.getMessage())
+        .contains("Expired token for user");
   }
 
   @Test
