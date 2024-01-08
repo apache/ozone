@@ -38,8 +38,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.function.Function;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE;
@@ -63,7 +61,6 @@ class TestSafeMode {
   @BeforeAll
   static void setup() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 5, SECONDS);
     clusterProvider = new MiniOzoneClusterProvider(
         conf, MiniOzoneCluster.newBuilder(conf), 2);
   }
