@@ -144,8 +144,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
         OzoneConfigKeys.HDDS_SCM_CLIENT_RPC_TIME_OUT,
         OzoneConfigKeys.HDDS_SCM_CLIENT_MAX_RETRY_TIMEOUT,
-        OzoneConfigKeys.HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY,
-        S3GatewayConfigKeys.OZONE_S3G_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY
-        ));
+        OzoneConfigKeys.HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY
+    ));
   }
 }
