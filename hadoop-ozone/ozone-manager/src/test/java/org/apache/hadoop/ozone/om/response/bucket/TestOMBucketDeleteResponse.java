@@ -100,9 +100,6 @@ public class TestOMBucketDeleteResponse {
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
-
-    Assertions.assertNull(omMetadataManager.getBucketTable().get(
-        omMetadataManager.getBucketKey(volumeName, bucketName)));
     
     assertNull(omMetadataManager.getBucketTable().get(
             omMetadataManager.getBucketKey(volumeName, bucketName)));
