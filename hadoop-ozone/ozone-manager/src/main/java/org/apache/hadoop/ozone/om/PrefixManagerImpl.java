@@ -259,12 +259,11 @@ public class PrefixManagerImpl implements PrefixManager {
 
   public OMPrefixAclOpResult removeAcl(OzoneObj ozoneObj, OzoneAcl ozoneAcl,
       OmPrefixInfo prefixInfo) throws IOException {
-    boolean removed = false;
     if (prefixInfo == null) {
-      return new OMPrefixAclOpResult(prefixInfo, removed);
+      return new OMPrefixAclOpResult(null, false);
     }
 
-    removed = prefixInfo.removeAcl(ozoneAcl);
+    boolean removed = prefixInfo.removeAcl(ozoneAcl);
 
     // Update in-memory prefix tree regardless whether the ACL is changed.
     // Under OM HA, update ID of the prefix info is updated for every request.
