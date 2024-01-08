@@ -40,9 +40,9 @@ import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_E
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_PROVIDER_KEY;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -100,7 +100,7 @@ public class TestFeaturesEndPoint {
     List<FeatureProvider.Feature> allDisabledFeatures =
         (List<FeatureProvider.Feature>) disabledFeatures.getEntity();
     assertNotNull(allDisabledFeatures);
-    assertTrue(allDisabledFeatures.size() > 0);
+    assertThat(allDisabledFeatures.size()).isGreaterThan(0);
     assertEquals(FeatureProvider.Feature.HEATMAP.getFeatureName(),
         allDisabledFeatures.get(0).getFeatureName());
   }
@@ -128,7 +128,7 @@ public class TestFeaturesEndPoint {
     List<FeatureProvider.Feature> allDisabledFeatures =
         (List<FeatureProvider.Feature>) disabledFeatures.getEntity();
     assertNotNull(allDisabledFeatures);
-    assertTrue(allDisabledFeatures.size() > 0);
+    assertThat(allDisabledFeatures.size()).isGreaterThan(0);
     assertEquals(FeatureProvider.Feature.HEATMAP.getFeatureName(),
         allDisabledFeatures.get(0).getFeatureName());
   }
