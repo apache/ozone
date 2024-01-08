@@ -164,7 +164,9 @@ public final class OmPrefixInfo extends WithObjectID {
   public PersistedPrefixInfo getProtobuf() {
     PersistedPrefixInfo.Builder pib =
         PersistedPrefixInfo.newBuilder().setName(name)
-        .addAllMetadata(KeyValueUtil.toProtobuf(metadata));
+        .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
+        .setObjectID(objectID)
+        .setUpdateID(updateID);
     if (acls != null) {
       pib.addAllAcls(OzoneAclStorageUtil.toProtobuf(acls));
     }
@@ -186,6 +188,14 @@ public final class OmPrefixInfo extends WithObjectID {
     if (prefixInfo.getAclsList() != null) {
       opib.setAcls(OzoneAclStorageUtil.fromProtobuf(prefixInfo.getAclsList()));
     }
+
+    if (prefixInfo.hasObjectID()) {
+      opib.setObjectID(prefixInfo.getObjectID());
+    }
+
+    if (prefixInfo.hasUpdateID()) {
+      opib.setUpdateID(prefixInfo.getUpdateID());
+    }
     return opib.build();
   }
 
@@ -200,7 +210,9 @@ public final class OmPrefixInfo extends WithObjectID {
     OmPrefixInfo that = (OmPrefixInfo) o;
     return name.equals(that.name) &&
         Objects.equals(acls, that.acls) &&
-        Objects.equals(metadata, that.metadata);
+        Objects.equals(metadata, that.metadata) &&
+        objectID == that.objectID &&
+        updateID == that.updateID;
   }
 
   @Override

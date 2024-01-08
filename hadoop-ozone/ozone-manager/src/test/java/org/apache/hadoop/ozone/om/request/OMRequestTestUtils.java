@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import com.google.common.base.Optional;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -48,6 +49,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
+import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -1620,6 +1622,57 @@ public final class OMRequestTestUtils {
                 .build())
         .setCmdType(Type.CommitKey)
         .setClientId(UUID.randomUUID().toString())
+        .build();
+  }
+
+  /**
+   * Add key entry to PrefixTable.
+   * @throws Exception
+   */
+  public static void addPrefixToTable(String volumeName, String bucketName, String prefixName, long trxnLogIndex,
+      OMMetadataManager omMetadataManager) throws Exception {
+
+    OmPrefixInfo omPrefixInfo = createOmPrefixInfo(volumeName, bucketName,
+        prefixName, trxnLogIndex);
+
+    addPrefixToTable(false, omPrefixInfo, trxnLogIndex,
+        omMetadataManager);
+  }
+
+  /**
+   * Add key entry to PrefixTable.
+   * @throws Exception
+   */
+  public static void addPrefixToTable(boolean addToCache, OmPrefixInfo omPrefixInfo, long trxnLogIndex,
+      OMMetadataManager omMetadataManager) throws Exception {
+    String prefixName = omPrefixInfo.getName();
+
+    if (addToCache) {
+      omMetadataManager.getPrefixTable()
+          .addCacheEntry(new CacheKey<>(omPrefixInfo.getName()),
+              new CacheValue<>(Optional.of(omPrefixInfo), trxnLogIndex));
+    }
+    omMetadataManager.getPrefixTable().put(prefixName, omPrefixInfo);
+  }
+
+  /**
+   * Create OmPrefixInfo.
+   */
+  @SuppressWarnings("parameterNumber")
+  public static OmPrefixInfo createOmPrefixInfo(String volumeName, String bucketName, String prefixName,
+        long trxnLogIndex) {
+    OzoneObjInfo prefixObj = OzoneObjInfo.Builder
+        .newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setPrefixName(prefixName)
+        .setResType(ResourceType.PREFIX)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .build();
+    return OmPrefixInfo.newBuilder()
+        .setName(prefixObj.getPath())
+        .setObjectID(System.currentTimeMillis())
+        .setUpdateID(trxnLogIndex)
         .build();
   }
 
