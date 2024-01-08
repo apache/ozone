@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone.dn.scanner;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -52,15 +53,16 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -320,7 +322,6 @@ public abstract class TestContainerScannerIntegrationAbstract {
 
     private final Consumer<Container<?>> corruption;
     private final ScanResult.FailureType expectedResult;
-    private static final Random RANDOM = new Random();
 
     ContainerCorruptions(Consumer<Container<?>> corruption,
                          ScanResult.FailureType expectedResult) {
@@ -357,11 +358,21 @@ public abstract class TestContainerScannerIntegrationAbstract {
      * Overwrite the file with random bytes.
      */
     private static void corruptFile(File file) {
-      byte[] corruptedBytes = new byte[(int)file.length()];
-      RANDOM.nextBytes(corruptedBytes);
       try {
-        Files.write(file.toPath(), corruptedBytes,
+        final int length = (int) file.length();
+
+        Path path = file.toPath();
+        final byte[] original = IOUtils.readFully(Files.newInputStream(path), length);
+
+        final byte[] corruptedBytes = new byte[length];
+        ThreadLocalRandom.current().nextBytes(corruptedBytes);
+
+        Files.write(path, corruptedBytes,
             StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
+
+        assertThat(IOUtils.readFully(Files.newInputStream(path), length))
+            .isEqualTo(corruptedBytes)
+            .isNotEqualTo(original);
       } catch (IOException ex) {
         // Fail the test.
         throw new UncheckedIOException(ex);
@@ -373,8 +384,10 @@ public abstract class TestContainerScannerIntegrationAbstract {
      */
     private static void truncateFile(File file) {
       try {
-        Files.write(file.toPath(), new byte[]{},
+        Files.write(file.toPath(), new byte[0],
             StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
+
+        assertEquals(0, file.length());
       } catch (IOException ex) {
         // Fail the test.
         throw new UncheckedIOException(ex);
