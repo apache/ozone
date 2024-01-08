@@ -1,4 +1,0 @@
-[WARNING] 
-[WARNING] Some problems were encountered while building the effective settings
-[WARNING] Unrecognised tag: 'snapshotRepository' (position: START_TAG seen ...<repositories>\n               <snapshotRepository>... @19:36)  @ /Users/ivan.andika/.m2/settings.xml, line 19, column 36
-[WARNING] 
