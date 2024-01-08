@@ -52,7 +52,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -62,6 +61,9 @@ import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
+import org.apache.hadoop.ozone.om.snapshot.exception.SnapshotError;
+import org.apache.hadoop.ozone.om.snapshot.exception.SnapshotException;
+import org.apache.hadoop.ozone.om.snapshot.exception.SnapshotRuntimeException;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
@@ -93,7 +95,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_CLE
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_REPORT_MAX_PAGE_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager.getSnapshotRootPath;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
@@ -169,7 +170,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   // Soft limit of the snapshot cache size.
   private final int softCacheSize;
 
-  public OmSnapshotManager(OzoneManager ozoneManager) {
+  public OmSnapshotManager(OzoneManager ozoneManager) throws SnapshotException {
 
     boolean isFilesystemSnapshotEnabled =
         ozoneManager.isFilesystemSnapshotEnabled();
@@ -180,13 +181,14 @@ public final class OmSnapshotManager implements AutoCloseable {
     // Throw unchecked exception if that is not the case.
     if (!isFilesystemSnapshotEnabled &&
         !canDisableFsSnapshot(ozoneManager.getMetadataManager())) {
-      throw new RuntimeException("Ozone Manager is refusing to start up" +
+      throw new SnapshotRuntimeException("Ozone Manager is refusing to start up" +
           "because filesystem snapshot feature is disabled in config while" +
           "there are still snapshots remaining in the system (including the " +
           "ones that are marked as deleted but not yet cleaned up by the " +
           "background worker thread). " +
           "Please set config ozone.filesystem.snapshot.enabled to true and " +
-          "try to start this Ozone Manager again.");
+          "try to start this Ozone Manager again.",
+          SnapshotError.INVALID_CONFIG_ERROR);
     }
 
     this.options = new ManagedDBOptions();
@@ -228,9 +230,9 @@ public final class OmSnapshotManager implements AutoCloseable {
           columnFamilyHandles);
 
       dropUnknownColumnFamilies(columnFamilyHandles);
-    } catch (RuntimeException exception) {
+    } catch (RuntimeException | RocksDBException exception) {
       close();
-      throw exception;
+      throw new SnapshotException(exception, SnapshotError.IO_ERROR);
     }
 
     this.ozoneManager = ozoneManager;
@@ -331,7 +333,7 @@ public final class OmSnapshotManager implements AutoCloseable {
       @Nonnull
       @Override
       public OmSnapshot load(@Nonnull String snapshotTableKey)
-          throws IOException {
+          throws SnapshotException {
         // Check if the snapshot exists
         final SnapshotInfo snapshotInfo = getSnapshotInfo(snapshotTableKey);
 
@@ -359,7 +361,7 @@ public final class OmSnapshotManager implements AutoCloseable {
               maxOpenSstFilesInSnapshotDb);
         } catch (IOException e) {
           LOG.error("Failed to retrieve snapshot: {}", snapshotTableKey, e);
-          throw e;
+          throw new SnapshotException(e, SnapshotError.IO_ERROR);
         }
 
         try {
@@ -379,9 +381,13 @@ public final class OmSnapshotManager implements AutoCloseable {
         } catch (Exception e) {
           // Close RocksDB if there is any failure.
           if (!snapshotMetadataManager.getStore().isClosed()) {
-            snapshotMetadataManager.getStore().close();
+            try {
+              snapshotMetadataManager.getStore().close();
+            } catch (IOException ex) {
+              throw new SnapshotException(ex, SnapshotError.IO_ERROR);
+            }
           }
-          throw new IOException(e);
+          throw new SnapshotException(e, SnapshotError.IO_ERROR);
         }
       }
     };
@@ -594,7 +600,7 @@ public final class OmSnapshotManager implements AutoCloseable {
       String volumeName,
       String bucketName,
       String keyName,
-      boolean skipActiveCheck) throws IOException {
+      boolean skipActiveCheck) throws SnapshotException {
     if (keyName == null || !ozoneManager.isFilesystemSnapshotEnabled()) {
       return ozoneManager.getOmMetadataReader();
     }
@@ -605,7 +611,7 @@ public final class OmSnapshotManager implements AutoCloseable {
       String snapshotName = keyParts[1];
       if (snapshotName == null || snapshotName.isEmpty()) {
         // don't allow snapshot indicator without snapshot name
-        throw new OMException(INVALID_KEY_NAME);
+        throw new SnapshotException(SnapshotError.INVALID_KEY_NAME);
       }
       String snapshotTableKey = SnapshotInfo.getTableKey(volumeName,
           bucketName, snapshotName);
@@ -636,11 +642,11 @@ public final class OmSnapshotManager implements AutoCloseable {
    */
   public boolean isSnapshotStatus(String key,
                                   SnapshotInfo.SnapshotStatus status)
-      throws IOException {
+      throws SnapshotException {
     return getSnapshotInfo(key).getSnapshotStatus().equals(status);
   }
 
-  public SnapshotInfo getSnapshotInfo(String key) throws IOException {
+  public SnapshotInfo getSnapshotInfo(String key) throws SnapshotException {
     return SnapshotUtils.getSnapshotInfo(ozoneManager, key);
   }
 
@@ -666,7 +672,7 @@ public final class OmSnapshotManager implements AutoCloseable {
       final String bucket,
       final String fromSnapshot,
       final String toSnapshot
-  ) throws IOException {
+  ) throws SnapshotException {
     return snapshotDiffManager.cancelSnapshotDiff(volume, bucket, fromSnapshot,
         toSnapshot);
   }
@@ -680,7 +686,7 @@ public final class OmSnapshotManager implements AutoCloseable {
                                                     int pageSize,
                                                     boolean forceFullDiff,
                                                     boolean disableNativeDiff)
-      throws IOException {
+      throws SnapshotException {
 
     validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
 
@@ -717,18 +723,23 @@ public final class OmSnapshotManager implements AutoCloseable {
                                                    final String bucketName,
                                                    final String jobStatus,
                                                    final boolean listAll)
-      throws IOException {
+      throws SnapshotException {
     String volumeKey = ozoneManager.getMetadataManager()
         .getVolumeKey(volumeName);
     String bucketKey = ozoneManager.getMetadataManager()
         .getBucketKey(volumeName, bucketName);
 
-    if (!ozoneManager.getMetadataManager()
-            .getVolumeTable().isExist(volumeKey) ||
-        !ozoneManager.getMetadataManager()
-            .getBucketTable().isExist(bucketKey)) {
-      throw new IOException("Provided volume name " + volumeName +
-          " or bucket name " + bucketName + " doesn't exist");
+    try {
+      if (!ozoneManager.getMetadataManager()
+              .getVolumeTable().isExist(volumeKey) ||
+          !ozoneManager.getMetadataManager()
+              .getBucketTable().isExist(bucketKey)) {
+        throw new SnapshotException("Provided volume name " + volumeName +
+            " or bucket name " + bucketName + " doesn't exist",
+            SnapshotError.NOT_FOUND);
+      }
+    } catch (IOException e) {
+      throw new SnapshotException(e, SnapshotError.IO_ERROR);
     }
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
         ozoneManager.getMetadataManager();
@@ -749,7 +760,7 @@ public final class OmSnapshotManager implements AutoCloseable {
                                                final String bucketName,
                                                final String fromSnapshotName,
                                                final String toSnapshotName)
-      throws IOException {
+      throws SnapshotException {
     SnapshotInfo fromSnapInfo = SnapshotUtils.getSnapshotInfo(ozoneManager,
         volumeName, bucketName, fromSnapshotName);
     SnapshotInfo toSnapInfo = SnapshotUtils.getSnapshotInfo(ozoneManager,
@@ -760,7 +771,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     checkSnapshotActive(toSnapInfo, false);
   }
 
-  private int getIndexFromToken(final String token) throws IOException {
+  private int getIndexFromToken(final String token) throws SnapshotException {
     if (isBlank(token)) {
       return 0;
     }
@@ -770,13 +781,17 @@ public final class OmSnapshotManager implements AutoCloseable {
     try {
       int index = Integer.parseInt(token);
       if (index < 0) {
-        throw new IOException("Passed token is invalid. Resend the request " +
-            "with valid token returned in previous request.");
+        throw new SnapshotException(
+            String.format("Passed token %s is invalid. Resend the request ", token) +
+            "with valid token returned in previous request.",
+            SnapshotError.INVALID_INPUT);
       }
       return index;
     } catch (NumberFormatException exception) {
-      throw new IOException("Passed token is invalid. " +
-          "Resend the request with valid token returned in previous request.");
+      throw new SnapshotException(
+          String.format("Passed token %s is invalid. Resend the request ",
+              token) + "with valid token returned in previous request.",
+          SnapshotError.INVALID_INPUT);
     }
   }
 
@@ -784,16 +799,11 @@ public final class OmSnapshotManager implements AutoCloseable {
       final ManagedDBOptions dbOptions, String dbPath,
       final List<ColumnFamilyDescriptor> familyDescriptors,
       final List<ColumnFamilyHandle> familyHandles
-  ) {
-    try {
-      return ManagedRocksDB.open(dbOptions,
-          dbPath,
-          familyDescriptors,
-          familyHandles);
-    } catch (RocksDBException exception) {
-      // TODO: [SNAPSHOT] Fail gracefully.
-      throw new RuntimeException(exception);
-    }
+  ) throws RocksDBException {
+    return ManagedRocksDB.open(dbOptions,
+        dbPath,
+        familyDescriptors,
+        familyHandles);
   }
 
   private String getDbPath(final OzoneConfiguration config) {
@@ -804,19 +814,14 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   private List<ColumnFamilyDescriptor> getExitingColumnFamilyDescriptors(
-      final String path) {
-    try {
-      return RocksDatabase.listColumnFamiliesEmptyOptions(path)
-          .stream()
-          .map(columnFamilyName ->
-              new ColumnFamilyDescriptor(columnFamilyName,
-                  new ManagedColumnFamilyOptions(columnFamilyOptions)
-              ))
-          .collect(Collectors.toList());
-    } catch (RocksDBException exception) {
-      // TODO: [SNAPSHOT] Fail gracefully.
-      throw new RuntimeException(exception);
-    }
+      final String path) throws RocksDBException {
+    return RocksDatabase.listColumnFamiliesEmptyOptions(path)
+        .stream()
+        .map(columnFamilyName ->
+            new ColumnFamilyDescriptor(columnFamilyName,
+                new ManagedColumnFamilyOptions(columnFamilyOptions)
+            ))
+        .collect(Collectors.toList());
   }
 
   /**
@@ -830,7 +835,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   private ColumnFamilyHandle getOrCreateColumnFamily(
       final String columnFamilyName,
       final List<ColumnFamilyDescriptor> familyDescriptors,
-      final List<ColumnFamilyHandle> familyHandles) {
+      final List<ColumnFamilyHandle> familyHandles) throws RocksDBException {
 
     for (int i = 0; i < familyDescriptors.size(); i++) {
       String cfName = StringUtils.bytes2String(familyDescriptors.get(i)
@@ -840,21 +845,16 @@ public final class OmSnapshotManager implements AutoCloseable {
       }
     }
 
-    try {
-      ColumnFamilyDescriptor columnFamilyDescriptor =
-          new ColumnFamilyDescriptor(StringUtils.string2Bytes(columnFamilyName),
-              columnFamilyOptions);
-      ColumnFamilyHandle columnFamily = snapshotDiffDb.get()
-          .createColumnFamily(columnFamilyDescriptor);
+    ColumnFamilyDescriptor columnFamilyDescriptor =
+        new ColumnFamilyDescriptor(StringUtils.string2Bytes(columnFamilyName),
+            columnFamilyOptions);
+    ColumnFamilyHandle columnFamily = snapshotDiffDb.get()
+        .createColumnFamily(columnFamilyDescriptor);
 
-      // Add column family and descriptor so that they can be closed if needed.
-      familyHandles.add(columnFamily);
-      familyDescriptors.add(columnFamilyDescriptor);
-      return columnFamily;
-    } catch (RocksDBException exception) {
-      // TODO: [SNAPSHOT] Fail gracefully.
-      throw new RuntimeException(exception);
-    }
+    // Add column family and descriptor so that they can be closed if needed.
+    familyHandles.add(columnFamily);
+    familyDescriptors.add(columnFamilyDescriptor);
+    return columnFamily;
   }
 
   /**
@@ -864,22 +864,17 @@ public final class OmSnapshotManager implements AutoCloseable {
    */
   private void dropUnknownColumnFamilies(
       List<ColumnFamilyHandle> familyHandles
-  ) {
+  ) throws RocksDBException {
     Set<String> allowedColumnFamilyOnStartUp = new HashSet<>(
         Arrays.asList(DEFAULT_COLUMN_FAMILY_NAME, SNAP_DIFF_JOB_TABLE_NAME,
             SNAP_DIFF_REPORT_TABLE_NAME, SNAP_DIFF_PURGED_JOB_TABLE_NAME));
 
-    try {
-      for (ColumnFamilyHandle columnFamilyHandle : familyHandles) {
-        String columnFamilyName =
-            StringUtils.bytes2String(columnFamilyHandle.getName());
-        if (!allowedColumnFamilyOnStartUp.contains(columnFamilyName)) {
-          dropColumnFamilyHandle(snapshotDiffDb, columnFamilyHandle);
-        }
+    for (ColumnFamilyHandle columnFamilyHandle : familyHandles) {
+      String columnFamilyName =
+          StringUtils.bytes2String(columnFamilyHandle.getName());
+      if (!allowedColumnFamilyOnStartUp.contains(columnFamilyName)) {
+        dropColumnFamilyHandle(snapshotDiffDb, columnFamilyHandle);
       }
-    } catch (RocksDBException e) {
-      // TODO: [SNAPSHOT] Fail gracefully.
-      throw new RuntimeException(e);
     }
   }
 

@@ -101,6 +101,7 @@ import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
+import org.apache.hadoop.ozone.om.snapshot.exception.SnapshotException;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.security.acl.OzoneAuthorizerFactory;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
@@ -4739,11 +4740,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private ReferenceCounted<
       IOmMetadataReader, SnapshotCache> getReader(OzoneObj ozoneObj)
       throws IOException {
-    return omSnapshotManager.checkForSnapshot(
-        ozoneObj.getVolumeName(),
-        ozoneObj.getBucketName(),
-        ozoneObj.getKeyName(),
-        false);
+    try {
+      return omSnapshotManager.checkForSnapshot(
+          ozoneObj.getVolumeName(),
+          ozoneObj.getBucketName(),
+          ozoneObj.getKeyName(),
+          false);
+    } catch (SnapshotException e) {
+      throw new IOException(e);
+    }
   }
 
   @SuppressWarnings("parameternumber")
@@ -4756,9 +4761,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                            boolean forceFullDiff,
                                            boolean disableNativeDiff)
       throws IOException {
-    return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
-        fromSnapshot, toSnapshot, token, pageSize, forceFullDiff,
-        disableNativeDiff);
+    try {
+      return omSnapshotManager.getSnapshotDiffReport(volume, bucket,
+          fromSnapshot, toSnapshot, token, pageSize, forceFullDiff,
+          disableNativeDiff);
+    } catch (SnapshotException e) {
+      throw new IOException(e);
+    }
   }
 
   public CancelSnapshotDiffResponse cancelSnapshotDiff(String volume,
@@ -4766,8 +4775,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                                        String fromSnapshot,
                                                        String toSnapshot)
       throws IOException {
-    return omSnapshotManager.cancelSnapshotDiff(volume, bucket,
-        fromSnapshot, toSnapshot);
+    try {
+      return omSnapshotManager.cancelSnapshotDiff(volume, bucket,
+          fromSnapshot, toSnapshot);
+    } catch (SnapshotException e) {
+      throw new IOException(e);
+    }
   }
 
   public List<SnapshotDiffJob> listSnapshotDiffJobs(String volume,
@@ -4775,8 +4788,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
                                                     String jobStatus,
                                                     boolean listAll)
       throws IOException {
-    return omSnapshotManager.getSnapshotDiffList(volume,
-        bucket, jobStatus, listAll);
+    try {
+      return omSnapshotManager.getSnapshotDiffList(volume,
+          bucket, jobStatus, listAll);
+    } catch (SnapshotException e) {
+      throw new IOException(e);
+    }
   }
 
   public String printCompactionLogDag(String fileNamePrefix,

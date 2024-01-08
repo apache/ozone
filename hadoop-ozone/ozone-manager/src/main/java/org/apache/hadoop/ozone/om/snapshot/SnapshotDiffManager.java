@@ -50,6 +50,9 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
+import org.apache.hadoop.ozone.om.snapshot.exception.SnapshotError;
+import org.apache.hadoop.ozone.om.snapshot.exception.SnapshotException;
+import org.apache.hadoop.ozone.om.snapshot.exception.SnapshotRuntimeException;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
@@ -71,6 +74,7 @@ import org.slf4j.LoggerFactory;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -203,7 +207,8 @@ public class SnapshotDiffManager implements AutoCloseable {
                              ColumnFamilyHandle snapDiffJobCfh,
                              ColumnFamilyHandle snapDiffReportCfh,
                              ManagedColumnFamilyOptions familyOptions,
-                             CodecRegistry codecRegistry) {
+                             CodecRegistry codecRegistry)
+      throws SnapshotException {
     this.db = db;
     this.differ = differ;
     this.ozoneManager = ozoneManager;
@@ -328,15 +333,15 @@ public class SnapshotDiffManager implements AutoCloseable {
    * if there were any created by previous snapDiff job and were not removed
    * because of any failure.
    */
-  private void createEmptySnapDiffDir(Path path) {
+  private void createEmptySnapDiffDir(Path path) throws SnapshotException {
     try {
       if (Files.exists(path)) {
         PathUtils.deleteDirectory(path);
       }
       Files.createDirectories(path);
     } catch (IOException e) {
-      throw new IllegalStateException("Couldn't delete existing or create new" +
-          " directory for:" + path, e);
+      throw new SnapshotException("Couldn't delete existing or create new" +
+          " directory for:" + path, e, SnapshotError.IO_ERROR);
     }
 
     // Create readme file.
@@ -349,22 +354,18 @@ public class SnapshotDiffManager implements AutoCloseable {
             " generate snap diff report for a particular job.\n" +
             " DO NOT add, change or delete any files in this directory" +
             " unless you know what you are doing.\n");
-      } catch (IOException ignored) {
+      } catch (IOException ioException) {
+        LOG.warn("Readme file creation inside snapdiff dir failed.",
+            ioException);
       }
     }
   }
 
-  private void deleteDir(Path path) {
+  private void deleteDir(Path path) throws IOException {
     if (path == null || Files.notExists(path)) {
       return;
     }
-
-    try {
-      PathUtils.deleteDirectory(path);
-    } catch (IOException e) {
-      // TODO: [SNAPSHOT] Fail gracefully
-      throw new IllegalStateException(e);
-    }
+    PathUtils.deleteDirectory(path);
   }
 
   /**
@@ -409,14 +410,19 @@ public class SnapshotDiffManager implements AutoCloseable {
       final String bucketName,
       final String fromSnapshotName,
       final String toSnapshotName
-  ) throws IOException {
+  ) throws SnapshotException {
     SnapshotInfo fsInfo =
         getSnapshotInfo(ozoneManager, volumeName, bucketName, fromSnapshotName);
     SnapshotInfo tsInfo =
         getSnapshotInfo(ozoneManager, volumeName, bucketName, toSnapshotName);
 
     String diffJobKey = generateSnapDiffJobKey.apply(fsInfo, tsInfo);
-    SnapshotDiffJob diffJob = snapDiffJobTable.get(diffJobKey);
+    SnapshotDiffJob diffJob = null;
+    try {
+      diffJob = snapDiffJobTable.get(diffJobKey);
+    } catch (IOException e) {
+      throw new SnapshotException(e, SnapshotError.IO_ERROR);
+    }
 
     if (diffJob == null) {
       return new CancelSnapshotDiffResponse(CANCEL_JOB_NOT_EXIST.getMessage());
@@ -452,13 +458,18 @@ public class SnapshotDiffManager implements AutoCloseable {
 
   public List<SnapshotDiffJob> getSnapshotDiffJobList(
       String volumeName, String bucketName,
-      String jobStatus, boolean listAll) throws IOException {
+      String jobStatus, boolean listAll) throws SnapshotException {
     List<SnapshotDiffJob> jobList = new ArrayList<>();
 
     try (ClosableIterator<Map.Entry<String, SnapshotDiffJob>> iterator =
              snapDiffJobTable.iterator()) {
       while (iterator.hasNext()) {
-        SnapshotDiffJob snapshotDiffJob = iterator.next().getValue();
+        SnapshotDiffJob snapshotDiffJob = null;
+        try {
+          snapshotDiffJob = iterator.next().getValue();
+        } catch (UncheckedIOException e) {
+          throw e.getCause();
+        }
         if (Objects.equals(snapshotDiffJob.getVolume(), volumeName) &&
             Objects.equals(snapshotDiffJob.getBucket(), bucketName)) {
           if (listAll) {
@@ -472,6 +483,8 @@ public class SnapshotDiffManager implements AutoCloseable {
           }
         }
       }
+    } catch (IOException e) {
+      throw new SnapshotException(e, SnapshotError.IO_ERROR);
     }
     return jobList;
   }
@@ -496,7 +509,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       final int pageSize,
       final boolean forceFullDiff,
       final boolean disableNativeDiff
-  ) throws IOException {
+  ) throws SnapshotException {
 
     SnapshotInfo fsInfo = getSnapshotInfo(ozoneManager,
         volumeName, bucketName, fromSnapshotName);
@@ -571,13 +584,14 @@ public class SnapshotDiffManager implements AutoCloseable {
       final String toSnapshotName,
       final int index,
       final int pageSize
-  ) throws IOException {
+  ) throws SnapshotException {
     if (index < 0 || index > snapDiffJob.getTotalDiffEntries()
         || pageSize <= 0) {
-      throw new IOException(String.format(
+      throw new SnapshotException(String.format(
           "Index (given: %d) should be a number >= 0 and < totalDiffEntries: " +
               "%d. Page size (given: %d) should be a positive number > 0.",
-          index, snapDiffJob.getTotalDiffEntries(), pageSize));
+          index, snapDiffJob.getTotalDiffEntries(), pageSize),
+          SnapshotError.INVALID_INPUT);
     }
 
     OFSPath path = getSnapshotRootPath(volumeName, bucketName);
@@ -595,22 +609,33 @@ public class SnapshotDiffManager implements AutoCloseable {
       final SnapshotDiffJob snapDiffJob,
       final int index,
       final int pageSize
-  ) throws IOException {
+  ) throws SnapshotException {
     List<DiffReportEntry> diffReportList = new ArrayList<>();
 
     boolean hasMoreEntries = true;
 
-    byte[] lowerIndex = codecRegistry.asRawData(getReportKeyForIndex(
-        snapDiffJob.getJobId(), index));
-    byte[] upperIndex = codecRegistry.asRawData(getReportKeyForIndex(
-        snapDiffJob.getJobId(), index + pageSize));
+    byte[] lowerIndex = null;
+    byte[] upperIndex = null;
+    try {
+      lowerIndex = codecRegistry.asRawData(getReportKeyForIndex(
+          snapDiffJob.getJobId(), index));
+      upperIndex = codecRegistry.asRawData(getReportKeyForIndex(
+          snapDiffJob.getJobId(), index + pageSize));
+    } catch (IOException e) {
+      throw new SnapshotException(e, SnapshotError.IO_ERROR);
+    }
     int idx = index;
     try (ClosableIterator<Map.Entry<byte[], byte[]>> iterator =
              snapDiffReportTable.iterator(Optional.of(lowerIndex),
                  Optional.of(upperIndex))) {
       int itemsFetched = 0;
       while (iterator.hasNext() && itemsFetched < pageSize) {
-        Map.Entry<byte[], byte[]> entry = iterator.next();
+        Map.Entry<byte[], byte[]> entry = null;
+        try {
+          entry = iterator.next();
+        } catch (UncheckedIOException e) {
+          throw e.getCause();
+        }
         byte[] bytes = entry.getValue();
         diffReportList.add(codecRegistry.asObject(bytes,
             DiffReportEntry.class));
@@ -620,11 +645,13 @@ public class SnapshotDiffManager implements AutoCloseable {
       if (diffReportList.size() < pageSize) {
         hasMoreEntries = false;
       }
+    } catch (Exception e) {
+      throw new SnapshotException(e, SnapshotError.IO_ERROR);
     }
 
     String nextTokenString = hasMoreEntries ? String.valueOf(idx) : null;
-
     checkReportsIntegrity(snapDiffJob, index, diffReportList.size());
+
     return Pair.of(diffReportList, nextTokenString);
   }
 
@@ -638,7 +665,7 @@ public class SnapshotDiffManager implements AutoCloseable {
   void checkReportsIntegrity(final SnapshotDiffJob diffJob,
                              final int pageStartIdx,
                              final int numberOfEntriesInPage)
-      throws IOException {
+      throws SnapshotException {
     if ((pageStartIdx >= diffJob.getTotalDiffEntries() &&
         numberOfEntriesInPage != 0) || (pageStartIdx <
         diffJob.getTotalDiffEntries() && numberOfEntriesInPage == 0)) {
@@ -647,8 +674,10 @@ public class SnapshotDiffManager implements AutoCloseable {
           diffJob.getTotalDiffEntries(),
           pageStartIdx + numberOfEntriesInPage);
       updateJobStatus(diffJob.getJobId(), DONE, FAILED);
-      throw new IOException("Report integrity check failed. Retry after: " +
-          ozoneManager.getOmSnapshotManager().getDiffCleanupServiceInterval());
+      throw new SnapshotException("Report integrity " +
+          "check failed. Retry after: " +
+          ozoneManager.getOmSnapshotManager().getDiffCleanupServiceInterval(),
+          SnapshotError.IO_ERROR);
     }
   }
 
@@ -663,9 +692,14 @@ public class SnapshotDiffManager implements AutoCloseable {
       final int pageSize,
       final boolean forceFullDiff,
       final boolean disableNativeDiff
-  ) throws IOException {
+  ) throws SnapshotException {
 
-    SnapshotDiffJob snapDiffJob = snapDiffJobTable.get(jobKey);
+    SnapshotDiffJob snapDiffJob = null;
+    try {
+      snapDiffJob = snapDiffJobTable.get(jobKey);
+    } catch (Exception e) {
+      throw new SnapshotException(e, SnapshotError.IO_ERROR);
+    }
 
     OFSPath snapshotRoot = getSnapshotRootPath(volume, bucket);
 
@@ -712,7 +746,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       final String fromSnapshotName,
       final String toSnapshotName,
       final boolean forceFullDiff,
-      final boolean disableNativeDiff) {
+      final boolean disableNativeDiff) throws SnapshotException {
 
     LOG.info("Submitting snap diff report generation request for" +
             " volume: {}, bucket: {}, fromSnapshot: {} and toSnapshot: {}",
@@ -738,7 +772,11 @@ public class SnapshotDiffManager implements AutoCloseable {
       // If entry is not removed, client has to wait till cleanup service
       // removes the entry even tho there are resources to execute the request
       // before the cleanup kicks in.
-      snapDiffJobTable.remove(jobKey);
+      try {
+        snapDiffJobTable.remove(jobKey);
+      } catch (Exception e) {
+        throw new SnapshotException(e, SnapshotError.IO_ERROR);
+      }
       LOG.info("Exceeded the snapDiff parallel requests progressing " +
           "limit. Removed the jobKey: {}. Please retry after {}.",
           jobKey, defaultWaitTime);
@@ -749,7 +787,11 @@ public class SnapshotDiffManager implements AutoCloseable {
           REJECTED, defaultWaitTime);
     } catch (Exception exception) {
       // Remove the entry from job table as well.
-      snapDiffJobTable.remove(jobKey);
+      try {
+        snapDiffJobTable.remove(jobKey);
+      } catch (Exception e) {
+        throw new SnapshotException(e, SnapshotError.IO_ERROR);
+      }
       LOG.error("Failure in job submission to the executor. Removed the" +
               " jobKey: {}.", jobKey, exception);
       return new SnapshotDiffResponse(
@@ -772,32 +814,40 @@ public class SnapshotDiffManager implements AutoCloseable {
       String fromSnapshotName,
       String toSnapshotName,
       boolean forceFullDiff,
-      boolean disableNativeDiff) {
-    SnapshotDiffJob snapDiffJob = snapDiffJobTable.get(jobKey);
+      boolean disableNativeDiff) throws SnapshotException {
+    try {
+      SnapshotDiffJob snapDiffJob = snapDiffJobTable.get(jobKey);
 
-    if (snapDiffJob == null) {
-      String jobId = UUID.randomUUID().toString();
-      snapDiffJob = new SnapshotDiffJob(System.currentTimeMillis(), jobId,
-          QUEUED, volumeName, bucketName, fromSnapshotName, toSnapshotName,
-          forceFullDiff, disableNativeDiff, 0L);
-      snapDiffJobTable.put(jobKey, snapDiffJob);
+      if (snapDiffJob == null) {
+        String jobId = UUID.randomUUID().toString();
+        snapDiffJob = new SnapshotDiffJob(System.currentTimeMillis(), jobId,
+            QUEUED, volumeName, bucketName, fromSnapshotName, toSnapshotName,
+            forceFullDiff, disableNativeDiff, 0L);
+        snapDiffJobTable.put(jobKey, snapDiffJob);
+      }
+    } catch (Exception e) {
+      throw new SnapshotException(e, SnapshotError.IO_ERROR);
     }
-
-    return snapDiffJob;
+    return null;
   }
 
   @VisibleForTesting
   boolean areDiffJobAndSnapshotsActive(
       final String volumeName, final String bucketName,
       final String fromSnapshotName, final String toSnapshotName)
-      throws IOException {
+      throws SnapshotException {
     SnapshotInfo fromSnapInfo = getSnapshotInfo(ozoneManager, volumeName,
         bucketName, fromSnapshotName);
     SnapshotInfo toSnapInfo = getSnapshotInfo(ozoneManager, volumeName,
         bucketName, toSnapshotName);
 
     String jobKey = generateSnapDiffJobKey.apply(fromSnapInfo, toSnapInfo);
-    SnapshotDiffJob diffJob = snapDiffJobTable.get(jobKey);
+    SnapshotDiffJob diffJob = null;
+    try {
+      diffJob = snapDiffJobTable.get(jobKey);
+    } catch (Exception e) {
+      throw new SnapshotException(e, SnapshotError.IO_ERROR);
+    }
     if (diffJob == null || diffJob.getStatus() == CANCELLED) {
       return false;
     }
@@ -1001,28 +1051,52 @@ public class SnapshotDiffManager implements AutoCloseable {
         methodCall.call();
       }
     } catch (IOException | RocksDBException exception) {
-      updateJobStatusToFailed(jobKey, exception.getMessage());
       LOG.error("Caught checked exception during diff report generation for " +
               "volume: {} bucket: {}, fromSnapshot: {} and toSnapshot: {}",
           volumeName, bucketName, fromSnapshotName, toSnapshotName, exception);
+      try {
+        updateJobStatusToFailed(jobKey, exception.getMessage());
+      } catch (SnapshotException e) {
+        LOG.error("Error while updating job status for job {}", jobKey, e);
+        throw e.convertToSnapshotRuntimeException();
+      }
       // TODO: [SNAPSHOT] Fail gracefully. Also check if it is even needed to
       //  throw this exception.
-      throw new RuntimeException(exception);
+      throw new SnapshotRuntimeException(exception, SnapshotError.IO_ERROR);
     } catch (Exception exception) {
-      updateJobStatusToFailed(jobKey, exception.getMessage());
       LOG.error("Caught unchecked exception during diff report generation " +
               "for volume: {} bucket: {}, fromSnapshot: {} and toSnapshot: {}",
           volumeName, bucketName, fromSnapshotName, toSnapshotName, exception);
+      try {
+        updateJobStatusToFailed(jobKey, exception.getMessage());
+      } catch (SnapshotException e) {
+        LOG.error("Error while updating job status for job {}", jobKey, e);
+        throw e.convertToSnapshotRuntimeException();
+      }
       // TODO: [SNAPSHOT] Fail gracefully. Also check if it is even needed to
       //  throw this exception.
-      throw new RuntimeException(exception);
+      throw new SnapshotRuntimeException(exception, SnapshotError.UNKNOWN_ERROR);
     } finally {
       // Clean up: drop the intermediate column family and close them.
-      dropAndCloseColumnFamilyHandle(fromSnapshotColumnFamily);
-      dropAndCloseColumnFamilyHandle(toSnapshotColumnFamily);
-      dropAndCloseColumnFamilyHandle(objectIDsColumnFamily);
+      SnapshotRuntimeException r = null;
+      try {
+        dropAndCloseColumnFamilyHandle(fromSnapshotColumnFamily);
+        dropAndCloseColumnFamilyHandle(toSnapshotColumnFamily);
+        dropAndCloseColumnFamilyHandle(objectIDsColumnFamily);
+      } catch (RocksDBException e) {
+        LOG.warn("Error while closing column family handle", e);
+        r = new SnapshotRuntimeException(e, SnapshotError.IO_ERROR);
+      }
+
       // Delete SST files backup directory.
-      deleteDir(path);
+      try {
+        deleteDir(path);
+      } catch (IOException e) {
+        LOG.warn("Error while deleting directory " + path, e);
+        if (r == null) {
+          r = new SnapshotRuntimeException(e, SnapshotError.IO_ERROR);
+        }
+      }
       // Decrement ref counts
       if (rcFromSnapshot != null) {
         rcFromSnapshot.close();
@@ -1131,13 +1205,11 @@ public class SnapshotDiffManager implements AutoCloseable {
                 .getParentObjectID()));
           }
         } catch (IOException e) {
-          throw new RuntimeException(e);
+          throw new UncheckedIOException(e);
         }
       });
-    } catch (RocksDBException rocksDBException) {
-      // TODO: [SNAPSHOT] Gracefully handle exception
-      //  e.g. when input files do not exist
-      throw new RuntimeException(rocksDBException);
+    } catch (UncheckedIOException ioException) {
+      throw ioException.getCause();
     }
   }
 
@@ -1260,7 +1332,7 @@ public class SnapshotDiffManager implements AutoCloseable {
       final boolean isFSOBucket,
       final Optional<Map<Long, Path>> oldParentIdPathMap,
       final Optional<Map<Long, Path>> newParentIdPathMap,
-      final Map<String, String> tablePrefix) {
+      final Map<String, String> tablePrefix) throws SnapshotException {
     LOG.info("Starting diff report generation for jobId: {}.", jobId);
     ColumnFamilyHandle deleteDiffColumnFamily = null;
     ColumnFamilyHandle renameDiffColumnFamily = null;
@@ -1301,7 +1373,12 @@ public class SnapshotDiffManager implements AutoCloseable {
             return -1L;
           }
 
-          Map.Entry<byte[], Boolean> nextEntry = iterator.next();
+          Map.Entry<byte[], Boolean> nextEntry = null;
+          try {
+            nextEntry = iterator.next();
+          } catch (UncheckedIOException e) {
+            throw e.getCause();
+          }
           byte[] id = nextEntry.getKey();
           boolean isDirectoryObject = nextEntry.getValue();
 
@@ -1427,12 +1504,16 @@ public class SnapshotDiffManager implements AutoCloseable {
       return addToReport(jobId, index, modifyDiffs);
     } catch (RocksDBException | IOException e) {
       // TODO: [SNAPSHOT] Fail gracefully.
-      throw new RuntimeException(e);
+      throw new SnapshotException(e, SnapshotError.IO_ERROR);
     } finally {
-      dropAndCloseColumnFamilyHandle(deleteDiffColumnFamily);
-      dropAndCloseColumnFamilyHandle(renameDiffColumnFamily);
-      dropAndCloseColumnFamilyHandle(createDiffColumnFamily);
-      dropAndCloseColumnFamilyHandle(modifyDiffColumnFamily);
+      try {
+        dropAndCloseColumnFamilyHandle(deleteDiffColumnFamily);
+        dropAndCloseColumnFamilyHandle(renameDiffColumnFamily);
+        dropAndCloseColumnFamilyHandle(createDiffColumnFamily);
+        dropAndCloseColumnFamilyHandle(modifyDiffColumnFamily);
+      } catch (RocksDBException e) {
+        throw new SnapshotException(e, SnapshotError.IO_ERROR);
+      }
     }
   }
 
@@ -1481,21 +1562,25 @@ public class SnapshotDiffManager implements AutoCloseable {
       String toObjectName,
       final Table<String, ? extends WithObjectID> fromSnapshotTable,
       final Table<String, ? extends WithObjectID> toSnapshotTable
-  ) throws IOException {
+  ) throws SnapshotException {
     Objects.requireNonNull(fromObjectName, "fromObjectName is null.");
     Objects.requireNonNull(toObjectName, "toObjectName is null.");
 
-    final WithObjectID fromObject = fromSnapshotTable.get(fromObjectName);
-    final WithObjectID toObject = toSnapshotTable.get(toObjectName);
+    try {
+      final WithObjectID fromObject = fromSnapshotTable.get(fromObjectName);
+      final WithObjectID toObject = toSnapshotTable.get(toObjectName);
 
-    if (!(fromObject instanceof OmKeyInfo) ||
-        !(toObject instanceof OmKeyInfo)) {
-      throw new IllegalStateException("fromObject or toObject is not of " +
-          "OmKeyInfo");
+      if (!(fromObject instanceof OmKeyInfo) ||
+          !(toObject instanceof OmKeyInfo)) {
+        throw new SnapshotException("fromObject or toObject is not of " +
+            "OmKeyInfo", SnapshotError.IO_ERROR);
+      }
+
+      return SnapshotDeletingService.isBlockLocationInfoSame(
+          (OmKeyInfo) fromObject, (OmKeyInfo) toObject);
+    } catch (IOException e) {
+      throw new SnapshotException(e, SnapshotError.IO_ERROR);
     }
-
-    return SnapshotDeletingService.isBlockLocationInfoSame(
-        (OmKeyInfo) fromObject, (OmKeyInfo) toObject);
   }
 
   private PersistentList<byte[]> createDiffReportPersistentList(
@@ -1517,76 +1602,101 @@ public class SnapshotDiffManager implements AutoCloseable {
 
   private long addToReport(String jobId, long index,
                            PersistentList<byte[]> diffReportEntries)
-      throws IOException {
+      throws SnapshotException {
     try (ClosableIterator<byte[]>
              diffReportIterator = diffReportEntries.iterator()) {
       while (diffReportIterator.hasNext()) {
-        snapDiffReportTable.put(codecRegistry.asRawData(
-            getReportKeyForIndex(jobId, index)), diffReportIterator.next());
+        try {
+          snapDiffReportTable.put(codecRegistry.asRawData(
+              getReportKeyForIndex(jobId, index)), diffReportIterator.next());
+        } catch (UncheckedIOException e) {
+          throw e.getCause();
+        }
         index++;
       }
+    } catch (IOException e) {
+      throw new SnapshotException(e, SnapshotError.IO_ERROR);
     }
     return index;
   }
 
   private void dropAndCloseColumnFamilyHandle(
-      final ColumnFamilyHandle columnFamilyHandle) {
+      final ColumnFamilyHandle columnFamilyHandle) throws RocksDBException {
 
     if (columnFamilyHandle == null) {
       return;
     }
+    try {
+      dropColumnFamilyHandle(db, columnFamilyHandle);
+    } finally {
+      columnFamilyHandle.close();
+    }
 
-    dropColumnFamilyHandle(db, columnFamilyHandle);
-    columnFamilyHandle.close();
   }
 
   private synchronized void updateJobStatus(String jobKey,
                                             JobStatus oldStatus,
-                                            JobStatus newStatus) {
-    SnapshotDiffJob snapshotDiffJob = snapDiffJobTable.get(jobKey);
-    if (snapshotDiffJob.getStatus() != oldStatus) {
-      throw new IllegalStateException("Invalid job status for jobID: " +
-          snapshotDiffJob.getJobId() + ". Job's current status is '" +
-          snapshotDiffJob.getStatus() + "', while '" + oldStatus +
-          "' is expected.");
+                                            JobStatus newStatus)
+      throws SnapshotException {
+    SnapshotDiffJob snapshotDiffJob = null;
+    try {
+      snapshotDiffJob = snapDiffJobTable.get(jobKey);
+      if (snapshotDiffJob.getStatus() != oldStatus) {
+        throw new SnapshotException("Invalid job status for jobID: " +
+            snapshotDiffJob.getJobId() + ". Job's current status is '" +
+            snapshotDiffJob.getStatus() + "', while '" + oldStatus +
+            "' is expected.", SnapshotError.INVALID_INPUT);
+      }
+      snapshotDiffJob.setStatus(newStatus);
+      snapDiffJobTable.put(jobKey, snapshotDiffJob);
+    } catch (IOException e) {
+      throw new SnapshotException(e, SnapshotError.IO_ERROR);
     }
-    snapshotDiffJob.setStatus(newStatus);
-    snapDiffJobTable.put(jobKey, snapshotDiffJob);
   }
 
   private synchronized void updateJobStatusToFailed(String jobKey,
-                                                    String reason) {
-    SnapshotDiffJob snapshotDiffJob = snapDiffJobTable.get(jobKey);
-    if (snapshotDiffJob.getStatus() != IN_PROGRESS) {
-      throw new IllegalStateException("Invalid job status for jobID: " +
-          snapshotDiffJob.getJobId() + ". Job's current status is '" +
-          snapshotDiffJob.getStatus() + "', while '" + IN_PROGRESS +
-          "' is expected.");
+                                                    String reason)
+      throws SnapshotException {
+    try {
+      SnapshotDiffJob snapshotDiffJob = snapDiffJobTable.get(jobKey);
+      if (snapshotDiffJob.getStatus() != IN_PROGRESS) {
+        throw new IllegalStateException("Invalid job status for jobID: " +
+            snapshotDiffJob.getJobId() + ". Job's current status is '" +
+            snapshotDiffJob.getStatus() + "', while '" + IN_PROGRESS +
+            "' is expected.");
+      }
+      snapshotDiffJob.setStatus(FAILED);
+      if (org.apache.commons.lang3.StringUtils.isNotEmpty(reason)) {
+        snapshotDiffJob.setReason(reason);
+      } else {
+        // TODO: [Snapshot] Revisit this when we have proper exception handling.
+        snapshotDiffJob.setReason("Job failed due to unknown reason.");
+      }
+      ozoneManager.getMetrics().incNumSnapshotDiffJobFails();
+      snapDiffJobTable.put(jobKey, snapshotDiffJob);
+    } catch (IOException e) {
+      throw new SnapshotException(e, SnapshotError.IO_ERROR);
     }
-    snapshotDiffJob.setStatus(FAILED);
-    if (org.apache.commons.lang3.StringUtils.isNotEmpty(reason)) {
-      snapshotDiffJob.setReason(reason);
-    } else {
-      // TODO: [Snapshot] Revisit this when we have proper exception handling.
-      snapshotDiffJob.setReason("Job failed due to unknown reason.");
-    }
-    ozoneManager.getMetrics().incNumSnapshotDiffJobFails();
-    snapDiffJobTable.put(jobKey, snapshotDiffJob);
   }
 
   private synchronized void updateJobStatusToDone(String jobKey,
-                                                  long totalNumberOfEntries) {
-    SnapshotDiffJob snapshotDiffJob = snapDiffJobTable.get(jobKey);
-    if (snapshotDiffJob.getStatus() != IN_PROGRESS) {
-      throw new IllegalStateException("Invalid job status for jobID: " +
-          snapshotDiffJob.getJobId() + ". Job's current status is '" +
-          snapshotDiffJob.getStatus() + "', while '" + IN_PROGRESS +
-          "' is expected.");
-    }
+                                                  long totalNumberOfEntries)
+      throws SnapshotException {
+    try {
+      SnapshotDiffJob snapshotDiffJob = snapDiffJobTable.get(jobKey);
+      if (snapshotDiffJob.getStatus() != IN_PROGRESS) {
+        throw new IllegalStateException("Invalid job status for jobID: " +
+            snapshotDiffJob.getJobId() + ". Job's current status is '" +
+            snapshotDiffJob.getStatus() + "', while '" + IN_PROGRESS +
+            "' is expected.");
+      }
 
-    snapshotDiffJob.setStatus(DONE);
-    snapshotDiffJob.setTotalDiffEntries(totalNumberOfEntries);
-    snapDiffJobTable.put(jobKey, snapshotDiffJob);
+      snapshotDiffJob.setStatus(DONE);
+      snapshotDiffJob.setTotalDiffEntries(totalNumberOfEntries);
+      snapDiffJobTable.put(jobKey, snapshotDiffJob);
+    } catch (IOException e) {
+      throw new SnapshotException(e, SnapshotError.IO_ERROR);
+    }
   }
 
   @VisibleForTesting
@@ -1644,12 +1754,17 @@ public class SnapshotDiffManager implements AutoCloseable {
    * execute it.
    */
   @VisibleForTesting
-  void loadJobsOnStartUp() {
+  void loadJobsOnStartUp() throws SnapshotException {
 
     try (ClosableIterator<Map.Entry<String, SnapshotDiffJob>> iterator =
              snapDiffJobTable.iterator()) {
       while (iterator.hasNext()) {
-        Map.Entry<String, SnapshotDiffJob> next = iterator.next();
+        Map.Entry<String, SnapshotDiffJob> next = null;
+        try {
+          next = iterator.next();
+        } catch (UncheckedIOException e) {
+          throw e.getCause();
+        }
         String jobKey = next.getKey();
         SnapshotDiffJob snapshotDiffJob = next.getValue();
         if (snapshotDiffJob.getStatus() == IN_PROGRESS) {
@@ -1670,6 +1785,8 @@ public class SnapshotDiffManager implements AutoCloseable {
               snapshotDiffJob.isNativeDiffDisabled());
         }
       }
+    } catch (IOException e) {
+      throw new SnapshotException(e, SnapshotError.IO_ERROR);
     }
   }
 

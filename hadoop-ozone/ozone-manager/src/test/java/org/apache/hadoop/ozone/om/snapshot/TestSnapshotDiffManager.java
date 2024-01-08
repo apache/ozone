@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotTestUtils.StubbedPersistentMap;
+import org.apache.hadoop.ozone.om.snapshot.exception.SnapshotException;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
@@ -253,7 +254,8 @@ public class TestSnapshotDiffManager {
   }
 
   @BeforeEach
-  public void init() throws RocksDBException, IOException, ExecutionException {
+  public void init() throws RocksDBException, SnapshotException,
+      ExecutionException, IOException {
     ExitUtils.disableSystemExit();
     ExitUtil.disableSystemExit();
 
@@ -428,7 +430,8 @@ public class TestSnapshotDiffManager {
 
   @ParameterizedTest
   @ValueSource(ints = {1, 2, 5, 10, 100, 1000, 10000})
-  public void testGetDeltaFilesWithDag(int numberOfFiles) throws IOException {
+  public void testGetDeltaFilesWithDag(int numberOfFiles)
+      throws SnapshotException, IOException {
     UUID snap1 = UUID.randomUUID();
     UUID snap2 = UUID.randomUUID();
 
@@ -471,7 +474,7 @@ public class TestSnapshotDiffManager {
       "10,false", "100,false", "1000,false", "10000,false"})
   public void testGetDeltaFilesWithFullDiff(int numberOfFiles,
                                             boolean useFullDiff)
-      throws IOException {
+      throws IOException, SnapshotException {
     try (MockedStatic<RdbUtil> mockedRdbUtil = mockStatic(RdbUtil.class);
          MockedStatic<RocksDiffUtils> mockedRocksDiffUtils =
              mockStatic(RocksDiffUtils.class)) {
@@ -534,7 +537,7 @@ public class TestSnapshotDiffManager {
   @ParameterizedTest
   @ValueSource(ints = {0, 1, 2, 5, 10, 100, 1000, 10000})
   public void testGetDeltaFilesWithDifferThrowException(int numberOfFiles)
-      throws IOException {
+      throws IOException, SnapshotException {
     try (MockedStatic<RdbUtil> mockedRdbUtil = mockStatic(RdbUtil.class);
          MockedStatic<RocksDiffUtils> mockedRocksDiffUtils =
              mockStatic(RocksDiffUtils.class)) {
@@ -641,7 +644,7 @@ public class TestSnapshotDiffManager {
       "true," + OmMetadataManagerImpl.KEY_TABLE})
   public void testObjectIdMapWithTombstoneEntries(boolean nativeLibraryLoaded,
                                                   String snapshotTableName)
-      throws IOException, RocksDBException {
+      throws Exception {
     Set<String> keysIncludingTombstones = IntStream.range(0, 100)
         .boxed().map(i -> (i + 100) + "/key" + i).collect(Collectors.toSet());
     // Mocking SST file with keys in SST file excluding tombstones
@@ -755,7 +758,7 @@ public class TestSnapshotDiffManager {
   }
 
   @Test
-  public void testGenerateDiffReport() throws IOException {
+  public void testGenerateDiffReport() throws IOException, SnapshotException {
     PersistentMap<byte[], byte[]> oldObjectIdKeyMap =
         new StubbedPersistentMap<>();
     PersistentMap<byte[], byte[]> newObjectIdKeyMap =
@@ -797,7 +800,7 @@ public class TestSnapshotDiffManager {
         if (objectId > 25 && objectId < 50) {
           diffMap.put(objectId, SnapshotDiffReport.DiffType.CREATE);
         }
-      } catch (IOException e) {
+      } catch (Exception e) {
         throw new RuntimeException(e);
       }
     });
@@ -899,7 +902,7 @@ public class TestSnapshotDiffManager {
   public void testCreatePageResponse(int startIdx,
                                      int pageSize,
                                      int totalNumberOfRecords)
-      throws IOException, RocksDBException {
+      throws IOException, RocksDBException, SnapshotException {
     String testJobId = "jobId";
     String testJobId2 = "jobId2";
 
@@ -961,7 +964,7 @@ public class TestSnapshotDiffManager {
    * Job response until that happens, is CANCELLED.
    */
   @Test
-  public void testGetSnapshotDiffReportForCancelledJob() throws IOException {
+  public void testGetSnapshotDiffReportForCancelledJob() throws Exception {
 
     String volumeName = "vol-" + RandomStringUtils.randomNumeric(5);
     String bucketName = "bucket-" + RandomStringUtils.randomNumeric(5);
@@ -1045,7 +1048,7 @@ public class TestSnapshotDiffManager {
   @MethodSource("snapDiffCancelFailureScenarios")
   public void testSnapshotDiffCancelFailure(JobStatus jobStatus,
                                             CancelMessage cancelMessage)
-      throws IOException {
+      throws Exception {
 
     String volumeName = "vol-" + RandomStringUtils.randomNumeric(5);
     String bucketName = "bucket-" + RandomStringUtils.randomNumeric(5);
@@ -1124,7 +1127,7 @@ public class TestSnapshotDiffManager {
   public void testListSnapshotDiffJobs(String jobStatus,
                                        boolean listAll,
                                        boolean containsJob)
-      throws IOException {
+      throws IOException, SnapshotException {
     String volumeName = "vol-" + RandomStringUtils.randomNumeric(5);
     String bucketName = "bucket-" + RandomStringUtils.randomNumeric(5);
     String fromSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
@@ -1182,7 +1185,8 @@ public class TestSnapshotDiffManager {
   }
 
   @Test
-  public void testListSnapDiffWithInvalidStatus() throws IOException {
+  public void testListSnapDiffWithInvalidStatus()
+      throws IOException {
     String volumeName = "vol-" + RandomStringUtils.randomNumeric(5);
     String bucketName = "bucket-" + RandomStringUtils.randomNumeric(5);
     String fromSnapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
@@ -1210,7 +1214,8 @@ public class TestSnapshotDiffManager {
   }
 
   @Test
-  public void testGenerateDiffReportWhenThereInEntry() {
+  public void testGenerateDiffReportWhenThereInEntry()
+      throws IOException {
     PersistentMap<byte[], Boolean> objectIdToIsDirectoryMap =
         new StubbedPersistentMap<>();
     PersistentMap<byte[], byte[]> oldObjIdToKeyMap =

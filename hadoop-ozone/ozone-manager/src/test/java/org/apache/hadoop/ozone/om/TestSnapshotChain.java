@@ -21,6 +21,7 @@ import com.google.common.collect.ImmutableMap;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.exception.SnapshotException;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Named;
@@ -93,7 +94,7 @@ public class TestSnapshotChain {
         .build();
   }
 
-  private void deleteSnapshot(UUID snapshotID) throws IOException {
+  private void deleteSnapshot(UUID snapshotID) throws SnapshotException {
     SnapshotInfo sinfo = null;
     final String snapshotPath = "vol1/bucket1";
     // reset the next snapshotInfo.globalPreviousSnapshotID

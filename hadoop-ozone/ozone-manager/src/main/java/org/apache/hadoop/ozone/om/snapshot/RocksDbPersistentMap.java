@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nonnull;
@@ -57,66 +58,60 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
   }
 
   @Override
-  public V get(K key) {
+  public V get(K key) throws IOException {
+    byte[] rawKey = codecRegistry.asRawData(key);
+    byte[] rawValue = null;
     try {
-      byte[] rawKey = codecRegistry.asRawData(key);
-      byte[] rawValue = db.get().get(columnFamilyHandle, rawKey);
-      return codecRegistry.asObject(rawValue, valueType);
-    } catch (IOException | RocksDBException exception) {
-      // TODO: [SNAPSHOT] Fail gracefully.
-      throw new RuntimeException(exception);
+      rawValue = db.get().get(columnFamilyHandle, rawKey);
+    } catch (RocksDBException e) {
+      throw new IOException(e);
     }
+    return codecRegistry.asObject(rawValue, valueType);
   }
 
   @Override
-  public void put(K key, V value) {
+  public void put(K key, V value) throws IOException {
+    byte[] rawKey = codecRegistry.asRawData(key);
+    byte[] rawValue = codecRegistry.asRawData(value);
     try {
-      byte[] rawKey = codecRegistry.asRawData(key);
-      byte[] rawValue = codecRegistry.asRawData(value);
       db.get().put(columnFamilyHandle, rawKey, rawValue);
-    } catch (IOException | RocksDBException exception) {
-      // TODO: [SNAPSHOT] Fail gracefully.
-      throw new RuntimeException(exception);
+    } catch (RocksDBException e) {
+      throw new IOException(e);
     }
   }
 
   @Override
-  public void remove(K key) {
+  public void remove(K key) throws IOException {
+    byte[] rawKey = codecRegistry.asRawData(key);
     try {
-      byte[] rawKey = codecRegistry.asRawData(key);
       db.get().delete(columnFamilyHandle, rawKey);
-    } catch (IOException | RocksDBException exception) {
-      // TODO: [SNAPSHOT] Fail gracefully.
-      throw new RuntimeException(exception);
+    } catch (RocksDBException e) {
+      throw new IOException(e);
     }
   }
 
   @Override
   public ClosableIterator<Map.Entry<K, V>> iterator(Optional<K> lowerBound,
-                                                    Optional<K> upperBound) {
+                                                    Optional<K> upperBound)
+      throws IOException {
     final ManagedReadOptions readOptions = new ManagedReadOptions();
     ManagedRocksIterator iterator;
     final ManagedSlice lowerBoundSlice;
     final ManagedSlice upperBoundSlice;
-    try {
-      if (lowerBound.isPresent()) {
-        lowerBoundSlice = new ManagedSlice(
-            codecRegistry.asRawData(lowerBound.get()));
-        readOptions.setIterateLowerBound(lowerBoundSlice);
-      } else {
-        lowerBoundSlice = null;
-      }
+    if (lowerBound.isPresent()) {
+      lowerBoundSlice = new ManagedSlice(
+          codecRegistry.asRawData(lowerBound.get()));
+      readOptions.setIterateLowerBound(lowerBoundSlice);
+    } else {
+      lowerBoundSlice = null;
+    }
 
-      if (upperBound.isPresent()) {
-        upperBoundSlice = new ManagedSlice(
-            codecRegistry.asRawData(upperBound.get()));
-        readOptions.setIterateUpperBound(upperBoundSlice);
-      } else {
-        upperBoundSlice = null;
-      }
-    } catch (IOException exception) {
-      // TODO: [SNAPSHOT] Fail gracefully.
-      throw new RuntimeException(exception);
+    if (upperBound.isPresent()) {
+      upperBoundSlice = new ManagedSlice(
+          codecRegistry.asRawData(upperBound.get()));
+      readOptions.setIterateUpperBound(upperBoundSlice);
+    } else {
+      upperBoundSlice = null;
     }
 
     iterator = ManagedRocksIterator.managed(
@@ -143,7 +138,7 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
           value = codecRegistry.asObject(iterator.get().value(), valueType);
         } catch (IOException exception) {
           // TODO: [SNAPSHOT] Fail gracefully.
-          throw new RuntimeException(exception);
+          throw new UncheckedIOException(exception);
         }
 
         // Move iterator to the next.

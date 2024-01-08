@@ -19,6 +19,8 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
+
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
@@ -48,14 +50,13 @@ public class RocksDbPersistentSet<E> implements PersistentSet<E> {
 
 
   @Override
-  public void add(E entry) {
+  public void add(E entry) throws IOException {
+    byte[] rawKey = codecRegistry.asRawData(entry);
+    byte[] rawValue = codecRegistry.asRawData(emptyByteArray);
     try {
-      byte[] rawKey = codecRegistry.asRawData(entry);
-      byte[] rawValue = codecRegistry.asRawData(emptyByteArray);
       db.get().put(columnFamilyHandle, rawKey, rawValue);
-    } catch (IOException | RocksDBException exception) {
-      // TODO: [SNAPSHOT] Fail gracefully.
-      throw new RuntimeException(exception);
+    } catch (RocksDBException e) {
+      throw new IOException(e);
     }
   }
 
@@ -79,7 +80,7 @@ public class RocksDbPersistentSet<E> implements PersistentSet<E> {
           return codecRegistry.asObject(rawKey, entryType);
         } catch (IOException exception) {
           // TODO: [SNAPSHOT] Fail gracefully.
-          throw new RuntimeException(exception);
+          throw new UncheckedIOException(exception);
         }
       }
 

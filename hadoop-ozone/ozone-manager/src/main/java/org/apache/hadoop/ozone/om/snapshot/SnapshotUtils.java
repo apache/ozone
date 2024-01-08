@@ -27,6 +27,8 @@ import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus;
+import org.apache.hadoop.ozone.om.snapshot.exception.SnapshotError;
+import org.apache.hadoop.ozone.om.snapshot.exception.SnapshotException;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
@@ -43,8 +45,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TIMEOUT;
 
 /**
@@ -62,14 +62,14 @@ public final class SnapshotUtils {
                                              final String volumeName,
                                              final String bucketName,
                                              final String snapshotName)
-      throws IOException {
+      throws SnapshotException {
     return getSnapshotInfo(ozoneManager,
         SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName));
   }
 
   public static SnapshotInfo getSnapshotInfo(final OzoneManager ozoneManager,
                                              final String snapshotKey)
-      throws IOException {
+      throws SnapshotException {
     SnapshotInfo snapshotInfo;
     try {
       snapshotInfo = ozoneManager.getMetadataManager()
@@ -77,29 +77,23 @@ public final class SnapshotUtils {
           .get(snapshotKey);
     } catch (IOException e) {
       LOG.error("Snapshot '{}' is not found.", snapshotKey, e);
-      throw e;
+      throw new SnapshotException(e, SnapshotError.IO_ERROR);
     }
     if (snapshotInfo == null) {
-      throw new OMException("Snapshot '" + snapshotKey + "' is not found.",
-          KEY_NOT_FOUND);
+      throw new SnapshotException("Snapshot '" + snapshotKey + "' is not found.",
+          SnapshotError.NOT_FOUND);
     }
     return snapshotInfo;
   }
 
   public static void dropColumnFamilyHandle(
       final ManagedRocksDB rocksDB,
-      final ColumnFamilyHandle columnFamilyHandle) {
+      final ColumnFamilyHandle columnFamilyHandle) throws RocksDBException {
 
     if (columnFamilyHandle == null) {
       return;
     }
-
-    try {
-      rocksDB.get().dropColumnFamily(columnFamilyHandle);
-    } catch (RocksDBException exception) {
-      // TODO: [SNAPSHOT] Fail gracefully.
-      throw new RuntimeException(exception);
-    }
+    rocksDB.get().dropColumnFamily(columnFamilyHandle);
   }
 
   /**
@@ -122,19 +116,19 @@ public final class SnapshotUtils {
    */
   public static void checkSnapshotActive(OzoneManager ozoneManager,
                                          String snapshotTableKey)
-      throws IOException {
+      throws SnapshotException {
     checkSnapshotActive(getSnapshotInfo(ozoneManager, snapshotTableKey), false);
   }
 
   public static void checkSnapshotActive(SnapshotInfo snapInfo,
                                          boolean skipCheck)
-      throws OMException {
+      throws SnapshotException {
 
     if (!skipCheck &&
         snapInfo.getSnapshotStatus() != SnapshotStatus.SNAPSHOT_ACTIVE) {
-      throw new OMException("Unable to load snapshot. " +
+      throw new SnapshotException("Unable to load snapshot. " +
           "Snapshot with table key '" + snapInfo.getTableKey() +
-          "' is no longer active", FILE_NOT_FOUND);
+          "' is no longer active", SnapshotError.NOT_FOUND);
     }
   }
 
@@ -143,7 +137,7 @@ public final class SnapshotUtils {
    */
   public static SnapshotInfo getNextActiveSnapshot(SnapshotInfo snapInfo,
       SnapshotChainManager chainManager, OmSnapshotManager omSnapshotManager)
-      throws IOException {
+      throws SnapshotException {
 
     // If the snapshot is deleted in the previous run, then the in-memory
     // SnapshotChainManager might throw NoSuchElementException as the snapshot

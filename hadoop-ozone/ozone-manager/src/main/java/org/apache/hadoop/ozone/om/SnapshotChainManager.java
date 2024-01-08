@@ -20,6 +20,8 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.exception.SnapshotError;
+import org.apache.hadoop.ozone.om.snapshot.exception.SnapshotException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,36 +72,38 @@ public class SnapshotChainManager {
    * Add snapshot to global snapshot chain.
    */
   private void addSnapshotGlobal(UUID snapshotID, UUID prevGlobalID)
-      throws IOException {
+      throws SnapshotException {
     if (globalSnapshotChain.containsKey(snapshotID)) {
-      throw new IOException(String.format(
+      throw new SnapshotException(String.format(
           "Global Snapshot chain corruption. Snapshot with snapshotId: %s is " +
-              "already present in the chain.", snapshotID));
+              "already present in the chain.", snapshotID),
+          SnapshotError.SNAPSHOT_CHAIN_CORRUPTION);
     }
     if (globalSnapshotChain.size() > 0 && prevGlobalID == null) {
-      throw new IOException(String.format("Snapshot chain " +
+      throw new SnapshotException(String.format("Snapshot chain " +
           "corruption. Adding snapshot %s as head node while there are %d " +
               "snapshots in the global snapshot chain.", snapshotID,
-          globalSnapshotChain.size()));
+          globalSnapshotChain.size()), SnapshotError.SNAPSHOT_CHAIN_CORRUPTION);
     }
 
     if (prevGlobalID != null &&
         !globalSnapshotChain.containsKey(prevGlobalID)) {
-      throw new IOException(String.format(
+      throw new SnapshotException(String.format(
           "Global Snapshot chain corruption. Previous snapshotId: %s is " +
               "set for snapshotId: %s but no associated snapshot found in " +
-              "snapshot chain.", prevGlobalID, snapshotID));
+              "snapshot chain.", prevGlobalID, snapshotID),
+          SnapshotError.SNAPSHOT_CHAIN_CORRUPTION);
     }
 
     if (prevGlobalID != null) {
       if (globalSnapshotChain.get(prevGlobalID).hasNextSnapshotId()) {
-        throw new IOException(String.format(
+        throw new SnapshotException(String.format(
             "Global Snapshot chain corruption. Snapshot with snapshotId: %s " +
                 "already has the next snapshotId: %s. Adding snapshot %s " +
                 "with prevSnapshotId: %s will make the chain non linear.",
             prevGlobalID,
             globalSnapshotChain.get(prevGlobalID).getNextSnapshotId(),
-            snapshotID, prevGlobalID));
+            snapshotID, prevGlobalID), SnapshotError.SNAPSHOT_CHAIN_CORRUPTION);
       }
       // On add snapshot, set previous snapshot entry nextSnapshotID =
       // snapshotID
@@ -117,36 +121,38 @@ public class SnapshotChainManager {
    * Add snapshot to bucket snapshot chain(path based).
    */
   private void addSnapshotPath(String snapshotPath, UUID snapshotID,
-                               UUID prevPathID) throws IOException {
+                               UUID prevPathID) throws SnapshotException {
     // On add snapshot, set previous snapshot entry nextSnapshotId = snapshotId
     if (prevPathID != null &&
         ((!snapshotChainByPath.containsKey(snapshotPath)) ||
             (!snapshotChainByPath.get(snapshotPath).containsKey(prevPathID)))) {
-      throw new IOException(String.format(
+      throw new SnapshotException(String.format(
           "Path Snapshot chain corruption. Previous snapshotId: %s is set " +
               "for snapshotId: %s but no associated snapshot found in " +
-              "snapshot chain.", prevPathID, snapshotID));
+              "snapshot chain.", prevPathID, snapshotID),
+          SnapshotError.SNAPSHOT_CHAIN_CORRUPTION);
     }
 
     if (prevPathID == null && snapshotChainByPath.containsKey(snapshotPath) &&
         !snapshotChainByPath.get(snapshotPath).isEmpty()) {
-      throw new IOException(String.format(
+      throw new SnapshotException(String.format(
           "Path Snapshot chain corruption. Error while adding snapshot with " +
               "snapshotId %s with as the first snapshot in snapshot path: " +
               "%s which already has %d snapshots.", snapshotID, snapshotPath,
-          snapshotChainByPath.get(snapshotPath).size()));
+          snapshotChainByPath.get(snapshotPath).size()),
+          SnapshotError.SNAPSHOT_CHAIN_CORRUPTION);
     }
 
     if (prevPathID != null && snapshotChainByPath.containsKey(snapshotPath)) {
       if (snapshotChainByPath.get(snapshotPath).get(prevPathID)
           .hasNextSnapshotId()) {
-        throw new IOException(String.format(
+        throw new SnapshotException(String.format(
             "Path Snapshot chain corruption. Next snapshotId: %s is already " +
                 "set for snapshotId: %s. Adding snapshotId: %s with " +
                 "prevSnapshotId: %s will make the chain non linear.",
             snapshotChainByPath.get(snapshotPath).get(prevPathID)
                 .getNextSnapshotId(), prevPathID,
-            snapshotID, prevPathID));
+            snapshotID, prevPathID), SnapshotError.SNAPSHOT_CHAIN_CORRUPTION);
       }
       snapshotChainByPath
           .get(snapshotPath)
@@ -165,7 +171,8 @@ public class SnapshotChainManager {
     latestSnapshotIdByPath.put(snapshotPath, snapshotID);
   }
 
-  private boolean deleteSnapshotGlobal(UUID snapshotID) throws IOException {
+  private boolean deleteSnapshotGlobal(UUID snapshotID)
+      throws SnapshotException {
     if (globalSnapshotChain.containsKey(snapshotID)) {
       // reset prev and next snapshot entries in chain ordered list
       // for node removal
@@ -173,18 +180,18 @@ public class SnapshotChainManager {
       UUID prev = globalSnapshotChain.get(snapshotID).getPreviousSnapshotId();
 
       if (prev != null && !globalSnapshotChain.containsKey(prev)) {
-        throw new IOException(String.format(
+        throw new SnapshotException(String.format(
             "Global snapshot chain corruption. " +
                 "SnapshotId: %s to be deleted has previous snapshotId: %s " +
                 "but associated snapshot is not found in snapshot chain.",
-            snapshotID, prev));
+            snapshotID, prev), SnapshotError.SNAPSHOT_CHAIN_CORRUPTION);
       }
       if (next != null && !globalSnapshotChain.containsKey(next)) {
-        throw new IOException(String.format(
+        throw new SnapshotException(String.format(
             "Global snapshot chain corruption. " +
                 "SnapshotId: {%s} to be deleted has next snapshotId: %s " +
                 "but associated snapshot is not found in snapshot chain.",
-            snapshotID, next));
+            snapshotID, next), SnapshotError.SNAPSHOT_CHAIN_CORRUPTION);
       }
       globalSnapshotChain.remove(snapshotID);
       if (next != null) {
@@ -207,7 +214,8 @@ public class SnapshotChainManager {
   }
 
   private boolean deleteSnapshotPath(String snapshotPath,
-                                     UUID snapshotId) throws IOException {
+                                     UUID snapshotId)
+      throws SnapshotException {
     if (snapshotChainByPath.containsKey(snapshotPath) &&
         snapshotChainByPath.get(snapshotPath).containsKey(snapshotId)) {
       // reset prev and next snapshot entries in chain ordered list
@@ -224,21 +232,21 @@ public class SnapshotChainManager {
       if (previousSnapshotId != null &&
           !snapshotChainByPath.get(snapshotPath)
               .containsKey(previousSnapshotId)) {
-        throw new IOException(String.format(
+        throw new SnapshotException(String.format(
             "Path snapshot chain corruption. " +
                 "SnapshotId: %s at snapshotPath: %s to be deleted has " +
                 "previous snapshotId: %s but associated snapshot is not " +
                 "found in snapshot chain.", snapshotId, snapshotPath,
-            previousSnapshotId));
+            previousSnapshotId), SnapshotError.SNAPSHOT_CHAIN_CORRUPTION);
       }
       if (nextSnapshotId != null && !snapshotChainByPath.get(snapshotPath)
           .containsKey(nextSnapshotId)) {
-        throw new IOException(String.format(
+        throw new SnapshotException(String.format(
             "Path snapshot chain corruption. " +
                 "SnapshotId: %s at snapshotPath: %s to be deleted has next " +
                 "snapshotId: %s but associated snapshot is not found in " +
                 "snapshot chain.", snapshotId, snapshotPath,
-            nextSnapshotId));
+            nextSnapshotId), SnapshotError.SNAPSHOT_CHAIN_CORRUPTION);
       }
 
       snapshotChainByPath.get(snapshotPath).remove(snapshotId);
@@ -321,9 +329,10 @@ public class SnapshotChainManager {
         head = snapshotToNextSnapshotMap.get(head);
       }
       if (size != snaps.size()) {
-        throw new IOException(String.format("Snapshot chain " +
+        throw new SnapshotException(String.format("Snapshot chain " +
             "corruption. All snapshots have not been added to the " +
-            "snapshot chain. Last snapshot added to chain : %s", prev));
+            "snapshot chain. Last snapshot added to chain : %s", prev),
+            SnapshotError.SNAPSHOT_CHAIN_CORRUPTION);
       }
     } catch (IOException exception) {
       LOG.error("Failure while loading snapshot chain.", exception);
@@ -336,7 +345,7 @@ public class SnapshotChainManager {
    * Add snapshot to snapshot chain.
    */
   public synchronized void addSnapshot(SnapshotInfo snapshotInfo)
-      throws IOException {
+      throws SnapshotException {
     validateSnapshotChain();
     addSnapshotGlobal(snapshotInfo.getSnapshotId(),
         snapshotInfo.getGlobalPreviousSnapshotId());
@@ -352,7 +361,7 @@ public class SnapshotChainManager {
    * Delete snapshot from snapshot chain.
    */
   public synchronized boolean deleteSnapshot(SnapshotInfo snapshotInfo)
-      throws IOException {
+      throws SnapshotException {
     validateSnapshotChain();
     boolean status = deleteSnapshotGlobal(snapshotInfo.getSnapshotId()) &&
         deleteSnapshotPath(snapshotInfo.getSnapshotPath(),
@@ -366,7 +375,7 @@ public class SnapshotChainManager {
   /**
    * Get latest global snapshot in snapshot chain.
    */
-  public UUID getLatestGlobalSnapshotId() throws IOException {
+  public UUID getLatestGlobalSnapshotId() throws SnapshotException {
     validateSnapshotChain();
     return latestGlobalSnapshotId;
   }
@@ -374,7 +383,8 @@ public class SnapshotChainManager {
   /**
    * Get latest path snapshot in snapshot chain.
    */
-  public UUID getLatestPathSnapshotId(String snapshotPath) throws IOException {
+  public UUID getLatestPathSnapshotId(String snapshotPath)
+      throws SnapshotException {
     validateSnapshotChain();
     return latestSnapshotIdByPath.get(snapshotPath);
   }
@@ -383,7 +393,8 @@ public class SnapshotChainManager {
    * Returns true if snapshot from given snapshotId has a next snapshot entry
    * in the global snapshot chain.
    */
-  public boolean hasNextGlobalSnapshot(UUID snapshotId) throws IOException {
+  public boolean hasNextGlobalSnapshot(UUID snapshotId)
+      throws SnapshotException {
     validateSnapshotChain();
     if (!globalSnapshotChain.containsKey(snapshotId)) {
       LOG.error("No snapshot for provided snapshotId: {}", snapshotId);
@@ -396,7 +407,7 @@ public class SnapshotChainManager {
   /**
    * Get next global snapshot in snapshot chain from given snapshot.
    */
-  public UUID nextGlobalSnapshot(UUID snapshotId) throws IOException {
+  public UUID nextGlobalSnapshot(UUID snapshotId) throws SnapshotException {
     validateSnapshotChain();
     if (!hasNextGlobalSnapshot(snapshotId)) {
       LOG.error("No snapshot for provided snapshotId: {}", snapshotId);
@@ -410,7 +421,8 @@ public class SnapshotChainManager {
    * Returns true if snapshot from given snapshotId has a previous snapshot
    * entry in the global snapshot chain.
    */
-  public boolean hasPreviousGlobalSnapshot(UUID snapshotId) throws IOException {
+  public boolean hasPreviousGlobalSnapshot(UUID snapshotId)
+      throws SnapshotException {
     validateSnapshotChain();
     if (!globalSnapshotChain.containsKey(snapshotId)) {
       LOG.error("No snapshot found in snapshot chain for provided " +
@@ -425,7 +437,7 @@ public class SnapshotChainManager {
   /**
    * Get previous global snapshot in snapshot chain from given snapshot.
    */
-  public UUID previousGlobalSnapshot(UUID snapshotId) throws IOException {
+  public UUID previousGlobalSnapshot(UUID snapshotId) throws SnapshotException {
     validateSnapshotChain();
     if (!hasPreviousGlobalSnapshot(snapshotId)) {
       LOG.error("No preceding snapshot found in snapshot chain for provided " +
@@ -441,7 +453,7 @@ public class SnapshotChainManager {
    * entry in the path snapshot chain.
    */
   public boolean hasNextPathSnapshot(String snapshotPath, UUID snapshotId)
-      throws IOException {
+      throws SnapshotException {
     validateSnapshotChain();
     if (!snapshotChainByPath.containsKey(snapshotPath) ||
         !snapshotChainByPath.get(snapshotPath).containsKey(snapshotId)) {
@@ -462,7 +474,7 @@ public class SnapshotChainManager {
    * Get next path snapshot in snapshot chain from given snapshot.
    */
   public UUID nextPathSnapshot(String snapshotPath, UUID snapshotId)
-      throws IOException {
+      throws SnapshotException {
     validateSnapshotChain();
     if (!hasNextPathSnapshot(snapshotPath, snapshotId)) {
       LOG.error("No following snapshot for provided snapshotId {} and " +
@@ -481,15 +493,15 @@ public class SnapshotChainManager {
    * previous snapshot entry in the path snapshot chain.
    */
   public boolean hasPreviousPathSnapshot(String snapshotPath,
-                                         UUID snapshotId) throws IOException {
+                                         UUID snapshotId) throws SnapshotException {
     validateSnapshotChain();
     if (!snapshotChainByPath.containsKey(snapshotPath) ||
         !snapshotChainByPath.get(snapshotPath).containsKey(snapshotId)) {
       LOG.error("No snapshot found for provided snapshotId: {} and " +
           "snapshotPath: {}", snapshotId, snapshotPath);
-      throw new NoSuchElementException(String.format("SnapshotId: %s is not " +
+      throw new SnapshotException(String.format("SnapshotId: %s is not " +
               "found in snapshot chain for snapshotPath: %s.", snapshotId,
-          snapshotPath));
+          snapshotPath), SnapshotError.NOT_FOUND);
     }
     return snapshotChainByPath.get(snapshotPath)
         .get(snapshotId)
@@ -500,7 +512,7 @@ public class SnapshotChainManager {
    * Get previous path snapshot in snapshot chain from given snapshot.
    */
   public UUID previousPathSnapshot(String snapshotPath,
-                                   UUID snapshotId) throws IOException {
+                                   UUID snapshotId) throws SnapshotException {
     validateSnapshotChain();
     if (!hasPreviousPathSnapshot(snapshotPath, snapshotId)) {
       LOG.error("No preceding snapshot for provided snapshotId: {} and " +
@@ -520,14 +532,14 @@ public class SnapshotChainManager {
   }
 
   public LinkedHashMap<UUID, SnapshotChainInfo> getSnapshotChainPath(
-      String path) throws IOException {
+      String path) throws SnapshotException {
     validateSnapshotChain();
     return snapshotChainByPath.get(path);
   }
 
   @VisibleForTesting
   public Map<UUID, SnapshotChainInfo> getGlobalSnapshotChain()
-      throws IOException {
+      throws SnapshotException {
     validateSnapshotChain();
     return globalSnapshotChain;
   }
@@ -535,7 +547,7 @@ public class SnapshotChainManager {
   @VisibleForTesting
   public Map<String,
       LinkedHashMap<UUID, SnapshotChainInfo>> getSnapshotChainByPath()
-      throws IOException {
+      throws SnapshotException {
     validateSnapshotChain();
     return snapshotChainByPath;
   }
@@ -545,9 +557,10 @@ public class SnapshotChainManager {
    * IOException in case there was an issue while loading snapshot
    * chain on OM start up.
    */
-  private void validateSnapshotChain() throws IOException {
+  private void validateSnapshotChain() throws SnapshotException {
     if (snapshotChainCorrupted) {
-      throw new IOException("Snapshot chain is corrupted.");
+      throw new SnapshotException("Snapshot chain is corrupted.",
+          SnapshotError.SNAPSHOT_CHAIN_CORRUPTION);
     }
   }
 

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,19 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package org.apache.hadoop.ozone.om.snapshot;
-
-import org.apache.hadoop.util.ClosableIterator;
-
-import java.io.IOException;
+package org.apache.hadoop.ozone.om.snapshot.exception;
 
 /**
- * Define an interface for persistent set.
+ * This package contains classes related to snapshot exceptions.
  */
-public interface PersistentSet<E> {
-
-  void add(E entry) throws IOException;
-
-  ClosableIterator<E> iterator();
-}

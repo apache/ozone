@@ -24,6 +24,8 @@ import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.snapshot.exception.SnapshotError;
+import org.apache.hadoop.ozone.om.snapshot.exception.SnapshotException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -153,7 +155,7 @@ public class SnapshotCache implements ReferenceCountedCallback {
   }
 
   public ReferenceCounted<IOmMetadataReader, SnapshotCache> get(String key)
-      throws IOException {
+      throws SnapshotException {
     return get(key, false);
   }
 
@@ -164,7 +166,7 @@ public class SnapshotCache implements ReferenceCountedCallback {
    * @return an OmSnapshot instance, or null on error
    */
   public ReferenceCounted<IOmMetadataReader, SnapshotCache> get(String key,
-      boolean skipActiveCheck) throws IOException {
+      boolean skipActiveCheck) throws SnapshotException {
     // Atomic operation to initialize the OmSnapshot instance (once) if the key
     // does not exist, and increment the reference count on the instance.
     ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot =
@@ -192,9 +194,9 @@ public class SnapshotCache implements ReferenceCountedCallback {
     if (rcOmSnapshot == null) {
       // The only exception that would fall through the loader logic above
       // is OMException with FILE_NOT_FOUND.
-      throw new OMException("Snapshot table key '" + key + "' not found, "
+      throw new SnapshotException("Snapshot table key '" + key + "' not found, "
           + "or the snapshot is no longer active",
-          OMException.ResultCodes.FILE_NOT_FOUND);
+          SnapshotError.NOT_FOUND);
     } else {
       // When RC OmSnapshot is successfully loaded
       rcOmSnapshot.incrementRefCount();
@@ -207,9 +209,9 @@ public class SnapshotCache implements ReferenceCountedCallback {
         !omSnapshotManager.isSnapshotStatus(key, SNAPSHOT_ACTIVE)) {
       // Ref count was incremented. Need to decrement on exception here.
       rcOmSnapshot.decrementRefCount();
-      throw new OMException("Unable to load snapshot. " +
+      throw new SnapshotException("Unable to load snapshot. " +
           "Snapshot with table key '" + key + "' is no longer active",
-          FILE_NOT_FOUND);
+          SnapshotError.NOT_FOUND);
     }
 
     synchronized (pendingEvictionList) {

@@ -108,7 +108,9 @@ public class TestRocksDbPersistentList {
       );
 
       List<String> testList = Arrays.asList("e1", "e2", "e3", "e1", "e2");
-      testList.forEach(persistentList::add);
+      for (String s : testList) {
+        persistentList.add(s);
+      }
 
       try (ClosableIterator<String> iterator = persistentList.iterator()) {
         int index = 0;
