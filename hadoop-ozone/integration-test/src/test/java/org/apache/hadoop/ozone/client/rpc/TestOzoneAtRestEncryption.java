@@ -85,6 +85,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
@@ -92,7 +94,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.mockito.Mockito;
 
 class TestOzoneAtRestEncryption {
 
@@ -675,7 +676,7 @@ class TestOzoneAtRestEncryption {
   @Test
   void testGetKeyProvider() throws Exception {
     KeyProvider kp1 = store.getKeyProvider();
-    KeyProvider kpSpy = Mockito.spy(kp1);
+    KeyProvider kpSpy = spy(kp1);
     assertNotEquals(kpSpy, kp1);
     Cache<URI, KeyProvider> cacheSpy =
         ((RpcClient)store.getClientProxy()).getKeyProviderCache();
@@ -685,7 +686,7 @@ class TestOzoneAtRestEncryption {
 
     // Verify the spied key provider is closed upon ozone client close
     ozClient.close();
-    Mockito.verify(kpSpy).close();
+    verify(kpSpy).close();
 
     KeyProvider kp3 = ozClient.getObjectStore().getKeyProvider();
     assertNotEquals(kp3, kpSpy);
