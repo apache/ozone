@@ -340,7 +340,10 @@ public final class RocksDatabase implements Closeable {
       if (isClosed.get()) {
         throw new IOException("Rocks Database is closed");
       }
-      counter.getAndIncrement();
+      if (counter.getAndIncrement() < 0) {
+        counter.getAndDecrement();
+        throw new IOException("Rocks Database is closed");
+      }
       return counter::getAndDecrement;
     }
 
@@ -437,7 +440,10 @@ public final class RocksDatabase implements Closeable {
     if (isClosed()) {
       throw new IOException("Rocks Database is closed");
     }
-    counter.getAndIncrement();
+    if (counter.getAndIncrement() < 0) {
+      counter.getAndDecrement();
+      throw new IOException("Rocks Database is closed");
+    }
     return counter::getAndDecrement;
   }
 
