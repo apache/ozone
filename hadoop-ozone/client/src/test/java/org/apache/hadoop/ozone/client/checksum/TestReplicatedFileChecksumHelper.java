@@ -362,7 +362,6 @@ public class TestReplicatedFileChecksumHelper {
 
       helper.compute();
       FileChecksum fileChecksum = helper.getFileChecksum();
-      //assertTrue(fileChecksum instanceof MD5MD5CRC32GzipFileChecksum);
       assertEquals(DataChecksum.Type.CRC32C,
           ((MD5MD5CRC32FileChecksum)fileChecksum).getCrcType());
       assertEquals(1, helper.getKeyLocationInfoList().size());
