@@ -1047,7 +1047,7 @@ public class TestStorageContainerManager {
         = new IncrementalContainerReportFromDatanode(dn, report);
     IncrementalContainerReportHandler icr =
         mock(IncrementalContainerReportHandler.class);
-    Mockito.doAnswer((inv) -> {
+    doAnswer((inv) -> {
       Thread.currentThread().sleep(500);
       return null;
     }).when(icr).onMessage(dndata, eventQueue);
