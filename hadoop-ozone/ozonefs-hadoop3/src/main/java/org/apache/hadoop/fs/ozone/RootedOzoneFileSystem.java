@@ -29,6 +29,7 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderTokenIssuer;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.StorageStatistics;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.security.token.DelegationTokenIssuer;
@@ -138,7 +139,16 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
     LOG.trace("recoverLease() path:{}", f);
     Path qualifiedPath = makeQualified(f);
     String key = pathToKey(qualifiedPath);
-    List<OmKeyInfo> infoList = getAdapter().recoverFilePrepare(key);
+    List<OmKeyInfo> infoList = null;
+    try {
+      infoList = getAdapter().recoverFilePrepare(key);
+    } catch (OMException e) {
+      if (e.getResult() == OMException.ResultCodes.KEY_ALREADY_CLOSED) {
+        // key is already closed, let's just return success
+        return true;
+      }
+      throw e;
+    }
     // TODO: query DN to get the final block length
     OmKeyInfo keyInfo = infoList.get(0);
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(keyInfo.getVolumeName())

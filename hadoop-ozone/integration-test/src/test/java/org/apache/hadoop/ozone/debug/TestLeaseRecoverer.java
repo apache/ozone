@@ -146,5 +146,9 @@ public class TestLeaseRecoverer {
     // make sure length remains the same
     fileStatus = fs.getFileStatus(file);
     assertEquals(dataSize, fileStatus.getLen());
+
+    // recover the same file second time should succeed
+    cmd.execute(args);
+    assertEquals("", stderr.toString());
   }
 }
