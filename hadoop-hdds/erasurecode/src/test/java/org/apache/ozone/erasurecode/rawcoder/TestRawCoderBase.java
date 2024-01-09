@@ -20,11 +20,12 @@ package org.apache.ozone.erasurecode.rawcoder;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.ozone.erasurecode.ECChunk;
 import org.apache.ozone.erasurecode.TestCoderBase;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -93,12 +94,8 @@ public abstract class TestRawCoderBase extends TestCoderBase {
     this.usingDirectBuffer = usingDirectBuffer;
     prepareCoders(true);
 
-    try {
-      performTestCoding(baseChunkSize, false, true, false);
-      Assertions.fail("Encoding test with bad input should fail");
-    } catch (Exception e) {
-      // Expected
-    }
+    assertThrows(Exception.class, () -> performTestCoding(baseChunkSize, false, true, false),
+        "Encoding test with bad input should fail");
   }
 
   /**
@@ -109,12 +106,8 @@ public abstract class TestRawCoderBase extends TestCoderBase {
     this.usingDirectBuffer = usingDirectBuffer;
     prepareCoders(true);
 
-    try {
-      performTestCoding(baseChunkSize, false, false, true);
-      Assertions.fail("Decoding test with bad output should fail");
-    } catch (Exception e) {
-      // Expected
-    }
+    assertThrows(Exception.class, () -> performTestCoding(baseChunkSize, false, false, true),
+        "Decoding test with bad output should fail");
   }
 
   /**
@@ -142,19 +135,9 @@ public abstract class TestRawCoderBase extends TestCoderBase {
 
   @Test
   public void testCodingWithErasingTooMany() {
-    try {
-      testCoding(true);
-      Assertions.fail("Decoding test erasing too many should fail");
-    } catch (Exception e) {
-      // Expected
-    }
+    assertThrows(Exception.class, () -> testCoding(true),"Decoding test erasing too many should fail");
 
-    try {
-      testCoding(false);
-      Assertions.fail("Decoding test erasing too many should fail");
-    } catch (Exception e) {
-      // Expected
-    }
+    assertThrows(Exception.class, () -> testCoding(false), "Decoding test erasing too many should fail");
   }
 
   @Test
@@ -188,11 +171,7 @@ public abstract class TestRawCoderBase extends TestCoderBase {
     ECChunk[] clonedDataChunks = cloneChunksWithData(dataChunks);
     markChunks(dataChunks);
 
-    try {
-      encoder.encode(dataChunks, parityChunks);
-    } catch (IOException e) {
-      Assertions.fail("Should not get IOException: " + e.getMessage());
-    }
+    assertDoesNotThrow(() -> encoder.encode(dataChunks, parityChunks));
     dumpChunks("Encoded parity chunks", parityChunks);
 
     //TODOif (!allowChangeInputs) {
@@ -224,12 +203,7 @@ public abstract class TestRawCoderBase extends TestCoderBase {
     //}
 
     dumpChunks("Decoding input chunks", inputChunks);
-    try {
-      decoder.decode(inputChunks, getErasedIndexesForDecoding(),
-          recoveredChunks);
-    } catch (IOException e) {
-      Assertions.fail("Should not get IOException: " + e.getMessage());
-    }
+    assertDoesNotThrow(() -> decoder.decode(inputChunks, getErasedIndexesForDecoding(), recoveredChunks));
     dumpChunks("Decoded/recovered chunks", recoveredChunks);
 
     //TODOif (!allowChangeInputs) {
@@ -315,11 +289,7 @@ public abstract class TestRawCoderBase extends TestCoderBase {
     ECChunk[] dataChunks = prepareDataChunksForEncoding();
     ECChunk[] parityChunks = prepareParityChunksForEncoding();
     ECChunk[] clonedDataChunks = cloneChunksWithData(dataChunks);
-    try {
-      encoder.encode(dataChunks, parityChunks);
-    } catch (IOException e) {
-      Assertions.fail("Should not get IOException: " + e.getMessage());
-    }
+    assertDoesNotThrow(() -> encoder.encode(dataChunks, parityChunks));
     verifyBufferPositionAtEnd(dataChunks);
 
     // verify decode
@@ -328,19 +298,14 @@ public abstract class TestRawCoderBase extends TestCoderBase {
         clonedDataChunks, parityChunks);
     ensureOnlyLeastRequiredChunks(inputChunks);
     ECChunk[] recoveredChunks = prepareOutputChunksForDecoding();
-    try {
-      decoder.decode(inputChunks, getErasedIndexesForDecoding(),
-          recoveredChunks);
-    } catch (IOException e) {
-      Assertions.fail("Should not get IOException: " + e.getMessage());
-    }
+    assertDoesNotThrow(() -> decoder.decode(inputChunks, getErasedIndexesForDecoding(), recoveredChunks));
     verifyBufferPositionAtEnd(inputChunks);
   }
 
   private void verifyBufferPositionAtEnd(ECChunk[] inputChunks) {
     for (ECChunk chunk : inputChunks) {
       if (chunk != null) {
-        Assertions.assertEquals(0, chunk.getBuffer().remaining());
+        assertEquals(0, chunk.getBuffer().remaining());
       }
     }
   }

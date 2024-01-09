@@ -19,7 +19,6 @@
 package org.apache.ozone.compaction.log;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionFileInfoProto;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -28,6 +27,8 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test class for CompactionFileInfo.
@@ -62,7 +63,7 @@ public class TestCompactionFileInfo {
     CompactionFileInfo compactionFileInfo =
         new CompactionFileInfo.Builder(fileName).setStartRange(startRange)
             .setEndRange(endRange).setColumnFamily(columnFamily).build();
-    Assertions.assertNotNull(compactionFileInfo);
+    assertNotNull(compactionFileInfo);
   }
 
   private static Stream<Arguments> compactionFileInfoInvalidScenarios() {
@@ -146,7 +147,7 @@ public class TestCompactionFileInfo {
                                                     String endRange,
                                                     String columnFamily,
                                                     String expectedMessage) {
-    RuntimeException exception = Assertions.assertThrows(RuntimeException.class,
+    RuntimeException exception = assertThrows(RuntimeException.class,
         () -> new CompactionFileInfo.Builder(fileName).setStartRange(startRange)
             .setEndRange(endRange).setColumnFamily(columnFamily).build());
     assertEquals(expectedMessage, exception.getMessage());

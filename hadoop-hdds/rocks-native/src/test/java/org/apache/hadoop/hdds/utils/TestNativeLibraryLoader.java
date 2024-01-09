@@ -19,12 +19,10 @@ package org.apache.hadoop.hdds.utils;
 
 
 import org.apache.ozone.test.tag.Native;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedStatic;
-import org.mockito.Mockito;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -37,6 +35,11 @@ import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LI
 import static org.apache.hadoop.hdds.utils.NativeLibraryLoader.NATIVE_LIB_TMP_DIR;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.same;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.mockStatic;
 
 /**
  * Test class for NativeLibraryLoader.
@@ -58,16 +61,16 @@ public class TestNativeLibraryLoader {
     Map<String, Boolean> libraryLoadedMap = new HashMap<>();
     NativeLibraryLoader loader = new NativeLibraryLoader(libraryLoadedMap);
     try (MockedStatic<NativeLibraryLoader> mockedNativeLibraryLoader =
-             Mockito.mockStatic(NativeLibraryLoader.class,
-                 Mockito.CALLS_REAL_METHODS)) {
+             mockStatic(NativeLibraryLoader.class,
+                 CALLS_REAL_METHODS)) {
       mockedNativeLibraryLoader.when(() ->
               NativeLibraryLoader.getSystemProperty(same(NATIVE_LIB_TMP_DIR)))
           .thenReturn(nativeLibraryDirectoryLocation);
       mockedNativeLibraryLoader.when(() -> NativeLibraryLoader.getInstance())
           .thenReturn(loader);
-      Assertions.assertTrue(NativeLibraryLoader.getInstance()
+      assertTrue(NativeLibraryLoader.getInstance()
           .loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME));
-      Assertions.assertTrue(NativeLibraryLoader
+      assertTrue(NativeLibraryLoader
           .isLibraryLoaded(ROCKS_TOOLS_NATIVE_LIBRARY_NAME));
       // Mocking to force copy random bytes to create a lib file to
       // nativeLibraryDirectoryLocation. But load library will fail.
@@ -84,9 +87,9 @@ public class TestNativeLibraryLoader {
           .getAbsoluteFile().listFiles((dir, name) ->
               name.startsWith(dummyLibraryName) &&
                   name.endsWith(NativeLibraryLoader.getLibOsSuffix()));
-      Assertions.assertNotNull(libPath);
-      Assertions.assertEquals(1, libPath.length);
-      Assertions.assertTrue(libPath[0].delete());
+      assertNotNull(libPath);
+      assertEquals(1, libPath.length);
+      assertTrue(libPath[0].delete());
     }
 
   }
