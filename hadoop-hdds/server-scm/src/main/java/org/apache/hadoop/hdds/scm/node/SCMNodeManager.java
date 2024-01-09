@@ -143,7 +143,7 @@ public class SCMNodeManager implements NodeManager {
   private final String opeState = "OPSTATE";
   private final String comState = "COMSTATE";
   private final String lastHeartbeat = "LASTHEARTBEAT";
-  private final String usedPercent = "USEDPERCENT";
+  private final String usedSpacePercent = "USEDSPACEPERCENT";
   /**
    * Constructs SCM machine Manager.
    */
@@ -1117,7 +1117,7 @@ public class SCMNodeManager implements NodeManager {
                   httpsPort.getValue().toString());
       }
       double usedPec = calculateStoragePercentage(dni);
-      map.put(usedPercent, usedPec + "%");
+      map.put(usedSpacePercent, usedPec + "%");
       nodes.put(hostName, map);
     }
     return nodes;

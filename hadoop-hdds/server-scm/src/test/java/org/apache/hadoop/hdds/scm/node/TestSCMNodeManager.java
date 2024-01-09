@@ -86,6 +86,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -123,6 +124,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.eq;
 
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.slf4j.Logger;
@@ -1587,9 +1590,21 @@ public class TestSCMNodeManager {
     return reports;
   }
 
-  @Test
-  public void testCalculateStoragePercentage()
-      throws IOException, AuthenticationException {
+  private static Stream<Arguments> calculateStoragePercentageScenarios() {
+    return Stream.of(
+        Arguments.of(1000, 600, 10, 60),
+        Arguments.of(1000, 1000, 10, 100),
+        Arguments.of(1000, 1001, 10, 100),
+        Arguments.of(0, 0, 0, 0),
+        Arguments.of(1010, 547, 5, 54.16)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("calculateStoragePercentageScenarios")
+  public void testCalculateStoragePercentage(long capacity,
+      long used, int volumeCount, double targetUsedPerc)
+          throws AuthenticationException, IOException {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
         MILLISECONDS);
@@ -1600,52 +1615,19 @@ public class TestSCMNodeManager {
       LayoutVersionProto layoutInfo = toLayoutVersionProto(
           versionManager.getMetadataLayoutVersion(),
           versionManager.getSoftwareLayoutVersion());
-      // Generate the first DataNode
-      DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
-      UUID dnId1 = dn1.getUuid();
-      int volumeCount = 10;
-      List<StorageReportProto> reports1 = generateStorageReportProto(
-          volumeCount, dnId1, 1000, 600);
-      nodeManager.register(dn1, HddsTestUtils.createNodeReport(reports1,
-          emptyList()), null);
-      nodeManager.processHeartbeat(dn1, layoutInfo);
-      // Generate the 2nd DataNode
-      DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
-      UUID dnId2 = dn2.getUuid();
-      List<StorageReportProto> reports2 = generateStorageReportProto(
-          volumeCount, dnId2, 1000, 1000);
-      nodeManager.register(dn2, HddsTestUtils.createNodeReport(reports2,
-          emptyList()), null);
-      nodeManager.processHeartbeat(dn2, layoutInfo);
-      // Generate the 3rd DataNode
-      DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
-      UUID dnId3 = dn3.getUuid();
-      List<StorageReportProto> reports3 = generateStorageReportProto(
-          volumeCount, dnId3, 1000, 1001);
-      nodeManager.register(dn3, HddsTestUtils.createNodeReport(reports3,
-          emptyList()), null);
-      nodeManager.processHeartbeat(dn3, layoutInfo);
-      // Generate the 4th DataNode
-      DatanodeDetails dn4 = MockDatanodeDetails.randomDatanodeDetails();
-      UUID dnId4 = dn4.getUuid();
-      nodeManager.register(dn4, null, null);
-      nodeManager.processHeartbeat(dn4, layoutInfo);
-
+      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      UUID dnId = dn.getUuid();
+      List<StorageReportProto> reports = volumeCount > 0 ?
+          generateStorageReportProto(volumeCount, dnId, capacity, used) : null;
+      nodeManager.register(dn, reports != null ?
+          HddsTestUtils.createNodeReport(reports, emptyList()) : null, null);
+      nodeManager.processHeartbeat(dn, layoutInfo);
       eventQueue.processAll(8000L);
       NodeStateManager nodeStateManager = nodeManager.getNodeStateManager();
       List<DatanodeInfo> dataNodeInfoList = nodeStateManager.getAllNodes();
-      for (DatanodeInfo datanodeInfo : dataNodeInfoList) {
-        double usedPerc = nodeManager.calculateStoragePercentage(datanodeInfo);
-        if (datanodeInfo.getUuid().toString().equals(dnId1.toString())) {
-          assertEquals(usedPerc, 60);
-        } else if (datanodeInfo.getUuid().toString().equals(dnId2.toString())) {
-          assertEquals(usedPerc, 100);
-        } else if (datanodeInfo.getUuid().toString().equals(dnId3.toString())) {
-          assertEquals(usedPerc, 100);
-        } else if (datanodeInfo.getUuid().toString().equals(dnId4.toString())) {
-          assertEquals(usedPerc, 0);
-        }
-      }
+      double usedPerc = nodeManager.calculateStoragePercentage(
+          dataNodeInfoList.get(0));
+      assertEquals(usedPerc, targetUsedPerc);
     }
   }
 
