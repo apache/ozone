@@ -1192,7 +1192,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   @Override
   public ListOpenFilesResult listOpenFiles(BucketLayout bucketLayout,
-                                           long maxKeys,
+                                           int maxKeys,
                                            String dbOpenKeyPrefix,
                                            boolean hasContToken,
                                            String dbContTokenPrefix)

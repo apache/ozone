@@ -1531,7 +1531,7 @@ message CancelPrepareResponse {
 
 message ListOpenFilesRequest {
   optional string path = 1;
-  optional uint64 count = 2;
+  optional uint32 count = 2;
   optional string token = 3;
 }
 

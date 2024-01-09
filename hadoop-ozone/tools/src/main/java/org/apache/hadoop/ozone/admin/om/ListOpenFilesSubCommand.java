@@ -82,7 +82,7 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
       description = "Maximum number of items to list",
       defaultValue = "100"
   )
-  private long limit;
+  private int limit;
 
   @CommandLine.Option(
       names = {"-s", "--start"},

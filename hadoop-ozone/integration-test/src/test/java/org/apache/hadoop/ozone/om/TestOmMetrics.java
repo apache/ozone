@@ -287,7 +287,7 @@ public class TestOmMetrics {
     doKeyOps(keyArgs);
 
     MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
-    assertCounter("NumKeyOps", 7L, omMetrics);
+    assertCounter("NumKeyOps", 8L, omMetrics);
     assertCounter("NumKeyAllocate", 1L, omMetrics);
     assertCounter("NumKeyLookup", 1L, omMetrics);
     assertCounter("NumKeyDeletes", 1L, omMetrics);
@@ -295,12 +295,13 @@ public class TestOmMetrics {
     assertCounter("NumTrashKeyLists", 1L, omMetrics);
     assertCounter("NumKeys", 0L, omMetrics);
     assertCounter("NumInitiateMultipartUploads", 1L, omMetrics);
+    assertCounter("NumListOpenFiles", 1L, omMetrics);
 
     keyArgs = createKeyArgs(volumeName, bucketName,
         new ECReplicationConfig("rs-3-2-1024K"));
     doKeyOps(keyArgs);
     omMetrics = getMetrics("OMMetrics");
-    assertCounter("NumKeyOps", 14L, omMetrics);
+    assertCounter("NumKeyOps", 16L, omMetrics);
     assertCounter("EcKeyCreateTotal", 1L, omMetrics);
 
     keyArgs = createKeyArgs(volumeName, bucketName,
@@ -352,7 +353,7 @@ public class TestOmMetrics {
     doKeyOps(keyArgs);
 
     omMetrics = getMetrics("OMMetrics");
-    assertCounter("NumKeyOps", 28L, omMetrics);
+    assertCounter("NumKeyOps", 31L, omMetrics);
     assertCounter("NumKeyAllocate", 6L, omMetrics);
     assertCounter("NumKeyLookup", 3L, omMetrics);
     assertCounter("NumKeyDeletes", 4L, omMetrics);
@@ -692,6 +693,11 @@ public class TestOmMetrics {
 
     try {
       writeClient.initiateMultipartUpload(keyArgs);
+    } catch (IOException ignored) {
+    }
+
+    try {
+      writeClient.listOpenFiles("", 100, "");
     } catch (IOException ignored) {
     }
   }

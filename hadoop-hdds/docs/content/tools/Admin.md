@@ -68,7 +68,7 @@ Some of those subcommand usages has been detailed in their dedicated feature doc
 
 List open files admin command lists open keys in Ozone Manager's `OpenKeyTable`.
 Works for all bucket types.
-Argument `--prefix` could point to root (`/`), path to a bucket (`/vol1/buck`) or a key prefix.
+Argument `--prefix` could be root (`/`), path to a bucket (`/vol1/buck`) or a key prefix (for FSO buckets the key prefix could contain parent object ID). But it can't be a volume.
 
 ```bash
 $ ozone admin om lof --help

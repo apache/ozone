@@ -3193,7 +3193,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public ListOpenFilesResult listOpenFiles(String path,
-                                           long maxKeys,
+                                           int maxKeys,
                                            String contToken)
       throws IOException {
 

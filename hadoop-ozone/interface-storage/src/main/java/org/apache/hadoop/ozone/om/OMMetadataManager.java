@@ -222,7 +222,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @throws IOException
    */
   ListOpenFilesResult listOpenFiles(BucketLayout bucketLayout,
-                                    long maxKeys,
+                                    int maxKeys,
                                     String dbOpenKeyPrefix,
                                     boolean hasContToken,
                                     String dbContTokenPrefix)

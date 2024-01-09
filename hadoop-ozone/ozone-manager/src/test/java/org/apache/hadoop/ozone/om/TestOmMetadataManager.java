@@ -634,7 +634,7 @@ public class TestOmMetadataManager {
 
     // Without pagination
     ListOpenFilesResult res = omMetadataManager.listOpenFiles(
-        bucketLayout, 100L, dbPrefix, false, dbPrefix);
+        bucketLayout, 100, dbPrefix, false, dbPrefix);
 
     assertEquals(numOpenKeys, res.getTotalOpenKeyCount());
     assertEquals(false, res.hasMore());
@@ -649,11 +649,10 @@ public class TestOmMetadataManager {
     }
 
     // With pagination
-    long pageSize = 2;
-    int numExpectedKeys = (int)pageSize;
+    int pageSize = 2;
+    int numExpectedKeys = pageSize;
     res = omMetadataManager.listOpenFiles(
         bucketLayout, pageSize, dbPrefix, false, dbPrefix);
-
     // total open key count should still be 3
     assertEquals(numOpenKeys, res.getTotalOpenKeyCount());
     // hasMore should have been set
@@ -668,21 +667,9 @@ public class TestOmMetadataManager {
     }
 
     // Get the second page
-    OmKeyInfo lastKeyInfo = keySessionList.get((int)pageSize - 1).getKeyInfo();
-    String dbContTokenPrefix;
-    if (bucketLayout.isFileSystemOptimized()) {
-      dbContTokenPrefix = OM_KEY_PREFIX + volumeId +
-          OM_KEY_PREFIX + bucketId +
-          OM_KEY_PREFIX + lastKeyInfo.getPath();
-    } else {
-      dbContTokenPrefix = OM_KEY_PREFIX + volumeName +
-          OM_KEY_PREFIX + bucketName +
-          OM_KEY_PREFIX + lastKeyInfo.getFileName();
-    }
     res = omMetadataManager.listOpenFiles(
-        bucketLayout, pageSize, dbPrefix, true, dbContTokenPrefix);
-
-    numExpectedKeys = numOpenKeys - (int)pageSize;
+        bucketLayout, pageSize, dbPrefix, true, res.getContinuationToken());
+    numExpectedKeys = numOpenKeys - pageSize;
     // total open key count should still be 3
     assertEquals(numOpenKeys, res.getTotalOpenKeyCount());
     assertEquals(false, res.hasMore());
