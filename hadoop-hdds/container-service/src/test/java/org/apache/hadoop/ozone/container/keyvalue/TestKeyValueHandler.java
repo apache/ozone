@@ -251,7 +251,7 @@ public class TestKeyValueHandler {
         getDummyCommandRequestProto(ContainerProtos.Type.FinalizeBlock);
     KeyValueHandler
         .dispatchRequest(handler, finalizeBlock, container, null);
-    Mockito.verify(handler, times(1)).handleFinalizeBlock(
+    verify(handler, times(1)).handleFinalizeBlock(
         any(ContainerCommandRequestProto.class), any());
   }
 

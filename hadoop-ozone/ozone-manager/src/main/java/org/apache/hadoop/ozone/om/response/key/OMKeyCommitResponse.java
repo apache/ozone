@@ -84,7 +84,7 @@ public class OMKeyCommitResponse extends OmKeyResponse {
     // Delete from OpenKey table
     if (!isHSync()) {
       omMetadataManager.getOpenKeyTable(getBucketLayout())
-              .deleteWithBatch(batchOperation, openKeyName);
+          .deleteWithBatch(batchOperation, openKeyName);
     }
 
     omMetadataManager.getKeyTable(getBucketLayout())

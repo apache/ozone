@@ -4592,9 +4592,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public boolean recoverLease(String volumeName, String bucketName,
-                              String keyName) {
-    return false;
+  public List<OmKeyInfo> recoverLease(String volumeName, String bucketName, String keyName) {
+    return null;
   }
 
   @Override

@@ -69,6 +69,7 @@ import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -1353,14 +1354,21 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   @Override
-  public boolean recoverLease(final String pathStr) throws IOException {
-    incrementCounter(Statistic.INVOCATION_RECOVER_LEASE, 1);
+  public List<OmKeyInfo> recoverFilePrepare(final String pathStr) throws IOException {
+    incrementCounter(Statistic.INVOCATION_RECOVER_FILE_PREPARE, 1);
     OFSPath ofsPath = new OFSPath(pathStr, config);
 
     OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
     OzoneBucket bucket = getBucket(ofsPath, false);
     return ozoneClient.getProxy().getOzoneManagerClient().recoverLease(
             volume.getName(), bucket.getName(), ofsPath.getKeyName());
+  }
+
+  @Override
+  public void recoverFile(OmKeyArgs keyArgs) throws IOException {
+    incrementCounter(Statistic.INVOCATION_RECOVER_FILE, 1);
+
+    ozoneClient.getProxy().getOzoneManagerClient().recoverKey(keyArgs, 0L);
   }
 
   @Override

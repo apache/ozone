@@ -77,18 +77,18 @@ public class OMKeyCommitResponseWithFSO extends OMKeyCommitResponse {
     // Delete from OpenKey table if commit
     if (!this.isHSync()) {
       omMetadataManager.getOpenKeyTable(getBucketLayout())
-              .deleteWithBatch(batchOperation, getOpenKeyName());
+          .deleteWithBatch(batchOperation, getOpenKeyName());
     }
 
     OMFileRequest.addToFileTable(omMetadataManager, batchOperation,
-            getOmKeyInfo(), volumeId, getOmBucketInfo().getObjectID());
+        getOmKeyInfo(), volumeId, getOmBucketInfo().getObjectID());
 
     updateDeletedTable(omMetadataManager, batchOperation);
 
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
-            omMetadataManager.getBucketKey(getOmBucketInfo().getVolumeName(),
-                    getOmBucketInfo().getBucketName()), getOmBucketInfo());
+        omMetadataManager.getBucketKey(getOmBucketInfo().getVolumeName(),
+            getOmBucketInfo().getBucketName()), getOmBucketInfo());
   }
 
   @Override
