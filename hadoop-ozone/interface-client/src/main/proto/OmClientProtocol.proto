@@ -1536,24 +1536,14 @@ message ListOpenFilesRequest {
 }
 
 message ListOpenFilesResponse {
-  // size of openKeyTable (may not be reliable due to how RocksDB returns count)
-  optional uint64 globalTotal = 1;
+  // size of openKeyTable and openFileTable combined
+  optional uint64 globalTotal = 1;  // TODO: Rename to totalOpenKeyCount
   // if true, indicates that there are remaining entries under the path
   optional bool hasMore = 2;
   // result
   repeated uint64 clientID = 3;
   repeated KeyInfo keyInfo = 4;
-  // row count with the path prefix
-//  optional uint64 totalUnderPath = 2;
-  // remaining rows that are not returned after this batch of result
-//  optional uint64 remainingUnderPath = 3;
-//  repeated OpenKeyInfoWithClientID openFiles = 4;
 }
-
-//message OpenKeyInfoWithClientID {
-//  optional uint64 clientID = 1;
-//  optional KeyInfo keyInfo = 2;
-//}
 
 message ServicePort {
     enum Type {

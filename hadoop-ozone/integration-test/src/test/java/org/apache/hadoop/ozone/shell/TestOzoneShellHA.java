@@ -586,14 +586,15 @@ public class TestOzoneShellHA {
       streams[i].write(1);
     }
 
+    String path = "/" +  volumeName + "/" + bucketName;
     try {
-      // Wait for flush to DB table
+      // Wait for DB flush
       cluster.getOzoneManager().awaitDoubleBufferFlush();
 
-      String[] args = new String[] {"om", "listopenfiles",
+      String[] args = new String[] {"om", "lof",
           "-id", omServiceId,
           "-l", String.valueOf(numKeys + 1),  // pagination
-          "-p", "/volumelof/buck1"};
+          "-p", path};
       // Run listopenfiles
       execute(ozoneAdminShell, args);
       String cmdRes = getStdOut();
@@ -603,10 +604,10 @@ public class TestOzoneShellHA {
       }
 
       // Try pagination
-      args = new String[] {"om", "listopenfiles",
+      args = new String[] {"om", "lof",
           "-id", omServiceId,
           "-l", String.valueOf(pageSize),  // pagination
-          "-p", "/volumelof/buck1"};
+          "-p", path};
       execute(ozoneAdminShell, args);
       cmdRes = getStdOut();
 
@@ -627,10 +628,10 @@ public class TestOzoneShellHA {
       String contToken =
           nextCmd.substring(nextCmd.lastIndexOf(kw) + kw.length());
 
-      args = new String[] {"om", "listopenfiles",
+      args = new String[] {"om", "lof",
           "-id", omServiceId,
           "-l", String.valueOf(pageSize),  // pagination
-          "-p", "/volumelof/buck1",
+          "-p", path,
           "-s", contToken};
       execute(ozoneAdminShell, args);
       cmdRes = getStdOut();
@@ -646,6 +647,8 @@ public class TestOzoneShellHA {
 
       // hsync last key
       streams[numKeys - 1].hsync();
+      // Wait for flush
+      cluster.getOzoneManager().awaitDoubleBufferFlush();
 
       execute(ozoneAdminShell, args);
       cmdRes = getStdOut();
@@ -660,7 +663,6 @@ public class TestOzoneShellHA {
       }
     }
 
-    // TODO: In UT, test with OBS/LEGACY bucket
   }
 
   /**

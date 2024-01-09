@@ -24,11 +24,13 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -49,6 +51,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import java.io.File;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
@@ -61,6 +64,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
@@ -556,6 +560,141 @@ public class TestOmMetadataManager {
 
 
 
+  }
+
+  @Test
+  public void testListOpenFilesFSO() throws Exception {
+    testListOpenFiles(BucketLayout.FILE_SYSTEM_OPTIMIZED);
+  }
+
+  @Test
+  public void testListOpenFilesOBS() throws Exception {
+    testListOpenFiles(BucketLayout.OBJECT_STORE);
+  }
+
+  @Test
+  public void testListOpenFilesLegacy() throws Exception {
+    // OBS and LEGACY should share the same internal structure for the most part
+    // still, testing both here for the sake of completeness
+    testListOpenFiles(BucketLayout.LEGACY);
+  }
+
+  /**
+   * Tests inner impl of listOpenFiles with different bucket types with and
+   * without pagination. NOTE: This UT does NOT test hsync in this since hsync
+   * status check is done purely on the client side.
+   * @param bucketLayout BucketLayout
+   */
+  public void testListOpenFiles(BucketLayout bucketLayout) throws Exception {
+    final long clientID = 1000L;
+
+    String volumeName = "volume-lof";
+    String bucketName = "bucket-" + bucketLayout.name().toLowerCase();
+    String keyPrefix = "key";
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, bucketLayout);
+
+    long volumeId = -1L, bucketId = -1L;
+    if (bucketLayout.isFileSystemOptimized()) {
+      volumeId = omMetadataManager.getVolumeId(volumeName);
+      bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
+    }
+
+    int numOpenKeys = 3;
+    List<String> openKeys = new ArrayList<>();
+    for (int i = 0; i < numOpenKeys; i++) {
+      final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+          bucketName, keyPrefix + i, HddsProtos.ReplicationType.RATIS,
+          HddsProtos.ReplicationFactor.ONE, 0L, Time.now());
+
+      final String dbOpenKeyName;
+      if (bucketLayout.isFileSystemOptimized()) {
+        keyInfo.setParentObjectID(i);
+        keyInfo.setFileName(OzoneFSUtils.getFileName(keyInfo.getKeyName()));
+        OMRequestTestUtils.addFileToKeyTable(true, false,
+            keyInfo.getFileName(), keyInfo, clientID, 0L, omMetadataManager);
+        dbOpenKeyName = omMetadataManager.getOpenFileName(volumeId, bucketId,
+            keyInfo.getParentObjectID(), keyInfo.getFileName(), clientID);
+      } else {
+        OMRequestTestUtils.addKeyToTable(true, false,
+            keyInfo, clientID, 0L, omMetadataManager);
+        dbOpenKeyName = omMetadataManager.getOpenKey(volumeName, bucketName,
+            keyInfo.getKeyName(), clientID);
+      }
+      openKeys.add(dbOpenKeyName);
+    }
+
+    String dbPrefix;
+    if (bucketLayout.isFileSystemOptimized()) {
+      dbPrefix = omMetadataManager.getOzoneKeyFSO(volumeName, bucketName, "");
+    } else {
+      dbPrefix = omMetadataManager.getOzoneKey(volumeName, bucketName, "");
+    }
+
+    // Without pagination
+    ListOpenFilesResult res = omMetadataManager.listOpenFiles(
+        bucketLayout, 100L, dbPrefix, false, dbPrefix);
+
+    assertEquals(numOpenKeys, res.getTotalOpenKeyCount());
+    assertEquals(false, res.hasMore());
+    List<OpenKeySession> keySessionList = res.getOpenKeys();
+    assertEquals(numOpenKeys, keySessionList.size());
+    // Verify that every single open key shows up in the result, and in order
+    for (int i = 0; i < numOpenKeys; i++) {
+      OpenKeySession keySession = keySessionList.get(i);
+      assertEquals(keyPrefix + i, keySession.getKeyInfo().getKeyName());
+      assertEquals(clientID, keySession.getId());
+      assertEquals(0, keySession.getOpenVersion());
+    }
+
+    // With pagination
+    long pageSize = 2;
+    int numExpectedKeys = (int)pageSize;
+    res = omMetadataManager.listOpenFiles(
+        bucketLayout, pageSize, dbPrefix, false, dbPrefix);
+
+    // total open key count should still be 3
+    assertEquals(numOpenKeys, res.getTotalOpenKeyCount());
+    // hasMore should have been set
+    assertEquals(true, res.hasMore());
+    keySessionList = res.getOpenKeys();
+    assertEquals(numExpectedKeys, keySessionList.size());
+    for (int i = 0; i < numExpectedKeys; i++) {
+      OpenKeySession keySession = keySessionList.get(i);
+      assertEquals(keyPrefix + i, keySession.getKeyInfo().getKeyName());
+      assertEquals(clientID, keySession.getId());
+      assertEquals(0, keySession.getOpenVersion());
+    }
+
+    // Get the second page
+    OmKeyInfo lastKeyInfo = keySessionList.get((int)pageSize - 1).getKeyInfo();
+    String dbContTokenPrefix;
+    if (bucketLayout.isFileSystemOptimized()) {
+      dbContTokenPrefix = OM_KEY_PREFIX + volumeId +
+          OM_KEY_PREFIX + bucketId +
+          OM_KEY_PREFIX + lastKeyInfo.getPath();
+    } else {
+      dbContTokenPrefix = OM_KEY_PREFIX + volumeName +
+          OM_KEY_PREFIX + bucketName +
+          OM_KEY_PREFIX + lastKeyInfo.getFileName();
+    }
+    res = omMetadataManager.listOpenFiles(
+        bucketLayout, pageSize, dbPrefix, true, dbContTokenPrefix);
+
+    numExpectedKeys = numOpenKeys - (int)pageSize;
+    // total open key count should still be 3
+    assertEquals(numOpenKeys, res.getTotalOpenKeyCount());
+    assertEquals(false, res.hasMore());
+    keySessionList = res.getOpenKeys();
+    assertEquals(numExpectedKeys, keySessionList.size());
+    for (int i = 0; i < numExpectedKeys; i++) {
+      OpenKeySession keySession = keySessionList.get(i);
+      assertEquals(keyPrefix + (pageSize + i),
+          keySession.getKeyInfo().getKeyName());
+      assertEquals(clientID, keySession.getId());
+      assertEquals(0, keySession.getOpenVersion());
+    }
   }
 
   private static BucketLayout getDefaultBucketLayout() {

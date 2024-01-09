@@ -846,6 +846,18 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
+  public String getOzoneKeyFSO(String volumeName,
+                               String bucketName,
+                               String keyPrefix)
+      throws IOException {
+    final long volumeId = getVolumeId(volumeName);
+    final long bucketId = getBucketId(volumeName, bucketName);
+    // FSO keyPrefix could look like: -9223372036854774527/key1
+    return getOzoneKey(Long.toString(volumeId),
+        Long.toString(bucketId), keyPrefix);
+  }
+
+  @Override
   public String getOzoneDirKey(String volume, String bucket, String key) {
     key = OzoneFSUtils.addTrailingSlashIfNeeded(key);
     return getOzoneKey(volume, bucket, key);
@@ -1245,7 +1257,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     return new ListOpenFilesResult(
         openKeySessionList,
         hasMore,
-        getOpenKeyCount());
+        getTotalOpenKeyCount());
   }
 
   /**
@@ -1257,6 +1269,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                                                 KeyValue<String, OmKeyInfo>>
                                                 keyIter)
       throws IOException {
+    // TODO: do keyTable.get() directly
     KeyValue<String, OmKeyInfo> kv = keyIter.seek(dbKey);
     if (kv != null && kv.getKey().equals(dbKey)) {
       // The same key in OpenKeyTable also exists in KeyTable, indicating
@@ -1826,7 +1839,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public long getOpenKeyCount() throws IOException {
+  public long getTotalOpenKeyCount() throws IOException {
     // Get an estimated key count of OpenKeyTable + OpenFileTable
     return openKeyTable.getEstimatedKeyCount()
         + openFileTable.getEstimatedKeyCount();

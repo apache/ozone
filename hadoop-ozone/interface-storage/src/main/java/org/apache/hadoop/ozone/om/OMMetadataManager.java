@@ -125,9 +125,12 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @param key    - key name
    * @return DB key as String.
    */
-
   String getOzoneKey(String volume, String bucket, String key);
 
+  /**
+   * Get DB key for a key or prefix in an FSO bucket given existing
+   * volume and bucket names.
+   */
   String getOzoneKeyFSO(String volumeName,
                         String bucketName,
                         String keyPrefix)

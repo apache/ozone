@@ -409,7 +409,14 @@ public interface OzoneManagerProtocol
 
   ServiceInfoEx getServiceInfo() throws IOException;
 
-  // TODO: Rename arg list
+  /**
+   * List open files in OM.
+   * @param path root "/", path to a bucket, key path, or key prefix
+   * @param maxKeys Limit the number of keys that can be returned in this batch.
+   * @param contToken Continuation token.
+   * @return ListOpenFilesResult
+   * @throws IOException
+   */
   ListOpenFilesResult listOpenFiles(String path, long maxKeys, String contToken)
       throws IOException;
 

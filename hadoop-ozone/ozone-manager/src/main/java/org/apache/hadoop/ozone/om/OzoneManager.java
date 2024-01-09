@@ -3200,7 +3200,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metrics.incNumListOpenFiles();
     checkAdminUserPrivilege("list open files.");
 
-    // Mark as final to make sure they are assigned once and only once in
+    // Using final to make sure they are assigned once and only once in
     // every branch.
     final String dbOpenKeyPrefix, dbContTokenPrefix;
     final String volumeName, bucketName;
@@ -3249,12 +3249,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       bucketLayout = bucketInfo.getBucketLayout();
       switch (bucketLayout) {
       case FILE_SYSTEM_OPTIMIZED:
-        dbOpenKeyPrefix = getDbKeyFSO(volumeName, bucketName, keyPrefix);
+        dbOpenKeyPrefix = metadataManager.getOzoneKeyFSO(
+            volumeName, bucketName, keyPrefix);
         break;
       case OBJECT_STORE:
       case LEGACY:
-        dbOpenKeyPrefix =
-            metadataManager.getOzoneKey(volumeName, bucketName, keyPrefix);
+        dbOpenKeyPrefix = metadataManager.getOzoneKey(
+            volumeName, bucketName, keyPrefix);
         break;
       default:
         metrics.incNumListOpenFilesFails();
@@ -3291,8 +3292,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
         final String ctKeyPrefix = tokenizer.hasMoreTokens() ?
             tokenizer.nextToken("").substring(1) : "";
-        dbContTokenPrefix =
-            getDbKeyFSO(ctVolumeName, ctBucketName, ctKeyPrefix);
+        dbContTokenPrefix = metadataManager.getOzoneKeyFSO(
+            ctVolumeName, ctBucketName, ctKeyPrefix);
       } else {
         dbContTokenPrefix = contToken;
       }
@@ -3302,21 +3303,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return metadataManager.listOpenFiles(
         bucketLayout, maxKeys, dbOpenKeyPrefix,
         !StringUtils.isEmpty(contToken), dbContTokenPrefix);
-  }
-
-  /**
-   * For FSO buckets, retrieve object ID for volume name and bucket name,
-   * and return the dbKey prefixed by volume and bucket object ID.
-   */
-  private String getDbKeyFSO(String volumeName,
-                             String bucketName,
-                             String keyPrefix)
-      throws IOException {
-    final long volumeId = metadataManager.getVolumeId(volumeName);
-    final long bucketId = metadataManager.getBucketId(volumeName, bucketName);
-    // FSO keyPrefix could look like: -9223372036854774527/key1
-    return metadataManager.getOzoneKey(
-        Long.toString(volumeId), Long.toString(bucketId), keyPrefix);
   }
 
   @Override
