@@ -307,7 +307,12 @@ public class SnapshotCache implements ReferenceCountedCallback {
           rcOmSnapshot, omSnapshot.getSnapshotTableKey());
 
       final String key = omSnapshot.getSnapshotTableKey();
-      dbMap.computeIfPresent(key, (k, v) -> {
+      dbMap.compute(key, (k, v) -> {
+        if (v == null) {
+          throw new IllegalStateException("Key '" + k + "' does not exist in cache. The RocksDB " +
+              "instance of the Snapshot may not be closed properly.");
+        }
+
         // Sanity check
         Preconditions.checkState(rcOmSnapshot == v,
             "Cache map entry removal failure. The cache is in an inconsistent "
