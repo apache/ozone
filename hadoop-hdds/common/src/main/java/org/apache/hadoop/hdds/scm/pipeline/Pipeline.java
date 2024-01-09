@@ -81,7 +81,7 @@ public final class Pipeline {
   private Map<DatanodeDetails, Long> nodeStatus;
   private Map<DatanodeDetails, Integer> replicaIndexes;
   // nodes with ordered distance to client
-  private ThreadLocal<List<DatanodeDetails>> nodesInOrder = new ThreadLocal<>();
+  private List<DatanodeDetails> nodesInOrder = new ArrayList<>();
   // Current reported Leader for the pipeline
   private UUID leaderId;
   // Timestamp for pipeline upon creation
@@ -297,11 +297,11 @@ public final class Pipeline {
     if (excluded == null) {
       excluded = Collections.emptySet();
     }
-    if (nodesInOrder.get() == null || nodesInOrder.get().isEmpty()) {
+    if (nodesInOrder.isEmpty()) {
       LOG.debug("Nodes in order is empty, delegate to getFirstNode");
       return getFirstNode(excluded);
     }
-    for (DatanodeDetails d : nodesInOrder.get()) {
+    for (DatanodeDetails d : nodesInOrder) {
       if (!excluded.contains(d)) {
         return d;
       }
@@ -326,15 +326,19 @@ public final class Pipeline {
   }
 
   public void setNodesInOrder(List<DatanodeDetails> nodes) {
-    nodesInOrder.set(nodes);
+    nodesInOrder.clear();
+    if (null == nodes) {
+      return;
+    }
+    nodesInOrder.addAll(nodes);
   }
 
   public List<DatanodeDetails> getNodesInOrder() {
-    if (nodesInOrder.get() == null || nodesInOrder.get().isEmpty()) {
+    if (nodesInOrder.isEmpty()) {
       LOG.debug("Nodes in order is empty, delegate to getNodes");
       return getNodes();
     }
-    return nodesInOrder.get();
+    return nodesInOrder;
   }
 
   void reportDatanode(DatanodeDetails dn) throws IOException {
@@ -412,8 +416,8 @@ public final class Pipeline {
 
     // To save the message size on wire, only transfer the node order based on
     // network topology
-    List<DatanodeDetails> nodes = nodesInOrder.get();
-    if (nodes != null && !nodes.isEmpty()) {
+    List<DatanodeDetails> nodes = nodesInOrder;
+    if (!nodes.isEmpty()) {
       for (int i = 0; i < nodes.size(); i++) {
         Iterator<DatanodeDetails> it = nodeStatus.keySet().iterator();
         for (int j = 0; j < nodeStatus.keySet().size(); j++) {
@@ -564,7 +568,7 @@ public final class Pipeline {
       this.replicationConfig = pipeline.replicationConfig;
       this.state = pipeline.state;
       this.nodeStatus = pipeline.nodeStatus;
-      this.nodesInOrder = pipeline.nodesInOrder.get();
+      this.nodesInOrder = pipeline.nodesInOrder;
       this.leaderId = pipeline.getLeaderId();
       this.creationTimestamp = pipeline.getCreationTimestamp();
       this.suggestedLeaderId = pipeline.getSuggestedLeaderId();
