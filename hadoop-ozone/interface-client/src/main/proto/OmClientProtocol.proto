@@ -524,6 +524,8 @@ enum Status {
     S3_SECRET_ALREADY_EXISTS = 92;
     
     INVALID_PATH = 93;
+    KEY_UNDER_LEASE_RECOVERY = 94;
+    KEY_ALREADY_CLOSED = 95;
 }
 
 /**
@@ -1413,6 +1415,7 @@ message CommitKeyRequest {
     required KeyArgs keyArgs = 1;
     required uint64 clientID = 2;
     optional bool hsync = 3;
+    optional bool recovery = 4;
 }
 
 message CommitKeyResponse {
@@ -2070,7 +2073,8 @@ message RecoverLeaseRequest {
 }
 
 message RecoverLeaseResponse {
-  optional bool response = 1;
+  optional KeyInfo keyInfo = 1;
+  optional KeyInfo openKeyInfo = 2;
 }
 
 message SetTimesRequest {

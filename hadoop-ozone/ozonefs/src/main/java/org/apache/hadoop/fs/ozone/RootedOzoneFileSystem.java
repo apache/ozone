@@ -29,11 +29,14 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderTokenIssuer;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.StorageStatistics;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.security.token.DelegationTokenIssuer;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.util.List;
 
 /**
  * The Rooted Ozone Filesystem (OFS) implementation.
@@ -128,7 +131,16 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
     LOG.trace("recoverLease() path:{}", f);
     Path qualifiedPath = makeQualified(f);
     String key = pathToKey(qualifiedPath);
-    return getAdapter().recoverLease(key);
+    List<OmKeyInfo> infoList = getAdapter().recoverFilePrepare(key);
+    // TODO: query DN to get the final block length
+    OmKeyInfo keyInfo = infoList.get(0);
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(keyInfo.getVolumeName())
+        .setBucketName(keyInfo.getBucketName()).setKeyName(keyInfo.getKeyName())
+        .setReplicationConfig(keyInfo.getReplicationConfig()).setDataSize(keyInfo.getDataSize())
+        .setLocationInfoList(keyInfo.getLatestVersionLocations().getLocationList())
+        .build();
+    getAdapter().recoverFile(keyArgs);
+    return true;
   }
 
   @Override

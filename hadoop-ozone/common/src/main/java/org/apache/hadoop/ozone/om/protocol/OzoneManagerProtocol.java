@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.UUID;
 
 import javax.annotation.Nonnull;
+
 import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -269,6 +270,19 @@ public interface OzoneManagerProtocol
             "this to be implemented, as write requests use a new approach.");
   }
 
+  /**
+   * Recovery and commit a key. This will make the change from the client visible. The client
+   * is identified by the clientID.
+   *
+   * @param args the key to commit
+   * @param clientID the client identification
+   * @throws IOException
+   */
+  default void recoverKey(OmKeyArgs args, long clientID)
+      throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach.");
+  }
 
   /**
    * Allocate a new block, it is assumed that the client is having an open key
@@ -1086,11 +1100,10 @@ public interface OzoneManagerProtocol
    * @param volumeName - The volume name.
    * @param bucketName - The bucket name.
    * @param keyName - The key user want to recover.
-   * @return true if the file is already closed
+   * @return OmKeyInfo KeyInfo is file under recovery
    * @throws IOException if an error occurs
    */
-  boolean recoverLease(String volumeName, String bucketName,
-                              String keyName) throws IOException;
+  List<OmKeyInfo> recoverLease(String volumeName, String bucketName, String keyName) throws IOException;
 
   /**
    * Update modification time and access time of a file.
