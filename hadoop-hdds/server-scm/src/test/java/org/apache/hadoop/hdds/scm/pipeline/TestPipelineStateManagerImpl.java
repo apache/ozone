@@ -41,7 +41,6 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -54,6 +53,10 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -116,7 +119,7 @@ public class TestPipelineStateManagerImpl {
 
   @Test
   public void testAddAndGetPipeline() throws IOException, TimeoutException {
-    Exception e = Assertions.assertThrows(SCMException.class,
+    Exception e = assertThrows(SCMException.class,
         () -> stateManager.addPipeline(createDummyPipeline(0)
             .getProtobufMessage(ClientVersion.CURRENT_VERSION)));
     // replication factor and number of nodes in the pipeline do not match
@@ -131,12 +134,12 @@ public class TestPipelineStateManagerImpl {
       stateManager.addPipeline(pipelineProto);
 
       // Cannot add a pipeline twice
-      e = Assertions.assertThrows(SCMException.class,
+      e = assertThrows(SCMException.class,
           () -> stateManager.addPipeline(pipelineProto));
       assertThat(e.getMessage()).contains("Duplicate pipeline ID");
 
       // verify pipeline returned is same
-      Assertions.assertEquals(pipeline.getId(),
+      assertEquals(pipeline.getId(),
           stateManager.getPipeline(pipeline.getId()).getId());
     } finally {
       // clean up
@@ -148,7 +151,7 @@ public class TestPipelineStateManagerImpl {
   @Test
   public void testGetPipelines() throws IOException, TimeoutException {
     // In start there should be no pipelines
-    Assertions.assertTrue(stateManager.getPipelines().isEmpty());
+    assertTrue(stateManager.getPipelines().isEmpty());
 
     Set<HddsProtos.Pipeline> pipelines = new HashSet<>();
     HddsProtos.Pipeline pipeline = createDummyPipeline(1).getProtobufMessage(
@@ -163,10 +166,10 @@ public class TestPipelineStateManagerImpl {
     Set<Pipeline> pipelines1 = new HashSet<>(stateManager
         .getPipelines(RatisReplicationConfig
             .getInstance(ReplicationFactor.ONE)));
-    Assertions.assertEquals(pipelines1.size(), pipelines.size());
+    assertEquals(pipelines1.size(), pipelines.size());
 
     pipelines1 = new HashSet<>(stateManager.getPipelines());
-    Assertions.assertEquals(pipelines1.size(), pipelines.size());
+    assertEquals(pipelines1.size(), pipelines.size());
 
     // clean up
     for (HddsProtos.Pipeline pipeline1 : pipelines) {
@@ -214,9 +217,9 @@ public class TestPipelineStateManagerImpl {
         List<Pipeline> pipelines1 =
             stateManager.getPipelines(
                 ReplicationConfig.fromProtoTypeAndFactor(type, factor));
-        Assertions.assertEquals(15, pipelines1.size());
+        assertEquals(15, pipelines1.size());
         pipelines1.stream().forEach(p -> {
-          Assertions.assertEquals(type, p.getType());
+          assertEquals(type, p.getType());
         });
       }
     }
@@ -279,10 +282,10 @@ public class TestPipelineStateManagerImpl {
               stateManager.getPipelines(
                   ReplicationConfig.fromProtoTypeAndFactor(type, factor),
                   state);
-          Assertions.assertEquals(5, pipelines1.size());
+          assertEquals(5, pipelines1.size());
           pipelines1.forEach(p -> {
-            Assertions.assertEquals(type, p.getType());
-            Assertions.assertEquals(state, p.getPipelineState());
+            assertEquals(type, p.getType());
+            assertEquals(state, p.getPipelineState());
           });
         }
       }
@@ -316,14 +319,14 @@ public class TestPipelineStateManagerImpl {
     //verify the number of containers returned
     Set<ContainerID> containerIDs =
         stateManager.getContainers(pipeline.getId());
-    Assertions.assertEquals(containerIDs.size(), containerID);
+    assertEquals(containerIDs.size(), containerID);
 
     finalizePipeline(pipelineProto);
     removePipeline(pipelineProto);
     try {
       stateManager.addContainerToPipeline(pipeline.getId(),
           ContainerID.valueOf(++containerID));
-      Assertions.fail("Container should not have been added");
+      fail("Container should not have been added");
     } catch (IOException e) {
       // Can not add a container to removed pipeline
       assertThat(e.getMessage()).contains("not found");
@@ -343,7 +346,7 @@ public class TestPipelineStateManagerImpl {
 
     try {
       removePipeline(pipelineProto);
-      Assertions.fail("Pipeline should not have been removed");
+      fail("Pipeline should not have been removed");
     } catch (IOException e) {
       // can not remove a pipeline which already has containers
       assertThat(e.getMessage()).contains("not yet closed");
@@ -367,11 +370,11 @@ public class TestPipelineStateManagerImpl {
 
     stateManager.addContainerToPipeline(pipeline.getId(),
         ContainerID.valueOf(containerID));
-    Assertions.assertEquals(1,
+    assertEquals(1,
         stateManager.getContainers(pipeline.getId()).size());
     stateManager.removeContainerFromPipeline(pipeline.getId(),
         ContainerID.valueOf(containerID));
-    Assertions.assertEquals(0,
+    assertEquals(0,
         stateManager.getContainers(pipeline.getId()).size());
 
     // add two containers in the pipeline
@@ -379,7 +382,7 @@ public class TestPipelineStateManagerImpl {
         ContainerID.valueOf(++containerID));
     stateManager.addContainerToPipeline(pipeline.getId(),
         ContainerID.valueOf(++containerID));
-    Assertions.assertEquals(2,
+    assertEquals(2,
         stateManager.getContainers(pipeline.getId()).size());
 
     // move pipeline to closing state
@@ -389,7 +392,7 @@ public class TestPipelineStateManagerImpl {
         ContainerID.valueOf(containerID));
     stateManager.removeContainerFromPipeline(pipeline.getId(),
         ContainerID.valueOf(--containerID));
-    Assertions.assertEquals(0,
+    assertEquals(0,
         stateManager.getContainers(pipeline.getId()).size());
 
     // clean up
@@ -404,7 +407,7 @@ public class TestPipelineStateManagerImpl {
     stateManager.addPipeline(pipelineProto);
     // finalize on ALLOCATED pipeline
     finalizePipeline(pipelineProto);
-    Assertions.assertEquals(Pipeline.PipelineState.CLOSED,
+    assertEquals(Pipeline.PipelineState.CLOSED,
         stateManager.getPipeline(pipeline.getId()).getPipelineState());
     // clean up
     removePipeline(pipelineProto);
@@ -416,7 +419,7 @@ public class TestPipelineStateManagerImpl {
     openPipeline(pipelineProto);
     // finalize on OPEN pipeline
     finalizePipeline(pipelineProto);
-    Assertions.assertEquals(Pipeline.PipelineState.CLOSED,
+    assertEquals(Pipeline.PipelineState.CLOSED,
         stateManager.getPipeline(pipeline.getId()).getPipelineState());
     // clean up
     removePipeline(pipelineProto);
@@ -429,7 +432,7 @@ public class TestPipelineStateManagerImpl {
     finalizePipeline(pipelineProto);
     // finalize should work on already closed pipeline
     finalizePipeline(pipelineProto);
-    Assertions.assertEquals(Pipeline.PipelineState.CLOSED,
+    assertEquals(Pipeline.PipelineState.CLOSED,
         stateManager.getPipeline(pipeline.getId()).getPipelineState());
     // clean up
     removePipeline(pipelineProto);
@@ -443,12 +446,12 @@ public class TestPipelineStateManagerImpl {
     stateManager.addPipeline(pipelineProto);
     // open on ALLOCATED pipeline
     openPipeline(pipelineProto);
-    Assertions.assertEquals(Pipeline.PipelineState.OPEN,
+    assertEquals(Pipeline.PipelineState.OPEN,
         stateManager.getPipeline(pipeline.getId()).getPipelineState());
 
     openPipeline(pipelineProto);
     // open should work on already open pipeline
-    Assertions.assertEquals(Pipeline.PipelineState.OPEN,
+    assertEquals(Pipeline.PipelineState.OPEN,
         stateManager.getPipeline(pipeline.getId()).getPipelineState());
     // clean up
     finalizePipeline(pipelineProto);
@@ -463,7 +466,7 @@ public class TestPipelineStateManagerImpl {
     HddsProtos.Pipeline pipelineProto = pipeline
         .getProtobufMessage(ClientVersion.CURRENT_VERSION);
     stateManager.addPipeline(pipelineProto);
-    Assertions.assertEquals(0, stateManager
+    assertEquals(0, stateManager
         .getPipelines(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.OPEN)
@@ -471,7 +474,7 @@ public class TestPipelineStateManagerImpl {
 
     // pipeline in open state should be reported
     openPipeline(pipelineProto);
-    Assertions.assertEquals(1, stateManager
+    assertEquals(1, stateManager
         .getPipelines(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.OPEN)
@@ -486,7 +489,7 @@ public class TestPipelineStateManagerImpl {
         .getProtobufMessage(ClientVersion.CURRENT_VERSION);
     // pipeline in open state should be reported
     stateManager.addPipeline(pipelineProto2);
-    Assertions.assertEquals(2, stateManager
+    assertEquals(2, stateManager
         .getPipelines(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.OPEN)
@@ -494,7 +497,7 @@ public class TestPipelineStateManagerImpl {
 
     // pipeline in closed state should not be reported
     finalizePipeline(pipelineProto2);
-    Assertions.assertEquals(1, stateManager
+    assertEquals(1, stateManager
         .getPipelines(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.OPEN)

@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.hdfs.server.datanode.checker.Checkable;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
@@ -50,7 +51,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion.getLatestVersion;
-import static org.apache.hadoop.ozone.container.common.volume.VolumeUsage.PrecomputedVolumeSpace;
 
 
 /**
@@ -456,14 +456,14 @@ public abstract class StorageVolume
 
   }
 
-  public long getAvailable(PrecomputedVolumeSpace precomputedVolumeSpace) {
+  public long getAvailable(SpaceUsageSource precomputedVolumeSpace) {
     return volumeInfo.map(info -> info.getAvailable(precomputedVolumeSpace))
         .orElse(0L);
   }
 
-  public PrecomputedVolumeSpace getPrecomputedVolumeSpace() {
-    return volumeInfo.map(VolumeInfo::getPrecomputedVolumeSpace)
-        .orElse(new PrecomputedVolumeSpace(0L, 0L));
+  public SpaceUsageSource getCurrentUsage() {
+    return volumeInfo.map(VolumeInfo::getCurrentUsage)
+        .orElse(SpaceUsageSource.UNKNOWN);
   }
 
   public long getUsedSpace() {

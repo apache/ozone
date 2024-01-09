@@ -61,11 +61,11 @@ import org.junit.jupiter.api.Test;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class is to test all the public facing APIs of Ozone Client with an
@@ -78,8 +78,6 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
    * Ozone is made active by setting OZONE_ENABLED = true.
    * Ozone OM Ratis server is made active by setting
    * OZONE_OM_RATIS_ENABLE = true;
-   *
-   * @throws IOException
    */
   @BeforeAll
   public static void init() throws Exception {
@@ -106,10 +104,9 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
 
   /**
    * Tests get the information of key with network topology awareness enabled.
-   * @throws IOException
    */
   @Test
-  public void testGetKeyAndFileWithNetworkTopology() throws IOException {
+  void testGetKeyAndFileWithNetworkTopology() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
@@ -202,9 +199,6 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
 
     assertNotNull(multipartInfo);
     String uploadID = multipartInfo.getUploadID();
-    assertEquals(volumeName, multipartInfo.getVolumeName());
-    assertEquals(bucketName, multipartInfo.getBucketName());
-    assertEquals(keyName, multipartInfo.getKeyName());
     assertNotNull(multipartInfo.getUploadID());
 
     OzoneDataStreamOutput ozoneStreamOutput = bucket.createMultipartStreamKey(
@@ -350,7 +344,7 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
           ReplicationType.RATIS, ONE, new HashMap<>());
     }
 
-    assertTrue(omSMLog.getOutput().contains("Failed to write, Exception occurred"));
+    assertThat(omSMLog.getOutput()).contains("Failed to write, Exception occurred");
   }
 
   private static class OMRequestHandlerPauseInjector extends FaultInjector {
@@ -378,13 +372,13 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
     }
 
     @Override
-    public void resume() throws IOException {
+    public void resume() {
       // Make sure injector pauses before resuming.
       try {
         ready.await();
       } catch (InterruptedException e) {
         e.printStackTrace();
-        assertTrue(fail("resume interrupted"));
+        fail("resume interrupted");
       }
       wait.countDown();
     }

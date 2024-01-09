@@ -70,6 +70,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadFactory;
@@ -111,6 +112,7 @@ public class OzoneContainer {
   private final ContainerController controller;
   private BackgroundContainerMetadataScanner metadataScanner;
   private List<BackgroundContainerDataScanner> dataScanners;
+  private List<AbstractBackgroundContainerScanner> backgroundScanners;
   private final BlockDeletingService blockDeletingService;
   private final StaleRecoveringContainerScrubbingService
       recoveringContainerScrubbingService;
@@ -338,8 +340,10 @@ public class OzoneContainer {
           "the on-demand container scanner have been disabled.");
       return;
     }
+
     initOnDemandContainerScanner(c);
 
+    backgroundScanners = new LinkedList<>();
     // This config is for testing the scanners in isolation.
     if (c.isMetadataScanEnabled()) {
       initMetadataScanner(c);
@@ -363,6 +367,7 @@ public class OzoneContainer {
           new BackgroundContainerDataScanner(c, controller, (HddsVolume) v);
       s.start();
       dataScanners.add(s);
+      backgroundScanners.add(s);
     }
   }
 
@@ -370,6 +375,7 @@ public class OzoneContainer {
     if (this.metadataScanner == null) {
       this.metadataScanner =
           new BackgroundContainerMetadataScanner(c, controller);
+      backgroundScanners.add(metadataScanner);
     }
     this.metadataScanner.start();
   }
@@ -400,6 +406,16 @@ public class OzoneContainer {
       s.shutdown();
     }
     OnDemandContainerDataScanner.shutdown();
+  }
+
+  @VisibleForTesting
+  public void pauseContainerScrub() {
+    backgroundScanners.forEach(AbstractBackgroundContainerScanner::pause);
+  }
+
+  @VisibleForTesting
+  public void resumeContainerScrub() {
+    backgroundScanners.forEach(AbstractBackgroundContainerScanner::unpause);
   }
 
   /**

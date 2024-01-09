@@ -38,10 +38,10 @@ import static org.apache.hadoop.ozone.container.common.volume.HddsVolume
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -216,7 +216,7 @@ public class TestVolumeSet {
 
     // Verify that volume usage can be queried during shutdown.
     for (StorageVolume volume : volumesList) {
-      Assertions.assertNotNull(volume.getVolumeInfo().get()
+      assertNotNull(volume.getVolumeInfo().get()
               .getUsageForTesting());
       volume.getAvailable();
     }

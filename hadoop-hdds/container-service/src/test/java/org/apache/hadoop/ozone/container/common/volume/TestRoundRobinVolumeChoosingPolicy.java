@@ -32,13 +32,14 @@ import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
-import static org.apache.ozone.test.GenericTestUtils.getTestDir;
-import static org.assertj.core.api.Assertions.assertThat;
-
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import static org.apache.ozone.test.GenericTestUtils.getTestDir;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests {@link RoundRobinVolumeChoosingPolicy}.
@@ -91,24 +92,24 @@ public class TestRoundRobinVolumeChoosingPolicy {
     HddsVolume hddsVolume1 = volumes.get(0);
     HddsVolume hddsVolume2 = volumes.get(1);
 
-    Assertions.assertEquals(100L, hddsVolume1.getAvailable());
-    Assertions.assertEquals(200L, hddsVolume2.getAvailable());
+    assertEquals(100L, hddsVolume1.getAvailable());
+    assertEquals(200L, hddsVolume2.getAvailable());
 
     // Test two rounds of round-robin choosing
-    Assertions.assertEquals(hddsVolume1, policy.chooseVolume(volumes, 0));
-    Assertions.assertEquals(hddsVolume2, policy.chooseVolume(volumes, 0));
-    Assertions.assertEquals(hddsVolume1, policy.chooseVolume(volumes, 0));
-    Assertions.assertEquals(hddsVolume2, policy.chooseVolume(volumes, 0));
+    assertEquals(hddsVolume1, policy.chooseVolume(volumes, 0));
+    assertEquals(hddsVolume2, policy.chooseVolume(volumes, 0));
+    assertEquals(hddsVolume1, policy.chooseVolume(volumes, 0));
+    assertEquals(hddsVolume2, policy.chooseVolume(volumes, 0));
 
     // The first volume has only 100L space, so the policy should
     // choose the second one in case we ask for more.
-    Assertions.assertEquals(hddsVolume2,
+    assertEquals(hddsVolume2,
         policy.chooseVolume(volumes, 120));
   }
 
   @Test
   public void throwsDiskOutOfSpaceIfRequestMoreThanAvailable() {
-    Exception e = Assertions.assertThrows(DiskOutOfSpaceException.class,
+    Exception e = assertThrows(DiskOutOfSpaceException.class,
         () -> policy.chooseVolume(volumes, 300));
 
     String msg = e.getMessage();

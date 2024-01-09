@@ -135,10 +135,8 @@ import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DO
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.awaitility.Awaitility.with;
 import static org.awaitility.Awaitility.await;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsString;
+import static org.awaitility.Awaitility.with;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -146,8 +144,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Abstract class to test OmSnapshot.
@@ -275,8 +273,8 @@ public abstract class TestOmSnapshot {
   private static void assertFinalizationException(OMException omException) {
     assertEquals(NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
         omException.getResult());
-    assertThat(omException.getMessage(),
-        containsString("cannot be invoked before finalization."));
+    assertThat(omException.getMessage())
+        .contains("cannot be invoked before finalization.");
   }
 
   /**
@@ -1434,9 +1432,9 @@ public abstract class TestOmSnapshot {
     IOException ioException = assertThrows(IOException.class,
         () -> store.snapshotDiff(volume, bucket, snap6,
             snap7, "3", 0, forceFullSnapshotDiff, disableNativeDiff));
-    assertThat(ioException.getMessage(), containsString("Index (given: 3) " +
+    assertThat(ioException.getMessage()).contains("Index (given: 3) " +
         "should be a number >= 0 and < totalDiffEntries: 2. Page size " +
-        "(given: 1000) should be a positive number > 0."));
+        "(given: 1000) should be a positive number > 0.");
 
   }
 
