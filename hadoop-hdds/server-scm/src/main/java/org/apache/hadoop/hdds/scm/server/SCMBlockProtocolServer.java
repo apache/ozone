@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -383,6 +384,9 @@ public class SCMBlockProtocolServer implements
   }
 
   private Node getClientNode(String clientMachine) {
+    if (StringUtils.isEmpty(clientMachine)) {
+      return null;
+    }
     List<DatanodeDetails> datanodes = scm.getScmNodeManager()
         .getNodesByAddress(clientMachine);
     return !datanodes.isEmpty() ? datanodes.get(0) :

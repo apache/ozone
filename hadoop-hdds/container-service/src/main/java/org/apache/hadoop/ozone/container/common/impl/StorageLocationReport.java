@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.container.common.impl;
 
 import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.
     StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.
@@ -27,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.proto.
     StorageContainerDatanodeProtocolProtos.StorageTypeProto;
 import org.apache.hadoop.ozone.container.common.interfaces
     .StorageLocationReportMXBean;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 
 import java.io.IOException;
 
@@ -42,17 +44,22 @@ public final class StorageLocationReport implements
   private final long capacity;
   private final long scmUsed;
   private final long remaining;
+  private final long committed;
+  private final long freeSpaceToSpare;
   private final StorageType storageType;
   private final String storageLocation;
 
+  @SuppressWarnings("checkstyle:parameternumber")
   private StorageLocationReport(String id, boolean failed, long capacity,
-      long scmUsed, long remaining, StorageType storageType,
-      String storageLocation) {
+      long scmUsed, long remaining, long committed, long freeSpaceToSpare,
+      StorageType storageType, String storageLocation) {
     this.id = id;
     this.failed = failed;
     this.capacity = capacity;
     this.scmUsed = scmUsed;
     this.remaining = remaining;
+    this.committed = committed;
+    this.freeSpaceToSpare = freeSpaceToSpare;
     this.storageType = storageType;
     this.storageLocation = storageLocation;
   }
@@ -80,6 +87,16 @@ public final class StorageLocationReport implements
   @Override
   public long getRemaining() {
     return remaining;
+  }
+
+  @Override
+  public long getCommitted() {
+    return committed;
+  }
+
+  @Override
+  public long getFreeSpaceToSpare() {
+    return freeSpaceToSpare;
   }
 
   @Override
@@ -157,14 +174,22 @@ public final class StorageLocationReport implements
    * @throws IOException In case, the storage type specified is invalid.
    */
   public StorageReportProto getProtoBufMessage() throws IOException {
+    return getProtoBufMessage(null);
+  }
+
+  public StorageReportProto getProtoBufMessage(ConfigurationSource conf)
+      throws IOException {
     StorageReportProto.Builder srb = StorageReportProto.newBuilder();
     return srb.setStorageUuid(getId())
         .setCapacity(getCapacity())
         .setScmUsed(getScmUsed())
         .setRemaining(getRemaining())
+        .setCommitted(getCommitted())
         .setStorageType(getStorageTypeProto())
         .setStorageLocation(getStorageLocation())
         .setFailed(isFailed())
+        .setFreeSpaceToSpare(conf != null ?
+            VolumeUsage.getMinVolumeFreeSpace(conf, getCapacity()) : 0)
         .build();
   }
 
@@ -266,6 +291,8 @@ public final class StorageLocationReport implements
     private long capacity;
     private long scmUsed;
     private long remaining;
+    private long committed;
+    private long freeSpaceToSpare;
     private StorageType storageType;
     private String storageLocation;
 
@@ -335,6 +362,29 @@ public final class StorageLocationReport implements
     }
 
     /**
+     * Sets the committed bytes count.
+     * (bytes for previously created containers)
+     * @param committed previously created containers size
+     * @return StorageLocationReport.Builder
+     */
+    public Builder setCommitted(long committed) {
+      this.committed = committed;
+      return this;
+    }
+
+    /**
+     * Sets the free space available to spare.
+     * (depends on datanode volume config,
+     * consider 'hdds.datanode.volume.min.*' configuration properties)
+     * @param freeSpaceToSpare the size of free volume space available to spare
+     * @return StorageLocationReport.Builder
+     */
+    public Builder setFreeSpaceToSpare(long freeSpaceToSpare) {
+      this.freeSpaceToSpare = freeSpaceToSpare;
+      return this;
+    }
+
+    /**
      * Sets the storageLocation.
      *
      * @param storageLocationValue location of the volume
@@ -352,7 +402,7 @@ public final class StorageLocationReport implements
      */
     public StorageLocationReport build() {
       return new StorageLocationReport(id, failed, capacity, scmUsed,
-          remaining, storageType, storageLocation);
+          remaining, committed, freeSpaceToSpare, storageType, storageLocation);
     }
 
   }

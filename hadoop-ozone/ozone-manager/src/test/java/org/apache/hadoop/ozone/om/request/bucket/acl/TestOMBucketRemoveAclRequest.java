@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.ozone.om.request.bucket.acl;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.bucket.TestBucketRequest;
@@ -25,7 +29,6 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -50,13 +53,13 @@ public class TestOMBucketRemoveAclRequest extends TestBucketRequest {
         new OMBucketRemoveAclRequest(originalRequest);
     OMRequest preExecuteRequest = omBucketRemoveAclRequest
         .preExecute(ozoneManager);
-    Assertions.assertNotEquals(originalRequest, preExecuteRequest);
+    assertNotEquals(originalRequest, preExecuteRequest);
 
     long newModTime = preExecuteRequest.getRemoveAclRequest()
         .getModificationTime();
     // When preExecute() of removing acl,
     // the new modification time is greater than origin one.
-    Assertions.assertTrue(newModTime > originModTime);
+    assertThat(newModTime).isGreaterThan(originModTime);
   }
 
   @Test
@@ -80,16 +83,16 @@ public class TestOMBucketRemoveAclRequest extends TestBucketRequest {
     OMClientResponse omClientAddAclResponse = omBucketAddAclRequest
         .validateAndUpdateCache(ozoneManager, 1);
     OMResponse omAddAclResponse = omClientAddAclResponse.getOMResponse();
-    Assertions.assertNotNull(omAddAclResponse.getAddAclResponse());
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertNotNull(omAddAclResponse.getAddAclResponse());
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omAddAclResponse.getStatus());
 
     // Verify result of adding acl.
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     List<OzoneAcl> bucketAcls = omMetadataManager.getBucketTable()
         .get(bucketKey).getAcls();
-    Assertions.assertEquals(1, bucketAcls.size());
-    Assertions.assertEquals(acl, bucketAcls.get(0));
+    assertEquals(1, bucketAcls.size());
+    assertEquals(acl, bucketAcls.get(0));
 
     // Remove acl.
     OMRequest removeAclRequest = OMRequestTestUtils
@@ -100,14 +103,14 @@ public class TestOMBucketRemoveAclRequest extends TestBucketRequest {
     OMClientResponse omClientRemoveAclResponse = omBucketRemoveAclRequest
         .validateAndUpdateCache(ozoneManager, 2);
     OMResponse omRemoveAclResponse = omClientRemoveAclResponse.getOMResponse();
-    Assertions.assertNotNull(omRemoveAclResponse.getRemoveAclResponse());
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertNotNull(omRemoveAclResponse.getRemoveAclResponse());
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omRemoveAclResponse.getStatus());
 
     // Verify result of removing acl.
     List<OzoneAcl> newAcls = omMetadataManager.getBucketTable()
         .get(bucketKey).getAcls();
-    Assertions.assertEquals(0, newAcls.size());
+    assertEquals(0, newAcls.size());
   }
 
   @Test
@@ -126,9 +129,9 @@ public class TestOMBucketRemoveAclRequest extends TestBucketRequest {
         .validateAndUpdateCache(ozoneManager, 1);
     OMResponse omResponse = omClientResponse.getOMResponse();
 
-    Assertions.assertNotNull(omResponse.getRemoveAclResponse());
+    assertNotNull(omResponse.getRemoveAclResponse());
     // The bucket is not created.
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
+    assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
         omResponse.getStatus());
   }
 }

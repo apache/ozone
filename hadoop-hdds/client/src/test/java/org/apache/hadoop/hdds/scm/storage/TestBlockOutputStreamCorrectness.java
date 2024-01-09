@@ -45,9 +45,11 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * UNIT test for BlockOutputStream.
@@ -93,8 +95,8 @@ public class TestBlockOutputStreamCorrectness {
 
     final Pipeline pipeline = MockPipeline.createRatisPipeline();
 
-    final XceiverClientManager xcm = Mockito.mock(XceiverClientManager.class);
-    Mockito.when(xcm.acquireClient(Mockito.any()))
+    final XceiverClientManager xcm = mock(XceiverClientManager.class);
+    when(xcm.acquireClient(any()))
         .thenReturn(new MockXceiverClientSpi(pipeline));
 
     OzoneClientConfig config = new OzoneClientConfig();

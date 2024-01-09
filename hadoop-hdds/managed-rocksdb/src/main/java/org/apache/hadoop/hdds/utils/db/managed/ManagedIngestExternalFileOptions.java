@@ -18,26 +18,20 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.IngestExternalFileOptions;
 
-import javax.annotation.Nullable;
-
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.assertClosed;
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.formatStackTrace;
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.getStackTrace;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * Managed IngestExternalFileOptions.
  */
-public class ManagedIngestExternalFileOptions extends
-    IngestExternalFileOptions {
-
-  @Nullable
-  private final StackTraceElement[] elements = getStackTrace();
+public class ManagedIngestExternalFileOptions extends IngestExternalFileOptions {
+  private final UncheckedAutoCloseable leakTracker = track(this);
 
   @Override
-  protected void finalize() throws Throwable {
-    assertClosed(this, formatStackTrace(elements));
-    super.finalize();
+  public void close() {
+    super.close();
+    leakTracker.close();
   }
 }

@@ -127,6 +127,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import org.mockito.Mockito;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -317,8 +318,8 @@ public class TestKeyManagerImpl {
     OMException omException = assertThrows(OMException.class,
          () ->
              writeClient.allocateBlock(keyArgs, 1L, new ExcludeList()));
-    assertTrue(omException.getMessage()
-        .contains("SafeModePrecheck failed for allocateBlock"));
+    assertThat(omException.getMessage())
+        .contains("SafeModePrecheck failed for allocateBlock");
   }
 
   @Test
@@ -334,8 +335,8 @@ public class TestKeyManagerImpl {
         .build();
     OMException omException = assertThrows(OMException.class,
         () -> writeClient.openKey(keyArgs));
-    assertTrue(omException.getMessage()
-        .contains("SafeModePrecheck failed for allocateBlock"));
+    assertThat(omException.getMessage())
+        .contains("SafeModePrecheck failed for allocateBlock");
   }
 
   @Test
@@ -580,13 +581,13 @@ public class TestKeyManagerImpl {
     assertEquals(2, matchEntries);
 
     boolean result = writeClient.removeAcl(ozPrefix1, ozAcl4);
-    assertEquals(true, result);
+    assertTrue(result);
 
     ozAclGet = writeClient.getAcl(ozPrefix1);
     assertEquals(2, ozAclGet.size());
 
     result = writeClient.removeAcl(ozPrefix1, ozAcl3);
-    assertEquals(true, result);
+    assertTrue(result);
     ozAclGet = writeClient.getAcl(ozPrefix1);
     assertEquals(1, ozAclGet.size());
 
@@ -716,7 +717,7 @@ public class TestKeyManagerImpl {
     assertEquals(ozAcl1, prefixInfos.get(6).getAcls().get(0));
     // All other nodes don't have acl value associate with it
     for (int i = 0; i < 6; i++) {
-      assertEquals(null, prefixInfos.get(i));
+      assertNull(prefixInfos.get(i));
     }
     // cleanup
     writeClient.removeAcl(ozPrefix1, ozAcl1);
@@ -847,9 +848,9 @@ public class TestKeyManagerImpl {
     // lookup key, random node as client
     OmKeyInfo key4 = keyManager.lookupKey(keyArgs, resolvedBucket(),
         "/d=default-drack/127.0.0.1");
-    assertTrue(
-        keyPipeline.getNodes().containsAll(key4.getLatestVersionLocations()
-            .getLocationList().get(0).getPipeline().getNodesInOrder()));
+    assertThat(keyPipeline.getNodes())
+        .containsAll(key4.getLatestVersionLocations()
+            .getLocationList().get(0).getPipeline().getNodesInOrder());
   }
 
   @NotNull
@@ -1522,13 +1523,10 @@ public class TestKeyManagerImpl {
     KeyManagerImpl keyManagerImpl =
         new KeyManagerImpl(ozoneManager, scmClientMock, conf, metrics);
 
-    try {
-      keyManagerImpl.refresh(omKeyInfo);
-      fail();
-    } catch (OMException omEx) {
-      assertEquals(SCM_GET_PIPELINE_EXCEPTION, omEx.getResult());
-      assertTrue(omEx.getMessage().equals(errorMessage));
-    }
+    OMException omEx = assertThrows(OMException.class,
+        () -> keyManagerImpl.refresh(omKeyInfo));
+    assertEquals(SCM_GET_PIPELINE_EXCEPTION, omEx.getResult());
+    assertEquals(errorMessage, omEx.getMessage());
   }
 
   /**
@@ -1592,11 +1590,11 @@ public class TestKeyManagerImpl {
       }
       // verify filestatus is present in directory or file set accordingly
       if (fileStatus.isDirectory()) {
-        assertTrue(directorySet.contains(normalizedKeyName),
-            directorySet + " doesn't contain " + normalizedKeyName);
+        assertThat(directorySet).withFailMessage(directorySet +
+            " doesn't contain " + normalizedKeyName).contains(normalizedKeyName);
       } else {
-        assertTrue(fileSet.contains(normalizedKeyName),
-            fileSet + " doesn't contain " + normalizedKeyName);
+        assertThat(fileSet).withFailMessage(fileSet + " doesn't contain " + normalizedKeyName)
+            .contains(normalizedKeyName);
       }
     }
 

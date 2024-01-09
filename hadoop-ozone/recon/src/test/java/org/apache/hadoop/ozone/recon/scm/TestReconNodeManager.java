@@ -24,10 +24,10 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -99,7 +99,7 @@ public class TestReconNodeManager {
         scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager);
     ReconNewNodeHandler reconNewNodeHandler =
         new ReconNewNodeHandler(reconNodeManager);
-    assertTrue(reconNodeManager.getAllNodes().isEmpty());
+    assertThat(reconNodeManager.getAllNodes()).isEmpty();
 
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
     String uuidString = datanodeDetails.getUuidString();
@@ -219,7 +219,7 @@ public class TestReconNodeManager {
         scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager);
     ReconNewNodeHandler reconNewNodeHandler =
         new ReconNewNodeHandler(reconNodeManager);
-    assertTrue(reconNodeManager.getAllNodes().isEmpty());
+    assertThat(reconNodeManager.getAllNodes()).isEmpty();
 
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
     datanodeDetails.setHostName("hostname1");

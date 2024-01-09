@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -53,8 +52,11 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyList;
 
 /**
  * Unit tests for {@link ECMisReplicationCheckHandler}.
@@ -69,9 +71,8 @@ public class TestECMisReplicationCheckHandler {
 
   @BeforeEach
   public void setup() {
-    placementPolicy = Mockito.mock(PlacementPolicy.class);
-    Mockito.when(placementPolicy.validateContainerPlacement(
-            anyList(), anyInt()))
+    placementPolicy = mock(PlacementPolicy.class);
+    when(placementPolicy.validateContainerPlacement(anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(5, 5, 5));
     handler = new ECMisReplicationCheckHandler(placementPolicy);
     repConfig = new ECReplicationConfig(3, 2);
@@ -126,9 +127,7 @@ public class TestECMisReplicationCheckHandler {
     ContainerInfo container = createContainerInfo(repConfig);
 
     // Placement policy is always violated
-    Mockito.when(placementPolicy.validateContainerPlacement(
-        Mockito.any(),
-        Mockito.anyInt()
+    when(placementPolicy.validateContainerPlacement(any(), anyInt()
     )).thenAnswer(invocation ->
         new ContainerPlacementStatusDefault(4, 5, 9));
 
@@ -163,9 +162,7 @@ public class TestECMisReplicationCheckHandler {
   public void shouldReturnFalseForMisReplicatedContainerFixedByPending() {
     ContainerInfo container = createContainerInfo(repConfig);
 
-    Mockito.when(placementPolicy.validateContainerPlacement(
-        Mockito.any(),
-        Mockito.anyInt()
+    when(placementPolicy.validateContainerPlacement(any(), anyInt()
     )).thenAnswer(invocation -> {
       List<DatanodeDetails> dns = invocation.getArgument(0);
       // If the number of DNs is 5 or less make it be mis-replicated
@@ -214,9 +211,7 @@ public class TestECMisReplicationCheckHandler {
   public void testMisReplicationWithUnhealthyReplica() {
     ContainerInfo container = createContainerInfo(repConfig);
 
-    Mockito.when(placementPolicy.validateContainerPlacement(
-        Mockito.any(),
-        Mockito.anyInt()
+    when(placementPolicy.validateContainerPlacement(any(), anyInt()
     )).thenAnswer(invocation -> {
       List<DatanodeDetails> dns = invocation.getArgument(0);
       // If the number of DNs is 6 or more make it mis-replicated

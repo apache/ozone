@@ -17,14 +17,14 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
-import org.junit.BeforeClass;
+import org.junit.jupiter.api.BeforeAll;
 
 /**
  * Tests key output stream with zero-copy enabled.
  */
 public class TestECKeyOutputStreamWithZeroCopy extends
     AbstractTestECKeyOutputStream {
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     init(true);
   }

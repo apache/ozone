@@ -63,9 +63,6 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,12 +82,18 @@ import static org.apache.hadoop.hdds.fs.MockSpaceUsageSource.fixed;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Test-cases to verify the functionality of HddsDispatcher.
@@ -103,12 +106,7 @@ public class TestHddsDispatcher {
       c -> {
       };
 
-  private static Iterable<Object[]> layoutVersion() {
-    return ContainerLayoutTestInfo.containerLayoutParameters();
-  }
-
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testContainerCloseActionWhenFull(
       ContainerLayoutVersion layout) throws IOException {
 
@@ -149,7 +147,7 @@ public class TestHddsDispatcher {
       assertEquals(ContainerProtos.Result.SUCCESS,
           responseOne.getResult());
       verify(context, times(0))
-          .addContainerActionIfAbsent(Mockito.any(ContainerAction.class));
+          .addContainerActionIfAbsent(any(ContainerAction.class));
       containerData.setBytesUsed(Double.valueOf(
           StorageUnit.MB.toBytes(950)).longValue());
       ContainerCommandResponseProto responseTwo = hddsDispatcher
@@ -157,7 +155,7 @@ public class TestHddsDispatcher {
       assertEquals(ContainerProtos.Result.SUCCESS,
           responseTwo.getResult());
       verify(context, times(1))
-          .addContainerActionIfAbsent(Mockito.any(ContainerAction.class));
+          .addContainerActionIfAbsent(any(ContainerAction.class));
 
     } finally {
       volumeSet.shutdown();
@@ -166,8 +164,7 @@ public class TestHddsDispatcher {
     }
   }
 
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testContainerCloseActionWhenVolumeFull(
       ContainerLayoutVersion layoutVersion) throws Exception {
     String testDir = GenericTestUtils.getTempPath(
@@ -187,8 +184,8 @@ public class TestHddsDispatcher {
     SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
         spaceUsage, Duration.ZERO, inMemory(new AtomicLong(0)));
     volumeBuilder.usageCheckFactory(factory);
-    MutableVolumeSet volumeSet = Mockito.mock(MutableVolumeSet.class);
-    Mockito.when(volumeSet.getVolumesList())
+    MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+    when(volumeSet.getVolumesList())
         .thenReturn(Collections.singletonList(volumeBuilder.build()));
     try {
       UUID scmId = UUID.randomUUID();
@@ -221,7 +218,7 @@ public class TestHddsDispatcher {
       assertEquals(ContainerProtos.Result.SUCCESS,
           response.getResult());
       verify(context, times(1))
-          .addContainerActionIfAbsent(Mockito.any(ContainerAction.class));
+          .addContainerActionIfAbsent(any(ContainerAction.class));
 
       // try creating another container now as the volume used has crossed
       // threshold
@@ -327,9 +324,9 @@ public class TestHddsDispatcher {
       assertEquals(
           ContainerProtos.Result.CONTAINER_NOT_FOUND, response.getResult());
 
-      assertTrue(logCapturer.getOutput().contains(
+      assertThat(logCapturer.getOutput()).contains(
           "ContainerID " + writeChunkRequest.getContainerID()
-              + " does not exist"));
+              + " does not exist");
     } finally {
       ContainerMetrics.remove();
       FileUtils.deleteDirectory(new File(testDir));
@@ -350,13 +347,13 @@ public class TestHddsDispatcher {
       ContainerCommandRequestProto writeChunkRequest = getWriteChunkRequest(
           dd.getUuidString(), 1L, 1L);
 
-      HddsDispatcher mockDispatcher = Mockito.spy(hddsDispatcher);
+      HddsDispatcher mockDispatcher = spy(hddsDispatcher);
       ContainerCommandResponseProto.Builder builder =
           getContainerCommandResponse(writeChunkRequest,
               ContainerProtos.Result.DISK_OUT_OF_SPACE, "");
       // Return DISK_OUT_OF_SPACE response when writing chunk
       // with container creation.
-      Mockito.doReturn(builder.build()).when(mockDispatcher)
+      doReturn(builder.build()).when(mockDispatcher)
           .createContainer(writeChunkRequest);
 
       GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
@@ -364,9 +361,9 @@ public class TestHddsDispatcher {
       // send write chunk request without sending create container
       mockDispatcher.dispatch(writeChunkRequest, null);
       // verify the error log
-      assertTrue(logCapturer.getOutput()
+      assertThat(logCapturer.getOutput())
           .contains("ContainerID " + writeChunkRequest.getContainerID()
-              + " creation failed , Result: DISK_OUT_OF_SPACE"));
+              + " creation failed , Result: DISK_OUT_OF_SPACE");
     } finally {
       ContainerMetrics.remove();
       FileUtils.deleteDirectory(new File(testDir));

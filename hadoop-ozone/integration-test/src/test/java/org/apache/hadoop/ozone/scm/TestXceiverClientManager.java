@@ -117,7 +117,7 @@ public class TestXceiverClientManager {
       clientManager.releaseClient(client1, true);
       clientManager.releaseClient(client2, true);
       clientManager.releaseClient(client3, true);
-      Assertions.assertTrue(clientManager.getClientCache().size() == 0);
+      Assertions.assertEquals(0, clientManager.getClientCache().size());
     }
   }
 
@@ -159,7 +159,7 @@ public class TestXceiverClientManager {
       XceiverClientSpi nonExistent1 = cache.getIfPresent(
           container1.getContainerInfo().getPipelineID().getId().toString()
               + container1.getContainerInfo().getReplicationType());
-      Assertions.assertEquals(null, nonExistent1);
+      Assertions.assertNull(nonExistent1);
       // However container call should succeed because of refcount on the client
       ContainerProtocolCalls.createContainer(client1,
           container1.getContainerInfo().getContainerID(), null);
@@ -218,7 +218,7 @@ public class TestXceiverClientManager {
       XceiverClientSpi nonExistent = cache.getIfPresent(
           container1.getContainerInfo().getPipelineID().getId().toString()
               + container1.getContainerInfo().getReplicationType());
-      Assertions.assertEquals(null, nonExistent);
+      Assertions.assertNull(nonExistent);
 
       // Any container operation should now fail
       Throwable t = Assertions.assertThrows(IOException.class,

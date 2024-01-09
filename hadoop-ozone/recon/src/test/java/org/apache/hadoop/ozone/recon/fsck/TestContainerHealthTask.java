@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.fsck;
 
 import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.ALL_REPLICAS_UNHEALTHY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
@@ -59,7 +60,6 @@ import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.daos.UnhealthyContainersDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -137,7 +137,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
         .thenReturn(Collections.emptySet());
 
     List<UnhealthyContainers> all = unHealthyContainersTableHandle.findAll();
-    Assertions.assertTrue(all.isEmpty());
+    assertThat(all).isEmpty();
 
     long currentTime = System.currentTimeMillis();
     ReconTaskStatusDao reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
@@ -192,8 +192,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
     ReconTaskStatus taskStatus =
         reconTaskStatusDao.findById(containerHealthTask.getTaskName());
-    Assertions.assertTrue(taskStatus.getLastUpdatedTimestamp() >
-        currentTime);
+    assertThat(taskStatus.getLastUpdatedTimestamp()).isGreaterThan(currentTime);
 
     // Now run the job again, to check that relevant records are updated or
     // removed as appropriate. Need to adjust the return value for all the mocks
@@ -300,7 +299,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
         .thenReturn(new ContainerWithPipeline(mockContainers.get(0), null));
 
     List<UnhealthyContainers> all = unHealthyContainersTableHandle.findAll();
-    Assertions.assertTrue(all.isEmpty());
+    assertThat(all).isEmpty();
 
     long currentTime = System.currentTimeMillis();
     ReconTaskStatusDao reconTaskStatusDao = getDao(ReconTaskStatusDao.class);
@@ -328,8 +327,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
     ReconTaskStatus taskStatus =
         reconTaskStatusDao.findById(containerHealthTask.getTaskName());
-    Assertions.assertTrue(taskStatus.getLastUpdatedTimestamp() >
-        currentTime);
+    assertThat(taskStatus.getLastUpdatedTimestamp()).isGreaterThan(currentTime);
   }
 
   private Set<ContainerReplica> getMockReplicas(

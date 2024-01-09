@@ -27,33 +27,26 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test Recon SCM Snapshot Download implementation.
  */
+@Timeout(100)
 public class TestReconScmSnapshot {
-  /**
-   * Set a timeout for each test.
-   */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(100));
   private OzoneConfiguration conf;
   private MiniOzoneCluster ozoneCluster = null;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(
@@ -126,7 +119,7 @@ public class TestReconScmSnapshot {
     assertEquals(keyCountAfter, keyCountBefore);
   }
 
-  @After
+  @AfterEach
   public void shutdown() throws Exception {
     if (ozoneCluster != null) {
       ozoneCluster.shutdown();

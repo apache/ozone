@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -37,40 +36,28 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMBINED_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Common test cases for ChunkManager implementation tests.
  */
-public abstract class CommonChunkManagerTestCases
-    extends AbstractTestChunkManager {
+public abstract class CommonChunkManagerTestCases extends AbstractTestChunkManager {
 
   @Test
   public void testWriteChunkIncorrectLength() {
-    // GIVEN
     ChunkManager chunkManager = createTestSubject();
-    try {
-      long randomLength = 200L;
-      BlockID blockID = getBlockID();
-      ChunkInfo chunkInfo = new ChunkInfo(
-          String.format("%d.data.%d", blockID.getLocalID(), 0),
-          0, randomLength);
+    long randomLength = 200L;
+    BlockID blockID = getBlockID();
+    ChunkInfo chunkInfo = new ChunkInfo(String.format("%d.data.%d", blockID.getLocalID(), 0), 0, randomLength);
 
-      chunkManager.writeChunk(getKeyValueContainer(), blockID, chunkInfo,
-          getData(),
-          WRITE_STAGE);
-
-      // THEN
-      fail("testWriteChunkIncorrectLength failed");
-    } catch (StorageContainerException ex) {
-      // As we got an exception, writeBytes should be 0.
-      checkWriteIOStats(0, 0);
-      GenericTestUtils.assertExceptionContains("Unexpected buffer size", ex);
-      assertEquals(ContainerProtos.Result.INVALID_WRITE_SIZE, ex.getResult());
-    }
+    StorageContainerException exception = assertThrows(StorageContainerException.class,
+        () -> chunkManager.writeChunk(getKeyValueContainer(), blockID, chunkInfo, getData(), WRITE_STAGE));
+    checkWriteIOStats(0, 0);
+    assertEquals(ContainerProtos.Result.INVALID_WRITE_SIZE, exception.getResult());
+    assertThat(exception).hasMessageStartingWith("Unexpected buffer size");
   }
 
   @Test
@@ -80,7 +67,7 @@ public abstract class CommonChunkManagerTestCases
     KeyValueContainer container = getKeyValueContainer();
     int tooLarge = OZONE_SCM_CHUNK_MAX_SIZE + 1;
     byte[] array = RandomStringUtils.randomAscii(tooLarge).getBytes(UTF_8);
-    assertTrue(array.length >= tooLarge);
+    assertThat(array.length).isGreaterThanOrEqualTo(tooLarge);
 
     BlockID blockID = getBlockID();
     ChunkInfo chunkInfo = new ChunkInfo(

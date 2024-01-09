@@ -668,6 +668,13 @@ public final class OzoneConfigKeys {
   public static final String OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION =
       "ozone.scm.close.container.wait.duration";
 
+  public static final String HDDS_SCM_CLIENT_RPC_TIME_OUT =
+      "hdds.scmclient.rpc.timeout";
+  public static final String HDDS_SCM_CLIENT_MAX_RETRY_TIMEOUT =
+      "hdds.scmclient.max.retry.timeout";
+  public static final String HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY =
+      "hdds.scmclient.failover.max.retry";
+
   public static final String
       OZONE_SCM_NETWORK_TOPOLOGY_CLUSTER_TREE_REFRESH_DURATION =
       "ozone.scm.network.topology.cluster.tree.refresh.duration";

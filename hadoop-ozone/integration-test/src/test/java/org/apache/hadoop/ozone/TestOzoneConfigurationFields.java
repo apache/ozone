@@ -141,7 +141,10 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY,
         ScmConfigKeys.OZONE_SCM_HA_PREFIX,
         S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,
-        HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT
+        HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT,
+        OzoneConfigKeys.HDDS_SCM_CLIENT_RPC_TIME_OUT,
+        OzoneConfigKeys.HDDS_SCM_CLIENT_MAX_RETRY_TIMEOUT,
+        OzoneConfigKeys.HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY
     ));
   }
 }

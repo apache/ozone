@@ -20,29 +20,25 @@ package org.apache.hadoop.hdds.scm.net;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
 import static org.apache.hadoop.hdds.scm.net.NetConstants.DEFAULT_NODEGROUP;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.DEFAULT_RACK;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Test the node schema loader. */
 @Timeout(30)
-public class TestNodeSchemaManager {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestNodeSchemaManager.class);
-  private ClassLoader classLoader =
+class TestNodeSchemaManager {
+  private final ClassLoader classLoader =
       Thread.currentThread().getContextClassLoader();
-  private NodeSchemaManager manager;
-  private OzoneConfiguration conf;
+  private final NodeSchemaManager manager;
+  private final OzoneConfiguration conf;
 
-  public TestNodeSchemaManager() {
+  TestNodeSchemaManager() {
     conf = new OzoneConfiguration();
     String filePath = classLoader.getResource(
         "./networkTopologyTestFiles/good.xml").getPath();
@@ -52,38 +48,37 @@ public class TestNodeSchemaManager {
   }
 
   @Test
-  public void testFailure1() {
+  void testFailure1() {
     assertThrows(IllegalArgumentException.class,
         () -> manager.getCost(0));
   }
 
   @Test
-  public void testFailure2() {
+  void testFailure2() {
     assertThrows(IllegalArgumentException.class,
         () -> manager.getCost(manager.getMaxLevel() + 1));
   }
 
   @Test
-  public void testPass() {
+  void testPass() {
     assertEquals(4, manager.getMaxLevel());
     for (int i  = 1; i <= manager.getMaxLevel(); i++) {
-      assertTrue(manager.getCost(i) == 1 || manager.getCost(i) == 0);
+      assertThat(manager.getCost(i)).isIn(0, 1);
     }
   }
 
   @Test
-  public void testInitFailure() {
+  void testInitFailure() {
     String filePath = classLoader.getResource(
         "./networkTopologyTestFiles/good.xml").getPath() + ".backup";
     conf.set(ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE, filePath);
     Throwable e = assertThrows(RuntimeException.class,
         () -> manager.init(conf));
-    assertTrue(e.getMessage().contains("Failed to load schema file:" +
-        filePath));
+    assertThat(e).hasMessageContaining("Failed to load schema file:" + filePath);
   }
 
   @Test
-  public void testComplete() {
+  void testComplete() {
     // successful complete action
     String path = "/node1";
     assertEquals(DEFAULT_RACK + DEFAULT_NODEGROUP + path,

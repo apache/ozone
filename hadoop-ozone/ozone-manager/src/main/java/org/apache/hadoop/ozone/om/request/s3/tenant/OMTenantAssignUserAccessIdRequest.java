@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.s3.tenant;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
@@ -191,9 +192,8 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
 
   @Override
   @SuppressWarnings("checkstyle:methodlength")
-  public OMClientResponse validateAndUpdateCache(
-      OzoneManager ozoneManager, long transactionLogIndex) {
-
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long transactionLogIndex = termIndex.getIndex();
     final OMMultiTenantManager multiTenantManager =
         ozoneManager.getMultiTenantManager();
 

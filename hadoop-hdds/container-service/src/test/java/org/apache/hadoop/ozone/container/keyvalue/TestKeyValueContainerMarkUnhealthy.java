@@ -28,12 +28,8 @@ import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingP
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,11 +41,12 @@ import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.OPEN;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.core.Is.is;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests unhealthy container functionality in the {@link KeyValueContainer}
@@ -78,10 +75,6 @@ public class TestKeyValueContainerMarkUnhealthy {
     setup();
   }
 
-  private static Iterable<Object[]> layoutVersion() {
-    return ContainerLayoutTestInfo.containerLayoutParameters();
-  }
-
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
     datanodeId = UUID.randomUUID();
@@ -96,7 +89,7 @@ public class TestKeyValueContainerMarkUnhealthy {
 
     volumeSet = mock(MutableVolumeSet.class);
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
-    Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenReturn(hddsVolume);
 
     keyValueContainerData = new KeyValueContainerData(1L,
@@ -125,20 +118,19 @@ public class TestKeyValueContainerMarkUnhealthy {
    *
    * @throws IOException
    */
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testMarkContainerUnhealthy(ContainerLayoutVersion layoutVersion) throws Exception {
     initTestData(layoutVersion);
-    assertThat(keyValueContainerData.getState(), is(OPEN));
+    assertThat(keyValueContainerData.getState()).isEqualTo(OPEN);
     keyValueContainer.markContainerUnhealthy();
-    assertThat(keyValueContainerData.getState(), is(UNHEALTHY));
+    assertThat(keyValueContainerData.getState()).isEqualTo(UNHEALTHY);
 
     // Check metadata in the .container file
     File containerFile = keyValueContainer.getContainerFile();
 
     keyValueContainerData = (KeyValueContainerData) ContainerDataYaml
         .readContainerFile(containerFile);
-    assertThat(keyValueContainerData.getState(), is(UNHEALTHY));
+    assertThat(keyValueContainerData.getState()).isEqualTo(UNHEALTHY);
   }
 
   /**
@@ -146,12 +138,11 @@ public class TestKeyValueContainerMarkUnhealthy {
    *
    * @throws IOException
    */
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testCloseUnhealthyContainer(ContainerLayoutVersion layoutVersion) throws Exception {
     initTestData(layoutVersion);
     keyValueContainer.markContainerUnhealthy();
-    Assertions.assertThrows(StorageContainerException.class, () ->
+    assertThrows(StorageContainerException.class, () ->
         keyValueContainer.markContainerForClose());
 
   }
@@ -159,8 +150,7 @@ public class TestKeyValueContainerMarkUnhealthy {
   /**
    * Attempting to mark a closed container as unhealthy should succeed.
    */
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testMarkClosedContainerAsUnhealthy(ContainerLayoutVersion layoutVersion) throws Exception {
     initTestData(layoutVersion);
     // We need to create the container so the compact-on-close operation
@@ -168,14 +158,13 @@ public class TestKeyValueContainerMarkUnhealthy {
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
     keyValueContainer.close();
     keyValueContainer.markContainerUnhealthy();
-    assertThat(keyValueContainerData.getState(), is(UNHEALTHY));
+    assertThat(keyValueContainerData.getState()).isEqualTo(UNHEALTHY);
   }
 
   /**
    * Attempting to mark a quasi-closed container as unhealthy should succeed.
    */
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testMarkQuasiClosedContainerAsUnhealthy(ContainerLayoutVersion layoutVersion) throws Exception {
     initTestData(layoutVersion);
     // We need to create the container so the sync-on-quasi-close operation
@@ -183,18 +172,17 @@ public class TestKeyValueContainerMarkUnhealthy {
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
     keyValueContainer.quasiClose();
     keyValueContainer.markContainerUnhealthy();
-    assertThat(keyValueContainerData.getState(), is(UNHEALTHY));
+    assertThat(keyValueContainerData.getState()).isEqualTo(UNHEALTHY);
   }
 
   /**
    * Attempting to mark a closing container as unhealthy should succeed.
    */
-  @ParameterizedTest
-  @MethodSource("layoutVersion")
+  @ContainerLayoutTestInfo.ContainerTest
   public void testMarkClosingContainerAsUnhealthy(ContainerLayoutVersion layoutVersion) throws Exception {
     initTestData(layoutVersion);
     keyValueContainer.markContainerForClose();
     keyValueContainer.markContainerUnhealthy();
-    assertThat(keyValueContainerData.getState(), is(UNHEALTHY));
+    assertThat(keyValueContainerData.getState()).isEqualTo(UNHEALTHY);
   }
 }
