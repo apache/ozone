@@ -32,11 +32,11 @@ import java.util.List;
 import java.util.concurrent.Callable;
 
 /**
- * Handler of ozone admin om listopenfiles command.
+ * Handler of ozone admin om list-open-files command.
  */
 @CommandLine.Command(
-    name = "listopenfiles",
-    aliases = {"listopenkeys", "lof", "lok"},
+    name = "list-open-files",
+    aliases = {"list-open-keys", "lof", "lok"},
     description = "Lists open files (keys) in Ozone Manager.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
@@ -119,29 +119,27 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
 
   private void printOpenKeysListAsJson(ListOpenFilesResult res)
       throws IOException {
-    // TODO: Untested
     System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(res));
   }
 
   private void printOpenKeysList(ListOpenFilesResult res) {
 
-    List<OpenKeySession> openFileList = res.getOpenFiles();
+    List<OpenKeySession> openFileList = res.getOpenKeys();
 
-    // TODO: Conform to HDFS style output?
-    String msg = res.getGlobalTotal() + " global open files (estimated). " +
-        "Showing " + openFileList.size() + " open files (limit " + limit + ") " +
-        "under path prefix:\n  " + pathPrefix;
+    String msg = res.getTotalOpenKeyCount() +
+        " total open files (est.). Showing " + openFileList.size() +
+        " open files (limit " + limit + ") under path prefix:\n  " + pathPrefix;
 
     if (startItem != null && !startItem.isEmpty()) {
       msg += "\nafter continuation token:\n  " + startItem;
     }
-    msg += "\n\nClient ID\t\tHsync'ed\tPath";  // TODO: Add creation time
+    msg += "\n\nClient ID\t\tCreation time\tHsync'ed\tOpen File Path";
     System.out.println(msg);
 
     for (OpenKeySession e : openFileList) {
       long clientId = e.getId();
-      String line = clientId + "\t";
       OmKeyInfo omKeyInfo = e.getKeyInfo();
+      String line = clientId + "\t" + omKeyInfo.getCreationTime() + "\t";
 
       if (omKeyInfo.isHsync()) {
         String hsyncClientIdStr =
