@@ -68,7 +68,8 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
       description = "Format output as JSON")
   private boolean json;
 
-  // TODO: Use {@link org.apache.hadoop.ozone.shell.ListOptions}?
+  // Conforms to ListOptions, but not all in ListOptions applies here so
+  // not using that directly
   @CommandLine.Option(
       names = {"-p", "--prefix"},
       description = "Filter results by the specified path on the server side.",

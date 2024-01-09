@@ -434,7 +434,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   }
 
   public void incNumListOpenFiles() {
-    // TODO: Reconsider if this should increment key ops
     numKeyOps.incr();
     numListOpenFiles.incr();
   }

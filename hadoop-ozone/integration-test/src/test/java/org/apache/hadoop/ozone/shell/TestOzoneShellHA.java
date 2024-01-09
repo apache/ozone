@@ -668,7 +668,7 @@ public class TestOzoneShellHA {
   }
 
   /**
-   * Return stdout as a String, then clears exising output.
+   * Return stdout as a String, then clears existing output.
    */
   private String getStdOut() throws UnsupportedEncodingException {
     String res = out.toString(UTF_8.name());
