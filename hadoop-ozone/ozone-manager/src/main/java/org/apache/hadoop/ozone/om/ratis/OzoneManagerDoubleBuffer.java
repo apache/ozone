@@ -28,7 +28,6 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Queue;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
@@ -695,9 +694,10 @@ public final class OzoneManagerDoubleBuffer {
     synchronized int notifyFlush() {
       final int await = awaitCount;
       final int flush = ++flushCount;
-      awaitCount -= Optional.ofNullable(flushFutures.remove(flush))
-          .map(Entry::complete)
-          .orElse(0);
+      final Entry removed = flushFutures.remove(flush);
+      if (removed != null) {
+        awaitCount -= removed.complete();
+      }
       LOG.debug("notifyFlush {}, awaitCount: {} -> {}", flush, await, awaitCount);
       return await;
     }
