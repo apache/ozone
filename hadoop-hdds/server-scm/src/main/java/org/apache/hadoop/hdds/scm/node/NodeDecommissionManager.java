@@ -55,11 +55,7 @@ public class NodeDecommissionManager {
 
   private final NodeManager nodeManager;
   private final SCMContext scmContext;
-  private final EventPublisher eventQueue;
-  private final ReplicationManager replicationManager;
-  private final OzoneConfiguration conf;
   private final boolean useHostnames;
-  private long monitorInterval;
 
   // Decommissioning and Maintenance mode progress related metrics.
   private final NodeDecommissionMetrics metrics;
@@ -258,10 +254,7 @@ public class NodeDecommissionManager {
              SCMContext scmContext,
              EventPublisher eventQueue, ReplicationManager rm) {
     this.nodeManager = nm;
-    conf = config;
     this.scmContext = scmContext;
-    this.eventQueue = eventQueue;
-    this.replicationManager = rm;
 
     executor = Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder()
@@ -271,11 +264,11 @@ public class NodeDecommissionManager {
             .build()
     );
 
-    useHostnames = conf.getBoolean(
+    useHostnames = config.getBoolean(
         DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME,
         DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
 
-    monitorInterval = conf.getTimeDuration(
+    long monitorInterval = config.getTimeDuration(
         ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
         ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT,
         TimeUnit.SECONDS);
@@ -283,16 +276,16 @@ public class NodeDecommissionManager {
       LOG.warn("{} must be greater than zero, defaulting to {}",
           ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
           ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT);
-      conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
+      config.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
           ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT);
-      monitorInterval = conf.getTimeDuration(
+      monitorInterval = config.getTimeDuration(
           ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
           ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT,
           TimeUnit.SECONDS);
     }
 
-    monitor = new DatanodeAdminMonitorImpl(conf, eventQueue, nodeManager,
-        replicationManager);
+    monitor = new DatanodeAdminMonitorImpl(config, eventQueue, nodeManager,
+        rm);
     this.metrics = NodeDecommissionMetrics.create();
     monitor.setMetrics(this.metrics);
     executor.scheduleAtFixedRate(monitor, monitorInterval, monitorInterval,
