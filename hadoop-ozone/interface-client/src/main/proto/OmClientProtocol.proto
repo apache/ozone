@@ -1537,8 +1537,8 @@ message ListOpenFilesRequest {
 
 message ListOpenFilesResponse {
   // size of openKeyTable and openFileTable combined
-  optional uint64 globalTotal = 1;  // TODO: Rename to totalOpenKeyCount
-  // if true, indicates that there are remaining entries under the path
+  optional uint64 totalOpenKeyCount = 1;
+  // indicates if there are more entries to be retrieved under the given path
   optional bool hasMore = 2;
   // result
   repeated uint64 clientID = 3;

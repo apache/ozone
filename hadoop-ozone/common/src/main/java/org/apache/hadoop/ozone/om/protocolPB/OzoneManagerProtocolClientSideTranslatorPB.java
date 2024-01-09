@@ -1815,7 +1815,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     return new ListOpenFilesResult(resp.getClientIDList(),
         resp.getKeyInfoList(),
         resp.getHasMore(),
-        resp.getGlobalTotal());
+        resp.getTotalOpenKeyCount());
   }
 
   @Override
