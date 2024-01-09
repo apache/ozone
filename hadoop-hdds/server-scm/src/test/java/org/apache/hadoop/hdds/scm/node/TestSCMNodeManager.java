@@ -1631,6 +1631,46 @@ public class TestSCMNodeManager {
     }
   }
 
+  private static Stream<Arguments> calculateStorageCapacityScenarios() {
+    return Stream.of(
+        Arguments.of(600, 6, 1, "600.0B"),
+        Arguments.of(10000, 1000, 12, "117.2KB"),
+        Arguments.of(100000000, 1000, 12, "1.1GB"),
+        Arguments.of(10000, 1000, 0, "0.0B")
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("calculateStorageCapacityScenarios")
+  public void testcalculateStorageCapacity(long capacity,
+      long used, int volumeCount, String totalCapacity)
+          throws AuthenticationException, IOException {
+    OzoneConfiguration conf = getConf();
+    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
+        MILLISECONDS);
+    try (SCMNodeManager nodeManager = createNodeManager(conf)) {
+      EventQueue eventQueue = (EventQueue) scm.getEventQueue();
+      LayoutVersionManager versionManager =
+          nodeManager.getLayoutVersionManager();
+      LayoutVersionProto layoutInfo = toLayoutVersionProto(
+          versionManager.getMetadataLayoutVersion(),
+          versionManager.getSoftwareLayoutVersion());
+      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+      UUID dnId = dn.getUuid();
+      List<StorageReportProto> reports = volumeCount > 0 ?
+          generateStorageReportProto(volumeCount, dnId, capacity, used) : null;
+      nodeManager.register(dn, reports != null ?
+          HddsTestUtils.createNodeReport(reports, emptyList()) : null, null);
+      nodeManager.processHeartbeat(dn, layoutInfo);
+      eventQueue.processAll(8000L);
+      NodeStateManager nodeStateManager = nodeManager.getNodeStateManager();
+      List<DatanodeInfo> dataNodeInfoList = nodeStateManager.getAllNodes();
+      String capacityResult = nodeManager.calculateStorageCapacity(
+          dataNodeInfoList.get(0));
+      assertEquals(capacityResult, totalCapacity);
+    }
+  }
+
   /**
    * Test multiple nodes sending initial heartbeat with their node report
    * with multiple volumes.

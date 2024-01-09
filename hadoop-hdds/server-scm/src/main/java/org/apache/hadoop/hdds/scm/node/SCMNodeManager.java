@@ -144,6 +144,7 @@ public class SCMNodeManager implements NodeManager {
   private final String comState = "COMSTATE";
   private final String lastHeartbeat = "LASTHEARTBEAT";
   private final String usedSpacePercent = "USEDSPACEPERCENT";
+  private final String totalCapacity = "CAPACITY";
   /**
    * Constructs SCM machine Manager.
    */
@@ -1116,11 +1117,52 @@ public class SCMNodeManager implements NodeManager {
         map.put(httpsPort.getName().toString(),
                   httpsPort.getValue().toString());
       }
+      String capacity = calculateStorageCapacity(dni);
+      map.put(totalCapacity, capacity);
       double usedPec = calculateStoragePercentage(dni);
       map.put(usedSpacePercent, usedPec + "%");
       nodes.put(hostName, map);
     }
     return nodes;
+  }
+
+  /**
+   * Calculate the storage capacity of the DataNode node.
+   * @param dni DataNode node that needs to be calculated.
+   * @return
+   */
+  public String calculateStorageCapacity(DatanodeInfo dni) {
+    long capacityByte = 0;
+    List<StorageReportProto> storageReports = dni.getStorageReports();
+    if (storageReports != null && !storageReports.isEmpty()) {
+      for (StorageReportProto storageReport : storageReports) {
+        capacityByte += storageReport.getCapacity();
+      }
+    }
+
+    double ua = capacityByte;
+    String unit = "B";
+    if (ua > 1024) {
+      ua = ua / 1024;
+      unit = "KB";
+    }
+    if (ua > 1024) {
+      ua = ua / 1024;
+      unit = "MB";
+    }
+    if (ua > 1024) {
+      ua = ua / 1024;
+      unit = "GB";
+    }
+    if (ua > 1024) {
+      ua = ua / 1024;
+      unit = "TB";
+    }
+
+    DecimalFormat decimalFormat = new DecimalFormat("#0.0");
+    decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
+    double capacity = Double.valueOf(decimalFormat.format(ua));
+    return capacity + unit;
   }
 
   /**
@@ -1135,8 +1177,8 @@ public class SCMNodeManager implements NodeManager {
       long capacity = 0;
       long scmUsed = 0;
       for (StorageReportProto storageReport : storageReports) {
-        capacity = capacity + storageReport.getCapacity();
-        scmUsed = scmUsed + storageReport.getScmUsed();
+        capacity += storageReport.getCapacity();
+        scmUsed += storageReport.getScmUsed();
       }
       double percent = (double) scmUsed / capacity;
       percent = percent > 1.0 ? 1.0 : percent;
