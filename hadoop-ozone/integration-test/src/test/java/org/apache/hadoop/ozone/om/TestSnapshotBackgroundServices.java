@@ -51,7 +51,6 @@ import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -81,6 +80,9 @@ import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithStoppedNodes.createKey;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests snapshot background services.
@@ -222,7 +224,7 @@ public class TestSnapshotBackgroundServices {
         getNewLeader(leaderOM, followerOM.getOMNodeId(), followerOM);
     OzoneManager newFollowerOM =
         cluster.getOzoneManager(leaderOM.getOMNodeId());
-    Assertions.assertEquals(leaderOM, newFollowerOM);
+    assertEquals(leaderOM, newFollowerOM);
 
     SnapshotInfo newSnapshot = createOzoneSnapshot(newLeaderOM,
         SNAPSHOT_NAME_PREFIX + RandomStringUtils.randomNumeric(5));
@@ -247,12 +249,12 @@ public class TestSnapshotBackgroundServices {
         .getMetadataManager()
         .getKeyTable(ozoneBucket.getBucketLayout());
     OmKeyInfo keyInfoA = omKeyInfoTable.get(keyA);
-    Assertions.assertNotNull(keyInfoA);
+    assertNotNull(keyInfoA);
 
     // create snapshot b
     SnapshotInfo snapshotInfoB = createOzoneSnapshot(newLeaderOM,
         SNAPSHOT_NAME_PREFIX + RandomStringUtils.randomNumeric(5));
-    Assertions.assertNotNull(snapshotInfoB);
+    assertNotNull(snapshotInfoB);
 
     // delete key a
     ozoneBucket.deleteKey(keyNameA);
@@ -270,7 +272,7 @@ public class TestSnapshotBackgroundServices {
         .getOmSnapshotManager()
         .checkForSnapshot(volumeName, bucketName,
             getSnapshotPrefix(snapshotInfoC.getName()), true)) {
-      Assertions.assertNotNull(rcC);
+      assertNotNull(rcC);
       snapC = (OmSnapshot) rcC.get();
     }
 
@@ -296,7 +298,7 @@ public class TestSnapshotBackgroundServices {
         .getOmSnapshotManager()
         .checkForSnapshot(volumeName, bucketName,
             getSnapshotPrefix(snapshotInfoD.getName()), true)) {
-      Assertions.assertNotNull(rcD);
+      assertNotNull(rcD);
       snapD = (OmSnapshot) rcD.get();
     }
 
@@ -403,23 +405,23 @@ public class TestSnapshotBackgroundServices {
         getNewLeader(leaderOM, followerOM.getOMNodeId(), followerOM);
     OzoneManager newFollowerOM =
         cluster.getOzoneManager(leaderOM.getOMNodeId());
-    Assertions.assertEquals(leaderOM, newFollowerOM);
+    assertEquals(leaderOM, newFollowerOM);
 
     List<CompactionLogEntry> compactionLogEntriesOnPreviousLeader =
         getCompactionLogEntries(leaderOM);
 
     List<CompactionLogEntry> compactionLogEntriesOnNewLeader =
         getCompactionLogEntries(newLeaderOM);
-    Assertions.assertEquals(compactionLogEntriesOnPreviousLeader,
+    assertEquals(compactionLogEntriesOnPreviousLeader,
         compactionLogEntriesOnNewLeader);
 
-    Assertions.assertEquals(leaderOM.getMetadataManager().getStore()
+    assertEquals(leaderOM.getMetadataManager().getStore()
             .getRocksDBCheckpointDiffer().getForwardCompactionDAG().nodes()
             .stream().map(CompactionNode::getFileName).collect(toSet()),
         newLeaderOM.getMetadataManager().getStore()
             .getRocksDBCheckpointDiffer().getForwardCompactionDAG().nodes()
             .stream().map(CompactionNode::getFileName).collect(toSet()));
-    Assertions.assertEquals(leaderOM.getMetadataManager().getStore()
+    assertEquals(leaderOM.getMetadataManager().getStore()
             .getRocksDBCheckpointDiffer().getForwardCompactionDAG().edges()
             .stream().map(edge ->
                 edge.source().getFileName() + "-" + edge.target().getFileName())
@@ -467,13 +469,13 @@ public class TestSnapshotBackgroundServices {
         getNewLeader(leaderOM, followerOM.getOMNodeId(), followerOM);
     OzoneManager newFollowerOM =
         cluster.getOzoneManager(leaderOM.getOMNodeId());
-    Assertions.assertEquals(leaderOM, newFollowerOM);
+    assertEquals(leaderOM, newFollowerOM);
 
     createSnapshotsEachWithNewKeys(newLeaderOM);
 
     File sstBackupDir = getSstBackupDir(newLeaderOM);
     File[] files = sstBackupDir.listFiles();
-    Assertions.assertNotNull(files);
+    assertNotNull(files);
     int numberOfSstFiles = files.length;
 
     resumeBackupCompactionFilesPruning(newLeaderOM);
@@ -522,7 +524,7 @@ public class TestSnapshotBackgroundServices {
         getNewLeader(leaderOM, followerOM.getOMNodeId(), followerOM);
     OzoneManager newFollowerOM =
         cluster.getOzoneManager(leaderOM.getOMNodeId());
-    Assertions.assertEquals(leaderOM, newFollowerOM);
+    assertEquals(leaderOM, newFollowerOM);
 
     checkIfSnapshotGetsProcessedBySFS(newLeaderOM);
 
@@ -542,7 +544,7 @@ public class TestSnapshotBackgroundServices {
             RandomStringUtils.randomNumeric(10)).getName();
     SnapshotDiffReportOzone diff = getSnapDiffReport(volumeName, bucketName,
         firstSnapshot, secondSnapshot);
-    Assertions.assertEquals(Collections.singletonList(
+    assertEquals(Collections.singletonList(
             SnapshotDiffReportOzone.getDiffReportEntry(
                 SnapshotDiffReport.DiffType.CREATE, diffKey, null)),
         diff.getDiffList());
@@ -565,9 +567,9 @@ public class TestSnapshotBackgroundServices {
         .getStore()
         .getRocksDBCheckpointDiffer()
         .getSSTBackupDir();
-    Assertions.assertNotNull(sstBackupDirPath);
+    assertNotNull(sstBackupDirPath);
     File sstBackupDir = new File(sstBackupDirPath);
-    Assertions.assertNotNull(sstBackupDir);
+    assertNotNull(sstBackupDir);
     return sstBackupDir;
   }
 
@@ -577,7 +579,7 @@ public class TestSnapshotBackgroundServices {
     SnapshotInfo newSnapshot = createOzoneSnapshot(ozoneManager,
         TestSnapshotBackgroundServices.SNAPSHOT_NAME_PREFIX +
             RandomStringUtils.randomNumeric(5));
-    Assertions.assertNotNull(newSnapshot);
+    assertNotNull(newSnapshot);
     Table<String, SnapshotInfo> snapshotInfoTable =
         ozoneManager.getMetadataManager().getSnapshotInfoTable();
     GenericTestUtils.waitFor(() -> {
@@ -585,7 +587,7 @@ public class TestSnapshotBackgroundServices {
       try {
         snapshotInfo = snapshotInfoTable.get(newSnapshot.getTableKey());
       } catch (IOException e) {
-        Assertions.fail();
+        fail();
       }
       return snapshotInfo.isSstFiltered();
     }, 1000, 10000);
@@ -597,7 +599,7 @@ public class TestSnapshotBackgroundServices {
       throws IOException, TimeoutException, InterruptedException {
     verifyLeadershipTransfer(leaderOM, followerNodeId, followerOM);
     OzoneManager newLeaderOM = cluster.getOMLeader();
-    Assertions.assertEquals(followerOM, newLeaderOM);
+    assertEquals(followerOM, newLeaderOM);
     return newLeaderOM;
   }
 
