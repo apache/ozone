@@ -79,7 +79,7 @@ public final class Pipeline {
   private Map<DatanodeDetails, Long> nodeStatus;
   private Map<DatanodeDetails, Integer> replicaIndexes;
   // nodes with ordered distance to client
-  private volatile List<DatanodeDetails> nodesInOrder = null;
+  private List<DatanodeDetails> nodesInOrder = new ArrayList<>();
   // Current reported Leader for the pipeline
   private UUID leaderId;
   // Timestamp for pipeline upon creation
@@ -287,7 +287,7 @@ public final class Pipeline {
     if (excluded == null) {
       excluded = Collections.emptySet();
     }
-    if (nodesInOrder == null || nodesInOrder.isEmpty()) {
+    if (nodesInOrder.isEmpty()) {
       LOG.debug("Nodes in order is empty, delegate to getFirstNode");
       return getFirstNode(excluded);
     }
@@ -316,11 +316,15 @@ public final class Pipeline {
   }
 
   public void setNodesInOrder(List<DatanodeDetails> nodes) {
-    nodesInOrder = nodes;
+    nodesInOrder.clear();
+    if (null == nodes) {
+      return;
+    }
+    nodesInOrder.addAll(nodes);
   }
 
   public List<DatanodeDetails> getNodesInOrder() {
-    if (nodesInOrder == null || nodesInOrder.isEmpty()) {
+    if (nodesInOrder.isEmpty()) {
       LOG.debug("Nodes in order is empty, delegate to getNodes");
       return getNodes();
     }
@@ -403,7 +407,7 @@ public final class Pipeline {
     // To save the message size on wire, only transfer the node order based on
     // network topology
     List<DatanodeDetails> nodes = nodesInOrder;
-    if (nodes != null && !nodes.isEmpty()) {
+    if (!nodes.isEmpty()) {
       for (int i = 0; i < nodes.size(); i++) {
         Iterator<DatanodeDetails> it = nodeStatus.keySet().iterator();
         for (int j = 0; j < nodeStatus.keySet().size(); j++) {
