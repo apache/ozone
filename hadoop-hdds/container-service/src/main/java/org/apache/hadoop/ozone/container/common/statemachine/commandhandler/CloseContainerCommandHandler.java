@@ -102,12 +102,8 @@ public class CloseContainerCommandHandler implements CommandHandler {
         final Container container = controller.getContainer(containerId);
 
         if (container == null) {
-          // Change the log level from error to info,
-          // since the container may not have been created
-          // due to issue documented in HDDS-9550/HDDS-9600.
-          // Currently the error log stands out when it is
-          // probably not a real issue.
           LOG.info("Container #{} does not exist in datanode. "
+              + "Its pipeline may have closed before it was created. "
               + "Container close failed.", containerId);
           return;
         }
