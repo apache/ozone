@@ -1201,10 +1201,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     List<OpenKeySession> openKeySessionList = new ArrayList<>();
     int currentCount = 0;
     final boolean hasMore;
+    final String retContToken;
 
-    // TODO: If we want "better" results, we may want to iterate cache like
+    // TODO: If we want "better" results, we want to iterate cache like
     //  listKeys do. But that complicates the iteration logic by quite a bit.
-    //  If we do that, we would want to refactor listKeys as well to dedup.
+    //  And if we do that, we need to refactor listKeys as well to dedup.
 
     final Table<String, OmKeyInfo> okTable, kTable;
     okTable = getOpenKeyTable(bucketLayout);
@@ -1213,16 +1214,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     // No lock required since table iterator creates a "snapshot"
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-             openKeyIter = okTable.iterator();
-         TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
-             keyIter = kTable.iterator()
-    ) {
+             openKeyIter = okTable.iterator()) {
       KeyValue<String, OmKeyInfo> kv;
       kv = openKeyIter.seek(dbContTokenPrefix);
-      if (hasContToken &&
-          kv.getKey().startsWith(dbContTokenPrefix + OM_KEY_PREFIX)) {
+      if (hasContToken && kv.getKey().equals(dbContTokenPrefix)) {
         // Skip one entry when cont token is specified and the current entry
-        // has the same prefix (less the client ID) as cont token.
+        // key is exactly the same as cont token.
         openKeyIter.next();
       }
       while (currentCount < maxKeys && openKeyIter.hasNext()) {
@@ -1235,8 +1232,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           // Trim client ID to get the keyTable dbKey
           int lastSlashIdx = dbKey.lastIndexOf(OM_KEY_PREFIX);
           String ktDbKey = dbKey.substring(0, lastSlashIdx);
-          // Check whether the key has been hsync'ed by seeking keyTable
-          checkAndUpdateKeyHsyncStatus(omKeyInfo, ktDbKey, keyIter);
+          // Check whether the key has been hsync'ed by checking keyTable
+          checkAndUpdateKeyHsyncStatus(omKeyInfo, ktDbKey, kTable);
 
           openKeySessionList.add(
               new OpenKeySession(clientID, omKeyInfo,
@@ -1247,17 +1244,21 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
       // Set hasMore flag as a hint for client-side pagination
       if (openKeyIter.hasNext()) {
-        kv = openKeyIter.next();
-        hasMore = kv != null && kv.getKey().startsWith(dbOpenKeyPrefix);
+        KeyValue<String, OmKeyInfo> nextKv = openKeyIter.next();
+        hasMore = nextKv != null && nextKv.getKey().startsWith(dbOpenKeyPrefix);
       } else {
         hasMore = false;
       }
+
+      // Set continuation token
+      retContToken = hasMore ? kv.getKey() : null;
     }
 
     return new ListOpenFilesResult(
-        openKeySessionList,
+        getTotalOpenKeyCount(),
         hasMore,
-        getTotalOpenKeyCount());
+        retContToken,
+        openKeySessionList);
   }
 
   /**
@@ -1265,16 +1266,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    */
   private void checkAndUpdateKeyHsyncStatus(OmKeyInfo omKeyInfo,
                                             String dbKey,
-                                            TableIterator<String, ? extends
-                                                KeyValue<String, OmKeyInfo>>
-                                                keyIter)
+                                            Table<String, OmKeyInfo> kTable)
       throws IOException {
-    // TODO: do keyTable.get() directly
-    KeyValue<String, OmKeyInfo> kv = keyIter.seek(dbKey);
-    if (kv != null && kv.getKey().equals(dbKey)) {
+    OmKeyInfo ktOmKeyInfo = kTable.get(dbKey);
+    if (ktOmKeyInfo != null) {
       // The same key in OpenKeyTable also exists in KeyTable, indicating
       // the key has been hsync'ed
-      OmKeyInfo ktOmKeyInfo = kv.getValue();
       String hsyncClientId = ktOmKeyInfo.getMetadata().get(HSYNC_CLIENT_ID);
       // Append HSYNC_CLIENT_ID to OmKeyInfo to be returned to the client
       omKeyInfo.getMetadata().put(HSYNC_CLIENT_ID, hsyncClientId);

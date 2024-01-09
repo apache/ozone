@@ -411,7 +411,7 @@ public interface OzoneManagerProtocol
 
   /**
    * List open files in OM.
-   * @param path root "/", path to a bucket, key path, or key prefix
+   * @param path One of: root "/", path to a bucket, key path, or key prefix
    * @param maxKeys Limit the number of keys that can be returned in this batch.
    * @param contToken Continuation token.
    * @return ListOpenFilesResult

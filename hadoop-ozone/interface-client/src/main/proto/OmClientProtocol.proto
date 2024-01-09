@@ -1540,9 +1540,11 @@ message ListOpenFilesResponse {
   optional uint64 totalOpenKeyCount = 1;
   // indicates if there are more entries to be retrieved under the given path
   optional bool hasMore = 2;
+  // continuation token should match a dbKey in openKeyTable or openFileTable
+  optional string continuationToken = 3;
   // result
-  repeated uint64 clientID = 3;
-  repeated KeyInfo keyInfo = 4;
+  repeated uint64 clientID = 4;
+  repeated KeyInfo keyInfo = 5;
 }
 
 message ServicePort {

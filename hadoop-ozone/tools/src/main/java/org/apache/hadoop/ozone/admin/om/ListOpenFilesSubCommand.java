@@ -163,9 +163,7 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
 
     // Compose next batch's command
     if (res.hasMore()) {
-      OpenKeySession lastElement = openFileList.get(openFileList.size() - 1);
-      String nextBatchCmd =
-          getCmdForNextBatch(getFullPathFromKeyInfo(lastElement.getKeyInfo()));
+      String nextBatchCmd = getCmdForNextBatch(res.getContinuationToken());
 
       System.out.println("\n" +
           "To get the next batch of open keys, run:\n  " + nextBatchCmd);

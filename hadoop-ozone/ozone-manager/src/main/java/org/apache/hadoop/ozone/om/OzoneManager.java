@@ -3269,34 +3269,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // if a continuation token is not specified
       dbContTokenPrefix = dbOpenKeyPrefix;
     } else {
-      // need to translate FSO bucket cont. token's volume and bucket names
-      // into object IDs
-
-      StringTokenizer tokenizer = new StringTokenizer(contToken, OM_KEY_PREFIX);
-      // Validate cont. token to avoid NoSuchElementException
-      if (tokenizer.countTokens() < 2) {
-        metrics.incNumListOpenFilesFails();
-        throw new OMException("Invalid continuation token: " + contToken,
-            INVALID_PATH);
-      }
-      final String ctVolumeName = tokenizer.nextToken();
-      final String ctBucketName = tokenizer.nextToken();
-      // Validate that path and cont. token refers to the same bucket
-      Preconditions.checkArgument(volumeName.equals(ctVolumeName),
-          "Path volume name '" + volumeName +
-              "' and token volume name '" + ctVolumeName + "' does not match");
-      Preconditions.checkArgument(bucketName.equals(ctBucketName),
-          "Path bucket name '" + bucketName +
-              "' and token bucket name '" + ctBucketName + "' does not match");
-
-      if (bucketLayout.equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
-        final String ctKeyPrefix = tokenizer.hasMoreTokens() ?
-            tokenizer.nextToken("").substring(1) : "";
-        dbContTokenPrefix = metadataManager.getOzoneKeyFSO(
-            ctVolumeName, ctBucketName, ctKeyPrefix);
-      } else {
-        dbContTokenPrefix = contToken;
-      }
+      dbContTokenPrefix = contToken;
     }
 
     // arg processing done. call inner impl (table iteration)

@@ -1812,10 +1812,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     final ListOpenFilesResponse resp = handleError(submitRequest(omRequest))
         .getListOpenFilesResponse();
 
-    return new ListOpenFilesResult(resp.getClientIDList(),
-        resp.getKeyInfoList(),
+    return new ListOpenFilesResult(
+        resp.getTotalOpenKeyCount(),
         resp.getHasMore(),
-        resp.getTotalOpenKeyCount());
+        resp.hasContinuationToken() ? resp.getContinuationToken() : null,
+        resp.getClientIDList(),
+        resp.getKeyInfoList());
   }
 
   @Override

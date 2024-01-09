@@ -32,37 +32,52 @@ import java.util.List;
  */
 public class ListOpenFilesResult {
   /**
-   * List of open files. Each has client ID and OmKeyInfo.
+   * Number of total open files globally.
    */
-  private final List<OpenKeySession> openKeySessionList;
+  @JsonProperty("totalOpenKeyCount")
+  private final long totalOpenKeyCount;
   /**
    * True if there are more entries after this batch under the given path.
    */
   @JsonProperty("hasMore")
   private final boolean hasMore;
   /**
-   * Number of total open files globally.
+   * True if there are more entries after this batch under the given path.
    */
-  @JsonProperty("totalOpenKeyCount")
-  private final long totalOpenKeyCount;
+  @JsonProperty("contToken")
+  private final String continuationToken;
+  /**
+   * List of open files. Each has client ID and OmKeyInfo.
+   */
+  private final List<OpenKeySession> openKeySessionList;
 
-  public ListOpenFilesResult(List<OpenKeySession> openKeySessionList,
-                             boolean hasMore, long totalOpenKeyCount) {
+  public ListOpenFilesResult(long totalOpenKeyCount,
+                             boolean hasMore,
+                             String continuationToken,
+                             List<OpenKeySession> openKeySessionList) {
     this.openKeySessionList = openKeySessionList;
     this.hasMore = hasMore;
+    this.continuationToken = continuationToken;
     this.totalOpenKeyCount = totalOpenKeyCount;
   }
 
-  public ListOpenFilesResult(List<Long> clientIDsList,
-                             List<KeyInfo> keyInfosList,
-                             boolean hasMore, long totalOpenKeyCount)
+  public ListOpenFilesResult(long totalOpenKeyCount,
+                             boolean hasMore,
+                             String continuationToken,
+                             List<Long> clientIDsList,
+                             List<KeyInfo> keyInfosList)
       throws IOException {
     this.openKeySessionList = getOpenKeySessionListFromPB(clientIDsList,
         keyInfosList);
     this.hasMore = hasMore;
+    this.continuationToken = continuationToken;
     this.totalOpenKeyCount = totalOpenKeyCount;
   }
 
+  /**
+   * Combines clientIDsList and keyInfosList into OpenKeySessionList for
+   * transfer to the client.
+   */
   private List<OpenKeySession> getOpenKeySessionListFromPB(
       List<Long> clientIDsList, List<KeyInfo> keyInfosList)
       throws IOException {
@@ -82,15 +97,19 @@ public class ListOpenFilesResult {
     return res;
   }
 
-  public List<OpenKeySession> getOpenKeys() {
-    return openKeySessionList;
+  public long getTotalOpenKeyCount() {
+    return totalOpenKeyCount;
   }
 
   public boolean hasMore() {
     return hasMore;
   }
 
-  public long getTotalOpenKeyCount() {
-    return totalOpenKeyCount;
+  public String getContinuationToken() {
+    return continuationToken;
+  }
+
+  public List<OpenKeySession> getOpenKeys() {
+    return openKeySessionList;
   }
 }

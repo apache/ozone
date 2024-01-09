@@ -941,6 +941,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
     resp.setTotalOpenKeyCount(res.getTotalOpenKeyCount());
     resp.setHasMore(res.hasMore());
+    if (res.getContinuationToken() != null) {
+      resp.setContinuationToken(res.getContinuationToken());
+    }
 
     for (OpenKeySession e : res.getOpenKeys()) {
       resp.addClientID(e.getId());

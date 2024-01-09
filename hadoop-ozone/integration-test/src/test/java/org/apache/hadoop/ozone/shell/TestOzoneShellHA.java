@@ -563,9 +563,11 @@ public class TestOzoneShellHA {
     OzoneConfiguration clientConf = getClientConfForOFS(hostPrefix, conf);
     FileSystem fs = FileSystem.get(clientConf);
 
-    final String volumeName = "volumelof";
+    final String volumeName = "volume-lof";
+    final String bucketName = "buck1";
+
     String dir1 = hostPrefix + OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX +
-        "buck1" + OM_KEY_PREFIX + "dir1";
+        bucketName + OM_KEY_PREFIX + "dir1";
     // Create volume, bucket, dir
     assertTrue(fs.mkdirs(new Path(dir1)));
     String keyPrefix = OM_KEY_PREFIX + "key";
