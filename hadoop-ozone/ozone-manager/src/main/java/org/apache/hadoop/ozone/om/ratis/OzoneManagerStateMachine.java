@@ -453,6 +453,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   public long takeSnapshot() throws IOException {
     // wait until applied == skipped
     while (getLastAppliedTermIndex().getIndex() < lastSkippedIndex) {
+      if (ozoneManager.isStopped()) {
+        throw new IOException("OzoneManager is already stopped: " + ozoneManager.getNodeDetails());
+      }
       try {
         ozoneManagerDoubleBuffer.awaitFlush();
       } catch (InterruptedException e) {
