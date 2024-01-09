@@ -939,10 +939,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         impl.listOpenFiles(req.getPath(), req.getCount(), req.getToken());
     // TODO: Avoid unnecessary ser-de?
 
-    resp.setGlobalTotal(res.getGlobalTotal());
+    resp.setGlobalTotal(res.getTotalOpenKeyCount());
     resp.setHasMore(res.hasMore());
 
-    for (OpenKeySession e : res.getOpenFiles()) {
+    for (OpenKeySession e : res.getOpenKeys()) {
       resp.addClientID(e.getId());
       resp.addKeyInfo(e.getKeyInfo().getProtobuf(clientVersion));
     }

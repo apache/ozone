@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 
@@ -37,27 +38,29 @@ public class ListOpenFilesResult {
   /**
    * True if there are more entries after this batch under the given path.
    */
+  @JsonProperty("hasMore")
   private final boolean hasMore;
   /**
    * Number of total open files globally.
    */
-  private final long globalTotal;
+  @JsonProperty("totalOpenKeyCount")
+  private final long totalOpenKeyCount;
 
   public ListOpenFilesResult(List<OpenKeySession> openKeySessionList,
-                             boolean hasMore, long globalTotal) {
+                             boolean hasMore, long totalOpenKeyCount) {
     this.openKeySessionList = openKeySessionList;
     this.hasMore = hasMore;
-    this.globalTotal = globalTotal;
+    this.totalOpenKeyCount = totalOpenKeyCount;
   }
 
   public ListOpenFilesResult(List<Long> clientIDsList,
                              List<KeyInfo> keyInfosList,
-                             boolean hasMore, long globalTotal)
+                             boolean hasMore, long totalOpenKeyCount)
       throws IOException {
     this.openKeySessionList = getOpenKeySessionListFromPB(clientIDsList,
         keyInfosList);
     this.hasMore = hasMore;
-    this.globalTotal = globalTotal;
+    this.totalOpenKeyCount = totalOpenKeyCount;
   }
 
   private List<OpenKeySession> getOpenKeySessionListFromPB(
@@ -79,7 +82,7 @@ public class ListOpenFilesResult {
     return res;
   }
 
-  public List<OpenKeySession> getOpenFiles() {
+  public List<OpenKeySession> getOpenKeys() {
     return openKeySessionList;
   }
 
@@ -87,7 +90,7 @@ public class ListOpenFilesResult {
     return hasMore;
   }
 
-  public long getGlobalTotal() {
-    return globalTotal;
+  public long getTotalOpenKeyCount() {
+    return totalOpenKeyCount;
   }
 }

@@ -128,6 +128,11 @@ public interface OMMetadataManager extends DBStoreHAManager {
 
   String getOzoneKey(String volume, String bucket, String key);
 
+  String getOzoneKeyFSO(String volumeName,
+                        String bucketName,
+                        String keyPrefix)
+      throws IOException;
+
   /**
    * Given a volume, bucket and a key, return the corresponding DB directory
    * key.
@@ -314,7 +319,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * Get total open key count (estimated, due to the nature of RocksDB impl)
    * of both OpenKeyTable and OpenFileTable.
    */
-  long getOpenKeyCount() throws IOException;
+  long getTotalOpenKeyCount() throws IOException;
 
   /**
    * Returns the names of up to {@code count} open keys whose age is
