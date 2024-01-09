@@ -67,7 +67,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import org.apache.ratis.statemachine.impl.StatemachineImplTestUtil;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -209,9 +208,7 @@ public class TestValidateBCSIDOnRestart {
     // make sure the missing containerSet is not empty
     HddsDispatcher dispatcher = (HddsDispatcher) ozoneContainer.getDispatcher();
     assertFalse(dispatcher.getMissingContainerSet().isEmpty());
-    Assertions
-        .assertTrue(dispatcher.getMissingContainerSet()
-            .contains(containerID));
+    assertTrue(dispatcher.getMissingContainerSet().contains(containerID));
     // write a new key
     key = objectStore.getVolume(volumeName).getBucket(bucketName)
         .createKey("ratis", 1024,
