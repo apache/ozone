@@ -297,7 +297,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <aspectj.version>1.9.7</aspectj.version>
     <aspectj-plugin.version>1.14.0</aspectj-plugin.version>
     <restrict-imports.enforcer.version>2.4.0</restrict-imports.enforcer.version>
-    <awaitility.version>4.2.0</awaitility.version>
     <bzip2.version>1.0.8</bzip2.version>
     <zlib.version>1.2.13</zlib.version>
     <lz4.version>1.9.3</lz4.version>
@@ -1487,11 +1486,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.xerial</groupId>
         <artifactId>sqlite-jdbc</artifactId>
         <version>${sqlite.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.awaitility</groupId>
-        <artifactId>awaitility</artifactId>
-        <version>${awaitility.version}</version>
       </dependency>
       <dependency>
         <groupId>jakarta.activation</groupId>
