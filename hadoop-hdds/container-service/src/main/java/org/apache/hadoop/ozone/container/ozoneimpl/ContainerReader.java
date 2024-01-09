@@ -148,7 +148,18 @@ public class ContainerReader implements Runnable {
       LOG.info("Start to verify containers on volume {}", hddsVolumeRootDir);
       File currentDir = new File(idDir, Storage.STORAGE_DIR_CURRENT);
       File[] containerTopDirs = currentDir.listFiles();
-      if (containerTopDirs != null) {
+      if (containerTopDirs != null && containerTopDirs.length > 0) {
+        try {
+          // idDir is working directory having data
+          // and volume is initialized with temp path
+          hddsVolume.createTmpDirs(idDir.getName());
+        } catch (IOException e) {
+          LOG.error("Volume {} dir path {} can not be accessed to create " +
+              "temp dirs.", hddsVolumeRootDir, idDir.getName(), e);
+          volumeSet.failVolume(hddsVolumeRootDir.getPath());
+          return;
+        }
+
         for (File containerTopDir : containerTopDirs) {
           if (containerTopDir.isDirectory()) {
             File[] containerDirs = containerTopDir.listFiles();
