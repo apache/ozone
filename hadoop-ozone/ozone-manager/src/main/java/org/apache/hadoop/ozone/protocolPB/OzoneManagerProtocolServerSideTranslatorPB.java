@@ -364,7 +364,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
 
   @VisibleForTesting
   public void setShouldFlushCache(boolean shouldFlushCache) {
-    ozoneManagerDoubleBuffer.stopDaemon();
+    if (ozoneManagerDoubleBuffer != null) {
+      ozoneManagerDoubleBuffer.stopDaemon();
+    }
     this.shouldFlushCache = shouldFlushCache;
   }
 }
