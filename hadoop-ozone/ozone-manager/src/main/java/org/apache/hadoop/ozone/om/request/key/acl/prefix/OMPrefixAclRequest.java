@@ -162,8 +162,7 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
 
   private void validatePrefixPath(String prefixPath) throws OMException {
     if (!OzoneFSUtils.isValidName(prefixPath)) {
-      throw new OMException("Prefix path is not a valid path " +
-          "for prefix path: " + prefixPath,
+      throw new OMException("Invalid prefix path name: " + prefixPath,
           OMException.ResultCodes.INVALID_PATH_IN_ACL_REQUEST);
     }
   }
