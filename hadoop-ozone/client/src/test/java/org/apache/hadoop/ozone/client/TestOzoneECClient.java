@@ -65,8 +65,8 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -225,7 +225,7 @@ public class TestOzoneECClient {
     // create key without mentioning replication config. Since we set EC
     // replication in bucket, key should be EC key.
     try (OzoneOutputStream out = bucket.createKey("mykey", inputSize)) {
-      assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
+      assertInstanceOf(ECKeyOutputStream.class, out.getOutputStream());
       for (int i = 0; i < inputChunks.length; i++) {
         out.write(inputChunks[i]);
       }
@@ -467,7 +467,7 @@ public class TestOzoneECClient {
     // create key without mentioning replication config. Since we set EC
     // replication in bucket, key should be EC key.
     try (OzoneOutputStream out = bucket.createKey("mykey", 6 * inputSize)) {
-      assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
+      assertInstanceOf(ECKeyOutputStream.class, out.getOutputStream());
       // Block Size is 2kb, so to create 3 blocks we need 6 iterations here
       for (int j = 0; j < 6; j++) {
         for (int i = 0; i < inputChunks.length; i++) {
@@ -863,8 +863,7 @@ public class TestOzoneECClient {
     try (OzoneOutputStream out = bucket.createKey(keyName,
         2L * dataBlocks * chunkSize, repConfig, new HashMap<>())) {
 
-      assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
-      ECKeyOutputStream ecKeyOut = (ECKeyOutputStream) out.getOutputStream();
+      ECKeyOutputStream ecKeyOut = assertInstanceOf(ECKeyOutputStream.class, out.getOutputStream());
 
       List<HddsProtos.DatanodeDetailsProto> dns = blkAllocator.getClusterDns();
 
@@ -1065,8 +1064,7 @@ public class TestOzoneECClient {
         new ECReplicationConfig(dataBlocks, parityBlocks,
             ECReplicationConfig.EcCodec.RS,
             chunkSize), new HashMap<>())) {
-      assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
-      ECKeyOutputStream kos = (ECKeyOutputStream) out.getOutputStream();
+      ECKeyOutputStream kos = assertInstanceOf(ECKeyOutputStream.class, out.getOutputStream());
       List<OmKeyLocationInfo> blockInfos = getAllLocationInfoList(kos);
       assertEquals(1, blockInfos.size());
 
