@@ -1655,8 +1655,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .getBucketTable()));
 
     if (getMetricsStorageFile().exists()) {
-      OmMetricsInfo metricsInfo = READER.readValue(getMetricsStorageFile());
-      metrics.setNumKeys(metricsInfo.getNumKeys());
+      OmMetricsInfo metricsInfo = null;
+      try {
+        metricsInfo = READER.readValue(getMetricsStorageFile());
+      } catch (Exception e) {
+        LOG.error("Failure to parse OM Metrics File", e);
+      }
+      if (metricsInfo != null) {
+        metrics.setNumKeys(metricsInfo.getNumKeys());
+      } else {
+        metrics.setNumKeys(metadataManager.countEstimatedRowsInTable(
+            metadataManager.getKeyTable(BucketLayout.LEGACY)));
+      }
     }
 
     // FSO(FILE_SYSTEM_OPTIMIZED)
