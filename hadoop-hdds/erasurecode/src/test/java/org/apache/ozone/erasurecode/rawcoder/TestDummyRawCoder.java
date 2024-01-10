@@ -21,7 +21,6 @@ import org.apache.ozone.erasurecode.ECChunk;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;

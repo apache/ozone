@@ -135,7 +135,7 @@ public abstract class TestRawCoderBase extends TestCoderBase {
 
   @Test
   public void testCodingWithErasingTooMany() {
-    assertThrows(Exception.class, () -> testCoding(true),"Decoding test erasing too many should fail");
+    assertThrows(Exception.class, () -> testCoding(true), "Decoding test erasing too many should fail");
 
     assertThrows(Exception.class, () -> testCoding(false), "Decoding test erasing too many should fail");
   }
