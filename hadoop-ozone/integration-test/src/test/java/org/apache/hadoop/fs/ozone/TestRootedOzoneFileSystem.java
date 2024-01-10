@@ -256,6 +256,7 @@ public class TestRootedOzoneFileSystem {
     conf.setFloat(FS_TRASH_CHECKPOINT_INTERVAL_KEY, TRASH_INTERVAL / 2);
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, omRatisEnabled);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
+    conf.set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "0s");
     if (isBucketFSOptimized) {
       bucketLayout = BucketLayout.FILE_SYSTEM_OPTIMIZED;
       conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
