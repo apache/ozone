@@ -22,6 +22,7 @@ import com.google.common.collect.Sets;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
@@ -136,7 +137,7 @@ public class ContainerKeyScanner implements Callable<Void>,
           db.get().newIterator(columnFamilyHandle))) {
         iterator.get().seekToFirst();
         while (iterator.get().isValid()) {
-          directoryTableData.put(new String(iterator.get().key(), UTF_8),
+          directoryTableData.put(StringUtils.bytes2String(iterator.get().key()),
               OmDirectoryInfo.getCodec()
                   .fromPersistedFormat(iterator.get().value()));
           iterator.get().next();
