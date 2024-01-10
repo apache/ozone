@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
+import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -37,6 +38,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.PriorityQueue;
 import java.util.TreeMap;
+import java.util.function.Predicate;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -118,13 +120,16 @@ public class ListIterator {
 
     private final Table<String, Value> table;
     private HeapEntry currentKey;
+    private Predicate<String> isKeyExistsInCache;
 
     DbTableIter(int entryIteratorId, Table<String, Value> table,
-                String prefixKey, String startKey) throws IOException {
+                String prefixKey, String startKey,
+                Predicate<String> isKeyExistsInCache) throws IOException {
       this.entryIteratorId = entryIteratorId;
       this.table = table;
       this.tableIterator = table.iterator(prefixKey);
       this.currentKey = null;
+      this.isKeyExistsInCache = isKeyExistsInCache;
 
       // only seek for the start key if the start key is lexicographically
       // after the prefix key. For example
@@ -144,7 +149,7 @@ public class ListIterator {
       while (tableIterator.hasNext() && currentKey == null) {
         Table.KeyValue<String, Value> entry = tableIterator.next();
         String entryKey = entry.getKey();
-        if (!KeyManagerImpl.isKeyInCache(entryKey, table)) {
+        if (!isKeyExistsInCache.test(entryKey)) {
           currentKey = new HeapEntry(entryIteratorId,
               table.getName(), entryKey, entry.getValue());
         }
@@ -236,6 +241,10 @@ public class ListIterator {
       }
     }
 
+    public boolean isKeyExistInCache(String key) {
+      return cacheKeyMap.containsKey(key);
+    }
+
     public boolean hasNext() {
       return cacheCreatedKeyIter.hasNext();
     }
@@ -292,11 +301,13 @@ public class ListIterator {
       try {
         int iteratorId = 0;
         for (Table table : tables) {
-          iterators.add(new CacheIter<>(iteratorId, table.getName(),
-                  table.cacheIterator(), startKey, prefixKey));
+          CacheIter cacheIter = new CacheIter<>(iteratorId, table.getName(),
+              table.cacheIterator(), startKey, prefixKey);
+          Predicate<String> isKeyExistInCache = cacheIter::isKeyExistInCache;
+          iterators.add(cacheIter);
           iteratorId++;
           iterators.add(new DbTableIter<>(iteratorId, table, prefixKey,
-              startKey));
+              startKey, isKeyExistInCache));
           iteratorId++;
         }
       } finally {
@@ -321,7 +332,9 @@ public class ListIterator {
       return !minHeap.isEmpty();
     }
 
-    public HeapEntry next() {
+    // HeapEntry can be null when a key is marked as deleted because
+    // value of key would be returned as null from cache iterator.
+    public @Nullable HeapEntry next() {
       HeapEntry heapEntry = minHeap.remove();
       // remove the least element and
       // reinsert the next element from the same iterator
