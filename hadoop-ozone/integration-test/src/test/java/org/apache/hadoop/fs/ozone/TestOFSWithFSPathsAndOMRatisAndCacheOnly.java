@@ -15,15 +15,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.ozone.test;
+package org.apache.hadoop.fs.ozone;
 
-/**
- * Interface to mark JUnit4 test classes or methods that take too much time.
- * These are excluded from CI runs for each commit, but can be run manually or
- * in scheduled runs.
- *
- * Usage: <code>@Category(SlowTest.class) @Slow("HDDS-123")</code>
- */
-public interface SlowTest {
-  // category marker
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.junit.jupiter.api.TestInstance;
+
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class TestOFSWithFSPathsAndOMRatisAndCacheOnly extends AbstractRootedOzoneFileSystemTest {
+  TestOFSWithFSPathsAndOMRatisAndCacheOnly() {
+    super(BucketLayout.LEGACY, true, true, false, true);
+  }
 }

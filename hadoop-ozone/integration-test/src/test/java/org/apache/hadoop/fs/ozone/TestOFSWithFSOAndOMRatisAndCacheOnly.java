@@ -15,16 +15,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.ozone.test;
+package org.apache.hadoop.fs.ozone;
 
-/**
- * Interface to mark JUnit4 test classes or methods that are unhealthy, which
- * means either they are unstable or inconsistent to run.
- * These are excluded from CI runs for each commit, but can be run manually or
- * in scheduled runs.
- *
- * Usage: <code>@Category(UnhealthyTest.class) @Unhealthy("HDDS-123")</code>
- */
-public interface UnhealthyTest {
-  // category marker
+import org.junit.jupiter.api.TestInstance;
+
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class TestOFSWithFSOAndOMRatisAndCacheOnly extends AbstractRootedOzoneFileSystemTestWithFSO {
+  TestOFSWithFSOAndOMRatisAndCacheOnly() {
+    super(true, false, true);
+  }
 }

@@ -26,13 +26,16 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.HashMap;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -49,13 +52,17 @@ import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
+import org.apache.hadoop.ozone.om.ratis.metrics.OzoneManagerStateMachineMetrics;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -72,8 +79,6 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
    * Ozone is made active by setting OZONE_ENABLED = true.
    * Ozone OM Ratis server is made active by setting
    * OZONE_OM_RATIS_ENABLE = true;
-   *
-   * @throws IOException
    */
   @BeforeAll
   public static void init() throws Exception {
@@ -100,10 +105,9 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
 
   /**
    * Tests get the information of key with network topology awareness enabled.
-   * @throws IOException
    */
   @Test
-  public void testGetKeyAndFileWithNetworkTopology() throws IOException {
+  void testGetKeyAndFileWithNetworkTopology() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
@@ -196,9 +200,6 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
 
     assertNotNull(multipartInfo);
     String uploadID = multipartInfo.getUploadID();
-    assertEquals(volumeName, multipartInfo.getVolumeName());
-    assertEquals(bucketName, multipartInfo.getBucketName());
-    assertEquals(keyName, multipartInfo.getKeyName());
     assertNotNull(multipartInfo.getUploadID());
 
     OzoneDataStreamOutput ozoneStreamOutput = bucket.createMultipartStreamKey(
@@ -283,5 +284,114 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
       }
     }
     assertArrayEquals(data, buffer);
+  }
+
+  @Test
+  public void testParallelDeleteBucketAndCreateKey() throws IOException,
+      InterruptedException, TimeoutException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    String value = "sample value";
+    getStore().createVolume(volumeName);
+    OzoneVolume volume = getStore().getVolume(volumeName);
+    volume.createBucket(bucketName);
+    String keyName = UUID.randomUUID().toString();
+
+    GenericTestUtils.LogCapturer omSMLog = GenericTestUtils.LogCapturer
+        .captureLogs(OzoneManagerStateMachine.LOG);
+    OzoneManagerStateMachine omSM = getCluster().getOzoneManager()
+        .getOmRatisServer().getOmStateMachine();
+    OzoneManagerStateMachineMetrics metrics = omSM.getMetrics();
+
+    Thread thread1 = new Thread(() -> {
+      try {
+        volume.deleteBucket(bucketName);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    });
+
+    Thread thread2 = new Thread(() -> {
+      try {
+        getClient().getProxy().createKey(volumeName, bucketName, keyName,
+            0, ReplicationType.RATIS, ONE, new HashMap<>());
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    });
+
+    OMRequestHandlerPauseInjector injector =
+        new OMRequestHandlerPauseInjector();
+    omSM.getHandler().setInjector(injector);
+    thread1.start();
+    thread2.start();
+    GenericTestUtils.waitFor(() -> metrics.getApplyTransactionMapSize() > 0,
+        100, 5000);
+    Thread.sleep(2000);
+    injector.resume();
+
+    try {
+      thread1.join();
+      thread2.join();
+    } catch (InterruptedException ex) {
+      throw new RuntimeException(ex);
+    }
+
+    omSM.getHandler().setInjector(null);
+    // Generate more write requests to OM
+    String newBucketName = UUID.randomUUID().toString();
+    volume.createBucket(newBucketName);
+    OzoneBucket bucket = volume.getBucket(newBucketName);
+    for (int i = 0; i < 10; i++) {
+      bucket.createKey("key-" + i, value.getBytes(UTF_8).length,
+          ReplicationType.RATIS, ONE, new HashMap<>());
+    }
+
+    assertThat(omSMLog.getOutput()).contains("Failed to write, Exception occurred");
+    GenericTestUtils.waitFor(() -> metrics.getApplyTransactionMapSize() == 0,
+        100, 5000);
+  }
+
+  private static class OMRequestHandlerPauseInjector extends FaultInjector {
+    private CountDownLatch ready;
+    private CountDownLatch wait;
+
+    OMRequestHandlerPauseInjector() {
+      init();
+    }
+
+    @Override
+    public void init() {
+      this.ready = new CountDownLatch(1);
+      this.wait = new CountDownLatch(1);
+    }
+
+    @Override
+    public void pause() throws IOException {
+      ready.countDown();
+      try {
+        wait.await();
+      } catch (InterruptedException e) {
+        throw new IOException(e);
+      }
+    }
+
+    @Override
+    public void resume() {
+      // Make sure injector pauses before resuming.
+      try {
+        ready.await();
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+        fail("resume interrupted");
+      }
+      wait.countDown();
+    }
+
+    @Override
+    public void reset() throws IOException {
+      init();
+    }
   }
 }

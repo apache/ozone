@@ -487,6 +487,7 @@ function get_count_misc_files() {
         "^.github"
         "^hadoop-hdds/dev-support/checkstyle"
         "^hadoop-ozone/dev-support/checks"
+        "^hadoop-ozone/dev-support/intellij"
         "^hadoop-ozone/dist/src/main/license"
         "\.bats$"
         "\.txt$"

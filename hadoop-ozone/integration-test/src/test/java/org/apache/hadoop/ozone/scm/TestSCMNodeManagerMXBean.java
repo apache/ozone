@@ -98,7 +98,7 @@ public class TestSCMNodeManagerMXBean {
     Map<String, Map<String, Integer>> mbeanMap = convertNodeCountToMap(data);
     Map<String, Map<String, Integer>> nodeMap =
         scm.getScmNodeManager().getNodeCount();
-    assertTrue(nodeMap.equals(mbeanMap));
+    assertEquals(nodeMap, mbeanMap);
   }
 
   private Map<String, Map<String, Integer>> convertNodeCountToMap(

@@ -36,6 +36,8 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 
 import org.apache.commons.lang3.StringUtils;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT;
@@ -43,17 +45,12 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * This test class verifies the parsing of SCM endpoint config settings. The
@@ -130,8 +127,8 @@ public class TestHddsClientUtils {
         HddsUtils.getScmAddressForClients(conf).iterator();
     assertTrue(scmAddrIterator.hasNext());
     InetSocketAddress scmAddr = scmAddrIterator.next();
-    assertThat(scmAddr.getHostString(), is(address));
-    assertThat(scmAddr.getPort(), is(port));
+    assertEquals(address, scmAddr.getHostString());
+    assertEquals(port, scmAddr.getPort());
   }
 
   @Test

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -95,23 +95,15 @@ import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.Time;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
-import org.apache.ozone.test.FlakyTest;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.JUnit5AwareTimeout;
-import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.RaftServerConfigKeys;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.experimental.categories.Category;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.mockito.ArgumentMatcher;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
@@ -133,6 +125,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -147,7 +140,16 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_C
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils.setInternalState;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
-import static org.junit.Assert.fail;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
@@ -156,35 +158,25 @@ import static org.mockito.Mockito.verify;
 /**
  * Test class that exercises the StorageContainerManager.
  */
+@Timeout(900)
 public class TestStorageContainerManager {
   private static XceiverClientManager xceiverClientManager;
   private static final Logger LOG = LoggerFactory.getLogger(
             TestStorageContainerManager.class);
-  /**
-   * Set the timeout for every test.
-   */
-  @Rule
-  public TestRule testTimeout = new JUnit5AwareTimeout(Timeout.seconds(900));
 
-  @Rule
-  public ExpectedException thrown = ExpectedException.none();
-
-  @Rule
-  public ExpectedException exception = ExpectedException.none();
-
-  @BeforeClass
+  @BeforeAll
   public static void setup() throws IOException {
     xceiverClientManager = new XceiverClientManager(new OzoneConfiguration());
   }
 
-  @AfterClass
+  @AfterAll
   public static void cleanup() {
     if (xceiverClientManager != null) {
       xceiverClientManager.close();
     }
   }
 
-  @After
+  @AfterEach
   public void cleanupDefaults() {
     DefaultConfigManager.clearDefaultConfigs();
   }
@@ -238,7 +230,7 @@ public class TestStorageContainerManager {
       } else {
         // If passes permission check, it should fail with
         // container not exist exception.
-        Assert.assertTrue(e instanceof ContainerNotFoundException);
+        assertInstanceOf(ContainerNotFoundException.class, e);
       }
     }
 
@@ -249,7 +241,7 @@ public class TestStorageContainerManager {
       if (expectPermissionDenied) {
         fail("Operation should fail, expecting an IOException here.");
       } else {
-        Assert.assertEquals(1, container2.getPipeline().getNodes().size());
+        assertEquals(1, container2.getPipeline().getNodes().size());
       }
     } catch (Exception e) {
       verifyPermissionDeniedException(e, fakeRemoteUsername);
@@ -265,7 +257,7 @@ public class TestStorageContainerManager {
       } else {
         // If passes permission check, it should fail with
         // key not exist exception.
-        Assert.assertTrue(e instanceof ContainerNotFoundException);
+        assertInstanceOf(ContainerNotFoundException.class, e);
       }
     }
   }
@@ -273,8 +265,8 @@ public class TestStorageContainerManager {
   private void verifyPermissionDeniedException(Exception e, String userName) {
     String expectedErrorMessage = "Access denied for user "
         + userName + ". " + "SCM superuser privilege is required.";
-    Assert.assertTrue(e instanceof IOException);
-    Assert.assertEquals(expectedErrorMessage, e.getMessage());
+    assertInstanceOf(IOException.class, e);
+    assertEquals(expectedErrorMessage, e.getMessage());
   }
 
   @Test
@@ -307,7 +299,7 @@ public class TestStorageContainerManager {
     try {
       DeletedBlockLog delLog = cluster.getStorageContainerManager()
           .getScmBlockManager().getDeletedBlockLog();
-      Assert.assertEquals(0, delLog.getNumOfValidTransactions());
+      assertEquals(0, delLog.getNumOfValidTransactions());
 
       // Create {numKeys} random names keys.
       TestStorageContainerManagerHelper helper =
@@ -325,7 +317,7 @@ public class TestStorageContainerManager {
           delLog, keyLocations, helper);
 
       // Verify a few TX gets created in the TX log.
-      Assert.assertTrue(delLog.getNumOfValidTransactions() > 0);
+      assertTrue(delLog.getNumOfValidTransactions() > 0);
 
       // Once TXs are written into the log, SCM starts to fetch TX
       // entries from the log and schedule block deletions in HB interval,
@@ -343,7 +335,7 @@ public class TestStorageContainerManager {
           return false;
         }
       }, 1000, 10000);
-      Assert.assertTrue(helper.verifyBlocksWithTxnTable(containerBlocks));
+      assertTrue(helper.verifyBlocksWithTxnTable(containerBlocks));
       // Continue the work, add some TXs that with known container names,
       // but unknown block IDs.
       for (Long containerID : containerBlocks.keySet()) {
@@ -358,7 +350,7 @@ public class TestStorageContainerManager {
       }
 
       // Verify a few TX gets created in the TX log.
-      Assert.assertTrue(delLog.getNumOfValidTransactions() > 0);
+      assertTrue(delLog.getNumOfValidTransactions() > 0);
 
       // These blocks cannot be found in the container, skip deleting them
       // eventually these TX will success.
@@ -401,13 +393,13 @@ public class TestStorageContainerManager {
       scm = HddsTestUtils.getScmSimple(scm.getConfiguration());
 
       DatanodeStateMachine dsm = datanode.getDatanodeStateMachine();
-      Assert.assertEquals(DatanodeStateMachine.DatanodeStates.RUNNING,
+      assertEquals(DatanodeStateMachine.DatanodeStates.RUNNING,
           dsm.getContext().getState());
       // DN Endpoint State has already gone through GetVersion and Register,
       // so it will be in HEARTBEAT state.
       for (EndpointStateMachine endpoint : dsm.getConnectionManager()
           .getValues()) {
-        Assert.assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT,
+        assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT,
             endpoint.getState());
       }
       GenericTestUtils.LogCapturer scmDnHBDispatcherLog =
@@ -419,12 +411,12 @@ public class TestStorageContainerManager {
       GenericTestUtils.LogCapturer versionEndPointTaskLog =
           GenericTestUtils.LogCapturer.captureLogs(VersionEndpointTask.LOG);
       // Initially empty
-      Assert.assertTrue(scmDnHBDispatcherLog.getOutput().isEmpty());
-      Assert.assertTrue(versionEndPointTaskLog.getOutput().isEmpty());
+      assertTrue(scmDnHBDispatcherLog.getOutput().isEmpty());
+      assertTrue(versionEndPointTaskLog.getOutput().isEmpty());
       // start the new SCM
       scm.start();
       // Initially DatanodeStateMachine will be in Running state
-      Assert.assertEquals(DatanodeStateMachine.DatanodeStates.RUNNING,
+      assertEquals(DatanodeStateMachine.DatanodeStates.RUNNING,
           dsm.getContext().getState());
       // DN heartbeats to new SCM, SCM doesn't recognize the node, sends the
       // command to DN to re-register. Wait for SCM to send re-register command
@@ -448,9 +440,9 @@ public class TestStorageContainerManager {
           100, 5000);
       GenericTestUtils.waitFor(() -> dsm.getContext().getShutdownOnError(), 100,
           5000);
-      Assert.assertEquals(DatanodeStateMachine.DatanodeStates.SHUTDOWN,
+      assertEquals(DatanodeStateMachine.DatanodeStates.SHUTDOWN,
           dsm.getContext().getState());
-      Assert.assertTrue(versionEndPointTaskLog.getOutput().contains(
+      assertTrue(versionEndPointTaskLog.getOutput().contains(
           "org.apache.hadoop.ozone.common" +
               ".InconsistentStorageStateException: Mismatched ClusterIDs"));
     } finally {
@@ -484,7 +476,7 @@ public class TestStorageContainerManager {
     try {
       DeletedBlockLog delLog = cluster.getStorageContainerManager()
           .getScmBlockManager().getDeletedBlockLog();
-      Assert.assertEquals(0, delLog.getNumOfValidTransactions());
+      assertEquals(0, delLog.getNumOfValidTransactions());
 
       int limitSize = 1;
       // Reset limit value to 1, so that we only allow one TX is dealt per
@@ -507,7 +499,7 @@ public class TestStorageContainerManager {
       createDeleteTXLog(cluster.getStorageContainerManager(),
           delLog, keyLocations, helper);
       // Verify a few TX gets created in the TX log.
-      Assert.assertTrue(delLog.getNumOfValidTransactions() > 0);
+      assertTrue(delLog.getNumOfValidTransactions() > 0);
 
       // Verify the size in delete commands is expected.
       GenericTestUtils.waitFor(() -> {
@@ -561,8 +553,8 @@ public class TestStorageContainerManager {
     for (OmKeyInfo info : keyLocations.values()) {
       totalCreatedBlocks += info.getKeyLocationVersions().size();
     }
-    Assert.assertTrue(totalCreatedBlocks > 0);
-    Assert.assertEquals(totalCreatedBlocks,
+    assertTrue(totalCreatedBlocks > 0);
+    assertEquals(totalCreatedBlocks,
         helper.getAllBlocks(containerNames).size());
 
     // Create a deletion TX for each key.
@@ -600,12 +592,12 @@ public class TestStorageContainerManager {
     StorageContainerManager.scmInit(conf, testClusterId);
 
     SCMStorageConfig scmStore = new SCMStorageConfig(conf);
-    Assert.assertEquals(NodeType.SCM, scmStore.getNodeType());
-    Assert.assertEquals(testClusterId, scmStore.getClusterID());
+    assertEquals(NodeType.SCM, scmStore.getNodeType());
+    assertEquals(testClusterId, scmStore.getClusterID());
     StorageContainerManager.scmInit(conf, testClusterId);
-    Assert.assertEquals(NodeType.SCM, scmStore.getNodeType());
-    Assert.assertEquals(testClusterId, scmStore.getClusterID());
-    Assert.assertTrue(scmStore.isSCMHAEnabled());
+    assertEquals(NodeType.SCM, scmStore.getNodeType());
+    assertEquals(testClusterId, scmStore.getClusterID());
+    assertTrue(scmStore.isSCMHAEnabled());
   }
 
   @Test
@@ -622,7 +614,7 @@ public class TestStorageContainerManager {
     // This will initialize SCM
     StorageContainerManager.scmInit(conf, clusterId.toString());
     SCMStorageConfig scmStore = new SCMStorageConfig(conf);
-    Assert.assertTrue(scmStore.isSCMHAEnabled());
+    assertTrue(scmStore.isSCMHAEnabled());
     validateRatisGroupExists(conf, clusterId.toString());
   }
 
@@ -637,13 +629,14 @@ public class TestStorageContainerManager {
     MiniOzoneCluster cluster =
         MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
     cluster.waitForClusterToBeReady();
+    cluster.getStorageContainerManager().stop();
     try {
       final UUID clusterId = UUID.randomUUID();
       // This will initialize SCM
       StorageContainerManager.scmInit(conf, clusterId.toString());
       SCMStorageConfig scmStore = new SCMStorageConfig(conf);
-      Assert.assertNotEquals(clusterId.toString(), scmStore.getClusterID());
-      Assert.assertFalse(scmStore.isSCMHAEnabled());
+      assertNotEquals(clusterId.toString(), scmStore.getClusterID());
+      assertTrue(scmStore.isSCMHAEnabled());
     } finally {
       cluster.shutdown();
     }
@@ -663,13 +656,13 @@ public class TestStorageContainerManager {
 
     StorageContainerManager.scmInit(conf, clusterId.toString());
     SCMStorageConfig scmStore = new SCMStorageConfig(conf);
-    Assert.assertEquals(clusterId.toString(), scmStore.getClusterID());
-    Assert.assertFalse(scmStore.isSCMHAEnabled());
+    assertEquals(clusterId.toString(), scmStore.getClusterID());
+    assertFalse(scmStore.isSCMHAEnabled());
 
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     StorageContainerManager.scmInit(conf, clusterId.toString());
     scmStore = new SCMStorageConfig(conf);
-    Assert.assertTrue(scmStore.isSCMHAEnabled());
+    assertTrue(scmStore.isSCMHAEnabled());
     validateRatisGroupExists(conf, clusterId.toString());
 
   }
@@ -734,7 +727,7 @@ public class TestStorageContainerManager {
       // validate there is no ratis group pre existing
       try {
         validateRatisGroupExists(conf, clusterId);
-        Assert.fail();
+        fail();
       } catch (IOException ioe) {
         // Exception is expected here
       }
@@ -746,24 +739,22 @@ public class TestStorageContainerManager {
       // Ratis group with cluster id exists now
       validateRatisGroupExists(conf, clusterId);
       SCMStorageConfig scmStore = new SCMStorageConfig(conf);
-      Assert.assertTrue(scmStore.isSCMHAEnabled());
+      assertTrue(scmStore.isSCMHAEnabled());
     } finally {
       cluster.shutdown();
     }
   }
 
   @Test
-  public void testSCMInitializationFailure()
-      throws IOException, AuthenticationException {
+  void testSCMInitializationFailure() {
     OzoneConfiguration conf = new OzoneConfiguration();
     final String path =
         GenericTestUtils.getTempPath(UUID.randomUUID().toString());
     Path scmPath = Paths.get(path, "scm-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
-    exception.expect(SCMException.class);
-    exception.expectMessage(
-        "SCM not initialized due to storage config failure");
-    HddsTestUtils.getScmSimple(conf);
+
+    Exception e = assertThrows(SCMException.class, () -> HddsTestUtils.getScmSimple(conf));
+    assertThat(e).hasMessageContaining("SCM not initialized due to storage config failure");
   }
 
   @Test
@@ -784,12 +775,12 @@ public class TestStorageContainerManager {
       StorageContainerManager scm = HddsTestUtils.getScmSimple(conf);
       //Reads the SCM Info from SCM instance
       ScmInfo scmInfo = scm.getClientProtocolServer().getScmInfo();
-      Assert.assertEquals(clusterId, scmInfo.getClusterId());
-      Assert.assertEquals(scmId, scmInfo.getScmId());
+      assertEquals(clusterId, scmInfo.getClusterId());
+      assertEquals(scmId, scmInfo.getScmId());
 
       String expectedVersion = HddsVersionInfo.HDDS_VERSION_INFO.getVersion();
       String actualVersion = scm.getSoftwareVersion();
-      Assert.assertEquals(expectedVersion, actualVersion);
+      assertEquals(expectedVersion, actualVersion);
     } finally {
       FileUtils.deleteQuietly(new File(path));
     }
@@ -827,14 +818,14 @@ public class TestStorageContainerManager {
       Thread.sleep(heartbeatCheckerIntervalMs * 2);
 
       List<DatanodeDetails> allNodes = scm.getScmNodeManager().getAllNodes();
-      Assert.assertEquals(datanodeNum, allNodes.size());
+      assertEquals(datanodeNum, allNodes.size());
       for (DatanodeDetails node : allNodes) {
         DatanodeInfo datanodeInfo = (DatanodeInfo) scm.getScmNodeManager()
             .getNodeByUuid(node.getUuidString());
-        Assert.assertTrue(datanodeInfo.getLastHeartbeatTime() > start);
-        Assert.assertEquals(datanodeInfo.getUuidString(),
+        assertTrue(datanodeInfo.getLastHeartbeatTime() > start);
+        assertEquals(datanodeInfo.getUuidString(),
             datanodeInfo.getNetworkName());
-        Assert.assertEquals("/rack1", datanodeInfo.getNetworkLocation());
+        assertEquals("/rack1", datanodeInfo.getNetworkLocation());
       }
     } finally {
       cluster.shutdown();
@@ -875,7 +866,7 @@ public class TestStorageContainerManager {
       StorageContainerManager scm = cluster.getStorageContainerManager();
       List<ContainerInfo> containers = cluster.getStorageContainerManager()
           .getContainerManager().getContainers();
-      Assert.assertNotNull(containers);
+      assertNotNull(containers);
       ContainerInfo selectedContainer = containers.iterator().next();
 
       // Stop processing HB
@@ -975,16 +966,15 @@ public class TestStorageContainerManager {
     eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata);
     eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata);
     eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata);
-    Assert.assertTrue(containerReportExecutors.droppedEvents() > 1);
+    assertTrue(containerReportExecutors.droppedEvents() > 1);
     Thread.currentThread().sleep(1000);
-    Assert.assertEquals(containerReportExecutors.droppedEvents()
+    assertEquals(containerReportExecutors.droppedEvents()
             + containerReportExecutors.scheduledEvents(),
         containerReportExecutors.queuedEvents());
     containerReportExecutors.close();
   }
 
   @Test
-  @Category(FlakyTest.class) @Flaky("HDDS-8470")
   public void testContainerReportQueueTakingMoreTime() throws Exception {
     EventQueue eventQueue = new EventQueue();
     List<BlockingQueue<SCMDatanodeHeartbeatDispatcher.ContainerReport>>
@@ -992,11 +982,13 @@ public class TestStorageContainerManager {
     for (int i = 0; i < 1; ++i) {
       queues.add(new ContainerReportQueue());
     }
-
+    Semaphore semaphore = new Semaphore(2);
+    semaphore.acquire(2);
     ContainerReportHandler containerReportHandler =
         Mockito.mock(ContainerReportHandler.class);
     Mockito.doAnswer((inv) -> {
       Thread.currentThread().sleep(1000);
+      semaphore.release(1);
       return null;
     }).when(containerReportHandler).onMessage(Mockito.any(),
         Mockito.eq(eventQueue));
@@ -1013,8 +1005,8 @@ public class TestStorageContainerManager {
             containerReportHandler, queues, eventQueue,
             ContainerReportFromDatanode.class, executors,
             reportExecutorMap);
-    containerReportExecutors.setQueueWaitThreshold(1000);
-    containerReportExecutors.setExecWaitThreshold(1000);
+    containerReportExecutors.setQueueWaitThreshold(800);
+    containerReportExecutors.setExecWaitThreshold(800);
     
     eventQueue.addHandler(SCMEvents.CONTAINER_REPORT, containerReportExecutors,
         containerReportHandler);
@@ -1024,15 +1016,17 @@ public class TestStorageContainerManager {
     ContainerReportFromDatanode dndata1
         = new ContainerReportFromDatanode(dn, report);
     eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata1);
+
     dn = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID())
         .build();
     ContainerReportFromDatanode dndata2
         = new ContainerReportFromDatanode(dn, report);
     eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata2);
-    Thread.currentThread().sleep(3000);
-    Assert.assertTrue(containerReportExecutors.longWaitInQueueEvents() >= 1);
-    Assert.assertTrue(containerReportExecutors.longTimeExecutionEvents() >= 1);
+    semaphore.acquire(2);
+    assertTrue(containerReportExecutors.longWaitInQueueEvents() >= 1);
+    assertTrue(containerReportExecutors.longTimeExecutionEvents() >= 1);
     containerReportExecutors.close();
+    semaphore.release(2);
   }
 
   @Test
@@ -1073,11 +1067,42 @@ public class TestStorageContainerManager {
     eventQueue.fireEvent(SCMEvents.INCREMENTAL_CONTAINER_REPORT, dndata);
     eventQueue.fireEvent(SCMEvents.INCREMENTAL_CONTAINER_REPORT, dndata);
     eventQueue.fireEvent(SCMEvents.INCREMENTAL_CONTAINER_REPORT, dndata);
-    Assert.assertTrue(containerReportExecutors.droppedEvents() == 0);
+    assertEquals(0, containerReportExecutors.droppedEvents());
     Thread.currentThread().sleep(3000);
-    Assert.assertEquals(containerReportExecutors.scheduledEvents(),
+    assertEquals(containerReportExecutors.scheduledEvents(),
         containerReportExecutors.queuedEvents());
     containerReportExecutors.close();
+  }
+
+  @Test
+  public void testNonRatisToRatis()
+      throws IOException, AuthenticationException, InterruptedException,
+      TimeoutException {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    final String clusterID = UUID.randomUUID().toString();
+    try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
+        .setClusterId(clusterID)
+        .setScmId(UUID.randomUUID().toString())
+        .setNumDatanodes(3)
+        .build()) {
+      final StorageContainerManager nonRatisSCM = cluster
+          .getStorageContainerManager();
+      assertNull(nonRatisSCM.getScmHAManager().getRatisServer());
+      assertFalse(nonRatisSCM.getScmStorageConfig().isSCMHAEnabled());
+      nonRatisSCM.stop();
+      nonRatisSCM.join();
+
+      DefaultConfigManager.clearDefaultConfigs();
+      conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
+      StorageContainerManager.scmInit(conf, clusterID);
+      cluster.restartStorageContainerManager(false);
+
+      final StorageContainerManager ratisSCM = cluster
+          .getStorageContainerManager();
+      assertNotNull(ratisSCM.getScmHAManager().getRatisServer());
+      assertTrue(ratisSCM.getScmStorageConfig().isSCMHAEnabled());
+
+    }
   }
 
   private void addTransactions(StorageContainerManager scm,

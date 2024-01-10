@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import com.google.common.base.Optional;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -72,8 +73,8 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long trxnLogIndex = termIndex.getIndex();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumExpiredMPUAbortRequests();

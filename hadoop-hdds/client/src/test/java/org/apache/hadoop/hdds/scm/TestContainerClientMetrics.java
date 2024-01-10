@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.util.Collections;
 import java.util.UUID;
@@ -31,6 +30,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
 
 /**
  * Test ContainerClientMetrics.
@@ -108,7 +108,7 @@ public class TestContainerClientMetrics {
   private Pipeline createPipeline(PipelineID piplineId, UUID leaderId) {
     return Pipeline.newBuilder()
         .setId(piplineId)
-        .setReplicationConfig(Mockito.mock(ReplicationConfig.class))
+        .setReplicationConfig(mock(ReplicationConfig.class))
         .setState(Pipeline.PipelineState.OPEN)
         .setNodes(Collections.emptyList())
         .setLeaderId(leaderId)

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,30 +15,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.fs.ozone;
 
-package org.apache.hadoop.ozone.om.ratis.helpers;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.junit.jupiter.api.TestInstance;
 
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
-
-/**
- * Entry in OzoneManagerDouble Buffer.
- * @param <Response>
- */
-public class DoubleBufferEntry<Response extends OMClientResponse> {
-
-  private long trxLogIndex;
-  private Response response;
-
-  public DoubleBufferEntry(long trxLogIndex, Response response) {
-    this.trxLogIndex = trxLogIndex;
-    this.response = response;
-  }
-
-  public long getTrxLogIndex() {
-    return trxLogIndex;
-  }
-
-  public Response getResponse() {
-    return response;
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class TestOFSWithFSPathsAndOMRatis extends AbstractRootedOzoneFileSystemTest {
+  TestOFSWithFSPathsAndOMRatis() {
+    super(BucketLayout.LEGACY, true, true, false, false);
   }
 }

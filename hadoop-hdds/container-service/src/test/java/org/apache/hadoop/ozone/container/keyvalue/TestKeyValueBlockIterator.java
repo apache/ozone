@@ -54,8 +54,10 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import org.junit.jupiter.api.AfterEach;
 
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.params.ParameterizedTest;
@@ -169,12 +171,8 @@ public class TestKeyValueBlockIterator {
       assertFalse(keyValueBlockIterator.hasNext());
       assertFalse(blockIDIter.hasNext());
 
-      try {
-        keyValueBlockIterator.nextBlock();
-      } catch (NoSuchElementException ex) {
-        GenericTestUtils.assertExceptionContains("Block Iterator reached end " +
-            "for ContainerID " + CONTAINER_ID, ex);
-      }
+      NoSuchElementException exception = assertThrows(NoSuchElementException.class, keyValueBlockIterator::nextBlock);
+      assertThat(exception).hasMessage("Block Iterator reached end for ContainerID " + CONTAINER_ID);
     }
   }
 
@@ -192,12 +190,8 @@ public class TestKeyValueBlockIterator {
       assertEquals((long) blockIDs.get(1),
           keyValueBlockIterator.nextBlock().getLocalID());
 
-      try {
-        keyValueBlockIterator.nextBlock();
-      } catch (NoSuchElementException ex) {
-        GenericTestUtils.assertExceptionContains("Block Iterator reached end " +
-            "for ContainerID " + CONTAINER_ID, ex);
-      }
+      NoSuchElementException exception = assertThrows(NoSuchElementException.class, keyValueBlockIterator::nextBlock);
+      assertThat(exception).hasMessage("Block Iterator reached end for ContainerID " + CONTAINER_ID);
     }
   }
 
@@ -208,8 +202,7 @@ public class TestKeyValueBlockIterator {
       throws Exception {
     initTest(versionInfo, keySeparator);
     List<Long> blockIDs = createContainerWithBlocks(CONTAINER_ID, 2);
-    try (BlockIterator<BlockData> blockIter =
-             db.getStore().getBlockIterator(CONTAINER_ID)) {
+    try (BlockIterator<BlockData> blockIter = db.getStore().getBlockIterator(CONTAINER_ID)) {
 
       // Even calling multiple times hasNext() should not move entry forward.
       assertTrue(blockIter.hasNext());
@@ -217,8 +210,7 @@ public class TestKeyValueBlockIterator {
       assertTrue(blockIter.hasNext());
       assertTrue(blockIter.hasNext());
       assertTrue(blockIter.hasNext());
-      assertEquals((long) blockIDs.get(0),
-          blockIter.nextBlock().getLocalID());
+      assertEquals((long) blockIDs.get(0), blockIter.nextBlock().getLocalID());
 
       assertTrue(blockIter.hasNext());
       assertTrue(blockIter.hasNext());
@@ -229,14 +221,10 @@ public class TestKeyValueBlockIterator {
 
       blockIter.seekToFirst();
       assertEquals((long) blockIDs.get(0), blockIter.nextBlock().getLocalID());
-      assertEquals((long)blockIDs.get(1), blockIter.nextBlock().getLocalID());
+      assertEquals((long) blockIDs.get(1), blockIter.nextBlock().getLocalID());
 
-      try {
-        blockIter.nextBlock();
-      } catch (NoSuchElementException ex) {
-        GenericTestUtils.assertExceptionContains("Block Iterator reached end " +
-            "for ContainerID " + CONTAINER_ID, ex);
-      }
+      NoSuchElementException exception = assertThrows(NoSuchElementException.class, blockIter::nextBlock);
+      assertThat(exception).hasMessage("Block Iterator reached end for ContainerID " + CONTAINER_ID);
     }
   }
 

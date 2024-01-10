@@ -41,9 +41,9 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.junit.Assert;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * The contract of Ozone: only enabled if the test bucket is provided.
@@ -142,7 +142,7 @@ class OzoneContract extends AbstractFSContract {
   @Override
   public FileSystem getTestFileSystem() throws IOException {
     //assumes cluster is not null
-    Assert.assertNotNull("cluster not created", client);
+    assertNotNull(client);
 
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
 

@@ -876,13 +876,18 @@ public class SCMNodeManager implements NodeManager {
     long capacity = 0L;
     long used = 0L;
     long remaining = 0L;
+    long committed = 0L;
+    long freeSpaceToSpare = 0L;
 
     for (SCMNodeStat stat : getNodeStats().values()) {
       capacity += stat.getCapacity().get();
       used += stat.getScmUsed().get();
       remaining += stat.getRemaining().get();
+      committed += stat.getCommitted().get();
+      freeSpaceToSpare += stat.getFreeSpaceToSpare().get();
     }
-    return new SCMNodeStat(capacity, used, remaining);
+    return new SCMNodeStat(capacity, used, remaining, committed,
+        freeSpaceToSpare);
   }
 
   /**
@@ -987,6 +992,8 @@ public class SCMNodeManager implements NodeManager {
       long capacity = 0L;
       long used = 0L;
       long remaining = 0L;
+      long committed = 0L;
+      long freeSpaceToSpare = 0L;
 
       final DatanodeInfo datanodeInfo = nodeStateManager
           .getNode(datanodeDetails);
@@ -996,8 +1003,11 @@ public class SCMNodeManager implements NodeManager {
         capacity += reportProto.getCapacity();
         used += reportProto.getScmUsed();
         remaining += reportProto.getRemaining();
+        committed += reportProto.getCommitted();
+        freeSpaceToSpare += reportProto.getFreeSpaceToSpare();
       }
-      return new SCMNodeStat(capacity, used, remaining);
+      return new SCMNodeStat(capacity, used, remaining, committed,
+          freeSpaceToSpare);
     } catch (NodeNotFoundException e) {
       LOG.warn("Cannot generate NodeStat, datanode {} not found.",
           datanodeDetails.getUuidString());
@@ -1034,6 +1044,8 @@ public class SCMNodeManager implements NodeManager {
         nodeInfo.put(s.label + stat.name(), 0L);
       }
     }
+    nodeInfo.put("TotalCapacity", 0L);
+    nodeInfo.put("TotalUsed", 0L);
 
     for (DatanodeInfo node : nodeStateManager.getAllNodes()) {
       String keyPrefix = "";
@@ -1068,6 +1080,8 @@ public class SCMNodeManager implements NodeManager {
           nodeInfo.compute(keyPrefix + UsageMetrics.SSDUsed.name(),
               (k, v) -> v + reportProto.getScmUsed());
         }
+        nodeInfo.compute("TotalCapacity", (k, v) -> v + reportProto.getCapacity());
+        nodeInfo.compute("TotalUsed", (k, v) -> v + reportProto.getScmUsed());
       }
     }
     return nodeInfo;

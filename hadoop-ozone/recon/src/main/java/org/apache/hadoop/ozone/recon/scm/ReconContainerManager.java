@@ -218,31 +218,34 @@ public class ReconContainerManager extends ContainerManagerImpl {
 
   /**
    * Adds a new container to Recon's container manager.
+   *
    * @param containerWithPipeline containerInfo with pipeline info
    * @throws IOException on Error.
    */
   public void addNewContainer(ContainerWithPipeline containerWithPipeline)
       throws IOException {
+    ReconPipelineManager reconPipelineManager = (ReconPipelineManager) pipelineManager;
     ContainerInfo containerInfo = containerWithPipeline.getContainerInfo();
     try {
       if (containerInfo.getState().equals(HddsProtos.LifeCycleState.OPEN)) {
         PipelineID pipelineID = containerWithPipeline.getPipeline().getId();
-        if (pipelineManager.containsPipeline(pipelineID)) {
-          getContainerStateManager().addContainer(containerInfo.getProtobuf());
-          pipelineManager.addContainerToPipeline(
-              containerWithPipeline.getPipeline().getId(),
-              containerInfo.containerID());
-          // update open container count on all datanodes on this pipeline
-          pipelineToOpenContainer.put(pipelineID,
-                    pipelineToOpenContainer.getOrDefault(pipelineID, 0) + 1);
-          LOG.info("Successfully added container {} to Recon.",
-              containerInfo.containerID());
-        } else {
-          // Get open container for a pipeline that Recon does not know
-          // about yet. Cannot update internal state until pipeline is synced.
-          LOG.warn("Pipeline {} not found. Cannot add container {}",
-                  pipelineID, containerInfo.containerID());
+        // Check if the pipeline is present in Recon
+        if (!pipelineManager.containsPipeline(pipelineID)) {
+          // Pipeline is not present, add it first.
+          LOG.info("Adding new pipeline {} from SCM.", pipelineID);
+          reconPipelineManager.addPipeline(containerWithPipeline.getPipeline());
         }
+
+        getContainerStateManager().addContainer(containerInfo.getProtobuf());
+        pipelineManager.addContainerToPipeline(
+            containerWithPipeline.getPipeline().getId(),
+            containerInfo.containerID());
+        // update open container count on all datanodes on this pipeline
+        pipelineToOpenContainer.put(pipelineID,
+            pipelineToOpenContainer.getOrDefault(pipelineID, 0) + 1);
+        LOG.info("Successfully added container {} to Recon.",
+            containerInfo.containerID());
+
       } else {
         getContainerStateManager().addContainer(containerInfo.getProtobuf());
         LOG.info("Successfully added no open container {} to Recon.",
@@ -456,4 +459,8 @@ public class ReconContainerManager extends ContainerManagerImpl {
     return pipelineToOpenContainer;
   }
 
+  @VisibleForTesting
+  public StorageContainerServiceProvider getScmClient() {
+    return scmClient;
+  }
 }

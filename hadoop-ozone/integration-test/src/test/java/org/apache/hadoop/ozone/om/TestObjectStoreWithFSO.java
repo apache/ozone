@@ -168,9 +168,9 @@ public class TestObjectStoreWithFSO {
 
     ObjectStore objectStore = client.getObjectStore();
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
-    assertTrue(ozoneVolume.getName().equals(volumeName));
+    assertEquals(volumeName, ozoneVolume.getName());
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
-    assertTrue(ozoneBucket.getName().equals(bucketName));
+    assertEquals(bucketName, ozoneBucket.getName());
 
     Table<String, OmKeyInfo> openFileTable =
         cluster.getOzoneManager().getMetadataManager()
@@ -303,9 +303,9 @@ public class TestObjectStoreWithFSO {
 
     ObjectStore objectStore = client.getObjectStore();
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
-    assertTrue(ozoneVolume.getName().equals(volumeName));
+    assertEquals(volumeName, ozoneVolume.getName());
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
-    assertTrue(ozoneBucket.getName().equals(bucketName));
+    assertEquals(bucketName, ozoneBucket.getName());
 
     Table<String, OmKeyInfo> openFileTable =
         cluster.getOzoneManager().getMetadataManager()
@@ -397,9 +397,9 @@ public class TestObjectStoreWithFSO {
   public void testListKeysAtDifferentLevels() throws Exception {
     ObjectStore objectStore = client.getObjectStore();
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
-    assertTrue(ozoneVolume.getName().equals(volumeName));
+    assertEquals(volumeName, ozoneVolume.getName());
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
-    assertTrue(ozoneBucket.getName().equals(bucketName));
+    assertEquals(bucketName, ozoneBucket.getName());
 
     String keyc1 = "/a/b1/c1/c1.tx";
     String keyc2 = "/a/b1/c2/c2.tx";
@@ -529,9 +529,9 @@ public class TestObjectStoreWithFSO {
   public void testListKeysWithNotNormalizedPath() throws Exception {
     ObjectStore objectStore = client.getObjectStore();
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
-    assertTrue(ozoneVolume.getName().equals(volumeName));
+    assertEquals(volumeName, ozoneVolume.getName());
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
-    assertTrue(ozoneBucket.getName().equals(bucketName));
+    assertEquals(bucketName, ozoneBucket.getName());
 
     String key1 = "/dir1///dir2/file1/";
     String key2 = "/dir1///dir2/file2/";

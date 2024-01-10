@@ -40,6 +40,7 @@ import static org.apache.hadoop.ozone.om.request.validation.testvalidatorset1.Ge
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateDirectory;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateKey;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateVolume;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -111,8 +112,8 @@ public class TestValidatorRegistry {
     assertEquals(2, validators.size());
     List<String> methodNames =
         validators.stream().map(Method::getName).collect(Collectors.toList());
-    assertTrue(methodNames.contains("oldClientPreProcessCreateKeyValidator"));
-    assertTrue(methodNames.contains("oldClientPreProcessCreateKeyValidator2"));
+    assertThat(methodNames).contains("oldClientPreProcessCreateKeyValidator");
+    assertThat(methodNames).contains("oldClientPreProcessCreateKeyValidator2");
   }
 
   @Test
@@ -125,8 +126,8 @@ public class TestValidatorRegistry {
     assertEquals(2, validators.size());
     List<String> methodNames =
         validators.stream().map(Method::getName).collect(Collectors.toList());
-    assertTrue(methodNames.contains("oldClientPostProcessCreateKeyValidator"));
-    assertTrue(methodNames.contains("oldClientPostProcessCreateKeyValidator2"));
+    assertThat(methodNames).contains("oldClientPostProcessCreateKeyValidator");
+    assertThat(methodNames).contains("oldClientPostProcessCreateKeyValidator2");
   }
 
   @Test
@@ -174,12 +175,9 @@ public class TestValidatorRegistry {
     assertEquals(3, validators.size());
     List<String> methodNames =
         validators.stream().map(Method::getName).collect(Collectors.toList());
-    assertTrue(
-        methodNames.contains("preFinalizePostProcessCreateKeyValidator"));
-    assertTrue(
-        methodNames.contains("oldClientPostProcessCreateKeyValidator"));
-    assertTrue(
-        methodNames.contains("oldClientPostProcessCreateKeyValidator2"));
+    assertThat(methodNames).contains("preFinalizePostProcessCreateKeyValidator");
+    assertThat(methodNames).contains("oldClientPostProcessCreateKeyValidator");
+    assertThat(methodNames).contains("oldClientPostProcessCreateKeyValidator2");
   }
 
   @Test

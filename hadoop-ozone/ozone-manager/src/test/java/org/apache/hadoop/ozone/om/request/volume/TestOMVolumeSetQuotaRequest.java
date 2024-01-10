@@ -26,13 +26,17 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Tests set volume property request.
@@ -53,7 +57,7 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
 
     OMRequest modifiedRequest = omVolumeSetQuotaRequest.preExecute(
         ozoneManager);
-    Assertions.assertNotEquals(modifiedRequest, originalRequest);
+    assertNotEquals(modifiedRequest, originalRequest);
   }
 
   @Test
@@ -81,7 +85,7 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
     OmVolumeArgs omVolumeArgs =
         omMetadataManager.getVolumeTable().get(volumeKey);
     // As request is valid volume table should not have entry.
-    Assertions.assertNotNull(omVolumeArgs);
+    assertNotNull(omVolumeArgs);
     long quotaBytesBeforeSet = omVolumeArgs.getQuotaInBytes();
     long quotaNamespaceBeforeSet = omVolumeArgs.getQuotaInNamespace();
 
@@ -90,18 +94,17 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
-    Assertions.assertNotNull(omResponse.getSetVolumePropertyResponse());
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
-        omResponse.getStatus());
+    assertNotNull(omResponse.getSetVolumePropertyResponse());
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, omResponse.getStatus());
 
 
     OmVolumeArgs ova = omMetadataManager.getVolumeTable().get(volumeKey);
     long quotaBytesAfterSet = ova.getQuotaInBytes();
     long quotaNamespaceAfterSet = ova.getQuotaInNamespace();
-    Assertions.assertEquals(quotaInBytes, quotaBytesAfterSet);
-    Assertions.assertEquals(quotaInNamespace, quotaNamespaceAfterSet);
-    Assertions.assertNotEquals(quotaBytesBeforeSet, quotaBytesAfterSet);
-    Assertions.assertNotEquals(quotaNamespaceBeforeSet, quotaNamespaceAfterSet);
+    assertEquals(quotaInBytes, quotaBytesAfterSet);
+    assertEquals(quotaInNamespace, quotaNamespaceAfterSet);
+    assertNotEquals(quotaBytesBeforeSet, quotaBytesAfterSet);
+    assertNotEquals(quotaNamespaceBeforeSet, quotaNamespaceAfterSet);
 
     // modificationTime should be greater than creationTime.
     long creationTime = omMetadataManager
@@ -113,7 +116,7 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
     // millisecond - since there is no time-consuming operation between
     // OMRequestTestUtils.addVolumeToDB (sets creationTime) and
     // preExecute (sets modificationTime).
-    Assertions.assertTrue(modificationTime >= creationTime);
+    assertThat(modificationTime).isGreaterThanOrEqualTo(creationTime);
   }
 
   @Test
@@ -137,8 +140,8 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
-    Assertions.assertNotNull(omResponse.getCreateVolumeResponse());
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
+    assertNotNull(omResponse.getCreateVolumeResponse());
+    assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omResponse.getStatus());
   }
 
@@ -161,8 +164,8 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
 
     OzoneManagerProtocolProtos.OMResponse omResponse =
         omClientResponse.getOMResponse();
-    Assertions.assertNotNull(omResponse.getCreateVolumeResponse());
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST,
+    assertNotNull(omResponse.getCreateVolumeResponse());
+    assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST,
         omResponse.getStatus());
   }
 
@@ -191,15 +194,15 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
     OMClientResponse omClientResponse = omVolumeSetQuotaRequest
         .validateAndUpdateCache(ozoneManager, 1);
     //capture the error log
-    Assertions.assertTrue(logs.getOutput().contains(
-        "Changing volume quota failed for volume"));
+    assertThat(logs.getOutput()).contains(
+        "Changing volume quota failed for volume");
 
-    Assertions.assertFalse(omClientResponse.getOMResponse().getSuccess());
-    Assertions.assertEquals(omClientResponse.getOMResponse().getStatus(),
+    assertFalse(omClientResponse.getOMResponse().getSuccess());
+    assertEquals(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
-    Assertions.assertTrue(omClientResponse.getOMResponse().getMessage().
+    assertThat(omClientResponse.getOMResponse().getMessage()).
         contains("Total buckets quota in this volume " +
-            "should not be greater than volume quota"));
+            "should not be greater than volume quota");
   }
 
   @Test
@@ -220,7 +223,7 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
 
     OMClientResponse omClientResponse = omVolumeSetQuotaRequest
         .validateAndUpdateCache(ozoneManager, 1);
-    Assertions.assertEquals(omClientResponse.getOMResponse().getStatus(),
+    assertEquals(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.QUOTA_ERROR);
   }
 
@@ -250,7 +253,7 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
 
     OMClientResponse omClientResponse = omVolumeSetQuotaRequest
         .validateAndUpdateCache(ozoneManager, 1);
-    Assertions.assertEquals(omClientResponse.getOMResponse().getStatus(),
+    assertEquals(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.OK);
   }
 
@@ -274,10 +277,9 @@ public class TestOMVolumeSetQuotaRequest extends TestOMVolumeRequest {
 
     OMClientResponse omClientResponse = omVolumeSetQuotaRequest
         .validateAndUpdateCache(ozoneManager, 1);
-    Assertions.assertEquals(omClientResponse.getOMResponse().getStatus(),
+    assertEquals(omClientResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
-    Assertions.assertTrue(omClientResponse.getOMResponse().getMessage()
-        .contains(
-        "this volume should not be greater than volume namespace quota"));
+    assertThat(omClientResponse.getOMResponse().getMessage())
+        .contains("this volume should not be greater than volume namespace quota");
   }
 }

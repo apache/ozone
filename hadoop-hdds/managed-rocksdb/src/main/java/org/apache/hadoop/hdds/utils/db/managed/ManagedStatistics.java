@@ -18,25 +18,20 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.Statistics;
 
-import javax.annotation.Nullable;
-
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.assertClosed;
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.formatStackTrace;
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.getStackTrace;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * Managed Statistics.
  */
 public class ManagedStatistics extends Statistics {
-
-  @Nullable
-  private final StackTraceElement[] elements = getStackTrace();
+  private final UncheckedAutoCloseable leakTracker = track(this);
 
   @Override
-  protected void finalize() throws Throwable {
-    assertClosed(this, formatStackTrace(elements));
-    super.finalize();
+  public void close() {
+    super.close();
+    leakTracker.close();
   }
 }

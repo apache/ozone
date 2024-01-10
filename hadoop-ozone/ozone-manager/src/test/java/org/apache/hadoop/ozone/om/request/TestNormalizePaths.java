@@ -20,10 +20,11 @@
 package org.apache.hadoop.ozone.om.request;
 
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.om.request.OMClientRequest.validateAndNormalizeKey;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -33,31 +34,31 @@ public class TestNormalizePaths {
   @Test
   public void testNormalizePathsEnabled() throws Exception {
 
-    Assertions.assertEquals("a/b/c/d",
+    assertEquals("a/b/c/d",
         validateAndNormalizeKey(true, "a/b/c/d"));
-    Assertions.assertEquals("a/b/c/d",
+    assertEquals("a/b/c/d",
         validateAndNormalizeKey(true, "/a/b/c/d"));
-    Assertions.assertEquals("a/b/c/d",
+    assertEquals("a/b/c/d",
         validateAndNormalizeKey(true, "////a/b/c/d"));
-    Assertions.assertEquals("a/b/c/d",
+    assertEquals("a/b/c/d",
         validateAndNormalizeKey(true, "////a/b/////c/d"));
-    Assertions.assertEquals("a/b/c/...../d",
+    assertEquals("a/b/c/...../d",
         validateAndNormalizeKey(true, "////a/b/////c/...../d"));
-    Assertions.assertEquals("a/b/d",
+    assertEquals("a/b/d",
         validateAndNormalizeKey(true, "/a/b/c/../d"));
-    Assertions.assertEquals("a",
+    assertEquals("a",
         validateAndNormalizeKey(true, "a"));
-    Assertions.assertEquals("a/b",
+    assertEquals("a/b",
         validateAndNormalizeKey(true, "/a/./b"));
-    Assertions.assertEquals("a/b",
+    assertEquals("a/b",
         validateAndNormalizeKey(true, ".//a/./b"));
-    Assertions.assertEquals("a/",
+    assertEquals("a/",
         validateAndNormalizeKey(true, "/a/."));
-    Assertions.assertEquals("b/c",
+    assertEquals("b/c",
         validateAndNormalizeKey(true, "//./b/c/"));
-    Assertions.assertEquals("a/b/c/d",
+    assertEquals("a/b/c/d",
         validateAndNormalizeKey(true, "a/b/c/d/"));
-    Assertions.assertEquals("a/b/c/...../d",
+    assertEquals("a/b/c/...../d",
         validateAndNormalizeKey(true, "////a/b/////c/...../d/"));
   }
 
@@ -78,7 +79,7 @@ public class TestNormalizePaths {
       validateAndNormalizeKey(true, keyName);
       fail("checkInvalidPath failed for path " + keyName);
     } catch (OMException ex) {
-      Assertions.assertTrue(ex.getMessage().contains("Invalid KeyPath"));
+      assertThat(ex.getMessage()).contains("Invalid KeyPath");
     }
   }
 
@@ -87,17 +88,17 @@ public class TestNormalizePaths {
   @Test
   public void testNormalizePathsDisable() throws OMException {
 
-    Assertions.assertEquals("/a/b/c/d",
+    assertEquals("/a/b/c/d",
         validateAndNormalizeKey(false, "/a/b/c/d"));
-    Assertions.assertEquals("////a/b/c/d",
+    assertEquals("////a/b/c/d",
         validateAndNormalizeKey(false, "////a/b/c/d"));
-    Assertions.assertEquals("////a/b/////c/d",
+    assertEquals("////a/b/////c/d",
         validateAndNormalizeKey(false, "////a/b/////c/d"));
-    Assertions.assertEquals("////a/b/////c/...../d",
+    assertEquals("////a/b/////c/...../d",
         validateAndNormalizeKey(false, "////a/b/////c/...../d"));
-    Assertions.assertEquals("/a/b/c/../d",
+    assertEquals("/a/b/c/../d",
         validateAndNormalizeKey(false, "/a/b/c/../d"));
-    Assertions.assertEquals("/a/b/c/../../d",
+    assertEquals("/a/b/c/../../d",
         validateAndNormalizeKey(false, "/a/b/c/../../d"));
   }
 }

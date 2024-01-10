@@ -112,6 +112,9 @@ public class ContainerReportQueue
 
       // 2. Add ICR report or merge to previous ICR
       List<ContainerReport> dataList = dataMap.get(uuidString);
+      if (mergeIcr(val, dataList)) {
+        return true;
+      }
       dataList.add(val);
       ++capacity;
       orderingQueue.add(uuidString);
@@ -374,5 +377,10 @@ public class ContainerReportQueue
       return droppedCount.getAndSet(0);
     }
     return 0;
+  }
+
+  protected boolean mergeIcr(ContainerReport val,
+                             List<ContainerReport> dataList) {
+    return false;
   }
 }

@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,14 +15,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.ozone.test;
+
+package org.apache.hadoop.ozone.om.response;
+
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+
+import javax.annotation.Nonnull;
+import java.io.IOException;
 
 /**
- * Interface to mark JUnit4 test classes or methods that exhibit intermittent
- * issues.  These are run separately from the normal tests in CI.  In case of
- * failure they may be repeated a few times.
- * Usage: <code>@Category(FlakyTest.class) @Flaky("HDDS-123")</code>
+ * A dummy OMClientResponse implementation.
  */
-public interface FlakyTest {
-  // category marker
+@CleanupTableInfo
+public class DummyOMClientResponse extends OMClientResponse {
+
+  public DummyOMClientResponse(@Nonnull OMResponse omResponse) {
+    super(omResponse);
+  }
+
+  @Override
+  public void addToDBBatch(OMMetadataManager omMetadataManager,
+      BatchOperation batchOperation) throws IOException {
+    // do nothing
+  }
 }
+

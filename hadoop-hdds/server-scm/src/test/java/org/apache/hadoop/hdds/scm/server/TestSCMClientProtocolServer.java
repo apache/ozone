@@ -31,11 +31,10 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
-
 import java.io.IOException;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
+import static org.mockito.Mockito.mock;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -63,7 +62,7 @@ public class TestSCMClientProtocolServer {
 
     server = scm.getClientProtocolServer();
     service = new StorageContainerLocationProtocolServerSideTranslatorPB(server,
-        scm, Mockito.mock(ProtocolMessageMetrics.class));
+        scm, mock(ProtocolMessageMetrics.class));
   }
 
   @AfterEach

@@ -18,12 +18,12 @@
 package org.apache.ozone.rocksdiff;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReaderIterator;
 import org.rocksdb.SstFileReader;
 import org.rocksdb.TableProperties;
-import org.rocksdb.Options;
-import org.rocksdb.ReadOptions;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,16 +87,20 @@ public final class RocksDiffUtils {
 
   public static boolean doesSstFileContainKeyRange(String filepath,
       Map<String, String> tableToPrefixMap) throws IOException {
-    try (ManagedSstFileReader sstFileReader = ManagedSstFileReader.managed(
-        new SstFileReader(new Options()))) {
+
+    try (
+        ManagedOptions options = new ManagedOptions();
+        ManagedSstFileReader sstFileReader = ManagedSstFileReader.managed(new SstFileReader(options))) {
       sstFileReader.get().open(filepath);
       TableProperties properties = sstFileReader.get().getTableProperties();
       String tableName = new String(properties.getColumnFamilyName(), UTF_8);
       if (tableToPrefixMap.containsKey(tableName)) {
         String prefix = tableToPrefixMap.get(tableName);
-        try (ManagedSstFileReaderIterator iterator =
-            ManagedSstFileReaderIterator.managed(sstFileReader.get()
-                .newIterator(new ReadOptions()))) {
+
+        try (
+            ManagedReadOptions readOptions = new ManagedReadOptions();
+            ManagedSstFileReaderIterator iterator = ManagedSstFileReaderIterator.managed(
+                sstFileReader.get().newIterator(readOptions))) {
           iterator.get().seek(prefix.getBytes(UTF_8));
           String seekResultKey = new String(iterator.get().key(), UTF_8);
           return seekResultKey.startsWith(prefix);

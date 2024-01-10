@@ -74,6 +74,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
@@ -790,16 +791,12 @@ public class BasicRootedOzoneClientAdapterImpl
     OFSPath ofsStartPath = new OFSPath(startPath, config);
     // list buckets in the volume
     OzoneVolume volume = objectStore.getVolume(volumeStr);
-    UserGroupInformation ugi =
-        UserGroupInformation.createRemoteUser(volume.getOwner());
-    String owner = ugi.getShortUserName();
-    String group = getGroupName(ugi);
     Iterator<? extends OzoneBucket> iter =
         volume.listBuckets(null, ofsStartPath.getBucketName());
     List<FileStatusAdapter> res = new ArrayList<>();
     while (iter.hasNext() && res.size() < numEntries) {
       OzoneBucket bucket = iter.next();
-      res.add(getFileStatusAdapterForBucket(bucket, uri, owner, group));
+      res.add(getFileStatusAdapterForBucket(bucket, uri));
       if (recursive) {
         String pathStrNext = volumeStr + OZONE_URI_DELIMITER + bucket.getName();
         res.addAll(listStatus(pathStrNext, recursive, startPath,
@@ -827,8 +824,10 @@ public class BasicRootedOzoneClientAdapterImpl
 
     while (snapshotIter.hasNext()) {
       OzoneSnapshot ozoneSnapshot = snapshotIter.next();
-      res.add(getFileStatusAdapterForBucketSnapshot(
-          ozoneBucket, ozoneSnapshot, uri, owner, group));
+      if (SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE.name().equals(ozoneSnapshot.getSnapshotStatus())) {
+        res.add(getFileStatusAdapterForBucketSnapshot(
+            ozoneBucket, ozoneSnapshot, uri, owner, group));
+      }
     }
 
     return res;
@@ -1112,12 +1111,9 @@ public class BasicRootedOzoneClientAdapterImpl
    * Generate a FileStatusAdapter for a bucket.
    * @param ozoneBucket OzoneBucket object.
    * @param uri Full URI to OFS root.
-   * @param owner Owner of the parent volume of the bucket.
-   * @param group Group of the parent volume of the bucket.
    * @return FileStatusAdapter for a bucket.
    */
-  private static FileStatusAdapter getFileStatusAdapterForBucket(
-      OzoneBucket ozoneBucket, URI uri, String owner, String group) {
+  private static FileStatusAdapter getFileStatusAdapterForBucket(OzoneBucket ozoneBucket, URI uri) {
     String pathStr = uri.toString() +
         OZONE_URI_DELIMITER + ozoneBucket.getVolumeName() +
         OZONE_URI_DELIMITER + ozoneBucket.getName();
@@ -1127,6 +1123,9 @@ public class BasicRootedOzoneClientAdapterImpl
               ozoneBucket.getName(), pathStr);
     }
     Path path = new Path(pathStr);
+    UserGroupInformation ugi = UserGroupInformation.createRemoteUser(ozoneBucket.getOwner());
+    String owner = ugi.getShortUserName();
+    String group = getGroupName(ugi);
     return new FileStatusAdapter(0L, 0L, path, true, (short)0, 0L,
         ozoneBucket.getCreationTime().getEpochSecond() * 1000, 0L,
         FsPermission.getDirDefault().toShort(),
