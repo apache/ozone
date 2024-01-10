@@ -274,42 +274,51 @@ public class ContainerKeyScanner implements Callable<Void>,
           bucketId = Long.parseLong(keyParts[2]);
         }
 
-        for (OmKeyLocationInfoGroup locationInfoGroup : keyLocationVersions) {
-          for (List<OmKeyLocationInfo> locationInfos :
-              locationInfoGroup.getLocationVersionMap().values()) {
-            for (OmKeyLocationInfo locationInfo : locationInfos) {
-              if (containerIds.contains(locationInfo.getContainerID())) {
-                // Generate asbolute key path for FSO keys
-                StringBuilder keyName = new StringBuilder();
-                if (tableName.equals(FILE_TABLE)) {
-                  // Load directory table only after the first fso key is found
-                  // to reduce necessary load if there are not fso keys
-                  if (!isDirTableLoaded) {
-                    long start = System.currentTimeMillis();
-                    directoryTable = getDirectoryTableData(parent.getDbPath());
-                    long end = System.currentTimeMillis();
-                    out().println(
-                        "directoryTable loaded in " + (end - start) + " ms.");
-                    isDirTableLoaded = true;
-                  }
-                  keyName.append(getFsoKeyPrefix(volumeId, bucketId, value));
-                }
-                keyName.append(value.getKeyName());
-                containerKeyInfos.add(
-                    new ContainerKeyInfo(locationInfo.getContainerID(),
-                        value.getVolumeName(), volumeId, value.getBucketName(),
-                        bucketId, keyName.toString(),
-                        value.getParentObjectID()));
-              }
-            }
-          }
-        }
+        processData(containerKeyInfos, tableName, keyLocationVersions, volumeId,
+            bucketId, value);
         iterator.get().next();
         keysProcessed++;
       }
       return keysProcessed;
     } catch (RocksDBException e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  private void processData(List<ContainerKeyInfo> containerKeyInfos,
+                           String tableName,
+                           List<OmKeyLocationInfoGroup> keyLocationVersions,
+                           long volumeId, long bucketId, OmKeyInfo value)
+      throws RocksDBException, IOException {
+    for (OmKeyLocationInfoGroup locationInfoGroup : keyLocationVersions) {
+      for (List<OmKeyLocationInfo> locationInfos :
+          locationInfoGroup.getLocationVersionMap().values()) {
+        for (OmKeyLocationInfo locationInfo : locationInfos) {
+          if (containerIds.contains(locationInfo.getContainerID())) {
+            // Generate asbolute key path for FSO keys
+            StringBuilder keyName = new StringBuilder();
+            if (tableName.equals(FILE_TABLE)) {
+              // Load directory table only after the first fso key is found
+              // to reduce necessary load if there are not fso keys
+              if (!isDirTableLoaded) {
+                long start = System.currentTimeMillis();
+                directoryTable = getDirectoryTableData(parent.getDbPath());
+                long end = System.currentTimeMillis();
+                out().println(
+                    "directoryTable loaded in " + (end - start) + " ms.");
+                isDirTableLoaded = true;
+              }
+              keyName.append(getFsoKeyPrefix(volumeId, bucketId, value));
+            }
+            keyName.append(value.getKeyName());
+            containerKeyInfos.add(
+                new ContainerKeyInfo(locationInfo.getContainerID(),
+                    value.getVolumeName(), volumeId, value.getBucketName(),
+                    bucketId, keyName.toString(),
+                    value.getParentObjectID()));
+          }
+        }
+      }
     }
   }
 
