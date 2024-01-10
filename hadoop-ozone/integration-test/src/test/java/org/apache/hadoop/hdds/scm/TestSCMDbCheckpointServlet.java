@@ -50,7 +50,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.MULTIPART_FORM_DATA_BOUNDARY;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -58,17 +57,19 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -166,8 +167,7 @@ public class TestSCMDbCheckpointServlet {
     setupHttpMethod(toExcludeList);
 
     doNothing().when(responseMock).setContentType("application/x-tgz");
-    doNothing().when(responseMock).setHeader(Mockito.anyString(),
-        Mockito.anyString());
+    doNothing().when(responseMock).setHeader(anyString(), anyString());
 
     final Path outputPath = tempDir.resolve("testEndpoint.tar");
     when(responseMock.getOutputStream()).thenReturn(
@@ -203,17 +203,17 @@ public class TestSCMDbCheckpointServlet {
 
     doEndpoint();
 
-    Assertions.assertTrue(outputPath.toFile().length() > 0);
-    Assertions.assertTrue(
+    assertTrue(outputPath.toFile().length() > 0);
+    assertTrue(
         scmMetrics.getDBCheckpointMetrics().
             getLastCheckpointCreationTimeTaken() > 0);
-    Assertions.assertTrue(
+    assertTrue(
         scmMetrics.getDBCheckpointMetrics().
             getLastCheckpointStreamingTimeTaken() > 0);
-    Assertions.assertTrue(scmMetrics.getDBCheckpointMetrics().
+    assertTrue(scmMetrics.getDBCheckpointMetrics().
         getNumCheckpoints() > initialCheckpointCount);
 
-    Mockito.verify(scmDbCheckpointServletMock).writeDbDataToStream(any(),
+    verify(scmDbCheckpointServletMock).writeDbDataToStream(any(),
         any(), any(), eq(toExcludeList), any(), any());
   }
 
@@ -225,7 +225,7 @@ public class TestSCMDbCheckpointServlet {
 
     scmDbCheckpointServletMock.doPost(requestMock, responseMock);
 
-    Mockito.verify(responseMock).setStatus(HttpServletResponse.SC_BAD_REQUEST);
+    verify(responseMock).setStatus(HttpServletResponse.SC_BAD_REQUEST);
   }
 
   /**
@@ -288,7 +288,7 @@ public class TestSCMDbCheckpointServlet {
     // Use generated form data as input stream to the HTTP request
     InputStream input = new ByteArrayInputStream(
         sb.toString().getBytes(StandardCharsets.UTF_8));
-    ServletInputStream inputStream = Mockito.mock(ServletInputStream.class);
+    ServletInputStream inputStream = mock(ServletInputStream.class);
     when(requestMock.getInputStream()).thenReturn(inputStream);
     when(inputStream.read(any(byte[].class), anyInt(), anyInt()))
         .thenAnswer(invocation -> {
