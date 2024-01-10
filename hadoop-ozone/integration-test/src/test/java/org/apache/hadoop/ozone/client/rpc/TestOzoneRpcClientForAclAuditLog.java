@@ -37,15 +37,12 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.UnhealthyTest;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Test;
-import org.junit.experimental.categories.Category;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,7 +74,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @NotThreadSafe
 @TestMethodOrder(MethodOrderer.MethodName.class)
-@Category(UnhealthyTest.class)
 @Unhealthy("Fix this after adding audit support for HA Acl code. This will " +
     "be fixed by HDDS-2038")
 public class TestOzoneRpcClientForAclAuditLog {
@@ -196,7 +192,7 @@ public class TestOzoneRpcClientForAclAuditLog {
     OzoneVolume retVolumeinfo = store.getVolume(volumeName);
     verifyLog(OMAction.READ_VOLUME.name(), volumeName,
         AuditEventStatus.SUCCESS.name());
-    Assertions.assertTrue(retVolumeinfo.getName().equalsIgnoreCase(volumeName));
+    assertTrue(retVolumeinfo.getName().equalsIgnoreCase(volumeName));
 
     OzoneObj volObj = new OzoneObjInfo.Builder()
         .setVolumeName(volumeName)
@@ -208,7 +204,7 @@ public class TestOzoneRpcClientForAclAuditLog {
     List<OzoneAcl> acls = store.getAcl(volObj);
     verifyLog(OMAction.GET_ACL.name(), volumeName,
         AuditEventStatus.SUCCESS.name());
-    Assertions.assertTrue(acls.size() > 0);
+    assertTrue(acls.size() > 0);
 
     //Testing addAcl
     store.addAcl(volObj, USER_ACL);

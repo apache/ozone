@@ -16,11 +16,11 @@
  */
 package org.apache.hadoop.ozone.client;
 
+import static org.junit.jupiter.api.Assertions.fail;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -66,7 +66,7 @@ public class TestOzoneClientFactory {
           return null;
         }
       });
-      Assertions.fail("Should throw exception here");
+      fail("Should throw exception here");
     } catch (IOException | InterruptedException e) {
       assert e instanceof AccessControlException;
     }

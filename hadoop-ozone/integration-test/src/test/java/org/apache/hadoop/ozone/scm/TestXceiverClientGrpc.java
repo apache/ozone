@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.ozone.scm;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -31,7 +34,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -78,9 +80,9 @@ public class TestXceiverClientGrpc {
 
   @Test
   public void testCorrectDnsReturnedFromPipeline() throws IOException {
-    Assertions.assertEquals(dnsInOrder.get(0), pipeline.getClosestNode());
-    Assertions.assertEquals(dns.get(0), pipeline.getFirstNode());
-    Assertions.assertNotEquals(dns.get(0), dnsInOrder.get(0));
+    assertEquals(dnsInOrder.get(0), pipeline.getClosestNode());
+    assertEquals(dns.get(0), pipeline.getFirstNode());
+    assertNotEquals(dns.get(0), dnsInOrder.get(0));
   }
 
   @Test
@@ -112,7 +114,7 @@ public class TestXceiverClientGrpc {
   @Timeout(5)
   public void testGetBlockRetryAlNodes() {
     final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
-    Assertions.assertTrue(allDNs.size() > 1);
+    assertTrue(allDNs.size() > 1);
     try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
       @Override
       public XceiverClientReply sendCommandAsync(
@@ -126,14 +128,14 @@ public class TestXceiverClientGrpc {
     } catch (IOException e) {
       e.printStackTrace();
     }
-    Assertions.assertEquals(0, allDNs.size());
+    assertEquals(0, allDNs.size());
   }
 
   @Test
   @Timeout(5)
   public void testReadChunkRetryAllNodes() {
     final ArrayList<DatanodeDetails> allDNs = new ArrayList<>(dns);
-    Assertions.assertTrue(allDNs.size() > 1);
+    assertTrue(allDNs.size() > 1);
     try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
       @Override
       public XceiverClientReply sendCommandAsync(
@@ -147,7 +149,7 @@ public class TestXceiverClientGrpc {
     } catch (IOException e) {
       e.printStackTrace();
     }
-    Assertions.assertEquals(0, allDNs.size());
+    assertEquals(0, allDNs.size());
   }
 
   @Test
@@ -172,7 +174,7 @@ public class TestXceiverClientGrpc {
         invokeXceiverClientGetBlock(client);
       }
     }
-    Assertions.assertEquals(1, seenDNs.size());
+    assertEquals(1, seenDNs.size());
   }
 
   @Test
@@ -195,7 +197,7 @@ public class TestXceiverClientGrpc {
         invokeXceiverClientReadChunk(client);
         invokeXceiverClientReadSmallFile(client);
       }
-      Assertions.assertEquals(1, seenDNs.size());
+      assertEquals(1, seenDNs.size());
     }
   }
 

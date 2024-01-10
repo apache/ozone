@@ -71,6 +71,8 @@ class TestBackgroundContainerDataScannerIntegration
   @EnumSource
   void testCorruptionDetected(ContainerCorruptions corruption)
       throws Exception {
+    pauseScanner();
+
     long containerID = writeDataThenCloseContainer();
     // Container corruption has not yet been introduced.
     Container<?> container = getDnContainer(containerID);
@@ -78,10 +80,12 @@ class TestBackgroundContainerDataScannerIntegration
 
     corruption.applyTo(container);
 
+    resumeScanner();
+
     // Wait for the scanner to detect corruption.
     GenericTestUtils.waitFor(
         () -> container.getContainerState() == State.UNHEALTHY,
-        500, 5000);
+        500, 15_000);
 
     // Wait for SCM to get a report of the unhealthy replica.
     waitForScmToSeeUnhealthyReplica(containerID);

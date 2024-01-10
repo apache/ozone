@@ -55,11 +55,12 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVA
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.ratis.grpc.server.GrpcLogAppender;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -145,7 +146,7 @@ public class TestContainerStateMachineFailureOnRead {
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipelines(RatisReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.THREE));
-    Assertions.assertEquals(1, pipelines.size());
+    assertEquals(1, pipelines.size());
     Pipeline ratisPipeline = pipelines.iterator().next();
 
     Optional<HddsDatanodeService> dnToStop =
@@ -159,7 +160,7 @@ public class TestContainerStateMachineFailureOnRead {
               }
             }).findFirst();
 
-    Assertions.assertTrue(dnToStop.isPresent());
+    assertTrue(dnToStop.isPresent());
     cluster.shutdownHddsDatanode(dnToStop.get().getDatanodeDetails());
     // Verify healthy pipeline before creating key
     try (XceiverClientRatis xceiverClientRatis =
@@ -182,7 +183,7 @@ public class TestContainerStateMachineFailureOnRead {
 
     List<OmKeyLocationInfo> locationInfoList =
         groupOutputStream.getLocationInfoList();
-    Assertions.assertEquals(1, locationInfoList.size());
+    assertEquals(1, locationInfoList.size());
     omKeyLocationInfo = locationInfoList.get(0);
     key.close();
     groupOutputStream.close();
@@ -197,7 +198,7 @@ public class TestContainerStateMachineFailureOnRead {
           }
         }).findFirst();
 
-    Assertions.assertTrue(leaderDn.isPresent());
+    assertTrue(leaderDn.isPresent());
     // delete the container dir from leader
     FileUtil.fullyDelete(new File(
         leaderDn.get().getDatanodeStateMachine()
@@ -214,7 +215,7 @@ public class TestContainerStateMachineFailureOnRead {
     try {
       Pipeline pipeline = cluster.getStorageContainerManager()
           .getPipelineManager().getPipeline(pipelines.get(0).getId());
-      Assertions.assertEquals(Pipeline.PipelineState.CLOSED, pipeline.getPipelineState(),
+      assertEquals(Pipeline.PipelineState.CLOSED, pipeline.getPipelineState(),
           "Pipeline " + pipeline.getId() + "should be in CLOSED state");
     } catch (PipelineNotFoundException e) {
       // do nothing

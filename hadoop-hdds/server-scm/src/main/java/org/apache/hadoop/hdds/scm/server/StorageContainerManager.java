@@ -359,8 +359,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       throws IOException, AuthenticationException  {
     super(HddsVersionInfo.HDDS_VERSION_INFO);
 
-    Objects.requireNonNull(configurator, "configurator cannot not be null");
-    Objects.requireNonNull(conf, "configuration cannot not be null");
+    Objects.requireNonNull(configurator, "configurator cannot be null");
+    Objects.requireNonNull(conf, "configuration cannot be null");
     // It is assumed the scm --init command creates the SCM Storage Config.
     scmStorageConfig = new SCMStorageConfig(conf);
 
@@ -847,7 +847,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager,
-        containerManager, scmContext, eventQueue, replicationManager);
+        scmContext, eventQueue, replicationManager);
 
     statefulServiceStateManager = StatefulServiceStateManagerImpl.newBuilder()
         .setStatefulServiceConfig(

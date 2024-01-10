@@ -1999,7 +1999,7 @@ public abstract class TestOzoneRpcClientAbstract {
         byte[] content = new byte[100];
         is.read(content);
         String retValue = new String(content, UTF_8);
-        assertTrue(value.equals(retValue.trim()));
+        assertEquals(value, retValue.trim());
       }
     } catch (IOException e) {
       fail("Reading unhealthy replica should succeed.");
