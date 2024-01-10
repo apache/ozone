@@ -561,6 +561,7 @@ public class TestOzoneShellHA {
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
 
     OzoneConfiguration clientConf = getClientConfForOFS(hostPrefix, conf);
+    clientConf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     FileSystem fs = FileSystem.get(clientConf);
 
     final String volumeName = "volume-lof";
@@ -656,8 +657,8 @@ public class TestOzoneShellHA {
       cmdRes = getStdOut();
 
       // Verify that only one key is hsync'ed
-      assertTrue(cmdRes.contains("\tYes\t"));
-      assertTrue(cmdRes.contains("\tNo\t"));
+      assertTrue(cmdRes.contains("\tYes\t"), "One key should be hsync'ed");
+      assertTrue(cmdRes.contains("\tNo\t"), "One key should not be hsync'ed");
     } finally {
       // Cleanup
       for (int i = 0; i < numKeys; i++) {
@@ -1578,7 +1579,7 @@ public class TestOzoneShellHA {
   }
 
   @Test
-  public void testRecursiveBucketDelete()
+  public void testZRecursiveBucketDelete()
       throws Exception {
     String volume1 = "volume50";
     String bucket1 = "bucketfso";

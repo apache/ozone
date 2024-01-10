@@ -1796,7 +1796,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   @Override
   public ListOpenFilesResult listOpenFiles(String path,
-                                           long maxKeys,
+                                           int maxKeys,
                                            String contToken)
       throws IOException {
     ListOpenFilesRequest req = ListOpenFilesRequest.newBuilder()
