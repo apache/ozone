@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import org.apache.hadoop.util.ClosableIterator;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -165,7 +166,7 @@ public class SnapshotTestUtils {
       implements PersistentList<K> {
 
     @Override
-    public boolean addAll(PersistentList<K> from) {
+    public boolean addAll(PersistentList<K> from) throws IOException {
       boolean ret = true;
       Iterator<K> iterator = from.iterator();
       while (iterator.hasNext()) {

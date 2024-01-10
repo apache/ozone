@@ -16,18 +16,8 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.snapshot;
-
-import org.apache.hadoop.util.ClosableIterator;
-
-import java.io.IOException;
+package org.apache.hadoop.ozone.om.snapshot.exception;
 
 /**
- * Define an interface for persistent set.
+ * This package contains OM Snapshot Exception related classes.
  */
-public interface PersistentSet<E> {
-
-  void add(E entry) throws IOException;
-
-  ClosableIterator<E> iterator();
-}

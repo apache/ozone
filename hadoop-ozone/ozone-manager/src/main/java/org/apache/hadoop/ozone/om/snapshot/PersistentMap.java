@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
 
@@ -28,16 +29,17 @@ import org.apache.hadoop.util.ClosableIterator;
  */
 public interface PersistentMap<K, V> {
 
-  V get(K key);
+  V get(K key) throws IOException;
 
-  void put(K key, V value);
+  void put(K key, V value) throws IOException;
 
-  void remove(K key);
+  void remove(K key) throws IOException;
 
-  default ClosableIterator<Map.Entry<K, V>> iterator() {
+  default ClosableIterator<Map.Entry<K, V>> iterator() throws IOException {
     return this.iterator(Optional.empty(), Optional.empty());
   }
 
   ClosableIterator<Map.Entry<K, V>> iterator(Optional<K> lowerBoundKey,
-                                             Optional<K> upperBoundKey);
+                                             Optional<K> upperBoundKey)
+      throws IOException;
 }

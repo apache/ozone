@@ -20,16 +20,18 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import org.apache.hadoop.util.ClosableIterator;
 
+import java.io.IOException;
+
 /**
  * Define an interface for persistent list.
  */
 public interface PersistentList<E> {
 
-  boolean add(E entry);
+  boolean add(E entry) throws IOException;
 
-  boolean addAll(PersistentList<E> from);
+  boolean addAll(PersistentList<E> from) throws IOException;
 
-  E get(int index);
+  E get(int index) throws IOException;
 
-  ClosableIterator<E> iterator();
+  ClosableIterator<E> iterator() throws IOException;
 }

@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -96,7 +97,7 @@ public class TestRocksDbPersistentSet {
   }
 
   @Test
-  public void testRocksDBPersistentSet() throws IOException, RocksDBException {
+  public void testRocksDBPersistentSet() throws RocksDBException, IOException {
     ColumnFamilyHandle columnFamily = null;
 
     try {
@@ -115,12 +116,18 @@ public class TestRocksDbPersistentSet {
       List<String> testList = Arrays.asList("e1", "e1", "e2", "e2", "e3");
       Set<String> testSet = new HashSet<>(testList);
 
-      testList.forEach(persistentSet::add);
+      for (String s : testList) {
+        persistentSet.add(s);
+      }
 
       Iterator<String> setIterator = testSet.iterator();
       try (ClosableIterator<String> iterator = persistentSet.iterator()) {
         while (iterator.hasNext()) {
-          assertEquals(iterator.next(), setIterator.next());
+          try {
+            assertEquals(iterator.next(), setIterator.next());
+          } catch (UncheckedIOException e) {
+            throw e.getCause();
+          }
         }
       }
       assertFalse(setIterator.hasNext());
