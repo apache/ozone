@@ -194,7 +194,7 @@ public class TestStorageContainerManagerHA {
       assertEquals(keyName, key.getName());
       OzoneInputStream is = bucket.readKey(keyName);
       byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-      is.read(fileContent);
+      assertEquals(fileContent.length, is.read(fileContent));
       assertEquals(value, new String(fileContent, UTF_8));
       assertFalse(key.getCreationTime().isBefore(testStartTime));
       assertFalse(key.getModificationTime().isBefore(testStartTime));
