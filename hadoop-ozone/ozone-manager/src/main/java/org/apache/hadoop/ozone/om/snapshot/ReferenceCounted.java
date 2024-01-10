@@ -25,8 +25,7 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * Add reference counter to an object instance.
  */
-public class ReferenceCounted<T, U extends ReferenceCountedCallback>
-    implements AutoCloseable {
+public class ReferenceCounted<T, U> implements AutoCloseable {
 
   /**
    * Object that is being reference counted. e.g. OmSnapshot
@@ -95,12 +94,6 @@ public class ReferenceCounted<T, U extends ReferenceCountedCallback>
       long newValTotal = refCount.incrementAndGet();
       Preconditions.checkState(newValTotal > 0L,
           "Total reference count overflown");
-
-      if (refCount.get() == 1L) {
-        // ref count increased to one (from zero), remove from
-        // pendingEvictionList if added
-        parentWithCallback.callback(this);
-      }
     }
 
     return refCount.get();
@@ -131,11 +124,6 @@ public class ReferenceCounted<T, U extends ReferenceCountedCallback>
       long newValTotal = refCount.decrementAndGet();
       Preconditions.checkState(newValTotal >= 0L,
           "Total reference count underflow");
-
-      if (refCount.get() == 0L) {
-        // ref count decreased to zero, add to pendingEvictionList
-        parentWithCallback.callback(this);
-      }
     }
 
     return refCount.get();
@@ -153,7 +141,7 @@ public class ReferenceCounted<T, U extends ReferenceCountedCallback>
   }
 
   /**
-   * @return Number of times current thread has held reference to the object.
+   * @return Number of times the current thread has held reference to the object.
    */
   public long getCurrentThreadRefCount() {
     if (refCount == null || threadMap == null) {
@@ -166,7 +154,7 @@ public class ReferenceCounted<T, U extends ReferenceCountedCallback>
 
   @Override
   public void close() {
-    // Decrease ref count by 1 when close() is called on this object
+    // Decrease ref count by 1 when close() is called on this object,
     // so it is eligible to be used with try-with-resources.
     decrementRefCount();
   }

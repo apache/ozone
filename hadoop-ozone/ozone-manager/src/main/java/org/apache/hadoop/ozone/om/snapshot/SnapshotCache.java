@@ -42,7 +42,7 @@ import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNA
 /**
  * Thread-safe custom unbounded LRU cache to manage open snapshot DB instances.
  */
-public class SnapshotCache implements ReferenceCountedCallback {
+public class SnapshotCache {
 
   static final Logger LOG = LoggerFactory.getLogger(SnapshotCache.class);
   // Snapshot cache internal hash map.
@@ -249,30 +249,10 @@ public class SnapshotCache implements ReferenceCountedCallback {
   }
 
   /**
-   * Callback method used to enqueue or dequeue ReferenceCounted from
-   * pendingEvictionList.
-   *
-   * @param referenceCounted ReferenceCounted object
-   */
-  @Override
-  public void callback(ReferenceCounted referenceCounted) {
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot =
-        (ReferenceCounted<IOmMetadataReader, SnapshotCache>) referenceCounted;
-    String key = ((OmSnapshot) rcOmSnapshot.get()).getSnapshotTableKey();
-    Lock lock = getLock(key);
-    lock.lock();
-    try {
-      referenceCounted.getTotalRefCount();
-    } finally {
-      lock.unlock();
-    }
-  }
-
-  /**
    * Wrapper for cleanupInternal() that is synchronized to prevent multiple
    * threads from interleaving into the cleanup method.
    */
-  private void cleanup() {
+  private synchronized void cleanup() {
     if (dbMap.size() > cacheSizeLimit) {
       cleanupInternal();
     }
@@ -288,14 +268,14 @@ public class SnapshotCache implements ReferenceCountedCallback {
         dbMap.entrySet().iterator();
     while (iterator.hasNext()) {
       Map.Entry<String, ReferenceCounted<IOmMetadataReader, SnapshotCache>> entry = iterator.next();
-      // Get the first instance in the clean up list
+      // Get the first instance in the clean-up list
       ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot = entry.getValue();
       OmSnapshot omSnapshot = (OmSnapshot) rcOmSnapshot.get();
       final String key = omSnapshot.getSnapshotTableKey();
       Lock lock = getLock(key);
       lock.lock();
       try {
-        if (rcOmSnapshot.getTotalRefCount() != 0) {
+        if (rcOmSnapshot.getTotalRefCount() > 0) {
           LOG.debug("Snapshot {} is still being referenced ({}), skipping its clean up",
               key, rcOmSnapshot.getTotalRefCount());
           continue;
