@@ -24,7 +24,6 @@ import com.google.gson.GsonBuilder;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
@@ -121,28 +120,13 @@ public class ContainerKeyScanner implements Callable<Void>,
         RocksDBUtils.getColumnFamilyDescriptors(dbPath);
     final List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
 
-    // Get all table handles
     try (ManagedRocksDB db = ManagedRocksDB.openReadOnly(dbPath,
         columnFamilyDescriptors, columnFamilyHandles)) {
-      dbPath = removeTrailingSlashIfNeeded(dbPath);
-      DBDefinition dbDefinition = DBDefinitionFactory.getDefinition(
-          Paths.get(dbPath), new OzoneConfiguration());
-      if (dbDefinition == null) {
-        throw new IllegalStateException("Incorrect DB Path");
-      }
-
-      // Get directory table
-      DBColumnFamilyDefinition<?, ?> columnFamilyDefinition =
-          dbDefinition.getColumnFamily(DIRECTORY_TABLE);
-      if (columnFamilyDefinition == null) {
-        throw new IllegalStateException(
-            "Table with name" + DIRECTORY_TABLE + " not found");
-      }
 
       // Get directory table handle
-      ColumnFamilyHandle columnFamilyHandle = getColumnFamilyHandle(
-          columnFamilyDefinition.getName().getBytes(UTF_8),
-          columnFamilyHandles);
+      ColumnFamilyHandle columnFamilyHandle =
+          getColumnFamilyHandle(DIRECTORY_TABLE.getBytes(UTF_8),
+              columnFamilyHandles);
       if (columnFamilyHandle == null) {
         throw new IllegalStateException("columnFamilyHandle is null");
       }
@@ -153,8 +137,8 @@ public class ContainerKeyScanner implements Callable<Void>,
         iterator.get().seekToFirst();
         while (iterator.get().isValid()) {
           directoryTableData.put(new String(iterator.get().key(), UTF_8),
-              ((OmDirectoryInfo) columnFamilyDefinition.getValueCodec()
-                  .fromPersistedFormat(iterator.get().value())));
+              OmDirectoryInfo.getCodec()
+                  .fromPersistedFormat(iterator.get().value()));
           iterator.get().next();
         }
       }
@@ -258,16 +242,9 @@ public class ContainerKeyScanner implements Callable<Void>,
                             String tableName)
       throws IOException {
     long keysProcessed = 0;
-    DBColumnFamilyDefinition<?, ?> columnFamilyDefinition =
-        dbDefinition.getColumnFamily(tableName);
-    if (columnFamilyDefinition == null) {
-      throw new IllegalStateException(
-          "Table with name" + tableName + " not found");
-    }
 
-    ColumnFamilyHandle columnFamilyHandle = getColumnFamilyHandle(
-        columnFamilyDefinition.getName().getBytes(UTF_8),
-        columnFamilyHandles);
+    ColumnFamilyHandle columnFamilyHandle =
+        getColumnFamilyHandle(tableName.getBytes(UTF_8), columnFamilyHandles);
     if (columnFamilyHandle == null) {
       throw new IllegalStateException("columnFamilyHandle is null");
     }
@@ -276,8 +253,8 @@ public class ContainerKeyScanner implements Callable<Void>,
         db.get().newIterator(columnFamilyHandle))) {
       iterator.get().seekToFirst();
       while (iterator.get().isValid()) {
-        OmKeyInfo value = ((OmKeyInfo) columnFamilyDefinition.getValueCodec()
-            .fromPersistedFormat(iterator.get().value()));
+        OmKeyInfo value = OmKeyInfo.getCodec(true)
+            .fromPersistedFormat(iterator.get().value());
         List<OmKeyLocationInfoGroup> keyLocationVersions =
             value.getKeyLocationVersions();
         if (Objects.isNull(keyLocationVersions)) {
