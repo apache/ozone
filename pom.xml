@@ -2264,7 +2264,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
               <includes>
-                <include>org.apache.hadoop.ozone.scm.**</include>
+                <include>org.apache.hadoop.hdds.scm.**</include>
               </includes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>
             </configuration>
@@ -2320,6 +2320,9 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
               <includes>
                 <include>org.apache.hadoop.hdds.**</include>
               </includes>
+              <excludes>
+                <exclude>org.apache.hadoop.hdds.scm.**</exclude>
+              </excludes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>
             </configuration>
           </plugin>
@@ -2342,7 +2345,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                 <exclude>org.apache.hadoop.ozone.debug.**</exclude>
                 <exclude>org.apache.hadoop.ozone.freon.**</exclude>
                 <exclude>org.apache.hadoop.ozone.om.**</exclude>
-                <exclude>org.apache.hadoop.ozone.scm.**</exclude>
                 <exclude>org.apache.hadoop.ozone.shell.**</exclude>
               </excludes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>
