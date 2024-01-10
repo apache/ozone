@@ -99,6 +99,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestRe
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -449,8 +450,7 @@ public class TestContainerEndpoint {
     keyMetadata = iterator.next();
     assertEquals("key_two", keyMetadata.getKey());
     assertEquals(2, keyMetadata.getVersions().size());
-    assertTrue(keyMetadata.getVersions().contains(0L) && keyMetadata
-        .getVersions().contains(1L));
+    assertThat(keyMetadata.getVersions()).contains(0L, 1L);
     assertEquals(2, keyMetadata.getBlockIds().size());
     blockIds = keyMetadata.getBlockIds();
     assertEquals(103, blockIds.get(0L).iterator().next().getLocalID());
@@ -459,7 +459,7 @@ public class TestContainerEndpoint {
     response = containerEndpoint.getKeysForContainer(3L, -1, "");
     data = (KeysResponse) response.getEntity();
     keyMetadataList = data.getKeys();
-    assertTrue(keyMetadataList.isEmpty());
+    assertThat(keyMetadataList).isEmpty();
     assertEquals(0, data.getTotalCount());
 
     // test if limit works as expected
@@ -759,7 +759,7 @@ public class TestContainerEndpoint {
         new HashSet<>(Arrays.asList("host2", "host3", "host4")));
     List<ContainerHistory> containerReplicas = container.getReplicas();
     containerReplicas.forEach(history -> {
-      assertTrue(datanodes.contains(history.getDatanodeHost()));
+      assertThat(datanodes).contains(history.getDatanodeHost());
     });
   }
 
@@ -838,7 +838,7 @@ public class TestContainerEndpoint {
         new HashSet<>(Arrays.asList("host2", "host3", "host4")));
     List<ContainerHistory> containerReplicas = missing.get(0).getReplicas();
     containerReplicas.forEach(history -> {
-      assertTrue(datanodes.contains(history.getDatanodeHost()));
+      assertThat(datanodes).contains(history.getDatanodeHost());
     });
 
     List<UnhealthyContainerMetadata> overRep = records
@@ -999,7 +999,7 @@ public class TestContainerEndpoint {
             u1.toString(), u2.toString(), u3.toString(), u4.toString())));
     assertEquals(4, histories.size());
     histories.forEach(history -> {
-      assertTrue(datanodes.contains(history.getDatanodeUuid()));
+      assertThat(datanodes).contains(history.getDatanodeUuid());
       if (history.getDatanodeUuid().equals(u1.toString())) {
         assertEquals("host1", history.getDatanodeHost());
         assertEquals(1L, history.getFirstSeenTime());
@@ -1010,11 +1010,11 @@ public class TestContainerEndpoint {
     // Check getLatestContainerHistory
     List<ContainerHistory> hist1 = reconContainerManager
         .getLatestContainerHistory(1L, 10);
-    assertTrue(hist1.size() <= 10);
+    assertThat(hist1.size()).isLessThanOrEqualTo(10);
     // Descending order by last report timestamp
     for (int i = 0; i < hist1.size() - 1; i++) {
-      assertTrue(hist1.get(i).getLastSeenTime()
-          >= hist1.get(i + 1).getLastSeenTime());
+      assertThat(hist1.get(i).getLastSeenTime())
+          .isGreaterThanOrEqualTo(hist1.get(i + 1).getLastSeenTime());
     }
   }
 
@@ -1477,16 +1477,16 @@ public class TestContainerEndpoint {
         .map(ContainerDiscrepancyInfo::getContainerID)
         .collect(Collectors.toList());
     // ContainerID 1 and 2 are missing in OM but present in SCM
-    assertTrue(missingContainerIdsOM.contains(3L));
-    assertTrue(missingContainerIdsOM.contains(4L));
-    assertTrue(missingContainerIdsOM.contains(5L));
+    assertThat(missingContainerIdsOM).contains(3L);
+    assertThat(missingContainerIdsOM).contains(4L);
+    assertThat(missingContainerIdsOM).contains(5L);
 
     List<Long> missingContainerIdsSCM = containerDiscrepancyInfoListSCM.stream()
         .map(ContainerDiscrepancyInfo::getContainerID)
         .collect(Collectors.toList());
     // ContainerID 1 and 2 are missing in SCM but present in OM
-    assertTrue(missingContainerIdsSCM.contains(1L));
-    assertTrue(missingContainerIdsSCM.contains(2L));
+    assertThat(missingContainerIdsSCM).contains(1L);
+    assertThat(missingContainerIdsSCM).contains(2L);
   }
 
 

@@ -193,8 +193,8 @@ public class TestKeyValueContainer {
     String chunksPath = keyValueContainerData.getChunksPath();
 
     // Check whether containerMetaDataPath and chunksPath exists or not.
-    assertTrue(containerMetaDataPath != null);
-    assertTrue(chunksPath != null);
+    assertNotNull(containerMetaDataPath);
+    assertNotNull(chunksPath);
     // Check whether container file and container db file exists or not.
     assertTrue(keyValueContainer.getContainerFile().exists(),
         ".Container File does not exist");

@@ -21,8 +21,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import org.junit.jupiter.api.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.hamcrest.CoreMatchers.containsString;
-import static org.hamcrest.MatcherAssert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
@@ -36,8 +35,8 @@ public abstract class Proto2CodecTestBase<T> {
     InvalidProtocolBufferException exception =
         assertThrows(InvalidProtocolBufferException.class,
             () -> getCodec().fromPersistedFormat("random".getBytes(UTF_8)));
-    assertThat(exception.getMessage(),
-        containsString("the input ended unexpectedly"));
+    assertThat(exception.getMessage())
+        .contains("the input ended unexpectedly");
   }
 
   @Test

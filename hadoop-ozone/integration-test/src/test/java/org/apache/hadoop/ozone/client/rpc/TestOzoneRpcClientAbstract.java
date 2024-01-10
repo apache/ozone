@@ -1513,7 +1513,7 @@ public abstract class TestOzoneRpcClientAbstract {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    String value = RandomStringUtils.random(RandomUtils.nextInt(0, 1024));
+    String value = RandomStringUtils.random(RandomUtils.nextInt(1, 1024));
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
@@ -1999,7 +1999,7 @@ public abstract class TestOzoneRpcClientAbstract {
         byte[] content = new byte[100];
         is.read(content);
         String retValue = new String(content, UTF_8);
-        assertTrue(value.equals(retValue.trim()));
+        assertEquals(value, retValue.trim());
       }
     } catch (IOException e) {
       fail("Reading unhealthy replica should succeed.");

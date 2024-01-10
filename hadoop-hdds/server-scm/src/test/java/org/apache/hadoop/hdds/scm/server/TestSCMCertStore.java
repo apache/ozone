@@ -36,7 +36,6 @@ import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -342,6 +341,6 @@ public class TestSCMCertStore {
   private void checkListCerts(NodeType role, int expected) throws Exception {
     List<X509Certificate> certificateList = scmCertStore.listCertificate(role,
         BigInteger.valueOf(0), 10, VALID_CERTS);
-    Assertions.assertEquals(expected, certificateList.size());
+    assertEquals(expected, certificateList.size());
   }
 }

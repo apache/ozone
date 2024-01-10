@@ -57,8 +57,10 @@ import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutV
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.AfterEach;
@@ -221,14 +223,13 @@ public class TestReconPipelineManager {
             scmContext);
 
     PipelineFactory pipelineFactory = reconPipelineManager.getPipelineFactory();
-    assertTrue(pipelineFactory instanceof ReconPipelineFactory);
     ReconPipelineFactory reconPipelineFactory =
-        (ReconPipelineFactory) pipelineFactory;
-    assertTrue(reconPipelineFactory.getProviders().isEmpty());
+        assertInstanceOf(ReconPipelineFactory.class, pipelineFactory);
+    assertThat(reconPipelineFactory.getProviders()).isEmpty();
     for (ReplicationType type  : reconPipelineFactory.getProviders().keySet()) {
       PipelineProvider pipelineProvider =
           reconPipelineFactory.getProviders().get(type);
-      assertTrue(pipelineProvider instanceof ReconPipelineProvider);
+      assertInstanceOf(ReconPipelineProvider.class, pipelineProvider);
     }
   }
 
