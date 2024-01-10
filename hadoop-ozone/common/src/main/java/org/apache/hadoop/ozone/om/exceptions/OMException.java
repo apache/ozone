@@ -269,6 +269,7 @@ public class OMException extends IOException {
     
     INVALID_PATH,
     KEY_UNDER_LEASE_RECOVERY,
-    KEY_ALREADY_CLOSED
+    KEY_ALREADY_CLOSED,
+    KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD
   }
 }

@@ -3988,6 +3988,14 @@
       Enable hsync/hflush. By default they are disabled.
     </description>
   </property>
+  <property>
+    <name>ozone.om.lease.soft.limit</name>
+    <value>60s</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Hsync soft limit lease period.
+    </description>
+  </property>
 
   <property>
     <name>ozone.recon.scm.snapshot.task.initial.delay</name>

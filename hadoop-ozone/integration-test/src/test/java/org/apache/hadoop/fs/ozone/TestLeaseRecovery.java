@@ -95,6 +95,7 @@ public class TestLeaseRecovery {
     conf.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
+    conf.set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "0s");
     cluster = MiniOzoneCluster.newBuilder(conf)
       .setNumDatanodes(5)
       .setTotalPipelineNumLimit(10)
