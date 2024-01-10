@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.concurrent.CompletableFuture;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCheckpoint;
@@ -398,9 +397,8 @@ public final class RocksDatabase implements Closeable {
         waitAndClose();
         return;
       }
-      CompletableFuture.runAsync(() -> {
-        waitAndClose();
-      });
+      // async trigger the close event
+      new Thread(() -> waitAndClose(), "DBCloser-" + name).start();
     }
   }
 
