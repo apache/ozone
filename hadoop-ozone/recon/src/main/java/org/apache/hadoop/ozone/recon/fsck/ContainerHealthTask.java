@@ -66,6 +66,7 @@ public class ContainerHealthTask extends ReconScmTask {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerHealthTask.class);
+  public static final int FETCH_COUNT = Integer.parseInt(DEFAULT_FETCH_COUNT);
 
   private ReadWriteLock lock = new ReentrantReadWriteLock(true);
 
@@ -145,7 +146,7 @@ public class ContainerHealthTask extends ReconScmTask {
           unhealthyContainerStateStatsMap, long currentTime) {
     ContainerID startID = ContainerID.valueOf(1);
     List<ContainerInfo> containers = containerManager.getContainers(startID,
-        Integer.parseInt(DEFAULT_FETCH_COUNT));
+        FETCH_COUNT);
     long start;
     while (!containers.isEmpty()) {
       start = Time.monotonicNow();
@@ -158,12 +159,11 @@ public class ContainerHealthTask extends ReconScmTask {
               " processing {} containers.", Time.monotonicNow() - start,
           containers.size());
       logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
-      if (containers.size() > Integer.parseInt(DEFAULT_FETCH_COUNT)) {
+      if (containers.size() > FETCH_COUNT) {
         startID = ContainerID.valueOf(
             containers.get(containers.size() - 1).getContainerID());
         containers.clear();
-        containers = containerManager.getContainers(startID,
-            Integer.parseInt(DEFAULT_FETCH_COUNT));
+        containers = containerManager.getContainers(startID, FETCH_COUNT);
       }
       containers.clear();
     }
