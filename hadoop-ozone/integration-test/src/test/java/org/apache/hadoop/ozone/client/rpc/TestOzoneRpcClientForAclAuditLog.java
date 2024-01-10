@@ -61,6 +61,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -204,7 +205,7 @@ public class TestOzoneRpcClientForAclAuditLog {
     List<OzoneAcl> acls = store.getAcl(volObj);
     verifyLog(OMAction.GET_ACL.name(), volumeName,
         AuditEventStatus.SUCCESS.name());
-    assertTrue(acls.size() > 0);
+    assertThat(acls.size()).isGreaterThan(0);
 
     //Testing addAcl
     store.addAcl(volObj, USER_ACL);
@@ -286,7 +287,7 @@ public class TestOzoneRpcClientForAclAuditLog {
       // that must be equal to the expected string
       assertNotEquals(0, lines.size());
       for (String exp: expected) {
-        assertTrue(lines.get(0).contains(exp));
+        assertThat(lines.get(0)).contains(exp);
       }
     } catch (AssertionError ex) {
       LOG.error("Error occurred in log verification", ex);

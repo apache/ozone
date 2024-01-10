@@ -149,6 +149,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -675,7 +676,7 @@ public abstract class TestOzoneRpcClientAbstract {
     volume.createBucket(bucketName, builder.build());
     OzoneBucket bucket = volume.getBucket(bucketName);
     assertEquals(bucketName, bucket.getName());
-    assertTrue(bucket.getAcls().contains(userAcl));
+    assertThat(bucket.getAcls()).contains(userAcl);
   }
 
   @Test
@@ -717,7 +718,7 @@ public abstract class TestOzoneRpcClientAbstract {
     assertEquals(bucketName, bucket.getName());
     assertTrue(bucket.getVersioning());
     assertEquals(StorageType.SSD, bucket.getStorageType());
-    assertTrue(bucket.getAcls().contains(userAcl));
+    assertThat(bucket.getAcls()).contains(userAcl);
     assertEquals(repConfig, bucket.getReplicationConfig());
   }
 
@@ -749,7 +750,7 @@ public abstract class TestOzoneRpcClientAbstract {
     }
     OzoneBucket newBucket = volume.getBucket(bucketName);
     assertEquals(bucketName, newBucket.getName());
-    assertTrue(bucket.getAcls().contains(acls.get(0)));
+    assertThat(bucket.getAcls()).contains(acls.get(0));
   }
 
   @Test
@@ -772,7 +773,7 @@ public abstract class TestOzoneRpcClientAbstract {
     }
     OzoneBucket newBucket = volume.getBucket(bucketName);
     assertEquals(bucketName, newBucket.getName());
-    assertFalse(bucket.getAcls().contains(acls.get(0)));
+    assertThat(bucket.getAcls()).doesNotContain(acls.get(0));
   }
 
   @Test
@@ -800,11 +801,11 @@ public abstract class TestOzoneRpcClientAbstract {
     // Remove the 2nd acl added to the list.
     boolean remove = store.removeAcl(ozoneObj, acls.get(1));
     assertTrue(remove);
-    assertFalse(store.getAcl(ozoneObj).contains(acls.get(1)));
+    assertThat(store.getAcl(ozoneObj)).doesNotContain(acls.get(1));
 
     remove = store.removeAcl(ozoneObj, acls.get(0));
     assertTrue(remove);
-    assertFalse(store.getAcl(ozoneObj).contains(acls.get(0)));
+    assertThat(store.getAcl(ozoneObj)).doesNotContain(acls.get(0));
   }
 
   @Test
@@ -1432,7 +1433,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     IOException ioException = assertThrows(IOException.class,
         () -> writeKey(bucket, key3, ONE, value, value.length()));
-    assertTrue(ioException.toString().contains("QUOTA_EXCEEDED"));
+    assertThat(ioException.toString()).contains("QUOTA_EXCEEDED");
 
     // Write failed, bucket usedNamespace should remain as 2
     assertEquals(2L,
@@ -1665,8 +1666,9 @@ public abstract class TestOzoneRpcClientAbstract {
 
     latch.await(600, TimeUnit.SECONDS);
 
-    assertTrue(failCount.get() <= 0,
-        "testPutKeyRatisThreeNodesParallel failed");
+    assertThat(failCount.get())
+        .withFailMessage("testPutKeyRatisThreeNodesParallel failed")
+        .isLessThanOrEqualTo(0);
   }
 
 
@@ -2035,7 +2037,7 @@ public abstract class TestOzoneRpcClientAbstract {
     OzoneKey key = bucket.getKey(keyName);
     List<OzoneKeyLocation> keyLocation =
         ((OzoneKeyDetails) key).getOzoneKeyLocations();
-    assertFalse(keyLocation.isEmpty(), "Key location not found in OM");
+    assertThat(keyLocation).withFailMessage("Key location not found in OM").isNotEmpty();
     long containerID = ((OzoneKeyDetails) key).getOzoneKeyLocations().get(0)
         .getContainerID();
 
@@ -2052,7 +2054,7 @@ public abstract class TestOzoneRpcClientAbstract {
         }
       }
     }
-    assertFalse(containerList.isEmpty(), "Container not found");
+    assertThat(containerList).withFailMessage("Container not found").isNotEmpty();
     corruptData(containerList.get(0), key);
     // Try reading the key. Read will fail on the first node and will eventually
     // failover to next replica
@@ -2811,7 +2813,7 @@ public abstract class TestOzoneRpcClientAbstract {
         initiateMultipartUpload(bucket2, keyName2, anyReplication());
         fail("User without permission should fail");
       } catch (Exception e) {
-        assertTrue(e instanceof OMException);
+        assertInstanceOf(OMException.class, e);
         assertEquals(ResultCodes.PERMISSION_DENIED,
             ((OMException) e).getResult());
       }
@@ -2846,7 +2848,7 @@ public abstract class TestOzoneRpcClientAbstract {
       try (OzoneInputStream ignored = bucket2.readKey(keyName)) {
         fail("User without permission should fail");
       } catch (Exception e) {
-        assertTrue(e instanceof OMException);
+        assertInstanceOf(OMException.class, e);
         assertEquals(ResultCodes.PERMISSION_DENIED,
             ((OMException) e).getResult());
       }
@@ -3058,7 +3060,7 @@ public abstract class TestOzoneRpcClientAbstract {
       ozoneOutputStream.close();
       fail("testAbortUploadFailWithInProgressPartUpload failed");
     } catch (IOException ex) {
-      assertTrue(ex instanceof OMException);
+      assertInstanceOf(OMException.class, ex);
       assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR,
           ((OMException) ex).getResult());
     }
@@ -3121,7 +3123,7 @@ public abstract class TestOzoneRpcClientAbstract {
       ozoneOutputStream.close();
       fail("testCommitPartAfterCompleteUpload failed");
     } catch (IOException ex) {
-      assertTrue(ex instanceof OMException);
+      assertInstanceOf(OMException.class, ex);
       assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR,
           ((OMException) ex).getResult());
     }
@@ -3401,20 +3403,24 @@ public abstract class TestOzoneRpcClientAbstract {
       }
     }
     List<OzoneAcl> acls = store.getAcl(parentObj);
-    assertTrue(acls.contains(defaultUserAcl),
-        "Current acls: " + StringUtils.join(",", acls) +
-            " inheritedUserAcl: " + inheritedUserAcl);
-    assertTrue(acls.contains(defaultGroupAcl),
-        "Current acls: " + StringUtils.join(",", acls) +
-            " inheritedGroupAcl: " + inheritedGroupAcl);
+    assertThat(acls)
+        .withFailMessage("Current acls: " + StringUtils.join(",", acls) +
+             " inheritedUserAcl: " + inheritedUserAcl)
+        .contains(defaultUserAcl);
+    assertThat(acls)
+        .withFailMessage("Current acls: " + StringUtils.join(",", acls) +
+            " inheritedGroupAcl: " + inheritedGroupAcl)
+        .contains(defaultGroupAcl);
 
     acls = store.getAcl(childObj);
-    assertTrue(acls.contains(inheritedUserAcl),
-        "Current acls:" + StringUtils.join(",", acls) +
-            " inheritedUserAcl:" + inheritedUserAcl);
-    assertTrue(acls.contains(inheritedGroupAcl),
-        "Current acls:" + StringUtils.join(",", acls) +
-            " inheritedGroupAcl:" + inheritedGroupAcl);
+    assertThat(acls)
+        .withFailMessage("Current acls:" + StringUtils.join(",", acls) +
+            " inheritedUserAcl:" + inheritedUserAcl)
+        .contains(inheritedUserAcl);
+    assertThat(acls)
+        .withFailMessage("Current acls:" + StringUtils.join(",", acls) +
+            " inheritedGroupAcl:" + inheritedGroupAcl)
+        .contains(inheritedGroupAcl);
   }
 
   @Test
@@ -3468,10 +3474,12 @@ public abstract class TestOzoneRpcClientAbstract {
     // Prefix should inherit DEFAULT acl from bucket.
 
     List<OzoneAcl> acls = store.getAcl(prefixObj);
-    assertTrue(acls.contains(inheritedUserAcl),
-        "Current acls:" + StringUtils.join(",", acls));
-    assertTrue(acls.contains(inheritedGroupAcl),
-        "Current acls:" + StringUtils.join(",", acls));
+    assertThat(acls)
+        .withFailMessage("Current acls:" + StringUtils.join(",", acls))
+        .contains(inheritedUserAcl);
+    assertThat(acls)
+        .withFailMessage("Current acls:" + StringUtils.join(",", acls))
+        .contains(inheritedGroupAcl);
     // Remove inherited acls from prefix.
     assertTrue(store.removeAcl(prefixObj, inheritedUserAcl));
     assertTrue(store.removeAcl(prefixObj, inheritedGroupAcl));
@@ -3607,8 +3615,9 @@ public abstract class TestOzoneRpcClientAbstract {
               && acl.getType().equals(newAcl.getType()))
           .findFirst();
       assertTrue(readAcl.isPresent(), "New acl expected but not found.");
-      assertTrue(readAcl.get().getAclList().contains(ACLType.READ_ACL),
-          "READ_ACL should exist in current acls:" + readAcl.get());
+      assertThat(readAcl.get().getAclList())
+          .withFailMessage("READ_ACL should exist in current acls:" + readAcl.get())
+          .contains(ACLType.READ_ACL);
 
 
       // Case:2 Remove newly added acl permission.
@@ -3620,14 +3629,15 @@ public abstract class TestOzoneRpcClientAbstract {
               && acl.getType().equals(newAcl.getType()))
           .findFirst();
       assertTrue(nonReadAcl.isPresent(), "New acl expected but not found.");
-      assertFalse(nonReadAcl.get().getAclList().contains(ACLType.READ_ACL),
-          "READ_ACL should not exist in current acls:" + nonReadAcl.get());
+      assertThat(nonReadAcl.get().getAclList())
+          .withFailMessage("READ_ACL should not exist in current acls:" + nonReadAcl.get())
+          .doesNotContain(ACLType.READ_ACL);
     } else {
       fail("Default acl should not be empty.");
     }
 
     List<OzoneAcl> keyAcls = store.getAcl(ozObj);
-    expectedAcls.forEach(a -> assertTrue(keyAcls.contains(a)));
+    expectedAcls.forEach(a -> assertThat(keyAcls).contains(a));
 
     // Remove all acl's.
     for (OzoneAcl a : expectedAcls) {
@@ -3646,7 +3656,7 @@ public abstract class TestOzoneRpcClientAbstract {
     newAcls = store.getAcl(ozObj);
     assertEquals(expectedAcls.size(), newAcls.size());
     List<OzoneAcl> finalNewAcls = newAcls;
-    expectedAcls.forEach(a -> assertTrue(finalNewAcls.contains(a)));
+    expectedAcls.forEach(a -> assertThat(finalNewAcls).contains(a));
 
     // Reset acl's.
     OzoneAcl ua = new OzoneAcl(USER, "userx",
@@ -3656,8 +3666,8 @@ public abstract class TestOzoneRpcClientAbstract {
     store.setAcl(ozObj, Arrays.asList(ua, ug));
     newAcls = store.getAcl(ozObj);
     assertEquals(2, newAcls.size());
-    assertTrue(newAcls.contains(ua));
-    assertTrue(newAcls.contains(ug));
+    assertThat(newAcls).contains(ua);
+    assertThat(newAcls).contains(ug);
   }
 
   private void writeKey(String key1, OzoneBucket bucket) throws IOException {
@@ -3958,11 +3968,9 @@ public abstract class TestOzoneRpcClientAbstract {
     if (deletedKeys != null) {
       Map<String, String> deletedKeyMetadata =
           deletedKeys.getOmKeyInfoList().get(0).getMetadata();
-      assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_FLAG));
-      assertFalse(
-          deletedKeyMetadata.containsKey(OzoneConsts.GDPR_SECRET));
-      assertFalse(
-          deletedKeyMetadata.containsKey(OzoneConsts.GDPR_ALGORITHM));
+      assertThat(deletedKeyMetadata).doesNotContainKey(OzoneConsts.GDPR_FLAG);
+      assertThat(deletedKeyMetadata).doesNotContainKey(OzoneConsts.GDPR_SECRET);
+      assertThat(deletedKeyMetadata).doesNotContainKey(OzoneConsts.GDPR_ALGORITHM);
     }
   }
 
@@ -3983,7 +3991,7 @@ public abstract class TestOzoneRpcClientAbstract {
 
     List<OzoneAcl> ozoneAclList = store.getAcl(s3vVolume);
 
-    assertTrue(ozoneAclList.contains(ozoneAcl));
+    assertThat(ozoneAclList).contains(ozoneAcl);
   }
 
   @Test
@@ -4082,7 +4090,7 @@ public abstract class TestOzoneRpcClientAbstract {
               cluster.getOzoneManager().getMetadataManager()
               .getOzoneKey(volumeName, bucketName, keyName));
 
-      assertTrue(rangeKVs.size() > 0);
+      assertThat(rangeKVs.size()).isGreaterThan(0);
       assertEquals(expectedCount,
           rangeKVs.get(0).getValue().getOmKeyInfoList().size());
     } else {

@@ -62,10 +62,10 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests delete key operation with a slow follower in the datanode
@@ -231,9 +231,10 @@ public class TestContainerReplicationEndToEnd {
       return newReplicaNode.getDatanodeStateMachine().getContainer()
           .getContainerSet().getContainer(containerID) != null;
     }, 500, 100000);
-    assertTrue(newReplicaNode.getDatanodeStateMachine().getContainer()
+    assertThat(newReplicaNode.getDatanodeStateMachine().getContainer()
         .getContainerSet().getContainer(containerID).getContainerData()
-        .getBlockCommitSequenceId() > 0);
+        .getBlockCommitSequenceId())
+        .isGreaterThan(0);
     // wait for SCM to update the replica Map
     Thread.sleep(5 * containerReportInterval);
     // now shutdown the other two dns of the original pipeline and try reading

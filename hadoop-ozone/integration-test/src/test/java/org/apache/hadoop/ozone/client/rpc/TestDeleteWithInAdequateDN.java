@@ -69,10 +69,11 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
@@ -307,8 +308,8 @@ public class TestDeleteWithInAdequateDN {
 
     // Make sure the readStateMachine call got triggered after the follower
     // caught up
-    assertTrue(stateMachine.getMetrics().getNumReadStateMachineOps()
-        > numReadStateMachineOps);
+    assertThat(stateMachine.getMetrics().getNumReadStateMachineOps())
+        .isGreaterThan(numReadStateMachineOps);
     assertEquals(0, stateMachine.getMetrics().getNumReadStateMachineFails());
     // wait for the chunk to get deleted now
     Thread.sleep(10000);
@@ -325,9 +326,8 @@ public class TestDeleteWithInAdequateDN {
         }
         fail("Expected exception is not thrown");
       } catch (IOException ioe) {
-        assertTrue(ioe instanceof StorageContainerException);
-        assertSame(((StorageContainerException) ioe).getResult(),
-            ContainerProtos.Result.UNABLE_TO_FIND_CHUNK);
+        StorageContainerException e = assertInstanceOf(StorageContainerException.class, ioe);
+        assertSame(e.getResult(), ContainerProtos.Result.UNABLE_TO_FIND_CHUNK);
       }
     }
   }
