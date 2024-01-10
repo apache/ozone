@@ -132,7 +132,7 @@ public class TestContainerKeyScanner {
   }
 
   @Test
-  void testWhenThereAreKeysForConatainerIds() throws IOException {
+  void testWhenThereAreKeysForContainerIds() throws IOException {
 
     // create keys for tables
     long volumeId = -123L;
@@ -156,7 +156,7 @@ public class TestContainerKeyScanner {
   }
 
   @Test
-  void testWhenThereAreNotKeysForConatainerIds() throws IOException {
+  void testWhenThereAreNotKeysForContainerIds() throws IOException {
 
     // create keys for tables
     long volumeId = -123L;
