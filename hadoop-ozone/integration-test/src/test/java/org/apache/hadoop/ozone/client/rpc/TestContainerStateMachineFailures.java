@@ -87,7 +87,9 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVA
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -340,9 +342,8 @@ public class TestContainerStateMachineFailures {
             .getContainer().getContainerSet()
             .getContainer(omKeyLocationInfo.getContainerID())
             .getContainerData();
-    assertTrue(containerData instanceof KeyValueContainerData);
     KeyValueContainerData keyValueContainerData =
-        (KeyValueContainerData) containerData;
+        assertInstanceOf(KeyValueContainerData.class, containerData);
     // delete the container db file
     FileUtil.fullyDelete(new File(keyValueContainerData.getChunksPath()));
     try {
@@ -425,9 +426,8 @@ public class TestContainerStateMachineFailures {
         .getContainer().getContainerSet()
         .getContainer(omKeyLocationInfo.getContainerID())
         .getContainerData();
-    assertTrue(containerData instanceof KeyValueContainerData);
     KeyValueContainerData keyValueContainerData =
-        (KeyValueContainerData) containerData;
+        assertInstanceOf(KeyValueContainerData.class, containerData);
     key.close();
     ContainerStateMachine stateMachine =
         (ContainerStateMachine) TestHelper.getStateMachine(cluster.
@@ -439,7 +439,7 @@ public class TestContainerStateMachineFailures {
     final Path parentPath = snapshot.getPath();
     // Since the snapshot threshold is set to 1, since there are
     // applyTransactions, we should see snapshots
-    assertTrue(parentPath.getParent().toFile().listFiles().length > 0);
+    assertThat(parentPath.getParent().toFile().listFiles().length).isGreaterThan(0);
     assertNotNull(snapshot);
     long containerID = omKeyLocationInfo.getContainerID();
     // delete the container db file
@@ -474,7 +474,7 @@ public class TestContainerStateMachineFailures {
       // try to take a new snapshot, ideally it should just fail
       stateMachine.takeSnapshot();
     } catch (IOException ioe) {
-      assertTrue(ioe instanceof StateMachineException);
+      assertInstanceOf(StateMachineException.class, ioe);
     }
 
     if (snapshot.getPath().toFile().exists()) {
@@ -517,7 +517,7 @@ public class TestContainerStateMachineFailures {
         .getContainer().getContainerSet()
         .getContainer(omKeyLocationInfo.getContainerID())
         .getContainerData();
-    assertTrue(containerData instanceof KeyValueContainerData);
+    assertInstanceOf(KeyValueContainerData.class, containerData);
     key.close();
     ContainerStateMachine stateMachine =
         (ContainerStateMachine) TestHelper.getStateMachine(dn,
@@ -527,7 +527,7 @@ public class TestContainerStateMachineFailures {
     final FileInfo snapshot = getSnapshotFileInfo(storage);
     final Path parentPath = snapshot.getPath();
     stateMachine.takeSnapshot();
-    assertTrue(parentPath.getParent().toFile().listFiles().length > 0);
+    assertThat(parentPath.getParent().toFile().listFiles().length).isGreaterThan(0);
     assertNotNull(snapshot);
     long markIndex1 = StatemachineImplTestUtil.findLatestSnapshot(storage)
         .getIndex();
@@ -610,7 +610,7 @@ public class TestContainerStateMachineFailures {
             .getContainer().getContainerSet()
             .getContainer(omKeyLocationInfo.getContainerID())
             .getContainerData();
-    assertTrue(containerData instanceof KeyValueContainerData);
+    assertInstanceOf(KeyValueContainerData.class, containerData);
     key.close();
     ContainerStateMachine stateMachine =
         (ContainerStateMachine) TestHelper.getStateMachine(dn,
@@ -622,7 +622,7 @@ public class TestContainerStateMachineFailures {
     stateMachine.takeSnapshot();
     // Since the snapshot threshold is set to 1, since there are
     // applyTransactions, we should see snapshots
-    assertTrue(parentPath.getParent().toFile().listFiles().length > 0);
+    assertThat(parentPath.getParent().toFile().listFiles().length).isGreaterThan(0);
     assertNotNull(snapshot);
     long containerID = omKeyLocationInfo.getContainerID();
     Pipeline pipeline = cluster.getStorageContainerLocationClient()
@@ -664,9 +664,8 @@ public class TestContainerStateMachineFailures {
           failCount.incrementAndGet();
         }
         String message = e.getMessage();
-        assertFalse(message.contains("hello"), message);
-        assertTrue(message.contains(HddsUtils.REDACTED.toStringUtf8()),
-            message);
+        assertThat(message).doesNotContain("hello");
+        assertThat(message).contains(HddsUtils.REDACTED.toStringUtf8());
       }
     };
 
@@ -808,9 +807,8 @@ public class TestContainerStateMachineFailures {
           ContainerData containerData =
               container
                   .getContainerData();
-          assertTrue(containerData instanceof KeyValueContainerData);
           KeyValueContainerData keyValueContainerData =
-              (KeyValueContainerData) containerData;
+              assertInstanceOf(KeyValueContainerData.class, containerData);
           FileUtil.fullyDelete(new File(keyValueContainerData.getChunksPath()));
         }
 

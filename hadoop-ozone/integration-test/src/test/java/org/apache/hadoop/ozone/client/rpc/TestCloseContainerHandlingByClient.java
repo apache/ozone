@@ -55,7 +55,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -135,7 +135,7 @@ public class TestCloseContainerHandlingByClient {
         .getBytes(UTF_8);
     key.write(data);
 
-    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
+    assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -168,7 +168,7 @@ public class TestCloseContainerHandlingByClient {
         .getBytes(UTF_8);
     key.write(data);
 
-    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
+    assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -202,7 +202,7 @@ public class TestCloseContainerHandlingByClient {
     assertEquals(data.length, 3 * blockSize);
     key.write(data);
 
-    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
+    assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -241,7 +241,7 @@ public class TestCloseContainerHandlingByClient {
     KeyOutputStream keyOutputStream =
         (KeyOutputStream) key.getOutputStream();
 
-    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
+    assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     // With the initial size provided, it should have pre allocated 2 blocks
     assertEquals(2, keyOutputStream.getStreamEntries().size());
     String dataString =
@@ -306,7 +306,7 @@ public class TestCloseContainerHandlingByClient {
     assertEquals(data.length, 3 * blockSize + chunkSize);
     key.write(data);
 
-    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
+    assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -377,7 +377,7 @@ public class TestCloseContainerHandlingByClient {
         .setKeyName(keyName)
         .build();
 
-    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
+    assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     waitForContainerClose(key);
     // Again Write the Data. This will throw an exception which will be handled
     // and new blocks will be allocated
@@ -403,7 +403,7 @@ public class TestCloseContainerHandlingByClient {
             .getBytes(UTF_8);
     key.write(data1);
 
-    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
+    assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     //get the name of a valid container
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)

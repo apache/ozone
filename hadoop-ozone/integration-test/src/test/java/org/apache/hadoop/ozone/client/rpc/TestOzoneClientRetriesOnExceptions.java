@@ -50,8 +50,9 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.fail;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.junit.jupiter.api.AfterEach;
@@ -153,8 +154,8 @@ public class TestOzoneClientRetriesOnExceptions {
     byte[] data1 =
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
             .getBytes(UTF_8);
-    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
-    KeyOutputStream keyOutputStream = (KeyOutputStream) key.getOutputStream();
+    KeyOutputStream keyOutputStream =
+        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     long containerID =
         keyOutputStream.getStreamEntries().get(0).
             getBlockID().getContainerID();
@@ -173,14 +174,13 @@ public class TestOzoneClientRetriesOnExceptions {
     key.write(data1);
     OutputStream stream = keyOutputStream.getStreamEntries().get(0)
         .getOutputStream();
-    assertTrue(stream instanceof BlockOutputStream);
-    BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
+    BlockOutputStream blockOutputStream = assertInstanceOf(BlockOutputStream.class, stream);
     TestHelper.waitForPipelineClose(key, cluster, false);
     key.flush();
-    assertTrue(HddsClientUtils.checkForException(blockOutputStream
-        .getIoException()) instanceof GroupMismatchException);
-    assertTrue(keyOutputStream.getExcludeList().getPipelineIds()
-        .contains(pipeline.getId()));
+    assertInstanceOf(GroupMismatchException.class,
+        HddsClientUtils.checkForException(blockOutputStream.getIoException()));
+    assertThat(keyOutputStream.getExcludeList().getPipelineIds())
+        .contains(pipeline.getId());
     assertEquals(2, keyOutputStream.getStreamEntries().size());
     key.close();
     assertEquals(0, keyOutputStream.getStreamEntries().size());
@@ -192,8 +192,8 @@ public class TestOzoneClientRetriesOnExceptions {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(
         keyName, ReplicationType.RATIS, (MAX_RETRIES + 1) * blockSize);
-    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
-    KeyOutputStream keyOutputStream = (KeyOutputStream) key.getOutputStream();
+    KeyOutputStream keyOutputStream =
+        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     List<BlockOutputStreamEntry> entries = keyOutputStream.getStreamEntries();
     assertEquals((MAX_RETRIES + 1),
         keyOutputStream.getStreamEntries().size());
@@ -222,8 +222,7 @@ public class TestOzoneClientRetriesOnExceptions {
     }
     key.write(data1);
     OutputStream stream = entries.get(0).getOutputStream();
-    assertTrue(stream instanceof BlockOutputStream);
-    BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
+    BlockOutputStream blockOutputStream = assertInstanceOf(BlockOutputStream.class, stream);
     TestHelper.waitForContainerClose(key, cluster);
     // Ensure that blocks for the key have been allocated to at least N+1
     // containers so that write request will be tried on N+1 different blocks
@@ -237,19 +236,18 @@ public class TestOzoneClientRetriesOnExceptions {
       key.flush();
       fail("Expected exception not thrown");
     } catch (IOException ioe) {
-      assertTrue(HddsClientUtils.checkForException(blockOutputStream
-          .getIoException()) instanceof ContainerNotOpenException);
-      assertTrue(ioe.
-          getMessage().contains(
+      assertInstanceOf(ContainerNotOpenException.class,
+          HddsClientUtils.checkForException(blockOutputStream.getIoException()));
+      assertThat(ioe.getMessage()).contains(
               "Retry request failed. " +
                   "retries get failed due to exceeded maximum " +
-                  "allowed retries number: " + MAX_RETRIES));
+                  "allowed retries number: " + MAX_RETRIES);
     }
     try {
       key.flush();
       fail("Expected exception not thrown");
     } catch (IOException ioe) {
-      assertTrue(ioe.getMessage().contains("Stream is closed"));
+      assertThat(ioe.getMessage()).contains("Stream is closed");
     }
     try {
       key.close();
