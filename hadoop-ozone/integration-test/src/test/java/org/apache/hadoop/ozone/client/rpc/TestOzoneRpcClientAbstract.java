@@ -125,7 +125,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
-import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
@@ -2813,9 +2812,8 @@ public abstract class TestOzoneRpcClientAbstract {
         initiateMultipartUpload(bucket2, keyName2, anyReplication());
         fail("User without permission should fail");
       } catch (Exception e) {
-        assertInstanceOf(OMException.class, e);
-        assertEquals(ResultCodes.PERMISSION_DENIED,
-            ((OMException) e).getResult());
+        OMException ome = assertInstanceOf(OMException.class, e);
+        assertEquals(ResultCodes.PERMISSION_DENIED, ome.getResult());
       }
 
       // Add create permission for user, and try multi-upload init again
@@ -2848,9 +2846,8 @@ public abstract class TestOzoneRpcClientAbstract {
       try (OzoneInputStream ignored = bucket2.readKey(keyName)) {
         fail("User without permission should fail");
       } catch (Exception e) {
-        assertInstanceOf(OMException.class, e);
-        assertEquals(ResultCodes.PERMISSION_DENIED,
-            ((OMException) e).getResult());
+        OMException ome = assertInstanceOf(OMException.class, e);
+        assertEquals(ResultCodes.PERMISSION_DENIED, ome.getResult());
       }
     }
   }
@@ -3060,9 +3057,8 @@ public abstract class TestOzoneRpcClientAbstract {
       ozoneOutputStream.close();
       fail("testAbortUploadFailWithInProgressPartUpload failed");
     } catch (IOException ex) {
-      assertInstanceOf(OMException.class, ex);
-      assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR,
-          ((OMException) ex).getResult());
+      OMException ome = assertInstanceOf(OMException.class, ex);
+      assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, ome.getResult());
     }
   }
 
@@ -3123,9 +3119,8 @@ public abstract class TestOzoneRpcClientAbstract {
       ozoneOutputStream.close();
       fail("testCommitPartAfterCompleteUpload failed");
     } catch (IOException ex) {
-      assertInstanceOf(OMException.class, ex);
-      assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR,
-          ((OMException) ex).getResult());
+      OMException ome = assertInstanceOf(OMException.class, ex);
+      assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, ome.getResult());
     }
   }
 
@@ -3403,24 +3398,12 @@ public abstract class TestOzoneRpcClientAbstract {
       }
     }
     List<OzoneAcl> acls = store.getAcl(parentObj);
-    assertThat(acls)
-        .withFailMessage("Current acls: " + StringUtils.join(",", acls) +
-             " inheritedUserAcl: " + inheritedUserAcl)
-        .contains(defaultUserAcl);
-    assertThat(acls)
-        .withFailMessage("Current acls: " + StringUtils.join(",", acls) +
-            " inheritedGroupAcl: " + inheritedGroupAcl)
-        .contains(defaultGroupAcl);
+    assertThat(acls).contains(defaultUserAcl);
+    assertThat(acls).contains(defaultGroupAcl);
 
     acls = store.getAcl(childObj);
-    assertThat(acls)
-        .withFailMessage("Current acls:" + StringUtils.join(",", acls) +
-            " inheritedUserAcl:" + inheritedUserAcl)
-        .contains(inheritedUserAcl);
-    assertThat(acls)
-        .withFailMessage("Current acls:" + StringUtils.join(",", acls) +
-            " inheritedGroupAcl:" + inheritedGroupAcl)
-        .contains(inheritedGroupAcl);
+    assertThat(acls).contains(inheritedUserAcl);
+    assertThat(acls).contains(inheritedGroupAcl);
   }
 
   @Test
@@ -3474,12 +3457,8 @@ public abstract class TestOzoneRpcClientAbstract {
     // Prefix should inherit DEFAULT acl from bucket.
 
     List<OzoneAcl> acls = store.getAcl(prefixObj);
-    assertThat(acls)
-        .withFailMessage("Current acls:" + StringUtils.join(",", acls))
-        .contains(inheritedUserAcl);
-    assertThat(acls)
-        .withFailMessage("Current acls:" + StringUtils.join(",", acls))
-        .contains(inheritedGroupAcl);
+    assertThat(acls).contains(inheritedUserAcl);
+    assertThat(acls).contains(inheritedGroupAcl);
     // Remove inherited acls from prefix.
     assertTrue(store.removeAcl(prefixObj, inheritedUserAcl));
     assertTrue(store.removeAcl(prefixObj, inheritedGroupAcl));
@@ -3615,9 +3594,7 @@ public abstract class TestOzoneRpcClientAbstract {
               && acl.getType().equals(newAcl.getType()))
           .findFirst();
       assertTrue(readAcl.isPresent(), "New acl expected but not found.");
-      assertThat(readAcl.get().getAclList())
-          .withFailMessage("READ_ACL should exist in current acls:" + readAcl.get())
-          .contains(ACLType.READ_ACL);
+      assertThat(readAcl.get().getAclList()).contains(ACLType.READ_ACL);
 
 
       // Case:2 Remove newly added acl permission.
@@ -3629,15 +3606,13 @@ public abstract class TestOzoneRpcClientAbstract {
               && acl.getType().equals(newAcl.getType()))
           .findFirst();
       assertTrue(nonReadAcl.isPresent(), "New acl expected but not found.");
-      assertThat(nonReadAcl.get().getAclList())
-          .withFailMessage("READ_ACL should not exist in current acls:" + nonReadAcl.get())
-          .doesNotContain(ACLType.READ_ACL);
+      assertThat(nonReadAcl.get().getAclList()).doesNotContain(ACLType.READ_ACL);
     } else {
       fail("Default acl should not be empty.");
     }
 
     List<OzoneAcl> keyAcls = store.getAcl(ozObj);
-    expectedAcls.forEach(a -> assertThat(keyAcls).contains(a));
+    assertThat(keyAcls).containsAll(expectedAcls);
 
     // Remove all acl's.
     for (OzoneAcl a : expectedAcls) {
@@ -3656,7 +3631,7 @@ public abstract class TestOzoneRpcClientAbstract {
     newAcls = store.getAcl(ozObj);
     assertEquals(expectedAcls.size(), newAcls.size());
     List<OzoneAcl> finalNewAcls = newAcls;
-    expectedAcls.forEach(a -> assertThat(finalNewAcls).contains(a));
+    assertThat(finalNewAcls).containsAll(expectedAcls);
 
     // Reset acl's.
     OzoneAcl ua = new OzoneAcl(USER, "userx",

@@ -463,8 +463,6 @@ class TestBlockOutputStreamWithFailures {
 
     assertInstanceOf(ContainerNotOpenException.class,
         checkForException(blockOutputStream.getIoException()));
-    assertInstanceOf(ContainerNotOpenException.class,
-        checkForException(blockOutputStream.getIoException()));
     // Make sure the retryCount is reset after the exception is handled
     assertEquals(0, keyOutputStream.getRetryCount());
     // make sure the bufferPool is empty
@@ -542,8 +540,6 @@ class TestBlockOutputStreamWithFailures {
     // and one flush for partial chunk
     key.flush();
 
-    assertInstanceOf(ContainerNotOpenException.class,
-        checkForException(blockOutputStream.getIoException()));
     assertInstanceOf(ContainerNotOpenException.class,
         checkForException(blockOutputStream.getIoException()));
     // Make sure the retryCount is reset after the exception is handled

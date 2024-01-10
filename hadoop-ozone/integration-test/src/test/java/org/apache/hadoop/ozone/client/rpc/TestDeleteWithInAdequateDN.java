@@ -327,7 +327,7 @@ public class TestDeleteWithInAdequateDN {
         fail("Expected exception is not thrown");
       } catch (IOException ioe) {
         StorageContainerException e = assertInstanceOf(StorageContainerException.class, ioe);
-        assertSame(e.getResult(), ContainerProtos.Result.UNABLE_TO_FIND_CHUNK);
+        assertSame(ContainerProtos.Result.UNABLE_TO_FIND_CHUNK, e.getResult());
       }
     }
   }
