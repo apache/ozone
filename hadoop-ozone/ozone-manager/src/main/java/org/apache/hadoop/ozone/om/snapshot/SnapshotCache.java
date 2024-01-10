@@ -30,11 +30,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -70,7 +70,7 @@ public class SnapshotCache implements ReferenceCountedCallback {
       OmSnapshotManager omSnapshotManager,
       CacheLoader<String, OmSnapshot> cacheLoader,
       int cacheSizeLimit) {
-    this.dbMap = new ConcurrentHashMap<>();
+    this.dbMap = new HashMap<>();
     this.pendingEvictionList = new LinkedHashSet<>();
     this.omSnapshotManager = omSnapshotManager;
     this.cacheLoader = cacheLoader;
@@ -228,7 +228,6 @@ public class SnapshotCache implements ReferenceCountedCallback {
       // even if there are entries that can be evicted, which is fine since it
       // is a soft limit.
       cleanup();
-
     } finally {
       lock.unlock();
     }

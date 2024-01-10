@@ -417,6 +417,7 @@ public class TestSnapshotDiffManager {
     when(omSnapshot.getName()).thenReturn(snapshot);
     when(omSnapshot.getMetadataManager()).thenReturn(omMetadataManager);
     when(omMetadataManager.getStore()).thenReturn(dbStore);
+    when(omSnapshot.getSnapshotTableKey()).thenReturn(snapshot);
     return omSnapshot;
   }
 
