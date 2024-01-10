@@ -19,7 +19,7 @@
 
 package org.apache.hadoop.ozone.om.response.bucket;
 
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.nio.file.Path;
 import java.util.UUID;
 
@@ -100,9 +100,9 @@ public class TestOMBucketDeleteResponse {
 
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
-    
-    assertNull(omMetadataManager.getBucketTable().get(
-            omMetadataManager.getBucketKey(volumeName, bucketName)));
+
+    assertEquals(null, omMetadataManager.getBucketTable().get(
+        omMetadataManager.getBucketKey(volumeName, bucketName)));
   }
 
 }
