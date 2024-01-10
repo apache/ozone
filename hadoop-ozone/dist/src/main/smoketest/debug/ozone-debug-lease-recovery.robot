@@ -36,12 +36,12 @@ Create volume bucket and put key
 *** Test Cases ***
 Test ozone debug recover for o3fs
     ${result} =              Execute Lease recovery cli    o3fs://${BUCKET}.${VOLUME}.om/${TESTFILE}
-    Should Contain    ${result}  Key: ${TESTFILE} is already closed
+    Should Contain    ${result}   Lease recovery SUCCEEDED
     ${result} =              Execute Lease recovery cli    o3fs://${BUCKET}.${VOLUME}.om/randomfile
     Should Contain    ${result}    not found
 
 Test ozone debug recover for ofs
     ${result} =              Execute Lease recovery cli    ofs://om/${VOLUME}/${BUCKET}/${TESTFILE}
-    Should Contain    ${result}  Key: ${TESTFILE} is already closed
+    Should Contain    ${result}   Lease recovery SUCCEEDED
     ${result} =              Execute Lease recovery cli    ofs://om/${VOLUME}/${BUCKET}/randomfile
     Should Contain    ${result}    not found
