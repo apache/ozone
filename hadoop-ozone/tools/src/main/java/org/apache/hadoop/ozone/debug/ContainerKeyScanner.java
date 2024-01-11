@@ -88,11 +88,10 @@ public class ContainerKeyScanner implements Callable<Void>,
   private RDBParser parent;
 
   @CommandLine.Option(names = {"--container-ids"},
-      split = ",",
-      paramLabel = "containerIDs",
+      split = " ",
+      paramLabel = "<container ID>",
       required = true,
-      description = "Set of container IDs to be used for getting all " +
-          "their keys. Example-usage: 1,11,2 (Separated by ',').")
+      description = "One or more container IDs separated by spaces.")
   private Set<Long> containerIds;
 
   private static Map<String, OmDirectoryInfo> directoryTable;
