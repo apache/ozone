@@ -2071,6 +2071,7 @@ message RecoverLeaseRequest {
   optional string volumeName = 1;
   optional string bucketName = 2;
   optional string keyName = 3;
+  optional bool force = 4;
 }
 
 message RecoverLeaseResponse {

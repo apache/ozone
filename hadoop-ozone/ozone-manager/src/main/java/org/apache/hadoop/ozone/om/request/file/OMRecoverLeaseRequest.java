@@ -80,6 +80,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
   private String dbFileKey;
   private OmKeyInfo openKeyInfo;
   private String dbOpenFileKey;
+  private boolean force;
 
   private OMMetadataManager omMetadataManager;
 
@@ -92,6 +93,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     volumeName = recoverLeaseRequest.getVolumeName();
     bucketName = recoverLeaseRequest.getBucketName();
     keyName = recoverLeaseRequest.getKeyName();
+    force = recoverLeaseRequest.getForce();
   }
 
   @Override
@@ -218,7 +220,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     } else {
       final long leaseSoftLimit = ozoneManager.getConfiguration()
           .getTimeDuration(OZONE_OM_LEASE_SOFT_LIMIT, OZONE_OM_LEASE_SOFT_LIMIT_DEFAULT, TimeUnit.MILLISECONDS);
-      if (Time.now() < openKeyInfo.getModificationTime() + leaseSoftLimit) {
+      if (!force && Time.now() < openKeyInfo.getModificationTime() + leaseSoftLimit) {
         throw new OMException("Open Key " + keyName + " updated recently and is inside soft limit period",
             KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD);
       }
