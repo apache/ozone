@@ -82,12 +82,16 @@
                 });
             /*if option is 'All' display all records else display specified record on page*/
             $scope.UpdateRecordsToShow = () => {
-                if($scope.RecordsToDisplay == 'All') {
-                    $scope.lastIndex = 1;
-                    $scope.nodeStatus = nodeStatusCopy;
-                } else {
-                    $scope.lastIndex = Math.ceil(nodeStatusCopy.length / $scope.RecordsToDisplay);
-                    $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
+                if($scope.search){
+                    $scope.nodeStatus = nodeStatusCopy.filter(item => item.hostname.includes($scope.search));
+                }else {
+                    if ($scope.RecordsToDisplay == 'All') {
+                        $scope.lastIndex = 1;
+                        $scope.nodeStatus = nodeStatusCopy;
+                    } else {
+                        $scope.lastIndex = Math.ceil(nodeStatusCopy.length / $scope.RecordsToDisplay);
+                        $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
+                    }
                 }
                 $scope.currentPage = 1;
             }
