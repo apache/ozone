@@ -86,6 +86,15 @@ public class DatanodeSchemaTwoDBDefinition
           Long.class,
           LongCodec.get());
 
+  public static final DBColumnFamilyDefinition<String, BlockData>
+      LAST_CHUNK_INFO =
+      new DBColumnFamilyDefinition<>(
+          "last_chunk_info",
+          String.class,
+          FixedLengthStringCodec.get(),
+          BlockData.class,
+          BlockData.getCodec());
+
   public DatanodeSchemaTwoDBDefinition(String dbPath,
       ConfigurationSource config) {
     super(dbPath, config);
@@ -97,7 +106,8 @@ public class DatanodeSchemaTwoDBDefinition
           METADATA,
           DELETED_BLOCKS,
           DELETE_TRANSACTION,
-          FINALIZE_BLOCKS);
+          FINALIZE_BLOCKS,
+          LAST_CHUNK_INFO);
 
   @Override
   public Map<String, DBColumnFamilyDefinition<?, ?>> getMap() {
@@ -119,6 +129,12 @@ public class DatanodeSchemaTwoDBDefinition
   public DBColumnFamilyDefinition<String, ChunkInfoList>
       getDeletedBlocksColumnFamily() {
     return DELETED_BLOCKS;
+  }
+
+  @Override
+  public DBColumnFamilyDefinition<String, BlockData>
+      getLastChunkInfoColumnFamily() {
+    return LAST_CHUNK_INFO;
   }
 
   public DBColumnFamilyDefinition<Long, DeletedBlocksTransaction>

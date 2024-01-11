@@ -101,6 +101,15 @@ public class DatanodeSchemaThreeDBDefinition
           Long.class,
           LongCodec.get());
 
+  public static final DBColumnFamilyDefinition<String, BlockData>
+      LAST_CHUNK_INFO =
+      new DBColumnFamilyDefinition<>(
+          "last_chunk_info",
+          String.class,
+          FixedLengthStringCodec.get(),
+          BlockData.class,
+          BlockData.getCodec());
+
   private static String separator = "";
 
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>
@@ -109,8 +118,8 @@ public class DatanodeSchemaThreeDBDefinition
          METADATA,
          DELETED_BLOCKS,
          DELETE_TRANSACTION,
-         FINALIZE_BLOCKS);
-
+         FINALIZE_BLOCKS,
+         LAST_CHUNK_INFO);
 
   public DatanodeSchemaThreeDBDefinition(String dbPath,
       ConfigurationSource config) {
@@ -134,6 +143,7 @@ public class DatanodeSchemaThreeDBDefinition
     DELETED_BLOCKS.setCfOptions(cfOptions);
     DELETE_TRANSACTION.setCfOptions(cfOptions);
     FINALIZE_BLOCKS.setCfOptions(cfOptions);
+    LAST_CHUNK_INFO.setCfOptions(cfOptions);
   }
 
   @Override
@@ -156,6 +166,12 @@ public class DatanodeSchemaThreeDBDefinition
   public DBColumnFamilyDefinition<String, ChunkInfoList>
       getDeletedBlocksColumnFamily() {
     return DELETED_BLOCKS;
+  }
+
+  @Override
+  public DBColumnFamilyDefinition<String, BlockData>
+      getLastChunkInfoColumnFamily() {
+    return LAST_CHUNK_INFO;
   }
 
   public DBColumnFamilyDefinition<String, DeletedBlocksTransaction>
