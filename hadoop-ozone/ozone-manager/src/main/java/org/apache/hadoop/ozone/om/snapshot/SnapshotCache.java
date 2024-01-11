@@ -200,15 +200,14 @@ public class SnapshotCache {
             "Snapshot with table key '" + key + "' is no longer active",
             FILE_NOT_FOUND);
       }
-
-      // Check if any entries can be cleaned up.
-      // At this point, cache size might temporarily exceed cacheSizeLimit
-      // even if there are entries that can be evicted, which is fine since it
-      // is a soft limit.
-      cleanup();
     } finally {
       lock.unlock();
     }
+
+    // Check if any entries can be cleaned up.
+    // At this point, cache size might temporarily exceed cacheSizeLimit
+    // even if there are entries that can be evicted, which is fine since it is a soft limit.
+    cleanup();
     return rcOmSnapshot;
   }
 
