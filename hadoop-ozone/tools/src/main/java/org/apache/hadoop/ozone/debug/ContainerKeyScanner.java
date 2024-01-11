@@ -87,7 +87,7 @@ public class ContainerKeyScanner implements Callable<Void>,
   @CommandLine.ParentCommand
   private RDBParser parent;
 
-  @CommandLine.Option(names = {"-ids", "--container-ids"},
+  @CommandLine.Option(names = {"--container-ids"},
       split = ",",
       paramLabel = "containerIDs",
       required = true,

@@ -139,7 +139,7 @@ public class TestContainerKeyScanner {
 
     String[] cmdArgs =
         {"--db", dbStore.getDbLocation().getAbsolutePath(), "ckscanner",
-            "-ids", "1,2,3"};
+            "--container-ids", "1,2,3"};
 
     int exitCode = cmd.execute(cmdArgs);
     Assertions.assertEquals(0, exitCode);
@@ -163,7 +163,7 @@ public class TestContainerKeyScanner {
 
     String[] cmdArgs =
         {"--db", dbStore.getDbLocation().getAbsolutePath(), "ckscanner",
-            "-ids", "1,2,3"};
+            "--container-ids", "1,2,3"};
 
     int exitCode = cmd.execute(cmdArgs);
     Assertions.assertEquals(0, exitCode);
