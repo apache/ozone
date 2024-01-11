@@ -37,6 +37,8 @@ import org.kohsuke.MetaInfServices;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -74,6 +76,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.ROOT_PATH;
 public class ContainerKeyScanner implements Callable<Void>,
     SubcommandWithParent {
 
+  public static final Logger LOG =
+      LoggerFactory.getLogger(ContainerKeyScanner.class);
   private static final String FILE_TABLE = "fileTable";
   private static final String KEY_TABLE = "keyTable";
   private static final String DIRECTORY_TABLE = "directoryTable";
@@ -304,8 +308,7 @@ public class ContainerKeyScanner implements Callable<Void>,
                 long start = System.currentTimeMillis();
                 directoryTable = getDirectoryTableData(parent.getDbPath());
                 long end = System.currentTimeMillis();
-                out().println(
-                    "directoryTable loaded in " + (end - start) + " ms.");
+                LOG.info("directoryTable loaded in " + (end - start) + " ms.");
                 isDirTableLoaded = true;
               }
               keyName.append(getFsoKeyPrefix(volumeId, bucketId, value));
@@ -402,7 +405,7 @@ public class ContainerKeyScanner implements Callable<Void>,
         new ContainerKeyInfoResponse(containerKeyInfoWrapper.getKeysProcessed(),
             infoMap));
 
-    out().println(prettyJson);
+    out().print(prettyJson);
   }
 
 }

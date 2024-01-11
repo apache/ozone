@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.ozone.debug;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -40,6 +42,9 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -57,45 +62,33 @@ public class TestContainerKeyScanner {
   private StringWriter stdout, stderr;
   private PrintWriter pstdout, pstderr;
   private CommandLine cmd;
+  private static final Gson GSON =
+      new GsonBuilder().setPrettyPrinting().create();
+  private static final ContainerKeyInfo KEY_ONE =
+      new ContainerKeyInfo(1L, "vol1", -123L, "bucket1", -456L, "dir1/key1",
+          -789L);
+  private static final ContainerKeyInfo KEY_TWO =
+      new ContainerKeyInfo(2L, "vol1", 0L, "bucket1", 0L, "key2", 0L);
+  private static final ContainerKeyInfo KEY_THREE =
+      new ContainerKeyInfo(3L, "vol1", 0L, "bucket1", 0L, "key3", 0L);
 
-  private static final String KEYS_FOUND_OUTPUT = "{\n" +
-      "  \"keysProcessed\": 3,\n" +
-      "  \"containerKeys\": {\n" +
-      "    \"1\": [\n" +
-      "      {\n" +
-      "        \"containerID\": 1,\n" +
-      "        \"volumeName\": \"vol1\",\n" +
-      "        \"volumeId\": -123,\n" +
-      "        \"bucketName\": \"bucket1\",\n" +
-      "        \"bucketId\": -456,\n" +
-      "        \"keyName\": \"dir1/key1\",\n" +
-      "        \"parentId\": -789\n" +
-      "      }\n" +
-      "    ],\n" +
-      "    \"2\": [\n" +
-      "      {\n" +
-      "        \"containerID\": 2,\n" +
-      "        \"volumeName\": \"vol1\",\n" +
-      "        \"volumeId\": 0,\n" +
-      "        \"bucketName\": \"bucket1\",\n" +
-      "        \"bucketId\": 0,\n" +
-      "        \"keyName\": \"key2\",\n" +
-      "        \"parentId\": 0\n" +
-      "      }\n" +
-      "    ],\n" +
-      "    \"3\": [\n" +
-      "      {\n" +
-      "        \"containerID\": 3,\n" +
-      "        \"volumeName\": \"vol1\",\n" +
-      "        \"volumeId\": 0,\n" +
-      "        \"bucketName\": \"bucket1\",\n" +
-      "        \"bucketId\": 0,\n" +
-      "        \"keyName\": \"key3\",\n" +
-      "        \"parentId\": 0\n" +
-      "      }\n" +
-      "    ]\n" +
-      "  }\n" +
-      "}\n";
+  private static final Map<Long, List<ContainerKeyInfo>> CONTAINER_KEYS =
+      new HashMap<>();
+
+  static {
+    List<ContainerKeyInfo> list1 = new ArrayList<>();
+    list1.add(KEY_ONE);
+    List<ContainerKeyInfo> list2 = new ArrayList<>();
+    list2.add(KEY_TWO);
+    List<ContainerKeyInfo> list3 = new ArrayList<>();
+    list3.add(KEY_THREE);
+    CONTAINER_KEYS.put(1L, list1);
+    CONTAINER_KEYS.put(2L, list2);
+    CONTAINER_KEYS.put(3L, list3);
+  }
+
+  private static final ContainerKeyInfoResponse KEYS_FOUND_OUTPUT =
+      new ContainerKeyInfoResponse(3, CONTAINER_KEYS);
 
   private static final String KEYS_NOT_FOUND_OUTPUT =
       "No keys were found for container IDs: [1, 2, 3]\n" +
@@ -150,7 +143,9 @@ public class TestContainerKeyScanner {
     int exitCode = cmd.execute(cmdArgs);
     Assertions.assertEquals(0, exitCode);
 
-    Assertions.assertTrue(stdout.toString().contains(KEYS_FOUND_OUTPUT));
+    Assertions.assertEquals(
+        GSON.fromJson(stdout.toString(), ContainerKeyInfoResponse.class),
+        KEYS_FOUND_OUTPUT);
 
     Assertions.assertTrue(stderr.toString().isEmpty());
   }

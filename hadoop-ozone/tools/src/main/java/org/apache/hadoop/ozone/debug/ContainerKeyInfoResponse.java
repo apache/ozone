@@ -21,6 +21,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Class for response for container key scanner.
@@ -37,11 +38,21 @@ public class ContainerKeyInfoResponse {
     this.containerKeys = containerKeys;
   }
 
-  public long getKeysProcessed() {
-    return keysProcessed;
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    ContainerKeyInfoResponse that = (ContainerKeyInfoResponse) o;
+    return keysProcessed == that.keysProcessed &&
+        Objects.equals(containerKeys, that.containerKeys);
   }
 
-  public Map<Long, List<ContainerKeyInfo>> getContainerKeys() {
-    return containerKeys;
+  @Override
+  public int hashCode() {
+    return Objects.hash(keysProcessed, containerKeys);
   }
 }
