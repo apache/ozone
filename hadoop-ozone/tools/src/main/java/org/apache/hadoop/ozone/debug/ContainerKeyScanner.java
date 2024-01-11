@@ -63,6 +63,9 @@ import java.util.stream.Collectors;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.ROOT_PATH;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 
 /**
  * Parser for a list of container IDs, to scan for keys.
@@ -77,9 +80,6 @@ public class ContainerKeyScanner implements Callable<Void>,
 
   public static final Logger LOG =
       LoggerFactory.getLogger(ContainerKeyScanner.class);
-  private static final String FILE_TABLE = "fileTable";
-  private static final String KEY_TABLE = "keyTable";
-  private static final String DIRECTORY_TABLE = "directoryTable";
 
   @CommandLine.Spec
   private static CommandLine.Model.CommandSpec spec;

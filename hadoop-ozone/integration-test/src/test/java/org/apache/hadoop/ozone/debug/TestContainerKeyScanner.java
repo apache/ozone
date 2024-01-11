@@ -48,15 +48,15 @@ import java.util.Map;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 
 /**
  * This class tests `ozone debug ldb ckscanner` CLI that reads from RocksDB
  * and gets keys for container ids.
  */
 public class TestContainerKeyScanner {
-  private static final String KEY_TABLE = "keyTable";
-  private static final String FILE_TABLE = "fileTable";
-  private static final String DIRECTORY_TABLE = "directoryTable";
   private DBStore dbStore;
   @TempDir
   private File tempDir;
