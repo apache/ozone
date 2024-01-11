@@ -52,8 +52,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.
 import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests the validity BCSID of a container.
@@ -139,7 +139,7 @@ public class TestBCSID {
             .getContainer().getContainerSet()
             .getContainer(omKeyLocationInfo.getContainerID())
             .getContainerReport().getBlockCommitSequenceId();
-    assertTrue(blockCommitSequenceId > 0);
+    assertThat(blockCommitSequenceId).isGreaterThan(0);
 
     // make sure the persisted block Id in OM is same as that seen in the
     // container report to be reported to SCM.

@@ -133,4 +133,10 @@
     <Class name="org.apache.hadoop.ozone.scm.TestSCMInstallSnapshotWithHA"/>
     <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
   </Match>
+  <Match>
+    <Class name="org.apache.hadoop.fs.contract.AbstractContractCopyFromLocalTest"/>
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.fs.contract.AbstractContractEtagTest"/>
+  </Match>
 </FindBugsFilter>

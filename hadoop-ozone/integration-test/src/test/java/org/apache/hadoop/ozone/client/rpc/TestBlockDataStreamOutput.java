@@ -49,8 +49,9 @@ import java.util.concurrent.TimeUnit;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 /**
  * Tests BlockDataStreamOutput class.
@@ -177,7 +178,7 @@ public class TestBlockDataStreamOutput {
         (KeyDataStreamOutput) key.getByteBufStreamOutput();
     ByteBufferStreamOutput stream =
         keyDataStreamOutput.getStreamEntries().get(0).getByteBufStreamOutput();
-    assertTrue(stream instanceof BlockDataStreamOutput);
+    assertInstanceOf(BlockDataStreamOutput.class, stream);
     TestHelper.waitForContainerClose(key, cluster);
     key.write(b);
     key.close();
@@ -201,9 +202,8 @@ public class TestBlockDataStreamOutput {
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
             .getBytes(UTF_8);
     key.write(ByteBuffer.wrap(data));
-    assertTrue(
-        metrics.getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock)
-            <= pendingPutBlockCount + 1);
+    assertThat(metrics.getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock))
+        .isLessThanOrEqualTo(pendingPutBlockCount + 1);
     key.close();
     // Since data length is 500 , first putBlock will be at 400(flush boundary)
     // and the other at 500
