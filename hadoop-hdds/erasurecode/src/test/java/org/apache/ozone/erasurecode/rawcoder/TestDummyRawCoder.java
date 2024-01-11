@@ -21,9 +21,10 @@ import org.apache.ozone.erasurecode.ECChunk;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test dummy raw coder.
@@ -63,7 +64,11 @@ public class TestDummyRawCoder extends TestRawCoderBase {
     ECChunk[] dataChunks = prepareDataChunksForEncoding();
     markChunks(dataChunks);
     ECChunk[] parityChunks = prepareParityChunksForEncoding();
-    assertDoesNotThrow(() -> encode(dataChunks, parityChunks));
+    try {
+      encode(dataChunks, parityChunks);
+    } catch (IOException e) {
+      fail("Unexpected IOException: " + e.getMessage());
+    }
     compareAndVerify(parityChunks, getEmptyChunks(parityChunks.length));
 
     // Decode
@@ -73,7 +78,12 @@ public class TestDummyRawCoder extends TestRawCoderBase {
         dataChunks, parityChunks);
     ensureOnlyLeastRequiredChunks(inputChunks);
     ECChunk[] recoveredChunks = prepareOutputChunksForDecoding();
-    assertDoesNotThrow(() -> decode(inputChunks, getErasedIndexesForDecoding(), recoveredChunks));
+    try {
+      decode(inputChunks, getErasedIndexesForDecoding(),
+          recoveredChunks);
+    } catch (IOException e) {
+      fail("Unexpected IOException: " + e.getMessage());
+    }
     compareAndVerify(recoveredChunks, getEmptyChunks(recoveredChunks.length));
   }
 
