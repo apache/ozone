@@ -42,6 +42,7 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashSet;
@@ -331,6 +332,70 @@ public class TestDatanodeAdminMonitor {
         replicas.iterator().next().getSequenceId() + 1);
     // UNHEALTHY replica is on a unique origin and has same sequence id as
     // the container
+    ContainerReplica unhealthy =
+        ReplicationTestUtil.createContainerReplica(containerID, 0,
+            dn1.getPersistedOpState(), State.UNHEALTHY,
+            container.getNumberOfKeys(), container.getUsedBytes(), dn1,
+            dn1.getUuid(), container.getSequenceId());
+    replicas.add(unhealthy);
+    nodeManager.setContainers(dn1, ImmutableSet.of(containerID));
+
+    Mockito.when(repManager.getContainerReplicaCount(Mockito.eq(containerID)))
+        .thenReturn(new RatisContainerReplicaCount(container, replicas,
+            Collections.emptyList(), 2, false));
+    DatanodeAdminMonitorTestUtil.mockCheckContainerState(repManager, true);
+
+    // start monitoring dn1
+    monitor.startMonitoring(dn1);
+    monitor.run();
+    assertEquals(1, monitor.getTrackedNodeCount());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dn1).getOperationalState());
+
+    // Running the monitor again causes it to remain DECOMMISSIONING
+    // as nothing has changed.
+    monitor.run();
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dn1).getOperationalState());
+
+    // add a copy of the UNHEALTHY replica on a new node, dn1 should get
+    // decommissioned now
+    ContainerReplica copyOfUnhealthyOnNewNode = unhealthy.toBuilder()
+        .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
+        .build();
+    replicas.add(copyOfUnhealthyOnNewNode);
+    Mockito.when(repManager.getContainerReplicaCount(Mockito.eq(containerID)))
+        .thenReturn(new RatisContainerReplicaCount(container, replicas,
+            Collections.emptyList(), 2, false));
+    DatanodeAdminMonitorTestUtil.mockCheckContainerState(repManager, false);
+    monitor.run();
+    assertEquals(0, monitor.getTrackedNodeCount());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONED,
+        nodeManager.getNodeStatus(dn1).getOperationalState());
+  }
+
+  /**
+   * Situation: A QUASI_CLOSED container has an UNHEALTHY replica with a unique origin and three QUASI_CLOSED replicas.
+   * All the replicas have the correct Sequence ID. UNHEALTHY container is on a decommissioning node, and there are
+   * no other copies of this replica, that is, replicas with the same Origin ID as this replica.
+   *
+   * Expectation: Decommissioning should not complete until the UNHEALTHY replica has been replicated to another node.
+   */
+  @Test
+  public void testDecommissionWaitsForUnhealthyReplicaWithUniqueOriginToReplicateNewRM()
+      throws NodeNotFoundException, ContainerNotFoundException {
+    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+    nodeManager.register(dn1,
+        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING, HddsProtos.NodeState.HEALTHY));
+
+    // create a container and 3 QUASI_CLOSED replicas with containerID 1 and same origin ID
+    ContainerID containerID = ContainerID.valueOf(1);
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(RatisReplicationConfig.getInstance(
+        HddsProtos.ReplicationFactor.THREE), containerID.getId(), HddsProtos.LifeCycleState.QUASI_CLOSED);
+    Set<ContainerReplica> replicas =
+        ReplicationTestUtil.createReplicasWithSameOrigin(containerID, State.QUASI_CLOSED, 0, 0, 0);
+
+    // UNHEALTHY replica is on a unique origin and has same sequence id as the container
     ContainerReplica unhealthy =
         ReplicationTestUtil.createContainerReplica(containerID, 0,
             dn1.getPersistedOpState(), State.UNHEALTHY,

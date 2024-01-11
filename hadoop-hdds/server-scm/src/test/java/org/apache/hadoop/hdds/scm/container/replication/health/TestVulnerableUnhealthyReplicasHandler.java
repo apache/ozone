@@ -126,6 +126,11 @@ public class TestVulnerableUnhealthyReplicasHandler {
     assertEquals(0, repQueue.overReplicatedQueueSize());
   }
 
+  /**
+   * A QUASI_CLOSED container with 3 QUASI_CLOSED replicas with incorrect sequence id. They're on unique origin nodes.
+   * There's an UNHEALTHY replica on a Decommissioning node, which has the correct sequence ID and unique origin.
+   * It's expected that the UNHEALTHY replica is queued for under replication.
+   */
   @Test
   public void testReturnsTrueForQuasiClosedContainerWithVulnerableReplica() throws NodeNotFoundException {
     long sequenceId = 10;
@@ -134,6 +139,49 @@ public class TestVulnerableUnhealthyReplicasHandler {
     for (int i = 0; i < 3; i++) {
       replicas.add(createContainerReplica(container.containerID(), 0, IN_SERVICE, State.QUASI_CLOSED,
           container.getSequenceId() - 1));
+    }
+    // create UNHEALTHY replica with unique origin id on a DECOMMISSIONING node
+    ContainerReplica unhealthy =
+        createContainerReplica(container.containerID(), 0, DECOMMISSIONING, State.UNHEALTHY, sequenceId);
+    replicas.add(unhealthy);
+    Mockito.when(replicationManager.getNodeStatus(Mockito.any(DatanodeDetails.class)))
+        .thenAnswer(invocation -> {
+          DatanodeDetails dn = invocation.getArgument(0);
+          if (dn.equals(unhealthy.getDatanodeDetails())) {
+            return new NodeStatus(DECOMMISSIONING, HEALTHY);
+          }
+          return NodeStatus.inServiceHealthy();
+        });
+    requestBuilder.setContainerReplicas(replicas).setContainerInfo(container);
+
+    assertTrue(handler.handle(requestBuilder.build()));
+    assertEquals(1, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+  }
+
+  /**
+   * A QUASI_CLOSED container with 3 QUASI_CLOSED replicas with correct sequence id. They're on unique origin nodes.
+   * There's an UNHEALTHY replica on a Decommissioning node, which also has the correct sequence ID and unique origin.
+   * It's expected that the UNHEALTHY replica is queued for under replication. This is a variation of the situation
+   * where the healthy replicas have incorrect sequence id, and the unhealthy ones have the correct sequence id.
+   * Here, all the replicas have the correct sequence id but the unhealthy still need to be saved because they're on
+   * unique origin nodes.
+   * <p>
+   * Why do we need to save the UNHEALTHY replicas if we have enough unique QUASI_CLOSED replicas to form a quorum?
+   * Simply because we're ensuring redundancy of replicas having unique origin node IDs. When HDDS has the ability to
+   * restore UNHEALTHY replicas to a healthy state, they can also be used to create a quorum. In any case, when the
+   * container transitions to CLOSED, any UNHEALTHY replicas will be deleted.
+   * </p>
+   */
+  @Test
+  public void testReturnsTrueForQuasiClosedContainerWithVulnerableReplicaWhenAllReplicasHaveCorrectSequence()
+      throws NodeNotFoundException {
+    long sequenceId = 10;
+    ContainerInfo container = createContainerInfo(repConfig, 1, LifeCycleState.QUASI_CLOSED, sequenceId);
+    Set<ContainerReplica> replicas = new HashSet<>(4);
+    for (int i = 0; i < 3; i++) {
+      replicas.add(createContainerReplica(container.containerID(), 0, IN_SERVICE, State.QUASI_CLOSED,
+          container.getSequenceId()));
     }
     // create UNHEALTHY replica with unique origin id on a DECOMMISSIONING node
     ContainerReplica unhealthy =
