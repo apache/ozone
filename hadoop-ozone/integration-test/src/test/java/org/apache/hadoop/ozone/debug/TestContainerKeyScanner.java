@@ -47,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
  * This class tests `ozone debug ldb ckscanner` CLI that reads from RocksDB
@@ -179,7 +180,9 @@ public class TestContainerKeyScanner {
 
     // format: /volumeId/bucketId/parentId(bucketId)/keyName
     String key =
-        "/" + volumeId + "/" + bucketId + "/" + parentId + "/" + keyName;
+        OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX +
+            bucketId + OM_KEY_PREFIX + parentId +
+            OM_KEY_PREFIX + keyName;
 
     OmKeyInfo value =
         getOmKeyInfo("vol1", "bucket1", keyName, containerId, objectId,
@@ -195,7 +198,8 @@ public class TestContainerKeyScanner {
     String volumeName = "vol1";
     String bucketName = "bucket1";
     // format: /volumeName/bucketName/keyName
-    String key = "/" + volumeName + "/" + bucketName + "/" + keyName;
+    String key = OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName +
+        OM_KEY_PREFIX + keyName;
 
     // generate table value
     OmKeyInfo value =
@@ -212,7 +216,8 @@ public class TestContainerKeyScanner {
 
     // format: /volumeId/bucketId/parentId(bucketId)/keyName
     String key =
-        "/" + volumeId + "/" + bucketId + "/" + parentId + "/" + keyName;
+        OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX +
+            parentId + OM_KEY_PREFIX + keyName;
 
     OmDirectoryInfo value =
         OMRequestTestUtils.createOmDirectoryInfo(keyName, objectId, parentId);
