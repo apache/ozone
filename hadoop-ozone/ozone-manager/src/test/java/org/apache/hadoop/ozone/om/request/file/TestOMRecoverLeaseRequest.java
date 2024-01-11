@@ -302,22 +302,33 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
   public void testLeaseSoftLimitForHsyncRecoverFile() throws Exception {
     populateNamespace(true, true, true, true);
 
-    // Call first time
-    OMClientResponse omClientResponse = validateAndUpdateCache();
-    // Update soft limit period to high value
+    // update soft limit to high value
     ozoneManager.getConfiguration().set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "2s");
-    // Call second time inside soft limit, it should fail
-    omClientResponse = validateAndUpdateCache();
+    // Call recovery inside soft limit period it should fail
+    OMClientResponse omClientResponse = validateAndUpdateCache();
     OMResponse omResponse = omClientResponse.getOMResponse();
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD,
         omResponse.getStatus());
+    // Call second time inside soft limit period also should fail
+    omClientResponse = validateAndUpdateCache();
+    omResponse = omClientResponse.getOMResponse();
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD,
+        omResponse.getStatus());
     Thread.sleep(2000);
-    // Call again after soft limit period it should succeed
+    // Call recovery after soft limit period it should succeed
     omClientResponse = validateAndUpdateCache();
     omResponse = omClientResponse.getOMResponse();
     Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK, omResponse.getStatus());
     RecoverLeaseResponse recoverLeaseResponse = omResponse.getRecoverLeaseResponse();
     KeyInfo keyInfo = recoverLeaseResponse.getKeyInfo();
+    Assertions.assertNotNull(keyInfo);
+
+    // Call recovery again it should succeed
+    omClientResponse = validateAndUpdateCache();
+    omResponse = omClientResponse.getOMResponse();
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK, omResponse.getStatus());
+    recoverLeaseResponse = omResponse.getRecoverLeaseResponse();
+    keyInfo = recoverLeaseResponse.getKeyInfo();
     Assertions.assertNotNull(keyInfo);
   }
 

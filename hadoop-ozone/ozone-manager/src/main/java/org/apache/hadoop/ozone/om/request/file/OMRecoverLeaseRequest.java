@@ -213,16 +213,15 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       throw new OMException("Open Key " + dbOpenFileKey + " not found in openKeyTable", KEY_NOT_FOUND);
     }
 
-    final long leaseSoftLimit = ozoneManager.getConfiguration()
-        .getTimeDuration(OZONE_OM_LEASE_SOFT_LIMIT, OZONE_OM_LEASE_SOFT_LIMIT_DEFAULT, TimeUnit.MILLISECONDS);
-    if (Time.now() < openKeyInfo.getModificationTime() + leaseSoftLimit) {
-      throw new OMException("Open Key " + keyName + " updated recently and is inside soft limit period",
-          KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD);
-    }
-
     if (openKeyInfo.getMetadata().containsKey(OzoneConsts.LEASE_RECOVERY)) {
       LOG.debug("Key: " + keyName + " is already under recovery");
     } else {
+      final long leaseSoftLimit = ozoneManager.getConfiguration()
+          .getTimeDuration(OZONE_OM_LEASE_SOFT_LIMIT, OZONE_OM_LEASE_SOFT_LIMIT_DEFAULT, TimeUnit.MILLISECONDS);
+      if (Time.now() < openKeyInfo.getModificationTime() + leaseSoftLimit) {
+        throw new OMException("Open Key " + keyName + " updated recently and is inside soft limit period",
+            KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD);
+      }
       openKeyInfo.getMetadata().put(OzoneConsts.LEASE_RECOVERY, "true");
       openKeyInfo.setUpdateID(transactionLogIndex, ozoneManager.isRatisEnabled());
       openKeyInfo.setModificationTime(Time.now());
