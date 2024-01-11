@@ -36,11 +36,8 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.Rule;
 import org.junit.jupiter.api.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
@@ -63,12 +60,9 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 /**
  * This class tests datanode can tolerate configured num of failed volumes.
  */
+@Timeout(300)
 public class TestDatanodeHddsVolumeFailureToleration {
-  /**
-   * Set a timeout for each test.
-   */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
+
   private MiniOzoneCluster cluster;
   private OzoneConfiguration ozoneConfig;
   private List<HddsDatanodeService> datanodes;
