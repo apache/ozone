@@ -117,7 +117,6 @@ export class PieChartComponent extends React.Component<ChartProps, ChartState> {
             layoutProps["width"] = windowWidth * 0.7
             layoutProps["height"] = windowHeight * 0.9
             layoutProps["legend"]["orientation"] = "h"
-            // layoutProps["width"] = windowWidth * 
             layoutProps["legend"]["x"] = 0.4;
             layoutProps["legend"]["xanchor"] = "center";
             layoutProps["legend"]["y"] = (- windowHeight);
