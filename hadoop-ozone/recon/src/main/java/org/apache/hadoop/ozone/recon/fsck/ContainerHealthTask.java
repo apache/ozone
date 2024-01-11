@@ -148,6 +148,7 @@ public class ContainerHealthTask extends ReconScmTask {
     List<ContainerInfo> containers = containerManager.getContainers(startID,
         FETCH_COUNT);
     long start;
+    long iterationCount = 0;
     while (!containers.isEmpty()) {
       start = Time.monotonicNow();
       containers.stream()
@@ -159,14 +160,19 @@ public class ContainerHealthTask extends ReconScmTask {
               " processing {} containers.", Time.monotonicNow() - start,
           containers.size());
       logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
-      if (containers.size() > FETCH_COUNT) {
+      if (containers.size() >= FETCH_COUNT) {
         startID = ContainerID.valueOf(
-            containers.get(containers.size() - 1).getContainerID());
-        containers.clear();
+            containers.get(containers.size() - 1).getContainerID() + 1);
         containers = containerManager.getContainers(startID, FETCH_COUNT);
+      } else {
+        containers.clear();
       }
-      containers.clear();
+      iterationCount++;
     }
+    LOG.info(
+        "Container Health task thread took {} iterations to fetch all " +
+            "containers using batched approach with batch size of {}",
+        iterationCount, FETCH_COUNT);
   }
 
   private void logUnhealthyContainerStats(
