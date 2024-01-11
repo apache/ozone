@@ -51,10 +51,10 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.assertj.core.api.Fail;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
@@ -202,6 +202,7 @@ public class TestOMRatisSnapshots {
   @ValueSource(ints = {100})
   // tried up to 1000 snapshots and this test works, but some of the
   //  timeouts have to be increased.
+  @Unhealthy("HDDS-10059")
   void testInstallSnapshot(int numSnapshotsToCreate, @TempDir Path tempDir) throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
@@ -334,8 +335,8 @@ public class TestOMRatisSnapshots {
             keys.get(keys.size() - 1)).build();
     OmKeyInfo omKeyInfo;
     omKeyInfo = followerOM.lookupKey(omKeyArgs);
-    Assertions.assertNotNull(omKeyInfo);
-    Assertions.assertEquals(omKeyInfo.getKeyName(), omKeyArgs.getKeyName());
+    assertNotNull(omKeyInfo);
+    assertEquals(omKeyInfo.getKeyName(), omKeyArgs.getKeyName());
 
     // Confirm followers snapshot hard links are as expected
     File followerMetaDir = OMStorage.getOmDbDir(followerOM.getConfiguration());
@@ -368,7 +369,7 @@ public class TestOMRatisSnapshots {
                 Paths.get(followerSnapshotDir.toString(), fileName);
             Path followerActiveSST =
                 Paths.get(followerActiveDir.toString(), fileName);
-            Assertions.assertEquals(
+            assertEquals(
                 OmSnapshotUtils.getINode(followerActiveSST),
                 OmSnapshotUtils.getINode(followerSnapshotSST),
                 "Snapshot sst file is supposed to be a hard link");
@@ -503,7 +504,7 @@ public class TestOMRatisSnapshots {
         firstIncrement.getSnapshotInfo());
     checkSnapshot(leaderOM, followerOM, "snap240", secondIncrement.getKeys(),
         secondIncrement.getSnapshotInfo());
-    Assertions.assertEquals(
+    assertEquals(
         followerOM.getOmSnapshotProvider().getInitCount(), 2,
         "Only initialized twice");
   }
@@ -649,7 +650,7 @@ public class TestOMRatisSnapshots {
     assertThat(sstList.size()).isGreaterThan(0);
     for (int i = 0; i < sstList.size(); i += 2) {
       File victimSst = new File(followerCandidateDir, sstList.get(i));
-      Assertions.assertTrue(victimSst.delete());
+      assertTrue(victimSst.delete());
     }
 
     // Resume the follower thread, it would download the full snapshot again

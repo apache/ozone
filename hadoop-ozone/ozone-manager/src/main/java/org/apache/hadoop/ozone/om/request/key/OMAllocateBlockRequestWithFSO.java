@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
+import org.apache.hadoop.ozone.om.helpers.OmFSOFile;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -200,15 +201,13 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       String keyName, long clientID, OzoneManager ozoneManager)
           throws IOException {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    final long volumeId = omMetadataManager.getVolumeId(volumeName);
-    final long bucketId = omMetadataManager.getBucketId(
-            volumeName, bucketName);
-    String fileName = OzoneFSUtils.getFileName(keyName);
 
-    long parentID = OMFileRequest.getParentID(volumeId, bucketId,
-          keyName, omMetadataManager);
-    return omMetadataManager.getOpenFileName(volumeId, bucketId, parentID,
-            fileName, clientID);
+    return new OmFSOFile.Builder()
+          .setVolumeName(volumeName)
+          .setBucketName(bucketName)
+          .setKeyName(keyName)
+          .setOmMetadataManager(omMetadataManager)
+          .build().getOpenFileName(clientID);
   }
 
   private void addOpenTableCacheEntry(long trxnLogIndex,

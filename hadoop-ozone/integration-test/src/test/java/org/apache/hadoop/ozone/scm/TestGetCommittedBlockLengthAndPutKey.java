@@ -44,7 +44,6 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -55,6 +54,9 @@ import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test Container calls.
@@ -127,9 +129,8 @@ public class TestGetCommittedBlockLengthAndPutKey {
       return true;
     }, 500, 5000);
     // make sure the block ids in the request and response are same.
-    Assertions.assertEquals(blockID,
-        BlockID.getFromProtobuf(response.get().getBlockID()));
-    Assertions.assertEquals(data.length, response.get().getBlockLength());
+    assertEquals(blockID, BlockID.getFromProtobuf(response.get().getBlockID()));
+    assertEquals(data.length, response.get().getBlockLength());
     xceiverClientManager.releaseClient(client, false);
   }
 
@@ -148,10 +149,10 @@ public class TestGetCommittedBlockLengthAndPutKey {
     ContainerProtocolCalls.closeContainer(client, containerID, null);
 
     // There is no block written inside the container. The request should fail.
-    Throwable t = Assertions.assertThrows(StorageContainerException.class,
+    Throwable t = assertThrows(StorageContainerException.class,
         () -> ContainerProtocolCalls.getCommittedBlockLength(client, blockID,
             null));
-    Assertions.assertTrue(t.getMessage().contains("Unable to find the block"));
+    assertTrue(t.getMessage().contains("Unable to find the block"));
 
     xceiverClientManager.releaseClient(client, false);
   }
@@ -181,9 +182,8 @@ public class TestGetCommittedBlockLengthAndPutKey {
         ContainerTestHelper
             .getPutBlockRequest(pipeline, writeChunkRequest.getWriteChunk());
     response = client.sendCommand(putKeyRequest).getPutBlock();
-    Assertions.assertEquals(
-        response.getCommittedBlockLength().getBlockLength(), data.length);
-    Assertions.assertTrue(response.getCommittedBlockLength().getBlockID()
+    assertEquals(response.getCommittedBlockLength().getBlockLength(), data.length);
+    assertTrue(response.getCommittedBlockLength().getBlockID()
         .getBlockCommitSequenceId() > 0);
     BlockID responseBlockID = BlockID
         .getFromProtobuf(response.getCommittedBlockLength().getBlockID());
@@ -192,7 +192,7 @@ public class TestGetCommittedBlockLengthAndPutKey {
     // make sure the block ids in the request and response are same.
     // This will also ensure that closing the container committed the block
     // on the Datanodes.
-    Assertions.assertEquals(responseBlockID, blockID);
+    assertEquals(responseBlockID, blockID);
     xceiverClientManager.releaseClient(client, false);
   }
 }

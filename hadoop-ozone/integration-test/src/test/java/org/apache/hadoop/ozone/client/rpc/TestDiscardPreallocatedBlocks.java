@@ -49,8 +49,10 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -127,15 +129,14 @@ public class TestDiscardPreallocatedBlocks {
     OzoneOutputStream key =
         createKey(keyName, ReplicationType.RATIS, 2 * blockSize);
     KeyOutputStream keyOutputStream =
-        (KeyOutputStream) key.getOutputStream();
-    Assertions.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
+        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     // With the initial size provided, it should have pre allocated 2 blocks
-    Assertions.assertEquals(2, keyOutputStream.getStreamEntries().size());
+    assertEquals(2, keyOutputStream.getStreamEntries().size());
     long containerID1 = keyOutputStream.getStreamEntries().get(0)
         .getBlockID().getContainerID();
     long containerID2 = keyOutputStream.getStreamEntries().get(1)
         .getBlockID().getContainerID();
-    Assertions.assertEquals(containerID1, containerID2);
+    assertEquals(containerID1, containerID2);
     String dataString =
         ContainerTestHelper.getFixedLengthString(keyString, (1 * blockSize));
     byte[] data = dataString.getBytes(UTF_8);
@@ -152,20 +153,20 @@ public class TestDiscardPreallocatedBlocks {
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(container.getPipelineID());
     List<DatanodeDetails> datanodes = pipeline.getNodes();
-    Assertions.assertEquals(3, datanodes.size());
+    assertEquals(3, datanodes.size());
     waitForContainerClose(key);
     dataString =
         ContainerTestHelper.getFixedLengthString(keyString, (1 * blockSize));
     data = dataString.getBytes(UTF_8);
     key.write(data);
-    Assertions.assertEquals(3, keyOutputStream.getStreamEntries().size());
+    assertEquals(3, keyOutputStream.getStreamEntries().size());
     // the 1st block got written. Now all the containers are closed, so the 2nd
     // pre allocated block will be removed from the list and new block should
     // have been allocated
-    Assertions.assertEquals(
+    assertEquals(
         keyOutputStream.getLocationInfoList().get(0).getBlockID(),
         locationInfos.get(0).getBlockID());
-    Assertions.assertNotEquals(locationStreamInfos.get(1).getBlockID(),
+    assertNotEquals(locationStreamInfos.get(1).getBlockID(),
         keyOutputStream.getLocationInfoList().get(1).getBlockID());
     key.close();
 

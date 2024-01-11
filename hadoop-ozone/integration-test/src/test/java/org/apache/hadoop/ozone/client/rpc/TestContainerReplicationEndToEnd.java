@@ -45,7 +45,6 @@ import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
@@ -63,6 +62,10 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 /**
  * Tests delete key operation with a slow follower in the datanode
@@ -163,7 +166,7 @@ public class TestContainerReplicationEndToEnd {
     KeyOutputStream groupOutputStream = (KeyOutputStream) key.getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =
         groupOutputStream.getLocationInfoList();
-    Assertions.assertEquals(1, locationInfoList.size());
+    assertEquals(1, locationInfoList.size());
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
     long containerID = omKeyLocationInfo.getContainerID();
     PipelineID pipelineID =
@@ -205,7 +208,7 @@ public class TestContainerReplicationEndToEnd {
     }
     // wait for container to move to closed state in SCM
     Thread.sleep(2 * containerReportInterval);
-    Assertions.assertSame(
+    assertSame(
         cluster.getStorageContainerManager().getContainerInfo(containerID)
             .getState(), HddsProtos.LifeCycleState.CLOSED);
     // shutdown the replica node
@@ -221,16 +224,17 @@ public class TestContainerReplicationEndToEnd {
       }
     }
 
-    Assertions.assertNotNull(dnService);
+    assertNotNull(dnService);
     final HddsDatanodeService newReplicaNode = dnService;
     // wait for the container to get replicated
     GenericTestUtils.waitFor(() -> {
       return newReplicaNode.getDatanodeStateMachine().getContainer()
           .getContainerSet().getContainer(containerID) != null;
     }, 500, 100000);
-    Assertions.assertTrue(newReplicaNode.getDatanodeStateMachine().getContainer()
+    assertThat(newReplicaNode.getDatanodeStateMachine().getContainer()
         .getContainerSet().getContainer(containerID).getContainerData()
-        .getBlockCommitSequenceId() > 0);
+        .getBlockCommitSequenceId())
+        .isGreaterThan(0);
     // wait for SCM to update the replica Map
     Thread.sleep(5 * containerReportInterval);
     // now shutdown the other two dns of the original pipeline and try reading

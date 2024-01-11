@@ -203,8 +203,8 @@ public class TestFailoverWithSCMHA {
         scm.getReplicationManager().getMoveScheduler().getInflightMove();
     assertTrue(inflightMove.containsKey(id));
     MoveDataNodePair mp = inflightMove.get(id);
-    assertTrue(dn2.equals(mp.getTgt()));
-    assertTrue(dn1.equals(mp.getSrc()));
+    assertEquals(dn2, mp.getTgt());
+    assertEquals(dn1, mp.getSrc());
 
     //complete move in the new leader
     scm.getReplicationManager().getMoveScheduler()
