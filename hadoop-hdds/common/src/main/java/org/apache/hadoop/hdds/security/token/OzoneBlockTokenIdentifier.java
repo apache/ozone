@@ -168,17 +168,7 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
 
   @Override
   public void write(DataOutput out) throws IOException {
-    BlockTokenSecretProto.Builder builder = BlockTokenSecretProto.newBuilder()
-        .setBlockId(blockId)
-        .setOwnerId(getOwnerId())
-        .setSecretKeyId(ProtobufUtils.toProtobuf(getSecretKeyId()))
-        .setExpiryDate(getExpiryDate())
-        .setMaxLength(maxLength);
-    // Add access mode allowed
-    for (AccessModeProto mode : modes) {
-      builder.addModes(AccessModeProto.valueOf(mode.name()));
-    }
-    out.write(builder.build().toByteArray());
+    out.write(getBytes());
   }
 
   @Override

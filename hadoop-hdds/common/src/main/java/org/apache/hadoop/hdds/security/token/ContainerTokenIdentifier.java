@@ -64,13 +64,18 @@ public class ContainerTokenIdentifier extends ShortLivedTokenIdentifier {
 
   @Override
   public void write(DataOutput out) throws IOException {
+    out.write(getBytes());
+  }
+
+  @Override
+  public byte[] getBytes() {
     ContainerTokenSecretProto.Builder builder = ContainerTokenSecretProto
         .newBuilder()
         .setOwnerId(getOwnerId())
         .setSecretKeyId(ProtobufUtils.toProtobuf(getSecretKeyId()))
         .setExpiryDate(getExpiry().toEpochMilli())
         .setContainerId(containerID.getProtobuf());
-    out.write(builder.build().toByteArray());
+    return builder.build().toByteArray();
   }
 
   @Override
