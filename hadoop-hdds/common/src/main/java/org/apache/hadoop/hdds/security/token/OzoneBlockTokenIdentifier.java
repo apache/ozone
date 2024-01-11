@@ -133,18 +133,17 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
     }
     BlockTokenSecretProto token =
         BlockTokenSecretProto.parseFrom((DataInputStream) in);
-    setOwnerId(token.getOwnerId());
-    setExpiry(Instant.ofEpochMilli(token.getExpiryDate()));
-    setSecretKeyId(ProtobufUtils.fromProtobuf(token.getSecretKeyId()));
-    this.blockId = token.getBlockId();
-    this.modes = EnumSet.copyOf(token.getModesList());
-    this.maxLength = token.getMaxLength();
+    readFromProto(token);
   }
 
   @Override
   public void readFromByteArray(byte[] bytes) throws IOException {
     BlockTokenSecretProto token =
         BlockTokenSecretProto.parseFrom(bytes);
+    readFromProto(token);
+  }
+
+  private void readFromProto(BlockTokenSecretProto token) {
     setOwnerId(token.getOwnerId());
     setExpiry(Instant.ofEpochMilli(token.getExpiryDate()));
     setSecretKeyId(ProtobufUtils.fromProtobuf(token.getSecretKeyId()));
