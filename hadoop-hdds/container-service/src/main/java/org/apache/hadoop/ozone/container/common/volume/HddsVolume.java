@@ -146,7 +146,7 @@ public class HddsVolume extends StorageVolume {
 
     // Create DB store for a newly formatted volume
     if (VersionedDatanodeFeatures.isFinalized(
-        HDDSLayoutFeature.LAST_CHUNK_TABLE)) {
+        HDDSLayoutFeature.DATANODE_SCHEMA_V3)) {
       createDbStore(dbVolumeSet);
     }
   }

@@ -112,7 +112,7 @@ public class BlockManagerImpl implements BlockManager {
             config.getBoolean(OZONE_CHUNK_LIST_INCREMENTAL,
                     OZONE_CHUNK_LIST_INCREMENTAL_DEFAULT);
     if (incrementalEnabled && !VersionedDatanodeFeatures.isFinalized(
-            HDDSLayoutFeature.LAST_CHUNK_TABLE)) {
+            HDDSLayoutFeature.HBASE_SUPPORT)) {
       throw new StorageContainerException("DataNode has not finalized " +
         "upgrading to a version that supports incremental chunk list.",
         UNSUPPORTED_REQUEST);

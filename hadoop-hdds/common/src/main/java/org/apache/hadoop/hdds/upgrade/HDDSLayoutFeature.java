@@ -42,8 +42,8 @@ public enum HDDSLayoutFeature implements LayoutFeature {
       "to DatanodeDetails."),
   HADOOP_PRC_PORTS_IN_DATANODEDETAILS(7, "Adding Hadoop RPC ports " +
                                      "to DatanodeDetails."),
-  LAST_CHUNK_TABLE(8, "Datanode RocksDB Schema Version 3 has an extra table " +
-          "for the last chunk of blocks)");
+  HBASE_SUPPORT(8, "Datanode RocksDB Schema Version 3 has an extra table " +
+          "for the last chunk of blocks to support HBase.)");
 
   //////////////////////////////  //////////////////////////////
 
