@@ -29,33 +29,25 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.segmentparser.DatanodeRatisLogParser;
 
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Test Datanode Ratis log parser.
  */
+@Timeout(300)
 public class TestDnRatisLogParser {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private MiniOzoneCluster cluster = null;
   private final ByteArrayOutputStream out = new ByteArrayOutputStream();
   private final ByteArrayOutputStream err = new ByteArrayOutputStream();
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -65,7 +57,7 @@ public class TestDnRatisLogParser {
     System.setErr(new PrintStream(err, false, UTF_8.name()));
   }
 
-  @After
+  @AfterEach
   public void destroy() throws Exception {
     if (cluster != null) {
       cluster.shutdown();
@@ -86,14 +78,14 @@ public class TestDnRatisLogParser {
     File currentDir = new File(pipelineDir, "current");
     File logFile = new File(currentDir, "log_inprogress_0");
     GenericTestUtils.waitFor(logFile::exists, 100, 15000);
-    Assert.assertTrue(logFile.isFile());
+    Assertions.assertTrue(logFile.isFile());
 
     DatanodeRatisLogParser datanodeRatisLogParser =
         new DatanodeRatisLogParser();
     datanodeRatisLogParser.setSegmentFile(logFile);
     datanodeRatisLogParser.parseRatisLogs(
         DatanodeRatisLogParser::smToContainerLogString);
-    Assert.assertTrue(out.toString(StandardCharsets.UTF_8.name())
+    Assertions.assertTrue(out.toString(StandardCharsets.UTF_8.name())
         .contains("Num Total Entries:"));
   }
 }
