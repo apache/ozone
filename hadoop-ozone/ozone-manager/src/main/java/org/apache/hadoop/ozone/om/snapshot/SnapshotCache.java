@@ -224,12 +224,12 @@ public class SnapshotCache {
         throw new IllegalArgumentException("Key '" + key + "' does not exist in cache");
       }
       rcOmSnapshot.decrementRefCount();
-      // The cache size might have already exceeded the soft limit
-      // Thus triggering cleanup() to check and evict if applicable
-      cleanup();
     } finally {
       lock.unlock();
     }
+    // The cache size might have already exceeded the soft limit
+    // Thus triggering cleanup() to check and evict if applicable
+    cleanup();
   }
 
   /**
