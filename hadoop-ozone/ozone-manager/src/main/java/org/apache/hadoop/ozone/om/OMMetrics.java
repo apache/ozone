@@ -327,8 +327,16 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   }
 
   public void setNumFiles(long val) {
-    long oldVal = this.numDirs.value();
-    this.numDirs.incr(val - oldVal);
+    long oldVal = this.numFiles.value();
+    this.numFiles.incr(val - oldVal);
+  }
+
+  public long getNumDirs() {
+    return numDirs.value();
+  }
+
+  public long getNumFiles() {
+    return numFiles.value();
   }
 
   public void decNumKeys(long val) {

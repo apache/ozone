@@ -18,19 +18,14 @@
 package org.apache.hadoop.ozone.om;
 
 import javax.management.ObjectName;
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.security.PrivilegedExceptionAction;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -43,8 +38,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -215,7 +208,6 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
-import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
@@ -224,9 +216,6 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.KMSUtil;
 import org.apache.hadoop.util.Time;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectReader;
-import com.fasterxml.jackson.databind.ObjectWriter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.BlockingService;
@@ -260,8 +249,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAU
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.PREPARE_MARKER_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
@@ -278,8 +265,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GRPC_SERVER_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NAMESPACE_STRICT_S3;
@@ -387,14 +372,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private OzoneManagerHttpServer httpServer;
   private final OMStorage omStorage;
   private ObjectName omInfoBeanName;
-  private Timer metricsTimer;
-  private ScheduleOMMetricsWriteTask scheduleOMMetricsWriteTask;
-  private static final ObjectWriter WRITER =
-      new ObjectMapper().writerWithDefaultPrettyPrinter();
-  private static final ObjectReader READER =
-      new ObjectMapper().readerFor(OmMetricsInfo.class);
-  private static final int SHUTDOWN_HOOK_PRIORITY = 30;
-  private final File omMetaDir;
   private boolean isAclEnabled;
   private final boolean isSpnegoEnabled;
   private final JvmPauseMonitor jvmPauseMonitor;
@@ -543,7 +520,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           + " once before starting the OM service.",
           ResultCodes.OM_NOT_INITIALIZED);
     }
-    omMetaDir = OMStorage.getOmDbDir(configuration);
 
     this.isSpnegoEnabled = conf.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")
         .equals("kerberos");
@@ -707,8 +683,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (isOmGrpcServerEnabled) {
       omS3gGrpcServer = getOmS3gGrpcServer(configuration);
     }
-    ShutdownHookManager.get().addShutdownHook(this::saveOmMetrics,
-        SHUTDOWN_HOOK_PRIORITY);
 
     if (isBootstrapping || isForcedBootstrapping) {
       omState = State.BOOTSTRAPPING;
@@ -972,56 +946,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public void close() throws IOException {
     stop();
-  }
-
-  /**
-   * Class which schedule saving metrics to a file.
-   */
-  private class ScheduleOMMetricsWriteTask extends TimerTask {
-    @Override
-    public void run() {
-      saveOmMetrics();
-    }
-  }
-
-  private void saveOmMetrics() {
-    try {
-      File parent = getTempMetricsStorageFile().getParentFile();
-      if (!parent.exists()) {
-        Files.createDirectories(parent.toPath());
-      }
-      try (BufferedWriter writer = new BufferedWriter(
-          new OutputStreamWriter(new FileOutputStream(
-              getTempMetricsStorageFile()), StandardCharsets.UTF_8))) {
-        OmMetricsInfo metricsInfo = new OmMetricsInfo();
-        metricsInfo.setNumKeys(metrics.getNumKeys());
-        WRITER.writeValue(writer, metricsInfo);
-      }
-
-      Files.move(getTempMetricsStorageFile().toPath(),
-          getMetricsStorageFile().toPath(), StandardCopyOption
-              .ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-    } catch (IOException ex) {
-      LOG.error("Unable to write the om Metrics file", ex);
-    }
-  }
-
-  /**
-   * Returns temporary metrics storage file.
-   *
-   * @return File
-   */
-  private File getTempMetricsStorageFile() {
-    return new File(omMetaDir, OM_METRICS_TEMP_FILE);
-  }
-
-  /**
-   * Returns metrics storage file.
-   *
-   * @return File
-   */
-  private File getMetricsStorageFile() {
-    return new File(omMetaDir, OM_METRICS_FILE);
   }
 
   private OzoneDelegationTokenSecretManager createDelegationTokenSecretManager(
@@ -1648,29 +1572,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           versionManager.getMetadataLayoutVersion(), layoutVersionInDB);
     }
 
-    // Set metrics and start metrics back ground thread
-    metrics.setNumVolumes(metadataManager.countRowsInTable(metadataManager
-        .getVolumeTable()));
-    metrics.setNumBuckets(metadataManager.countRowsInTable(metadataManager
-        .getBucketTable()));
-
-    if (getMetricsStorageFile().exists()) {
-      OmMetricsInfo metricsInfo = READER.readValue(getMetricsStorageFile());
-      metrics.setNumKeys(metricsInfo.getNumKeys());
-    }
-
-    // FSO(FILE_SYSTEM_OPTIMIZED)
-    metrics.setNumDirs(metadataManager
-        .countEstimatedRowsInTable(metadataManager.getDirectoryTable()));
-    metrics.setNumFiles(metadataManager
-        .countEstimatedRowsInTable(metadataManager.getFileTable()));
-
-    // Schedule save metrics
-    long period = configuration.getTimeDuration(OZONE_OM_METRICS_SAVE_INTERVAL,
-        OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
-    scheduleOMMetricsWriteTask = new ScheduleOMMetricsWriteTask();
-    metricsTimer = new Timer();
-    metricsTimer.schedule(scheduleOMMetricsWriteTask, 0, period);
+    setMetricsFromDB();
 
     keyManager.start(configuration);
 
@@ -1725,23 +1627,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     metrics.setNumBuckets(metadataManager.countRowsInTable(metadataManager
         .getBucketTable()));
 
-    if (getMetricsStorageFile().exists()) {
-      OmMetricsInfo metricsInfo = READER.readValue(getMetricsStorageFile());
-      metrics.setNumKeys(metricsInfo.getNumKeys());
-    }
-
-    // FSO(FILE_SYSTEM_OPTIMIZED)
-    metrics.setNumDirs(metadataManager
-        .countEstimatedRowsInTable(metadataManager.getDirectoryTable()));
-    metrics.setNumFiles(metadataManager
-        .countEstimatedRowsInTable(metadataManager.getFileTable()));
-
-    // Schedule save metrics
-    long period = configuration.getTimeDuration(OZONE_OM_METRICS_SAVE_INTERVAL,
-        OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
-    scheduleOMMetricsWriteTask = new ScheduleOMMetricsWriteTask();
-    metricsTimer = new Timer();
-    metricsTimer.schedule(scheduleOMMetricsWriteTask, 0, period);
+    setMetricsFromDB();
 
     initializeRatisServer(false);
     if (omRatisServer != null) {
@@ -1772,6 +1658,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     startJVMPauseMonitor();
     setStartTime();
     omState = State.RUNNING;
+  }
+
+  private void setMetricsFromDB() throws IOException {
+    metrics.setNumVolumes(metadataManager.countRowsInTable(metadataManager
+        .getVolumeTable()));
+    metrics.setNumBuckets(metadataManager.countRowsInTable(metadataManager
+        .getBucketTable()));
+
+    // FSO(FILE_SYSTEM_OPTIMIZED)
+    metrics.setNumDirs(metadataManager
+        .countEstimatedRowsInTable(metadataManager.getDirectoryTable()));
+    metrics.setNumFiles(metadataManager
+        .countEstimatedRowsInTable(metadataManager.getFileTable()));
+
+    // Returns total number of LEGACY and OBS keys.
+    long numObjects = metadataManager.countEstimatedRowsInTable(metadataManager.getKeyTable(BucketLayout.OBJECT_STORE));
+    // TODO should numKeys remain the total of these values, or should it only count non-FSO objects?
+    metrics.setNumKeys(numObjects + metrics.getNumFiles() + metrics.getNumDirs());
   }
 
   /**
@@ -2207,12 +2111,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     try {
       omState = State.STOPPED;
-      // Cancel the metrics timer and set to null.
-      if (metricsTimer != null) {
-        metricsTimer.cancel();
-        metricsTimer = null;
-        scheduleOMMetricsWriteTask = null;
-      }
       omRpcServer.stop();
       if (isOmGrpcServerEnabled) {
         omS3gGrpcServer.stop();
@@ -3998,24 +3896,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     startSecretManagerIfNecessary();
     startTrashEmptier(configuration);
 
-    // Set metrics and start metrics back ground thread
-    metrics.setNumVolumes(metadataManager.countRowsInTable(metadataManager
-        .getVolumeTable()));
-    metrics.setNumBuckets(metadataManager.countRowsInTable(metadataManager
-        .getBucketTable()));
-    metrics.setNumKeys(metadataManager.countEstimatedRowsInTable(metadataManager
-        .getKeyTable(getBucketLayout())));
-
-    // FSO(FILE_SYSTEM_OPTIMIZED)
-    metrics.setNumDirs(metadataManager
-        .countEstimatedRowsInTable(metadataManager.getDirectoryTable()));
-    metrics.setNumFiles(metadataManager
-        .countEstimatedRowsInTable(metadataManager.getFileTable()));
-
-    // Delete the omMetrics file if it exists and save the a new metrics file
-    // with new data
-    Files.deleteIfExists(getMetricsStorageFile().toPath());
-    saveOmMetrics();
+    setMetricsFromDB();
   }
 
   public static Logger getLogger() {
@@ -4632,10 +4513,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException {
     omMetadataManager.getMetaTable().put(LAYOUT_VERSION_KEY,
         String.valueOf(lvm.getMetadataLayoutVersion()));
-  }
-
-  private BucketLayout getBucketLayout() {
-    return BucketLayout.DEFAULT;
   }
 
   void saveNewCertId(String certId) {
