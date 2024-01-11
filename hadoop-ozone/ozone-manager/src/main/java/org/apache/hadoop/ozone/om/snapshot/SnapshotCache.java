@@ -94,15 +94,14 @@ public class SnapshotCache {
     Lock lock = getLock(key);
     lock.lock();
     try {
-      ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot = dbMap.get(key);
+      // Remove the entry from the map.
+      ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot = dbMap.remove(key);
       if (rcOmSnapshot != null) {
         try {
           ((OmSnapshot) rcOmSnapshot.get()).close();
         } catch (IOException e) {
           throw new IllegalStateException("Failed to close snapshot: " + key, e);
         }
-        // Remove the entry from map
-        dbMap.remove(key);
       }
     } finally {
       lock.unlock();
