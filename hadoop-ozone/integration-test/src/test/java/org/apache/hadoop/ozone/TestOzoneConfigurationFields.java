@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
-import org.apache.hadoop.http.HttpServer2;
+import org.apache.hadoop.hdds.server.http.HttpServer2;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
@@ -31,21 +31,11 @@ import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 import java.util.Arrays;
 
 import org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys;
-import org.junit.Rule;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * Tests if configuration constants documented in ozone-defaults.xml.
  */
 public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   @Override
   public void initializeMemberVariables() {

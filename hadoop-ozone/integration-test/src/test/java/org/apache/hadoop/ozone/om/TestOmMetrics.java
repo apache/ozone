@@ -32,6 +32,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.spy;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -86,7 +89,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.mockito.Mockito;
 
 /**
  * Test for OM metrics.
@@ -142,7 +144,7 @@ public class TestOmMetrics {
     VolumeManager volumeManager =
         (VolumeManager) HddsWhiteboxTestUtils.getInternalState(
             ozoneManager, "volumeManager");
-    VolumeManager mockVm = Mockito.spy(volumeManager);
+    VolumeManager mockVm = spy(volumeManager);
 
     OmVolumeArgs volumeArgs = createVolumeArgs();
     doVolumeOps(volumeArgs);
@@ -170,8 +172,8 @@ public class TestOmMetrics {
 
 
     // inject exception to test for Failure Metrics on the read path
-    Mockito.doThrow(exception).when(mockVm).getVolumeInfo(any());
-    Mockito.doThrow(exception).when(mockVm).listVolumes(any(), any(),
+    doThrow(exception).when(mockVm).getVolumeInfo(any());
+    doThrow(exception).when(mockVm).listVolumes(any(), any(),
         any(), anyInt());
 
     HddsWhiteboxTestUtils.setInternalState(ozoneManager,
@@ -211,7 +213,7 @@ public class TestOmMetrics {
     BucketManager bucketManager =
         (BucketManager) HddsWhiteboxTestUtils.getInternalState(
             ozoneManager, "bucketManager");
-    BucketManager mockBm = Mockito.spy(bucketManager);
+    BucketManager mockBm = spy(bucketManager);
 
     OmBucketInfo bucketInfo = createBucketInfo(false);
     doBucketOps(bucketInfo);
@@ -245,8 +247,8 @@ public class TestOmMetrics {
     assertCounter("NumBuckets", 2L, omMetrics);
 
     // inject exception to test for Failure Metrics on the read path
-    Mockito.doThrow(exception).when(mockBm).getBucketInfo(any(), any());
-    Mockito.doThrow(exception).when(mockBm).listBuckets(any(), any(),
+    doThrow(exception).when(mockBm).getBucketInfo(any(), any());
+    doThrow(exception).when(mockBm).listBuckets(any(), any(),
         any(), anyInt(), eq(false));
 
     HddsWhiteboxTestUtils.setInternalState(
@@ -295,7 +297,7 @@ public class TestOmMetrics {
     String bucketName = UUID.randomUUID().toString();
     KeyManager keyManager = (KeyManager) HddsWhiteboxTestUtils
         .getInternalState(ozoneManager, "keyManager");
-    KeyManager mockKm = Mockito.spy(keyManager);
+    KeyManager mockKm = spy(keyManager);
     // see HDDS-10078 for making this work with FILE_SYSTEM_OPTIMIZED layout
     TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName, BucketLayout.LEGACY);
     OmKeyArgs keyArgs = createKeyArgs(volumeName, bucketName,
@@ -348,10 +350,10 @@ public class TestOmMetrics {
     assertCounter("NumBlockAllocationFails", 1L, omMetrics);
 
     // inject exception to test for Failure Metrics on the read path
-    Mockito.doThrow(exception).when(mockKm).lookupKey(any(), any(), any());
-    Mockito.doThrow(exception).when(mockKm).listKeys(
+    doThrow(exception).when(mockKm).lookupKey(any(), any(), any());
+    doThrow(exception).when(mockKm).listKeys(
         any(), any(), any(), any(), anyInt());
-    Mockito.doThrow(exception).when(mockKm).listTrash(
+    doThrow(exception).when(mockKm).listTrash(
         any(), any(), any(), any(), anyInt());
     OmMetadataReader omMetadataReader =
         (OmMetadataReader) ozoneManager.getOmMetadataReader().get();
@@ -594,16 +596,16 @@ public class TestOmMetrics {
     }
     OMMetadataManager metadataManager = (OMMetadataManager)
         HddsWhiteboxTestUtils.getInternalState(ozoneManager, "metadataManager");
-    OMMetadataManager mockMm = Mockito.spy(metadataManager);
+    OMMetadataManager mockMm = spy(metadataManager);
     @SuppressWarnings("unchecked")
     Table<String, T> table = (Table<String, T>)
         HddsWhiteboxTestUtils.getInternalState(metadataManager, tableName);
-    Table<String, T> mockTable = Mockito.spy(table);
-    Mockito.doThrow(exception).when(mockTable).isExist(any());
+    Table<String, T> mockTable = spy(table);
+    doThrow(exception).when(mockTable).isExist(any());
     if (klass == OmBucketInfo.class) {
-      Mockito.doReturn(mockTable).when(mockMm).getBucketTable();
+      doReturn(mockTable).when(mockMm).getBucketTable();
     } else {
-      Mockito.doReturn(mockTable).when(mockMm).getVolumeTable();
+      doReturn(mockTable).when(mockMm).getVolumeTable();
     }
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "metadataManager", mockMm);

@@ -65,9 +65,10 @@ import org.apache.ozone.test.tag.Flaky;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
@@ -187,12 +188,12 @@ public class TestWatchForCommit {
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
             .getBytes(UTF_8);
     key.write(data1);
-    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
-    KeyOutputStream keyOutputStream = (KeyOutputStream)key.getOutputStream();
+    KeyOutputStream keyOutputStream =
+        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
 
     OutputStream stream = keyOutputStream.getStreamEntries().get(0)
         .getOutputStream();
-    assertTrue(stream instanceof BlockOutputStream);
+    assertInstanceOf(BlockOutputStream.class, stream);
     RatisBlockOutputStream blockOutputStream = (RatisBlockOutputStream) stream;
     // we have just written data more than flush Size(2 chunks), at this time
     // buffer pool will have 3 buffers allocated worth of chunk size
@@ -204,11 +205,12 @@ public class TestWatchForCommit {
     // since data equals to maxBufferSize is written, this will be a blocking
     // call and hence will wait for atleast flushSize worth of data to get
     // acked by all servers right here
-    assertTrue(blockOutputStream.getTotalAckDataLength() >= flushSize);
+    assertThat(blockOutputStream.getTotalAckDataLength())
+        .isGreaterThanOrEqualTo(flushSize);
     // watchForCommit will clean up atleast one entry from the map where each
     // entry corresponds to flushSize worth of data
-    assertTrue(
-        blockOutputStream.getCommitIndex2flushedDataMap().size() <= 1);
+    assertThat(blockOutputStream.getCommitIndex2flushedDataMap().size())
+        .isLessThanOrEqualTo(1);
     // Now do a flush. This will flush the data and update the flush length and
     // the map.
     key.flush();
@@ -218,8 +220,8 @@ public class TestWatchForCommit {
     assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
     assertEquals(dataLength, blockOutputStream.getTotalDataFlushedLength());
     // flush will make sure one more entry gets updated in the map
-    assertTrue(
-        blockOutputStream.getCommitIndex2flushedDataMap().size() <= 2);
+    assertThat(blockOutputStream.getCommitIndex2flushedDataMap().size())
+        .isLessThanOrEqualTo(2);
     XceiverClientRatis raftClient =
         (XceiverClientRatis) blockOutputStream.getXceiverClient();
     assertEquals(3, raftClient.getCommitInfoMap().size());
@@ -243,7 +245,7 @@ public class TestWatchForCommit {
     assertEquals(dataLength, blockOutputStream.getTotalAckDataLength());
     // make sure the bufferPool is empty
     assertEquals(0, blockOutputStream.getBufferPool().computeBufferData());
-    assertTrue(blockOutputStream.getCommitIndex2flushedDataMap().isEmpty());
+    assertThat(blockOutputStream.getCommitIndex2flushedDataMap()).isEmpty();
     validateData(keyName, data1);
   }
 
@@ -281,7 +283,7 @@ public class TestWatchForCommit {
             .watchForCommit(index + new Random().nextInt(100) + 10);
         fail("expected exception not thrown");
       } catch (Exception e) {
-        assertTrue(e instanceof ExecutionException);
+        assertInstanceOf(ExecutionException.class, e);
         // since the timeout value is quite long, the watch request will either
         // fail with NotReplicated exceptio, RetryFailureException or
         // RuntimeException
@@ -290,7 +292,7 @@ public class TestWatchForCommit {
         // client should not attempt to watch with
         // MAJORITY_COMMITTED replication level, except the grpc IO issue
         if (!logCapturer.getOutput().contains("Connection refused")) {
-          assertFalse(e.getMessage().contains("Watch-MAJORITY_COMMITTED"));
+          assertThat(e.getMessage()).doesNotContain("Watch-MAJORITY_COMMITTED");
         }
       }
       clientManager.releaseClient(xceiverClient, false);
@@ -338,9 +340,9 @@ public class TestWatchForCommit {
       assertEquals(2, ratisClient.getCommitInfoMap().size());
       clientManager.releaseClient(xceiverClient, false);
       String output = logCapturer.getOutput();
-      assertTrue(output.contains("3 way commit failed"));
-      assertTrue(output.contains("TimeoutException"));
-      assertTrue(output.contains("Committed by majority"));
+      assertThat(output).contains("3 way commit failed");
+      assertThat(output).contains("TimeoutException");
+      assertThat(output).contains("Committed by majority");
     }
     logCapturer.stopCapturing();
   }
@@ -375,8 +377,7 @@ public class TestWatchForCommit {
                 new Random().nextInt(100) + 10);
         fail("Expected exception not thrown");
       } catch (Exception e) {
-        assertTrue(HddsClientUtils
-            .checkForException(e) instanceof GroupMismatchException);
+        assertInstanceOf(GroupMismatchException.class, HddsClientUtils.checkForException(e));
       }
       clientManager.releaseClient(xceiverClient, false);
     }

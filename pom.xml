@@ -75,7 +75,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- HDDS Rocks Native dependency version-->
     <hdds.rocks.native.version>${hdds.version}</hdds.rocks.native.version>
     <!-- Apache Ratis version -->
-    <ratis.version>3.0.0</ratis.version>
+    <ratis.version>3.0.1</ratis.version>
 
     <!-- Apache Ratis thirdparty version -->
     <ratis.thirdparty.version>1.0.5</ratis.thirdparty.version>
@@ -283,7 +283,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-antrun-plugin.version>3.1.0</maven-antrun-plugin.version>
     <checkstyle.version>9.3</checkstyle.version>
     <surefire.fork.timeout>1200</surefire.fork.timeout>
-    <aws-java-sdk.version>1.12.261</aws-java-sdk.version>
+    <aws-java-sdk.version>1.12.632</aws-java-sdk.version>
     <frontend-maven-plugin.version>1.12.0</frontend-maven-plugin.version>
     <!-- the version of Hadoop declared in the version resources; can be overridden
     so that Hadoop 3.x can declare itself a 2.x artifact. -->
@@ -1810,6 +1810,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                     <reason>Use directly from Guava</reason>
                     <bannedImports>
                       <bannedImport>org.apache.ratis.thirdparty.com.google.common.**</bannedImport>
+                      <bannedImport>org.apache.hadoop.thirdparty.com.google.common.**</bannedImport>
                     </bannedImports>
                   </restrictImports>
                   <restrictImports>

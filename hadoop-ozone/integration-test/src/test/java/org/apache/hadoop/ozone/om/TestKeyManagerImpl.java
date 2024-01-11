@@ -125,8 +125,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import org.mockito.Mockito;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -137,6 +135,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -202,7 +203,7 @@ public class TestKeyManagerImpl {
     conf.setLong(OZONE_KEY_PREALLOCATION_BLOCKS_MAX, 10);
 
     mockScmContainerClient =
-        Mockito.mock(StorageContainerLocationProtocol.class);
+        mock(StorageContainerLocationProtocol.class);
     
     OmTestManagers omTestManagers
         = new OmTestManagers(conf, scm.getBlockProtocolServer(),
@@ -215,12 +216,12 @@ public class TestKeyManagerImpl {
 
     mockContainerClient();
 
-    Mockito.when(mockScmBlockLocationProtocol
-        .allocateBlock(Mockito.anyLong(), Mockito.anyInt(),
+    when(mockScmBlockLocationProtocol
+        .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class),
-            Mockito.anyString(),
+            anyString(),
             any(ExcludeList.class),
-            Mockito.anyString())).thenThrow(
+            anyString())).thenThrow(
                 new SCMException("SafeModePrecheck failed for allocateBlock",
             ResultCodes.SAFE_MODE_EXCEPTION));
     createVolume(VOLUME_NAME);

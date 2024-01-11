@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -51,25 +50,20 @@ import java.util.stream.Collectors;
  */
 public class NodeDecommissionManager {
 
-  private ScheduledExecutorService executor;
-  private DatanodeAdminMonitor monitor;
+  private final ScheduledExecutorService executor;
+  private final DatanodeAdminMonitor monitor;
 
-  private NodeManager nodeManager;
-  //private ContainerManager containerManager;
-  private SCMContext scmContext;
-  private EventPublisher eventQueue;
-  private ReplicationManager replicationManager;
-  private OzoneConfiguration conf;
-  private boolean useHostnames;
-  private long monitorInterval;
+  private final NodeManager nodeManager;
+  private final SCMContext scmContext;
+  private final boolean useHostnames;
 
   // Decommissioning and Maintenance mode progress related metrics.
-  private NodeDecommissionMetrics metrics;
+  private final NodeDecommissionMetrics metrics;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(NodeDecommissionManager.class);
 
-  static class HostDefinition {
+  static final class HostDefinition {
     private String rawHostname;
     private String hostname;
     private int port;
@@ -119,12 +113,7 @@ public class NodeDecommissionManager {
       try {
         host = new HostDefinition(hostString);
         addr = InetAddress.getByName(host.getHostname());
-      } catch (InvalidHostStringException e) {
-        LOG.warn("Unable to resolve host {} ", hostString, e);
-        errors.add(new DatanodeAdminError(hostString,
-            e.getMessage()));
-        continue;
-      } catch (UnknownHostException e) {
+      } catch (InvalidHostStringException | UnknownHostException e) {
         LOG.warn("Unable to resolve host {} ", hostString, e);
         errors.add(new DatanodeAdminError(hostString,
             e.getMessage()));
@@ -262,15 +251,10 @@ public class NodeDecommissionManager {
   }
 
   public NodeDecommissionManager(OzoneConfiguration config, NodeManager nm,
-             ContainerManager containerManager, SCMContext scmContext,
+             SCMContext scmContext,
              EventPublisher eventQueue, ReplicationManager rm) {
     this.nodeManager = nm;
-    conf = config;
-    //this.containerManager = containerManager;
     this.scmContext = scmContext;
-    this.eventQueue = eventQueue;
-    this.replicationManager = rm;
-    this.metrics = null;
 
     executor = Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder()
@@ -280,11 +264,11 @@ public class NodeDecommissionManager {
             .build()
     );
 
-    useHostnames = conf.getBoolean(
+    useHostnames = config.getBoolean(
         DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME,
         DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
 
-    monitorInterval = conf.getTimeDuration(
+    long monitorInterval = config.getTimeDuration(
         ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
         ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT,
         TimeUnit.SECONDS);
@@ -292,16 +276,16 @@ public class NodeDecommissionManager {
       LOG.warn("{} must be greater than zero, defaulting to {}",
           ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
           ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT);
-      conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
+      config.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
           ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT);
-      monitorInterval = conf.getTimeDuration(
+      monitorInterval = config.getTimeDuration(
           ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL,
           ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT,
           TimeUnit.SECONDS);
     }
 
-    monitor = new DatanodeAdminMonitorImpl(conf, eventQueue, nodeManager,
-        replicationManager);
+    monitor = new DatanodeAdminMonitorImpl(config, eventQueue, nodeManager,
+        rm);
     this.metrics = NodeDecommissionMetrics.create();
     monitor.setMetrics(this.metrics);
     executor.scheduleAtFixedRate(monitor, monitorInterval, monitorInterval,
@@ -342,7 +326,6 @@ public class NodeDecommissionManager {
    * be in DECOMMISSIONING or ENTERING_MAINTENANCE state. In that case, it
    * needs to be added back into the monitor to track its progress.
    * @param dn Datanode to add back to tracking.
-   * @throws NodeNotFoundException
    */
   public synchronized void continueAdminForNode(DatanodeDetails dn)
       throws NodeNotFoundException {
@@ -379,7 +362,7 @@ public class NodeDecommissionManager {
   }
 
   public synchronized List<DatanodeAdminError> recommissionNodes(
-      List<String> nodes) throws InvalidHostStringException {
+      List<String> nodes) {
     List<DatanodeAdminError> errors = new ArrayList<>();
     List<DatanodeDetails> dns = mapHostnamesToDatanodes(nodes, errors);
     for (DatanodeDetails dn : dns) {
@@ -416,7 +399,7 @@ public class NodeDecommissionManager {
   }
 
   public synchronized List<DatanodeAdminError> startMaintenanceNodes(
-      List<String> nodes, int endInHours) throws InvalidHostStringException {
+      List<String> nodes, int endInHours) {
     List<DatanodeAdminError> errors = new ArrayList<>();
     List<DatanodeDetails> dns = mapHostnamesToDatanodes(nodes, errors);
     for (DatanodeDetails dn : dns) {

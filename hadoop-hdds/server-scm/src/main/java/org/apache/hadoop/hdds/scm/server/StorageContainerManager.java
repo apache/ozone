@@ -847,7 +847,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     scmDecommissionManager = new NodeDecommissionManager(conf, scmNodeManager,
-        containerManager, scmContext, eventQueue, replicationManager);
+        scmContext, eventQueue, replicationManager);
 
     statefulServiceStateManager = StatefulServiceStateManagerImpl.newBuilder()
         .setStatefulServiceConfig(
