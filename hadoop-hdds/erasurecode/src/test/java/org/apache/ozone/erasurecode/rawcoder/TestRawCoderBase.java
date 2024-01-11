@@ -24,7 +24,6 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -111,8 +110,12 @@ public abstract class TestRawCoderBase extends TestCoderBase {
     this.usingDirectBuffer = usingDirectBuffer;
     prepareCoders(true);
 
-    assertThrows(Exception.class, () -> performTestCoding(baseChunkSize, false, false, true),
-        "Decoding test with bad output should fail");
+    try {
+      performTestCoding(baseChunkSize, false, false, true);
+      fail("Decoding test with bad output should fail");
+    } catch (Exception e) {
+      // Expected
+    }
   }
 
   /**
@@ -186,7 +189,11 @@ public abstract class TestRawCoderBase extends TestCoderBase {
     ECChunk[] clonedDataChunks = cloneChunksWithData(dataChunks);
     markChunks(dataChunks);
 
-    assertDoesNotThrow(() -> encoder.encode(dataChunks, parityChunks));
+    try {
+      encoder.encode(dataChunks, parityChunks);
+    } catch (IOException e) {
+      fail("Should not get IOException: " + e.getMessage());
+    }
     dumpChunks("Encoded parity chunks", parityChunks);
 
     //TODOif (!allowChangeInputs) {
@@ -218,7 +225,12 @@ public abstract class TestRawCoderBase extends TestCoderBase {
     //}
 
     dumpChunks("Decoding input chunks", inputChunks);
-    assertDoesNotThrow(() -> decoder.decode(inputChunks, getErasedIndexesForDecoding(), recoveredChunks));
+    try {
+      decoder.decode(inputChunks, getErasedIndexesForDecoding(),
+          recoveredChunks);
+    } catch (IOException e) {
+      fail("Should not get IOException: " + e.getMessage());
+    }
     dumpChunks("Decoded/recovered chunks", recoveredChunks);
 
     //TODOif (!allowChangeInputs) {
@@ -304,7 +316,11 @@ public abstract class TestRawCoderBase extends TestCoderBase {
     ECChunk[] dataChunks = prepareDataChunksForEncoding();
     ECChunk[] parityChunks = prepareParityChunksForEncoding();
     ECChunk[] clonedDataChunks = cloneChunksWithData(dataChunks);
-    assertDoesNotThrow(() -> encoder.encode(dataChunks, parityChunks));
+    try {
+      encoder.encode(dataChunks, parityChunks);
+    } catch (IOException e) {
+      fail("Should not get IOException: " + e.getMessage());
+    }
     verifyBufferPositionAtEnd(dataChunks);
 
     // verify decode
@@ -313,7 +329,12 @@ public abstract class TestRawCoderBase extends TestCoderBase {
         clonedDataChunks, parityChunks);
     ensureOnlyLeastRequiredChunks(inputChunks);
     ECChunk[] recoveredChunks = prepareOutputChunksForDecoding();
-    assertDoesNotThrow(() -> decoder.decode(inputChunks, getErasedIndexesForDecoding(), recoveredChunks));
+    try {
+      decoder.decode(inputChunks, getErasedIndexesForDecoding(),
+          recoveredChunks);
+    } catch (IOException e) {
+      fail("Should not get IOException: " + e.getMessage());
+    }
     verifyBufferPositionAtEnd(inputChunks);
   }
 
