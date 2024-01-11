@@ -168,9 +168,9 @@ public class TestContainerKeyScanner {
     int exitCode = cmd.execute(cmdArgs);
     Assertions.assertEquals(0, exitCode);
 
-    Assertions.assertTrue(stdout.toString().contains(KEYS_NOT_FOUND_OUTPUT));
+    Assertions.assertTrue(stderr.toString().contains(KEYS_NOT_FOUND_OUTPUT));
 
-    Assertions.assertTrue(stderr.toString().isEmpty());
+    Assertions.assertTrue(stdout.toString().isEmpty());
   }
 
   private void createFile(long volumeId, long bucketId, String keyName,

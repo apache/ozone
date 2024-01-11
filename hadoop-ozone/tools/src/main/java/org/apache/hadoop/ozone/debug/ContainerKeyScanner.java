@@ -381,8 +381,8 @@ public class ContainerKeyScanner implements Callable<Void>,
     List<ContainerKeyInfo> containerKeyInfos =
         containerKeyInfoWrapper.getContainerKeyInfos();
     if (containerKeyInfos.isEmpty()) {
-      out().println("No keys were found for container IDs: " + containerIds);
-      out().println(
+      err().println("No keys were found for container IDs: " + containerIds);
+      err().println(
           "Keys processed: " + containerKeyInfoWrapper.getKeysProcessed());
       return;
     }
