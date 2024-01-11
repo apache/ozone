@@ -1372,13 +1372,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
             bucketName, snapshotInfoTable)) {
       try {
         while (snapshotIterator.hasNext() && maxListResult > 0) {
-          Object value = snapshotIterator.next().getValue();
-          // value can be null for deleted snapshot key as CacheIterator from
-          // MinHeapIterator allows null (marked as deleted) values.
-          if (null == value) {
-            continue;
-          }
-          SnapshotInfo snapshotInfo = (SnapshotInfo) value;
+          SnapshotInfo snapshotInfo =
+              (SnapshotInfo) snapshotIterator.next().getValue();
           if (!snapshotInfo.getName().equals(prevSnapshot)) {
             snapshotInfos.add(snapshotInfo);
             maxListResult--;

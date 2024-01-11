@@ -120,16 +120,16 @@ public class ListIterator {
 
     private final Table<String, Value> table;
     private HeapEntry currentKey;
-    private Predicate<String> isKeyExistsInCache;
+    private Predicate<String> doesKeyExistInCache;
 
     DbTableIter(int entryIteratorId, Table<String, Value> table,
                 String prefixKey, String startKey,
-                Predicate<String> isKeyExistsInCache) throws IOException {
+                Predicate<String> doesKeyExistInCache) throws IOException {
       this.entryIteratorId = entryIteratorId;
       this.table = table;
       this.tableIterator = table.iterator(prefixKey);
       this.currentKey = null;
-      this.isKeyExistsInCache = isKeyExistsInCache;
+      this.doesKeyExistInCache = doesKeyExistInCache;
 
       // only seek for the start key if the start key is lexicographically
       // after the prefix key. For example
@@ -149,7 +149,7 @@ public class ListIterator {
       while (tableIterator.hasNext() && currentKey == null) {
         Table.KeyValue<String, Value> entry = tableIterator.next();
         String entryKey = entry.getKey();
-        if (!isKeyExistsInCache.test(entryKey)) {
+        if (!doesKeyExistInCache.test(entryKey)) {
           currentKey = new HeapEntry(entryIteratorId,
               table.getName(), entryKey, entry.getValue());
         }
@@ -191,7 +191,7 @@ public class ListIterator {
     private final String prefixKey;
     private final String startKey;
     private final String tableName;
-
+    private HeapEntry currentKey;
     private final int entryIteratorId;
 
     CacheIter(int entryIteratorId, String tableName,
@@ -199,7 +199,7 @@ public class ListIterator {
                   CacheValue<Value>>> cacheIter, String startKey,
               String prefixKey) {
       this.cacheKeyMap = new TreeMap<>();
-
+      this.currentKey = null;
       this.startKey = startKey;
       this.prefixKey = prefixKey;
       this.tableName = tableName;
@@ -241,18 +241,38 @@ public class ListIterator {
       }
     }
 
-    public boolean isKeyExistInCache(String key) {
+    public boolean doesKeyExistInCache(String key) {
       return cacheKeyMap.containsKey(key);
     }
 
+    private void getNextKey() throws IOException {
+      while (cacheCreatedKeyIter.hasNext() && currentKey == null) {
+        Map.Entry<String, Value> entry = cacheCreatedKeyIter.next();
+        if (null == entry.getValue()) {
+          continue;
+        }
+        currentKey = new HeapEntry(this.entryIteratorId, this.tableName,
+            entry.getKey(), entry.getValue());
+      }
+    }
+
     public boolean hasNext() {
-      return cacheCreatedKeyIter.hasNext();
+      //return cacheCreatedKeyIter.hasNext();
+      try {
+        getNextKey();
+      } catch (IOException t) {
+        throw new UncheckedIOException(t);
+      }
+      return currentKey != null;
     }
 
     public HeapEntry next() {
-      Map.Entry<String, Value> entry = cacheCreatedKeyIter.next();
-      return new HeapEntry(this.entryIteratorId, this.tableName,
-          entry.getKey(), entry.getValue());
+      if (hasNext()) {
+        HeapEntry ret = currentKey;
+        currentKey = null;
+        return ret;
+      }
+      throw new NoSuchElementException();
     }
 
     public void close() {
@@ -303,11 +323,12 @@ public class ListIterator {
         for (Table table : tables) {
           CacheIter cacheIter = new CacheIter<>(iteratorId, table.getName(),
               table.cacheIterator(), startKey, prefixKey);
-          Predicate<String> isKeyExistInCache = cacheIter::isKeyExistInCache;
+          Predicate<String> doesKeyExistInCache =
+              cacheIter::doesKeyExistInCache;
           iterators.add(cacheIter);
           iteratorId++;
           iterators.add(new DbTableIter<>(iteratorId, table, prefixKey,
-              startKey, isKeyExistInCache));
+              startKey, doesKeyExistInCache));
           iteratorId++;
         }
       } finally {
