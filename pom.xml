@@ -220,7 +220,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <mockito.version>4.11.0</mockito.version>
     <hamcrest.version>2.2</hamcrest.version>
     <jmockit.version>1.24</jmockit.version>
-    <junit4.version>4.13.1</junit4.version>
     <junit5.version>5.10.1</junit5.version>
     <zookeeper.version>3.7.2</zookeeper.version>
 
@@ -248,7 +247,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     -->
     <enforced.java.version>[${javac.version},)</enforced.java.version>
     <enforced.maven.version>[3.3.0,)</enforced.maven.version>
-    <allow.junit4>true</allow.junit4>
+    <allow.junit4>false</allow.junit4>
 
     <!-- Plugin versions and config -->
     <maven-surefire-plugin.argLine>-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
@@ -1157,17 +1156,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${aws-java-sdk.version}</version>
       </dependency>
       <dependency>
-        <groupId>junit</groupId>
-        <artifactId>junit</artifactId>
-        <version>${junit4.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>org.hamcrest</groupId>
-            <artifactId>hamcrest-core</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
         <groupId>org.hamcrest</groupId>
         <artifactId>hamcrest</artifactId>
         <version>${hamcrest.version}</version>
@@ -1818,7 +1806,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                     <includeTestCode>true</includeTestCode>
                     <reason>Disable with @Unhealthy or @Slow instead (see HDDS-9276)</reason>
                     <bannedImports>
-                      <bannedImport>org.junit.Ignore</bannedImport>
                       <bannedImport>org.junit.jupiter.api.Disabled</bannedImport>
                     </bannedImports>
                   </restrictImports>
@@ -1843,6 +1830,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                     </bannedImports>
                     <allowedImports>
                       <allowedImport>org.junit.jupiter.**</allowedImport>
+                      <allowedImport>org.junit.platform.**</allowedImport>
                     </allowedImports>
                   </restrictImports>
                 </rules>
