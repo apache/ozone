@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Raw coder test base with utilities.
@@ -94,8 +95,12 @@ public abstract class TestRawCoderBase extends TestCoderBase {
     this.usingDirectBuffer = usingDirectBuffer;
     prepareCoders(true);
 
-    assertThrows(Exception.class, () -> performTestCoding(baseChunkSize, false, true, false),
-        "Encoding test with bad input should fail");
+    try {
+      performTestCoding(baseChunkSize, false, true, false);
+      fail("Encoding test with bad input should fail");
+    } catch (Exception e) {
+      // Expected
+    }
   }
 
   /**
@@ -135,9 +140,19 @@ public abstract class TestRawCoderBase extends TestCoderBase {
 
   @Test
   public void testCodingWithErasingTooMany() {
-    assertThrows(Exception.class, () -> testCoding(true), "Decoding test erasing too many should fail");
+    try {
+      testCoding(true);
+      fail("Decoding test erasing too many should fail");
+    } catch (Exception e) {
+      // Expected
+    }
 
-    assertThrows(Exception.class, () -> testCoding(false), "Decoding test erasing too many should fail");
+    try {
+      testCoding(false);
+      fail("Decoding test erasing too many should fail");
+    } catch (Exception e) {
+      // Expected
+    }
   }
 
   @Test
