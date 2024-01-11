@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.debug;
 
 import com.google.common.collect.Sets;
-import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
@@ -101,10 +100,10 @@ public class ContainerKeyScanner implements Callable<Void>,
 
   @Override
   public Void call() throws Exception {
-    ContainerKeyInfoWrapper containerKeyInfoWrapper =
+    ContainerKeyInfoResponse containerKeyInfoResponse =
         scanDBForContainerKeys(parent.getDbPath());
 
-    printOutput(containerKeyInfoWrapper);
+    printOutput(containerKeyInfoResponse);
 
     closeStdChannels();
 
@@ -212,9 +211,9 @@ public class ContainerKeyScanner implements Callable<Void>,
     }
   }
 
-  private ContainerKeyInfoWrapper scanDBForContainerKeys(String dbPath)
+  private ContainerKeyInfoResponse scanDBForContainerKeys(String dbPath)
       throws RocksDBException, IOException {
-    List<ContainerKeyInfo> containerKeyInfos = new ArrayList<>();
+    Map<Long, List<ContainerKeyInfo>> containerKeyInfos = new HashMap<>();
 
     List<ColumnFamilyDescriptor> columnFamilyDescriptors =
         RocksDBUtils.getColumnFamilyDescriptors(dbPath);
@@ -237,13 +236,13 @@ public class ContainerKeyScanner implements Callable<Void>,
           processTable(dbDefinition, columnFamilyHandles, db,
               containerKeyInfos, KEY_TABLE);
     }
-    return new ContainerKeyInfoWrapper(keysProcessed, containerKeyInfos);
+    return new ContainerKeyInfoResponse(keysProcessed, containerKeyInfos);
   }
 
   private long processTable(DBDefinition dbDefinition,
                             List<ColumnFamilyHandle> columnFamilyHandles,
                             ManagedRocksDB db,
-                            List<ContainerKeyInfo> containerKeyInfos,
+                            Map<Long, List<ContainerKeyInfo>> containerKeyInfos,
                             String tableName)
       throws IOException {
     long keysProcessed = 0;
@@ -289,7 +288,7 @@ public class ContainerKeyScanner implements Callable<Void>,
     }
   }
 
-  private void processData(List<ContainerKeyInfo> containerKeyInfos,
+  private void processData(Map<Long, List<ContainerKeyInfo>> containerKeyInfos,
                            String tableName,
                            List<OmKeyLocationInfoGroup> keyLocationVersions,
                            long volumeId, long bucketId, OmKeyInfo value)
@@ -314,11 +313,17 @@ public class ContainerKeyScanner implements Callable<Void>,
               keyName.append(getFsoKeyPrefix(volumeId, bucketId, value));
             }
             keyName.append(value.getKeyName());
-            containerKeyInfos.add(
-                new ContainerKeyInfo(locationInfo.getContainerID(),
-                    value.getVolumeName(), volumeId, value.getBucketName(),
-                    bucketId, keyName.toString(),
-                    value.getParentObjectID()));
+
+            containerKeyInfos.merge(locationInfo.getContainerID(),
+                new ArrayList<>(Collections.singletonList(
+                    new ContainerKeyInfo(locationInfo.getContainerID(),
+                        value.getVolumeName(), volumeId, value.getBucketName(),
+                        bucketId, keyName.toString(),
+                        value.getParentObjectID()))),
+                (existingList, newList) -> {
+                  existingList.addAll(newList);
+                  return existingList;
+                });
           }
         }
       }
@@ -377,35 +382,16 @@ public class ContainerKeyScanner implements Callable<Void>,
     return dbPath;
   }
 
-  private void printOutput(ContainerKeyInfoWrapper containerKeyInfoWrapper) {
-    List<ContainerKeyInfo> containerKeyInfos =
-        containerKeyInfoWrapper.getContainerKeyInfos();
-    if (containerKeyInfos.isEmpty()) {
+  private void printOutput(ContainerKeyInfoResponse containerKeyInfoResponse) {
+    if (containerKeyInfoResponse.getContainerKeys().isEmpty()) {
       err().println("No keys were found for container IDs: " + containerIds);
       err().println(
-          "Keys processed: " + containerKeyInfoWrapper.getKeysProcessed());
+          "Keys processed: " + containerKeyInfoResponse.getKeysProcessed());
       return;
     }
 
-    Map<Long, List<ContainerKeyInfo>> infoMap = new HashMap<>();
-
-    for (long id : containerIds) {
-      List<ContainerKeyInfo> tmpList = new ArrayList<>();
-
-      for (ContainerKeyInfo info : containerKeyInfos) {
-        if (id == info.getContainerID()) {
-          tmpList.add(info);
-        }
-      }
-      infoMap.put(id, tmpList);
-    }
-
-    Gson gson = new GsonBuilder().setPrettyPrinting().create();
-    String prettyJson = gson.toJson(
-        new ContainerKeyInfoResponse(containerKeyInfoWrapper.getKeysProcessed(),
-            infoMap));
-
-    out().print(prettyJson);
+    out().print(new GsonBuilder().setPrettyPrinting().create()
+        .toJson(containerKeyInfoResponse));
   }
 
 }

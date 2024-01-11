@@ -38,6 +38,14 @@ public class ContainerKeyInfoResponse {
     this.containerKeys = containerKeys;
   }
 
+  public long getKeysProcessed() {
+    return keysProcessed;
+  }
+
+  public Map<Long, List<ContainerKeyInfo>> getContainerKeys() {
+    return containerKeys;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
