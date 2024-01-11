@@ -33,11 +33,11 @@ import org.apache.hadoop.ozone.dn.DatanodeTestUtils;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
 import org.apache.ozone.test.JUnit5AwareTimeout;
@@ -73,7 +73,7 @@ public class TestDatanodeHddsVolumeFailureToleration {
   private OzoneConfiguration ozoneConfig;
   private List<HddsDatanodeService> datanodes;
 
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     ozoneConfig = new OzoneConfiguration();
     ozoneConfig.set(OZONE_SCM_CONTAINER_SIZE, "1GB");
@@ -102,7 +102,7 @@ public class TestDatanodeHddsVolumeFailureToleration {
     datanodes = cluster.getHddsDatanodes();
   }
 
-  @After
+  @AfterEach
   public void shutdown() throws IOException {
     if (cluster != null) {
       cluster.shutdown();
@@ -147,7 +147,7 @@ public class TestDatanodeHddsVolumeFailureToleration {
     // cluster.
     GenericTestUtils.waitFor(() -> exitCapturer.getOutput()
         .contains("Exiting with status 1: ExitException"), 500, 60000);
-    Assert.assertTrue(dsmCapturer.getOutput()
+    Assertions.assertTrue(dsmCapturer.getOutput()
         .contains("DatanodeStateMachine Shutdown due to too many bad volumes"));
 
     // restore bad volumes
