@@ -356,29 +356,40 @@ public class OMKeyCreateRequest extends OMKeyRequest {
         OMAction.ALLOCATE_KEY, auditMap, exception,
         getOmRequest().getUserInfo()));
 
-    logResult(createKeyRequest, omMetrics, exception, result,
-            numMissingParents);
+    updateMetrics(createKeyRequest, omMetrics, result, numMissingParents);
+    logResult(createKeyRequest, exception, result);
 
     return omClientResponse;
   }
 
-  protected void logResult(CreateKeyRequest createKeyRequest,
-      OMMetrics omMetrics, Exception exception, Result result,
-       int numMissingParents) {
+  private void updateMetrics(CreateKeyRequest createKeyRequest, OMMetrics omMetrics, Result result,
+      int numMissingParents) {
     switch (result) {
     case SUCCESS:
       // Missing directories are created immediately, counting that here.
       // The metric for the key is incremented as part of the key commit.
       omMetrics.incNumKeys(numMissingParents);
+      break;
+    case FAILURE:
+      if (createKeyRequest.getKeyArgs().hasEcReplicationConfig()) {
+        omMetrics.incEcKeyCreateFailsTotal();
+      }
+      break;
+    default:
+      LOG.error("Unrecognized Result for OMKeyCreateRequest: {}",
+          createKeyRequest);
+    }
+  }
+
+  protected void logResult(CreateKeyRequest createKeyRequest, Exception exception, Result result) {
+    switch (result) {
+    case SUCCESS:
       LOG.debug("Key created. Volume:{}, Bucket:{}, Key:{}",
               createKeyRequest.getKeyArgs().getVolumeName(),
               createKeyRequest.getKeyArgs().getBucketName(),
               createKeyRequest.getKeyArgs().getKeyName());
       break;
     case FAILURE:
-      if (createKeyRequest.getKeyArgs().hasEcReplicationConfig()) {
-        omMetrics.incEcKeyCreateFailsTotal();
-      }
       LOG.error("Key creation failed. Volume:{}, Bucket:{}, Key:{}. ",
               createKeyRequest.getKeyArgs().getVolumeName(),
               createKeyRequest.getKeyArgs().getBucketName(),

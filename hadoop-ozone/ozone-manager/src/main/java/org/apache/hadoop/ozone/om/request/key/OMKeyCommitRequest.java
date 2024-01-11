@@ -348,8 +348,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     if (!isHSync) {
       auditLog(auditLogger, buildAuditMessage(OMAction.COMMIT_KEY, auditMap,
               exception, getOmRequest().getUserInfo()));
-      processResult(commitKeyRequest, volumeName, bucketName, keyName,
-          omMetrics, exception, omKeyInfo, result);
+      updateMetrics(commitKeyRequest, omMetrics, omKeyInfo, result);
+      logResult(commitKeyRequest, volumeName, bucketName, keyName, exception, result);
     }
 
     return omClientResponse;
@@ -374,25 +374,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     return locationInfoList;
   }
 
-  /**
-   * Process result of om request execution.
-   *
-   * @param commitKeyRequest commit key request
-   * @param volumeName       volume name
-   * @param bucketName       bucket name
-   * @param keyName          key name
-   * @param omMetrics        om metrics
-   * @param exception        exception trace
-   * @param omKeyInfo        omKeyInfo
-   * @param result           result
-   * @param result           stores the result of the execution
-   */
-  @SuppressWarnings("parameternumber")
-  protected void processResult(CommitKeyRequest commitKeyRequest,
-                               String volumeName, String bucketName,
-                               String keyName, OMMetrics omMetrics,
-                               Exception exception, OmKeyInfo omKeyInfo,
-                               Result result) {
+  private void updateMetrics(CommitKeyRequest commitKeyRequest, OMMetrics omMetrics, OmKeyInfo omKeyInfo,
+      Result result) {
     switch (result) {
     case SUCCESS:
       // As when we commit the key, then it is visible in ozone, so we should
@@ -407,12 +390,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         omMetrics.incEcKeysTotal();
       }
       omMetrics.incDataCommittedBytes(omKeyInfo.getDataSize());
-      LOG.debug("Key committed. Volume:{}, Bucket:{}, Key:{}", volumeName,
-              bucketName, keyName);
       break;
     case FAILURE:
-      LOG.error("Key committed failed. Volume:{}, Bucket:{}, Key:{}. " +
-          "Exception:{}", volumeName, bucketName, keyName, exception);
       if (commitKeyRequest.getKeyArgs().hasEcReplicationConfig()) {
         omMetrics.incEcKeyCreateFailsTotal();
       }
@@ -420,7 +399,23 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       break;
     default:
       LOG.error("Unrecognized Result for OMKeyCommitRequest: {}",
-              commitKeyRequest);
+          commitKeyRequest);
+    }
+  }
+
+  protected void logResult(CommitKeyRequest commitKeyRequest, String volumeName, String bucketName, String keyName,
+      Exception exception, Result result) {
+    switch (result) {
+    case SUCCESS:
+      LOG.debug("Key committed. Volume:{}, Bucket:{}, Key:{}", volumeName,
+          bucketName, keyName);
+      break;
+    case FAILURE:
+      LOG.error("Key committed failed. Volume:{}, Bucket:{}, Key:{}.", volumeName, bucketName, keyName, exception);
+      break;
+    default:
+      LOG.error("Unrecognized Result for OMKeyCommitRequest: {}",
+          commitKeyRequest);
     }
   }
 

@@ -115,7 +115,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     boolean acquiredLock = false;
 
     int indexFailed = 0;
-    int length = deleteKeys.size();
+    int originalNumDeletedKeys = deleteKeys.size();
     OzoneManagerProtocolProtos.DeleteKeyArgs.Builder unDeletedKeys =
         OzoneManagerProtocolProtos.DeleteKeyArgs.newBuilder()
             .setVolumeName(volumeName).setBucketName(bucketName);
@@ -135,7 +135,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       String volumeOwner = getVolumeOwner(omMetadataManager, volumeName);
 
-      for (indexFailed = 0; indexFailed < length; indexFailed++) {
+      for (indexFailed = 0; indexFailed < originalNumDeletedKeys; indexFailed++) {
         String keyName = deleteKeyArgs.getKeys(indexFailed);
         String objectKey =
             omMetadataManager.getOzoneKey(volumeName, bucketName, keyName);
@@ -194,7 +194,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
       // reset deleteKeys as request failed.
       deleteKeys = new ArrayList<>();
       // Add all keys which are failed due to any other exception .
-      for (int i = indexFailed; i < length; i++) {
+      for (int i = indexFailed; i < originalNumDeletedKeys; i++) {
         unDeletedKeys.addKeys(deleteKeyArgs.getKeys(i));
       }
 
@@ -219,16 +219,15 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     auditLog(auditLogger,
         buildAuditMessage(DELETE_KEYS, auditMap, exception, userInfo));
 
+    updateMetrics(result, omMetrics, omKeyInfoList.size(), dirList.size());
     switch (result) {
     case SUCCESS:
-      omMetrics.decNumKeys(deleteKeys.size());
       if (LOG.isDebugEnabled()) {
         LOG.debug("Keys delete success. Volume:{}, Bucket:{}, Keys:{}",
             volumeName, bucketName, auditMap.get(DELETED_KEYS_LIST));
       }
       break;
     case FAILURE:
-      omMetrics.incNumKeyDeleteFails();
       if (LOG.isDebugEnabled()) {
         LOG.debug("Keys delete failed. Volume:{}, Bucket:{}, DeletedKeys:{}, "
                 + "UnDeletedKeys:{}", volumeName, bucketName,
@@ -242,6 +241,19 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     }
 
     return omClientResponse;
+  }
+
+  protected void updateMetrics(Result result, OMMetrics omMetrics, long numKeysDeleted, long numDirsDeleted) {
+    switch (result) {
+    case SUCCESS:
+      omMetrics.decNumKeys(numKeysDeleted);
+      break;
+    case FAILURE:
+      omMetrics.incNumKeyDeleteFails();
+      break;
+    default:
+      LOG.error("Unrecognized Result for OMKeysDeleteRequest: {}", result);
+    }
   }
 
   protected OzoneFileStatus getOzoneKeyStatus(

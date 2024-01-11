@@ -189,9 +189,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numBuckets;
   private @Metric MutableCounterLong numS3Buckets;
 
-  //TODO: This metric is an estimate and it may be inaccurate on restart if the
-  // OM process was not shutdown cleanly. Key creations/deletions in the last
-  // few minutes before restart may not be included in this count.
   private @Metric MutableCounterLong numKeys;
 
   private @Metric MutableCounterLong numBucketS3Creates;
@@ -326,9 +323,25 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     this.numDirs.incr(val - oldVal);
   }
 
+  public void incNumDirs(long val) {
+    this.numDirs.incr(val);
+  }
+
   public void setNumFiles(long val) {
     long oldVal = this.numFiles.value();
     this.numFiles.incr(val - oldVal);
+  }
+
+  public void incNumFiles(long val) {
+    this.numFiles.incr(val);
+  }
+
+  public void decNumDirs() {
+    this.numDirs.incr(-1);
+  }
+
+  public void decNumDirs(long val) {
+    numDirs.incr(-val);
   }
 
   public long getNumDirs() {
@@ -338,6 +351,19 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   public long getNumFiles() {
     return numFiles.value();
   }
+
+  public void incNumFiles() {
+    numFiles.incr();
+  }
+
+  public void decNumFiles() {
+    numFiles.incr(-1);
+  }
+
+  public void decNumFiles(long val) {
+    numFiles.incr(-val);
+  }
+
 
   public void decNumKeys(long val) {
     this.numKeys.incr(-val);

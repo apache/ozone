@@ -1673,9 +1673,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         .countEstimatedRowsInTable(metadataManager.getFileTable()));
 
     // Returns total number of LEGACY and OBS keys.
-    long numObjects = metadataManager.countEstimatedRowsInTable(metadataManager.getKeyTable(BucketLayout.OBJECT_STORE));
-    // TODO should numKeys remain the total of these values, or should it only count non-FSO objects?
-    metrics.setNumKeys(numObjects + metrics.getNumFiles() + metrics.getNumDirs());
+    metrics.setNumKeys(
+        metadataManager.countEstimatedRowsInTable(metadataManager.getKeyTable(BucketLayout.OBJECT_STORE)));
   }
 
   /**

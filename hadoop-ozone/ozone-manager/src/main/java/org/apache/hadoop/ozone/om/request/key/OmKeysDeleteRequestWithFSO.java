@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -30,6 +31,8 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeysDeleteResponseWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
@@ -42,10 +45,28 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
  */
 public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OmKeysDeleteRequestWithFSO.class);
+
   public OmKeysDeleteRequestWithFSO(
       OzoneManagerProtocolProtos.OMRequest omRequest,
       BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
+  }
+
+  @Override
+  protected void updateMetrics(Result result, OMMetrics omMetrics, long numFilesDeleted, long numDirsDeleted) {
+    switch (result) {
+    case SUCCESS:
+      omMetrics.decNumFiles(numFilesDeleted);
+      omMetrics.decNumDirs(numDirsDeleted);
+      break;
+    case FAILURE:
+      omMetrics.incNumKeyDeleteFails();
+      break;
+    default:
+      LOG.error("Unrecognized Result for OMKeysDeleteRequestWithFSO: {}", result);
+    }
   }
 
   @Override

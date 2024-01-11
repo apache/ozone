@@ -41,6 +41,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -60,6 +62,9 @@ import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getParentId;
  * Handles CreateKey request layout version1.
  */
 public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OMKeyCreateRequestWithFSO.class);
 
   public OMKeyCreateRequestWithFSO(OMRequest omRequest,
       BucketLayout bucketLayout) {
@@ -231,10 +236,29 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
             OMAction.ALLOCATE_KEY, auditMap, exception,
             getOmRequest().getUserInfo()));
 
-    logResult(createKeyRequest, omMetrics, exception, result,
-            numKeysCreated);
+    updateMetrics(createKeyRequest, omMetrics, result, numKeysCreated);
+    logResult(createKeyRequest, exception, result);
 
     return omClientResponse;
+  }
+
+  private void updateMetrics(OzoneManagerProtocolProtos.CreateKeyRequest createKeyRequest, OMMetrics omMetrics,
+      Result result, int numMissingParents) {
+    switch (result) {
+    case SUCCESS:
+      // Missing directories are created immediately, counting that here.
+      // The metric for the key is incremented as part of the key commit.
+      omMetrics.incNumDirs(numMissingParents);
+      break;
+    case FAILURE:
+      if (createKeyRequest.getKeyArgs().hasEcReplicationConfig()) {
+        omMetrics.incEcKeyCreateFailsTotal();
+      }
+      break;
+    default:
+      LOG.error("Unrecognized Result for OMKeyCreateRequestWithFSO: {}",
+          createKeyRequest);
+    }
   }
 
   /**
