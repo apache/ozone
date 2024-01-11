@@ -42,9 +42,9 @@ public class TestCodecRawCoderMapping {
         CodecUtil.createRawDecoderWithFallback(coderOptions);
     if (ErasureCodeNative.isNativeCodeLoaded()) {
       assertInstanceOf(NativeRSRawEncoder.class, encoder);
-      assertInstanceOf(NativeRSRawEncoder.class, decoder);
+      assertInstanceOf(NativeRSRawDecoder.class, decoder);
     } else {
-      assertInstanceOf(RSRawDecoder.class, encoder);
+      assertInstanceOf(RSRawEncoder.class, encoder);
       assertInstanceOf(RSRawDecoder.class, decoder);
     }
   }
@@ -59,11 +59,11 @@ public class TestCodecRawCoderMapping {
     RawErasureDecoder decoder =
         CodecUtil.createRawDecoderWithFallback(coderOptions);
     if (ErasureCodeNative.isNativeCodeLoaded()) {
-      assertInstanceOf(NativeXORRawDecoder.class, encoder);
+      assertInstanceOf(NativeXORRawEncoder.class, encoder);
       assertInstanceOf(NativeXORRawDecoder.class, decoder);
     } else {
       assertInstanceOf(XORRawEncoder.class, encoder);
-      assertInstanceOf(XORRawEncoder.class, decoder);
+      assertInstanceOf(XORRawDecoder.class, decoder);
     }
   }
 }
