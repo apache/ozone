@@ -470,10 +470,10 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
 
   /**
    * QUASI_CLOSED containers that have a mix of healthy and UNHEALTHY
-   * replicas require special treatment. If the healthy replicas don't have
-   * the same BCSID as the container, but the UNHEALTHY ones do, then we need
-   * to save at least one copy of each such UNHEALTHY replica. This method
-   * finds such UNHEALTHY replicas.
+   * replicas require special treatment. If the UNHEALTHY replicas have the
+   * correct sequence ID and have unique origins, then we need to save at least
+   * one copy of each such UNHEALTHY replicas. This method finds such UNHEALTHY
+   * replicas.
    *
    * @param nodeStatusFn a function used to check the {@link NodeStatus} of a node,
    * accepting a {@link DatanodeDetails} and returning {@link NodeStatus}
@@ -498,11 +498,6 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
       if (replica.getSequenceId() == container.getSequenceId()) {
         if (replica.getState() == ContainerReplicaProto.State.UNHEALTHY && !replica.isEmpty()) {
           unhealthyReplicas.add(replica);
-        } else if (replica.getState() ==
-            ContainerReplicaProto.State.QUASI_CLOSED) {
-          // don't need to save UNHEALTHY replicas if there's a QUASI_CLOSED
-          // replica with the greatest Sequence ID.
-          return Collections.emptyList();
         }
       }
     }
@@ -513,6 +508,11 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
     }
 
     unhealthyReplicas.removeIf(
+        replica -> {
+          NodeStatus status = nodeStatusFn.apply(replica.getDatanodeDetails());
+          return status == null || !status.isHealthy();
+        });
+    replicas.removeIf(
         replica -> {
           NodeStatus status = nodeStatusFn.apply(replica.getDatanodeDetails());
           return status == null || !status.isHealthy();
@@ -531,9 +531,9 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
      */
     // TODO should we also consider pending deletes?
     Set<UUID> originsOfInServiceReplicas = new HashSet<>();
-    for (ContainerReplica replica : unhealthyReplicas) {
+    for (ContainerReplica replica : replicas) {
       if (replica.getDatanodeDetails().getPersistedOpState()
-          .equals(IN_SERVICE)) {
+          .equals(IN_SERVICE) && replica.getSequenceId().equals(container.getSequenceId())) {
         originsOfInServiceReplicas.add(replica.getOriginDatanodeId());
       }
     }
