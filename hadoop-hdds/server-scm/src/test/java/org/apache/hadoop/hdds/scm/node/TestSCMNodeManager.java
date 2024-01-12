@@ -1576,15 +1576,14 @@ public class TestSCMNodeManager {
   }
 
   private List<StorageReportProto> generateStorageReportProto(
-      int volumeCount, UUID dnId, long capacity, long used) {
+      int volumeCount, UUID dnId, long capacity, long used, long remaining) {
     List<StorageReportProto> reports = new ArrayList<>(volumeCount);
     boolean failed = true;
     for (int x = 0; x < volumeCount; x++) {
-      long free = capacity - used;
       String storagePath = testDir.getAbsolutePath() + "/" + dnId;
       reports.add(HddsTestUtils
           .createStorageReport(dnId, storagePath, capacity,
-              used, free, null, failed));
+              used, remaining, null, failed));
       failed = !failed;
     }
     return reports;
@@ -1592,18 +1591,20 @@ public class TestSCMNodeManager {
 
   private static Stream<Arguments> calculateStoragePercentageScenarios() {
     return Stream.of(
-        Arguments.of(1000, 600, 10, 60),
-        Arguments.of(1000, 1000, 10, 100),
-        Arguments.of(1000, 1001, 10, 100),
-        Arguments.of(0, 0, 0, 0),
-        Arguments.of(1010, 547, 5, 54.16)
+        Arguments.of(600, 65, 500, 1, "600.0B", 10.83, 5.83),
+        Arguments.of(10000, 1000, 8800, 12, "117.2KB", 10.0, 2.0),
+        Arguments.of(100000000, 1000, 899999, 12, "1.1GB", 0.0, 99.1),
+        Arguments.of(10000, 1000, 0, 0, "0.0B", 0.0, 0.0),
+        Arguments.of(0, 0, 0, 0, "0.0B", 0.0, 0.0),
+        Arguments.of(1010, 547, 400, 5, "4.9KB", 54.16, 6.24)
     );
   }
 
   @ParameterizedTest
   @MethodSource("calculateStoragePercentageScenarios")
-  public void testCalculateStoragePercentage(long capacity,
-      long used, int volumeCount, double targetUsedPerc)
+  public void testCalculateStoragePercentage(long perCapacity,
+      long used, long remaining, int volumeCount, String totalCapacity,
+          double scmUsedPerc, double nonScmUsedPerc)
           throws AuthenticationException, IOException {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
@@ -1618,56 +1619,20 @@ public class TestSCMNodeManager {
       DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
       UUID dnId = dn.getUuid();
       List<StorageReportProto> reports = volumeCount > 0 ?
-          generateStorageReportProto(volumeCount, dnId, capacity, used) : null;
+          generateStorageReportProto(volumeCount, dnId, perCapacity,
+              used, remaining) : null;
       nodeManager.register(dn, reports != null ?
           HddsTestUtils.createNodeReport(reports, emptyList()) : null, null);
       nodeManager.processHeartbeat(dn, layoutInfo);
       eventQueue.processAll(8000L);
       NodeStateManager nodeStateManager = nodeManager.getNodeStateManager();
       List<DatanodeInfo> dataNodeInfoList = nodeStateManager.getAllNodes();
-      double usedPerc = nodeManager.calculateStoragePercentage(
-          dataNodeInfoList.get(0));
-      assertEquals(usedPerc, targetUsedPerc);
-    }
-  }
-
-  private static Stream<Arguments> calculateStorageCapacityScenarios() {
-    return Stream.of(
-        Arguments.of(600, 6, 1, "600.0B"),
-        Arguments.of(10000, 1000, 12, "117.2KB"),
-        Arguments.of(100000000, 1000, 12, "1.1GB"),
-        Arguments.of(10000, 1000, 0, "0.0B")
-    );
-  }
-
-  @ParameterizedTest
-  @MethodSource("calculateStorageCapacityScenarios")
-  public void testcalculateStorageCapacity(long capacity,
-      long used, int volumeCount, String totalCapacity)
-          throws AuthenticationException, IOException {
-    OzoneConfiguration conf = getConf();
-    conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
-        MILLISECONDS);
-    try (SCMNodeManager nodeManager = createNodeManager(conf)) {
-      EventQueue eventQueue = (EventQueue) scm.getEventQueue();
-      LayoutVersionManager versionManager =
-          nodeManager.getLayoutVersionManager();
-      LayoutVersionProto layoutInfo = toLayoutVersionProto(
-          versionManager.getMetadataLayoutVersion(),
-          versionManager.getSoftwareLayoutVersion());
-      DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
-      UUID dnId = dn.getUuid();
-      List<StorageReportProto> reports = volumeCount > 0 ?
-          generateStorageReportProto(volumeCount, dnId, capacity, used) : null;
-      nodeManager.register(dn, reports != null ?
-          HddsTestUtils.createNodeReport(reports, emptyList()) : null, null);
-      nodeManager.processHeartbeat(dn, layoutInfo);
-      eventQueue.processAll(8000L);
-      NodeStateManager nodeStateManager = nodeManager.getNodeStateManager();
-      List<DatanodeInfo> dataNodeInfoList = nodeStateManager.getAllNodes();
-      String capacityResult = nodeManager.calculateStorageCapacity(
-          dataNodeInfoList.get(0));
+      DatanodeInfo dni = dataNodeInfoList.get(0);
+      String capacityResult = nodeManager.calculateStorageCapacity(dni);
       assertEquals(capacityResult, totalCapacity);
+      double[] storagePercentage = nodeManager.calculateStoragePercentage(dni);
+      assertEquals(storagePercentage[0], scmUsedPerc);
+      assertEquals(storagePercentage[1], nonScmUsedPerc);
     }
   }
 

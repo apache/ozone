@@ -1119,8 +1119,11 @@ public class SCMNodeManager implements NodeManager {
       }
       String capacity = calculateStorageCapacity(dni);
       map.put(totalCapacity, capacity);
-      double usedPec = calculateStoragePercentage(dni);
-      map.put(usedSpacePercent, usedPec + "%");
+      double[] storagePercentage = calculateStoragePercentage(dni);
+      double scmUsedPerc = storagePercentage[0];
+      double nonScmUsedPerc = storagePercentage[1];
+      map.put(usedSpacePercent,
+          "scmUsed: " + scmUsedPerc + "%, nonScmUsed: " + nonScmUsedPerc + "%");
       nodes.put(hostName, map);
     }
     return nodes;
@@ -1141,52 +1144,65 @@ public class SCMNodeManager implements NodeManager {
     }
 
     double ua = capacityByte;
-    String unit = "B";
+    StringBuilder unit = new StringBuilder("B");
     if (ua > 1024) {
       ua = ua / 1024;
-      unit = "KB";
+      unit.replace(0, 1, "KB");
     }
     if (ua > 1024) {
       ua = ua / 1024;
-      unit = "MB";
+      unit.replace(0, 2, "MB");
     }
     if (ua > 1024) {
       ua = ua / 1024;
-      unit = "GB";
+      unit.replace(0, 2, "GB");
     }
     if (ua > 1024) {
       ua = ua / 1024;
-      unit = "TB";
+      unit.replace(0, 2, "TB");
     }
 
     DecimalFormat decimalFormat = new DecimalFormat("#0.0");
     decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
     double capacity = Double.valueOf(decimalFormat.format(ua));
-    return capacity + unit;
+    return capacity + unit.toString();
   }
 
   /**
    * Calculate the storage usage percentage of a DataNode node.
-   * @param dni DataNode node that needs to be calculated
+   * @param dni DataNode node that needs to be calculated.
    * @return
    */
-  public double calculateStoragePercentage(DatanodeInfo dni) {
-    double usedPec = 0;
+  public double[] calculateStoragePercentage(DatanodeInfo dni) {
+    double[] storagePercentage = new double[2];
+    double usedPercentage = 0;
+    double nonUsedPercentage = 0;
     List<StorageReportProto> storageReports = dni.getStorageReports();
     if (storageReports != null && !storageReports.isEmpty()) {
       long capacity = 0;
       long scmUsed = 0;
+      long remaining = 0;
       for (StorageReportProto storageReport : storageReports) {
         capacity += storageReport.getCapacity();
         scmUsed += storageReport.getScmUsed();
+        remaining += storageReport.getRemaining();
       }
-      double percent = (double) scmUsed / capacity;
-      percent = percent > 1.0 ? 1.0 : percent;
-      DecimalFormat decimalFormat = new DecimalFormat("#0.0000");
+      long scmNonUsed = capacity - scmUsed - remaining;
+
+      DecimalFormat decimalFormat = new DecimalFormat("#0.00");
       decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
-      usedPec = Double.valueOf(decimalFormat.format(percent)) * 100;
+
+      double usedPerc = ((double) scmUsed / capacity) * 100;
+      usedPerc = usedPerc > 100.0 ? 100.0 : usedPerc;
+      double nonUsedPerc = ((double) scmNonUsed / capacity) * 100;
+      nonUsedPerc = nonUsedPerc > 100.0 ? 100.0 : nonUsedPerc;
+      usedPercentage = Double.valueOf(decimalFormat.format(usedPerc));
+      nonUsedPercentage = Double.valueOf(decimalFormat.format(nonUsedPerc));
     }
-    return usedPec;
+
+    storagePercentage[0] = usedPercentage;
+    storagePercentage[1] = nonUsedPercentage;
+    return storagePercentage;
   }
 
   /**
