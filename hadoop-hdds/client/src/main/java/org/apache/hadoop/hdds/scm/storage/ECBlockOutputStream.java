@@ -228,7 +228,7 @@ public class ECBlockOutputStream extends BlockOutputStream {
     try {
       ContainerProtos.BlockData blockData = getContainerBlockData().build();
       XceiverClientReply asyncReply =
-          putBlockAsync(getXceiverClient(), blockData, close, getToken());
+          putBlockAsync(getXceiverClient(), blockData, close, getTokenString());
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
           asyncReply.getResponse();
       flushFuture = future.thenApplyAsync(e -> {
