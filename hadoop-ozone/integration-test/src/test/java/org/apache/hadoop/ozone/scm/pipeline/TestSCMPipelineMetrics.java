@@ -43,6 +43,8 @@ import java.util.concurrent.TimeoutException;
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test cases to verify the metrics exposed by SCMPipelineManager.
@@ -107,8 +109,8 @@ public class TestSCMPipelineMetrics {
     MetricsRecordBuilder metrics =
         getMetrics(SCMPipelineMetrics.class.getSimpleName());
     Pipeline pipeline = block.getPipeline();
-    long numBlocksAllocated = getLongCounter(
-        SCMPipelineMetrics.getBlockAllocationMetricName(pipeline), metrics);
+    final String metricName = SCMPipelineMetrics.getBlockAllocationMetricName(pipeline);
+    long numBlocksAllocated = getLongCounter(metricName, metrics);
     Assertions.assertEquals(numBlocksAllocated, 1);
 
     // destroy the pipeline
@@ -118,12 +120,9 @@ public class TestSCMPipelineMetrics {
 
     MetricsRecordBuilder finalMetrics =
         getMetrics(SCMPipelineMetrics.class.getSimpleName());
-    Throwable t = Assertions.assertThrows(AssertionError.class, () ->
-        getLongCounter(SCMPipelineMetrics
-            .getBlockAllocationMetricName(pipeline), finalMetrics));
-    Assertions.assertTrue(t.getMessage().contains(
-        "Expected exactly one metric for name " + SCMPipelineMetrics
-            .getBlockAllocationMetricName(block.getPipeline())));
+    Throwable t = assertThrows(AssertionError.class, () ->
+        getLongCounter(metricName, finalMetrics));
+    assertThat(t).hasMessageContaining(metricName);
   }
 
   @AfterEach

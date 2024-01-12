@@ -55,12 +55,13 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
 import static org.apache.hadoop.test.MetricsAsserts.assertQuantileGauges;
 import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+
+import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.junit.Assert;
 import org.junit.Rule;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.rules.TestRule;
 import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
 
 /**
  * Test for metrics published by storage containers.

@@ -39,8 +39,8 @@ import java.util.UUID;
 
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeQueueMetrics.COMMAND_DISPATCHER_QUEUE_PREFIX;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeQueueMetrics.STATE_CONTEXT_COMMAND_QUEUE_PREFIX;
-import static org.apache.hadoop.test.MetricsAsserts.getLongGauge;
-import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.apache.ozone.test.MetricsAsserts.getLongGauge;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 
 /**
  * Test for queue metrics of datanodes.
