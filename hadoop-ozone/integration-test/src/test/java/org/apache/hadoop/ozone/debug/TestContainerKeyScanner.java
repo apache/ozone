@@ -116,9 +116,7 @@ public class TestContainerKeyScanner {
 
   @AfterEach
   public void shutdown() throws IOException {
-    if (dbStore != null) {
-      dbStore.close();
-    }
+    closeDbStore();
     pstderr.close();
     stderr.close();
     pstdout.close();
@@ -141,6 +139,8 @@ public class TestContainerKeyScanner {
         {"--db", dbStore.getDbLocation().getAbsolutePath(), "ckscanner",
             "--container-ids", "1 2 3"};
 
+    closeDbStore();
+
     int exitCode = cmd.execute(cmdArgs);
     Assertions.assertEquals(0, exitCode);
 
@@ -149,6 +149,15 @@ public class TestContainerKeyScanner {
         KEYS_FOUND_OUTPUT);
 
     Assertions.assertTrue(stderr.toString().isEmpty());
+  }
+
+  /**
+   * Close db store because of the lock.
+   */
+  private void closeDbStore() throws IOException {
+    if (dbStore != null) {
+      dbStore.close();
+    }
   }
 
   @Test
@@ -164,6 +173,8 @@ public class TestContainerKeyScanner {
     String[] cmdArgs =
         {"--db", dbStore.getDbLocation().getAbsolutePath(), "ckscanner",
             "--container-ids", "1 2 3"};
+
+    closeDbStore();
 
     int exitCode = cmd.execute(cmdArgs);
     Assertions.assertEquals(0, exitCode);

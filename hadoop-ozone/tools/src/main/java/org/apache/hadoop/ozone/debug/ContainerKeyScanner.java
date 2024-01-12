@@ -21,21 +21,19 @@ package org.apache.hadoop.ozone.debug;
 import com.google.common.collect.Sets;
 import com.google.gson.GsonBuilder;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.db.DBDefinition;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.kohsuke.MetaInfServices;
-import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -43,7 +41,6 @@ import picocli.CommandLine;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -60,12 +57,8 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.ROOT_PATH;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 
 /**
  * Parser for a list of container IDs, to scan for keys.
@@ -99,8 +92,14 @@ public class ContainerKeyScanner implements Callable<Void>,
 
   @Override
   public Void call() throws Exception {
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration.set("ozone.om.db.dirs",
+        parent.getDbPath().substring(0, parent.getDbPath().lastIndexOf("/")));
+    OmMetadataManagerImpl omMetadataManager =
+        new OmMetadataManagerImpl(ozoneConfiguration, null);
+
     ContainerKeyInfoResponse containerKeyInfoResponse =
-        scanDBForContainerKeys(parent.getDbPath());
+        scanDBForContainerKeys(omMetadataManager);
 
     printOutput(containerKeyInfoResponse);
 
@@ -114,36 +113,17 @@ public class ContainerKeyScanner implements Callable<Void>,
     err().close();
   }
 
-  private Map<String, OmDirectoryInfo> getDirectoryTableData(String dbPath)
-      throws RocksDBException, IOException {
+  private Map<String, OmDirectoryInfo> getDirectoryTableData(
+      OmMetadataManagerImpl metadataManager)
+      throws IOException {
     Map<String, OmDirectoryInfo> directoryTableData = new HashMap<>();
 
-    // Get all tables from RocksDB
-    List<ColumnFamilyDescriptor> columnFamilyDescriptors =
-        RocksDBUtils.getColumnFamilyDescriptors(dbPath);
-    final List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
-
-    try (ManagedRocksDB db = ManagedRocksDB.openReadOnly(dbPath,
-        columnFamilyDescriptors, columnFamilyHandles)) {
-
-      // Get directory table handle
-      ColumnFamilyHandle columnFamilyHandle =
-          getColumnFamilyHandle(DIRECTORY_TABLE.getBytes(UTF_8),
-              columnFamilyHandles);
-      if (columnFamilyHandle == null) {
-        throw new IllegalStateException("columnFamilyHandle is null");
-      }
-
-      // Get iterator for directory table
-      try (ManagedRocksIterator iterator = new ManagedRocksIterator(
-          db.get().newIterator(columnFamilyHandle))) {
-        iterator.get().seekToFirst();
-        while (iterator.get().isValid()) {
-          directoryTableData.put(StringUtils.bytes2String(iterator.get().key()),
-              OmDirectoryInfo.getCodec()
-                  .fromPersistedFormat(iterator.get().value()));
-          iterator.get().next();
-        }
+    try (
+        TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>>
+            iterator = metadataManager.getDirectoryTable().iterator()) {
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmDirectoryInfo> next = iterator.next();
+        directoryTableData.put(next.getKey(), next.getValue());
       }
     }
 
@@ -210,115 +190,139 @@ public class ContainerKeyScanner implements Callable<Void>,
     }
   }
 
-  private ContainerKeyInfoResponse scanDBForContainerKeys(String dbPath)
-      throws RocksDBException, IOException {
+  private ContainerKeyInfoResponse scanDBForContainerKeys(
+      OmMetadataManagerImpl omMetadataManager)
+      throws IOException {
     Map<Long, List<ContainerKeyInfo>> containerKeyInfos = new HashMap<>();
 
-    List<ColumnFamilyDescriptor> columnFamilyDescriptors =
-        RocksDBUtils.getColumnFamilyDescriptors(dbPath);
-    final List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
     long keysProcessed = 0;
 
-    try (ManagedRocksDB db = ManagedRocksDB.openReadOnly(dbPath,
-        columnFamilyDescriptors, columnFamilyHandles)) {
-      dbPath = removeTrailingSlashIfNeeded(dbPath);
-      DBDefinition dbDefinition = DBDefinitionFactory.getDefinition(
-          Paths.get(dbPath), new OzoneConfiguration());
-      if (dbDefinition == null) {
-        throw new IllegalStateException("Incorrect DB Path");
-      }
+    keysProcessed += processFileTable(containerKeyInfos, omMetadataManager);
+    keysProcessed += processKeyTable(containerKeyInfos, omMetadataManager);
 
-      keysProcessed +=
-          processTable(dbDefinition, columnFamilyHandles, db,
-              containerKeyInfos, FILE_TABLE);
-      keysProcessed +=
-          processTable(dbDefinition, columnFamilyHandles, db,
-              containerKeyInfos, KEY_TABLE);
-    }
     return new ContainerKeyInfoResponse(keysProcessed, containerKeyInfos);
   }
 
-  private long processTable(DBDefinition dbDefinition,
-                            List<ColumnFamilyHandle> columnFamilyHandles,
-                            ManagedRocksDB db,
-                            Map<Long, List<ContainerKeyInfo>> containerKeyInfos,
-                            String tableName)
-      throws IOException {
-    long keysProcessed = 0;
+  private long processKeyTable(
+      Map<Long, List<ContainerKeyInfo>> containerKeyInfos,
+      OmMetadataManagerImpl omMetadataManager) throws IOException {
+    long keysProcessed = 0L;
 
-    ColumnFamilyHandle columnFamilyHandle =
-        getColumnFamilyHandle(tableName.getBytes(UTF_8), columnFamilyHandles);
-    if (columnFamilyHandle == null) {
-      throw new IllegalStateException("columnFamilyHandle is null");
-    }
+    // Anything but not FSO bucket layout
+    Table<String, OmKeyInfo> fileTable = omMetadataManager.getKeyTable(
+        BucketLayout.DEFAULT);
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+             iterator = fileTable.iterator()) {
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> next = iterator.next();
+        keysProcessed++;
 
-    try (ManagedRocksIterator iterator = new ManagedRocksIterator(
-        db.get().newIterator(columnFamilyHandle))) {
-      iterator.get().seekToFirst();
-      while (iterator.get().isValid()) {
-        OmKeyInfo value = OmKeyInfo.getCodec(true)
-            .fromPersistedFormat(iterator.get().value());
-        List<OmKeyLocationInfoGroup> keyLocationVersions =
-            value.getKeyLocationVersions();
-        if (Objects.isNull(keyLocationVersions)) {
-          iterator.get().next();
-          keysProcessed++;
+        if (Objects.isNull(next.getValue().getKeyLocationVersions())) {
           continue;
         }
 
-        long volumeId = 0;
-        long bucketId = 0;
-        // volumeId and bucketId are only applicable to file table
-        if (tableName.equals(FILE_TABLE)) {
-          String key = new String(iterator.get().key(), UTF_8);
-          String[] keyParts = key.split(OM_KEY_PREFIX);
-          volumeId = Long.parseLong(keyParts[1]);
-          bucketId = Long.parseLong(keyParts[2]);
-        }
-
-        processData(containerKeyInfos, tableName, keyLocationVersions, volumeId,
-            bucketId, value);
-        iterator.get().next();
-        keysProcessed++;
+        processKeyData(containerKeyInfos, next.getKey(), next.getValue());
       }
-      return keysProcessed;
-    } catch (RocksDBException e) {
-      throw new RuntimeException(e);
     }
+
+    return keysProcessed;
   }
 
-  private void processData(Map<Long, List<ContainerKeyInfo>> containerKeyInfos,
-                           String tableName,
-                           List<OmKeyLocationInfoGroup> keyLocationVersions,
-                           long volumeId, long bucketId, OmKeyInfo value)
-      throws RocksDBException, IOException {
-    for (OmKeyLocationInfoGroup locationInfoGroup : keyLocationVersions) {
+
+  private long processFileTable(
+      Map<Long, List<ContainerKeyInfo>> containerKeyInfos,
+      OmMetadataManagerImpl omMetadataManager)
+      throws IOException {
+    long keysProcessed = 0L;
+
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+             iterator = omMetadataManager.getFileTable().iterator()) {
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> next = iterator.next();
+        keysProcessed++;
+
+        if (Objects.isNull(next.getValue().getKeyLocationVersions())) {
+          continue;
+        }
+
+        processFileData(containerKeyInfos, next.getKey(), next.getValue(),
+            omMetadataManager);
+      }
+    }
+
+    return keysProcessed;
+  }
+
+  /**
+   * @param key file table key.
+   * @return Pair of volume id and bucket id.
+   */
+  private Pair<Long, Long> parseKey(String key) {
+    String[] keyParts = key.split(OM_KEY_PREFIX);
+    return Pair.of(Long.parseLong(keyParts[1]), Long.parseLong(keyParts[2]));
+  }
+
+  private void processKeyData(
+      Map<Long, List<ContainerKeyInfo>> containerKeyInfos,
+      String key, OmKeyInfo keyInfo) {
+    long volumeId = 0L;
+    long bucketId = 0L;
+
+    for (OmKeyLocationInfoGroup locationInfoGroup :
+        keyInfo.getKeyLocationVersions()) {
       for (List<OmKeyLocationInfo> locationInfos :
           locationInfoGroup.getLocationVersionMap().values()) {
         for (OmKeyLocationInfo locationInfo : locationInfos) {
           if (containerIds.contains(locationInfo.getContainerID())) {
-            // Generate asbolute key path for FSO keys
-            StringBuilder keyName = new StringBuilder();
-            if (tableName.equals(FILE_TABLE)) {
-              // Load directory table only after the first fso key is found
-              // to reduce necessary load if there are not fso keys
-              if (!isDirTableLoaded) {
-                long start = System.currentTimeMillis();
-                directoryTable = getDirectoryTableData(parent.getDbPath());
-                long end = System.currentTimeMillis();
-                LOG.info("directoryTable loaded in " + (end - start) + " ms.");
-                isDirTableLoaded = true;
-              }
-              keyName.append(getFsoKeyPrefix(volumeId, bucketId, value));
-            }
-            keyName.append(value.getKeyName());
 
             containerKeyInfos.merge(locationInfo.getContainerID(),
                 new ArrayList<>(Collections.singletonList(
                     new ContainerKeyInfo(locationInfo.getContainerID(),
-                        value.getVolumeName(), volumeId, value.getBucketName(),
-                        bucketId, keyName.toString(),
-                        value.getParentObjectID()))),
+                        keyInfo.getVolumeName(), volumeId,
+                        keyInfo.getBucketName(), bucketId, keyInfo.getKeyName(),
+                        keyInfo.getParentObjectID()))),
+                (existingList, newList) -> {
+                  existingList.addAll(newList);
+                  return existingList;
+                });
+          }
+        }
+      }
+    }
+  }
+
+  private void processFileData(
+      Map<Long, List<ContainerKeyInfo>> containerKeyInfos,
+      String key, OmKeyInfo keyInfo, OmMetadataManagerImpl omMetadataManager)
+      throws IOException {
+
+    Pair<Long, Long> volumeAndBucketId = parseKey(key);
+    Long volumeId = volumeAndBucketId.getLeft();
+    Long bucketId = volumeAndBucketId.getRight();
+
+    for (OmKeyLocationInfoGroup locationInfoGroup :
+        keyInfo.getKeyLocationVersions()) {
+      for (List<OmKeyLocationInfo> locationInfos :
+          locationInfoGroup.getLocationVersionMap().values()) {
+        for (OmKeyLocationInfo locationInfo : locationInfos) {
+          if (containerIds.contains(locationInfo.getContainerID())) {
+            StringBuilder keyName = new StringBuilder();
+            if (!isDirTableLoaded) {
+              long start = System.currentTimeMillis();
+              directoryTable = getDirectoryTableData(omMetadataManager);
+              long end = System.currentTimeMillis();
+              LOG.info("directoryTable loaded in " + (end - start) + " ms.");
+              isDirTableLoaded = true;
+            }
+            keyName.append(getFsoKeyPrefix(volumeId, bucketId, keyInfo));
+            keyName.append(keyInfo.getKeyName());
+
+            containerKeyInfos.merge(locationInfo.getContainerID(),
+                new ArrayList<>(Collections.singletonList(
+                    new ContainerKeyInfo(locationInfo.getContainerID(),
+                        keyInfo.getVolumeName(), volumeId,
+                        keyInfo.getBucketName(), bucketId, keyName.toString(),
+                        keyInfo.getParentObjectID()))),
                 (existingList, newList) -> {
                   existingList.addAll(newList);
                   return existingList;
