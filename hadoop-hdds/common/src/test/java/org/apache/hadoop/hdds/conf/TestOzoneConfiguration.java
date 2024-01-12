@@ -283,7 +283,7 @@ public class TestOzoneConfiguration {
     if (isGen) {
       ozoneConfig.setInt(name, newVal);
     }
-    int value = ozoneConfig.getInt(name, fallbackName,defaultVal, LOG::info);
+    int value = ozoneConfig.getInt(name, fallbackName, defaultVal, LOG::info);
     assertEquals(value, targetVal);
   }
 
