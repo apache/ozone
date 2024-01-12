@@ -18,9 +18,9 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
-import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
-import static org.apache.hadoop.test.MetricsAsserts.getDoubleGauge;
-import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.apache.ozone.test.MetricsAsserts.assertCounter;
+import static org.apache.ozone.test.MetricsAsserts.getDoubleGauge;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 
 import java.io.File;
 import java.io.IOException;
