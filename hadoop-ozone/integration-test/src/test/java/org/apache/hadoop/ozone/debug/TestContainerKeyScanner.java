@@ -53,7 +53,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
 
 /**
- * This class tests `ozone debug ldb ckscanner` CLI that reads from RocksDB
+ * This class tests `ozone debug ckscanner` CLI that reads from RocksDB
  * and gets keys for container ids.
  */
 public class TestContainerKeyScanner {
@@ -103,7 +103,7 @@ public class TestContainerKeyScanner {
     stderr = new StringWriter();
     pstderr = new PrintWriter(stderr);
 
-    cmd = new CommandLine(new RDBParser())
+    cmd = new CommandLine(new OzoneDebug())
         .addSubcommand(new ContainerKeyScanner())
         .setOut(pstdout)
         .setErr(pstderr);
@@ -136,7 +136,7 @@ public class TestContainerKeyScanner {
     createKey("key3", 3L);
 
     String[] cmdArgs =
-        {"--db", dbStore.getDbLocation().getAbsolutePath(), "ckscanner",
+        {"ckscanner", "--om-db", dbStore.getDbLocation().getAbsolutePath(),
             "--container-ids", "1 2 3"};
 
     closeDbStore();
@@ -171,7 +171,7 @@ public class TestContainerKeyScanner {
     createKey("key3", 6L);
 
     String[] cmdArgs =
-        {"--db", dbStore.getDbLocation().getAbsolutePath(), "ckscanner",
+        {"ckscanner", "--om-db", dbStore.getDbLocation().getAbsolutePath(),
             "--container-ids", "1 2 3"};
 
     closeDbStore();

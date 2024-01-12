@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.cli.SubcommandWithParent;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -33,7 +32,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.kohsuke.MetaInfServices;
-import org.rocksdb.ColumnFamilyHandle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -42,7 +40,6 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -68,25 +65,24 @@ import static org.apache.hadoop.ozone.OzoneConsts.ROOT_PATH;
     description = "Find keys that reference a container"
 )
 @MetaInfServices(SubcommandWithParent.class)
-public class ContainerKeyScanner implements Callable<Void>,
-    SubcommandWithParent {
+public class ContainerKeyScanner
+    implements Callable<Void>, SubcommandWithParent {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(ContainerKeyScanner.class);
-
   @CommandLine.Spec
   private static CommandLine.Model.CommandSpec spec;
-
-  @CommandLine.ParentCommand
-  private RDBParser parent;
-
+  @CommandLine.Option(names = {"--om-db"},
+      paramLabel = "<OM DB path>",
+      required = true,
+      description = "Path to OM DB.")
+  private String dbPath;
   @CommandLine.Option(names = {"--container-ids"},
       split = " ",
       paramLabel = "<container ID>",
       required = true,
       description = "One or more container IDs separated by spaces.")
   private Set<Long> containerIds;
-
   private static Map<String, OmDirectoryInfo> directoryTable;
   private static boolean isDirTableLoaded = false;
 
@@ -94,7 +90,7 @@ public class ContainerKeyScanner implements Callable<Void>,
   public Void call() throws Exception {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set("ozone.om.db.dirs",
-        parent.getDbPath().substring(0, parent.getDbPath().lastIndexOf("/")));
+        dbPath.substring(0, dbPath.lastIndexOf("/")));
     OmMetadataManagerImpl omMetadataManager =
         new OmMetadataManagerImpl(ozoneConfiguration, null);
 
@@ -132,7 +128,7 @@ public class ContainerKeyScanner implements Callable<Void>,
 
   @Override
   public Class<?> getParentType() {
-    return RDBParser.class;
+    return OzoneDebug.class;
   }
 
   private static PrintWriter err() {
@@ -359,30 +355,6 @@ public class ContainerKeyScanner implements Callable<Void>,
     }
 
     return removeBeginningSlash(keyPath);
-  }
-
-
-  private ColumnFamilyHandle getColumnFamilyHandle(
-      byte[] name, List<ColumnFamilyHandle> columnFamilyHandles) {
-    return columnFamilyHandles
-        .stream()
-        .filter(
-            handle -> {
-              try {
-                return Arrays.equals(handle.getName(), name);
-              } catch (Exception ex) {
-                throw new RuntimeException(ex);
-              }
-            })
-        .findAny()
-        .orElse(null);
-  }
-
-  private String removeTrailingSlashIfNeeded(String dbPath) {
-    if (dbPath.endsWith(OzoneConsts.OZONE_URI_DELIMITER)) {
-      dbPath = dbPath.substring(0, dbPath.length() - 1);
-    }
-    return dbPath;
   }
 
   private void printOutput(ContainerKeyInfoResponse containerKeyInfoResponse) {
