@@ -881,11 +881,14 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
 
   itemRender = (_: any, type: string, originalElement: any) => {
     if (type === 'prev') {
-      return <>{this.state.prevClickable && this.state.pageDisplayCount && <Link to="/Om" onClick={this.fetchPreviousRecords}> {'<<'}
+      return <>{this.state.prevClickable && this.state.pageDisplayCount && <Link to="/Om" className='ant-pagination-item-link' onClick={this.fetchPreviousRecords}> {'<'}
       </Link>}</>;
     }
+    if (type === 'page') {
+      return <span>{this.state.pageDisplayCount}</span>
+    }
     if (type === 'next') {
-      return <> {this.state.nextClickable && <> {this.state.pageDisplayCount}&nbsp;&nbsp;<Link to="/Om" onClick={this.fetchNextRecords}> {'>>'} </Link></>}</>;
+      return <>{this.state.nextClickable && <> <Link to="/Om" className='ant-pagination-item-link next' onClick={this.fetchNextRecords}> {'>'} </Link></>}</>;
     }
     return originalElement;
   };
