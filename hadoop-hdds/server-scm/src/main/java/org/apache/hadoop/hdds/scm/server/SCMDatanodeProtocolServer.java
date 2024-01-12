@@ -158,10 +158,9 @@ public class SCMDatanodeProtocolServer implements
         conf, scm.getScmNodeDetails());
 
     protocolMessageMetrics = getProtocolMessageMetrics();
-
     final int handlerCount = conf.getInt(OZONE_SCM_DATANODE_HANDLER_COUNT_KEY,
-        conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,
-            OZONE_SCM_HANDLER_COUNT_DEFAULT));
+        OZONE_SCM_HANDLER_COUNT_KEY, OZONE_SCM_HANDLER_COUNT_DEFAULT,
+            LOG::info);
 
     RPC.setProtocolEngine(conf, getProtocolClass(), ProtobufRpcEngine.class);
 
