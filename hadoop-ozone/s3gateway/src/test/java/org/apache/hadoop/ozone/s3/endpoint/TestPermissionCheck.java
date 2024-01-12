@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -84,6 +85,7 @@ public class TestPermissionCheck {
     when(client.getConfiguration()).thenReturn(conf);
     headers = mock(HttpHeaders.class);
     clientProtocol = mock(ClientProtocol.class);
+    S3GatewayMetrics.create(conf);
     when(client.getProxy()).thenReturn(clientProtocol);
   }
 

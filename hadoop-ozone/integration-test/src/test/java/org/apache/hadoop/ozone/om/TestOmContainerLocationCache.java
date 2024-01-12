@@ -82,7 +82,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentMatcher;
-import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -104,9 +103,14 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -157,7 +161,7 @@ public class TestOmContainerLocationCache {
 
     mockScmBlockLocationProtocol = mock(ScmBlockLocationProtocol.class);
     mockScmContainerClient =
-        Mockito.mock(StorageContainerLocationProtocol.class);
+        mock(StorageContainerLocationProtocol.class);
 
     OmTestManagers omTestManagers = new OmTestManagers(conf,
         mockScmBlockLocationProtocol, mockScmContainerClient);
@@ -194,7 +198,7 @@ public class TestOmContainerLocationCache {
     when(manager.acquireClient(argThat(matchEmptyPipeline())))
         .thenCallRealMethod();
     when(manager.acquireClient(argThat(matchEmptyPipeline()),
-        Mockito.anyBoolean())).thenCallRealMethod();
+        anyBoolean())).thenCallRealMethod();
     when(manager.acquireClientForReadData(argThat(matchEmptyPipeline())))
         .thenCallRealMethod();
 
@@ -245,7 +249,7 @@ public class TestOmContainerLocationCache {
   @BeforeEach
   public void beforeEach() {
     CONTAINER_ID.getAndIncrement();
-    Mockito.reset(mockScmBlockLocationProtocol, mockScmContainerClient,
+    reset(mockScmBlockLocationProtocol, mockScmContainerClient,
         mockDn1Protocol, mockDn2Protocol);
     when(mockDn1Protocol.getPipeline()).thenReturn(createPipeline(DN1));
     when(mockDn2Protocol.getPipeline()).thenReturn(createPipeline(DN2));
@@ -618,11 +622,11 @@ public class TestOmContainerLocationCache {
         .setContainerBlockID(blockId)
         .build();
     when(mockScmBlockLocationProtocol
-        .allocateBlock(Mockito.anyLong(), Mockito.anyInt(),
+        .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class),
-            Mockito.anyString(),
+            anyString(),
             any(ExcludeList.class),
-            Mockito.anyString()))
+            anyString()))
         .thenReturn(Collections.singletonList(block));
   }
 

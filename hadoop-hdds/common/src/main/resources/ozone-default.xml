@@ -1876,6 +1876,14 @@
       will be used for http authentication.
     </description>
   </property>
+  <property>
+    <name>ozone.s3g.metrics.percentiles.intervals.seconds</name>
+    <value>60</value>
+    <tag>S3GATEWAY, PERFORMANCE</tag>
+    <description>Specifies the interval in seconds for the rollover of MutableQuantiles metrics.
+      Setting this interval equal to the metrics sampling time ensures more detailed metrics.
+    </description>
+  </property>
 
   <property>
     <name>ozone.om.save.metrics.interval</name>

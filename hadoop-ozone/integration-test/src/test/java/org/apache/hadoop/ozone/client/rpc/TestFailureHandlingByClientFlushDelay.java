@@ -61,9 +61,10 @@ import java.util.concurrent.TimeUnit;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests Exception handling by Ozone Client by set flush delay.
@@ -172,9 +173,8 @@ public class TestFailureHandlingByClientFlushDelay {
         .getFixedLengthString(keyString,  chunkSize);
 
     // get the name of a valid container
-    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream keyOutputStream =
-        (KeyOutputStream) key.getOutputStream();
+        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     List<BlockOutputStreamEntry> streamEntryList =
         keyOutputStream.getStreamEntries();
 
@@ -199,9 +199,9 @@ public class TestFailureHandlingByClientFlushDelay {
 
     key.write(data.getBytes(UTF_8));
     key.flush();
-    assertTrue(keyOutputStream.getExcludeList().getContainerIds().isEmpty());
-    assertTrue(keyOutputStream.getExcludeList().getDatanodes().isEmpty());
-    assertTrue(keyOutputStream.getExcludeList().getDatanodes().isEmpty());
+    assertThat(keyOutputStream.getExcludeList().getContainerIds()).isEmpty();
+    assertThat(keyOutputStream.getExcludeList().getDatanodes()).isEmpty();
+    assertThat(keyOutputStream.getExcludeList().getDatanodes()).isEmpty();
     key.write(data.getBytes(UTF_8));
     // The close will just write to the buffer
     key.close();

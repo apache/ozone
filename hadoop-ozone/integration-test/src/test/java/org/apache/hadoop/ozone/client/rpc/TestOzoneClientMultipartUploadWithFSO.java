@@ -83,6 +83,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_S
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -494,7 +495,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
       ozoneOutputStream.close();
       fail("testCommitPartAfterCompleteUpload failed");
     } catch (IOException ex) {
-      assertTrue(ex instanceof OMException);
+      assertInstanceOf(OMException.class, ex);
       assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR,
           ((OMException) ex).getResult());
     }
@@ -527,7 +528,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
       ozoneOutputStream.close();
       fail("testAbortUploadFailWithInProgressPartUpload failed");
     } catch (IOException ex) {
-      assertTrue(ex instanceof OMException);
+      assertInstanceOf(OMException.class, ex);
       assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR,
           ((OMException) ex).getResult());
     }
@@ -658,8 +659,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
       listPartNames.remove(partKeyName);
     }
 
-    assertTrue(listPartNames.isEmpty(),
-        "Wrong partKeyName format in DB!");
+    assertThat(listPartNames).withFailMessage("Wrong partKeyName format in DB!").isEmpty();
   }
 
   private String verifyPartNames(Map<Integer, String> partsMap, int index,

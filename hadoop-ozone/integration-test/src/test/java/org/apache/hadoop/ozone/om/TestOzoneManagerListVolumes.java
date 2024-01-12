@@ -46,8 +46,10 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -174,8 +176,7 @@ public class TestOzoneManagerListVolumes {
                                    String aclString) throws IOException {
     OzoneObj obj = OzoneObjInfo.Builder.newBuilder().setVolumeName(volumeName)
         .setResType(OzoneObj.ResourceType.VOLUME).setStoreType(OZONE).build();
-    Assertions.assertTrue(objectStore.setAcl(
-        obj, OzoneAcl.parseAcls(aclString)));
+    assertTrue(objectStore.setAcl(obj, OzoneAcl.parseAcls(aclString)));
   }
 
   /**
@@ -208,7 +209,7 @@ public class TestOzoneManagerListVolumes {
         String volumeName = vol.getName();
         accessibleVolumes.add(volumeName);
       }
-      Assertions.assertEquals(new HashSet<>(expectVol), accessibleVolumes);
+      assertEquals(new HashSet<>(expectVol), accessibleVolumes);
     } catch (RuntimeException ex) {
       if (expectListByUserSuccess) {
         throw ex;
@@ -234,11 +235,11 @@ public class TestOzoneManagerListVolumes {
         it.next();
         count++;
       }
-      Assertions.assertEquals(5, count);
+      assertEquals(5, count);
     } else {
       try {
         objectStore.listVolumes("volume");
-        Assertions.fail("listAllVolumes should fail for " + user.getUserName());
+        fail("listAllVolumes should fail for " + user.getUserName());
       } catch (RuntimeException ex) {
         // Current listAllVolumes throws RuntimeException
         if (ex.getCause() instanceof OMException) {

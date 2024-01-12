@@ -60,10 +60,10 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import org.apache.ratis.statemachine.impl.StatemachineImplTestUtil;
 import org.junit.jupiter.api.AfterAll;
@@ -176,9 +176,8 @@ public class TestValidateBCSIDOnRestart {
             .getContainer().getContainerSet()
             .getContainer(omKeyLocationInfo.getContainerID())
             .getContainerData();
-    assertTrue(containerData instanceof KeyValueContainerData);
     KeyValueContainerData keyValueContainerData =
-        (KeyValueContainerData) containerData;
+        assertInstanceOf(KeyValueContainerData.class, containerData);
     key.close();
 
     long containerID = omKeyLocationInfo.getContainerID();
@@ -203,12 +202,12 @@ public class TestValidateBCSIDOnRestart {
     stateMachine.buildMissingContainerSet(parentPath.toFile());
     // Since the snapshot threshold is set to 1, since there are
     // applyTransactions, we should see snapshots
-    assertTrue(parentPath.getParent().toFile().listFiles().length > 0);
+    assertThat(parentPath.getParent().toFile().listFiles().length).isGreaterThan(0);
 
     // make sure the missing containerSet is not empty
     HddsDispatcher dispatcher = (HddsDispatcher) ozoneContainer.getDispatcher();
-    assertFalse(dispatcher.getMissingContainerSet().isEmpty());
-    assertTrue(dispatcher.getMissingContainerSet().contains(containerID));
+    assertThat(dispatcher.getMissingContainerSet()).isNotEmpty();
+    assertThat(dispatcher.getMissingContainerSet()).contains(containerID);
     // write a new key
     key = objectStore.getVolume(volumeName).getBucket(bucketName)
         .createKey("ratis", 1024,
@@ -229,8 +228,7 @@ public class TestValidateBCSIDOnRestart {
         .getContainer().getContainerSet()
         .getContainer(omKeyLocationInfo.getContainerID())
         .getContainerData();
-    assertTrue(containerData instanceof KeyValueContainerData);
-    keyValueContainerData = (KeyValueContainerData) containerData;
+    keyValueContainerData = assertInstanceOf(KeyValueContainerData.class, containerData);
     try (DBHandle db = BlockUtils.getDB(keyValueContainerData, conf)) {
 
       // modify the bcsid for the container in the ROCKS DB thereby inducing
