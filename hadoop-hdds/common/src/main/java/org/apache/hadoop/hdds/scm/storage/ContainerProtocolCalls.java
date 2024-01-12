@@ -253,7 +253,7 @@ public final class ContainerProtocolCalls  {
    * @return putBlockResponse
    * @throws IOException if there is an error while performing the call
    */
-  static XceiverClientReply putBlockAsync(XceiverClientSpi xceiverClient,
+  public static XceiverClientReply putBlockAsync(XceiverClientSpi xceiverClient,
                                                  BlockData containerBlockData,
                                                  boolean eof,
                                                  String tokenString)
