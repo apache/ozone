@@ -247,8 +247,8 @@ public class BlockOutputStream extends OutputStream {
     return this.pipeline;
   }
 
-  Token<? extends TokenIdentifier> getToken() {
-    return this.token;
+  protected String getTokenString() {
+    return this.tokenString;
   }
 
   ExecutorService getResponseExecutor() {

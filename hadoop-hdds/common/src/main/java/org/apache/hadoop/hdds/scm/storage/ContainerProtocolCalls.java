@@ -248,52 +248,14 @@ public final class ContainerProtocolCalls  {
    *
    * @param xceiverClient client to perform call
    * @param containerBlockData block data to identify container
-   * @param token a token for this block (may be null)
-   * @return putBlockResponse
-   * @throws IOException if there is an I/O error while performing the call
-   */
-  public static ContainerProtos.PutBlockResponseProto putBlock(
-      XceiverClientSpi xceiverClient, BlockData containerBlockData,
-      Token<OzoneBlockTokenIdentifier> token)
-      throws IOException {
-    PutBlockRequestProto.Builder createBlockRequest =
-        PutBlockRequestProto.newBuilder().setBlockData(containerBlockData);
-    String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
-    ContainerCommandRequestProto.Builder builder =
-        ContainerCommandRequestProto.newBuilder().setCmdType(Type.PutBlock)
-            .setContainerID(containerBlockData.getBlockID().getContainerID())
-            .setDatanodeUuid(id)
-            .setPutBlock(createBlockRequest);
-    if (token != null) {
-      builder.setEncodedToken(token.encodeToUrlString());
-    }
-    ContainerCommandRequestProto request = builder.build();
-    ContainerCommandResponseProto response =
-        xceiverClient.sendCommand(request, getValidatorList());
-    return response.getPutBlock();
-  }
-
-  /**
-   * Calls the container protocol to put a container block.
-   *
-   * @param xceiverClient client to perform call
-   * @param containerBlockData block data to identify container
    * @param eof whether this is the last putBlock for the same block
-   * @param token a token for this block (may be null)
+   * @param tokenString a serialized token for this block (may be null)
    * @return putBlockResponse
    * @throws IOException if there is an error while performing the call
    */
-  public static XceiverClientReply putBlockAsync(XceiverClientSpi xceiverClient,
-      BlockData containerBlockData, boolean eof,
-      Token<? extends TokenIdentifier> token)
-      throws IOException, InterruptedException, ExecutionException {
-    final ContainerCommandRequestProto request = getPutBlockRequest(
-        xceiverClient.getPipeline(), containerBlockData, eof, token);
-    return xceiverClient.sendCommandAsync(request);
-  }
-
   static XceiverClientReply putBlockAsync(XceiverClientSpi xceiverClient,
-                                                 BlockData containerBlockData, boolean eof,
+                                                 BlockData containerBlockData,
+                                                 boolean eof,
                                                  String tokenString)
       throws IOException, InterruptedException, ExecutionException {
     final ContainerCommandRequestProto request = getPutBlockRequest(
@@ -316,25 +278,6 @@ public final class ContainerProtocolCalls  {
             .setPutBlock(createBlockRequest);
     if (tokenString != null) {
       builder.setEncodedToken(tokenString);
-    }
-    return builder.build();
-  }
-
-  public static ContainerCommandRequestProto getPutBlockRequest(
-      Pipeline pipeline, BlockData containerBlockData, boolean eof,
-      Token<? extends TokenIdentifier> token) throws IOException {
-    PutBlockRequestProto.Builder createBlockRequest =
-        PutBlockRequestProto.newBuilder()
-            .setBlockData(containerBlockData)
-            .setEof(eof);
-    final String id = pipeline.getFirstNode().getUuidString();
-    ContainerCommandRequestProto.Builder builder =
-        ContainerCommandRequestProto.newBuilder().setCmdType(Type.PutBlock)
-            .setContainerID(containerBlockData.getBlockID().getContainerID())
-            .setDatanodeUuid(id)
-            .setPutBlock(createBlockRequest);
-    if (token != null) {
-      builder.setEncodedToken(token.encodeToUrlString());
     }
     return builder.build();
   }
