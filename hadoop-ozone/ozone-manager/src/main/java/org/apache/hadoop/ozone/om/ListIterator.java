@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
-import javax.annotation.Nullable;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -119,7 +118,7 @@ public class ListIterator {
         ? extends Table.KeyValue<String, Value>> tableIterator;
 
     private final Table<String, Value> table;
-    private HeapEntry currentKey;
+    private HeapEntry currentEntry;
     private Predicate<String> doesKeyExistInCache;
 
     DbTableIter(int entryIteratorId, Table<String, Value> table,
@@ -128,7 +127,7 @@ public class ListIterator {
       this.entryIteratorId = entryIteratorId;
       this.table = table;
       this.tableIterator = table.iterator(prefixKey);
-      this.currentKey = null;
+      this.currentEntry = null;
       this.doesKeyExistInCache = doesKeyExistInCache;
 
       // only seek for the start key if the start key is lexicographically
@@ -146,11 +145,11 @@ public class ListIterator {
     }
 
     private void getNextKey() throws IOException {
-      while (tableIterator.hasNext() && currentKey == null) {
+      while (tableIterator.hasNext() && currentEntry == null) {
         Table.KeyValue<String, Value> entry = tableIterator.next();
         String entryKey = entry.getKey();
         if (!doesKeyExistInCache.test(entryKey)) {
-          currentKey = new HeapEntry(entryIteratorId,
+          currentEntry = new HeapEntry(entryIteratorId,
               table.getName(), entryKey, entry.getValue());
         }
       }
@@ -162,13 +161,13 @@ public class ListIterator {
       } catch (IOException t) {
         throw new UncheckedIOException(t);
       }
-      return currentKey != null;
+      return currentEntry != null;
     }
 
     public HeapEntry next() {
       if (hasNext()) {
-        HeapEntry ret = currentKey;
-        currentKey = null;
+        HeapEntry ret = currentEntry;
+        currentEntry = null;
         return ret;
       }
       throw new NoSuchElementException();
@@ -191,7 +190,7 @@ public class ListIterator {
     private final String prefixKey;
     private final String startKey;
     private final String tableName;
-    private HeapEntry currentKey;
+    private HeapEntry currentEntry;
     private final int entryIteratorId;
 
     CacheIter(int entryIteratorId, String tableName,
@@ -199,7 +198,7 @@ public class ListIterator {
                   CacheValue<Value>>> cacheIter, String startKey,
               String prefixKey) {
       this.cacheKeyMap = new TreeMap<>();
-      this.currentKey = null;
+      this.currentEntry = null;
       this.startKey = startKey;
       this.prefixKey = prefixKey;
       this.tableName = tableName;
@@ -246,30 +245,29 @@ public class ListIterator {
     }
 
     private void getNextKey() throws IOException {
-      while (cacheCreatedKeyIter.hasNext() && currentKey == null) {
+      while (cacheCreatedKeyIter.hasNext() && currentEntry == null) {
         Map.Entry<String, Value> entry = cacheCreatedKeyIter.next();
         if (null == entry.getValue()) {
           continue;
         }
-        currentKey = new HeapEntry(this.entryIteratorId, this.tableName,
+        currentEntry = new HeapEntry(this.entryIteratorId, this.tableName,
             entry.getKey(), entry.getValue());
       }
     }
 
     public boolean hasNext() {
-      //return cacheCreatedKeyIter.hasNext();
       try {
         getNextKey();
       } catch (IOException t) {
         throw new UncheckedIOException(t);
       }
-      return currentKey != null;
+      return currentEntry != null;
     }
 
     public HeapEntry next() {
       if (hasNext()) {
-        HeapEntry ret = currentKey;
-        currentKey = null;
+        HeapEntry ret = currentEntry;
+        currentEntry = null;
         return ret;
       }
       throw new NoSuchElementException();
@@ -323,8 +321,7 @@ public class ListIterator {
         for (Table table : tables) {
           CacheIter cacheIter = new CacheIter<>(iteratorId, table.getName(),
               table.cacheIterator(), startKey, prefixKey);
-          Predicate<String> doesKeyExistInCache =
-              cacheIter::doesKeyExistInCache;
+          Predicate<String> doesKeyExistInCache = cacheIter::doesKeyExistInCache;
           iterators.add(cacheIter);
           iteratorId++;
           iterators.add(new DbTableIter<>(iteratorId, table, prefixKey,
@@ -353,9 +350,7 @@ public class ListIterator {
       return !minHeap.isEmpty();
     }
 
-    // HeapEntry can be null when a key is marked as deleted because
-    // value of key would be returned as null from cache iterator.
-    public @Nullable HeapEntry next() {
+    public HeapEntry next() {
       HeapEntry heapEntry = minHeap.remove();
       // remove the least element and
       // reinsert the next element from the same iterator
