@@ -138,7 +138,7 @@ public class ConfigFileGenerator extends AbstractProcessor {
                 "@%s(key = \"%s\") should not duplicate prefix from @%s(\"%s\")",
                 Config.class.getSimpleName(), configAnnotation.key(),
                 ConfigGroup.class.getSimpleName(), configGroup.prefix());
-            processingEnv.getMessager().printMessage(Kind.ERROR, msg, typeElement);
+            processingEnv.getMessager().printMessage(Kind.ERROR, msg, element);
             continue;
           }
 
