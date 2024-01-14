@@ -26,6 +26,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
@@ -34,8 +35,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_HANDLER_COUNT_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -47,6 +57,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
  * Test class for OzoneConfiguration.
  */
 public class TestOzoneConfiguration {
+
+  private static final Logger LOG = LoggerFactory.getLogger(
+      TestOzoneConfiguration.class);
 
   private OzoneConfiguration conf;
 
@@ -248,6 +261,30 @@ public class TestOzoneConfiguration {
     assertEquals(0, subject.getInt("test.scm.client.port", 123));
     assertEquals(0, subject.getTimeDuration("test.scm.client.wait", 555, TimeUnit.SECONDS));
     assertEquals(0, subject.getDouble("test.scm.client.threshold", 20.5));
+  }
+
+  private static Stream<Arguments> getIntBackwardCompatibilityScenarios() {
+    return Stream.of(
+        Arguments.of(OZONE_SCM_CLIENT_HANDLER_COUNT_KEY, 10, true,
+            OZONE_SCM_HANDLER_COUNT_KEY, 10, OZONE_SCM_HANDLER_COUNT_DEFAULT),
+        Arguments.of(OZONE_SCM_BLOCK_HANDLER_COUNT_KEY, -1, false,
+            OZONE_SCM_HANDLER_COUNT_KEY, OZONE_SCM_HANDLER_COUNT_DEFAULT,
+                OZONE_SCM_HANDLER_COUNT_DEFAULT),
+        Arguments.of(OZONE_SCM_DATANODE_HANDLER_COUNT_KEY, 105, true,
+            OZONE_SCM_HANDLER_COUNT_KEY, 105, OZONE_SCM_HANDLER_COUNT_DEFAULT)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("getIntBackwardCompatibilityScenarios")
+  public void testGetIntBackwardCompatibility(String name, int newVal,
+      boolean isGen, String fallbackName, int targetVal, int defaultVal) {
+    OzoneConfiguration ozoneConfig = new OzoneConfiguration();
+    if (isGen) {
+      ozoneConfig.setInt(name, newVal);
+    }
+    int value = ozoneConfig.getInt(name, fallbackName, defaultVal, LOG::info);
+    assertEquals(value, targetVal);
   }
 
   @Test

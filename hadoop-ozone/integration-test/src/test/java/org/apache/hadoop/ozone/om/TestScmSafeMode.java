@@ -44,7 +44,6 @@ import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionExcepti
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Unhealthy;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -159,7 +158,7 @@ public class TestScmSafeMode {
     StorageContainerManager scm;
 
     scm = cluster.getStorageContainerManager();
-    Assertions.assertTrue(scm.isInSafeMode());
+    assertTrue(scm.isInSafeMode());
 
     om = cluster.getOzoneManager();
 
@@ -182,20 +181,20 @@ public class TestScmSafeMode {
   @Test
   public void testIsScmInSafeModeAndForceExit() throws Exception {
     // Test 1: SCM should be out of safe mode.
-    Assertions.assertFalse(storageContainerLocationClient.inSafeMode());
+    assertFalse(storageContainerLocationClient.inSafeMode());
     cluster.stop();
     // Restart the cluster with same metadata dir.
 
     try {
       cluster = builder.build();
     } catch (IOException e) {
-      Assertions.fail("Cluster startup failed.");
+      fail("Cluster startup failed.");
     }
 
     // Test 2: Scm should be in safe mode as datanodes are not started yet.
     storageContainerLocationClient = cluster
         .getStorageContainerLocationClient();
-    Assertions.assertTrue(storageContainerLocationClient.inSafeMode());
+    assertTrue(storageContainerLocationClient.inSafeMode());
     // Force scm out of safe mode.
     cluster.getStorageContainerManager().getClientProtocolServer()
         .forceExitSafeMode();
@@ -205,7 +204,7 @@ public class TestScmSafeMode {
         return !cluster.getStorageContainerManager().getClientProtocolServer()
             .inSafeMode();
       } catch (IOException e) {
-        Assertions.fail("Cluster");
+        fail("Cluster");
         return false;
       }
     }, 10, 1000 * 5);
@@ -220,7 +219,7 @@ public class TestScmSafeMode {
     try {
       cluster = builder.build();
     } catch (IOException e) {
-      Assertions.fail("Cluster startup failed.");
+      fail("Cluster startup failed.");
     }
     assertTrue(cluster.getStorageContainerManager().isInSafeMode());
     cluster.startHddsDatanodes();

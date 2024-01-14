@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.ozone.scm;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -26,7 +28,6 @@ import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolCli
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -68,14 +69,14 @@ public class TestAllocateContainer {
             SCMTestUtils.getReplicationType(conf),
             SCMTestUtils.getReplicationFactor(conf),
             OzoneConsts.OZONE);
-    Assertions.assertNotNull(container);
-    Assertions.assertNotNull(container.getPipeline().getFirstNode());
+    assertNotNull(container);
+    assertNotNull(container.getPipeline().getFirstNode());
 
   }
 
   @Test
   public void testAllocateNull() {
-    Assertions.assertThrows(NullPointerException.class, () ->
+    assertThrows(NullPointerException.class, () ->
         storageContainerLocationClient.allocateContainer(
             SCMTestUtils.getReplicationType(conf),
             SCMTestUtils.getReplicationFactor(conf), null));

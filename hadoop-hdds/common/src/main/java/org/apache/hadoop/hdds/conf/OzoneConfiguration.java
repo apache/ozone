@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
@@ -334,5 +335,28 @@ public class OzoneConfiguration extends Configuration
         new DeprecationDelta("hdds.datanode.replication.work.dir",
             OZONE_CONTAINER_COPY_WORKDIR)
     });
+  }
+
+  /**
+   * Gets backwards-compatible configuration property values.
+   * @param name Primary configuration attribute key name.
+   * @param fallbackName The key name of the configuration property that needs
+   *                     to be backward compatible.
+   * @param defaultValue The default value to be returned.
+   */
+  public int getInt(String name, String fallbackName, int defaultValue,
+      Consumer<String> log) {
+    String value = this.getTrimmed(name);
+    if (value == null) {
+      value = this.getTrimmed(fallbackName);
+      if (log != null) {
+        log.accept(name + " is not set.  Fallback to " + fallbackName +
+            ", which is set to " + value);
+      }
+    }
+    if (value == null) {
+      return defaultValue;
+    }
+    return Integer.parseInt(value);
   }
 }

@@ -27,7 +27,12 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
 
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_NAME;
 
@@ -59,4 +64,24 @@ public final class UpgradeUtils {
   public static File getContainerDBPath(HddsVolume volume) {
     return new File(volume.getDbParentDir(), CONTAINER_DB_NAME);
   }
+
+  public static File getVolumeUpgradeCompleteFile(HddsVolume volume) {
+    return new File(volume.getHddsRootDir(),
+        UpgradeTask.UPGRADE_COMPLETE_FILE_NAME);
+  }
+
+  public static File getVolumeUpgradeLockFile(HddsVolume volume) {
+    return new File(volume.getHddsRootDir(),
+        UpgradeTask.UPGRADE_LOCK_FILE_NAME);
+  }
+
+  public static boolean createFile(File file) throws IOException {
+    final Date date = new Date();
+    try (Writer writer = new OutputStreamWriter(new FileOutputStream(file),
+        StandardCharsets.UTF_8)) {
+      writer.write(date.toString());
+    }
+    return file.exists();
+  }
+
 }

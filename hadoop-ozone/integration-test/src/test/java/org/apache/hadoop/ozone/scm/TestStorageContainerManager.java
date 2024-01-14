@@ -105,7 +105,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.mockito.ArgumentMatcher;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -150,9 +149,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Matchers.argThat;
 import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
 /**
@@ -215,7 +217,7 @@ public class TestStorageContainerManager {
 
   private void testRpcPermission(MiniOzoneCluster cluster,
       String fakeRemoteUsername, boolean expectPermissionDenied) {
-    SCMClientProtocolServer mockClientServer = Mockito.spy(
+    SCMClientProtocolServer mockClientServer = spy(
         cluster.getStorageContainerManager().getClientProtocolServer());
 
     mockRemoteUser(UserGroupInformation.createRemoteUser(fakeRemoteUsername));
@@ -943,8 +945,8 @@ public class TestStorageContainerManager {
     ContainerReportFromDatanode dndata
         = new ContainerReportFromDatanode(dn, report);
     ContainerReportHandler containerReportHandler =
-        Mockito.mock(ContainerReportHandler.class);
-    Mockito.doAnswer((inv) -> {
+        mock(ContainerReportHandler.class);
+    doAnswer((inv) -> {
       Thread.currentThread().sleep(500);
       return null;
     }).when(containerReportHandler).onMessage(dndata, eventQueue);
@@ -985,13 +987,12 @@ public class TestStorageContainerManager {
     Semaphore semaphore = new Semaphore(2);
     semaphore.acquire(2);
     ContainerReportHandler containerReportHandler =
-        Mockito.mock(ContainerReportHandler.class);
-    Mockito.doAnswer((inv) -> {
+        mock(ContainerReportHandler.class);
+    doAnswer((inv) -> {
       Thread.currentThread().sleep(1000);
       semaphore.release(1);
       return null;
-    }).when(containerReportHandler).onMessage(Mockito.any(),
-        Mockito.eq(eventQueue));
+    }).when(containerReportHandler).onMessage(any(), eq(eventQueue));
     List<ThreadPoolExecutor> executors = FixedThreadPoolWithAffinityExecutor
         .initializeExecutorPool(queues);
     Map<String, FixedThreadPoolWithAffinityExecutor> reportExecutorMap
@@ -1045,7 +1046,7 @@ public class TestStorageContainerManager {
         = new IncrementalContainerReportFromDatanode(dn, report);
     IncrementalContainerReportHandler icr =
         mock(IncrementalContainerReportHandler.class);
-    Mockito.doAnswer((inv) -> {
+    doAnswer((inv) -> {
       Thread.currentThread().sleep(500);
       return null;
     }).when(icr).onMessage(dndata, eventQueue);

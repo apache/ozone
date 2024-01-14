@@ -37,7 +37,7 @@ import static org.apache.ratis.server.metrics.SegmentedRaftLogMetrics.RAFT_LOG_S
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Test RatisDropwizardRexporter.
+ * Test {@link RatisDropwizardExports}.
  */
 public class TestRatisDropwizardExports {
   static Timer findTimer(String name, MetricRegistry registry) {

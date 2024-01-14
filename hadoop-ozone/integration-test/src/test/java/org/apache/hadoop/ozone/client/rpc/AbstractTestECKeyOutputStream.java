@@ -61,10 +61,10 @@ import java.util.concurrent.TimeoutException;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -158,7 +158,7 @@ abstract class AbstractTestECKeyOutputStream {
         .createKey(keyString, new ECReplicationConfig(3, 2,
                 ECReplicationConfig.EcCodec.RS, chunkSize), inputSize,
             objectStore, volumeName, bucketName)) {
-      assertTrue(key.getOutputStream() instanceof ECKeyOutputStream);
+      assertInstanceOf(ECKeyOutputStream.class, key.getOutputStream());
     }
   }
 
@@ -167,7 +167,7 @@ abstract class AbstractTestECKeyOutputStream {
     OzoneVolume volume = objectStore.getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     try (OzoneOutputStream out = bucket.createKey("myKey", inputSize)) {
-      assertTrue(out.getOutputStream() instanceof KeyOutputStream);
+      assertInstanceOf(KeyOutputStream.class, out.getOutputStream());
       for (byte[] inputChunk : inputChunks) {
         out.write(inputChunk);
       }
@@ -188,7 +188,7 @@ abstract class AbstractTestECKeyOutputStream {
     OzoneBucket bucket = volume.getBucket(myBucket);
 
     try (OzoneOutputStream out = bucket.createKey(keyString, inputSize)) {
-      assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
+      assertInstanceOf(ECKeyOutputStream.class, out.getOutputStream());
       for (byte[] inputChunk : inputChunks) {
         out.write(inputChunk);
       }
@@ -259,7 +259,7 @@ abstract class AbstractTestECKeyOutputStream {
         "testCreateRatisKeyAndWithECBucketDefaults", 2000,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
         new HashMap<>())) {
-      assertTrue(out.getOutputStream() instanceof KeyOutputStream);
+      assertInstanceOf(KeyOutputStream.class, out.getOutputStream());
       for (byte[] inputChunk : inputChunks) {
         out.write(inputChunk);
       }
@@ -427,8 +427,8 @@ abstract class AbstractTestECKeyOutputStream {
 
         // Check the second blockGroup pipeline to make sure that the failed
         // node is not selected.
-        assertFalse(ecOut.getStreamEntries()
-            .get(1).getPipeline().getNodes().contains(nodeToKill));
+        assertThat(ecOut.getStreamEntries().get(1).getPipeline().getNodes())
+            .doesNotContain(nodeToKill);
       }
 
       try (OzoneInputStream is = bucket.readKey(keyName)) {
