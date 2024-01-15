@@ -88,10 +88,14 @@ class TestOzoneManagerDoubleBuffer {
   private final OMResponse omBucketResponse = mock(OMResponse.class);
   private final OMResponse omSnapshotResponse1 = mock(OMResponse.class);
   private final OMResponse omSnapshotResponse2 = mock(OMResponse.class);
-  private static final OMClientResponse omKeyCreateResponse = mock(OMKeyCreateResponse.class);
-  private static final OMClientResponse omBucketCreateResponse = mock(OMBucketCreateResponse.class);
-  private static final OMClientResponse omSnapshotCreateResponse1 = mock(OMSnapshotCreateResponse.class);
-  private static final OMClientResponse omSnapshotCreateResponse2 = mock(OMSnapshotCreateResponse.class);
+  private static OMClientResponse omKeyCreateResponse =
+      mock(OMKeyCreateResponse.class);
+  private static OMClientResponse omBucketCreateResponse =
+      mock(OMBucketCreateResponse.class);
+  private static OMClientResponse omSnapshotCreateResponse1 =
+      mock(OMSnapshotCreateResponse.class);
+  private static OMClientResponse omSnapshotCreateResponse2 =
+      mock(OMSnapshotCreateResponse.class);
   @TempDir
   private File tempDir;
   private OzoneManagerDoubleBuffer.FlushNotifier flushNotifier;
