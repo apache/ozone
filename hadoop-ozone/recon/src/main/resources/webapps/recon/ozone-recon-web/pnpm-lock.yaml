@@ -24,7 +24,7 @@ specifiers:
   customize-cra: ^0.2.14
   eslint: ^6.6.0
   eslint-config-xo: ^0.29.1
-  eslint-config-xo-react: ^0.23.0
+  eslint-config-xo-react: ^0.27.0
   eslint-config-xo-typescript: ^0.28.0
   eslint-plugin-import: ^2.20.2
   eslint-plugin-react: ^7.19.0
@@ -89,7 +89,7 @@ devDependencies:
   '@typescript-eslint/parser': 2.34.0_gwfevwdfvao4wdn2y246xkx3di
   eslint: 6.8.0
   eslint-config-xo: 0.29.1_eslint@6.8.0
-  eslint-config-xo-react: 0.23.0_b53wkfdkpwhrytkwoaulourpvy
+  eslint-config-xo-react: 0.27.0_b53wkfdkpwhrytkwoaulourpvy
   eslint-config-xo-typescript: 0.28.0_wp2ytyahinzayi5i5jc7flp7nm
   eslint-plugin-import: 2.28.1_tbglwmj7t2rhd43mvxmptakoay
   eslint-plugin-react: 7.33.2_eslint@6.8.0
@@ -4224,6 +4224,7 @@ packages:
 
   /bindings/1.5.0:
     resolution: {integrity: sha512-p2q/t/mhvuOj/UeLlV6566GD/guowlr0hHxClI0W9m7MWYkL1F0hLo+0Aexs9HSPCtR1SXQ0TD3MMKrXZajbiQ==}
+    requiresBuild: true
     dependencies:
       file-uri-to-path: 1.0.0
     dev: false
@@ -6646,13 +6647,13 @@ packages:
       typescript: 3.5.3
     dev: false
 
-  /eslint-config-xo-react/0.23.0_b53wkfdkpwhrytkwoaulourpvy:
-    resolution: {integrity: sha512-yBNoMF6COjJLRijlWksC1Jws6CGWHMgTfR/PAReCdZUo5cg/ZsyNeZx/fntyU4SbARwW2RvuezMeKle+jI5yoA==}
-    engines: {node: '>=10'}
+  /eslint-config-xo-react/0.27.0_b53wkfdkpwhrytkwoaulourpvy:
+    resolution: {integrity: sha512-wiV215xQIn71XZyyVfaOXHaFpR1B14IJttwOjMi/eqUK1s+ojJdHr7eHqTLaGUfh6FKgWha1QNwePlIXx7mBUg==}
+    engines: {node: '>=12'}
     peerDependencies:
-      eslint: '>=6'
-      eslint-plugin-react: '>=7.18.3'
-      eslint-plugin-react-hooks: '>=2.3.0'
+      eslint: '>=8.6.0'
+      eslint-plugin-react: '>=7.29.0'
+      eslint-plugin-react-hooks: '>=4.3.0'
     dependencies:
       eslint: 6.8.0
       eslint-plugin-react: 7.33.2_eslint@6.8.0
@@ -7592,6 +7593,7 @@ packages:
 
   /file-uri-to-path/1.0.0:
     resolution: {integrity: sha512-0Zt+s3L7Vf1biwWZ29aARiVYLx7iMGnEUl9x33fbB/j3jR81u/O2LbqK+Bm1CDSNDKVtJ/YjwY7TUd5SkeLQLw==}
+    requiresBuild: true
     dev: false
     optional: true
 
@@ -11433,6 +11435,7 @@ packages:
 
   /nan/2.17.0:
     resolution: {integrity: sha512-2ZTgtl0nJsO0KQCjEpxcIr5D+Yv90plTitZt9JBfQvVJDS5seMl3FOvsh3+9CoYWXf/1l5OaZzzF6nDm4cagaQ==}
+    requiresBuild: true
     dev: false
     optional: true
 
