@@ -1326,6 +1326,40 @@ public final class OMRequestTestUtils {
   }
 
   /**
+   * Create OMRequest for Rename Snapshot.
+   * @param volumeName vol to be used
+   * @param bucketName bucket to be used
+   * @param fromSnapshotName name of the snapshot to be renamed
+   * @param toSnapshotName new name to be used for the snapshot
+   */
+  public static OMRequest renameSnapshotRequest(String volumeName,
+                                                String bucketName,
+                                                String fromSnapshotName,
+                                                String toSnapshotName) {
+    OzoneManagerProtocolProtos.RenameSnapshotRequest renameSnapshotRequest =
+        OzoneManagerProtocolProtos.RenameSnapshotRequest.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setFromSnapshotName(fromSnapshotName)
+            .setToSnapshotName(toSnapshotName)
+            .build();
+
+    OzoneManagerProtocolProtos.UserInfo userInfo =
+        OzoneManagerProtocolProtos.UserInfo.newBuilder()
+            .setUserName("user")
+            .setHostName("host")
+            .setRemoteAddress("remote-address")
+            .build();
+
+    return OMRequest.newBuilder()
+        .setRenameSnapshotRequest(renameSnapshotRequest)
+        .setCmdType(Type.RenameSnapshot)
+        .setClientId(UUID.randomUUID().toString())
+        .setUserInfo(userInfo)
+        .build();
+  }
+
+  /**
    * Create OMRequest for Delete Snapshot.
    * @param volumeName vol to be used
    * @param bucketName bucket to be used

@@ -1,0 +1,231 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.ozone.om.request.snapshot;
+
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
+
+import java.io.IOException;
+import java.nio.file.InvalidPathException;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotRenameResponse;
+import org.apache.hadoop.ozone.om.snapshot.RequireSnapshotFeatureState;
+import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameSnapshotRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
+import org.apache.ratis.server.protocol.TermIndex;
+
+/**
+ * Changes snapshot name.
+ */
+public class OMSnapshotRenameRequest extends OMClientRequest {
+
+  public OMSnapshotRenameRequest(OMRequest omRequest) {
+    super(omRequest);
+  }
+
+  @Override
+  @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
+  @RequireSnapshotFeatureState(true)
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    final OMRequest omRequest = super.preExecute(ozoneManager);
+
+    final RenameSnapshotRequest renameSnapshotRequest =
+        omRequest.getRenameSnapshotRequest();
+
+    final String newSnapshotName = renameSnapshotRequest.getToSnapshotName();
+
+    OmUtils.validateSnapshotName(newSnapshotName);
+
+    String volumeName = renameSnapshotRequest.getVolumeName();
+    String bucketName = renameSnapshotRequest.getBucketName();
+
+    // Permission check
+    UserGroupInformation ugi = createUGIForApi();
+    String bucketOwner = ozoneManager.getBucketOwner(volumeName, bucketName,
+                                                     IAccessAuthorizer.ACLType.READ, OzoneObj.ResourceType.BUCKET);
+    if (!ozoneManager.isAdmin(ugi) &&
+        !ozoneManager.isOwner(ugi, bucketOwner)) {
+      throw new OMException(
+          "Only bucket owners and Ozone admins can rename snapshots",
+          OMException.ResultCodes.PERMISSION_DENIED);
+    }
+
+    // Set rename time here so OM leader and follower would have the
+    // exact same timestamp.
+    OMRequest.Builder omRequestBuilder = omRequest.toBuilder()
+        .setRenameSnapshotRequest(
+            RenameSnapshotRequest.newBuilder()
+                .setVolumeName(volumeName)
+                .setBucketName(bucketName)
+                .setToSnapshotName(newSnapshotName)
+                .setFromSnapshotName(renameSnapshotRequest.getFromSnapshotName())
+                .setRenameTime(Time.now()));
+
+    return omRequestBuilder.build();
+  }
+
+
+  @Override
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
+                                                 TermIndex termIndex) {
+    boolean acquiredBucketLock = false;
+    boolean acquiredSnapshotOldLock = false;
+    boolean acquiredSnapshotNewLock = false;
+    Exception exception = null;
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+
+    OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
+        getOmRequest());
+    OMClientResponse omClientResponse = null;
+    AuditLogger auditLogger = ozoneManager.getAuditLogger();
+
+    UserInfo userInfo = getOmRequest().getUserInfo();
+
+    final RenameSnapshotRequest request =
+        getOmRequest().getRenameSnapshotRequest();
+
+    final String volumeName = request.getVolumeName();
+    final String bucketName = request.getBucketName();
+    final String newSnapshotName = request.getToSnapshotName();
+    final String oldSnapshotName = request.getFromSnapshotName();
+
+    SnapshotInfo fromSnapshotInfo = null;
+    SnapshotInfo toSnapshotInfo = null;
+
+    try {
+      // Acquire bucket lock
+      mergeOmLockDetails(
+          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
+                                                       volumeName, bucketName));
+      acquiredBucketLock = getOmLockDetails().isLockAcquired();
+
+      mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(SNAPSHOT_LOCK,
+                                                       volumeName, bucketName, oldSnapshotName));
+      acquiredSnapshotOldLock = getOmLockDetails().isLockAcquired();
+
+      mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(SNAPSHOT_LOCK,
+                                                       volumeName, bucketName, newSnapshotName));
+      acquiredSnapshotNewLock = getOmLockDetails().isLockAcquired();
+
+      // Retrieve SnapshotInfo from the table
+      String toTableKey = SnapshotInfo.getTableKey(volumeName, bucketName,
+                                                    newSnapshotName);
+      toSnapshotInfo =
+          omMetadataManager.getSnapshotInfoTable().get(toTableKey);
+
+      if (toSnapshotInfo != null) {
+        // Snapshot does not exist
+        throw new OMException("Snapshot with name " + newSnapshotName + "already exist",
+            FILE_ALREADY_EXISTS);
+      }
+
+      // Retrieve SnapshotInfo from the table
+      String fromTableKey = SnapshotInfo.getTableKey(volumeName, bucketName,
+                                                 oldSnapshotName);
+      fromSnapshotInfo =
+          omMetadataManager.getSnapshotInfoTable().get(fromTableKey);
+
+      if (fromSnapshotInfo == null) {
+        // Snapshot does not exist
+        throw new OMException("Snapshot with name " + oldSnapshotName + "does not exist",
+            FILE_NOT_FOUND);
+      }
+
+      switch (fromSnapshotInfo.getSnapshotStatus()) {
+      case SNAPSHOT_DELETED:
+        throw new OMException("Snapshot is already deleted. "
+            + "Pending reclamation.", FILE_NOT_FOUND);
+      case SNAPSHOT_ACTIVE:
+        break;
+      default:
+          // Unknown snapshot non-active state
+        throw new OMException("Snapshot exists but no longer in active state",
+            FILE_NOT_FOUND);
+      }
+
+      fromSnapshotInfo.setName(newSnapshotName);
+
+      omMetadataManager.getSnapshotInfoTable().addCacheEntry(
+          new CacheKey<>(fromTableKey),
+          CacheValue.get(termIndex.getIndex()));
+
+      omMetadataManager.getSnapshotInfoTable().addCacheEntry(
+          new CacheKey<>(toTableKey),
+          CacheValue.get(termIndex.getIndex(), fromSnapshotInfo));
+
+      omResponse.setRenameSnapshotResponse(
+          OzoneManagerProtocolProtos.RenameSnapshotResponse.newBuilder()
+              .setSnapshotInfo(fromSnapshotInfo.getProtobuf()));
+      omClientResponse = new OMSnapshotRenameResponse(
+          omResponse.build(), fromTableKey, toTableKey, fromSnapshotInfo);
+    } catch (IOException | InvalidPathException ex) {
+      exception = ex;
+      omClientResponse = new OMSnapshotRenameResponse(
+          createErrorOMResponse(omResponse, exception));
+    } finally {
+      if (acquiredSnapshotNewLock) {
+        mergeOmLockDetails(omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_LOCK, volumeName,
+                                                     bucketName, newSnapshotName));
+      }
+      if (acquiredSnapshotOldLock) {
+        mergeOmLockDetails(omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_LOCK, volumeName,
+                                                     bucketName, oldSnapshotName));
+      }
+      if (acquiredBucketLock) {
+        mergeOmLockDetails(omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
+                                                     bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
+      }
+    }
+
+    if (fromSnapshotInfo == null) {
+      // Dummy SnapshotInfo for logging and audit logging when erred
+      fromSnapshotInfo = SnapshotInfo.newInstance(volumeName, bucketName,
+                                              oldSnapshotName, null, Time.now());
+    }
+
+    // Perform audit logging outside the lock
+    auditLog(auditLogger, buildAuditMessage(OMAction.RENAME_SNAPSHOT,
+                                            fromSnapshotInfo.toAuditMap(), exception, userInfo));
+    return omClientResponse;
+  }
+}

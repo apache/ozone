@@ -146,6 +146,7 @@ enum Type {
   SetSnapshotProperty = 128;
   ListStatusLight = 129;
   GetSnapshotInfo = 130;
+  RenameSnapshot = 131;
 }
 
 enum SafeMode {
@@ -281,6 +282,7 @@ message OMRequest {
   optional MultipartUploadsExpiredAbortRequest multipartUploadsExpiredAbortRequest = 126;
   optional SetSnapshotPropertyRequest       SetSnapshotPropertyRequest     = 127;
   optional SnapshotInfoRequest              SnapshotInfoRequest            = 128;
+  optional RenameSnapshotRequest            RenameSnapshotRequest          = 129;
 }
 
 message OMResponse {
@@ -403,6 +405,7 @@ message OMResponse {
   optional ListStatusLightResponse           listStatusLightResponse       = 129;
   optional SnapshotInfoResponse              SnapshotInfoResponse          = 130;
   optional OMLockDetailsProto                omLockDetails                 = 131;
+  optional RenameSnapshotResponse            RenameSnapshotResponse        = 132;
 }
 
 enum Status {
@@ -1826,6 +1829,14 @@ message CreateSnapshotRequest {
   optional uint64 creationTime = 5;
 }
 
+message RenameSnapshotRequest {
+  optional string volumeName = 1;
+  optional string bucketName = 2;
+  optional string fromSnapshotName = 3;
+  optional string toSnapshotName = 4;
+  optional uint64 renameTime = 5;
+}
+
 message ListSnapshotRequest {
   optional string volumeName = 1;
   optional string bucketName = 2;
@@ -1977,6 +1988,10 @@ message ListSnapshotDiffJobResponse {
 
 message DeleteSnapshotResponse {
 
+}
+
+message RenameSnapshotResponse {
+  optional SnapshotInfo snapshotInfo = 1;
 }
 
 message SnapshotInfoResponse {
