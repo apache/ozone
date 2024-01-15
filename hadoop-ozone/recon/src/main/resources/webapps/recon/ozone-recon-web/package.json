@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@ant-design/icons": "^5.2.5",
+    "@ant-design/icons": "^5.2.6",
     "@babel/core": "^7.22.10",
     "@fontsource/roboto": "^4.5.8",
     "@types/classnames": "^2.3.1",
