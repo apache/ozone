@@ -1620,7 +1620,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
             <dependency>
               <groupId>org.apache.maven.doxia</groupId>
               <artifactId>doxia-site-renderer</artifactId>
-              <version>1.6</version>
+              <version>1.11.1</version>
             </dependency>
           </dependencies>
           <configuration>
