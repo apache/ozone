@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,6 +49,7 @@ import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -157,7 +159,7 @@ public abstract class SCMCommonPlacementPolicy implements
     for (int i = 0; i < dns.size(); i++) {
       DatanodeDetails node = dns.get(i);
       DatanodeDetails datanodeDetails =
-          nodeManager.getNodeByUuid(node.getUuidString());
+          nodeManager.getNodeByUuid(node.getUuid());
       if (datanodeDetails != null) {
         dns.set(i, datanodeDetails);
       }
@@ -273,7 +275,7 @@ public abstract class SCMCommonPlacementPolicy implements
       int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
       throws SCMException {
     List<DatanodeDetails> nodesWithSpace = nodes.stream().filter(d ->
-        hasEnoughSpace(d, metadataSizeRequired, dataSizeRequired))
+        hasEnoughSpace(d, metadataSizeRequired, dataSizeRequired, conf))
         .collect(Collectors.toList());
 
     if (nodesWithSpace.size() < nodesRequired) {
@@ -282,7 +284,7 @@ public abstract class SCMCommonPlacementPolicy implements
               "data in healthy node set. Required %d. Found %d.",
           metadataSizeRequired, dataSizeRequired, nodesRequired,
           nodesWithSpace.size());
-      LOG.error(msg);
+      LOG.warn(msg);
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_NODES_WITH_SPACE);
     }
@@ -297,7 +299,9 @@ public abstract class SCMCommonPlacementPolicy implements
    * @return true if we have enough space.
    */
   public static boolean hasEnoughSpace(DatanodeDetails datanodeDetails,
-      long metadataSizeRequired, long dataSizeRequired) {
+                                       long metadataSizeRequired,
+                                       long dataSizeRequired,
+                                       ConfigurationSource conf) {
     Preconditions.checkArgument(datanodeDetails instanceof DatanodeInfo);
 
     boolean enoughForData = false;
@@ -307,7 +311,9 @@ public abstract class SCMCommonPlacementPolicy implements
 
     if (dataSizeRequired > 0) {
       for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
-        if (reportProto.getRemaining() > dataSizeRequired) {
+        if (VolumeUsage.hasVolumeEnoughSpace(reportProto.getRemaining(),
+              reportProto.getCommitted(), dataSizeRequired,
+              reportProto.getFreeSpaceToSpare())) {
           enoughForData = true;
           break;
         }
@@ -317,6 +323,8 @@ public abstract class SCMCommonPlacementPolicy implements
     }
 
     if (!enoughForData) {
+      LOG.debug("Datanode {} has no volumes with enough space to allocate {} " +
+              "bytes for data.", datanodeDetails, dataSizeRequired);
       return false;
     }
 
@@ -331,8 +339,11 @@ public abstract class SCMCommonPlacementPolicy implements
     } else {
       enoughForMeta = true;
     }
-
-    return enoughForData && enoughForMeta;
+    if (!enoughForMeta) {
+      LOG.debug("Datanode {} has no volumes with enough space to allocate {} " +
+              "bytes for metadata.", datanodeDetails, metadataSizeRequired);
+    }
+    return enoughForMeta;
   }
 
   /**
@@ -386,9 +397,12 @@ public abstract class SCMCommonPlacementPolicy implements
    * should have
    *
    * @param numReplicas - The desired replica counts
+   * @param excludedRackCount - The number of racks excluded due to containing
+   *                          only excluded nodes. The total racks on the
+   *                          cluster will be reduced by this number.
    * @return The number of racks containers should span to meet the policy
    */
-  protected int getRequiredRackCount(int numReplicas) {
+  protected int getRequiredRackCount(int numReplicas, int excludedRackCount) {
     return 1;
   }
 
@@ -426,7 +440,7 @@ public abstract class SCMCommonPlacementPolicy implements
       List<DatanodeDetails> dns, int replicas) {
     NetworkTopology topology = nodeManager.getClusterNetworkTopologyMap();
     // We have a network topology so calculate if it is satisfied or not.
-    int requiredRacks = getRequiredRackCount(replicas);
+    int requiredRacks = getRequiredRackCount(replicas, 0);
     if (topology == null || replicas == 1 || requiredRacks == 1) {
       if (dns.size() > 0) {
         // placement is always satisfied if there is at least one DN.
@@ -435,9 +449,13 @@ public abstract class SCMCommonPlacementPolicy implements
         return invalidPlacement;
       }
     }
-    Map<Node, Long> currentRackCount = dns.stream()
-            .collect(Collectors.groupingBy(this::getPlacementGroup,
-                    Collectors.counting()));
+    List<Integer> currentRackCount = new ArrayList<>(dns.stream()
+        .map(this::getPlacementGroup)
+        .filter(Objects::nonNull)
+        .collect(Collectors.groupingBy(
+            Function.identity(),
+            Collectors.reducing(0, e -> 1, Integer::sum)))
+        .values());
     final int maxLevel = topology.getMaxLevel();
     // The leaf nodes are all at max level, so the number of nodes at
     // leafLevel - 1 is the rack count
@@ -447,10 +465,19 @@ public abstract class SCMCommonPlacementPolicy implements
     }
     int maxReplicasPerRack = getMaxReplicasPerRack(replicas,
             Math.min(requiredRacks, numRacks));
+
+    // There are scenarios where there could be excessive replicas on a rack due to nodes
+    // in decommission or maintenance or over-replication in general.
+    // In these cases, ReplicationManager shouldn't report mis-replication.
+    // The original intention of mis-replication was to indicate that there isn't enough rack tolerance.
+    // In case of over-replication, this isn't an issue.
+    // Mis-replication should be an issue once over-replication is fixed, not before.
+    // Adjust the maximum number of replicas per rack to allow containers
+    // with excessive replicas to not be reported as mis-replicated.
+    maxReplicasPerRack += Math.max(0, dns.size() - replicas);
     return new ContainerPlacementStatusDefault(
         currentRackCount.size(), requiredRacks, numRacks, maxReplicasPerRack,
-            currentRackCount.values().stream().map(Long::intValue)
-                    .collect(Collectors.toList()));
+            currentRackCount);
   }
 
   /**
@@ -473,20 +500,24 @@ public abstract class SCMCommonPlacementPolicy implements
   public boolean isValidNode(DatanodeDetails datanodeDetails,
       long metadataSizeRequired, long dataSizeRequired) {
     DatanodeInfo datanodeInfo = (DatanodeInfo)getNodeManager()
-        .getNodeByUuid(datanodeDetails.getUuidString());
+        .getNodeByUuid(datanodeDetails.getUuid());
     if (datanodeInfo == null) {
       LOG.error("Failed to find the DatanodeInfo for datanode {}",
           datanodeDetails);
-    } else {
-      if (datanodeInfo.getNodeStatus().isNodeWritable() &&
-          (hasEnoughSpace(datanodeInfo, metadataSizeRequired,
-              dataSizeRequired))) {
-        LOG.debug("Datanode {} is chosen. Required metadata size is {} and " +
-                "required data size is {}",
-            datanodeDetails, metadataSizeRequired, dataSizeRequired);
-        return true;
-      }
+      return false;
     }
+    NodeStatus nodeStatus = datanodeInfo.getNodeStatus();
+    if (nodeStatus.isNodeWritable() &&
+        (hasEnoughSpace(datanodeInfo, metadataSizeRequired,
+            dataSizeRequired, conf))) {
+      LOG.debug("Datanode {} is chosen. Required metadata size is {} and " +
+              "required data size is {} and NodeStatus is {}",
+          datanodeDetails, metadataSizeRequired, dataSizeRequired, nodeStatus);
+      return true;
+    }
+    LOG.info("Datanode {} is not chosen. Required metadata size is {} and " +
+            "required data size is {} and NodeStatus is {}",
+        datanodeDetails, metadataSizeRequired, dataSizeRequired, nodeStatus);
     return false;
   }
 
@@ -507,7 +538,7 @@ public abstract class SCMCommonPlacementPolicy implements
 
     int totalNumberOfReplicas = replicas.size();
     int requiredNumberOfPlacementGroups =
-            getRequiredRackCount(totalNumberOfReplicas);
+            getRequiredRackCount(totalNumberOfReplicas, 0);
     Set<ContainerReplica> copyReplicaSet = Sets.newHashSet();
     List<List<ContainerReplica>> replicaSet = placementGroupReplicaIdMap
             .values().stream()

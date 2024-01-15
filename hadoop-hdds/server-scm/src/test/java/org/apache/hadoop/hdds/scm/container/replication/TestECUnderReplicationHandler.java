@@ -81,6 +81,7 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -110,6 +111,7 @@ public class TestECUnderReplicationHandler {
   private ContainerInfo container;
   private NodeManager nodeManager;
   private ReplicationManager replicationManager;
+  private ReplicationManagerMetrics metrics;
   private OzoneConfiguration conf;
   private PlacementPolicy policy;
   private static final int DATA = 3;
@@ -137,6 +139,8 @@ public class TestECUnderReplicationHandler {
         new ReplicationManager.ReplicationManagerConfiguration();
     when(replicationManager.getConfig())
         .thenReturn(rmConf);
+    metrics = ReplicationManagerMetrics.create(replicationManager);
+    when(replicationManager.getMetrics()).thenReturn(metrics);
 
     when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocation -> {
@@ -200,6 +204,7 @@ public class TestECUnderReplicationHandler {
     assertEquals(e.getRequiredNodes() - excluded.size(), e.getAvailableNodes());
     verify(replicationManager, never())
         .sendThrottledReconstructionCommand(any(), any());
+    assertEquals(1, metrics.getECPartialReconstructionSkippedTotal());
   }
 
   private static UnderReplicatedHealthResult mockUnderReplicated(
@@ -258,6 +263,7 @@ public class TestECUnderReplicationHandler {
     assertEquals(e.getRequiredNodes() - excluded.size(), e.getAvailableNodes());
     verify(replicationManager, times(1))
         .sendThrottledReconstructionCommand(any(), any());
+    assertEquals(1, metrics.getECPartialReconstructionCriticalTotal());
   }
 
   @Test
@@ -292,7 +298,7 @@ public class TestECUnderReplicationHandler {
       List<DatanodeDetails> usedNodes) {
     assertEquals(replicas.size(), usedNodes.size());
     for (ContainerReplica r : replicas) {
-      assertTrue(usedNodes.contains(r.getDatanodeDetails()));
+      assertThat(usedNodes).contains(r.getDatanodeDetails());
     }
   }
 
@@ -476,6 +482,10 @@ public class TestECUnderReplicationHandler {
         availableReplicas, 1, 2, policy);
   }
 
+  /**
+   * The expectation is that an under replicated container should recover
+   * even if datanodes hosting new replicas don't satisfy placement policy.
+   */
   @Test
   public void testUnderReplicationWithInvalidPlacement()
           throws IOException {
@@ -500,8 +510,8 @@ public class TestECUnderReplicationHandler {
               .allMatch(dns::contains));
           return mockedContainerPlacementStatus;
         });
-    testUnderReplicationWithMissingIndexes(emptyList(),
-            availableReplicas, 0, 0, mockedPolicy);
+    testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
+            availableReplicas, 2, 0, mockedPolicy);
   }
 
   @Test
@@ -711,6 +721,7 @@ public class TestECUnderReplicationHandler {
     ReconstructECContainersCommand cmd = (ReconstructECContainersCommand)
         commandsSent.iterator().next().getValue();
     assertEquals(1, cmd.getTargetDatanodes().size());
+    assertEquals(1, metrics.getEcPartialReconstructionNoneOverloadedTotal());
   }
 
   @Test
@@ -759,6 +770,8 @@ public class TestECUnderReplicationHandler {
     SCMCommand<?> cmd = commandsSent.iterator().next().getValue();
     assertEquals(
         SCMCommandProto.Type.replicateContainerCommand, cmd.getType());
+    assertEquals(1,
+        metrics.getEcPartialReplicationForOutOfServiceReplicasTotal());
   }
 
   @Test
@@ -782,6 +795,11 @@ public class TestECUnderReplicationHandler {
     SCMCommand<?> cmd = commandsSent.iterator().next().getValue();
     assertEquals(
         SCMCommandProto.Type.replicateContainerCommand, cmd.getType());
+    // The partial recovery here is due to overloaded nodes, not insufficient
+    // nodes. The "deferred" metric should be updated when all sources are
+    // overloaded.
+    assertEquals(0,
+        metrics.getEcPartialReplicationForOutOfServiceReplicasTotal());
   }
 
   @Test
@@ -807,6 +825,8 @@ public class TestECUnderReplicationHandler {
     SCMCommand<?> cmd = commandsSent.iterator().next().getValue();
     assertEquals(
         SCMCommandProto.Type.replicateContainerCommand, cmd.getType());
+    assertEquals(1,
+        metrics.getEcPartialReplicationForOutOfServiceReplicasTotal());
   }
 
   @Test
@@ -831,6 +851,11 @@ public class TestECUnderReplicationHandler {
     SCMCommand<?> cmd = commandsSent.iterator().next().getValue();
     assertEquals(
         SCMCommandProto.Type.replicateContainerCommand, cmd.getType());
+    // The partial recovery here is due to overloaded nodes, not insufficient
+    // nodes. The "deferred" metric should be updated when all sources are
+    // overloaded.
+    assertEquals(0,
+        metrics.getEcPartialReplicationForOutOfServiceReplicasTotal());
   }
 
   @Test

@@ -19,8 +19,8 @@
 package org.apache.hadoop.hdds.security.x509.crl;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.bouncycastle.cert.X509CRLHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CRLConverter;

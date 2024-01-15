@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CodecTestUtil;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
@@ -126,6 +127,8 @@ public class TestPipelineIDCodec {
 
     assertEquals(pid, oldCodec.fromPersistedFormat(expected));
     assertEquals(pid, newCodec.fromPersistedFormat(expected));
+
+    CodecTestUtil.runTest(newCodec, pid, 16, oldCodec);
   }
 
   private void checkPersisting(

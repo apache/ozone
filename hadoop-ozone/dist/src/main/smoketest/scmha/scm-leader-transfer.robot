@@ -21,6 +21,7 @@ Resource            ../commonlib.robot
 Test Timeout        5 minutes
 
 *** Variables ***
+${TARGET_SCM}=      scm2.org
 
 ** Keywords ***
 Get SCM Leader Node
@@ -34,13 +35,22 @@ Get SCM Leader Node
                             LOG                     Leader SCM: ${leaderSCM}
     [return]                ${leaderSCM}
 
+Get SCM UUID
+    ${result} =             Execute                 ozone admin scm roles --service-id=scmservice
+                            LOG                     ${result}
+    ${scm_line} =           Get Lines Containing String                     ${result}            ${TARGET_SCM}
+    ${scm_split} =          Split String            ${scm_line}             :
+    ${scm_uuid} =           Strip String            ${scm_split[3]}
+    [return]                ${scm_uuid}
+
 *** Test Cases ***
-Transfer Leadership randomly
-    # Find Leader SCM and one Follower SCM
+Transfer Leadership
+    # Find Leader SCM
     ${leaderSCM} =          Get SCM Leader Node
                             LOG                     Leader SCM: ${leaderSCM}
-    # Transfer leadership to the Follower SCM
-    ${result} =             Execute                 ozone admin scm transfer --service-id=scmservice -r
+    ${target_scm_uuid} =    Get SCM UUID
+    # Transfer leadership to target SCM
+    ${result} =             Execute                 ozone admin scm transfer --service-id=scmservice -n ${target_scm_uuid}
                             LOG                     ${result}
                             Should Contain          ${result}               Transfer leadership successfully
 

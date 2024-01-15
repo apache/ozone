@@ -65,9 +65,19 @@ public class VolumeUsage implements SpaceUsageSource {
     return source.getAvailable() - getRemainingReserved();
   }
 
+  public long getAvailable(SpaceUsageSource precomputedVolumeSpace) {
+    long available = precomputedVolumeSpace.getAvailable();
+    return available - getRemainingReserved(precomputedVolumeSpace);
+  }
+
   @Override
   public long getUsedSpace() {
     return source.getUsedSpace();
+  }
+
+  @Override
+  public SpaceUsageSource snapshot() {
+    return source.snapshot();
   }
 
   public void incrementUsedSpace(long usedSpace) {
@@ -89,8 +99,19 @@ public class VolumeUsage implements SpaceUsageSource {
     return Math.max(totalUsed - source.getUsedSpace(), 0L);
   }
 
+  private long getOtherUsed(SpaceUsageSource precomputedVolumeSpace) {
+    long totalUsed = precomputedVolumeSpace.getCapacity() -
+        precomputedVolumeSpace.getAvailable();
+    return Math.max(totalUsed - source.getUsedSpace(), 0L);
+  }
+
   private long getRemainingReserved() {
     return Math.max(reservedInBytes - getOtherUsed(), 0L);
+  }
+
+  private long getRemainingReserved(
+      SpaceUsageSource precomputedVolumeSpace) {
+    return Math.max(reservedInBytes - getOtherUsed(precomputedVolumeSpace), 0L);
   }
 
   public synchronized void start() {
@@ -144,5 +165,13 @@ public class VolumeUsage implements SpaceUsageSource {
     return (long) conf.getStorageSize(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
         HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT, StorageUnit.BYTES);
 
+  }
+
+  public static boolean hasVolumeEnoughSpace(long volumeAvailableSpace,
+                                             long volumeCommittedBytesCount,
+                                             long requiredSpace,
+                                             long volumeFreeSpaceToSpare) {
+    return (volumeAvailableSpace - volumeCommittedBytesCount) >
+        Math.max(requiredSpace, volumeFreeSpaceToSpare);
   }
 }

@@ -363,6 +363,15 @@ public interface ScmClient extends Closeable {
   List<String> getScmRatisRoles() throws IOException;
 
   /**
+   * Force generates new secret keys (rotate).
+   *
+   * @param force boolean flag that forcefully rotates the key on demand
+   * @return
+   * @throws IOException
+   */
+  boolean rotateSecretKeys(boolean force) throws IOException;
+
+  /**
    * Transfer the raft leadership.
    *
    * @param newLeaderId  the newLeaderId of the target expected leader
@@ -391,15 +400,15 @@ public interface ScmClient extends Closeable {
   int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException;
 
   /**
-   * Get usage information of datanode by ipaddress or uuid.
+   * Get usage information of datanode by address or uuid.
    *
-   * @param ipaddress datanode ipaddress String
+   * @param address datanode address String
    * @param uuid datanode uuid String
    * @return List of DatanodeUsageInfoProto. Each element contains info such as
    * capacity, SCMused, and remaining space.
    * @throws IOException
    */
-  List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(String ipaddress,
+  List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(String address,
                                                                String uuid)
       throws IOException;
 

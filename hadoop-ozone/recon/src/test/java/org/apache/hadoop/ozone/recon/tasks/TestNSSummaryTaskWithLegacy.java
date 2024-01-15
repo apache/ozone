@@ -35,17 +35,15 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.ClassRule;
-import org.junit.Assert;
-import org.junit.experimental.runners.Enclosed;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -55,15 +53,14 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyT
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Test for NSSummaryTaskWithLegacy.
  */
-@RunWith(Enclosed.class)
 public final class TestNSSummaryTaskWithLegacy {
-
-  @ClassRule
-  public static final TemporaryFolder TEMPORARY_FOLDER = new TemporaryFolder();
 
   private static ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private static OMMetadataManager omMetadataManager;
@@ -124,16 +121,16 @@ public final class TestNSSummaryTaskWithLegacy {
   private TestNSSummaryTaskWithLegacy() {
   }
 
-  @BeforeClass
-  public static void setUp() throws Exception {
-    initializeNewOmMetadataManager(TEMPORARY_FOLDER.newFolder());
+  @BeforeAll
+  public static void setUp(@TempDir File tmpDir) throws Exception {
+    initializeNewOmMetadataManager(new File(tmpDir, "om"));
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         getMockOzoneManagerServiceProvider();
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
-        TEMPORARY_FOLDER.newFolder());
+        new File(tmpDir, "recon"));
 
     ReconTestInjector reconTestInjector =
-        new ReconTestInjector.Builder(TEMPORARY_FOLDER)
+        new ReconTestInjector.Builder(tmpDir)
             .withReconOm(reconOMMetadataManager)
             .withOmServiceProvider(ozoneManagerServiceProvider)
             .withReconSqlDb()
@@ -144,7 +141,7 @@ public final class TestNSSummaryTaskWithLegacy {
 
     NSSummary nonExistentSummary =
         reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
-    Assert.assertNull(nonExistentSummary);
+    assertNull(nonExistentSummary);
 
     populateOMDB();
 
@@ -156,13 +153,14 @@ public final class TestNSSummaryTaskWithLegacy {
   /**
    * Nested class for testing NSSummaryTaskWithLegacy reprocess.
    */
-  public static class TestReprocess {
+  @Nested
+  public class TestReprocess {
 
-    private static NSSummary nsSummaryForBucket1;
-    private static NSSummary nsSummaryForBucket2;
+    private NSSummary nsSummaryForBucket1;
+    private NSSummary nsSummaryForBucket2;
 
-    @BeforeClass
-    public static void setUp() throws IOException {
+    @BeforeEach
+    public void setUp() throws IOException {
       // write a NSSummary prior to reprocess
       // verify it got cleaned up after.
       NSSummary staleNSSummary = new NSSummary();
@@ -172,34 +170,34 @@ public final class TestNSSummaryTaskWithLegacy {
       reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
 
       // Verify commit
-      Assert.assertNotNull(reconNamespaceSummaryManager.getNSSummary(-1L));
+      assertNotNull(reconNamespaceSummaryManager.getNSSummary(-1L));
 
       // reinit Recon RocksDB's namespace CF.
       reconNamespaceSummaryManager.clearNSSummaryTable();
 
       nSSummaryTaskWithLegacy.reprocessWithLegacy(reconOMMetadataManager);
-      Assert.assertNull(reconNamespaceSummaryManager.getNSSummary(-1L));
+      assertNull(reconNamespaceSummaryManager.getNSSummary(-1L));
 
       nsSummaryForBucket1 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
       nsSummaryForBucket2 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_TWO_OBJECT_ID);
-      Assert.assertNotNull(nsSummaryForBucket1);
-      Assert.assertNotNull(nsSummaryForBucket2);
+      assertNotNull(nsSummaryForBucket1);
+      assertNotNull(nsSummaryForBucket2);
     }
 
     @Test
     public void testReprocessNSSummaryNull() throws IOException {
-      Assert.assertNull(reconNamespaceSummaryManager.getNSSummary(-1L));
+      assertNull(reconNamespaceSummaryManager.getNSSummary(-1L));
     }
 
     @Test
     public void testReprocessGetFiles() {
-      Assert.assertEquals(1, nsSummaryForBucket1.getNumOfFiles());
-      Assert.assertEquals(2, nsSummaryForBucket2.getNumOfFiles());
+      assertEquals(1, nsSummaryForBucket1.getNumOfFiles());
+      assertEquals(2, nsSummaryForBucket2.getNumOfFiles());
 
-      Assert.assertEquals(KEY_ONE_SIZE, nsSummaryForBucket1.getSizeOfFiles());
-      Assert.assertEquals(KEY_TWO_OLD_SIZE + KEY_FOUR_SIZE,
+      assertEquals(KEY_ONE_SIZE, nsSummaryForBucket1.getSizeOfFiles());
+      assertEquals(KEY_TWO_OLD_SIZE + KEY_FOUR_SIZE,
           nsSummaryForBucket2.getSizeOfFiles());
     }
 
@@ -207,22 +205,22 @@ public final class TestNSSummaryTaskWithLegacy {
     public void testReprocessFileBucketSize() {
       int[] fileDistBucket1 = nsSummaryForBucket1.getFileSizeBucket();
       int[] fileDistBucket2 = nsSummaryForBucket2.getFileSizeBucket();
-      Assert.assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
+      assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
           fileDistBucket1.length);
-      Assert.assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
+      assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
           fileDistBucket2.length);
 
-      Assert.assertEquals(1, fileDistBucket1[0]);
+      assertEquals(1, fileDistBucket1[0]);
       for (int i = 1; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
-        Assert.assertEquals(0, fileDistBucket1[i]);
+        assertEquals(0, fileDistBucket1[i]);
       }
-      Assert.assertEquals(1, fileDistBucket2[1]);
-      Assert.assertEquals(1, fileDistBucket2[2]);
+      assertEquals(1, fileDistBucket2[1]);
+      assertEquals(1, fileDistBucket2[2]);
       for (int i = 0; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
         if (i == 1 || i == 2) {
           continue;
         }
-        Assert.assertEquals(0, fileDistBucket2[i]);
+        assertEquals(0, fileDistBucket2[i]);
       }
     }
 
@@ -231,11 +229,11 @@ public final class TestNSSummaryTaskWithLegacy {
       // Bucket one has one dir, bucket two has none.
       Set<Long> childDirBucketOne = nsSummaryForBucket1.getChildDir();
       Set<Long> childDirBucketTwo = nsSummaryForBucket2.getChildDir();
-      Assert.assertEquals(1, childDirBucketOne.size());
+      assertEquals(1, childDirBucketOne.size());
       bucketOneAns.clear();
       bucketOneAns.add(DIR_ONE_OBJECT_ID);
-      Assert.assertEquals(bucketOneAns, childDirBucketOne);
-      Assert.assertEquals(0, childDirBucketTwo.size());
+      assertEquals(bucketOneAns, childDirBucketOne);
+      assertEquals(0, childDirBucketTwo.size());
     }
 
     @Test
@@ -244,35 +242,35 @@ public final class TestNSSummaryTaskWithLegacy {
       // Dir 1 has two dir: dir2 and dir3.
       NSSummary nsSummaryInDir1 = reconNamespaceSummaryManager
           .getNSSummary(DIR_ONE_OBJECT_ID);
-      Assert.assertNotNull(nsSummaryInDir1);
+      assertNotNull(nsSummaryInDir1);
       Set<Long> childDirForDirOne = nsSummaryInDir1.getChildDir();
-      Assert.assertEquals(2, childDirForDirOne.size());
+      assertEquals(2, childDirForDirOne.size());
       dirOneAns.clear();
       dirOneAns.add(DIR_TWO_OBJECT_ID);
       dirOneAns.add(DIR_THREE_OBJECT_ID);
-      Assert.assertEquals(dirOneAns, childDirForDirOne);
+      assertEquals(dirOneAns, childDirForDirOne);
 
       NSSummary nsSummaryInDir2 = reconNamespaceSummaryManager
           .getNSSummary(DIR_TWO_OBJECT_ID);
-      Assert.assertEquals(1, nsSummaryInDir2.getNumOfFiles());
-      Assert.assertEquals(KEY_THREE_SIZE, nsSummaryInDir2.getSizeOfFiles());
+      assertEquals(1, nsSummaryInDir2.getNumOfFiles());
+      assertEquals(KEY_THREE_SIZE, nsSummaryInDir2.getSizeOfFiles());
 
       int[] fileDistForDir2 = nsSummaryInDir2.getFileSizeBucket();
-      Assert.assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
+      assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
           fileDistForDir2.length);
-      Assert.assertEquals(1,
+      assertEquals(1,
           fileDistForDir2[fileDistForDir2.length - 1]);
       for (int i = 0; i < ReconConstants.NUM_OF_FILE_SIZE_BINS - 1; ++i) {
-        Assert.assertEquals(0, fileDistForDir2[i]);
+        assertEquals(0, fileDistForDir2[i]);
       }
-      Assert.assertEquals(0, nsSummaryInDir2.getChildDir().size());
+      assertEquals(0, nsSummaryInDir2.getChildDir().size());
 
       // bucket should have empty dirName
-      Assert.assertEquals(0, nsSummaryForBucket1.getDirName().length());
-      Assert.assertEquals(0, nsSummaryForBucket2.getDirName().length());
+      assertEquals(0, nsSummaryForBucket1.getDirName().length());
+      assertEquals(0, nsSummaryForBucket2.getDirName().length());
       // check dirName is correctly written
-      Assert.assertEquals(DIR_ONE, nsSummaryInDir1.getDirName());
-      Assert.assertEquals(DIR_ONE + OM_KEY_PREFIX + DIR_TWO,
+      assertEquals(DIR_ONE, nsSummaryInDir1.getDirName());
+      assertEquals(DIR_ONE + OM_KEY_PREFIX + DIR_TWO,
           nsSummaryInDir2.getDirName());
     }
   }
@@ -280,33 +278,34 @@ public final class TestNSSummaryTaskWithLegacy {
   /**
    * Nested class for testing NSSummaryTaskWithLegacy process.
    */
-  public static class TestProcess {
+  @Nested
+  public class TestProcess {
 
-    private static NSSummary nsSummaryForBucket1;
-    private static NSSummary nsSummaryForBucket2;
+    private NSSummary nsSummaryForBucket1;
+    private NSSummary nsSummaryForBucket2;
 
-    private static OMDBUpdateEvent keyEvent1;
-    private static OMDBUpdateEvent keyEvent2;
-    private static OMDBUpdateEvent keyEvent3;
-    private static OMDBUpdateEvent keyEvent4;
-    private static OMDBUpdateEvent keyEvent5;
-    private static OMDBUpdateEvent keyEvent6;
-    private static OMDBUpdateEvent keyEvent7;
+    private OMDBUpdateEvent keyEvent1;
+    private OMDBUpdateEvent keyEvent2;
+    private OMDBUpdateEvent keyEvent3;
+    private OMDBUpdateEvent keyEvent4;
+    private OMDBUpdateEvent keyEvent5;
+    private OMDBUpdateEvent keyEvent6;
+    private OMDBUpdateEvent keyEvent7;
 
-    @BeforeClass
-    public static void setUp() throws IOException {
+    @BeforeEach
+    public void setUp() throws IOException {
       nSSummaryTaskWithLegacy.reprocessWithLegacy(reconOMMetadataManager);
       nSSummaryTaskWithLegacy.processWithLegacy(processEventBatch());
 
       nsSummaryForBucket1 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
-      Assert.assertNotNull(nsSummaryForBucket1);
+      assertNotNull(nsSummaryForBucket1);
       nsSummaryForBucket2 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_TWO_OBJECT_ID);
-      Assert.assertNotNull(nsSummaryForBucket2);
+      assertNotNull(nsSummaryForBucket2);
     }
 
-    private static OMUpdateEventBatch processEventBatch() throws IOException {
+    private OMUpdateEventBatch processEventBatch() throws IOException {
       // put file5 under bucket 2
       String omPutKey =
           OM_KEY_PREFIX + VOL +
@@ -430,33 +429,25 @@ public final class TestNSSummaryTaskWithLegacy {
           .setTable(omMetadataManager.getKeyTable(getBucketLayout()).getName())
           .build();
 
-      OMUpdateEventBatch omUpdateEventBatch = new OMUpdateEventBatch(
-          new ArrayList<OMDBUpdateEvent>() {{
-              add(keyEvent1);
-              add(keyEvent2);
-              add(keyEvent3);
-              add(keyEvent4);
-              add(keyEvent5);
-              add(keyEvent6);
-              add(keyEvent7);
-              }});
-
-      return omUpdateEventBatch;
+      return new OMUpdateEventBatch(Arrays.asList(
+          keyEvent1, keyEvent2, keyEvent3, keyEvent4, keyEvent5,
+          keyEvent6, keyEvent7
+      ));
     }
 
     @Test
     public void testProcessUpdateFileSize() throws IOException {
       // file 1 is gone, so bucket 1 is empty now
-      Assert.assertNotNull(nsSummaryForBucket1);
-      Assert.assertEquals(0, nsSummaryForBucket1.getNumOfFiles());
+      assertNotNull(nsSummaryForBucket1);
+      assertEquals(0, nsSummaryForBucket1.getNumOfFiles());
 
       Set<Long> childDirBucket1 = nsSummaryForBucket1.getChildDir();
       // after put dir4, bucket1 now has two child dirs: dir1 and dir4
-      Assert.assertEquals(2, childDirBucket1.size());
+      assertEquals(2, childDirBucket1.size());
       bucketOneAns.clear();
       bucketOneAns.add(DIR_ONE_OBJECT_ID);
       bucketOneAns.add(DIR_FOUR_OBJECT_ID);
-      Assert.assertEquals(bucketOneAns, childDirBucket1);
+      assertEquals(bucketOneAns, childDirBucket1);
     }
 
     @Test
@@ -464,31 +455,31 @@ public final class TestNSSummaryTaskWithLegacy {
       // file 5 is added under bucket 2, so bucket 2 has 3 keys now
       // file 2 is updated with new datasize,
       // so file size dist for bucket 2 should be updated
-      Assert.assertNotNull(nsSummaryForBucket2);
-      Assert.assertEquals(3, nsSummaryForBucket2.getNumOfFiles());
+      assertNotNull(nsSummaryForBucket2);
+      assertEquals(3, nsSummaryForBucket2.getNumOfFiles());
       // key 4 + key 5 + updated key 2
-      Assert.assertEquals(KEY_FOUR_SIZE + KEY_FIVE_SIZE
+      assertEquals(KEY_FOUR_SIZE + KEY_FIVE_SIZE
           + KEY_TWO_UPDATE_SIZE, nsSummaryForBucket2.getSizeOfFiles());
 
       int[] fileSizeDist = nsSummaryForBucket2.getFileSizeBucket();
-      Assert.assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
+      assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
           fileSizeDist.length);
       // 1023L and 100L
-      Assert.assertEquals(2, fileSizeDist[0]);
+      assertEquals(2, fileSizeDist[0]);
       // 2050L
-      Assert.assertEquals(1, fileSizeDist[2]);
+      assertEquals(1, fileSizeDist[2]);
       for (int i = 0; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
         if (i == 0 || i == 2) {
           continue;
         }
-        Assert.assertEquals(0, fileSizeDist[i]);
+        assertEquals(0, fileSizeDist[i]);
       }
 
       // after put dir5, bucket 2 now has one dir
       Set<Long> childDirBucket2 = nsSummaryForBucket2.getChildDir();
-      Assert.assertEquals(1, childDirBucket2.size());
+      assertEquals(1, childDirBucket2.size());
       bucketTwoAns.add(DIR_FIVE_OBJECT_ID);
-      Assert.assertEquals(bucketTwoAns, childDirBucket2);
+      assertEquals(bucketTwoAns, childDirBucket2);
     }
 
     @Test
@@ -496,15 +487,15 @@ public final class TestNSSummaryTaskWithLegacy {
       // after delete dir 3, dir 1 now has only one dir: dir2
       NSSummary nsSummaryForDir1 = reconNamespaceSummaryManager
           .getNSSummary(DIR_ONE_OBJECT_ID);
-      Assert.assertNotNull(nsSummaryForDir1);
+      assertNotNull(nsSummaryForDir1);
       Set<Long> childDirForDir1 = nsSummaryForDir1.getChildDir();
-      Assert.assertEquals(1, childDirForDir1.size());
+      assertEquals(1, childDirForDir1.size());
       dirOneAns.clear();
       dirOneAns.add(DIR_TWO_OBJECT_ID);
-      Assert.assertEquals(dirOneAns, childDirForDir1);
+      assertEquals(dirOneAns, childDirForDir1);
 
       // after renaming dir1, check its new name
-      Assert.assertEquals(DIR_ONE_RENAME, nsSummaryForDir1.getDirName());
+      assertEquals(DIR_ONE_RENAME, nsSummaryForDir1.getDirName());
     }
   }
 
@@ -704,7 +695,7 @@ public final class TestNSSummaryTaskWithLegacy {
     omConfiguration.set(OMConfigKeys
         .OZONE_OM_ENABLE_FILESYSTEM_PATHS, "true");
     omMetadataManager = new OmMetadataManagerImpl(
-        omConfiguration);
+        omConfiguration, null);
 
     String volumeKey = omMetadataManager.getVolumeKey(VOL);
     OmVolumeArgs args =

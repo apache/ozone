@@ -24,11 +24,10 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeQueueMetrics;
-import org.junit.Rule;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,12 +36,13 @@ import java.util.UUID;
 
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeQueueMetrics.COMMAND_DISPATCHER_QUEUE_PREFIX;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeQueueMetrics.STATE_CONTEXT_COMMAND_QUEUE_PREFIX;
-import static org.apache.hadoop.test.MetricsAsserts.getLongGauge;
-import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.apache.ozone.test.MetricsAsserts.getLongGauge;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 
 /**
  * Test for queue metrics of datanodes.
  */
+@Timeout(300)
 public class TestDatanodeQueueMetrics {
 
   private MiniOzoneHAClusterImpl cluster = null;
@@ -56,9 +56,6 @@ public class TestDatanodeQueueMetrics {
 
   private static final Logger LOG = LoggerFactory
       .getLogger(TestDatanodeQueueMetrics.class);
-
-  @Rule
-  public Timeout timeout = new Timeout(300_000);
 
   /**
    * Create a MiniDFSCluster for testing.

@@ -28,7 +28,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -37,6 +36,9 @@ import org.junit.jupiter.api.Timeout;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Integration test to verify Ozone snapshot RPCs throw exception when called.
@@ -94,10 +96,12 @@ public class TestOmSnapshotDisabled {
     volume.createBucket(bucketName);
 
     // create snapshot should throw
-    LambdaTestUtils.intercept(OMException.class, "FEATURE_NOT_ENABLED",
+    OMException omException = assertThrows(OMException.class,
         () -> store.createSnapshot(volumeName, bucketName, snapshotName));
+    assertEquals(FEATURE_NOT_ENABLED, omException.getResult());
     // delete snapshot should throw
-    LambdaTestUtils.intercept(OMException.class, "FEATURE_NOT_ENABLED",
+    omException = assertThrows(OMException.class,
         () -> store.deleteSnapshot(volumeName, bucketName, snapshotName));
+    assertEquals(FEATURE_NOT_ENABLED, omException.getResult());
   }
 }

@@ -72,6 +72,11 @@ public class ReconstructECContainersCommandHandler implements CommandHandler {
   }
 
   @Override
+  public long getTotalRunTime() {
+    return 0;
+  }
+
+  @Override
   public int getQueuedCount() {
     return supervisor
         .getInFlightReplications(ECReconstructionCoordinatorTask.class);

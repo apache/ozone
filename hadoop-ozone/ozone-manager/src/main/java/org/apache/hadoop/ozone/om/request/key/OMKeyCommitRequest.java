@@ -19,23 +19,28 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
@@ -65,6 +70,7 @@ import org.apache.hadoop.util.Time;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
@@ -72,7 +78,8 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
  */
 public class OMKeyCommitRequest extends OMKeyRequest {
 
-  private static final Logger LOG =
+  @VisibleForTesting
+  public static final Logger LOG =
       LoggerFactory.getLogger(OMKeyCommitRequest.class);
 
   public OMKeyCommitRequest(OMRequest omRequest, BucketLayout bucketLayout) {
@@ -95,6 +102,15 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       OmUtils.validateKeyName(StringUtils.removeEnd(keyArgs.getKeyName(),
               OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX));
     }
+    boolean isHsync = commitKeyRequest.hasHsync() &&
+        commitKeyRequest.getHsync();
+    boolean enableHsync = ozoneManager.getConfiguration().getBoolean(
+        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED,
+        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED_DEFAULT);
+    if (isHsync && !enableHsync) {
+      throw new OMException("Hsync is not enabled. To enable, " +
+          "set ozone.fs.hsync.enabled = true", NOT_SUPPORTED_OPERATION);
+    }
 
     String keyPath = keyArgs.getKeyName();
     keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
@@ -104,15 +120,19 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         keyArgs.toBuilder().setModificationTime(Time.now())
             .setKeyName(keyPath);
 
+    KeyArgs resolvedKeyArgs =
+        resolveBucketAndCheckOpenKeyAcls(newKeyArgs.build(), ozoneManager,
+            IAccessAuthorizer.ACLType.WRITE, commitKeyRequest.getClientID());
+
     return request.toBuilder()
         .setCommitKeyRequest(commitKeyRequest.toBuilder()
-            .setKeyArgs(newKeyArgs)).build();
+            .setKeyArgs(resolvedKeyArgs)).build();
   }
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long trxnLogIndex = termIndex.getIndex();
 
     CommitKeyRequest commitKeyRequest = getOmRequest().getCommitKeyRequest();
 
@@ -123,7 +143,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     String keyName = commitKeyArgs.getKeyName();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
-    omMetrics.incNumKeyCommits();
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
 
@@ -132,7 +151,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
 
-    IOException exception = null;
+    Exception exception = null;
     OmKeyInfo omKeyInfo = null;
     OmBucketInfo omBucketInfo = null;
     OMClientResponse omClientResponse = null;
@@ -143,16 +162,17 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
     boolean isHSync = commitKeyRequest.hasHsync() &&
             commitKeyRequest.getHsync();
+
+    if (isHSync) {
+      omMetrics.incNumKeyHSyncs();
+    } else {
+      omMetrics.incNumKeyCommits();
+    }
+
+    LOG.debug("isHSync = {}, volumeName = {}, bucketName = {}, keyName = {}",
+        isHSync, volumeName, bucketName, keyName);
+
     try {
-      commitKeyArgs = resolveBucketLink(ozoneManager, commitKeyArgs, auditMap);
-      volumeName = commitKeyArgs.getVolumeName();
-      bucketName = commitKeyArgs.getBucketName();
-
-      // check Acl
-      checkKeyAclsInOpenKeyTable(ozoneManager, volumeName, bucketName,
-          keyName, IAccessAuthorizer.ACLType.WRITE,
-          commitKeyRequest.getClientID());
-
       String dbOzoneKey =
           omMetadataManager.getOzoneKey(volumeName, bucketName,
               keyName);
@@ -162,9 +182,10 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       List<OmKeyLocationInfo>
           locationInfoList = getOmKeyLocationInfos(ozoneManager, commitKeyArgs);
 
-      bucketLockAcquired =
-          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-              volumeName, bucketName);
+      mergeOmLockDetails(
+          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
+              bucketName));
+      bucketLockAcquired = getOmLockDetails().isLockAcquired();
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
@@ -195,9 +216,19 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // creation and key commit, old versions will be just overwritten and
       // not kept. Bucket versioning will be effective from the first key
       // creation after the knob turned on.
+      boolean isPreviousCommitHsync = false;
       Map<String, RepeatedOmKeyInfo> oldKeyVersionsToDeleteMap = null;
       OmKeyInfo keyToDelete =
           omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
+      if (null != keyToDelete) {
+        final String clientIdString
+            = String.valueOf(commitKeyRequest.getClientID());
+        isPreviousCommitHsync = java.util.Optional.ofNullable(keyToDelete)
+            .map(WithMetadata::getMetadata)
+            .map(meta -> meta.get(OzoneConsts.HSYNC_CLIENT_ID))
+            .filter(id -> id.equals(clientIdString))
+            .isPresent();
+      }
 
       omKeyInfo =
           omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKey);
@@ -209,6 +240,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         throw new OMException("Failed to " + action + " key, as " + dbOpenKey +
             "entry is not found in the OpenKey table", KEY_NOT_FOUND);
       }
+      omKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
+          commitKeyArgs.getMetadataList()));
       if (isHSync) {
         omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID,
             String.valueOf(commitKeyRequest.getClientID()));
@@ -226,7 +259,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       long correctedSpace = omKeyInfo.getReplicatedSize();
       // if keyToDelete isn't null, usedNamespace needn't check and
       // increase.
-      if (keyToDelete != null && isHSync) {
+      if (keyToDelete != null && (isHSync || isPreviousCommitHsync)) {
         correctedSpace -= keyToDelete.getReplicatedSize();
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
             correctedSpace);
@@ -242,7 +275,16 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         if (null == oldKeyVersionsToDeleteMap) {
           oldKeyVersionsToDeleteMap = new HashMap<>();
         }
-        oldKeyVersionsToDeleteMap.put(delKeyName, oldVerKeyInfo);
+
+        // Remove any block from oldVerKeyInfo that share the same container ID
+        // and local ID with omKeyInfo blocks'.
+        // Otherwise, it causes data loss once those shared blocks are added
+        // to deletedTable and processed by KeyDeletingService for deletion.
+        filterOutBlocksStillInUse(omKeyInfo, oldVerKeyInfo);
+
+        if (!oldVerKeyInfo.getOmKeyInfoList().isEmpty()) {
+          oldKeyVersionsToDeleteMap.put(delKeyName, oldVerKeyInfo);
+        }
       } else {
         checkBucketQuotaInNamespace(omBucketInfo, 1L);
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
@@ -267,6 +309,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       // Add to cache of open key table and key table.
       if (!isHSync) {
+        // If isHSync = false, put a tombstone in OpenKeyTable cache,
+        // indicating the key is removed from OpenKeyTable.
+        // So that this key can't be committed again.
         omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
             dbOpenKey, trxnLogIndex);
       }
@@ -281,20 +326,24 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           oldKeyVersionsToDeleteMap, isHSync);
 
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new OMKeyCommitResponse(createErrorOMResponse(
           omResponse, exception), getBucketLayout());
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
-
       if (bucketLockAcquired) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
+
+    // Debug logging for any key commit operation, successful or not
+    LOG.debug("Key commit {} with isHSync = {}, omKeyInfo = {}",
+        result == Result.SUCCESS ? "succeeded" : "failed", isHSync, omKeyInfo);
 
     if (!isHSync) {
       auditLog(auditLogger, buildAuditMessage(OMAction.COMMIT_KEY, auditMap,
@@ -342,7 +391,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
   protected void processResult(CommitKeyRequest commitKeyRequest,
                                String volumeName, String bucketName,
                                String keyName, OMMetrics omMetrics,
-                               IOException exception, OmKeyInfo omKeyInfo,
+                               Exception exception, OmKeyInfo omKeyInfo,
                                Result result) {
     switch (result) {
     case SUCCESS:

@@ -19,11 +19,21 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
+
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 import java.io.IOException;
@@ -31,6 +41,8 @@ import java.util.List;
 import javax.annotation.Nonnull;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
+import static org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotMoveDeletedKeysResponse.createRepeatedOmKeyInfo;
 
 /**
  * Response for {@link OMKeyPurgeRequest} request.
@@ -38,13 +50,17 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 @CleanupTableInfo(cleanupTables = {DELETED_TABLE})
 public class OMKeyPurgeResponse extends OmKeyResponse {
   private List<String> purgeKeyList;
-  private OmSnapshot fromSnapshot;
+  private SnapshotInfo fromSnapshot;
+  private List<SnapshotMoveKeyInfos> keysToUpdateList;
 
   public OMKeyPurgeResponse(@Nonnull OMResponse omResponse,
-      @Nonnull List<String> keyList, OmSnapshot fromSnapshot) {
+      @Nonnull List<String> keyList,
+      SnapshotInfo fromSnapshot,
+      List<SnapshotMoveKeyInfos> keysToUpdate) {
     super(omResponse);
     this.purgeKeyList = keyList;
     this.fromSnapshot = fromSnapshot;
+    this.keysToUpdateList = keysToUpdate;
   }
 
   /**
@@ -61,14 +77,46 @@ public class OMKeyPurgeResponse extends OmKeyResponse {
       BatchOperation batchOperation) throws IOException {
 
     if (fromSnapshot != null) {
-      DBStore fromSnapshotStore = fromSnapshot.getMetadataManager().getStore();
-      // Init Batch Operation for snapshot db.
-      try (BatchOperation writeBatch = fromSnapshotStore.initBatchOperation()) {
-        processKeys(writeBatch, fromSnapshot.getMetadataManager());
-        fromSnapshotStore.commitBatchOperation(writeBatch);
+      OmSnapshotManager omSnapshotManager =
+          ((OmMetadataManagerImpl) omMetadataManager)
+              .getOzoneManager().getOmSnapshotManager();
+
+      try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmFromSnapshot =
+          omSnapshotManager.checkForSnapshot(
+              fromSnapshot.getVolumeName(),
+              fromSnapshot.getBucketName(),
+              getSnapshotPrefix(fromSnapshot.getName()),
+              true)) {
+
+        OmSnapshot fromOmSnapshot = (OmSnapshot) rcOmFromSnapshot.get();
+        DBStore fromSnapshotStore =
+            fromOmSnapshot.getMetadataManager().getStore();
+        // Init Batch Operation for snapshot db.
+        try (BatchOperation writeBatch =
+            fromSnapshotStore.initBatchOperation()) {
+          processKeys(writeBatch, fromOmSnapshot.getMetadataManager());
+          processKeysToUpdate(writeBatch, fromOmSnapshot.getMetadataManager());
+          fromSnapshotStore.commitBatchOperation(writeBatch);
+        }
       }
     } else {
       processKeys(batchOperation, omMetadataManager);
+      processKeysToUpdate(batchOperation, omMetadataManager);
+    }
+  }
+
+  private void processKeysToUpdate(BatchOperation batchOp,
+      OMMetadataManager metadataManager) throws IOException {
+    if (keysToUpdateList == null) {
+      return;
+    }
+
+    for (SnapshotMoveKeyInfos keyToUpdate : keysToUpdateList) {
+      List<KeyInfo> keyInfosList = keyToUpdate.getKeyInfosList();
+      RepeatedOmKeyInfo repeatedOmKeyInfo =
+          createRepeatedOmKeyInfo(keyInfosList);
+      metadataManager.getDeletedTable().putWithBatch(batchOp,
+          keyToUpdate.getKey(), repeatedOmKeyInfo);
     }
   }
 

@@ -18,9 +18,10 @@
 
 package org.apache.hadoop.ozone.s3.exception;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * This class tests OS3Exception class.
@@ -45,6 +46,6 @@ public class TestOS3Exceptions {
     String expected = String.format(formatString, ex.getCode(),
         ex.getErrorMessage(), ex.getResource(),
         ex.getRequestId());
-    Assert.assertEquals(expected, val);
+    assertEquals(expected, val);
   }
 }

@@ -34,9 +34,11 @@ import java.io.IOException;
  */
 @Provider
 @PreMatching
-@Priority(VirtualHostStyleFilter.PRIORITY
-    + S3GatewayHttpServer.FILTER_PRIORITY_DO_AFTER)
+@Priority(HeaderPreprocessor.PRIORITY)
 public class HeaderPreprocessor implements ContainerRequestFilter {
+
+  public static final int PRIORITY = VirtualHostStyleFilter.PRIORITY +
+      S3GatewayHttpServer.FILTER_PRIORITY_DO_AFTER;
 
   public static final String MULTIPART_UPLOAD_MARKER = "ozone/mpu";
 

@@ -21,7 +21,6 @@ package org.apache.hadoop.hdds.scm.node;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
@@ -31,7 +30,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Set;
-import java.util.concurrent.TimeoutException;
 
 /**
  * Handles Stale node event.
@@ -60,9 +58,8 @@ public class StaleNodeHandler implements EventHandler<DatanodeDetails> {
         datanodeDetails, pipelineIds);
     for (PipelineID pipelineID : pipelineIds) {
       try {
-        Pipeline pipeline = pipelineManager.getPipeline(pipelineID);
-        pipelineManager.closePipeline(pipeline, true);
-      } catch (IOException | TimeoutException e) {
+        pipelineManager.closePipeline(pipelineID);
+      } catch (IOException e) {
         LOG.info("Could not finalize pipeline={} for dn={}", pipelineID,
             datanodeDetails);
       }

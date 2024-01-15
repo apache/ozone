@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Base class for scheduled scanners on a Datanode.
@@ -37,15 +38,13 @@ public abstract class AbstractBackgroundContainerScanner extends Thread {
 
   private final long dataScanInterval;
 
-  /**
-   * True if the thread is stopping.<p/>
-   * Protected by this object's lock.
-   */
-  private volatile boolean stopping = false;
+  private final AtomicBoolean stopping;
+  private final AtomicBoolean pausing = new AtomicBoolean();
 
   public AbstractBackgroundContainerScanner(String name,
       long dataScanInterval) {
     this.dataScanInterval = dataScanInterval;
+    this.stopping = new AtomicBoolean(false);
     setName(name);
     setDaemon(true);
   }
@@ -54,7 +53,7 @@ public abstract class AbstractBackgroundContainerScanner extends Thread {
   public final void run() {
     AbstractContainerScannerMetrics metrics = getMetrics();
     try {
-      while (!stopping) {
+      while (!stopping.get()) {
         runIteration();
         metrics.resetNumContainersScanned();
         metrics.resetNumUnhealthyContainers();
@@ -71,33 +70,49 @@ public abstract class AbstractBackgroundContainerScanner extends Thread {
 
   @VisibleForTesting
   public final void runIteration() {
+    final boolean paused = pausing.get();
     long startTime = System.nanoTime();
-    scanContainers();
+    if (!paused) {
+      scanContainers();
+    }
     long totalDuration = System.nanoTime() - startTime;
-    if (stopping) {
+    if (stopping.get()) {
       return;
     }
-    AbstractContainerScannerMetrics metrics = getMetrics();
-    metrics.incNumScanIterations();
-    LOG.info("Completed an iteration in {} minutes." +
-            " Number of iterations (since the data-node restart) : {}" +
-            ", Number of containers scanned in this iteration : {}" +
-            ", Number of unhealthy containers found in this iteration : {}",
-        TimeUnit.NANOSECONDS.toMinutes(totalDuration),
-        metrics.getNumScanIterations(),
-        metrics.getNumContainersScanned(),
-        metrics.getNumUnHealthyContainers());
+    if (paused) {
+      LOG.debug("Skipped iteration due to pause");
+    } else {
+      AbstractContainerScannerMetrics metrics = getMetrics();
+      metrics.incNumScanIterations();
+      LOG.info("Completed an iteration in {} minutes." +
+              " Number of iterations (since the data-node restart) : {}" +
+              ", Number of containers scanned in this iteration : {}" +
+              ", Number of unhealthy containers found in this iteration : {}",
+          TimeUnit.NANOSECONDS.toMinutes(totalDuration),
+          metrics.getNumScanIterations(),
+          metrics.getNumContainersScanned(),
+          metrics.getNumUnHealthyContainers());
+    }
     long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(totalDuration);
     long remainingSleep = dataScanInterval - elapsedMillis;
     handleRemainingSleep(remainingSleep);
   }
 
-  public final void scanContainers() {
+  private void scanContainers() {
     Iterator<Container<?>> itr = getContainerIterator();
-    while (!stopping && itr.hasNext()) {
+    while (itr.hasNext()) {
+      final boolean stopped = stopping.get();
+      final boolean paused = pausing.get();
+      if (stopped || paused) {
+        LOG.info("{} exits scan loop stop={} pause={}", this, stopped, paused);
+        break;
+      }
+
       Container<?> c = itr.next();
       try {
         scanContainer(c);
+      } catch (InterruptedException ex) {
+        stopping.set(true);
       } catch (IOException ex) {
         LOG.warn("Unexpected exception while scanning container "
             + c.getContainerData().getContainerID(), ex);
@@ -107,29 +122,44 @@ public abstract class AbstractBackgroundContainerScanner extends Thread {
 
   public abstract Iterator<Container<?>> getContainerIterator();
 
-  public abstract void scanContainer(Container<?> c) throws IOException;
+  public abstract void scanContainer(Container<?> c)
+      throws IOException, InterruptedException;
 
   public final void handleRemainingSleep(long remainingSleep) {
     if (remainingSleep > 0) {
       try {
         Thread.sleep(remainingSleep);
       } catch (InterruptedException ignored) {
-        this.stopping = true;
+        stopping.set(true);
         LOG.warn("Background container scan was interrupted.");
         Thread.currentThread().interrupt();
       }
     }
   }
 
+  /**
+   * Shutdown the current container scanning thread.
+   * If the thread is already being shutdown, the call will block until the
+   * shutdown completes.
+   */
   public synchronized void shutdown() {
-    this.stopping = true;
-    this.interrupt();
-    try {
-      this.join();
-    } catch (InterruptedException ex) {
-      LOG.warn("Unexpected exception while stopping data scanner.", ex);
-      Thread.currentThread().interrupt();
+    if (stopping.compareAndSet(false, true)) {
+      this.interrupt();
+      try {
+        this.join();
+      } catch (InterruptedException ex) {
+        LOG.warn("Unexpected exception while stopping data scanner.", ex);
+        Thread.currentThread().interrupt();
+      }
     }
+  }
+
+  public void pause() {
+    pausing.getAndSet(true);
+  }
+
+  public void unpause() {
+    pausing.getAndSet(false);
   }
 
   @VisibleForTesting

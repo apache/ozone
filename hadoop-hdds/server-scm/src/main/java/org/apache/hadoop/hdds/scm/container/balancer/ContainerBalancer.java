@@ -31,7 +31,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -251,8 +250,7 @@ public class ContainerBalancer extends StatefulService {
    */
   public void startBalancer(ContainerBalancerConfiguration configuration)
       throws IllegalContainerBalancerStateException,
-      InvalidContainerBalancerConfigurationException, IOException,
-      TimeoutException {
+      InvalidContainerBalancerConfigurationException, IOException {
     lock.lock();
     try {
       // validates state, config, and then saves config
@@ -273,10 +271,11 @@ public class ContainerBalancer extends StatefulService {
    */
   private void startBalancingThread(int nextIterationIndex,
       boolean delayStart) {
+    String prefix = scmContext.threadNamePrefix();
     task = new ContainerBalancerTask(scm, nextIterationIndex, this, metrics,
         config, delayStart);
     Thread thread = new Thread(task);
-    thread.setName("ContainerBalancerTask-" + ID.incrementAndGet());
+    thread.setName(prefix + "ContainerBalancerTask-" + ID.incrementAndGet());
     thread.setDaemon(true);
     thread.start();
     currentBalancingThread = thread;
@@ -359,8 +358,7 @@ public class ContainerBalancer extends StatefulService {
    * "stop" command.
    */
   public void stopBalancer()
-      throws IOException, IllegalContainerBalancerStateException,
-      TimeoutException {
+      throws IOException, IllegalContainerBalancerStateException {
     Thread balancingThread;
     lock.lock();
     try {
@@ -377,7 +375,7 @@ public class ContainerBalancer extends StatefulService {
 
   public void saveConfiguration(ContainerBalancerConfiguration configuration,
                                 boolean shouldRun, int index)
-      throws IOException, TimeoutException {
+      throws IOException {
     config = configuration;
     saveConfiguration(configuration.toProtobufBuilder()
         .setShouldRun(shouldRun)

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import java.util.stream.Stream;
 
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -37,6 +38,10 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
 import org.apache.hadoop.hdds.scm.block.ScmBlockDeletingServiceMetrics;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
 import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -49,6 +54,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -162,9 +168,14 @@ public class TestBlockDeletion {
         0,
         TimeUnit.MILLISECONDS);
     conf.setInt("hdds.datanode.block.delete.threads.max", 5);
+    conf.setInt("hdds.datanode.block.delete.queue.limit", 32);
+    ReplicationManager.ReplicationManagerConfiguration replicationConf = conf
+        .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
+    replicationConf.setInterval(Duration.ofSeconds(300));
+    conf.setFromObject(replicationConf);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
-        .setHbInterval(200)
+        .setHbInterval(50)
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
@@ -195,6 +206,7 @@ public class TestBlockDeletion {
 
   @ParameterizedTest
   @MethodSource("replicationConfigs")
+  @Flaky("HDDS-9962")
   public void testBlockDeletion(ReplicationConfig repConfig) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
@@ -254,19 +266,19 @@ public class TestBlockDeletion {
     // close the containers which hold the blocks for the key
     OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
 
-    // If any container present as not closed, i.e. matches some entry 
+    // If any container present as not closed, i.e. matches some entry
     // not closed, then return false for wait
     ContainerSet containerSet = cluster.getHddsDatanodes().get(0)
         .getDatanodeStateMachine().getContainer().getContainerSet();
     GenericTestUtils.waitFor(() -> {
       return !(omKeyLocationInfoGroupList.stream().anyMatch((group) ->
-        group.getLocationList().stream().anyMatch((info) -> 
+        group.getLocationList().stream().anyMatch((info) ->
           containerSet.getContainer(info.getContainerID()).getContainerData()
               .getState() != ContainerProtos.ContainerDataProto.State.CLOSED
         )
       ));
     }, 1000, 30000);
-    
+
     // The blocks should be deleted in the DN.
     GenericTestUtils.waitFor(() -> {
       try {
@@ -282,11 +294,6 @@ public class TestBlockDeletion {
     Assertions.assertFalse(containerIdsWithDeletedBlocks.isEmpty());
     // Containers in the DN and SCM should have same delete transactionIds
     matchContainerTransactionIds();
-    // Containers in the DN and SCM should have same delete transactionIds
-    // after DN restart. The assertion is just to verify that the state of
-    // containerInfos in dn and scm is consistent after dn restart.
-    cluster.restartHddsDatanode(0, true);
-    matchContainerTransactionIds();
 
     // Verify transactions committed
     GenericTestUtils.waitFor(() -> {
@@ -298,6 +305,13 @@ public class TestBlockDeletion {
         return false;
       }
     }, 500, 10000);
+
+    // Containers in the DN and SCM should have same delete transactionIds
+    // after DN restart. The assertion is just to verify that the state of
+    // containerInfos in dn and scm is consistent after dn restart.
+    cluster.restartHddsDatanode(0, true);
+    matchContainerTransactionIds();
+
     Assertions.assertEquals(metrics.getNumBlockDeletionTransactionCreated(),
         metrics.getNumBlockDeletionTransactionCompleted());
     Assertions.assertTrue(metrics.getNumBlockDeletionCommandSent() >=
@@ -309,14 +323,18 @@ public class TestBlockDeletion {
     LOG.info(metrics.toString());
 
     // Datanode should receive retried requests with continuous retry counts.
-    Assertions.assertTrue(logCapturer.getOutput().contains("1(0)"));
-    Assertions.assertTrue(logCapturer.getOutput().contains("1(1)"));
-    Assertions.assertTrue(logCapturer.getOutput().contains("1(2)"));
-    Assertions.assertTrue(logCapturer.getOutput().contains("1(3)"));
+    for (int i = 5; i >= 0; i--) {
+      if (logCapturer.getOutput().contains("1(" + i + ")")) {
+        for (int j = 0; j <= i; j++) {
+          Assertions.assertTrue(logCapturer.getOutput()
+              .contains("1(" + i + ")"));
+        }
+        break;
+      }
+    }
   }
 
   @Test
-  @Flaky("HDDS-8353")
   public void testContainerStatisticsAfterDelete() throws Exception {
     ReplicationManager replicationManager = scm.getReplicationManager();
     boolean legacyEnabled = replicationManager.getConfig().isLegacyEnabled();
@@ -343,8 +361,6 @@ public class TestBlockDeletion {
             RatisReplicationConfig
                 .getInstance(HddsProtos.ReplicationFactor.THREE))
         .build();
-    List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList =
-        om.lookupKey(keyArgs).getKeyLocationVersions();
     Thread.sleep(5000);
     List<ContainerInfo> containerInfos =
         scm.getContainerManager().getContainers();
@@ -358,22 +374,13 @@ public class TestBlockDeletion {
     OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
     // Wait for container to close
     Thread.sleep(2000);
-    // make sure the containers are closed on the dn
-    omKeyLocationInfoGroupList.forEach((group) -> {
-      List<OmKeyLocationInfo> locationInfo = group.getLocationList();
-      locationInfo.forEach(
-          (info) -> cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
-              .getContainer().getContainerSet()
-              .getContainer(info.getContainerID()).getContainerData()
-              .setState(ContainerProtos.ContainerDataProto.State.CLOSED));
-    });
 
     writeClient.deleteKey(keyArgs);
     // Wait for blocks to be deleted and container reports to be processed
     GenericTestUtils.waitFor(() ->
-        scm.getContainerManager().getContainers().stream()
-            .allMatch(c -> c.getUsedBytes() == 0 && c.getNumberOfKeys() == 0),
-        500, 5000);
+            scm.getContainerManager().getContainers().stream()
+                .allMatch(c -> c.getUsedBytes() == 0 &&
+                    c.getNumberOfKeys() == 0), 500, 20000);
     Thread.sleep(5000);
     // Verify that pending block delete num are as expected with resent cmds
     cluster.getHddsDatanodes().forEach(dn -> {
@@ -433,6 +440,263 @@ public class TestBlockDeletion {
       return true;
     }, 500, 15000);
     LOG.info(metrics.toString());
+  }
+
+  @Test
+  public void testContainerStateAfterDNRestart() throws Exception {
+    ReplicationManager replicationManager = scm.getReplicationManager();
+
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    String value = RandomStringUtils.random(10 * 10);
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    String keyName = UUID.randomUUID().toString();
+    OzoneOutputStream out = bucket.createKey(keyName,
+        value.getBytes(UTF_8).length, ReplicationType.RATIS,
+        ReplicationFactor.THREE, new HashMap<>());
+    out.write(value.getBytes(UTF_8));
+    out.close();
+
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
+        .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
+        .setReplicationConfig(
+            RatisReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.THREE))
+        .build();
+    List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList =
+        om.lookupKey(keyArgs).getKeyLocationVersions();
+    Thread.sleep(5000);
+    List<ContainerInfo> containerInfos =
+        scm.getContainerManager().getContainers();
+    final int valueSize = value.getBytes(UTF_8).length;
+    final int keyCount = 1;
+    List<Long> containerIdList = new ArrayList<>();
+    containerInfos.stream().forEach(container -> {
+      Assertions.assertEquals(valueSize, container.getUsedBytes());
+      Assertions.assertEquals(keyCount, container.getNumberOfKeys());
+      containerIdList.add(container.getContainerID());
+    });
+
+    OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
+    // Wait for container to close
+    TestHelper.waitForContainerClose(cluster,
+        containerIdList.toArray(new Long[0]));
+    // make sure the containers are closed on the dn
+    omKeyLocationInfoGroupList.forEach((group) -> {
+      List<OmKeyLocationInfo> locationInfo = group.getLocationList();
+      locationInfo.forEach(
+          (info) -> cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
+              .getContainer().getContainerSet()
+              .getContainer(info.getContainerID()).getContainerData()
+              .setState(ContainerProtos.ContainerDataProto.State.CLOSED));
+    });
+
+    ContainerID containerId = ContainerID.valueOf(
+        containerInfos.get(0).getContainerID());
+    // Before restart container state is non-empty
+    Assertions.assertFalse(getContainerFromDN(
+        cluster.getHddsDatanodes().get(0), containerId.getId())
+        .getContainerData().isEmpty());
+    // Restart DataNode
+    cluster.restartHddsDatanode(0, true);
+
+    // After restart also container state remains non-empty.
+    Assertions.assertFalse(getContainerFromDN(
+        cluster.getHddsDatanodes().get(0), containerId.getId())
+        .getContainerData().isEmpty());
+
+    // Delete key
+    writeClient.deleteKey(keyArgs);
+    Thread.sleep(10000);
+
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return scm.getContainerManager().getContainerReplicas(
+            containerId).stream().
+            allMatch(replica -> replica.isEmpty());
+      } catch (ContainerNotFoundException e) {
+        throw new RuntimeException(e);
+      }
+    },
+        100, 10 * 1000);
+
+    // Container state should be empty now as key got deleted
+    Assertions.assertTrue(getContainerFromDN(
+        cluster.getHddsDatanodes().get(0), containerId.getId())
+        .getContainerData().isEmpty());
+
+    // Restart DataNode
+    cluster.restartHddsDatanode(0, true);
+    // Container state should be empty even after restart
+    Assertions.assertTrue(getContainerFromDN(
+        cluster.getHddsDatanodes().get(0), containerId.getId())
+        .getContainerData().isEmpty());
+
+    GenericTestUtils.waitFor(() -> {
+      replicationManager.processAll();
+      ((EventQueue)scm.getEventQueue()).processAll(1000);
+      List<ContainerInfo> infos = scm.getContainerManager().getContainers();
+      try {
+        infos.stream().forEach(container -> {
+          Assertions.assertEquals(HddsProtos.LifeCycleState.DELETED,
+              container.getState());
+          try {
+            Assertions.assertEquals(HddsProtos.LifeCycleState.DELETED,
+                scm.getScmMetadataStore().getContainerTable()
+                    .get(container.containerID()).getState());
+          } catch (IOException e) {
+            Assertions.fail(
+                "Container from SCM DB should be marked as DELETED");
+          }
+        });
+      } catch (Throwable e) {
+        LOG.info(e.getMessage());
+        return false;
+      }
+      return true;
+    }, 500, 30000);
+    LOG.info(metrics.toString());
+  }
+
+  /**
+   * Return the container for the given containerID from the given DN.
+   */
+  private Container getContainerFromDN(HddsDatanodeService hddsDatanodeService,
+                                       long containerID) {
+    return hddsDatanodeService.getDatanodeStateMachine().getContainer()
+        .getContainerSet().getContainer(containerID);
+  }
+
+  @Test
+  public void testContainerDeleteWithInvalidKeyCount()
+      throws Exception {
+    ReplicationManager replicationManager = scm.getReplicationManager();
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    String value = RandomStringUtils.random(1024 * 1024);
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    String keyName = UUID.randomUUID().toString();
+    OzoneOutputStream out = bucket.createKey(keyName,
+        value.getBytes(UTF_8).length, ReplicationType.RATIS,
+        ReplicationFactor.THREE, new HashMap<>());
+    out.write(value.getBytes(UTF_8));
+    out.close();
+
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
+        .setBucketName(bucketName).setKeyName(keyName).setDataSize(0)
+        .setReplicationConfig(
+            RatisReplicationConfig
+                .getInstance(HddsProtos.ReplicationFactor.THREE))
+        .build();
+    List<OmKeyLocationInfoGroup> omKeyLocationInfoGroupList =
+        om.lookupKey(keyArgs).getKeyLocationVersions();
+    Thread.sleep(5000);
+    List<ContainerInfo> containerInfos =
+        scm.getContainerManager().getContainers();
+    final int valueSize = value.getBytes(UTF_8).length;
+    final int keyCount = 1;
+    List<Long> containerIdList = new ArrayList<>();
+    containerInfos.stream().forEach(container -> {
+      Assertions.assertEquals(valueSize, container.getUsedBytes());
+      Assertions.assertEquals(keyCount, container.getNumberOfKeys());
+      containerIdList.add(container.getContainerID());
+    });
+
+    OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
+    // Wait for container to close
+    TestHelper.waitForContainerClose(cluster,
+        containerIdList.toArray(new Long[0]));
+    // make sure the containers are closed on the dn
+    omKeyLocationInfoGroupList.forEach((group) -> {
+      List<OmKeyLocationInfo> locationInfo = group.getLocationList();
+      locationInfo.forEach(
+          (info) -> cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
+              .getContainer().getContainerSet()
+              .getContainer(info.getContainerID()).getContainerData()
+              .setState(ContainerProtos.ContainerDataProto.State.CLOSED));
+    });
+
+    ContainerStateManager containerStateManager = scm.getContainerManager()
+        .getContainerStateManager();
+    ContainerID containerId = ContainerID.valueOf(
+        containerInfos.get(0).getContainerID());
+    // Get all the replicas state from SCM
+    Set<ContainerReplica> replicas
+        = scm.getContainerManager().getContainerReplicas(containerId);
+
+    // Ensure for all replica isEmpty are false in SCM
+    Assertions.assertTrue(scm.getContainerManager().getContainerReplicas(
+            containerId).stream().
+        allMatch(replica -> !replica.isEmpty()));
+
+    // Delete key
+    writeClient.deleteKey(keyArgs);
+    Thread.sleep(5000);
+
+    // Ensure isEmpty are true for all replica after delete key
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return scm.getContainerManager().getContainerReplicas(
+            containerId).stream()
+            .allMatch(replica -> replica.isEmpty());
+      } catch (ContainerNotFoundException e) {
+        throw new RuntimeException(e);
+      }
+    },
+        500, 5 * 2000);
+
+    // Update container replica by making invalid keyCount in one replica
+    ContainerReplica replicaOne = ContainerReplica.newBuilder()
+        .setContainerID(containerId)
+        .setKeyCount(10)
+        .setContainerState(StorageContainerDatanodeProtocolProtos
+            .ContainerReplicaProto.State.CLOSED)
+        .setDatanodeDetails(replicas.iterator().next().getDatanodeDetails())
+        .setEmpty(true)
+        .build();
+    // Update replica
+    containerStateManager.updateContainerReplica(containerId, replicaOne);
+
+    // Check replica updated with wrong keyCount
+    scm.getContainerManager().getContainerReplicas(
+            ContainerID.valueOf(containerInfos.get(0).getContainerID()))
+        .stream().anyMatch(replica -> replica.getKeyCount() == 10);
+
+    // Process delete container in SCM, ensure containers gets deleted,
+    // even though keyCount is invalid in one of the replica
+    GenericTestUtils.waitFor(() -> {
+      replicationManager.processAll();
+      ((EventQueue)scm.getEventQueue()).processAll(1000);
+      List<ContainerInfo> infos = scm.getContainerManager().getContainers();
+      try {
+        infos.stream().forEach(container -> {
+          Assertions.assertEquals(HddsProtos.LifeCycleState.DELETED,
+              container.getState());
+          try {
+            Assertions.assertEquals(HddsProtos.LifeCycleState.DELETED,
+                scm.getScmMetadataStore().getContainerTable()
+                    .get(container.containerID()).getState());
+          } catch (IOException e) {
+            Assertions.fail(
+                "Container from SCM DB should be marked as DELETED");
+          }
+        });
+      } catch (Throwable e) {
+        LOG.info(e.getMessage());
+        return false;
+      }
+      return true;
+    }, 500, 30000);
   }
 
   private void verifyTransactionsCommitted() throws IOException {

@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.junit.Test;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -33,7 +32,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 
-import static org.junit.Assert.assertEquals;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * {@link ECBlockOutputStreamEntry} tests.
@@ -60,21 +60,22 @@ public class TestECBlockOutputStreamEntry {
         .setState(Pipeline.PipelineState.OPEN)
         .setNodes(nodes)
         .build();
-    XceiverClientManager manager =
-        new XceiverClientManager(new OzoneConfiguration());
-    HashSet<XceiverClientSpi> clients = new HashSet<>();
-    ECBlockOutputStreamEntry entry = new ECBlockOutputStreamEntry.Builder()
-        .setXceiverClientManager(manager)
-        .setPipeline(anECPipeline)
-        .build();
-    for (int i = 0; i < nodes.size(); i++) {
-      clients.add(
-          manager.acquireClient(
-              entry.createSingleECBlockPipeline(
-                  anECPipeline, nodes.get(i), i
-              )));
+    try (XceiverClientManager manager =
+        new XceiverClientManager(new OzoneConfiguration())) {
+      HashSet<XceiverClientSpi> clients = new HashSet<>();
+      ECBlockOutputStreamEntry entry = new ECBlockOutputStreamEntry.Builder()
+          .setXceiverClientManager(manager)
+          .setPipeline(anECPipeline)
+          .build();
+      for (int i = 0; i < nodes.size(); i++) {
+        clients.add(
+            manager.acquireClient(
+                entry.createSingleECBlockPipeline(
+                    anECPipeline, nodes.get(i), i
+                )));
+      }
+      assertEquals(5, clients.size());
     }
-    assertEquals(5, clients.size());
   }
 
   @Test
@@ -97,23 +98,26 @@ public class TestECBlockOutputStreamEntry {
         .setState(Pipeline.PipelineState.OPEN)
         .setNodes(nodes)
         .build();
-    XceiverClientManager manager =
-        new XceiverClientManager(new OzoneConfiguration());
-    HashSet<XceiverClientSpi> clients = new HashSet<>();
-    ECBlockOutputStreamEntry entry = new ECBlockOutputStreamEntry.Builder()
-        .setXceiverClientManager(manager)
-        .setPipeline(anECPipeline)
-        .build();
-    for (int i = 0; i < nodes.size(); i++) {
-      clients.add(
-          manager.acquireClient(
-              entry.createSingleECBlockPipeline(
-                  anECPipeline, nodes.get(i), i
-              )));
+    try (XceiverClientManager manager =
+        new XceiverClientManager(new OzoneConfiguration())) {
+      HashSet<XceiverClientSpi> clients = new HashSet<>();
+      ECBlockOutputStreamEntry entry = new ECBlockOutputStreamEntry.Builder()
+          .setXceiverClientManager(manager)
+          .setPipeline(anECPipeline)
+          .build();
+      for (int i = 0; i < nodes.size(); i++) {
+        clients.add(
+            manager.acquireClient(
+                entry.createSingleECBlockPipeline(
+                    anECPipeline, nodes.get(i), i
+                )));
+      }
+      assertEquals(3, clients.size());
+      assertEquals(1,
+          clients.stream().filter(c -> c.getRefcount() == 3).count());
+      assertEquals(2,
+          clients.stream().filter(c -> c.getRefcount() == 1).count());
     }
-    assertEquals(3, clients.size());
-    assertEquals(1, clients.stream().filter(c -> c.getRefcount() == 3).count());
-    assertEquals(2, clients.stream().filter(c -> c.getRefcount() == 1).count());
   }
 
   private DatanodeDetails aNode(String ip, String hostName, int port) {

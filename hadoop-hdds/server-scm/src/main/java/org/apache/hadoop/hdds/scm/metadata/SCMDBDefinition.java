@@ -58,7 +58,7 @@ public class SCMDBDefinition extends DBDefinition.WithMap {
           Long.class,
           LongCodec.get(),
           DeletedBlocksTransaction.class,
-          Proto2Codec.get(DeletedBlocksTransaction.class));
+          Proto2Codec.get(DeletedBlocksTransaction.getDefaultInstance()));
 
   public static final DBColumnFamilyDefinition<BigInteger, X509Certificate>
       VALID_CERTS =
@@ -182,7 +182,7 @@ public class SCMDBDefinition extends DBDefinition.WithMap {
           String.class,
           StringCodec.get(),
           ByteString.class,
-          ByteStringCodec.getInstance());
+          ByteStringCodec.get());
 
   private static final Map<String, DBColumnFamilyDefinition<?, ?>>
       COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMap(

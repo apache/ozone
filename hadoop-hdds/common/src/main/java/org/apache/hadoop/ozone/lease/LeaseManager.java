@@ -63,7 +63,7 @@ public class LeaseManager<T> {
    *        Default timeout in milliseconds to be used for lease creation.
    */
   public LeaseManager(String name, long defaultTimeout) {
-    this.name = name;
+    this.name = name + "LeaseManager";
     this.defaultTimeout = defaultTimeout;
   }
 
@@ -71,11 +71,11 @@ public class LeaseManager<T> {
    * Starts the lease manager service.
    */
   public void start() {
-    LOG.debug("Starting {} LeaseManager service", name);
+    LOG.debug("Starting {} service", name);
     activeLeases = new ConcurrentHashMap<>();
     leaseMonitor = new LeaseMonitor();
     leaseMonitorThread = new Thread(leaseMonitor);
-    leaseMonitorThread.setName(name + "-LeaseManager#LeaseMonitor");
+    leaseMonitorThread.setName(name + "#LeaseMonitor");
     leaseMonitorThread.setDaemon(true);
     leaseMonitorThread.setUncaughtExceptionHandler((thread, throwable) -> {
       // Let us just restart this thread after logging an error.
@@ -84,7 +84,7 @@ public class LeaseManager<T> {
           thread.toString(), throwable);
       leaseMonitorThread.start();
     });
-    LOG.debug("Starting {}-LeaseManager#LeaseMonitor Thread", name);
+    LOG.debug("Starting {} Thread", leaseMonitorThread.getName());
     leaseMonitorThread.start();
     isRunning = true;
   }
@@ -149,11 +149,26 @@ public class LeaseManager<T> {
     if (activeLeases.containsKey(resource)) {
       throw new LeaseAlreadyExistException(messageForResource(resource));
     }
-    Lease<T> lease = new Lease<>(resource, timeout);
-    lease.registerCallBack(callback);
+    Lease<T> lease = new Lease<>(resource, timeout, callback);
     activeLeases.put(resource, lease);
     semaphore.release();
     return lease;
+  }
+
+  /**
+   * Returns a lease for the specified resource with the default timeout.
+   *
+   * @param resource
+   *        Resource for which lease has to be created
+   * @param callback
+   *        The callback trigger when lease expire
+   * @throws LeaseAlreadyExistException
+   *         If there is already a lease on the resource
+   */
+  public synchronized Lease<T> acquire(
+      T resource, Callable<Void> callback)
+      throws LeaseAlreadyExistException, LeaseExpiredException {
+    return acquire(resource, defaultTimeout, callback);
   }
 
   /**

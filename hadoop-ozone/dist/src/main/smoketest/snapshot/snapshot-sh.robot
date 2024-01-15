@@ -47,13 +47,28 @@ Snapshot Diff
     Set Suite Variable      ${KEY_THREE}        ${key_three}
     ${snapshot_two} =       Create snapshot     ${VOLUME}       ${BUCKET}
     Set Suite Variable      ${SNAPSHOT_TWO}     ${snapshot_two}
-    ${result} =     Execute             ozone sh snapshot snapshotDiff /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE} ${SNAPSHOT_TWO}
+    ${result} =     Execute             ozone sh snapshot diff /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE} ${SNAPSHOT_TWO}
                     Should contain      ${result}       Snapshot diff job is IN_PROGRESS
-    ${result} =     Execute             ozone sh snapshot snapshotDiff /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE} ${SNAPSHOT_TWO}
+    ${result} =     Execute             ozone sh snapshot diff /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE} ${SNAPSHOT_TWO}
                     Should contain      ${result}       +    ${KEY_TWO}
                     Should contain      ${result}       +    ${KEY_THREE}
+
+List Snapshot Diff Jobs
+    ${result} =     Execute             ozone sh snapshot listDiff /${VOLUME}/${BUCKET} --all
+                    Should contain      ${result}        ${VOLUME}
+                    Should contain      ${result}        ${BUCKET}
+                    Should contain      ${result}        ${SNAPSHOT_ONE}
+                    Should contain      ${result}        ${SNAPSHOT_TWO}
 
 Read Snapshot
     Key Should Match Local File         /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_ONE}/${KEY_ONE}       /etc/hosts
     Key Should Match Local File         /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_TWO}/${KEY_TWO}       /etc/passwd
     Key Should Match Local File         /${VOLUME}/${BUCKET}/${SNAPSHOT_INDICATOR}/${SNAPSHOT_TWO}/${KEY_THREE}     /etc/group
+
+Delete snapshot
+    ${output} =         Execute           ozone sh snapshot delete /${VOLUME}/${BUCKET} ${SNAPSHOT_ONE}
+                        Should not contain      ${output}       Failed
+
+    ${output} =         Execute            ozone sh snapshot ls /${VOLUME}/${BUCKET} | jq '[.[] | select(.name == "${SNAPSHOT_ONE}") | .snapshotStatus] | if length > 0 then .[] else "SNAPSHOT_DELETED" end'
+                        Should contain   ${output}   SNAPSHOT_DELETED
+

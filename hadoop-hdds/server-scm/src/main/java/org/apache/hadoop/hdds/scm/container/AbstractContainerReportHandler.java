@@ -159,6 +159,7 @@ public class AbstractContainerReportHandler {
         getOtherReplicas(containerInfo.containerID(), newSource);
     long usedBytes = newReplica.getUsed();
     long keyCount = newReplica.getKeyCount();
+
     for (ContainerReplica r : otherReplicas) {
       usedBytes = calculateUsage(containerInfo, usedBytes, r.getBytesUsed());
       keyCount = calculateUsage(containerInfo, keyCount, r.getKeyCount());
@@ -256,10 +257,11 @@ public class AbstractContainerReportHandler {
        * any other state.
        */
       if (replica.getState() != State.OPEN) {
-        logger.warn("Container {} is in OPEN state, but the datanode {} " +
-            "reports an {} replica.", containerId,
-            datanode, replica.getState());
-        // Should we take some action?
+        logger.info("Moving OPEN container {} to CLOSING state, datanode {} " +
+                "reported {} replica with index {}.", containerId, datanode,
+            replica.getState(), replica.getReplicaIndex());
+        containerManager.updateContainerState(containerId,
+            LifeCycleEvent.FINALIZE);
       }
       break;
     case CLOSING:
@@ -378,6 +380,7 @@ public class AbstractContainerReportHandler {
         .setKeyCount(replicaProto.getKeyCount())
         .setReplicaIndex(replicaProto.getReplicaIndex())
         .setBytesUsed(replicaProto.getUsed())
+        .setEmpty(replicaProto.getIsEmpty())
         .build();
 
     if (replica.getState().equals(State.DELETED)) {

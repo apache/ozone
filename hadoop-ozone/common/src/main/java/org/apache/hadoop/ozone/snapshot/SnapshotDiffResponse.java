@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.snapshot;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffResponse.JobStatusProto;
 
 /**
@@ -32,7 +33,8 @@ public class SnapshotDiffResponse {
     IN_PROGRESS,
     DONE,
     REJECTED,
-    FAILED;
+    FAILED,
+    CANCELLED;
 
     public JobStatusProto toProtobuf() {
       return JobStatusProto.valueOf(this.name());
@@ -46,6 +48,7 @@ public class SnapshotDiffResponse {
   private final SnapshotDiffReportOzone snapshotDiffReport;
   private final JobStatus jobStatus;
   private final long waitTimeInMs;
+  private final String reason;
 
   public SnapshotDiffResponse(final SnapshotDiffReportOzone snapshotDiffReport,
                               final JobStatus jobStatus,
@@ -53,6 +56,17 @@ public class SnapshotDiffResponse {
     this.snapshotDiffReport = snapshotDiffReport;
     this.jobStatus = jobStatus;
     this.waitTimeInMs = waitTimeInMs;
+    this.reason = StringUtils.EMPTY;
+  }
+
+  public SnapshotDiffResponse(final SnapshotDiffReportOzone snapshotDiffReport,
+                              final JobStatus jobStatus,
+                              final long waitTimeInMs,
+                              final String reason) {
+    this.snapshotDiffReport = snapshotDiffReport;
+    this.jobStatus = jobStatus;
+    this.waitTimeInMs = waitTimeInMs;
+    this.reason = reason;
   }
 
   public SnapshotDiffReportOzone getSnapshotDiffReport() {
@@ -67,18 +81,37 @@ public class SnapshotDiffResponse {
     return waitTimeInMs;
   }
 
+  public String getReason() {
+    return reason;
+  }
+
   @Override
   public String toString() {
     StringBuilder str = new StringBuilder();
-    if (jobStatus == JobStatus.DONE) {
+    switch (jobStatus) {
+    case DONE:
       str.append(snapshotDiffReport.toString());
-    } else {
-      str.append("Snapshot diff job is ");
-      str.append(jobStatus);
-      str.append("\n");
-      str.append("Please retry after ");
-      str.append(waitTimeInMs);
-      str.append(" ms.");
+      break;
+    case FAILED:
+      str.append("Snapshot diff job is FAILED due to '");
+      if (StringUtils.isNotEmpty(reason)) {
+        str.append(reason);
+      } else {
+        str.append("Unknown reason.");
+      }
+      str.append("'. Please retry after ")
+          .append(waitTimeInMs)
+          .append(" ms.\n");
+      break;
+    case CANCELLED:
+      str.append("Snapshot diff job has been CANCELLED.");
+      break;
+    default:
+      str.append("Snapshot diff job is ")
+          .append(jobStatus)
+          .append(". Please retry after ")
+          .append(waitTimeInMs)
+          .append(" ms.\n");
     }
     return str.toString();
   }

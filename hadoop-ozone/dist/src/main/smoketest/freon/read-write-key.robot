@@ -28,18 +28,24 @@ Pre-generate 100 keys of size 1 byte each to Ozone
 
 Read 10 keys from pre-generated keys
     ${keysCount} =     BuiltIn.Set Variable   10
-    ${result} =        Execute          ozone freon ockrw -n ${keysCount} -t 10 -r 100 -v voltest -b buckettest -p performanceTest
+    ${result} =        Execute          ozone freon ockrw -n ${keysCount} -t 10 -r 100 -v voltest -b buckettest -p performanceTest --percentage-read 100 --percentage-list 0
                        Should contain   ${result}   Successful executions: ${keysCount}
 
-Read 10 keys' metadata from pre-generated keys
+Read 10 keys metadata from pre-generated keys
     ${keysCount} =     BuiltIn.Set Variable   10
-    ${result} =        Execute          ozone freon ockrw -n ${keysCount} -t 10 -m -r 100 -v voltest -b buckettest -p performanceTest
+    ${result} =        Execute          ozone freon ockrw -n ${keysCount} -t 10 -m -r 100 -v voltest -b buckettest -p performanceTest --percentage-read 100 --percentage-list 0
+                       Should contain   ${result}   Successful executions: ${keysCount}
+
+Read 10 keys when generate in linear manner
+    ${keysCount} =     BuiltIn.Set Variable   10
+    ${result} =        Execute          ozone freon ockrw -n ${keysCount} -t 1 -r 100 --size 0 -v voltest -b buckettest -p performanceTest --linear --percentage-read=0 --percentage-list=0
+    ${result} =        Execute          ozone freon ockrw -n ${keysCount} -t 1 -m -r 100 -v voltest -b buckettest -p performanceTest --linear --percentage-read=100 --percentage-list=0
                        Should contain   ${result}   Successful executions: ${keysCount}
 
 Write 10 keys of size 1 byte each from key index 0 to 99
     ${keysCount} =     BuiltIn.Set Variable   10
     ${size} =          BuiltIn.Set Variable   1
-    ${result} =        Execute          ozone freon ockrw -n ${keysCount} -t 10 --percentage-read 0 --size ${size} -r 100 -v voltest -b buckettest -p performanceTest
+    ${result} =        Execute          ozone freon ockrw -n ${keysCount} -t 10 --percentage-read 0 --percentage-list 0 --size ${size} -r 100 -v voltest -b buckettest -p performanceTest --linear
                        Should contain   ${result}   Successful executions: ${keysCount}
     ${keyName} =       Execute          echo -n '1' | md5sum | head -c 7
     ${result} =        Execute          ozone sh key info /voltest/buckettest/performanceTest/${keyName}
@@ -48,6 +54,11 @@ Write 10 keys of size 1 byte each from key index 0 to 99
 
 Run 90 % of read-key tasks and 10 % of write-key tasks for 10 keys from pre-generated keys
     ${keysCount} =     BuiltIn.Set Variable   10
-    ${result} =        Execute          ozone freon ockrw -n ${keysCount} -t 10 --percentage-read 90 -r 100 -v voltest -b buckettest -p performanceTest
+    ${result} =        Execute          ozone freon ockrw -n ${keysCount} -t 10 --percentage-read 90 --percentage-list 0 -r 100 -v voltest -b buckettest -p performanceTest
+                       Should contain   ${result}   Successful executions: ${keysCount}
+
+Run 50 % of read-key tasks, 40 % list-key tasks and 10 % of write-key tasks for 10 keys from pre-generated keys
+    ${keysCount} =     BuiltIn.Set Variable   10
+    ${result} =        Execute          ozone freon ockrw -n ${keysCount} -t 10 --percentage-read 50 --percentage-list 40 -r 100 -v voltest -b buckettest -p performanceTest
                        Should contain   ${result}   Successful executions: ${keysCount}
 

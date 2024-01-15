@@ -24,13 +24,16 @@ import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.ozone.test.tag.Flaky;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import picocli.CommandLine;
+
+import static org.apache.ozone.test.GenericTestUtils.waitFor;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests Freon, with MiniOzoneCluster.
@@ -40,14 +43,8 @@ public class TestRandomKeyGenerator {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   */
   @BeforeAll
-  public static void init() throws Exception {
+  static void init() throws Exception {
     conf = new OzoneConfiguration();
     DatanodeRatisServerConfig ratisServerConfig =
         conf.getObject(DatanodeRatisServerConfig.class);
@@ -65,14 +62,28 @@ public class TestRandomKeyGenerator {
     cluster.waitForClusterToBeReady();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
-  public static void shutdown() {
+  static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }
+  }
+
+  @Test
+  @Timeout(5)
+  void singleFailedAttempt() {
+    BaseFreonGenerator subject = new BaseFreonGenerator();
+    subject.setThreadNo(2);
+    subject.setTestNo(1);
+    subject.init();
+
+    assertThrows(RuntimeException.class, () -> subject.runTests(
+        n -> {
+          waitFor(subject::isCompleted, 100, 3000);
+          throw new RuntimeException("fail");
+        }
+    ));
+    assertEquals(1, subject.getFailureCount());
   }
 
   @Test
@@ -84,9 +95,9 @@ public class TestRandomKeyGenerator {
         "--num-of-buckets", "5",
         "--num-of-keys", "10");
 
-    Assert.assertEquals(2, randomKeyGenerator.getNumberOfVolumesCreated());
-    Assert.assertEquals(10, randomKeyGenerator.getNumberOfBucketsCreated());
-    Assert.assertEquals(100, randomKeyGenerator.getNumberOfKeysAdded());
+    assertEquals(2, randomKeyGenerator.getNumberOfVolumesCreated());
+    assertEquals(10, randomKeyGenerator.getNumberOfBucketsCreated());
+    assertEquals(100, randomKeyGenerator.getNumberOfKeysAdded());
     randomKeyGenerator.printStats(System.out);
   }
 
@@ -102,9 +113,9 @@ public class TestRandomKeyGenerator {
         "--type", "EC"
     );
 
-    Assert.assertEquals(2, randomKeyGenerator.getNumberOfVolumesCreated());
-    Assert.assertEquals(10, randomKeyGenerator.getNumberOfBucketsCreated());
-    Assert.assertEquals(100, randomKeyGenerator.getNumberOfKeysAdded());
+    assertEquals(2, randomKeyGenerator.getNumberOfVolumesCreated());
+    assertEquals(10, randomKeyGenerator.getNumberOfBucketsCreated());
+    assertEquals(100, randomKeyGenerator.getNumberOfKeysAdded());
   }
 
   @Test
@@ -116,14 +127,14 @@ public class TestRandomKeyGenerator {
         "--num-of-buckets", "1",
         "--num-of-keys", "10",
         "--num-of-threads", "10",
-        "--key-size", "10240",
+        "--key-size", "10KB",
         "--factor", "THREE",
         "--type", "RATIS"
     );
 
-    Assert.assertEquals(10, randomKeyGenerator.getNumberOfVolumesCreated());
-    Assert.assertEquals(10, randomKeyGenerator.getNumberOfBucketsCreated());
-    Assert.assertEquals(100, randomKeyGenerator.getNumberOfKeysAdded());
+    assertEquals(10, randomKeyGenerator.getNumberOfVolumesCreated());
+    assertEquals(10, randomKeyGenerator.getNumberOfBucketsCreated());
+    assertEquals(100, randomKeyGenerator.getNumberOfKeysAdded());
   }
 
   @Test
@@ -135,14 +146,14 @@ public class TestRandomKeyGenerator {
         "--num-of-buckets", "1",
         "--num-of-keys", "10",
         "--num-of-threads", "10",
-        "--key-size", "10240",
+        "--key-size", "10KB",
         "--factor", "THREE",
         "--type", "RATIS"
     );
 
-    Assert.assertEquals(10, randomKeyGenerator.getNumberOfVolumesCreated());
-    Assert.assertEquals(10, randomKeyGenerator.getNumberOfBucketsCreated());
-    Assert.assertEquals(100, randomKeyGenerator.getNumberOfKeysAdded());
+    assertEquals(10, randomKeyGenerator.getNumberOfVolumesCreated());
+    assertEquals(10, randomKeyGenerator.getNumberOfBucketsCreated());
+    assertEquals(100, randomKeyGenerator.getNumberOfKeysAdded());
   }
 
   @Test
@@ -154,16 +165,16 @@ public class TestRandomKeyGenerator {
         "--num-of-buckets", "1",
         "--num-of-keys", "1",
         "--num-of-threads", "1",
-        "--key-size", String.valueOf(10L + Integer.MAX_VALUE),
+        "--key-size", "2.01GB",
         "--factor", "THREE",
         "--type", "RATIS",
         "--validate-writes"
     );
 
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
-    Assert.assertEquals(1, randomKeyGenerator.getSuccessfulValidationCount());
+    assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
+    assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
+    assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
+    assertEquals(1, randomKeyGenerator.getSuccessfulValidationCount());
   }
 
   @Test
@@ -181,10 +192,10 @@ public class TestRandomKeyGenerator {
         "--validate-writes"
     );
 
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
-    Assert.assertEquals(1, randomKeyGenerator.getSuccessfulValidationCount());
+    assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
+    assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
+    assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
+    assertEquals(1, randomKeyGenerator.getSuccessfulValidationCount());
   }
 
   @Test
@@ -200,12 +211,11 @@ public class TestRandomKeyGenerator {
         "--type", "RATIS"
     );
 
-    Assert.assertEquals(10, randomKeyGenerator.getThreadPoolSize());
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
+    assertEquals(10, randomKeyGenerator.getThreadPoolSize());
+    assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
   }
 
   @Test
-  @Flaky("HDDS-5993")
   void cleanObjectsTest() {
     RandomKeyGenerator randomKeyGenerator =
         new RandomKeyGenerator(cluster.getConf());
@@ -219,10 +229,10 @@ public class TestRandomKeyGenerator {
         "--clean-objects"
     );
 
-    Assert.assertEquals(2, randomKeyGenerator.getNumberOfVolumesCreated());
-    Assert.assertEquals(10, randomKeyGenerator.getNumberOfBucketsCreated());
-    Assert.assertEquals(100, randomKeyGenerator.getNumberOfKeysAdded());
-    Assert.assertEquals(2, randomKeyGenerator.getNumberOfVolumesCleaned());
-    Assert.assertEquals(10, randomKeyGenerator.getNumberOfBucketsCleaned());
+    assertEquals(2, randomKeyGenerator.getNumberOfVolumesCreated());
+    assertEquals(10, randomKeyGenerator.getNumberOfBucketsCreated());
+    assertEquals(100, randomKeyGenerator.getNumberOfKeysAdded());
+    assertEquals(2, randomKeyGenerator.getNumberOfVolumesCleaned());
+    assertEquals(10, randomKeyGenerator.getNumberOfBucketsCleaned());
   }
 }

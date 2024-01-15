@@ -31,15 +31,27 @@ public final class TenantArgs {
   private final String volumeName;
 
   /**
-   * Private constructor, constructed via builder.
-   * @param volumeName Volume name.
+   * Force tenant creation when volume exists.
    */
-  private TenantArgs(String volumeName) {
+  private final boolean forceCreationWhenVolumeExists;
+
+  /**
+   * Private constructor, constructed via builder.
+   *
+   * @param volumeName                    Volume name.
+   * @param forceCreationWhenVolumeExists Force creation when volume exists.
+   */
+  private TenantArgs(String volumeName, boolean forceCreationWhenVolumeExists) {
     this.volumeName = volumeName;
+    this.forceCreationWhenVolumeExists = forceCreationWhenVolumeExists;
   }
 
   public String getVolumeName() {
     return volumeName;
+  }
+
+  public boolean getForceCreationWhenVolumeExists() {
+    return forceCreationWhenVolumeExists;
   }
 
   /**
@@ -57,6 +69,7 @@ public final class TenantArgs {
   @SuppressWarnings("checkstyle:hiddenfield")
   public static class Builder {
     private String volumeName;
+    private boolean forceCreationWhenVolumeExists;
 
     /**
      * Constructs a builder.
@@ -69,13 +82,19 @@ public final class TenantArgs {
       return this;
     }
 
+    public TenantArgs.Builder setForceCreationWhenVolumeExists(
+        boolean forceCreationWhenVolumeExists) {
+      this.forceCreationWhenVolumeExists = forceCreationWhenVolumeExists;
+      return this;
+    }
+
     /**
      * Constructs a TenantArgs.
      * @return TenantArgs.
      */
     public TenantArgs build() {
       Preconditions.checkNotNull(volumeName);
-      return new TenantArgs(volumeName);
+      return new TenantArgs(volumeName, forceCreationWhenVolumeExists);
     }
   }
 

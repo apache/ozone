@@ -27,7 +27,3 @@ source "$COMPOSE_DIR/../testlib.sh"
 start_docker_env
 
 execute_robot_test csi csi.robot
-
-stop_docker_env
-
-generate_report

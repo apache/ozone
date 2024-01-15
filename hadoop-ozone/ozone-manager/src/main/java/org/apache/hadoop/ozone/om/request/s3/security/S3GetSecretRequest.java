@@ -19,23 +19,24 @@
 package org.apache.hadoop.ozone.om.request.s3.security;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.security.S3GetSecretResponse;
@@ -72,7 +73,8 @@ public class S3GetSecretRequest extends OMClientRequest {
     // protolock check.
     final String accessId = s3GetSecretRequest.getKerberosID();
 
-    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
+    final UserGroupInformation ugi =
+        S3SecretRequestHelper.getOrCreateUgi(accessId);
     // Permission check
     S3SecretRequestHelper.checkAccessIdSecretOpPermission(
         ozoneManager, ugi, accessId);
@@ -125,13 +127,11 @@ public class S3GetSecretRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-    IOException exception = null;
+    Exception exception = null;
 
     final GetS3SecretRequest getS3SecretRequest =
             getOmRequest().getGetS3SecretRequest();
@@ -160,6 +160,8 @@ public class S3GetSecretRequest extends OMClientRequest {
                 // Add new entry in this case
                 assignS3SecretValue =
                     new S3SecretValue(accessId, awsSecret.get());
+                // Set the transactionLogIndex to be used for updating.
+                assignS3SecretValue.setTransactionLogIndex(termIndex.getIndex());
                 // Add cache entry first.
                 s3SecretManager.updateCache(accessId,
                     assignS3SecretValue);
@@ -167,7 +169,18 @@ public class S3GetSecretRequest extends OMClientRequest {
                 assignS3SecretValue = null;
               }
             } else {
-              // Found in S3SecretTable.
+              final OMMultiTenantManager multiTenantManager =
+                  ozoneManager.getMultiTenantManager();
+              if (multiTenantManager == null ||
+                  !multiTenantManager.getTenantForAccessID(accessId)
+                      .isPresent()) {
+                // Access Id is not assigned to any tenant and
+                // Secret is found in S3SecretTable. No secret is returned.
+                throw new OMException("Secret for '" + accessId +
+                    "' already exists", OMException.ResultCodes.
+                    S3_SECRET_ALREADY_EXISTS);
+              }
+              // For tenant getsecret, secret is always returned
               awsSecret.set(s3SecretValue.getAwsSecret());
               assignS3SecretValue = null;
             }
@@ -195,14 +208,11 @@ public class S3GetSecretRequest extends OMClientRequest {
           });
 
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new S3GetSecretResponse(null,
           ozoneManager.getS3SecretManager(),
-          createErrorOMResponse(omResponse, ex));
-    } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
+          createErrorOMResponse(omResponse, exception));
     }
 
     Map<String, String> auditMap = new HashMap<>();

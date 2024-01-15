@@ -18,9 +18,18 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import org.rocksdb.RocksObject;
+import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.utils.LeakDetector;
+import org.apache.ratis.util.UncheckedAutoCloseable;
+import org.rocksdb.RocksDB;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
+import java.io.File;
+import java.io.IOException;
+import java.time.Duration;
 
 /**
  * Utilities to help assert RocksObject closures.
@@ -32,26 +41,57 @@ public final class ManagedRocksObjectUtils {
   public static final Logger LOG =
       LoggerFactory.getLogger(ManagedRocksObjectUtils.class);
 
-  static void assertClosed(RocksObject rocksObject) {
-    assertClosed(rocksObject, null);
-  }
+  private static final Duration POLL_INTERVAL_DURATION = Duration.ofMillis(100);
 
-  public static void assertClosed(ManagedObject<?> object) {
-    assertClosed(object.get(), object.getStackTrace());
-  }
+  private static final LeakDetector LEAK_DETECTOR = new LeakDetector("ManagedRocksObject");
 
-  static void assertClosed(RocksObject rocksObject, String stackTrace) {
+  static UncheckedAutoCloseable track(AutoCloseable object) {
     ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
-    if (rocksObject.isOwningHandle()) {
-      ManagedRocksObjectMetrics.INSTANCE.increaseLeakObject();
-      String warning = String.format("%s is not closed properly",
-          rocksObject.getClass().getSimpleName());
-      if (stackTrace != null && LOG.isDebugEnabled()) {
-        String debugMessage = String
-            .format("%n StackTrace for unclosed instance: %s", stackTrace);
-        warning = warning.concat(debugMessage);
-      }
-      LOG.warn(warning);
+    final Class<?> clazz = object.getClass();
+    final StackTraceElement[] stackTrace = getStackTrace();
+    return LEAK_DETECTOR.track(object, () -> reportLeak(clazz, formatStackTrace(stackTrace)));
+  }
+
+  static void reportLeak(Class<?> clazz, String stackTrace) {
+    ManagedRocksObjectMetrics.INSTANCE.increaseLeakObject();
+    String warning = String.format("%s is not closed properly", clazz.getSimpleName());
+    if (stackTrace != null && LOG.isDebugEnabled()) {
+      String debugMessage = String.format("%nStackTrace for unclosed instance: %s", stackTrace);
+      warning = warning.concat(debugMessage);
     }
+    LOG.warn(warning);
+  }
+
+  private static @Nullable StackTraceElement[] getStackTrace() {
+    return HddsUtils.getStackTrace(LOG);
+  }
+
+  static String formatStackTrace(@Nullable StackTraceElement[] elements) {
+    return HddsUtils.formatStackTrace(elements, 4);
+  }
+
+  /**
+   * Wait for file to be deleted.
+   * @param file File to be deleted.
+   * @param maxDuration poll max duration.
+   * @throws IOException in case of failure.
+   */
+  public static void waitForFileDelete(File file, Duration maxDuration)
+      throws IOException {
+    if (!RatisHelper.attemptUntilTrue(() -> !file.exists(), POLL_INTERVAL_DURATION, maxDuration)) {
+      String msg = String.format("File: %s didn't get deleted in %s secs.",
+          file.getAbsolutePath(), maxDuration.getSeconds());
+      LOG.info(msg);
+      throw new IOException(msg);
+    }
+  }
+
+  /**
+   * Ensures that the RocksDB native library is loaded.
+   * This method should be called before performing any operations
+   * that require the RocksDB native library.
+   */
+  public static void loadRocksDBLibrary() {
+    RocksDB.loadLibrary();
   }
 }

@@ -71,29 +71,27 @@ public class Lease<T> {
   }
 
   /**
+   * Creates a lease on the specified resource with given timeout.
+   *
+   * @param resource
+   *        Resource for which the lease has to be created
+   * @param timeout
+   *        Lease lifetime in milliseconds
+   * @param callback
+   *        Callback registered to be triggered when lease expire
+   */
+  public Lease(T resource, long timeout, Callable<Void> callback) {
+    this(resource, timeout);
+    callbacks.add(callback);
+  }
+
+  /**
    * Returns true if the lease has expired, else false.
    *
    * @return true if expired, else false
    */
   public boolean hasExpired() {
     return expired;
-  }
-
-  /**
-   * Registers a callback which will be executed in case of timeout. Callbacks
-   * are executed in a separate Thread (by {@link LeaseManager}).
-   *
-   * @param callback
-   *        The Callable which has to be executed
-   * @throws LeaseExpiredException
-   *         If the lease has already timed out
-   */
-  public void registerCallBack(Callable<Void> callback)
-      throws LeaseExpiredException {
-    if (hasExpired()) {
-      throw new LeaseExpiredException(messageForResource(resource));
-    }
-    callbacks.add(callback);
   }
 
   /**

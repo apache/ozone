@@ -36,12 +36,12 @@ public class KeyInsightInfoResponse {
 
   /** Amount of data mapped to all keys and files in
    * a cluster across all DNs. */
-  @JsonProperty("replicatedTotal")
-  private long replicatedTotal;
+  @JsonProperty("replicatedDataSize")
+  private long replicatedDataSize;
 
   /** Amount of data mapped to all keys and files on a single DN. */
-  @JsonProperty("unreplicatedTotal")
-  private long unreplicatedTotal;
+  @JsonProperty("unreplicatedDataSize")
+  private long unreplicatedDataSize;
 
   /** List of all non-fso keys. */
   @JsonProperty("nonFSO")
@@ -69,8 +69,8 @@ public class KeyInsightInfoResponse {
   public KeyInsightInfoResponse() {
     responseCode = ResponseStatus.OK;
     lastKey = "";
-    replicatedTotal = 0L;
-    unreplicatedTotal = 0L;
+    replicatedDataSize = 0L;
+    unreplicatedDataSize = 0L;
     nonFSOKeyInfoList = new ArrayList<>();
     fsoKeyInfoList = new ArrayList<>();
     repeatedOmKeyInfoList = new ArrayList<>();
@@ -85,20 +85,20 @@ public class KeyInsightInfoResponse {
     this.lastKey = lastKey;
   }
 
-  public long getReplicatedTotal() {
-    return replicatedTotal;
+  public long getReplicatedDataSize() {
+    return replicatedDataSize;
   }
 
-  public void setReplicatedTotal(long replicatedTotal) {
-    this.replicatedTotal = replicatedTotal;
+  public void setReplicatedDataSize(long replicatedDataSize) {
+    this.replicatedDataSize = replicatedDataSize;
   }
 
-  public long getUnreplicatedTotal() {
-    return unreplicatedTotal;
+  public long getUnreplicatedDataSize() {
+    return unreplicatedDataSize;
   }
 
-  public void setUnreplicatedTotal(long unreplicatedTotal) {
-    this.unreplicatedTotal = unreplicatedTotal;
+  public void setUnreplicatedDataSize(long unreplicatedDataSize) {
+    this.unreplicatedDataSize = unreplicatedDataSize;
   }
 
   public List<KeyEntityInfo> getNonFSOKeyInfoList() {

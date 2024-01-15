@@ -24,6 +24,8 @@ import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+
 /**
  * Containers written using schema version 1 wrote unprefixed block ID keys
  * as longs, and metadata or prefixed block IDs as Strings. This was done
@@ -47,7 +49,7 @@ public final class SchemaOneKeyCodec implements Codec<String> {
   }
 
   @Override
-  public byte[] toPersistedFormat(String stringObject) {
+  public byte[] toPersistedFormat(String stringObject) throws IOException {
     try {
       // If the caller's string has no prefix, it should be stored as a long
       // to be encoded as a long to be consistent with the schema one

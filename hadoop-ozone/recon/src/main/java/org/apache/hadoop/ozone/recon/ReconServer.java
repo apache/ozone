@@ -25,10 +25,12 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.ozone.recon.api.types.FeatureProvider;
 import org.apache.hadoop.ozone.recon.security.ReconCertificateClient;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
@@ -57,8 +59,10 @@ import java.net.InetSocketAddress;
 import static org.apache.hadoop.hdds.ratis.RatisHelper.newJvmPauseMonitor;
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
+import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
 /**
@@ -119,7 +123,7 @@ public class ReconServer extends GenericCli {
         if (OzoneSecurityUtil.isSecurityEnabled(configuration)) {
           LOG.info("ReconStorageConfig initialized." +
               "Initializing certificate.");
-          initializeCertificateClient(configuration);
+          initializeCertificateClient();
         }
       } catch (Exception e) {
         LOG.error("Error during initializing Recon certificate", e);
@@ -146,8 +150,10 @@ public class ReconServer extends GenericCli {
 
       this.reconTaskStatusMetrics =
           injector.getInstance(ReconTaskStatusMetrics.class);
-      LOG.info("Recon server initialized successfully!");
 
+      LOG.info("Initializing support of Recon Features...");
+      FeatureProvider.initFeatureSupport(configuration);
+      LOG.info("Recon server initialized successfully!");
     } catch (Exception e) {
       LOG.error("Error during initializing Recon server.", e);
     }
@@ -169,47 +175,15 @@ public class ReconServer extends GenericCli {
   /**
    * Initializes secure Recon.
    * */
-  private void initializeCertificateClient(OzoneConfiguration conf)
+  private void initializeCertificateClient()
       throws IOException {
     LOG.info("Initializing secure Recon.");
-    certClient = new ReconCertificateClient(new SecurityConfig(configuration),
-        reconStorage, this::saveNewCertId, null);
-
-    CertificateClient.InitResponse response = certClient.init();
-    if (response.equals(CertificateClient.InitResponse.REINIT)) {
-      LOG.info("Re-initialize certificate client.");
-      certClient.close();
-      reconStorage.unsetReconCertSerialId();
-      reconStorage.persistCurrentState();
-      certClient = new ReconCertificateClient(new SecurityConfig(configuration),
-          reconStorage, this::saveNewCertId, this::terminateRecon);
-      response = certClient.init();
-    }
-    LOG.info("Init response: {}", response);
-    switch (response) {
-    case SUCCESS:
-      LOG.info("Initialization successful, case:{}.", response);
-      break;
-    case GETCERT:
-      String certId = certClient.signAndStoreCertificate(
-          certClient.getCSRBuilder().build());
-      reconStorage.setReconCertSerialId(certId);
-      reconStorage.persistCurrentState();
-      LOG.info("Successfully stored SCM signed certificate, case:{}.",
-          response);
-      break;
-    case FAILURE:
-      LOG.error("Recon security initialization failed, case:{}.", response);
-      throw new RuntimeException("Recon security initialization failed.");
-    case RECOVER:
-      LOG.error("Recon security initialization failed. Recon certificate is " +
-          "missing.");
-      throw new RuntimeException("Recon security initialization failed.");
-    default:
-      LOG.error("Recon security initialization failed. Init response: {}",
-          response);
-      throw new RuntimeException("Recon security initialization failed.");
-    }
+    SCMSecurityProtocolClientSideTranslatorPB scmSecurityClient =
+        getScmSecurityClientWithMaxRetry(configuration, getCurrentUser());
+    SecurityConfig secConf = new SecurityConfig(configuration);
+    certClient = new ReconCertificateClient(secConf, scmSecurityClient,
+        reconStorage, this::saveNewCertId, this::terminateRecon);
+    certClient.initWithRecovery();
   }
 
   public void saveNewCertId(String newCertId) {

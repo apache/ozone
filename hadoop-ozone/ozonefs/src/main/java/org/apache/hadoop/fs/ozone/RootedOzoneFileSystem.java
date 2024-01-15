@@ -18,7 +18,10 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import org.apache.hadoop.fs.LeaseRecoverable;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.SafeMode;
+import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -43,7 +46,7 @@ import java.net.URI;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
-    implements KeyProviderTokenIssuer {
+    implements KeyProviderTokenIssuer, LeaseRecoverable, SafeMode {
 
   private OzoneFSStorageStatistics storageStatistics;
 
@@ -117,5 +120,29 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
       return cap;
     }
     return super.hasPathCapability(p, capability);
+  }
+
+  @Override
+  public boolean recoverLease(final Path f) throws IOException {
+    statistics.incrementWriteOps(1);
+    LOG.trace("recoverLease() path:{}", f);
+    Path qualifiedPath = makeQualified(f);
+    String key = pathToKey(qualifiedPath);
+    return getAdapter().recoverLease(key);
+  }
+
+  @Override
+  public boolean isFileClosed(Path f) throws IOException {
+    statistics.incrementWriteOps(1);
+    LOG.trace("isFileClosed() path:{}", f);
+    Path qualifiedPath = makeQualified(f);
+    String key = pathToKey(qualifiedPath);
+    return getAdapter().isFileClosed(key);
+  }
+
+  @Override
+  public boolean setSafeMode(SafeModeAction action, boolean isChecked)
+      throws IOException {
+    return setSafeModeUtil(action, isChecked);
   }
 }

@@ -18,15 +18,12 @@
 
 package org.apache.hadoop.ozone;
 
-import com.google.common.collect.Lists;
 import com.google.protobuf.BlockingService;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.ReconfigurationException;
-import org.apache.hadoop.conf.ReconfigurationTaskStatus;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslatorPB;
@@ -35,15 +32,11 @@ import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.utils.VersionInfo;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.Server;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.Collection;
-import java.util.List;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HANDLER_COUNT_DEFAULT;
@@ -54,29 +47,25 @@ import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.CLIENT_R
 /**
  * The RPC server that listens to requests from clients.
  */
-public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl
-    implements ReconfigureProtocol {
+public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl {
   private static final Logger LOG =
       LoggerFactory.getLogger(HddsDatanodeClientProtocolServer.class);
   private final RPC.Server rpcServer;
-  private InetSocketAddress clientRpcAddress;
-  private final DatanodeDetails datanodeDetails;
-  private final HddsDatanodeService service;
+  private final InetSocketAddress clientRpcAddress;
   private final OzoneConfiguration conf;
 
-  protected HddsDatanodeClientProtocolServer(HddsDatanodeService service,
+  protected HddsDatanodeClientProtocolServer(
       DatanodeDetails datanodeDetails, OzoneConfiguration conf,
-      VersionInfo versionInfo) throws IOException {
+      VersionInfo versionInfo, ReconfigurationHandler reconfigurationHandler
+  ) throws IOException {
     super(versionInfo);
-    this.datanodeDetails = datanodeDetails;
-    this.service = service;
     this.conf = conf;
 
-    rpcServer = getRpcServer(conf);
+    rpcServer = getRpcServer(conf, reconfigurationHandler);
     clientRpcAddress = ServerUtils.updateRPCListenAddress(this.conf,
         HDDS_DATANODE_CLIENT_ADDRESS_KEY,
         HddsUtils.getDatanodeRpcAddress(conf), rpcServer);
-    this.datanodeDetails.setPort(CLIENT_RPC, clientRpcAddress.getPort());
+    datanodeDetails.setPort(CLIENT_RPC, clientRpcAddress.getPort());
   }
 
   public void start() {
@@ -98,57 +87,12 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl
     getClientRpcServer().join();
   }
 
-  @Override
-  public String getServerName() {
-    return "Datanode";
-  }
-
-  @Override
-  public void startReconfigure() throws IOException {
-    service.checkAdminUserPrivilege(getRemoteUser());
-    startReconfigurationTask();
-  }
-
-  @Override
-  public ReconfigurationTaskStatus getReconfigureStatus() throws IOException {
-    service.checkAdminUserPrivilege(getRemoteUser());
-    return getReconfigurationTaskStatus();
-  }
-
-  @Override
-  public List<String> listReconfigureProperties() throws IOException {
-    service.checkAdminUserPrivilege(getRemoteUser());
-    return Lists.newArrayList(service.getReconfigurableProperties());
-  }
-
-  // optimize ugi lookup for RPC operations to avoid a trip through
-  // UGI.getCurrentUser which is synch'ed
-  private static UserGroupInformation getRemoteUser() throws IOException {
-    UserGroupInformation ugi = Server.getRemoteUser();
-    return (ugi != null) ? ugi : UserGroupInformation.getCurrentUser();
-  }
-
-  @Override
-  public Configuration getConf() {
-    return conf;
-  }
-
-  @Override
-  public Collection<String> getReconfigurableProperties() {
-    return service.getReconfigurableProperties();
-  }
-
-  @Override
-  public String reconfigurePropertyImpl(String property, String newVal)
-      throws ReconfigurationException {
-    return service.reconfigurePropertyImpl(property, newVal);
-  }
-
   /**
    * Creates a new instance of rpc server. If an earlier instance is already
    * running then returns the same.
    */
-  private RPC.Server getRpcServer(OzoneConfiguration configuration)
+  private RPC.Server getRpcServer(OzoneConfiguration configuration,
+      ReconfigurationHandler reconfigurationHandler)
       throws IOException {
     InetSocketAddress rpcAddress = HddsUtils.getDatanodeRpcAddress(conf);
     // Add reconfigureProtocolService.
@@ -158,7 +102,7 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl
     final int handlerCount = conf.getInt(HDDS_DATANODE_HANDLER_COUNT_KEY,
         HDDS_DATANODE_HANDLER_COUNT_DEFAULT);
     ReconfigureProtocolServerSideTranslatorPB reconfigureServerProtocol
-        = new ReconfigureProtocolServerSideTranslatorPB(this);
+        = new ReconfigureProtocolServerSideTranslatorPB(reconfigurationHandler);
     BlockingService reconfigureService = ReconfigureProtocolProtos
         .ReconfigureProtocolService.newReflectiveBlockingService(
             reconfigureServerProtocol);
@@ -200,10 +144,5 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl
 
   public InetSocketAddress getClientRpcAddress() {
     return clientRpcAddress;
-  }
-
-  @Override
-  public void close() throws IOException {
-    stop();
   }
 }

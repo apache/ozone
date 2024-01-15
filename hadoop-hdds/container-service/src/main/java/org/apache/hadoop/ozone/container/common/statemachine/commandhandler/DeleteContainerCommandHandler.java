@@ -58,13 +58,14 @@ public class DeleteContainerCommandHandler implements CommandHandler {
   private int maxQueueSize;
 
   public DeleteContainerCommandHandler(
-      int threadPoolSize, Clock clock, int queueSize) {
+      int threadPoolSize, Clock clock, int queueSize, String threadNamePrefix) {
     this(clock, new ThreadPoolExecutor(
-        threadPoolSize, threadPoolSize,
-        0L, TimeUnit.MILLISECONDS,
-        new LinkedBlockingQueue<>(queueSize),
-        new ThreadFactoryBuilder()
-            .setNameFormat("DeleteContainerThread-%d").build()),
+            threadPoolSize, threadPoolSize,
+            0L, TimeUnit.MILLISECONDS,
+            new LinkedBlockingQueue<>(queueSize),
+            new ThreadFactoryBuilder()
+                .setNameFormat(threadNamePrefix + "DeleteContainerThread-%d")
+                .build()),
         queueSize);
   }
 
@@ -152,6 +153,11 @@ public class DeleteContainerCommandHandler implements CommandHandler {
     final int invocations = invocationCount.get();
     return invocations == 0 ?
         0 : totalTime.get() / invocations;
+  }
+
+  @Override
+  public long getTotalRunTime() {
+    return totalTime.get();
   }
 
   @Override

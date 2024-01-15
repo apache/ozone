@@ -132,9 +132,16 @@ public final class HddsClientUtils {
     // ozone allows namespace to follow other volume/bucket naming convention,
     // for example, here supports '_',
     // which is a valid character in POSIX-compliant system, like HDFS.
-    return (c == '.' || c == '-' ||
-        Character.isLowerCase(c) || Character.isDigit(c)) ||
-        (c == '_' && !isStrictS3);
+    if (c >= '0' && c <= '9') {
+      return true;
+    } else if (c >= 'a' && c <= 'z') {
+      return true;
+    } else if (c == '-' || c == '.') {
+      return true;
+    } else if (c == '_' && !isStrictS3) {
+      return true;
+    }
+    return false;
   }
 
   private static void doCharacterChecks(char currChar, char prev,
@@ -287,6 +294,20 @@ public final class HddsClientUtils {
       t = t.getCause();
     }
     return t;
+  }
+
+  // This will return the underlying expected exception if it exists
+  // in an exception trace. Otherwise, returns null.
+  public static Throwable containsException(Exception e,
+            Class<? extends Exception> expectedExceptionClass) {
+    Throwable t = e;
+    while (t != null) {
+      if (expectedExceptionClass.isInstance(t)) {
+        return t;
+      }
+      t = t.getCause();
+    }
+    return null;
   }
 
   public static RetryPolicy createRetryPolicy(int maxRetryCount,

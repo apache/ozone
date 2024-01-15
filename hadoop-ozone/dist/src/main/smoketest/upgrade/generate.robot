@@ -19,6 +19,7 @@ Library             OperatingSystem
 Library             BuiltIn
 Resource            ../commonlib.robot
 Resource            ../s3/commonawslib.robot
+Suite Setup         Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 Test Timeout        5 minutes
 
 *** Variables ***
@@ -49,13 +50,11 @@ Create key in the bucket in s3v volume
                         Should not contain  ${output}       Failed
                         Execute and checkrc    rm /tmp/sourcekey    0
 
-Setup credentials for S3
-    # TODO: Run "Setup secure v4 headers" instead when security is enabled
-    Run Keyword         Setup dummy credentials for S3
-
 Try to create a bucket using S3 API
-    # Note: S3 API does not return error if the bucket already exists
-    ${output} =         Create bucket with name    ${PREFIX}-bucket
+    [setup]             Setup v4 headers
+    # Note: S3 API returns error if the bucket already exists
+    ${random} =         Generate Ozone String
+    ${output} =         Create bucket with name    ${PREFIX}-bucket-${random}
                         Should Be Equal    ${output}    ${None}
 
 Create key using S3 API

@@ -82,8 +82,7 @@ public class TestContainerUtils {
   @Test
   public void testTarName() throws IOException {
     long containerId = 100;
-    String tarName = "container-100.tar";
-    assertEquals(tarName, ContainerUtils.getContainerTarName(containerId));
+    String tarName = ContainerUtils.getContainerTarName(containerId);
 
     assertEquals(containerId,
         ContainerUtils.retrieveContainerIdFromTarName(tarName));

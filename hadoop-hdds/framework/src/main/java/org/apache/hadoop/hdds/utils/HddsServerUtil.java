@@ -44,18 +44,26 @@ import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
+import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolDatanodePB;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolOmPB;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolScmPB;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
+import org.apache.hadoop.hdds.scm.proxy.SecretKeyProtocolFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
+import org.apache.hadoop.hdds.scm.proxy.SingleSecretKeyProtocolProxyProvider;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.metrics2.MetricsException;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -87,8 +95,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_R
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_RETRY_INTERVAL_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.sanitizeUserArgs;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR;
 
@@ -103,6 +109,9 @@ public final class HddsServerUtil {
 
   private HddsServerUtil() {
   }
+
+  public static final String OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME =
+      "OZONE_RATIS_SNAPSHOT_COMPLETE";
 
   private static final Logger LOG = LoggerFactory.getLogger(
       HddsServerUtil.class);
@@ -465,31 +474,6 @@ public final class HddsServerUtil {
             ugi == null ? UserGroupInformation.getCurrentUser() : ugi));
   }
 
-  public static SCMSecurityProtocolClientSideTranslatorPB
-      getScmSecurityClientWithFixedDuration(OzoneConfiguration conf)
-      throws IOException {
-    // As for OM during init, we need to wait for specific duration so that
-    // we can give response to user performed operation init in a definite
-    // period, instead of stuck for ever.
-    OzoneConfiguration configuration = new OzoneConfiguration(conf);
-    long duration = conf.getTimeDuration(OZONE_SCM_INFO_WAIT_DURATION,
-        OZONE_SCM_INFO_WAIT_DURATION_DEFAULT, TimeUnit.SECONDS);
-    SCMClientConfig scmClientConfig = conf.getObject(SCMClientConfig.class);
-    int retryCount =
-        (int) (duration / (scmClientConfig.getRetryInterval() / 1000));
-
-    // If duration is set to lesser value, fall back to actual default
-    // retry count.
-    if (retryCount > scmClientConfig.getRetryCount()) {
-      scmClientConfig.setRetryCount(retryCount);
-      configuration.setFromObject(scmClientConfig);
-    }
-
-    return new SCMSecurityProtocolClientSideTranslatorPB(
-        new SCMSecurityProtocolFailoverProxyProvider(configuration,
-            UserGroupInformation.getCurrentUser()));
-  }
-
   /**
    * Create a scm block client, used by putKey() and getKey().
    *
@@ -506,6 +490,78 @@ public final class HddsServerUtil {
   }
 
   /**
+   * Creates a {@link org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm}
+   * intended to be used by clients under the SCM identity.
+   *
+   * @param conf - Ozone configuration
+   * @return {@link org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm}
+   * @throws IOException
+   */
+  public static SecretKeyProtocolScm getSecretKeyClientForSCM(
+      ConfigurationSource conf) throws IOException {
+    SecretKeyProtocolClientSideTranslatorPB scmSecretClient =
+        new SecretKeyProtocolClientSideTranslatorPB(
+            new SecretKeyProtocolFailoverProxyProvider(conf,
+                UserGroupInformation.getCurrentUser(),
+                SecretKeyProtocolScmPB.class), SecretKeyProtocolScmPB.class);
+
+    return TracingUtil.createProxy(scmSecretClient,
+        SecretKeyProtocolScm.class, conf);
+  }
+
+  /**
+   * Create a {@link org.apache.hadoop.hdds.protocol.SecretKeyProtocol} for
+   * datanode service, should be use only if user is the Datanode identity.
+   */
+  public static SecretKeyProtocolClientSideTranslatorPB
+      getSecretKeyClientForDatanode(ConfigurationSource conf)
+      throws IOException {
+    return new SecretKeyProtocolClientSideTranslatorPB(
+        new SecretKeyProtocolFailoverProxyProvider(conf,
+            UserGroupInformation.getCurrentUser(),
+            SecretKeyProtocolDatanodePB.class),
+        SecretKeyProtocolDatanodePB.class);
+  }
+
+  /**
+   * Create a {@link org.apache.hadoop.hdds.protocol.SecretKeyProtocol} for
+   * OM service, should be use only if user is the OM identity.
+   */
+  public static SecretKeyProtocolClientSideTranslatorPB
+      getSecretKeyClientForOm(ConfigurationSource conf) throws IOException {
+    return new SecretKeyProtocolClientSideTranslatorPB(
+        new SecretKeyProtocolFailoverProxyProvider(conf,
+            UserGroupInformation.getCurrentUser(),
+            SecretKeyProtocolOmPB.class),
+        SecretKeyProtocolOmPB.class);
+  }
+
+  public static SecretKeyProtocolClientSideTranslatorPB
+      getSecretKeyClientForDatanode(ConfigurationSource conf,
+      UserGroupInformation ugi) {
+    return new SecretKeyProtocolClientSideTranslatorPB(
+        new SecretKeyProtocolFailoverProxyProvider(conf, ugi,
+            SecretKeyProtocolDatanodePB.class),
+        SecretKeyProtocolDatanodePB.class);
+  }
+
+  /**
+   * Create a {@link org.apache.hadoop.hdds.protocol.SecretKeyProtocol} for
+   * SCM service, should be use only if user is the Datanode identity.
+   *
+   * The protocol returned by this method only target a single destination
+   * SCM node.
+   */
+  public static SecretKeyProtocolClientSideTranslatorPB
+      getSecretKeyClientForScm(ConfigurationSource conf,
+      String scmNodeId, UserGroupInformation ugi) {
+    return new SecretKeyProtocolClientSideTranslatorPB(
+        new SingleSecretKeyProtocolProxyProvider(conf, ugi,
+            SecretKeyProtocolScmPB.class, scmNodeId),
+        SecretKeyProtocolScmPB.class);
+  }
+
+  /**
    * Initialize hadoop metrics system for Ozone servers.
    * @param configuration OzoneConfiguration to use.
    * @param serverName    The logical name of the server components.
@@ -517,6 +573,7 @@ public final class HddsServerUtil {
       JvmMetrics.create(serverName,
           configuration.get(DFSConfigKeysLegacy.DFS_METRICS_SESSION_ID_KEY),
           DefaultMetricsSystem.instance());
+      CpuMetrics.create();
     } catch (MetricsException e) {
       LOG.info("Metrics source JvmMetrics already added to DataNode.");
     }
@@ -557,6 +614,7 @@ public final class HddsServerUtil {
           }
         }
       }
+      includeRatisSnapshotCompleteFlag(archiveOutputStream);
     }
   }
 
@@ -570,6 +628,27 @@ public final class HddsServerUtil {
       IOUtils.copy(fis, archiveOutputStream);
     }
     archiveOutputStream.closeArchiveEntry();
+  }
+
+  // Mark tarball completed.
+  public static void includeRatisSnapshotCompleteFlag(
+      ArchiveOutputStream archiveOutput) throws IOException {
+    File file = File.createTempFile(
+        OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME, "");
+    String entryName = OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME;
+    includeFile(file, entryName, archiveOutput);
+  }
+
+  static boolean ratisSnapshotComplete(Path dir) {
+    return new File(dir.toString(),
+        OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME).exists();
+  }
+
+  // optimize ugi lookup for RPC operations to avoid a trip through
+  // UGI.getCurrentUser which is synch'ed
+  public static UserGroupInformation getRemoteUser() throws IOException {
+    UserGroupInformation ugi = Server.getRemoteUser();
+    return (ugi != null) ? ugi : UserGroupInformation.getCurrentUser();
   }
 
   /**

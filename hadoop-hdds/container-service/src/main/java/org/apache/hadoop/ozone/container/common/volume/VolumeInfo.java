@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckParams;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -237,6 +238,15 @@ public final class VolumeInfo {
   public long getAvailable() {
     long avail = getCapacity() - usage.getUsedSpace();
     return Math.max(Math.min(avail, usage.getAvailable()), 0);
+  }
+
+  public long getAvailable(SpaceUsageSource precomputedValues) {
+    long avail = precomputedValues.getCapacity() - usage.getUsedSpace();
+    return Math.max(Math.min(avail, usage.getAvailable(precomputedValues)), 0);
+  }
+
+  public SpaceUsageSource getCurrentUsage() {
+    return usage.snapshot();
   }
 
   public void incrementUsedSpace(long usedSpace) {

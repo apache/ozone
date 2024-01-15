@@ -17,8 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.request.key;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -29,8 +28,9 @@ import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
 
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test cases for TestOMSetTimesRequestWithFSO.
@@ -54,20 +54,56 @@ public class TestOMSetTimesRequestWithFSO extends TestOMSetTimesRequest {
     long mtime = 2000;
     executeAndReturn(mtime);
     OzoneFileStatus keyStatus = OMFileRequest.getOMKeyInfoIfExists(
-        omMetadataManager, volumeName, bucketName, keyName, 0);
+        omMetadataManager, volumeName, bucketName, keyName, 0,
+        ozoneManager.getDefaultReplicationConfig());
     assertNotNull(keyStatus);
     assertTrue(keyStatus.isDirectory());
     long keyMtime = keyStatus.getKeyInfo().getModificationTime();
-    Assert.assertEquals(mtime, keyMtime);
+    assertEquals(mtime, keyMtime);
 
     long newMtime = -1;
     executeAndReturn(newMtime);
     keyStatus = OMFileRequest.getOMKeyInfoIfExists(
-        omMetadataManager, volumeName, bucketName, keyName, 0);
+        omMetadataManager, volumeName, bucketName, keyName, 0,
+        ozoneManager.getDefaultReplicationConfig());
     assertNotNull(keyStatus);
     assertTrue(keyStatus.isDirectory());
     keyMtime = keyStatus.getKeyInfo().getModificationTime();
-    Assert.assertEquals(mtime, keyMtime);
+    assertEquals(mtime, keyMtime);
+  }
+
+  /**
+   * Verify that setTimes() on key works as expected.
+   * @throws Exception
+   */
+  @Test
+  public void testKeySetTimesRequest() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+    String tableKey = addKeyToTable();
+    keyName = PARENT_DIR + "/" + FILE_NAME;
+    long mtime = 2000;
+    executeAndReturn(mtime);
+    OzoneFileStatus keyStatus = OMFileRequest.getOMKeyInfoIfExists(
+        omMetadataManager, volumeName, bucketName, keyName, 0,
+        ozoneManager.getDefaultReplicationConfig());
+    assertNotNull(keyStatus);
+    assertTrue(keyStatus.isFile());
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
+        .get(tableKey);
+    assertEquals(omKeyInfo.getKeyName(), FILE_NAME);
+    long keyMtime = keyStatus.getKeyInfo().getModificationTime();
+    assertEquals(mtime, keyMtime);
+    long newMtime = -1;
+    executeAndReturn(newMtime);
+    keyStatus = OMFileRequest.getOMKeyInfoIfExists(
+        omMetadataManager, volumeName, bucketName, keyName, 0,
+        ozoneManager.getDefaultReplicationConfig());
+    omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(tableKey);
+    assertEquals(omKeyInfo.getKeyName(), FILE_NAME);
+    assertTrue(keyStatus.isFile());
+    keyMtime = keyStatus.getKeyInfo().getModificationTime();
+    assertEquals(mtime, keyMtime);
   }
 
   protected String addKeyToTable() throws Exception {
@@ -80,7 +116,7 @@ public class TestOMSetTimesRequestWithFSO extends TestOMSetTimesRequest {
             omMetadataManager);
 
     OmKeyInfo omKeyInfo = OMRequestTestUtils
-        .createOmKeyInfo(volumeName, bucketName, key,
+        .createOmKeyInfo(volumeName, bucketName, FILE_NAME,
             HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
             parentId + 1, parentId, 100, Time.now());
     OMRequestTestUtils

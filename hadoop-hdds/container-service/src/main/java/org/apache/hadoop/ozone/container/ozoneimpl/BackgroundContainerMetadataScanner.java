@@ -19,7 +19,9 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,25 +57,46 @@ public class BackgroundContainerMetadataScanner extends
 
   @VisibleForTesting
   @Override
-  public void scanContainer(Container<?> container) throws IOException {
-    // Full data scan also does a metadata scan. If a full data scan was done
-    // recently, we can skip this metadata scan.
-    if (ContainerUtils.recentlyScanned(container, minScanGap, LOG)) {
+  public void scanContainer(Container<?> container)
+      throws IOException, InterruptedException {
+    // There is one background container metadata scanner per datanode.
+    // If this container's volume has failed, skip the container.
+    // The iterator returned by getContainerIterator may have stale results.
+    ContainerData data = container.getContainerData();
+    long containerID = data.getContainerID();
+    HddsVolume containerVolume = data.getVolume();
+    if (containerVolume.isFailed()) {
+      LOG.debug("Skipping scan of container {}. Its volume {} has failed.",
+          containerID, containerVolume);
       return;
     }
 
-    // Do not update the scan timestamp since this was just a metadata scan,
-    // not a full scan.
-    if (!container.scanMetaData()) {
-      metrics.incNumUnHealthyContainers();
-      controller.markContainerUnhealthy(
-          container.getContainerData().getContainerID());
+    if (!shouldScan(container)) {
+      return;
     }
+
+    Container.ScanResult result = container.scanMetaData();
+    if (!result.isHealthy()) {
+      LOG.error("Corruption detected in container [{}]. Marking it UNHEALTHY.",
+          containerID, result.getException());
+      metrics.incNumUnHealthyContainers();
+      controller.markContainerUnhealthy(containerID, result);
+    }
+
+    // Do not update the scan timestamp after the scan since this was just a
+    // metadata scan, not a full data scan.
     metrics.incNumContainersScanned();
   }
 
   @Override
   public ContainerMetadataScannerMetrics getMetrics() {
     return this.metrics;
+  }
+
+  private boolean shouldScan(Container<?> container) {
+    // Full data scan also does a metadata scan. If a full data scan was done
+    // recently, we can skip this metadata scan.
+    return container.shouldScanMetadata() &&
+        !ContainerUtils.recentlyScanned(container, minScanGap, LOG);
   }
 }

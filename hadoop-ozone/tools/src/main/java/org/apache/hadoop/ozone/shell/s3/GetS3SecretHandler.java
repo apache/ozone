@@ -31,7 +31,7 @@ import picocli.CommandLine.Option;
  * Executes getsecret calls.
  */
 @Command(name = "getsecret", aliases = "get-secret",
-    description = "Returns S3 secret for a user")
+    description = "Creates S3 secret for a user")
 public class GetS3SecretHandler extends S3Handler {
 
   @Option(names = "-u",

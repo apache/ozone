@@ -23,7 +23,6 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -33,6 +32,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -44,7 +44,7 @@ import org.apache.ratis.util.ExitUtils;
 /**
  * Interface used for MiniOzoneClusters.
  */
-public interface MiniOzoneCluster {
+public interface MiniOzoneCluster extends AutoCloseable {
 
   /**
    * Returns the Builder to construct MiniOzoneCluster.
@@ -259,6 +259,10 @@ public interface MiniOzoneCluster {
    */
   void shutdown();
 
+  default void close() {
+    shutdown();
+  }
+
   /**
    * Stop the MiniOzoneCluster without any cleanup.
    */
@@ -346,6 +350,7 @@ public interface MiniOzoneCluster {
     protected int numDataVolumes = 1;
     protected boolean  startDataNodes = true;
     protected CertificateClient certClient;
+    protected SecretKeyClient secretKeyClient;
     protected int pipelineNumLimit = DEFAULT_PIPELINE_LIMIT;
 
     protected Builder(OzoneConfiguration conf) {
@@ -405,6 +410,11 @@ public interface MiniOzoneCluster {
      */
     public Builder setCertificateClient(CertificateClient client) {
       this.certClient = client;
+      return this;
+    }
+
+    public Builder setSecretKeyClient(SecretKeyClient client) {
+      this.secretKeyClient = client;
       return this;
     }
 
@@ -646,36 +656,5 @@ public interface MiniOzoneCluster {
      * @throws IOException
      */
     public abstract MiniOzoneCluster build() throws IOException;
-  }
-
-  /**
-   * Helper class to get free port avoiding randomness.
-   */
-  class PortAllocator {
-
-    private static final int MIN_PORT = 15000;
-    private static final int MAX_PORT = 32000;
-    private static final AtomicInteger NEXT_PORT = new AtomicInteger(MIN_PORT);
-
-    private PortAllocator() {
-      // no instances
-    }
-
-    static synchronized int getFreePort() {
-      int port = NEXT_PORT.getAndIncrement();
-      if (port > MAX_PORT) {
-        NEXT_PORT.set(MIN_PORT);
-        port = NEXT_PORT.getAndIncrement();
-      }
-      return port;
-    }
-
-    static String localhostWithFreePort() {
-      return "127.0.0.1:" + getFreePort();
-    }
-
-    static String anyHostWithFreePort() {
-      return "0.0.0.0:" + getFreePort();
-    }
   }
 }

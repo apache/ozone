@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.scm;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -45,12 +44,9 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.statemachine.SnapshotInfo;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -64,6 +60,11 @@ import java.util.concurrent.TimeoutException;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Base class for SCM HA tests.
@@ -107,6 +108,7 @@ public class TestStorageContainerManagerHA {
         .setNumOfOzoneManagers(numOfOMs)
         .build();
     cluster.waitForClusterToBeReady();
+    waitForLeaderToBeReady();
   }
 
   /**
@@ -121,10 +123,10 @@ public class TestStorageContainerManagerHA {
   }
 
   @Test
-  public void testAllSCMAreRunning() throws Exception {
+  void testAllSCMAreRunning() throws Exception {
     int count = 0;
     List<StorageContainerManager> scms = cluster.getStorageContainerManagers();
-    Assertions.assertEquals(numOfSCMs, scms.size());
+    assertEquals(numOfSCMs, scms.size());
     int peerSize = cluster.getStorageContainerManager().getScmHAManager()
         .getRatisServer().getDivision().getGroup().getPeers().size();
     StorageContainerManager leaderScm = null;
@@ -133,23 +135,30 @@ public class TestStorageContainerManagerHA {
         count++;
         leaderScm = scm;
       }
-      Assertions.assertEquals(peerSize, numOfSCMs);
+      assertEquals(peerSize, numOfSCMs);
     }
-    Assertions.assertEquals(1, count);
+    assertEquals(1, count);
+    assertNotNull(leaderScm);
+
+    assertRatisRoles();
+
+    String leaderSCMId = leaderScm.getScmId();
+    checkSCMHAMetricsForAllSCMs(scms, leaderSCMId);
+
     count = 0;
     List<OzoneManager> oms = cluster.getOzoneManagersList();
-    Assertions.assertEquals(numOfOMs, oms.size());
+    assertEquals(numOfOMs, oms.size());
     for (OzoneManager om : oms) {
       if (om.isLeaderReady()) {
         count++;
       }
     }
-    Assertions.assertEquals(1, count);
+    assertEquals(1, count);
     
     // verify timer based transaction buffer flush is working
     SnapshotInfo latestSnapshot = leaderScm.getScmHAManager()
         .asSCMHADBTransactionBuffer().getLatestSnapshot();
-    testPutKey();
+    doPutKey();
     final StorageContainerManager leaderScmTmp = leaderScm;
     GenericTestUtils.waitFor(() -> {
       if (leaderScmTmp.getScmHAManager().asSCMHADBTransactionBuffer()
@@ -163,8 +172,7 @@ public class TestStorageContainerManagerHA {
     }, 2000, 30000);
   }
 
-  @Test
-  public void testPutKey() throws Exception {
+  private void doPutKey() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     Instant testStartTime = Instant.now();
@@ -184,13 +192,13 @@ public class TestStorageContainerManagerHA {
       out.write(value.getBytes(UTF_8));
       out.close();
       OzoneKey key = bucket.getKey(keyName);
-      Assertions.assertEquals(keyName, key.getName());
+      assertEquals(keyName, key.getName());
       OzoneInputStream is = bucket.readKey(keyName);
       byte[] fileContent = new byte[value.getBytes(UTF_8).length];
       is.read(fileContent);
-      Assertions.assertEquals(value, new String(fileContent, UTF_8));
-      Assertions.assertFalse(key.getCreationTime().isBefore(testStartTime));
-      Assertions.assertFalse(key.getModificationTime().isBefore(testStartTime));
+      assertEquals(value, new String(fileContent, UTF_8));
+      assertFalse(key.getCreationTime().isBefore(testStartTime));
+      assertFalse(key.getModificationTime().isBefore(testStartTime));
       is.close();
       final OmKeyArgs keyArgs = new OmKeyArgs.Builder()
           .setVolumeName(volumeName)
@@ -209,7 +217,7 @@ public class TestStorageContainerManagerHA {
           index = getLastAppliedIndex(scm);
         }
       }
-      Assertions.assertNotEquals(-1, index);
+      assertNotEquals(-1, index);
       long finalIndex = index;
       // Ensure all follower scms have caught up with the leader
       GenericTestUtils.waitFor(() -> areAllScmInSync(finalIndex), 100, 10000);
@@ -220,9 +228,9 @@ public class TestStorageContainerManagerHA {
         // flush to DB on each SCM
         ((SCMRatisServerImpl) scm.getScmHAManager().getRatisServer())
             .getStateMachine().takeSnapshot();
-        Assertions.assertTrue(scm.getContainerManager()
+        assertTrue(scm.getContainerManager()
             .containerExist(ContainerID.valueOf(containerID)));
-        Assertions.assertNotNull(scm.getScmMetadataStore().getContainerTable()
+        assertNotNull(scm.getScmMetadataStore().getContainerTable()
             .get(ContainerID.valueOf(containerID)));
       }
     }
@@ -252,51 +260,12 @@ public class TestStorageContainerManagerHA {
         scm1.getSCMNodeId());
     conf2.set(ScmConfigKeys.OZONE_SCM_PRIMORDIAL_NODE_ID_KEY,
         scm1.getSCMNodeId());
-    Assertions.assertTrue(StorageContainerManager.scmBootstrap(conf1));
+    assertTrue(StorageContainerManager.scmBootstrap(conf1));
     scm1.getScmHAManager().stop();
-    Assertions.assertTrue(
+    assertTrue(
         StorageContainerManager.scmInit(conf1, scm1.getClusterId()));
-    Assertions.assertTrue(StorageContainerManager.scmBootstrap(conf2));
-    Assertions.assertTrue(
-        StorageContainerManager.scmInit(conf2, scm2.getClusterId()));
-  }
-
-  @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  public void testHAConfig(boolean isRatisEnabled) throws Exception {
-    StorageContainerManager scm0 = cluster.getStorageContainerManager(0);
-    scm0.stop();
-    boolean isDeleted = scm0.getScmStorageConfig().getVersionFile().delete();
-    Assertions.assertTrue(isDeleted);
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, isRatisEnabled);
-    final SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
-    scmStorageConfig.setClusterId(UUID.randomUUID().toString());
-    scmStorageConfig.getCurrentDir().delete();
-    scmStorageConfig.setSCMHAFlag(isRatisEnabled);
-    DefaultConfigManager.clearDefaultConfigs();
-    scmStorageConfig.initialize();
-    StorageContainerManager.scmInit(conf, clusterId);
-    Assertions.assertEquals(DefaultConfigManager.getValue(
-        ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, !isRatisEnabled),
-        isRatisEnabled);
-  }
-
-  @ParameterizedTest
-  @ValueSource(booleans = {true, false})
-  public void testInvalidHAConfig(boolean isRatisEnabled) throws Exception {
-    StorageContainerManager scm0 = cluster.getStorageContainerManager(0);
-    scm0.stop();
-    boolean isDeleted = scm0.getScmStorageConfig().getVersionFile().delete();
-    Assertions.assertTrue(isDeleted);
-    conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, isRatisEnabled);
-    final SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf);
-    scmStorageConfig.setClusterId(UUID.randomUUID().toString());
-    scmStorageConfig.getCurrentDir().delete();
-    scmStorageConfig.setSCMHAFlag(!isRatisEnabled);
-    DefaultConfigManager.clearDefaultConfigs();
-    scmStorageConfig.initialize();
-    Assertions.assertThrows(ConfigurationException.class,
-        () -> StorageContainerManager.scmInit(conf, clusterId));
+    assertTrue(StorageContainerManager.scmBootstrap(conf2));
+    assertTrue(StorageContainerManager.scmInit(conf2, scm2.getClusterId()));
   }
 
   @Test
@@ -304,7 +273,7 @@ public class TestStorageContainerManagerHA {
     StorageContainerManager scm2 = cluster.getStorageContainerManagers().get(1);
     OzoneConfiguration conf2 = scm2.getConfiguration();
     boolean isDeleted = scm2.getScmStorageConfig().getVersionFile().delete();
-    Assertions.assertTrue(isDeleted);
+    assertTrue(isDeleted);
     final SCMStorageConfig scmStorageConfig = new SCMStorageConfig(conf2);
     scmStorageConfig.setClusterId(UUID.randomUUID().toString());
     scmStorageConfig.getCurrentDir().delete();
@@ -312,34 +281,21 @@ public class TestStorageContainerManagerHA {
     scmStorageConfig.initialize();
     conf2.setBoolean(ScmConfigKeys.OZONE_SCM_SKIP_BOOTSTRAP_VALIDATION_KEY,
         false);
-    Assertions.assertFalse(StorageContainerManager.scmBootstrap(conf2));
+    assertFalse(StorageContainerManager.scmBootstrap(conf2));
     conf2.setBoolean(ScmConfigKeys.OZONE_SCM_SKIP_BOOTSTRAP_VALIDATION_KEY,
         true);
-    Assertions.assertTrue(StorageContainerManager.scmBootstrap(conf2));
+    assertTrue(StorageContainerManager.scmBootstrap(conf2));
   }
 
-  @Test
-  public void testGetRatisRolesDetail() {
+  private void assertRatisRoles() {
     Set<String> resultSet = new HashSet<>();
     for (StorageContainerManager scm: cluster.getStorageContainerManagers()) {
       resultSet.addAll(scm.getScmHAManager().getRatisServer().getRatisRoles());
     }
     System.out.println(resultSet);
-    Assertions.assertEquals(3, resultSet.size());
-    Assertions.assertEquals(1,
+    assertEquals(3, resultSet.size());
+    assertEquals(1,
         resultSet.stream().filter(x -> x.contains("LEADER")).count());
-  }
-
-  @Test
-  public void testSCMHAMetrics() throws InterruptedException, TimeoutException {
-    waitForLeaderToBeReady();
-
-    StorageContainerManager leaderSCM = cluster.getActiveSCM();
-    String leaderSCMId = leaderSCM.getScmId();
-    List<StorageContainerManager> scms =
-        cluster.getStorageContainerManagersList();
-
-    checkSCMHAMetricsForAllSCMs(scms, leaderSCMId);
   }
 
   private void checkSCMHAMetricsForAllSCMs(List<StorageContainerManager> scms,
@@ -351,9 +307,9 @@ public class TestStorageContainerManagerHA {
       // If current SCM is leader, state should be 1
       int expectedState = nodeId.equals(leaderSCMId) ? 1 : 0;
 
-      Assertions.assertEquals(expectedState,
+      assertEquals(expectedState,
           scmHAMetrics.getSCMHAMetricsInfoLeaderState());
-      Assertions.assertEquals(nodeId, scmHAMetrics.getSCMHAMetricsInfoNodeId());
+      assertEquals(nodeId, scmHAMetrics.getSCMHAMetricsInfoNodeId());
     }
   }
 

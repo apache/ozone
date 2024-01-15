@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffJob;
+import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
 
@@ -43,6 +43,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_JOBS_PURGE_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_JOBS_PURGE_PER_TASK_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.CANCELLED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.FAILED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.REJECTED;
 
@@ -88,7 +89,7 @@ public class SnapshotDiffCleanupService extends BackgroundService {
     super(SnapshotDiffCleanupService.class.getSimpleName(),
         interval,
         TimeUnit.MILLISECONDS, SNAPSHOT_DIFF_CLEANUP_CORE_POOL_SIZE,
-        serviceTimeout);
+        serviceTimeout, ozoneManager.getThreadNamePrefix());
     this.suspended = new AtomicBoolean(false);
     this.runCount = new AtomicLong(0);
     this.successRunCount = new AtomicLong(0);
@@ -124,6 +125,17 @@ public class SnapshotDiffCleanupService extends BackgroundService {
     moveOldSnapDiffJobsToPurgeTable();
   }
 
+  @VisibleForTesting
+  public byte[] getEntryFromPurgedJobTable(String jobId) {
+    try {
+      return db.get().get(snapDiffPurgedJobCfh,
+          codecRegistry.asRawData(jobId));
+    } catch (IOException | RocksDBException e) {
+      // TODO: [SNAPSHOT] Fail gracefully.
+      throw new RuntimeException(e);
+    }
+  }
+
   /**
    * Move the snapDiff jobs from snapDiffJobTable to purge table which are
    * older than the allowed time or have FAILED or REJECTED status.
@@ -154,7 +166,8 @@ public class SnapshotDiffCleanupService extends BackgroundService {
 
         if (currentTimeMillis - snapDiffJob.getCreationTime() > maxAllowedTime
             || snapDiffJob.getStatus() == FAILED
-            || snapDiffJob.getStatus() == REJECTED) {
+            || snapDiffJob.getStatus() == REJECTED
+            || snapDiffJob.getStatus() == CANCELLED) {
 
           writeBatch.put(snapDiffPurgedJobCfh,
               codecRegistry.asRawData(snapDiffJob.getJobId()),

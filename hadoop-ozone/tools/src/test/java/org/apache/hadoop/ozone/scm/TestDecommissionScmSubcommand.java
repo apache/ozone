@@ -23,11 +23,14 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.ozone.admin.scm.DecommissionScmSubcommand;
 import org.apache.ozone.test.GenericTestUtils;
 
+import java.io.IOException;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.mockito.Mockito;
+
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import picocli.CommandLine;
@@ -98,11 +101,9 @@ public class TestDecommissionScmSubcommand {
     try (GenericTestUtils.SystemOutCapturer capture =
              new GenericTestUtils.SystemOutCapturer()) {
       cmd.execute(client);
-      assertTrue(capture.getOutput().contains(
-          "remove current leader"));
+      fail();
+    } catch (IOException ex) {
+      assertTrue(ex.getMessage().contains("remove current leader"));
     }
   }
-
-  // TODO: test decommission revoke certificate
-
 }

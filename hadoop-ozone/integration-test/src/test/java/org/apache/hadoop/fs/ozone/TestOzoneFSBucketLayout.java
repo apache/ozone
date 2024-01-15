@@ -17,102 +17,86 @@
  */
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.commons.lang3.StringUtils;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.junit.BeforeClass;
-import org.junit.AfterClass;
-import org.junit.Test;
-import org.junit.Assert;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-
-import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.Arrays;
-import java.util.Collection;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Ozone file system tests to validate default bucket layout configuration
  * and behaviour.
- * TODO: Refactor this and TestOzoneFileSystem to reduce duplication.
+ * TODO: merge with some other test
  */
-@RunWith(Parameterized.class)
-public class TestOzoneFSBucketLayout {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class TestOzoneFSBucketLayout {
 
-  private static String defaultBucketLayout;
-  private static MiniOzoneCluster cluster = null;
-  private static ObjectStore objectStore;
-  private static OzoneClient client;
-  private BasicRootedOzoneClientAdapterImpl adapter;
-  private static String rootPath;
-  private static String volumeName;
-  private static Path volumePath;
+  private MiniOzoneCluster cluster;
+  private ObjectStore objectStore;
+  private OzoneClient client;
+  private String rootPath;
+  private String volumeName;
 
-  private static final String INVALID_CONFIG = "INVALID";
+  private static final String UNKNOWN_LAYOUT = "INVALID";
   private static final Map<String, String> ERROR_MAP = new HashMap<>();
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestOzoneFSBucketLayout.class);
 
   // Initialize error map.
   static {
     ERROR_MAP.put(BucketLayout.OBJECT_STORE.name(),
         "Buckets created with OBJECT_STORE layout do not support file " +
             "system semantics.");
-    ERROR_MAP.put(INVALID_CONFIG, "Unsupported value provided for " +
+    ERROR_MAP.put(UNKNOWN_LAYOUT, "Unsupported value provided for " +
         OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT);
   }
 
-  @Parameterized.Parameters
-  public static Collection<String> data() {
+  static Collection<String> validDefaultBucketLayouts() {
     return Arrays.asList(
         // Empty Config
         "",
-        // Invalid Config
-        INVALID_CONFIG,
-        // Unsupported Bucket Layout for OFS
-        BucketLayout.OBJECT_STORE.name(),
         // Supported bucket layouts.
         BucketLayout.FILE_SYSTEM_OPTIMIZED.name(),
         BucketLayout.LEGACY.name()
     );
   }
 
-  public TestOzoneFSBucketLayout(String bucketLayout) {
-    // Ignored. Actual init done in initParam().
-    // This empty constructor is still required to avoid argument exception.
+  static Collection<String> invalidDefaultBucketLayouts() {
+    return Arrays.asList(
+        // Invalid Config
+        UNKNOWN_LAYOUT,
+        // Unsupported Bucket Layout for OFS
+        BucketLayout.OBJECT_STORE.name()
+    );
   }
 
-  @Parameterized.BeforeParam
-  public static void initDefaultLayout(String bucketLayout) {
-    defaultBucketLayout = bucketLayout;
-    LOG.info("Default bucket layout: {}", defaultBucketLayout);
-  }
-
-  @BeforeClass
-  public static void initCluster() throws Exception {
+  @BeforeAll
+  void initCluster() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
@@ -122,89 +106,64 @@ public class TestOzoneFSBucketLayout {
     objectStore = client.getObjectStore();
     rootPath = String.format("%s://%s/",
         OzoneConsts.OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
-
-    // create a volume and a bucket to be used by RootedOzoneFileSystem (OFS)
-    volumeName =
-        TestDataUtil.createVolumeAndBucket(client)
-            .getVolumeName();
-    volumePath = new Path(OZONE_URI_DELIMITER, volumeName);
+    volumeName = TestDataUtil.createVolumeAndBucket(client).getVolumeName();
   }
 
-  @AfterClass
-  public static void teardown() throws IOException {
+  @AfterAll
+  void teardown() throws IOException {
     IOUtils.closeQuietly(client);
-    // Tear down the cluster after EACH set of parameters
     if (cluster != null) {
       cluster.shutdown();
     }
   }
 
-  @Test
-  public void testFileSystemBucketLayoutConfiguration() throws IOException {
-    OzoneConfiguration conf = new OzoneConfiguration();
+  @ParameterizedTest
+  @MethodSource("invalidDefaultBucketLayouts")
+  void fileSystemWithUnsupportedDefaultBucketLayout(String layout) {
+    OzoneConfiguration conf = configWithDefaultBucketLayout(layout);
 
-    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-    clientConfig.setFsDefaultBucketLayout(defaultBucketLayout);
+    OMException e = assertThrows(OMException.class,
+        () -> FileSystem.newInstance(conf));
+    assertThat(e.getMessage())
+        .contains(ERROR_MAP.get(layout));
+  }
+  @ParameterizedTest
+  @MethodSource("validDefaultBucketLayouts")
+  void fileSystemWithValidBucketLayout(String layout) throws IOException {
+    OzoneConfiguration conf = configWithDefaultBucketLayout(layout);
 
-    conf.setFromObject(clientConfig);
+    try (FileSystem fs = FileSystem.newInstance(conf)) {
+      // Create a new directory, which in turn creates a new bucket.
+      String bucketName = getBucketName(layout);
+      fs.mkdirs(new Path(new Path(OZONE_ROOT, volumeName), bucketName));
 
-    // Set the fs.defaultFS and start the filesystem
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+      // Make sure the bucket layout of created bucket matches the config.
+      OzoneBucket bucketInfo =
+          objectStore.getClientProxy().getBucketDetails(volumeName, bucketName);
 
-    // In case OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT is set to OBS,
-    // FS initialization should fail.
-
-    if (ERROR_MAP.containsKey(defaultBucketLayout)) {
-      try {
-        FileSystem.newInstance(conf);
-        Assert.fail("File System initialization should fail in case " +
-            " of invalid configuration of " +
-            OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT);
-      } catch (OMException oe) {
-        Assert.assertTrue(
-            oe.getMessage().contains(ERROR_MAP.get(defaultBucketLayout)));
-        return;
-      }
+      String expectedLayout = layout.isEmpty()
+          ? OzoneConfigKeys.OZONE_CLIENT_FS_BUCKET_LAYOUT_DEFAULT
+          : layout;
+      assertEquals(expectedLayout, bucketInfo.getBucketLayout().name());
     }
-
-    // initialize FS and adapter.
-    FileSystem fs = FileSystem.newInstance(conf);
-    RootedOzoneFileSystem ofs = (RootedOzoneFileSystem) fs;
-    adapter = (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
-
-    // Create a new directory, which in turn creates a new bucket.
-    Path root = new Path("/" + volumeName);
-
-    String bucketName = getBucketName();
-    Path dir1 = new Path(root, bucketName);
-
-    adapter.createDirectory(dir1.toString());
-
-    // Make sure the bucket layout of created bucket matches the config.
-    OzoneBucket bucketInfo =
-        objectStore.getClientProxy().getBucketDetails(volumeName, bucketName);
-    if (StringUtils.isNotBlank(defaultBucketLayout)) {
-      Assert.assertEquals(defaultBucketLayout,
-          bucketInfo.getBucketLayout().name());
-    } else {
-      Assert.assertEquals(OzoneConfigKeys.OZONE_CLIENT_FS_BUCKET_LAYOUT_DEFAULT,
-          bucketInfo.getBucketLayout().name());
-    }
-
-    // cleanup
-    IOUtils.closeQuietly(fs);
   }
 
-  private String getBucketName() {
-    String bucketSuffix;
-    if (StringUtils.isNotBlank(defaultBucketLayout)) {
-      bucketSuffix = defaultBucketLayout
-          .toLowerCase()
-          .replaceAll("_", "-");
-    } else {
-      bucketSuffix = "empty";
-    }
+  private String getBucketName(String layout) {
+    String bucketSuffix = layout.isEmpty()
+        ? "empty"
+        : layout.toLowerCase().replaceAll("_", "-");
 
     return "bucket-" + bucketSuffix;
   }
+
+  private OzoneConfiguration configWithDefaultBucketLayout(String layout) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setFsDefaultBucketLayout(layout);
+    conf.setFromObject(clientConfig);
+    return conf;
+  }
+
 }

@@ -17,11 +17,14 @@
  */
 package org.apache.hadoop.ozone.s3.signature;
 
+import javax.enterprise.context.RequestScoped;
+
 /**
  * Signature and related information.
  * <p>
  * Required to create stringToSign and token.
  */
+@RequestScoped
 public class SignatureInfo {
 
   private Version version;
@@ -48,6 +51,13 @@ public class SignatureInfo {
 
   private boolean signPayload = true;
 
+  private String unfilteredURI = null;
+
+
+  private String stringToSign = null;
+
+  public SignatureInfo() { }
+
   @SuppressWarnings("checkstyle:ParameterNumber")
   public SignatureInfo(
       Version version,
@@ -60,6 +70,35 @@ public class SignatureInfo {
       String algorithm,
       boolean signPayload
   ) {
+    initialize(version, date, dateTime, awsAccessId, signature, signedHeaders,
+        credentialScope, algorithm, signPayload, null, null);
+  }
+
+  public void initialize(
+      SignatureInfo signatureInfo
+  ) {
+    initialize(signatureInfo.getVersion(), signatureInfo.getDate(),
+        signatureInfo.getDateTime(), signatureInfo.getAwsAccessId(),
+        signatureInfo.getSignature(), signatureInfo.getSignedHeaders(),
+        signatureInfo.getCredentialScope(), signatureInfo.getAlgorithm(),
+        signatureInfo.isSignPayload(), signatureInfo.getUnfilteredURI(),
+        signatureInfo.getStringToSign());
+  }
+
+  @SuppressWarnings({"checkstyle:ParameterNumber", "checkstyle:HiddenField"})
+  public void initialize(
+      Version version,
+      String date,
+      String dateTime,
+      String awsAccessId,
+      String signature,
+      String signedHeaders,
+      String credentialScope,
+      String algorithm,
+      boolean signPayload,
+      String uri,
+      String stringToSign
+  ) {
     this.version = version;
     this.date = date;
     this.dateTime = dateTime;
@@ -69,6 +108,8 @@ public class SignatureInfo {
     this.credentialScope = credentialScope;
     this.algorithm = algorithm;
     this.signPayload = signPayload;
+    this.unfilteredURI = uri;
+    this.stringToSign = stringToSign;
   }
 
   public String getAwsAccessId() {
@@ -105,6 +146,22 @@ public class SignatureInfo {
 
   public String getDateTime() {
     return dateTime;
+  }
+
+  public String getUnfilteredURI() {
+    return unfilteredURI;
+  }
+
+  public String getStringToSign() {
+    return stringToSign;
+  }
+
+  public void setUnfilteredURI(String uri) {
+    this.unfilteredURI = uri;
+  }
+
+  public void setStrToSign(String strToSign) {
+    this.stringToSign = strToSign;
   }
 
   /**

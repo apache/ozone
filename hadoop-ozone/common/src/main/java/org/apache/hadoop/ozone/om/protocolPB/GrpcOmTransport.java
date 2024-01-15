@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.protocolPB;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.net.InetAddress;
 import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -29,6 +30,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.google.common.net.HostAndPort;
+import io.grpc.Context;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import org.apache.hadoop.ipc.RemoteException;
@@ -37,12 +39,14 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.ClientAddressClientInterceptor;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -160,7 +164,9 @@ public class GrpcOmTransport implements OmTransport {
         channelBuilder.usePlaintext();
       }
 
-      channels.put(hostaddr, channelBuilder.build());
+      channels.put(hostaddr,
+          channelBuilder.intercept(new ClientAddressClientInterceptor())
+              .build());
       clients.put(hostaddr,
           OzoneManagerServiceGrpc
               .newBlockingStub(channels.get(hostaddr)));
@@ -175,7 +181,7 @@ public class GrpcOmTransport implements OmTransport {
 
   @Override
   public OMResponse submitRequest(OMRequest payload) throws IOException {
-    OMResponse resp = null;
+    AtomicReference<OMResponse> resp = new AtomicReference<>();
     boolean tryOtherHost = true;
     int expectedFailoverCount = 0;
     ResultCodes resultCode = ResultCodes.INTERNAL_ERROR;
@@ -183,7 +189,14 @@ public class GrpcOmTransport implements OmTransport {
       tryOtherHost = false;
       expectedFailoverCount = syncFailoverCount.get();
       try {
-        resp = clients.get(host.get()).submitRequest(payload);
+        InetAddress inetAddress = InetAddress.getLocalHost();
+        Context.current()
+            .withValue(GrpcClientConstants.CLIENT_IP_ADDRESS_CTX_KEY,
+                inetAddress.getHostAddress())
+            .withValue(GrpcClientConstants.CLIENT_HOSTNAME_CTX_KEY,
+                inetAddress.getHostName())
+            .run(() -> resp.set(clients.get(host.get())
+                .submitRequest(payload)));
       } catch (StatusRuntimeException e) {
         LOG.error("Failed to submit request", e);
         if (e.getStatus().getCode() == Status.Code.UNAVAILABLE) {
@@ -201,7 +214,7 @@ public class GrpcOmTransport implements OmTransport {
         }
       }
     }
-    return resp;
+    return resp.get();
   }
 
   private Exception unwrapException(Exception ex) {

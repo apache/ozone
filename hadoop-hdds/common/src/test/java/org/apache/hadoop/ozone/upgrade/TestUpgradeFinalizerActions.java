@@ -23,6 +23,8 @@ import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.VALIDATE_IN_PREFINALIZE;
 import static org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_2;
 import static org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_3;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -40,7 +42,6 @@ import org.apache.hadoop.hdds.upgrade.test.MockComponent;
 import org.apache.hadoop.hdds.upgrade.test.MockComponent.MockDnUpgradeAction;
 import org.apache.hadoop.hdds.upgrade.test.MockComponent.MockScmUpgradeAction;
 import org.apache.hadoop.ozone.common.Storage;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -97,12 +98,10 @@ public class TestUpgradeFinalizerActions {
     assertTrue(scmCurrent.mkdirs());
     Storage storage = newStorage(file);
 
-    LambdaTestUtils.intercept(UpgradeException.class,
-        "Exception while running pre finalize state validation",
-        () -> {
-          uF.runPrefinalizeStateActions(storage, mockObj);
-          return null;
-        });
+    UpgradeException upgradeException = assertThrows(UpgradeException.class,
+        () -> uF.runPrefinalizeStateActions(storage, mockObj));
+    assertThat(upgradeException)
+        .hasMessageContaining("Exception while running pre finalize state validation");
   }
 
   private Storage newStorage(File f) throws IOException {

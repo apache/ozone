@@ -21,6 +21,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.OptionalLong;
@@ -28,6 +29,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -102,7 +104,9 @@ public final class ReplicationSupervisor {
     private DatanodeConfiguration datanodeConfig;
     private ExecutorService executor;
     private Clock clock;
-    private IntConsumer executorThreadUpdater = threadCount -> { };
+    private IntConsumer executorThreadUpdater = threadCount -> {
+    };
+    private String threadNamePrefix;
 
     public Builder clock(Clock newClock) {
       clock = newClock;
@@ -134,6 +138,11 @@ public final class ReplicationSupervisor {
       return this;
     }
 
+    public Builder threadNamePrefix(String threadPrefix) {
+      this.threadNamePrefix = threadPrefix;
+      return this;
+    }
+
     public ReplicationSupervisor build() {
       if (replicationConfig == null || datanodeConfig == null) {
         ConfigurationSource conf = new OzoneConfiguration();
@@ -151,14 +160,18 @@ public final class ReplicationSupervisor {
       }
 
       if (executor == null) {
+        LOG.info("Initializing replication supervisor with thread count = {}",
+            replicationConfig.getReplicationMaxStreams());
+        ThreadFactory threadFactory = new ThreadFactoryBuilder()
+            .setDaemon(true)
+            .setNameFormat(threadNamePrefix + "ContainerReplicationThread-%d")
+            .build();
         ThreadPoolExecutor tpe = new ThreadPoolExecutor(
             replicationConfig.getReplicationMaxStreams(),
             replicationConfig.getReplicationMaxStreams(),
             60, TimeUnit.SECONDS,
             new PriorityBlockingQueue<>(),
-            new ThreadFactoryBuilder().setDaemon(true)
-                .setNameFormat("ContainerReplicationThread-%d")
-                .build());
+            threadFactory);
         executor = tpe;
         executorThreadUpdater = threadCount -> {
           if (threadCount < tpe.getCorePoolSize()) {
@@ -266,6 +279,14 @@ public final class ReplicationSupervisor {
       Class<? extends AbstractReplicationTask> taskClass) {
     AtomicInteger counter = taskCounter.get(taskClass);
     return counter == null ? 0 : counter.get();
+  }
+
+  public Map<String, Integer> getInFlightReplicationSummary() {
+    Map<String, Integer> result = new HashMap<>();
+    for (Map.Entry<Class<?>, AtomicInteger> entry : taskCounter.entrySet()) {
+      result.put(entry.getKey().getSimpleName(), entry.getValue().get());
+    }
+    return result;
   }
 
   /**
@@ -411,6 +432,14 @@ public final class ReplicationSupervisor {
       return ((ThreadPoolExecutor)executor).getQueue().size();
     } else {
       return 0;
+    }
+  }
+
+  public long getMaxReplicationStreams() {
+    if (executor instanceof ThreadPoolExecutor) {
+      return ((ThreadPoolExecutor) executor).getMaximumPoolSize();
+    } else {
+      return 1;
     }
   }
 

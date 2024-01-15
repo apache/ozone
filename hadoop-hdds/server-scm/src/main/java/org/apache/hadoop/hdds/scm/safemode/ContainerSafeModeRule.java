@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -78,7 +79,8 @@ public class ContainerSafeModeRule extends
 
       Optional.ofNullable(container.getState())
           .filter(state -> (state == HddsProtos.LifeCycleState.QUASI_CLOSED ||
-              state == HddsProtos.LifeCycleState.CLOSED))
+              state == HddsProtos.LifeCycleState.CLOSED)
+              && container.getNumberOfKeys() > 0)
           .ifPresent(s -> containerMap.put(container.getContainerID(),
               container));
     });
@@ -138,11 +140,22 @@ public class ContainerSafeModeRule extends
 
   @Override
   public String getStatusText() {
-    return String
-        .format(
-            "%% of containers with at least one reported replica (=%1.2f) >= "
-                + "safeModeCutoff (=%1.2f)",
-            getCurrentContainerThreshold(), this.safeModeCutoff);
+    List<Long> sampleContainers = containerMap.keySet()
+        .stream()
+        .limit(SAMPLE_CONTAINER_DISPLAY_LIMIT)
+        .collect(Collectors.toList());
+
+    String status = String.format("%% of containers with at least one reported"
+            + " replica (=%1.2f) >= safeModeCutoff (=%1.2f)",
+        getCurrentContainerThreshold(), this.safeModeCutoff);
+
+    if (!sampleContainers.isEmpty()) {
+      String sampleContainerText =
+          "Sample containers not satisfying the criteria : " + sampleContainers;
+      status = status.concat("\n").concat(sampleContainerText);
+    }
+
+    return status;
   }
 
 
@@ -166,7 +179,8 @@ public class ContainerSafeModeRule extends
 
       Optional.ofNullable(container.getState())
           .filter(state -> (state == HddsProtos.LifeCycleState.QUASI_CLOSED ||
-              state == HddsProtos.LifeCycleState.CLOSED))
+              state == HddsProtos.LifeCycleState.CLOSED)
+              && container.getNumberOfKeys() > 0)
           .ifPresent(s -> containerMap.put(container.getContainerID(),
               container));
     });

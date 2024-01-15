@@ -29,7 +29,6 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
-import org.apache.logging.log4j.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -155,8 +154,9 @@ public class SCMHANodeDetails {
    which defaults to
    {@link org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT}
    For Previously Initialized SCM the values are taken from the version file
-   Ratis SCM -> Non Ratis SCM & vice versa is not supported
-   This values is validated with the config provided.
+   <br>
+   Ratis SCM -> Non Ratis SCM is not supported.
+   This value is validated with the config provided.
   **/
   private static void validateSCMHAConfig(SCMStorageConfig scmStorageConfig,
                                           OzoneConfiguration conf) {
@@ -169,23 +169,21 @@ public class SCMHANodeDetails {
     if (Storage.StorageState.INITIALIZED.equals(state) &&
             scmHAEnabled != scmHAEnableDefault) {
       String errorMessage = String.format("Current State of SCM: %s",
-              scmHAEnableDefault ? "Ratis SCM is enabled "
-              : "SCM is running in Non-HA without Ratis")
-              + " Ratis SCM -> Non Ratis SCM or " +
-              "Non HA SCM -> HA SCM is not supported";
-      if (Strings.isNotEmpty(conf.get(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY))) {
+              scmHAEnableDefault ? "SCM is running with Ratis. "
+              : "SCM is running without Ratis. ")
+              + "Ratis SCM -> Non Ratis SCM is not supported.";
+      if (!scmHAEnabled) {
         throw new ConfigurationException(String.format("Invalid Config %s " +
-                "Provided ConfigValue: %s, Expected Config Value: %s. %s",
-            ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, scmHAEnabled,
-            scmHAEnableDefault, errorMessage));
+                "Provided ConfigValue: false, Expected Config Value: true. %s",
+            ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, errorMessage));
       } else {
-        LOG.warn("Invalid config {}. The config was not specified, " +
-                        "but the default value {} conflicts with " +
-                        "the expected config value {}. " +
-                        "Falling back to the expected value. {}",
-                ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
-                ScmConfigKeys.OZONE_SCM_HA_ENABLE_DEFAULT,
-                scmHAEnableDefault, errorMessage);
+        LOG.warn("Default/Configured value of config {} conflicts with " +
+                "the expected value. " +
+                "Default/Configured: {}. " +
+                "Expected: {}. " +
+                "Falling back to the expected value. {}",
+            ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
+            scmHAEnabled, scmHAEnableDefault, errorMessage);
       }
     }
     DefaultConfigManager.setConfigValue(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,

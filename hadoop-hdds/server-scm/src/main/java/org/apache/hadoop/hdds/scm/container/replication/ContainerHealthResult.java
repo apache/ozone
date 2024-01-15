@@ -108,9 +108,12 @@ public class ContainerHealthResult {
     private final boolean dueToOutOfService;
     private final boolean sufficientlyReplicatedAfterPending;
     private final boolean unrecoverable;
+    private boolean isMissing = false;
     private boolean hasHealthyReplicas;
     private boolean hasUnReplicatedOfflineIndexes = false;
+    private boolean offlineIndexesOkAfterPending = false;
     private int requeueCount = 0;
+    private boolean hasVulnerableUnhealthy = false;
 
     public UnderReplicatedHealthResult(ContainerInfo containerInfo,
         int remainingRedundancy, boolean dueToOutOfService,
@@ -200,8 +203,8 @@ public class ContainerHealthResult {
 
     /**
      * Indicates whether a container has enough replicas to be read. For Ratis
-     * at least one replia must be available. For EC, at least dataNum replicas
-     * are needed.
+     * at least one healthy replia must be available. For EC, at least
+     * dataNum healthy replicas are needed.
      * @return True if the container has insufficient replicas available to be
      *         read, false otherwise
      */
@@ -230,12 +233,49 @@ public class ContainerHealthResult {
       return hasUnReplicatedOfflineIndexes;
     }
 
+    /**
+     * Pass true if a container has some indexes which are only on nodes which
+     * are DECOMMISSIONING or ENTERING_MAINTENANCE, but the container has a
+     * pending add to correct the under replication caused by decommission, but
+     * it has not completed yet.
+     * @param val Pass True if the container has a pending add to correct the
+     *            under replication caused by decommission. False otherwise.
+     */
+    public void setOfflineIndexesOkAfterPending(boolean val) {
+      offlineIndexesOkAfterPending = val;
+    }
+
+    /**
+     * Returns true if a container has under-replication caused by offline
+     * indexes, but it is corrected by a pending add.
+     * @return
+     */
+    public boolean offlineIndexesOkAfterPending() {
+      return offlineIndexesOkAfterPending;
+    }
+
     public boolean hasHealthyReplicas() {
       return hasHealthyReplicas;
     }
 
     public void setHasHealthyReplicas(boolean hasHealthyReplicas) {
       this.hasHealthyReplicas = hasHealthyReplicas;
+    }
+
+    public void setIsMissing(boolean isMissing) {
+      this.isMissing = isMissing;
+    }
+
+    public boolean isMissing() {
+      return isMissing;
+    }
+
+    public void setHasVulnerableUnhealthy(boolean hasVulnerableUnhealthy) {
+      this.hasVulnerableUnhealthy = hasVulnerableUnhealthy;
+    }
+
+    public boolean hasVulnerableUnhealthy() {
+      return hasVulnerableUnhealthy;
     }
 
     @Override
@@ -252,6 +292,9 @@ public class ContainerHealthResult {
       }
       if (unrecoverable) {
         sb.append(" +unrecoverable");
+      }
+      if (isMissing) {
+        sb.append(" +missing");
       }
       if (hasHealthyReplicas) {
         sb.append(" +hasHealthyReplicas");

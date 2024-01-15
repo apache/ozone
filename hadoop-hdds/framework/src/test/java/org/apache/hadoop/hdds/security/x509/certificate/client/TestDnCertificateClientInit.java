@@ -20,7 +20,9 @@ package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
@@ -59,7 +61,7 @@ public class TestDnCertificateClientInit {
 
   private KeyPair keyPair;
   private String certSerialId = "3284792342234";
-  private CertificateClient dnCertificateClient;
+  private DNCertificateClient dnCertificateClient;
   private HDDSKeyGenerator keyGenerator;
   private Path metaDirPath;
   private SecurityConfig securityConfig;
@@ -72,7 +74,7 @@ public class TestDnCertificateClientInit {
         arguments(false, false, false, GETCERT),
         arguments(false, false, true, FAILURE),
         arguments(false, true, false, FAILURE),
-        arguments(true, false, false, FAILURE),
+        arguments(true, false, false, GETCERT),
         arguments(false, true, true, FAILURE),
         arguments(true, true, false, GETCERT),
         arguments(true, false, true, SUCCESS),
@@ -92,8 +94,10 @@ public class TestDnCertificateClientInit {
     keyPair = keyGenerator.generateKey();
     x509Certificate = getX509Certificate();
     certSerialId = x509Certificate.getSerialNumber().toString();
+    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     dnCertificateClient =
-        new DNCertificateClient(securityConfig, null, certSerialId, null, null);
+        new DNCertificateClient(
+            securityConfig, null, dn, certSerialId, null, null);
     dnKeyCodec = new KeyCodec(securityConfig, DN_COMPONENT);
 
     Files.createDirectories(securityConfig.getKeyLocation(DN_COMPONENT));

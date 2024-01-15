@@ -35,38 +35,35 @@ import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.ozone.test.GenericTestUtils.SystemOutCapturer;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * * Integration test for Ozone reconfig shell command. HA enabled.
+ * * Integration test for {@code ozone admin reconfig} command. HA enabled.
  */
+@Timeout(300)
 public class TestReconfigShell {
-  /**
-   * Set a timeout for each test.
-   */
-  @Rule
-  public Timeout timeout = new Timeout(300000);
+
+  private static final int DATANODE_COUNT = 3;
   private static MiniOzoneCluster cluster;
   private static List<HddsDatanodeService> datanodeServices;
   private static OzoneAdmin ozoneAdmin;
   private static OzoneManager ozoneManager;
   private static StorageContainerManager storageContainerManager;
-  private static int datanodeCount = 3;
   private static NodeManager nm;
 
 
   /**
    * Create a Mini Cluster for testing.
    */
-  @BeforeClass
+  @BeforeAll
   public static void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     String omServiceId = UUID.randomUUID().toString();
@@ -76,7 +73,7 @@ public class TestReconfigShell {
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(1)
         .setNumOfStorageContainerManagers(1)
-        .setNumDatanodes(datanodeCount)
+        .setNumDatanodes(DATANODE_COUNT)
         .build();
     cluster.waitForClusterToBeReady();
     ozoneAdmin = new OzoneAdmin(cluster.getConf());
@@ -86,7 +83,7 @@ public class TestReconfigShell {
     nm = storageContainerManager.getScmNodeManager();
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -100,7 +97,8 @@ public class TestReconfigShell {
         HddsDatanodeClientProtocolServer server =
             datanodeService.getClientProtocolServer();
         InetSocketAddress socket = server.getClientRpcAddress();
-        exectureAndAssertProperties(server, socket, capture);
+        executeAndAssertProperties(datanodeService.getReconfigurationHandler(),
+            socket, capture);
       }
     }
   }
@@ -109,20 +107,22 @@ public class TestReconfigShell {
   public void testOzoneManagerGetReconfigurationProperties() throws Exception {
     try (SystemOutCapturer capture = new SystemOutCapturer()) {
       InetSocketAddress socket = ozoneManager.getOmRpcServerAddr();
-      exectureAndAssertProperties(ozoneManager, socket, capture);
+      executeAndAssertProperties(ozoneManager.getReconfigurationHandler(),
+          socket, capture);
     }
   }
 
   @Test
-  public void testStorageContainerManagerrGetReconfigurationProperties()
+  public void testStorageContainerManagerGetReconfigurationProperties()
       throws Exception {
     try (SystemOutCapturer capture = new SystemOutCapturer()) {
       InetSocketAddress socket = storageContainerManager.getClientRpcAddress();
-      exectureAndAssertProperties(storageContainerManager, socket, capture);
+      executeAndAssertProperties(
+          storageContainerManager.getReconfigurationHandler(), socket, capture);
     }
   }
 
-  private void exectureAndAssertProperties(
+  private void executeAndAssertProperties(
       ReconfigurableBase reconfigurableBase,
       InetSocketAddress socket, SystemOutCapturer capture)
       throws UnsupportedEncodingException {
@@ -138,9 +138,7 @@ public class TestReconfigShell {
     List<String> outs =
         Arrays.asList(output.split(System.getProperty("line.separator")));
     for (String property : except) {
-      Assert.assertTrue(
-          String.format("Not found %s in output: %s", property, output),
-          outs.contains(property));
+      assertTrue(outs.contains(property), String.format("Not found %s in output: %s", property, output));
     }
   }
 
@@ -148,15 +146,15 @@ public class TestReconfigShell {
   public void testDatanodeBulkReconfig() throws Exception {
     // All Dn are normal, So All the Dn will be reconfig
     List<HddsDatanodeService> dns = cluster.getHddsDatanodes();
-    Assert.assertEquals(datanodeCount, dns.size());
-    executeAndAssertBulkReconfigCount(datanodeCount);
+    assertEquals(DATANODE_COUNT, dns.size());
+    executeAndAssertBulkReconfigCount(DATANODE_COUNT);
 
     // Shutdown a Dn, it will not be reconfig,
     // so only (datanodeCount - 1) Dn will be configured successfully
     cluster.shutdownHddsDatanode(0);
-    executeAndAssertBulkReconfigCount(datanodeCount - 1);
+    executeAndAssertBulkReconfigCount(DATANODE_COUNT - 1);
     cluster.restartHddsDatanode(0, true);
-    executeAndAssertBulkReconfigCount(datanodeCount);
+    executeAndAssertBulkReconfigCount(DATANODE_COUNT);
 
     // DECOMMISSIONED a Dn, it will not be reconfig,
     // so only (datanodeCount - 1) Dn will be configured successfully
@@ -164,11 +162,11 @@ public class TestReconfigShell {
     storageContainerManager.getScmDecommissionManager()
         .startDecommission(details);
     nm.setNodeOperationalState(details, DECOMMISSIONED);
-    executeAndAssertBulkReconfigCount(datanodeCount - 1);
+    executeAndAssertBulkReconfigCount(DATANODE_COUNT - 1);
     storageContainerManager.getScmDecommissionManager()
         .recommission(details);
     nm.setNodeOperationalState(details, IN_SERVICE);
-    executeAndAssertBulkReconfigCount(datanodeCount);
+    executeAndAssertBulkReconfigCount(DATANODE_COUNT);
   }
 
   private void executeAndAssertBulkReconfigCount(int except)
@@ -178,18 +176,8 @@ public class TestReconfigShell {
           "reconfig",  "--in-service-datanodes", "properties"});
       String output = capture.getOutput();
 
-      Assert.assertTrue(String.format(
-          "Excepted successfully %d. output: %s%n", except, output),
-          capture.getOutput().contains(
-              String.format("successfully %d", except)));
-    }
-  }
-
-
-  static class TestOzoneAdmin extends OzoneAdmin {
-    @Override
-    public OzoneConfiguration createOzoneConfiguration() {
-      return super.createOzoneConfiguration();
+      assertTrue(capture.getOutput().contains(String.format("successfully %d", except)),
+          String.format("Excepted successfully %d. output: %s%n", except, output));
     }
   }
 }

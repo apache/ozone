@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -381,7 +380,6 @@ public class TestDirectoryDeletingServiceWithFSO {
   }
 
   @Test
-  @Flaky("HDDS-8453")
   public void testDirDeletedTableCleanUpForSnapshot() throws Exception {
     Table<String, OmKeyInfo> deletedDirTable =
         cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
@@ -449,6 +447,13 @@ public class TestDirectoryDeletingServiceWithFSO {
     // After delete. 5 more files left out under the root dir
     assertTableRowCount(keyTable, 5);
     assertTableRowCount(dirTable, 5);
+
+    long prevKdsRunCount = keyDeletingService.getRunCount().get();
+
+    // wait for at least 1 iteration of KeyDeletingService
+    GenericTestUtils.waitFor(
+        () -> (keyDeletingService.getRunCount().get() > prevKdsRunCount), 100,
+        10000);
 
     // KeyDeletingService and DirectoryDeletingService will not
     // clean up because the paths are part of a snapshot.

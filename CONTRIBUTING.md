@@ -77,6 +77,19 @@ OZONE_REPLICATION_FACTOR=3 ./run.sh -d
 
 See more details in the [README](https://github.com/apache/ozone/blob/master/hadoop-ozone/dist/src/main/compose/ozone/README.md) and in the [docs](https://ozone.apache.org/docs/current/start.html).
 
+## Jira guideline
+
+When creating a new jira for any kind of new feature, improvement or bug, please follow below guideline: 
+
+  1. **Title:** Title should be a one-liner stating the problem.
+  2. **Description:**
+     * What is the problem? Is it a feature, improvement or bug? Add as many details as possible and related design doc and discussion.
+     * For new features, add as many details as possible. If it is part of the big feature, attach parent jira.
+     * For improvement, add the value it will bring. Is it an optimization, code simplification or something else?
+     * For bugs, add steps to reproduce it. Where the root cause is unknown and needs investigation, it would be great to update the jira description or add the summary once the root cause is identified.
+     * If it is follow up of another issue, please link the previous jira to it so that context is preserve.
+  3. **Jira examples:** [HDDS-9272](https://issues.apache.org/jira/browse/HDDS-9272), [HDDS-9322](https://issues.apache.org/jira/browse/HDDS-9322), [HDDS-9291](https://issues.apache.org/jira/browse/HDDS-9291), [HDDS-8940](https://issues.apache.org/jira/browse/HDDS-8940), [HDDS-9282](https://issues.apache.org/jira/browse/HDDS-9282)
+
 ## Contribute your modifications
 
 We use GitHub pull requests for contributing changes to the repository. The main workflow is as follows:
@@ -101,13 +114,12 @@ We use GitHub pull requests for contributing changes to the repository. The main
       * In general, please try to avoid force-push when updating the PR.  Here are some great articles that explain why:
         * https://developers.mattermost.com/blog/submitting-great-prs/#4-avoid-force-pushing
         * https://www.freecodecamp.org/news/optimize-pull-requests-for-reviewer-happiness#request-a-review
-    
 ## Code convention and tests
 
 Basic code conventions followed by Ozone:
 
  * 2 spaces indentation
- * 80-char line length limit
+ * 120-char line length limit
  * Apache license header required in most files
  * no `@author` tags, authorship is indicated by Git history
 
@@ -146,18 +158,6 @@ The set of tests run by `integration` and `acceptance` may be limited via argume
 Some scripts require third-party tools, but most of these are installed during the first run, if needed.
 
 Most scripts (except `build.sh`) output results in `target/<name>`, e.g. `target/docs`.
-
-### False positive findbugs violation
-
-If you have __very good__ reasons, you can ignore any Fingbugs warning. Your good reason can be persisted with the `@SuppressFBWarnings` annotation.
-
-```java
-@SuppressFBWarnings(value="AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION",
-      justification="The method is synchronized and this is the only place "+
-          "dnsToUuidMap is modified")
-private synchronized void addEntryTodnsToUuidMap(
-...
-```
 
 ## Using IDE
 

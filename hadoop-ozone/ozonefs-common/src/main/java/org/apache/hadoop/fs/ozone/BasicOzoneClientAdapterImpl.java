@@ -29,21 +29,20 @@ import java.util.Iterator;
 import java.util.List;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OFSPath;
@@ -64,19 +63,16 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.security.token.TokenRenewer;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -358,6 +354,10 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       bucket.deleteDirectory(keyName, recursive);
       return true;
     } catch (OMException ome) {
+      if (OMException.ResultCodes.KEY_NOT_FOUND == ome.getResult()) {
+        LOG.warn("delete key failed {}", ome.getMessage());
+        return false;
+      }
       LOG.error("delete key failed {}", ome.getMessage());
       if (OMException.ResultCodes.DIRECTORY_NOT_EMPTY == ome.getResult()) {
         throw new PathIsNotEmptyDirectoryException(ome.getMessage());
@@ -465,56 +465,6 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   @VisibleForTesting
   void setClock(Clock monotonicClock) {
     this.clock = monotonicClock;
-  }
-
-  /**
-   * Ozone Delegation Token Renewer.
-   */
-  @InterfaceAudience.Private
-  public static class Renewer extends TokenRenewer {
-
-    //Ensure that OzoneConfiguration files are loaded before trying to use
-    // the renewer.
-    static {
-      OzoneConfiguration.activate();
-    }
-
-    public Text getKind() {
-      return OzoneTokenIdentifier.KIND_NAME;
-    }
-
-    @Override
-    public boolean handleKind(Text kind) {
-      return getKind().equals(kind);
-    }
-
-    @Override
-    public boolean isManaged(Token<?> token) throws IOException {
-      return true;
-    }
-
-    @Override
-    public long renew(Token<?> token, Configuration conf)
-        throws IOException, InterruptedException {
-      Token<OzoneTokenIdentifier> ozoneDt =
-          (Token<OzoneTokenIdentifier>) token;
-
-      OzoneClient ozoneClient =
-          OzoneClientFactory.getOzoneClient(OzoneConfiguration.of(conf),
-              ozoneDt);
-      return ozoneClient.getObjectStore().renewDelegationToken(ozoneDt);
-    }
-
-    @Override
-    public void cancel(Token<?> token, Configuration conf)
-        throws IOException, InterruptedException {
-      Token<OzoneTokenIdentifier> ozoneDt =
-          (Token<OzoneTokenIdentifier>) token;
-      OzoneClient ozoneClient =
-          OzoneClientFactory.getOzoneClient(OzoneConfiguration.of(conf),
-              ozoneDt);
-      ozoneClient.getObjectStore().cancelDelegationToken(ozoneDt);
-    }
   }
 
   /**
@@ -655,14 +605,33 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   @Override
+  public void deleteSnapshot(String pathStr, String snapshotName)
+      throws IOException {
+    OFSPath ofsPath = new OFSPath(pathStr, config);
+    objectStore.deleteSnapshot(ofsPath.getVolumeName(),
+        ofsPath.getBucketName(),
+        snapshotName);
+  }
+
+  @Override
   public SnapshotDiffReport getSnapshotDiffReport(Path snapshotDir,
       String fromSnapshot, String toSnapshot)
       throws IOException, InterruptedException {
-    boolean takeTemporarySnapshot = false;
-    if (toSnapshot.equals(ACTIVE_FS_SNAPSHOT_NAME)) {
-      takeTemporarySnapshot = true;
+    boolean takeTemporaryToSnapshot = false;
+    boolean takeTemporaryFromSnapshot = false;
+    if (toSnapshot.isEmpty()) {
+      // empty toSnapshot implies diff b/w the fromSnapshot &
+      // current state.
+      takeTemporaryToSnapshot = true;
       toSnapshot = createSnapshot(snapshotDir.toString(),
-          "temp" + SnapshotInfo.generateName(Time.now()));
+          OzoneFSUtils.generateUniqueTempSnapshotName());
+    }
+    if (fromSnapshot.isEmpty()) {
+      // empty fromSnapshot implies diff b/w the current state
+      // & the toSnapshot
+      takeTemporaryFromSnapshot = true;
+      fromSnapshot = createSnapshot(snapshotDir.toString(),
+          OzoneFSUtils.generateUniqueTempSnapshotName());
     }
     try {
       SnapshotDiffReportOzone aggregated;
@@ -682,11 +651,14 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
       return aggregated;
     } finally {
       // delete the temp snapshot
-      if (takeTemporarySnapshot) {
+      if (takeTemporaryToSnapshot || takeTemporaryFromSnapshot) {
         OFSPath snapPath = new OFSPath(snapshotDir.toString(), config);
-        ozoneClient.getObjectStore()
-            .deleteSnapshot(snapPath.getVolumeName(), snapPath.getBucketName(),
-                toSnapshot);
+        if (takeTemporaryToSnapshot) {
+          OzoneClientUtils.deleteSnapshot(objectStore, toSnapshot, snapPath);
+        }
+        if (takeTemporaryFromSnapshot) {
+          OzoneClientUtils.deleteSnapshot(objectStore, fromSnapshot, snapPath);
+        }
       }
     }
   }
@@ -698,7 +670,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     while (true) {
       snapshotDiffResponse =
           objectStore.snapshotDiff(volume.getName(), bucket.getName(),
-              fromSnapshot, toSnapshot, token, -1, false);
+              fromSnapshot, toSnapshot, token, -1, false, false);
       if (snapshotDiffResponse.getJobStatus() == DONE) {
         break;
       }
@@ -708,8 +680,39 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   @Override
+  public boolean recoverLease(final String pathStr) throws IOException {
+    incrementCounter(Statistic.INVOCATION_RECOVER_LEASE, 1);
+
+    return ozoneClient.getProxy().getOzoneManagerClient().recoverLease(
+        volume.getName(), bucket.getName(), pathStr);
+  }
+
+  @Override
   public void setTimes(String key, long mtime, long atime) throws IOException {
     incrementCounter(Statistic.INVOCATION_SET_TIMES, 1);
     bucket.setTimes(key, mtime, atime);
+  }
+
+  @Override
+  public boolean isFileClosed(String pathStr) throws IOException {
+    incrementCounter(Statistic.INVOCATION_IS_FILE_CLOSED, 1);
+    OFSPath ofsPath = new OFSPath(pathStr, config);
+    if (!ofsPath.isKey()) {
+      throw new IOException("not a file");
+    }
+    OzoneFileStatus status = bucket.getFileStatus(pathStr);
+    if (!status.isFile()) {
+      throw new IOException("not a file");
+    }
+    return !status.getKeyInfo().isHsync();
+  }
+
+  @Override
+  public boolean setSafeMode(SafeModeAction action, boolean isChecked)
+      throws IOException {
+    incrementCounter(Statistic.INVOCATION_SET_SAFE_MODE, 1);
+
+    return ozoneClient.getProxy().getOzoneManagerClient().setSafeMode(
+        action, isChecked);
   }
 }

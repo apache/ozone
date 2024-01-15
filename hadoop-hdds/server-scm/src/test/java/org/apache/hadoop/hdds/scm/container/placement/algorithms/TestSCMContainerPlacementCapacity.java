@@ -21,6 +21,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -36,13 +37,14 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Matchers.anyObject;
-import org.mockito.Mockito;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -98,27 +100,23 @@ public class TestSCMContainerPlacementCapacity {
     datanodes.get(4).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage4)));
 
-    NodeManager mockNodeManager = Mockito.mock(NodeManager.class);
+    NodeManager mockNodeManager = mock(NodeManager.class);
     when(mockNodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
 
-    when(mockNodeManager.getNodeStat(anyObject()))
-        .thenReturn(new SCMNodeMetric(100L, 0L, 100L));
+    when(mockNodeManager.getNodeStat(any()))
+        .thenReturn(new SCMNodeMetric(100L, 0L, 100L, 0, 90));
     when(mockNodeManager.getNodeStat(datanodes.get(2)))
-        .thenReturn(new SCMNodeMetric(100L, 90L, 10L));
+        .thenReturn(new SCMNodeMetric(100L, 90L, 10L, 0, 9));
     when(mockNodeManager.getNodeStat(datanodes.get(3)))
-        .thenReturn(new SCMNodeMetric(100L, 80L, 20L));
+        .thenReturn(new SCMNodeMetric(100L, 80L, 20L, 0, 19));
     when(mockNodeManager.getNodeStat(datanodes.get(4)))
-        .thenReturn(new SCMNodeMetric(100L, 70L, 30L));
-    when(mockNodeManager.getNodeByUuid(anyString())).thenAnswer(
-            invocation -> {
-              String uuid = invocation.getArgument(0);
-              return datanodes.stream().filter(
-                              datanode ->
-                                      datanode.getUuid().toString()
-                                              .equals(uuid)).findFirst()
-                      .orElse(null);
-            });
+        .thenReturn(new SCMNodeMetric(100L, 70L, 30L, 0, 20));
+    when(mockNodeManager.getNodeByUuid(any(UUID.class))).thenAnswer(
+            invocation -> datanodes.stream()
+                .filter(dn -> dn.getUuid().equals(invocation.getArgument(0)))
+                .findFirst()
+                .orElse(null));
 
     SCMContainerPlacementCapacity scmContainerPlacementRandom =
         new SCMContainerPlacementCapacity(mockNodeManager, conf, null, true,
@@ -140,16 +138,16 @@ public class TestSCMContainerPlacementCapacity {
           .chooseDatanodes(existingNodes, null, 1, 15, 15);
 
       //then
-      Assertions.assertEquals(1, datanodeDetails.size());
+      assertEquals(1, datanodeDetails.size());
       DatanodeDetails datanode0Details = datanodeDetails.get(0);
 
-      Assertions.assertNotEquals(
+      assertNotEquals(
           datanodes.get(0), datanode0Details,
           "Datanode 0 should not been selected: excluded by parameter");
-      Assertions.assertNotEquals(
+      assertNotEquals(
           datanodes.get(1), datanode0Details,
           "Datanode 1 should not been selected: excluded by parameter");
-      Assertions.assertNotEquals(
+      assertNotEquals(
           datanodes.get(2), datanode0Details,
           "Datanode 2 should not been selected: not enough space there");
 
@@ -159,9 +157,9 @@ public class TestSCMContainerPlacementCapacity {
     }
 
     //datanode 6 has more space than datanode 3 and datanode 4.
-    Assertions.assertTrue(selectedCount.get(datanodes.get(3)) < selectedCount
-        .get(datanodes.get(6)));
-    Assertions.assertTrue(selectedCount.get(datanodes.get(4)) < selectedCount
-        .get(datanodes.get(6)));
+    assertThat(selectedCount.get(datanodes.get(3)))
+        .isLessThan(selectedCount.get(datanodes.get(6)));
+    assertThat(selectedCount.get(datanodes.get(4)))
+        .isLessThan(selectedCount.get(datanodes.get(6)));
   }
 }

@@ -24,15 +24,14 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OmSnapshot;
-import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMDirectoriesPurgeResponseWithFSO;
@@ -42,7 +41,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 
 import java.util.List;
 
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
@@ -55,31 +53,26 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest purgeDirsRequest =
         getOmRequest().getPurgeDirectoriesRequest();
-    OmSnapshotManager omSnapshotManager = ozoneManager.getOmSnapshotManager();
     String fromSnapshot = purgeDirsRequest.hasSnapshotTableKey() ?
         purgeDirsRequest.getSnapshotTableKey() : null;
 
     List<OzoneManagerProtocolProtos.PurgePathRequest> purgeRequests =
             purgeDirsRequest.getDeletedPathList();
 
-    OmSnapshot omFromSnapshot = null;
+    SnapshotInfo fromSnapshotInfo = null;
     Set<Pair<String, String>> lockSet = new HashSet<>();
     Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap = new HashMap<>();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+
+    OMMetrics omMetrics = ozoneManager.getMetrics();
     try {
       if (fromSnapshot != null) {
-        SnapshotInfo snapshotInfo =
-            ozoneManager.getMetadataManager().getSnapshotInfoTable()
-                .get(fromSnapshot);
-        // TODO: [SNAPSHOT] Revisit in HDDS-8529.
-        omFromSnapshot = (OmSnapshot) omSnapshotManager
-            .checkForSnapshot(snapshotInfo.getVolumeName(),
-                snapshotInfo.getBucketName(),
-                getSnapshotPrefix(snapshotInfo.getName()), true);
+        fromSnapshotInfo = ozoneManager.getMetadataManager()
+            .getSnapshotInfoTable()
+            .get(fromSnapshot);
       }
 
       for (OzoneManagerProtocolProtos.PurgePathRequest path : purgeRequests) {
@@ -94,7 +87,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
                 volumeName, bucketName);
             lockSet.add(volBucketPair);
           }
-          
+          omMetrics.decNumKeys();
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
               volumeName, bucketName);
           // bucketInfo can be null in case of delete volume or bucket
@@ -117,6 +110,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
                 volumeName, bucketName);
             lockSet.add(volBucketPair);
           }
+          omMetrics.decNumKeys();
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
               volumeName, bucketName);
           // bucketInfo can be null in case of delete volume or bucket
@@ -148,9 +142,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         getOmRequest());
     OMClientResponse omClientResponse = new OMDirectoriesPurgeResponseWithFSO(
         omResponse.build(), purgeRequests, ozoneManager.isRatisEnabled(),
-            getBucketLayout(), volBucketInfoMap, omFromSnapshot);
-    addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-        omDoubleBufferHelper);
+            getBucketLayout(), volBucketInfoMap, fromSnapshotInfo);
 
     return omClientResponse;
   }

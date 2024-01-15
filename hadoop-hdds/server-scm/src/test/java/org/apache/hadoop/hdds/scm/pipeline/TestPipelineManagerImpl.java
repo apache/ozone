@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import com.google.common.base.Supplier;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -39,6 +37,7 @@ import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
@@ -59,11 +58,12 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.apache.ratis.util.function.CheckedRunnable;
 import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.slf4j.LoggerFactory;
 
@@ -73,6 +73,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -84,12 +85,20 @@ import java.util.stream.Collectors;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.ALLOCATED;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
-import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
-import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.apache.ratis.util.Preconditions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.any;
@@ -110,7 +119,6 @@ import static org.mockito.Mockito.when;
  */
 public class TestPipelineManagerImpl {
   private OzoneConfiguration conf;
-  private File testDir;
   private DBStore dbStore;
   private MockNodeManager nodeManager;
   private int maxPipelineCount;
@@ -120,13 +128,9 @@ public class TestPipelineManagerImpl {
   private TestClock testClock;
 
   @BeforeEach
-  public void init() throws Exception {
+  void init(@TempDir File testDir) throws Exception {
     testClock = new TestClock(Instant.now(), ZoneOffset.UTC);
     conf = SCMTestUtils.getConf();
-    testDir = GenericTestUtils.getTestDir(
-        TestPipelineManagerImpl.class.getSimpleName() + UUID.randomUUID());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        GenericTestUtils.getRandomizedTempPath());
     scm = HddsTestUtils.getScm(conf);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     // Mock Node Manager is not able to correctly set up things for the EC
@@ -152,7 +156,6 @@ public class TestPipelineManagerImpl {
     if (dbStore != null) {
       dbStore.close();
     }
-    FileUtil.fullyDelete(testDir);
   }
 
   private PipelineManagerImpl createPipelineManager(boolean isLeader)
@@ -185,16 +188,26 @@ public class TestPipelineManagerImpl {
         new SCMHADBTransactionBufferStub(dbStore);
     PipelineManagerImpl pipelineManager =
         createPipelineManager(true, buffer1);
-    Assertions.assertTrue(pipelineManager.getPipelines().isEmpty());
+    assertTrue(pipelineManager.getPipelines().isEmpty());
     Pipeline pipeline1 = pipelineManager.createPipeline(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
-    Assertions.assertEquals(1, pipelineManager.getPipelines().size());
-    Assertions.assertTrue(pipelineManager.containsPipeline(pipeline1.getId()));
+    assertEquals(1, pipelineManager.getPipelines().size());
+    assertTrue(pipelineManager.containsPipeline(pipeline1.getId()));
 
     Pipeline pipeline2 = pipelineManager.createPipeline(
         RatisReplicationConfig.getInstance(ReplicationFactor.ONE));
-    Assertions.assertEquals(2, pipelineManager.getPipelines().size());
-    Assertions.assertTrue(pipelineManager.containsPipeline(pipeline2.getId()));
+    assertEquals(2, pipelineManager.getPipelines().size());
+    assertTrue(pipelineManager.containsPipeline(pipeline2.getId()));
+
+    Pipeline builtPipeline = pipelineManager.buildECPipeline(
+        new ECReplicationConfig(3, 2),
+        Collections.emptyList(), Collections.emptyList());
+    pipelineManager.addEcPipeline(builtPipeline);
+
+    assertEquals(3, pipelineManager.getPipelines().size());
+    assertTrue(pipelineManager.containsPipeline(
+        builtPipeline.getId()));
+
     buffer1.close();
     pipelineManager.close();
 
@@ -203,31 +216,24 @@ public class TestPipelineManagerImpl {
     PipelineManagerImpl pipelineManager2 =
         createPipelineManager(true, buffer2);
     // Should be able to load previous pipelines.
-    Assertions.assertFalse(pipelineManager2.getPipelines().isEmpty());
-    Assertions.assertEquals(2, pipelineManager.getPipelines().size());
+    assertFalse(pipelineManager2.getPipelines().isEmpty());
+    assertEquals(3, pipelineManager.getPipelines().size());
     Pipeline pipeline3 = pipelineManager2.createPipeline(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
     buffer2.close();
-    Assertions.assertEquals(3, pipelineManager2.getPipelines().size());
-    Assertions.assertTrue(pipelineManager2.containsPipeline(pipeline3.getId()));
+    assertEquals(4, pipelineManager2.getPipelines().size());
+    assertTrue(pipelineManager2.containsPipeline(pipeline3.getId()));
 
     pipelineManager2.close();
   }
 
   @Test
   public void testCreatePipelineShouldFailOnFollower() throws Exception {
-    PipelineManagerImpl pipelineManager = createPipelineManager(false);
-    Assertions.assertTrue(pipelineManager.getPipelines().isEmpty());
-    try {
-      pipelineManager
-          .createPipeline(RatisReplicationConfig
-              .getInstance(ReplicationFactor.THREE));
-    } catch (NotLeaderException ex) {
-      pipelineManager.close();
-      return;
+    try (PipelineManager pipelineManager = createPipelineManager(false)) {
+      assertTrue(pipelineManager.getPipelines().isEmpty());
+      assertFailsNotLeader(() -> pipelineManager.createPipeline(
+              RatisReplicationConfig.getInstance(ReplicationFactor.THREE)));
     }
-    // Should not reach here.
-    Assertions.fail();
   }
 
   @Test
@@ -237,233 +243,173 @@ public class TestPipelineManagerImpl {
         createPipelineManager(true, buffer);
     Table<PipelineID, Pipeline> pipelineStore =
         SCMDBDefinition.PIPELINES.getTable(dbStore);
-    Pipeline pipeline = pipelineManager.createPipeline(
-        RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
-    Assertions.assertEquals(1, pipelineManager.getPipelines().size());
-    Assertions.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
-    Assertions.assertEquals(ALLOCATED, pipeline.getPipelineState());
+    Pipeline pipeline = assertAllocate(pipelineManager);
     buffer.flush();
-    Assertions.assertEquals(ALLOCATED,
-        pipelineStore.get(pipeline.getId()).getPipelineState());
+    assertEquals(ALLOCATED, pipelineStore.get(pipeline.getId()).getPipelineState());
     PipelineID pipelineID = pipeline.getId();
 
     pipelineManager.openPipeline(pipelineID);
     pipelineManager.addContainerToPipeline(pipelineID, ContainerID.valueOf(1));
-    Assertions.assertTrue(pipelineManager
+    assertTrue(pipelineManager
         .getPipelines(RatisReplicationConfig
                 .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.OPEN).contains(pipeline));
     buffer.flush();
-    Assertions.assertTrue(pipelineStore.get(pipeline.getId()).isOpen());
+    assertTrue(pipelineStore.get(pipeline.getId()).isOpen());
 
     pipelineManager.deactivatePipeline(pipeline.getId());
-    Assertions.assertEquals(Pipeline.PipelineState.DORMANT,
-        pipelineManager.getPipeline(pipelineID).getPipelineState());
+    assertEquals(Pipeline.PipelineState.DORMANT, pipelineManager.getPipeline(pipelineID).getPipelineState());
     buffer.flush();
-    Assertions.assertEquals(Pipeline.PipelineState.DORMANT,
-        pipelineStore.get(pipeline.getId()).getPipelineState());
-    Assertions.assertFalse(pipelineManager
+    assertEquals(Pipeline.PipelineState.DORMANT, pipelineStore.get(pipeline.getId()).getPipelineState());
+    assertFalse(pipelineManager
         .getPipelines(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.OPEN).contains(pipeline));
-    Assertions.assertEquals(1, pipelineManager.getPipelineCount(
+    assertEquals(1, pipelineManager.getPipelineCount(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.DORMANT));
 
     pipelineManager.activatePipeline(pipeline.getId());
-    Assertions.assertTrue(pipelineManager
+    assertTrue(pipelineManager
         .getPipelines(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.OPEN).contains(pipeline));
-    Assertions.assertEquals(1, pipelineManager.getPipelineCount(
+    assertEquals(1, pipelineManager.getPipelineCount(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.OPEN));
     buffer.flush();
-    Assertions.assertTrue(pipelineStore.get(pipeline.getId()).isOpen());
+    assertTrue(pipelineStore.get(pipeline.getId()).isOpen());
     pipelineManager.close();
   }
 
   @Test
   public void testOpenPipelineShouldFailOnFollower() throws Exception {
-    PipelineManagerImpl pipelineManager = createPipelineManager(true);
-    Pipeline pipeline = pipelineManager.createPipeline(
-        RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
-    Assertions.assertEquals(1, pipelineManager.getPipelines().size());
-    Assertions.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
-    Assertions.assertEquals(ALLOCATED, pipeline.getPipelineState());
-    // Change to follower
-    assert pipelineManager.getScmhaManager() instanceof SCMHAManagerStub;
-    ((SCMHAManagerStub) pipelineManager.getScmhaManager()).setIsLeader(false);
-    try {
-      pipelineManager.openPipeline(pipeline.getId());
-    } catch (NotLeaderException ex) {
-      pipelineManager.close();
-      return;
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      Pipeline pipeline = assertAllocate(pipelineManager);
+      changeToFollower(pipelineManager);
+      assertFailsNotLeader(
+          () -> pipelineManager.openPipeline(pipeline.getId()));
     }
-    // Should not reach here.
-    Assertions.fail();
   }
 
   @Test
   public void testActivatePipelineShouldFailOnFollower() throws Exception {
-    PipelineManagerImpl pipelineManager = createPipelineManager(true);
-    Pipeline pipeline = pipelineManager.createPipeline(
-        RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
-    Assertions.assertEquals(1, pipelineManager.getPipelines().size());
-    Assertions.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
-    Assertions.assertEquals(ALLOCATED, pipeline.getPipelineState());
-    // Change to follower
-    assert pipelineManager.getScmhaManager() instanceof SCMHAManagerStub;
-    ((SCMHAManagerStub) pipelineManager.getScmhaManager()).setIsLeader(false);
-    try {
-      pipelineManager.activatePipeline(pipeline.getId());
-    } catch (NotLeaderException ex) {
-      pipelineManager.close();
-      return;
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      Pipeline pipeline = assertAllocate(pipelineManager);
+      changeToFollower(pipelineManager);
+      assertFailsNotLeader(
+          () -> pipelineManager.activatePipeline(pipeline.getId()));
     }
-    // Should not reach here.
-    Assertions.fail();
   }
 
   @Test
   public void testDeactivatePipelineShouldFailOnFollower() throws Exception {
-    PipelineManagerImpl pipelineManager = createPipelineManager(true);
-    Pipeline pipeline = pipelineManager.createPipeline(
-        RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
-    Assertions.assertEquals(1, pipelineManager.getPipelines().size());
-    Assertions.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
-    Assertions.assertEquals(ALLOCATED, pipeline.getPipelineState());
-    // Change to follower
-    assert pipelineManager.getScmhaManager() instanceof SCMHAManagerStub;
-    ((SCMHAManagerStub) pipelineManager.getScmhaManager()).setIsLeader(false);
-    try {
-      pipelineManager.deactivatePipeline(pipeline.getId());
-    } catch (NotLeaderException ex) {
-      pipelineManager.close();
-      return;
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      Pipeline pipeline = assertAllocate(pipelineManager);
+      changeToFollower(pipelineManager);
+      assertThrows(SCMException.class,
+          () -> pipelineManager.deactivatePipeline(pipeline.getId()));
     }
-    // Should not reach here.
-    Assertions.fail();
   }
 
   @Test
   public void testRemovePipeline() throws Exception {
-    PipelineManagerImpl pipelineManager = createPipelineManager(true);
-    // Create a pipeline
-    Pipeline pipeline = pipelineManager.createPipeline(
-        RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
-    Assertions.assertEquals(1, pipelineManager.getPipelines().size());
-    Assertions.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
-    Assertions.assertEquals(ALLOCATED, pipeline.getPipelineState());
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      Pipeline pipeline = assertAllocate(pipelineManager);
 
-    // Open the pipeline
-    pipelineManager.openPipeline(pipeline.getId());
-    ContainerManager containerManager = scm.getContainerManager();
-    ContainerInfo containerInfo = HddsTestUtils.
-            getContainer(HddsProtos.LifeCycleState.CLOSED, pipeline.getId());
-    ContainerID containerID = containerInfo.containerID();
-    //Add Container to ContainerMap
-    containerManager.getContainerStateManager().
-            addContainer(containerInfo.getProtobuf());
-    //Add Container to PipelineStateMap
-    pipelineManager.addContainerToPipeline(pipeline.getId(), containerID);
-    Assertions.assertTrue(pipelineManager
-        .getPipelines(RatisReplicationConfig
-            .getInstance(ReplicationFactor.THREE),
-            Pipeline.PipelineState.OPEN).contains(pipeline));
+      // Open the pipeline
+      pipelineManager.openPipeline(pipeline.getId());
+      ContainerManager containerManager = scm.getContainerManager();
+      ContainerInfo containerInfo = HddsTestUtils.
+          getContainer(HddsProtos.LifeCycleState.CLOSED, pipeline.getId());
+      ContainerID containerID = containerInfo.containerID();
+      //Add Container to ContainerMap
+      containerManager.getContainerStateManager().
+          addContainer(containerInfo.getProtobuf());
+      //Add Container to PipelineStateMap
+      pipelineManager.addContainerToPipeline(pipeline.getId(), containerID);
+      assertTrue(pipelineManager
+          .getPipelines(RatisReplicationConfig
+                  .getInstance(ReplicationFactor.THREE),
+              Pipeline.PipelineState.OPEN).contains(pipeline));
 
-    try {
-      pipelineManager.removePipeline(pipeline);
-      fail();
-    } catch (IOException ioe) {
-      // Should not be able to remove the OPEN pipeline.
-      Assertions.assertEquals(1, pipelineManager.getPipelines().size());
-    } catch (Exception e) {
-      Assertions.fail("Should not reach here.");
+      try {
+        pipelineManager.removePipeline(pipeline);
+        fail();
+      } catch (IOException ioe) {
+        // Should not be able to remove the OPEN pipeline.
+        assertEquals(1, pipelineManager.getPipelines().size());
+      } catch (Exception e) {
+        fail("Should not reach here.");
+      }
+
+      // Destroy pipeline
+      pipelineManager.closePipeline(pipeline.getId());
+      pipelineManager.deletePipeline(pipeline.getId());
+
+      try {
+        pipelineManager.getPipeline(pipeline.getId());
+        fail("Pipeline should not have been retrieved");
+      } catch (PipelineNotFoundException e) {
+        // There may be pipelines created by BackgroundPipelineCreator
+        // exist in pipelineManager, just ignore them.
+      }
     }
-
-    // Destroy pipeline
-    pipelineManager.closePipeline(pipeline, false);
-    try {
-      pipelineManager.getPipeline(pipeline.getId());
-      fail("Pipeline should not have been retrieved");
-    } catch (PipelineNotFoundException e) {
-      // There may be pipelines created by BackgroundPipelineCreator
-      // exist in pipelineManager, just ignore them.
-    }
-
-    pipelineManager.close();
   }
 
   @Test
   public void testClosePipelineShouldFailOnFollower() throws Exception {
-    PipelineManagerImpl pipelineManager = createPipelineManager(true);
-    Pipeline pipeline = pipelineManager.createPipeline(
-        RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
-    Assertions.assertEquals(1, pipelineManager.getPipelines().size());
-    Assertions.assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
-    Assertions.assertEquals(ALLOCATED, pipeline.getPipelineState());
-    // Change to follower
-    assert pipelineManager.getScmhaManager() instanceof SCMHAManagerStub;
-    ((SCMHAManagerStub) pipelineManager.getScmhaManager()).setIsLeader(false);
-    try {
-      pipelineManager.closePipeline(pipeline, false);
-    } catch (NotLeaderException ex) {
-      pipelineManager.close();
-      return;
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      Pipeline pipeline = assertAllocate(pipelineManager);
+      changeToFollower(pipelineManager);
+      assertFailsNotLeader(
+          () -> pipelineManager.closePipeline(pipeline, false));
     }
-    // Should not reach here.
-    Assertions.fail();
   }
 
   @Test
   public void testPipelineReport() throws Exception {
-    PipelineManagerImpl pipelineManager = createPipelineManager(true);
-    SCMSafeModeManager scmSafeModeManager =
-        new SCMSafeModeManager(conf, new ArrayList<>(), null, pipelineManager,
-            new EventQueue(), serviceManager, scmContext);
-    Pipeline pipeline = pipelineManager
-        .createPipeline(RatisReplicationConfig
-            .getInstance(ReplicationFactor.THREE));
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      SCMSafeModeManager scmSafeModeManager =
+          new SCMSafeModeManager(conf, new ArrayList<>(), null, pipelineManager,
+              new EventQueue(), serviceManager, scmContext);
+      Pipeline pipeline = pipelineManager
+          .createPipeline(RatisReplicationConfig
+              .getInstance(ReplicationFactor.THREE));
 
-    // pipeline is not healthy until all dns report
-    List<DatanodeDetails> nodes = pipeline.getNodes();
-    Assertions.assertFalse(
-        pipelineManager.getPipeline(pipeline.getId()).isHealthy());
-    // get pipeline report from each dn in the pipeline
-    PipelineReportHandler pipelineReportHandler =
-        new PipelineReportHandler(scmSafeModeManager, pipelineManager,
-            SCMContext.emptyContext(), conf);
-    nodes.subList(0, 2).forEach(dn -> sendPipelineReport(dn, pipeline,
-        pipelineReportHandler, false));
-    sendPipelineReport(nodes.get(nodes.size() - 1), pipeline,
-        pipelineReportHandler, true);
+      // pipeline is not healthy until all dns report
+      List<DatanodeDetails> nodes = pipeline.getNodes();
+      assertFalse(
+          pipelineManager.getPipeline(pipeline.getId()).isHealthy());
+      // get pipeline report from each dn in the pipeline
+      PipelineReportHandler pipelineReportHandler =
+          new PipelineReportHandler(scmSafeModeManager, pipelineManager,
+              SCMContext.emptyContext(), conf);
+      nodes.subList(0, 2).forEach(dn -> sendPipelineReport(dn, pipeline,
+          pipelineReportHandler, false));
+      sendPipelineReport(nodes.get(nodes.size() - 1), pipeline,
+          pipelineReportHandler, true);
 
-    // pipeline is healthy when all dns report
-    Assertions.assertTrue(
-        pipelineManager.getPipeline(pipeline.getId()).isHealthy());
-    // pipeline should now move to open state
-    Assertions.assertTrue(
-        pipelineManager.getPipeline(pipeline.getId()).isOpen());
+      // pipeline is healthy when all dns report
+      assertTrue(
+          pipelineManager.getPipeline(pipeline.getId()).isHealthy());
+      // pipeline should now move to open state
+      assertTrue(
+          pipelineManager.getPipeline(pipeline.getId()).isOpen());
 
-    // close the pipeline
-    pipelineManager.closePipeline(pipeline, false);
+      // close the pipeline
+      pipelineManager.closePipeline(pipeline.getId());
+      pipelineManager.deletePipeline(pipeline.getId());
 
-    // pipeline report for destroyed pipeline should be ignored
-    nodes.subList(0, 2).forEach(dn -> sendPipelineReport(dn, pipeline,
-        pipelineReportHandler, false));
-    sendPipelineReport(nodes.get(nodes.size() - 1), pipeline,
-        pipelineReportHandler, true);
+      // pipeline report for destroyed pipeline should be ignored
+      nodes.subList(0, 2).forEach(dn -> sendPipelineReport(dn, pipeline,
+          pipelineReportHandler, false));
+      sendPipelineReport(nodes.get(nodes.size() - 1), pipeline,
+          pipelineReportHandler, true);
 
-    try {
-      pipelineManager.getPipeline(pipeline.getId());
-      fail("Pipeline should not have been retrieved");
-    } catch (PipelineNotFoundException e) {
-      // should reach here
+      assertThrows(PipelineNotFoundException.class,
+          () -> pipelineManager.getPipeline(pipeline.getId()));
     }
-
-    // clean up
-    pipelineManager.close();
   }
 
   @Test
@@ -475,7 +421,7 @@ public class TestPipelineManagerImpl {
         SCMPipelineMetrics.class.getSimpleName());
     long numPipelineAllocated = getLongCounter("NumPipelineAllocated",
         metrics);
-    Assertions.assertEquals(0, numPipelineAllocated);
+    assertEquals(0, numPipelineAllocated);
 
     // 3 DNs are unhealthy.
     // Create 5 pipelines (Use up 15 Datanodes)
@@ -484,17 +430,17 @@ public class TestPipelineManagerImpl {
       Pipeline pipeline = pipelineManager
           .createPipeline(RatisReplicationConfig
               .getInstance(ReplicationFactor.THREE));
-      Assertions.assertNotNull(pipeline);
+      assertNotNull(pipeline);
     }
 
     metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
     numPipelineAllocated = getLongCounter("NumPipelineAllocated", metrics);
-    Assertions.assertEquals(maxPipelineCount, numPipelineAllocated);
+    assertEquals(maxPipelineCount, numPipelineAllocated);
 
     long numPipelineCreateFailed = getLongCounter(
         "NumPipelineCreationFailed", metrics);
-    Assertions.assertEquals(0, numPipelineCreateFailed);
+    assertEquals(0, numPipelineCreateFailed);
 
     //This should fail...
     try {
@@ -504,19 +450,19 @@ public class TestPipelineManagerImpl {
       fail();
     } catch (SCMException ioe) {
       // pipeline creation failed this time.
-      Assertions.assertEquals(
-          SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
+      assertEquals(
+          ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
           ioe.getResult());
     }
 
     metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
     numPipelineAllocated = getLongCounter("NumPipelineAllocated", metrics);
-    Assertions.assertEquals(maxPipelineCount, numPipelineAllocated);
+    assertEquals(maxPipelineCount, numPipelineAllocated);
 
     numPipelineCreateFailed = getLongCounter(
         "NumPipelineCreationFailed", metrics);
-    Assertions.assertEquals(1, numPipelineCreateFailed);
+    assertEquals(1, numPipelineCreateFailed);
 
     // clean up
     pipelineManager.close();
@@ -537,7 +483,7 @@ public class TestPipelineManagerImpl {
     pipelineManager.close();
     // new pipeline manager loads the pipelines from the db in ALLOCATED state
     pipelineManager = createPipelineManager(true);
-    Assertions.assertEquals(Pipeline.PipelineState.ALLOCATED,
+    assertEquals(Pipeline.PipelineState.ALLOCATED,
         pipelineManager.getPipeline(pipeline.getId()).getPipelineState());
 
     SCMSafeModeManager scmSafeModeManager =
@@ -550,12 +496,12 @@ public class TestPipelineManagerImpl {
 
     // Report pipelines with leaders
     List<DatanodeDetails> nodes = pipeline.getNodes();
-    Assertions.assertEquals(3, nodes.size());
+    assertEquals(3, nodes.size());
     // Send report for all but no leader
     nodes.forEach(dn -> sendPipelineReport(dn, pipeline, pipelineReportHandler,
         false));
 
-    Assertions.assertEquals(Pipeline.PipelineState.ALLOCATED,
+    assertEquals(Pipeline.PipelineState.ALLOCATED,
         pipelineManager.getPipeline(pipeline.getId()).getPipelineState());
 
     nodes.subList(0, 2).forEach(dn -> sendPipelineReport(dn, pipeline,
@@ -563,7 +509,7 @@ public class TestPipelineManagerImpl {
     sendPipelineReport(nodes.get(nodes.size() - 1), pipeline,
         pipelineReportHandler, true);
 
-    Assertions.assertEquals(Pipeline.PipelineState.OPEN,
+    assertEquals(Pipeline.PipelineState.OPEN,
         pipelineManager.getPipeline(pipeline.getId()).getPipelineState());
 
     pipelineManager.close();
@@ -574,17 +520,19 @@ public class TestPipelineManagerImpl {
     // Allocated pipelines should not be scrubbed for 50 seconds.
     conf.setTimeDuration(
         OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, 50, TimeUnit.SECONDS);
+    conf.setTimeDuration(
+        OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, 50, TimeUnit.SECONDS);
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
     Pipeline allocatedPipeline = pipelineManager
         .createPipeline(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE));
     // At this point, pipeline is not at OPEN stage.
-    Assertions.assertEquals(Pipeline.PipelineState.ALLOCATED,
+    assertEquals(Pipeline.PipelineState.ALLOCATED,
         allocatedPipeline.getPipelineState());
 
     // pipeline should be seen in pipelineManager as ALLOCATED.
-    Assertions.assertTrue(pipelineManager
+    assertTrue(pipelineManager
         .getPipelines(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.ALLOCATED).contains(allocatedPipeline));
@@ -596,7 +544,7 @@ public class TestPipelineManagerImpl {
     pipelineManager.closePipeline(closedPipeline, true);
 
     // pipeline should be seen in pipelineManager as CLOSED.
-    Assertions.assertTrue(pipelineManager
+    assertTrue(pipelineManager
         .getPipelines(RatisReplicationConfig
                 .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.CLOSED).contains(closedPipeline));
@@ -608,13 +556,14 @@ public class TestPipelineManagerImpl {
 
     // The allocatedPipeline should not be scrubbed as the interval has not
     // yet passed.
-    Assertions.assertTrue(pipelineManager
+    assertTrue(pipelineManager
         .getPipelines(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.ALLOCATED).contains(allocatedPipeline));
 
-    // The closedPipeline should be scrubbed, as they are scrubbed immediately
-    Assertions.assertFalse(pipelineManager
+    // The closedPipeline should not be scrubbed as the interval has not
+    // yet passed.
+    assertTrue(pipelineManager
         .getPipelines(RatisReplicationConfig
                 .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.CLOSED).contains(closedPipeline));
@@ -624,10 +573,16 @@ public class TestPipelineManagerImpl {
     pipelineManager.scrubPipelines();
 
     // The allocatedPipeline should now be scrubbed as the interval has passed
-    Assertions.assertFalse(pipelineManager
+    assertFalse(pipelineManager
         .getPipelines(RatisReplicationConfig
                 .getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.ALLOCATED).contains(allocatedPipeline));
+
+    // The closedPipeline should now be scrubbed as the interval has passed
+    assertFalse(pipelineManager
+        .getPipelines(RatisReplicationConfig
+                .getInstance(ReplicationFactor.THREE),
+            Pipeline.PipelineState.CLOSED).contains(closedPipeline));
 
     pipelineManager.close();
   }
@@ -642,7 +597,7 @@ public class TestPipelineManagerImpl {
     // Scrubbing the pipelines should not affect this pipeline
     pipelineManager.scrubPipelines();
     pipeline = pipelineManager.getPipeline(pipeline.getId());
-    Assertions.assertEquals(Pipeline.PipelineState.OPEN,
+    assertEquals(Pipeline.PipelineState.OPEN,
         pipeline.getPipelineState());
 
     // Now, "unregister" one of the nodes in the pipeline
@@ -652,7 +607,7 @@ public class TestPipelineManagerImpl {
 
     pipelineManager.scrubPipelines();
     pipeline = pipelineManager.getPipeline(pipeline.getId());
-    Assertions.assertEquals(Pipeline.PipelineState.CLOSED,
+    assertEquals(Pipeline.PipelineState.CLOSED,
         pipeline.getPipelineState());
   }
 
@@ -661,33 +616,13 @@ public class TestPipelineManagerImpl {
     conf.setTimeDuration(
         OZONE_SCM_PIPELINE_ALLOCATED_TIMEOUT, 10, TimeUnit.SECONDS);
 
-    PipelineManagerImpl pipelineManager = createPipelineManager(true);
-    Pipeline pipeline = pipelineManager
-        .createPipeline(RatisReplicationConfig
-            .getInstance(ReplicationFactor.THREE));
-    // At this point, pipeline is not at OPEN stage.
-    Assertions.assertEquals(Pipeline.PipelineState.ALLOCATED,
-        pipeline.getPipelineState());
-
-    // pipeline should be seen in pipelineManager as ALLOCATED.
-    Assertions.assertTrue(pipelineManager
-        .getPipelines(RatisReplicationConfig
-                .getInstance(ReplicationFactor.THREE),
-            Pipeline.PipelineState.ALLOCATED).contains(pipeline));
-
-    // Change to follower
-    assert pipelineManager.getScmhaManager() instanceof SCMHAManagerStub;
-    ((SCMHAManagerStub) pipelineManager.getScmhaManager()).setIsLeader(false);
-
-    testClock.fastForward(20000);
-    try {
-      pipelineManager.scrubPipelines();
-    } catch (NotLeaderException ex) {
-      pipelineManager.close();
-      return;
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      assertAllocate(pipelineManager);
+      changeToFollower(pipelineManager);
+      testClock.fastForward(20000);
+      assertThrows(SCMException.class,
+          pipelineManager::scrubPipelines);
     }
-    // Should not reach here.
-    Assertions.fail();
   }
 
   @Test
@@ -708,7 +643,7 @@ public class TestPipelineManagerImpl {
       fail("Pipelines should not have been created");
     } catch (IOException e) {
       // No pipeline is created.
-      Assertions.assertTrue(pipelineManager.getPipelines().isEmpty());
+      assertTrue(pipelineManager.getPipelines().isEmpty());
     }
 
     // Ensure a pipeline of factor ONE can be created - no exceptions should be
@@ -716,7 +651,7 @@ public class TestPipelineManagerImpl {
     Pipeline pipeline = pipelineManager
         .createPipeline(RatisReplicationConfig
             .getInstance(ReplicationFactor.ONE));
-    Assertions.assertTrue(pipelineManager
+    assertTrue(pipelineManager
         .getPipelines(RatisReplicationConfig
             .getInstance(ReplicationFactor.ONE))
         .contains(pipeline));
@@ -724,12 +659,8 @@ public class TestPipelineManagerImpl {
     // Simulate safemode check exiting.
     scmContext.updateSafeModeStatus(
         new SCMSafeModeManager.SafeModeStatus(true, true));
-    GenericTestUtils.waitFor(new Supplier<Boolean>() {
-      @Override
-      public Boolean get() {
-        return pipelineManager.getPipelines().size() != 0;
-      }
-    }, 100, 10000);
+    GenericTestUtils.waitFor(() -> pipelineManager.getPipelines().size() != 0,
+        100, 10000);
     pipelineManager.close();
   }
 
@@ -744,21 +675,21 @@ public class TestPipelineManagerImpl {
 
     scmContext.updateSafeModeStatus(
         new SCMSafeModeManager.SafeModeStatus(true, false));
-    Assertions.assertTrue(pipelineManager.getSafeModeStatus());
-    Assertions.assertFalse(pipelineManager.isPipelineCreationAllowed());
+    assertTrue(pipelineManager.getSafeModeStatus());
+    assertFalse(pipelineManager.isPipelineCreationAllowed());
 
     // First pass pre-check as true, but safemode still on
     // Simulate safemode check exiting.
     scmContext.updateSafeModeStatus(
         new SCMSafeModeManager.SafeModeStatus(true, true));
-    Assertions.assertTrue(pipelineManager.getSafeModeStatus());
-    Assertions.assertTrue(pipelineManager.isPipelineCreationAllowed());
+    assertTrue(pipelineManager.getSafeModeStatus());
+    assertTrue(pipelineManager.isPipelineCreationAllowed());
 
     // Then also turn safemode off
     scmContext.updateSafeModeStatus(
         new SCMSafeModeManager.SafeModeStatus(false, true));
-    Assertions.assertFalse(pipelineManager.getSafeModeStatus());
-    Assertions.assertTrue(pipelineManager.isPipelineCreationAllowed());
+    assertFalse(pipelineManager.getSafeModeStatus());
+    assertTrue(pipelineManager.isPipelineCreationAllowed());
     pipelineManager.close();
   }
 
@@ -779,12 +710,12 @@ public class TestPipelineManagerImpl {
     pipelineManager.getStateManager().updatePipelineState(
             pipelineID.getProtobuf(), HddsProtos.PipelineState.PIPELINE_CLOSED);
     buffer.flush();
-    Assertions.assertTrue(pipelineStore.get(pipelineID).isClosed());
+    assertTrue(pipelineStore.get(pipelineID).isClosed());
     pipelineManager.addContainerToPipelineSCMStart(pipelineID,
             ContainerID.valueOf(2));
-    assertTrue(logCapturer.getOutput().contains("Container " +
+    assertThat(logCapturer.getOutput()).contains("Container " +
             ContainerID.valueOf(2) + " in open state for pipeline=" +
-            pipelineID + " in closed state"));
+            pipelineID + " in closed state");
   }
 
   @Test
@@ -802,7 +733,7 @@ public class TestPipelineManagerImpl {
     pipelineManager.getStateManager().updatePipelineState(
         pipelineID.getProtobuf(), HddsProtos.PipelineState.PIPELINE_CLOSED);
     buffer.flush();
-    Assertions.assertTrue(pipelineStore.get(pipelineID).isClosed());
+    assertTrue(pipelineStore.get(pipelineID).isClosed());
     assertThrows(InvalidPipelineStateException.class,
         () -> pipelineManager.addContainerToPipeline(pipelineID,
         ContainerID.valueOf(2)));
@@ -826,18 +757,18 @@ public class TestPipelineManagerImpl {
             addContainer(containerInfo.getProtobuf());
     //Add Container to PipelineStateMap
     pipelineManager.addContainerToPipeline(pipelineID, containerID);
-    pipelineManager.closePipeline(pipeline, false);
+    pipelineManager.closePipeline(pipelineID);
     String containerExpectedOutput = "Container " + containerID +
             " closed for pipeline=" + pipelineID;
     String pipelineExpectedOutput =
-        "Pipeline " + pipeline + " moved to CLOSED state";
+        "Pipeline " + pipelineID + " moved to CLOSED state";
     String logOutput = logCapturer.getOutput();
-    assertTrue(logOutput.contains(containerExpectedOutput));
-    assertTrue(logOutput.contains(pipelineExpectedOutput));
+    assertThat(logOutput).contains(containerExpectedOutput);
+    assertThat(logOutput).contains(pipelineExpectedOutput);
 
     int containerLogIdx = logOutput.indexOf(containerExpectedOutput);
     int pipelineLogIdx = logOutput.indexOf(pipelineExpectedOutput);
-    assertTrue(containerLogIdx < pipelineLogIdx);
+    assertThat(containerLogIdx).isLessThan(pipelineLogIdx);
   }
 
   @Test
@@ -896,9 +827,9 @@ public class TestPipelineManagerImpl {
 
     // test IP change
     List<Pipeline> pipelineList1 = pipelineManager.getStalePipelines(node1);
-    Assertions.assertEquals(2, pipelineList1.size());
-    Assertions.assertEquals(pipelines.get(0), pipelineList1.get(0));
-    Assertions.assertEquals(pipelines.get(3), pipelineList1.get(1));
+    assertEquals(2, pipelineList1.size());
+    assertEquals(pipelines.get(0), pipelineList1.get(0));
+    assertEquals(pipelines.get(3), pipelineList1.get(1));
 
     // node with changed host name
     DatanodeDetails node2 = mock(DatanodeDetails.class);
@@ -908,9 +839,9 @@ public class TestPipelineManagerImpl {
 
     // test IP change
     List<Pipeline> pipelineList2 = pipelineManager.getStalePipelines(node2);
-    Assertions.assertEquals(2, pipelineList2.size());
-    Assertions.assertEquals(pipelines.get(0), pipelineList2.get(0));
-    Assertions.assertEquals(pipelines.get(3), pipelineList2.get(1));
+    assertEquals(2, pipelineList2.size());
+    assertEquals(pipelines.get(0), pipelineList2.get(0));
+    assertEquals(pipelines.get(3), pipelineList2.get(1));
   }
 
   @Test
@@ -931,9 +862,9 @@ public class TestPipelineManagerImpl {
 
     pipelineManager.closeStalePipelines(datanodeDetails);
     verify(pipelineManager, times(1))
-            .closePipeline(stalePipelines.get(0), false);
+            .closePipeline(stalePipelines.get(0).getId());
     verify(pipelineManager, times(1))
-            .closePipeline(stalePipelines.get(1), false);
+            .closePipeline(stalePipelines.get(1).getId());
   }
 
   @Test
@@ -979,9 +910,9 @@ public class TestPipelineManagerImpl {
         anyString(), eq(allocatedPipeline), any());
 
 
-    Assertions.assertTrue(pipelineManager.getPipelines(repConfig,  OPEN)
+    assertTrue(pipelineManager.getPipelines(repConfig,  OPEN)
         .isEmpty(), "No open pipelines exist");
-    Assertions.assertTrue(pipelineManager.getPipelines(repConfig,  ALLOCATED)
+    assertTrue(pipelineManager.getPipelines(repConfig,  ALLOCATED)
         .contains(allocatedPipeline), "An allocated pipeline exists");
 
     // Instrument waitOnePipelineReady to open pipeline a bit after it is called
@@ -1001,8 +932,7 @@ public class TestPipelineManagerImpl {
     
     ContainerInfo c = provider.getContainer(1, repConfig,
         owner, new ExcludeList());
-    Assertions.assertTrue(c.equals(container),
-        "Expected container was returned");
+    assertEquals(c, container, "Expected container was returned");
 
     // Confirm that waitOnePipelineReady was called on allocated pipelines
     ArgumentCaptor<Collection<PipelineID>> captor =
@@ -1010,8 +940,9 @@ public class TestPipelineManagerImpl {
     verify(pipelineManagerSpy, times(1))
         .waitOnePipelineReady(captor.capture(), anyLong());
     Collection<PipelineID> coll = captor.getValue();
-    Assertions.assertTrue(coll.contains(allocatedPipeline.getId()),
-               "waitOnePipelineReady() was called on allocated pipeline");
+    assertThat(coll)
+        .withFailMessage("waitOnePipelineReady() was called on allocated pipeline")
+        .contains(allocatedPipeline.getId());
     pipelineManager.close();
   }
 
@@ -1025,9 +956,9 @@ public class TestPipelineManagerImpl {
     Set<ContainerReplica> replicas = createContainerReplicasList(dns);
     Pipeline pipeline = pipelineManager.createPipelineForRead(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE), replicas);
-    Assertions.assertEquals(3, pipeline.getNodes().size());
+    assertEquals(3, pipeline.getNodes().size());
     for (DatanodeDetails dn : pipeline.getNodes())  {
-      Assertions.assertTrue(dns.contains(dn));
+      assertThat(dns).contains(dn);
     }
   }
 
@@ -1059,5 +990,26 @@ public class TestPipelineManagerImpl {
         HddsTestUtils.getPipelineReportFromDatanode(dn, pipeline.getId(),
             isLeader);
     pipelineReportHandler.onMessage(report, new EventQueue());
+  }
+
+  private static Pipeline assertAllocate(PipelineManagerImpl pipelineManager) {
+    Pipeline pipeline = assertDoesNotThrow(
+        () -> pipelineManager.createPipeline(
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE)));
+    assertEquals(1, pipelineManager.getPipelines().size());
+    assertTrue(pipelineManager.containsPipeline(pipeline.getId()));
+    assertEquals(ALLOCATED, pipeline.getPipelineState());
+    return pipeline;
+  }
+
+  private static void changeToFollower(PipelineManagerImpl pipelineManager) {
+    assertInstanceOf(pipelineManager.getScmhaManager(), SCMHAManagerStub.class)
+        .setIsLeader(false);
+  }
+
+  private static void assertFailsNotLeader(CheckedRunnable<?> block) {
+    SCMException e = assertThrows(SCMException.class, block::run);
+    assertEquals(ResultCodes.SCM_NOT_LEADER, e.getResult());
+    assertInstanceOf(NotLeaderException.class, e.getCause());
   }
 }

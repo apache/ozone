@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.util.function.Supplier;
 
 /**
  * Class used to pick messages from the ReplicationManager over replicated
@@ -28,8 +30,8 @@ public class OverReplicatedProcessor extends UnhealthyReplicationProcessor
         <ContainerHealthResult.OverReplicatedHealthResult> {
 
   public OverReplicatedProcessor(ReplicationManager replicationManager,
-      long intervalInMillis) {
-    super(replicationManager, intervalInMillis);
+      Supplier<Duration> interval) {
+    super(replicationManager, interval);
 
   }
 

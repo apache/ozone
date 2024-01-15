@@ -18,25 +18,31 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.Slice;
+
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * Managed Slice.
  */
 public class ManagedSlice extends Slice {
+  private final UncheckedAutoCloseable leakTracker = track(this);
 
-  public ManagedSlice(byte[] var1) {
-    super(var1);
+  public ManagedSlice(byte[] data) {
+    super(data);
   }
 
   @Override
-  protected void finalize() throws Throwable {
-    ManagedRocksObjectMetrics.INSTANCE.increaseManagedObject();
-    if (this.isOwningHandle()) {
-      ManagedRocksObjectMetrics.INSTANCE.increaseLeakObject();
-      ManagedRocksObjectUtils.LOG.warn("{} is not closed properly",
-          this.getClass().getSimpleName());
-    }
-    super.finalize();
+  public synchronized long getNativeHandle() {
+    return super.getNativeHandle();
+  }
+
+  @Override
+  protected void disposeInternal() {
+    super.disposeInternal();
+    // RocksMutableObject.close is final thus can't be decorated.
+    // So, we decorate disposeInternal instead to track closure.
+    leakTracker.close();
   }
 }

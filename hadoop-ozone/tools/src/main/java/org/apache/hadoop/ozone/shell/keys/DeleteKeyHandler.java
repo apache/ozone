@@ -19,18 +19,19 @@
 package org.apache.hadoop.ozone.shell.keys;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 import java.io.IOException;
@@ -48,10 +49,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
     description = "deletes an existing key")
 public class DeleteKeyHandler extends KeyHandler {
 
-  @CommandLine.Option(names = "--skipTrash",
-      description = "Specify whether to skip Trash ")
-  private boolean skipTrash = false;
-
   private static final Path CURRENT = new Path("Current");
 
   @Override
@@ -63,6 +60,13 @@ public class DeleteKeyHandler extends KeyHandler {
     OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = vol.getBucket(bucketName);
     String keyName = address.getKeyName();
+
+    try {
+      OmUtils.verifyKeyNameWithSnapshotReservedWordForDeletion(keyName);
+    } catch (OMException omException) {
+      out().printf("Operation not permitted: %s %n", omException.getMessage());
+      return;
+    }
 
     if (bucket.getBucketLayout().isFileSystemOptimized()) {
       // Handle FSO delete key which supports trash also
@@ -83,7 +87,7 @@ public class DeleteKeyHandler extends KeyHandler {
 
     // If Bucket layout is FSO and Trash is enabled
     // In this case during delete operation move key to trash
-    if (trashInterval > 0 && !skipTrash &&
+    if (trashInterval > 0 &&
         !keyName.contains(TRASH_PREFIX)) {
       keyName = OzoneFSUtils.removeTrailingSlashIfNeeded(keyName);
         // Check if key exists in Ozone
@@ -135,10 +139,10 @@ public class DeleteKeyHandler extends KeyHandler {
       // Rename key to move inside trash folder
       bucket.renameKey(keyName, toKeyName);
       out().printf("Key moved inside Trash: %s %n", toKeyName);
-    } else if (trashInterval > 0 && !skipTrash &&
+    } else if (trashInterval > 0 &&
         keyName.contains(TRASH_PREFIX)) {
-      // Delete from trash not possible when user didn't do skipTrash
-      out().printf("Use --skipTrash to delete key from Trash %n");
+      // Delete from trash not possible use fs to delete
+      out().printf("Use fs command to delete key from Trash %n");
     } else {
       bucket.deleteKey(keyName);
     }

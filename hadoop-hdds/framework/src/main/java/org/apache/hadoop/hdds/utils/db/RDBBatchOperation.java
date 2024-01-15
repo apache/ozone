@@ -166,17 +166,28 @@ public class RDBBatchOperation implements BatchOperation {
           }
         }
 
-        debug(() -> String.format("  %s %s, #put=%s, #del=%s", this,
-            batchSizeDiscardedString(), putCount, delCount));
+        debug(this::summary);
+      }
+
+      private String summary() {
+        return String.format("  %s %s, #put=%s, #del=%s", this,
+            batchSizeDiscardedString(), putCount, delCount);
       }
 
       void clear() {
+        final boolean warn = !isCommit && batchSize > 0;
+        String details = warn ? summary() : null;
+
         for (Object value : ops.values()) {
           if (value instanceof CodecBuffer) {
             ((CodecBuffer) value).release(); // the key will also be released
           }
         }
         ops.clear();
+
+        if (warn) {
+          LOG.warn("discarding changes {}", details);
+        }
       }
 
       void putOrDelete(Bytes key, int keyLen, Object val, int valLen) {
@@ -351,6 +362,7 @@ public class RDBBatchOperation implements BatchOperation {
   public void close() {
     debug(() -> String.format("%s: close", name));
     writeBatch.close();
+    opCache.clear();
   }
 
   public void delete(ColumnFamily family, byte[] key) throws IOException {

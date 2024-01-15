@@ -33,9 +33,9 @@ import org.apache.hadoop.ozone.om.lock.OMLockMetrics;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -61,7 +61,7 @@ public class TestOmBucketReadWriteKeyOps {
       LoggerFactory.getLogger(TestOmBucketReadWriteKeyOps.class);
   private OzoneClient client;
 
-  @Before
+  @BeforeEach
   public void setup() {
     path = GenericTestUtils
         .getTempPath(TestHadoopDirTreeGenerator.class.getSimpleName());
@@ -129,7 +129,7 @@ public class TestOmBucketReadWriteKeyOps {
           new ParameterBuilder().setVolumeName("vol4").setBucketName("bucket1")
               .setTotalThreadCount(10).setNumOfReadOperations(5)
               .setNumOfWriteOperations(3).setKeyCountForRead(5)
-              .setKeyCountForWrite(3).setKeySizeInBytes(64)
+              .setKeyCountForWrite(3).setKeySize("64B")
               .setBufferSize(16));
       verifyFreonCommand(
           new ParameterBuilder().setVolumeName("vol5").setBucketName("bucket1")
@@ -161,7 +161,7 @@ public class TestOmBucketReadWriteKeyOps {
             "-b", parameterBuilder.bucketName,
             "-k", String.valueOf(parameterBuilder.keyCountForRead),
             "-w", String.valueOf(parameterBuilder.keyCountForWrite),
-            "-g", String.valueOf(parameterBuilder.keySizeInBytes),
+            "-g", parameterBuilder.keySize,
             "--buffer", String.valueOf(parameterBuilder.bufferSize),
             "-l", String.valueOf(parameterBuilder.length),
             "-c", String.valueOf(parameterBuilder.totalThreadCount),
@@ -193,7 +193,7 @@ public class TestOmBucketReadWriteKeyOps {
       ozoneKeyIterator.next();
       ++actual;
     }
-    Assert.assertEquals("Mismatch Count!", expectedCount, actual);
+    Assertions.assertEquals(expectedCount, actual, "Mismatch Count!");
   }
 
   private void verifyOMLockMetrics(OMLockMetrics omLockMetrics) {
@@ -204,8 +204,7 @@ public class TestOmBucketReadWriteKeyOps {
         omLockMetrics.getLongestReadLockWaitingTimeMs());
     int readWaitingSamples =
         Integer.parseInt(readLockWaitingTimeMsStat.split(" ")[2]);
-    Assert.assertTrue("Read Lock Waiting Samples should be positive",
-        readWaitingSamples > 0);
+    Assertions.assertTrue(readWaitingSamples > 0, "Read Lock Waiting Samples should be positive");
 
     String readLockHeldTimeMsStat = omLockMetrics.getReadLockHeldTimeMsStat();
     LOG.info("Read Lock Held Time Stat: " + readLockHeldTimeMsStat);
@@ -213,8 +212,7 @@ public class TestOmBucketReadWriteKeyOps {
         omLockMetrics.getLongestReadLockHeldTimeMs());
     int readHeldSamples =
         Integer.parseInt(readLockHeldTimeMsStat.split(" ")[2]);
-    Assert.assertTrue("Read Lock Held Samples should be positive",
-        readHeldSamples > 0);
+    Assertions.assertTrue(readHeldSamples > 0, "Read Lock Held Samples should be positive");
 
     String writeLockWaitingTimeMsStat =
         omLockMetrics.getWriteLockWaitingTimeMsStat();
@@ -223,8 +221,7 @@ public class TestOmBucketReadWriteKeyOps {
         omLockMetrics.getLongestWriteLockWaitingTimeMs());
     int writeWaitingSamples =
         Integer.parseInt(writeLockWaitingTimeMsStat.split(" ")[2]);
-    Assert.assertTrue("Write Lock Waiting Samples should be positive",
-        writeWaitingSamples > 0);
+    Assertions.assertTrue(writeWaitingSamples > 0, "Write Lock Waiting Samples should be positive");
 
     String writeLockHeldTimeMsStat = omLockMetrics.getWriteLockHeldTimeMsStat();
     LOG.info("Write Lock Held Time Stat: " + writeLockHeldTimeMsStat);
@@ -232,8 +229,7 @@ public class TestOmBucketReadWriteKeyOps {
         omLockMetrics.getLongestWriteLockHeldTimeMs());
     int writeHeldSamples =
         Integer.parseInt(writeLockHeldTimeMsStat.split(" ")[2]);
-    Assert.assertTrue("Write Lock Held Samples should be positive",
-        writeHeldSamples > 0);
+    Assertions.assertTrue(writeHeldSamples > 0, "Write Lock Held Samples should be positive");
   }
 
   private static class ParameterBuilder {
@@ -242,7 +238,7 @@ public class TestOmBucketReadWriteKeyOps {
     private String bucketName = "bucket1";
     private int keyCountForRead = 100;
     private int keyCountForWrite = 10;
-    private long keySizeInBytes = 256;
+    private String keySize = "256B";
     private int bufferSize = 64;
     private int length = 10;
     private int totalThreadCount = 100;
@@ -270,8 +266,8 @@ public class TestOmBucketReadWriteKeyOps {
       return this;
     }
 
-    private ParameterBuilder setKeySizeInBytes(long keySizeInBytesParam) {
-      keySizeInBytes = keySizeInBytesParam;
+    private ParameterBuilder setKeySize(String keySizeParam) {
+      keySize = keySizeParam;
       return this;
     }
 

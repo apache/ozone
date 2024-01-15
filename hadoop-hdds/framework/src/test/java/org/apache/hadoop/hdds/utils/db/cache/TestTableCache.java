@@ -19,12 +19,15 @@
 
 package org.apache.hadoop.hdds.utils.db.cache;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.fail;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -36,7 +39,7 @@ import org.slf4j.event.Level;
  */
 public class TestTableCache {
 
-  private TableCache<CacheKey<String>, CacheValue<String>> tableCache;
+  private TableCache<String, String> tableCache;
 
   @BeforeAll
   public static void setLogLevel() {
@@ -45,9 +48,9 @@ public class TestTableCache {
 
   private void createTableCache(TableCache.CacheType cacheType) {
     if (cacheType == TableCache.CacheType.FULL_CACHE) {
-      tableCache = new FullTableCache<>();
+      tableCache = new FullTableCache<>("");
     } else {
-      tableCache = new PartialTableCache<>();
+      tableCache = new PartialTableCache<>("");
     }
   }
 
@@ -64,7 +67,7 @@ public class TestTableCache {
 
 
     for (int i = 0; i < 10; i++) {
-      Assertions.assertEquals(Integer.toString(i),
+      assertEquals(Integer.toString(i),
           tableCache.get(new CacheKey<>(Integer.toString(i))).getCacheValue());
     }
 
@@ -78,7 +81,7 @@ public class TestTableCache {
     tableCache.evictCache(epochs);
 
     for (int i = 5; i < 10; i++) {
-      Assertions.assertEquals(Integer.toString(i),
+      assertEquals(Integer.toString(i),
           tableCache.get(new CacheKey<>(Integer.toString(i))).getCacheValue());
     }
 
@@ -90,9 +93,9 @@ public class TestTableCache {
                            long expectedMisses,
                            long expectedIterations) {
     CacheStats stats = cache.getStats();
-    Assertions.assertEquals(expectedHits, stats.getCacheHits());
-    Assertions.assertEquals(expectedMisses, stats.getCacheMisses());
-    Assertions.assertEquals(expectedIterations, stats.getIterationTimes());
+    assertEquals(expectedHits, stats.getCacheHits());
+    assertEquals(expectedMisses, stats.getCacheMisses());
+    assertEquals(expectedIterations, stats.getIterationTimes());
   }
 
   @ParameterizedTest
@@ -111,17 +114,17 @@ public class TestTableCache {
 
     // Epoch entries should be like (long, (key1, key2, ...))
     // (0, (0A, 0B))  (1, (1A, 1B))  (2, (2A, 1B))
-    Assertions.assertEquals(3, tableCache.getEpochEntries().size());
-    Assertions.assertEquals(2, tableCache.getEpochEntries().get(0L).size());
+    assertEquals(3, tableCache.getEpochEntries().size());
+    assertEquals(2, tableCache.getEpochEntries().get(0L).size());
     
     // Cache should be like (key, (cacheValue, long))
     // (0A, (null, 0))   (0B, (0, 0))
     // (1A, (null, 1))   (1B, (0, 1))
     // (2A, (null, 2))   (2B, (0, 2))
     for (int i = 0; i < 3; i++) {
-      Assertions.assertNull(tableCache.get(new CacheKey<>(
+      assertNull(tableCache.get(new CacheKey<>(
           Integer.toString(i).concat("A"))).getCacheValue());
-      Assertions.assertEquals(Integer.toString(i),
+      assertEquals(Integer.toString(i),
           tableCache.get(new CacheKey<>(Integer.toString(i).concat("B")))
               .getCacheValue());
     }
@@ -135,12 +138,12 @@ public class TestTableCache {
 
     tableCache.evictCache(epochs);
 
-    Assertions.assertEquals(0, tableCache.getEpochEntries().size());
+    assertEquals(0, tableCache.getEpochEntries().size());
 
     if (cacheType == TableCache.CacheType.PARTIAL_CACHE) {
-      Assertions.assertEquals(0, tableCache.size());
+      assertEquals(0, tableCache.size());
     } else {
-      Assertions.assertEquals(3, tableCache.size());
+      assertEquals(3, tableCache.size());
     }
 
     verifyStats(tableCache, 6, 0, 0);
@@ -168,7 +171,7 @@ public class TestTableCache {
       totalCount++;
     }
 
-    Assertions.assertEquals(totalCount, tableCache.size());
+    assertEquals(totalCount, tableCache.size());
 
     tableCache.evictCache(epochs);
 
@@ -176,22 +179,22 @@ public class TestTableCache {
 
     // If cleanup policy is manual entries should have been removed.
     if (cacheType == TableCache.CacheType.PARTIAL_CACHE) {
-      Assertions.assertEquals(count - epochs.size(), tableCache.size());
+      assertEquals(count - epochs.size(), tableCache.size());
 
       // Check remaining entries exist or not and deleted entries does not
       // exist.
       for (long i = 0; i < insertedCount; i += 2) {
         if (!epochs.contains(i)) {
-          Assertions.assertEquals(Long.toString(i),
+          assertEquals(Long.toString(i),
               tableCache.get(new CacheKey<>(Long.toString(i))).getCacheValue());
         } else {
-          Assertions.assertNull(
+          assertNull(
               tableCache.get(new CacheKey<>(Long.toString(i))));
         }
       }
     } else {
       for (long i = 0; i < insertedCount; i += 2) {
-        Assertions.assertEquals(Long.toString(i),
+        assertEquals(Long.toString(i),
             tableCache.get(new CacheKey<>(Long.toString(i))).getCacheValue());
       }
     }
@@ -223,9 +226,9 @@ public class TestTableCache {
 
 
 
-    Assertions.assertEquals(3, tableCache.size());
+    assertEquals(3, tableCache.size());
     // It will have 2 additional entries because we have 2 override entries.
-    Assertions.assertEquals(3 + 2,
+    assertEquals(3 + 2,
         tableCache.getEpochEntries().size());
 
     // Now remove
@@ -241,9 +244,9 @@ public class TestTableCache {
 
       tableCache.evictCache(epochs);
 
-      Assertions.assertEquals(0, tableCache.size());
+      assertEquals(0, tableCache.size());
 
-      Assertions.assertEquals(0, tableCache.getEpochEntries().size());
+      assertEquals(0, tableCache.getEpochEntries().size());
     }
 
     // Add a new entry.
@@ -255,10 +258,10 @@ public class TestTableCache {
     if (cacheType == TableCache.CacheType.PARTIAL_CACHE) {
       tableCache.evictCache(epochs);
 
-      Assertions.assertEquals(0, tableCache.size());
+      assertEquals(0, tableCache.size());
 
       // Overridden entries would have been deleted.
-      Assertions.assertEquals(0, tableCache.getEpochEntries().size());
+      assertEquals(0, tableCache.getEpochEntries().size());
     }
 
     verifyStats(tableCache, 0, 0, 0);
@@ -297,9 +300,9 @@ public class TestTableCache {
     // 0-5, 1-6, 2-2
 
 
-    Assertions.assertEquals(3, tableCache.size());
+    assertEquals(3, tableCache.size());
     // It will have 4 additional entries because we have 4 override entries.
-    Assertions.assertEquals(3 + 4,
+    assertEquals(3 + 4,
         tableCache.getEpochEntries().size());
 
     // Now remove
@@ -317,16 +320,16 @@ public class TestTableCache {
     if (cacheType == TableCache.CacheType.PARTIAL_CACHE) {
       tableCache.evictCache(epochs);
 
-      Assertions.assertEquals(0, tableCache.size());
+      assertEquals(0, tableCache.size());
 
-      Assertions.assertEquals(0, tableCache.getEpochEntries().size());
+      assertEquals(0, tableCache.getEpochEntries().size());
     } else {
       tableCache.evictCache(epochs);
 
-      Assertions.assertEquals(1, tableCache.size());
+      assertEquals(1, tableCache.size());
 
       // Epoch entries which are overridden also will be cleaned up.
-      Assertions.assertEquals(0, tableCache.getEpochEntries().size());
+      assertEquals(0, tableCache.getEpochEntries().size());
     }
 
     // Add a new entry, now old override entries will be cleaned up.
@@ -339,19 +342,19 @@ public class TestTableCache {
     if (cacheType == TableCache.CacheType.PARTIAL_CACHE) {
       tableCache.evictCache(epochs);
 
-      Assertions.assertEquals(0, tableCache.size());
+      assertEquals(0, tableCache.size());
 
       // Epoch entries which are overridden now would have been deleted.
-      Assertions.assertEquals(0, tableCache.getEpochEntries().size());
+      assertEquals(0, tableCache.getEpochEntries().size());
     } else {
       tableCache.evictCache(epochs);
 
       // 2 entries will be in cache, as 2 are not deleted.
-      Assertions.assertEquals(2, tableCache.size());
+      assertEquals(2, tableCache.size());
 
       // Epoch entries which are not marked for delete will also be cleaned up.
       // As they are override entries in full cache.
-      Assertions.assertEquals(0, tableCache.getEpochEntries().size());
+      assertEquals(0, tableCache.getEpochEntries().size());
     }
 
     verifyStats(tableCache, 0, 0, 0);
@@ -370,12 +373,12 @@ public class TestTableCache {
           try {
             return writeToCache(10, 1, 0);
           } catch (InterruptedException ex) {
-            Assertions.fail("writeToCache got interrupt exception");
+            fail("writeToCache got interrupt exception");
           }
           return 0;
         });
     int value = future.get();
-    Assertions.assertEquals(10, value);
+    assertEquals(10, value);
 
     totalCount += value;
 
@@ -384,20 +387,20 @@ public class TestTableCache {
           try {
             return writeToCache(10, 11, 100);
           } catch (InterruptedException ex) {
-            Assertions.fail("writeToCache got interrupt exception");
+            fail("writeToCache got interrupt exception");
           }
           return 0;
         });
 
     // Check we have first 10 entries in cache.
     for (int i = 1; i <= 10; i++) {
-      Assertions.assertEquals(Integer.toString(i),
+      assertEquals(Integer.toString(i),
           tableCache.get(new CacheKey<>(Integer.toString(i))).getCacheValue());
     }
 
 
     value = future.get();
-    Assertions.assertEquals(10, value);
+    assertEquals(10, value);
 
     totalCount += value;
 
@@ -415,10 +418,10 @@ public class TestTableCache {
       tableCache.evictCache(epochs);
 
       // We should totalCount - deleted entries in cache.
-      Assertions.assertEquals(totalCount - deleted, tableCache.size());
+      assertEquals(totalCount - deleted, tableCache.size());
       // Check if we have remaining entries.
       for (int i = 6; i <= totalCount; i++) {
-        Assertions.assertEquals(Integer.toString(i), tableCache.get(
+        assertEquals(Integer.toString(i), tableCache.get(
             new CacheKey<>(Integer.toString(i))).getCacheValue());
       }
 
@@ -430,14 +433,14 @@ public class TestTableCache {
       tableCache.evictCache(epochs);
 
       // Cleaned up all entries, so cache size should be zero.
-      Assertions.assertEquals(0, tableCache.size());
+      assertEquals(0, tableCache.size());
     } else {
       ArrayList<Long> epochs = new ArrayList<>();
       for (long i = 0; i <= totalCount; i++) {
         epochs.add(i);
       }
       tableCache.evictCache(epochs);
-      Assertions.assertEquals(totalCount, tableCache.size());
+      assertEquals(totalCount, tableCache.size());
     }
   }
 
@@ -467,8 +470,8 @@ public class TestTableCache {
 
     tableCache.evictCache(epochs);
 
-    Assertions.assertEquals(0, tableCache.size());
-    Assertions.assertEquals(0, tableCache.getEpochEntries().size());
+    assertEquals(0, tableCache.size());
+    assertEquals(0, tableCache.getEpochEntries().size());
 
     verifyStats(tableCache, 0, 0, 0);
   }
@@ -502,15 +505,15 @@ public class TestTableCache {
 
     tableCache.evictCache(epochs);
 
-    Assertions.assertEquals(2, tableCache.size());
-    Assertions.assertEquals(2, tableCache.getEpochEntries().size());
+    assertEquals(2, tableCache.size());
+    assertEquals(2, tableCache.getEpochEntries().size());
 
-    Assertions.assertNotNull(tableCache.get(new CacheKey<>(Long.toString(0))));
-    Assertions.assertEquals(2,
+    assertNotNull(tableCache.get(new CacheKey<>(Long.toString(0))));
+    assertEquals(2,
         tableCache.get(new CacheKey<>(Long.toString(0))).getEpoch());
 
-    Assertions.assertNotNull(tableCache.get(new CacheKey<>(Long.toString(1))));
-    Assertions.assertEquals(4,
+    assertNotNull(tableCache.get(new CacheKey<>(Long.toString(1))));
+    assertEquals(4,
         tableCache.get(new CacheKey<>(Long.toString(1))).getEpoch());
 
     // now evict 2,4
@@ -521,21 +524,21 @@ public class TestTableCache {
     tableCache.evictCache(epochs);
 
     if (cacheType == TableCache.CacheType.PARTIAL_CACHE) {
-      Assertions.assertEquals(0, tableCache.size());
-      Assertions.assertEquals(0, tableCache.getEpochEntries().size());
+      assertEquals(0, tableCache.size());
+      assertEquals(0, tableCache.getEpochEntries().size());
     } else {
-      Assertions.assertEquals(2, tableCache.size());
-      Assertions.assertEquals(0, tableCache.getEpochEntries().size());
+      assertEquals(2, tableCache.size());
+      assertEquals(0, tableCache.getEpochEntries().size());
 
       // Entries should exist, as the entries are not delete entries
-      Assertions.assertNotNull(
+      assertNotNull(
           tableCache.get(new CacheKey<>(Long.toString(0))));
-      Assertions.assertEquals(2,
+      assertEquals(2,
           tableCache.get(new CacheKey<>(Long.toString(0))).getEpoch());
 
-      Assertions.assertNotNull(
+      assertNotNull(
           tableCache.get(new CacheKey<>(Long.toString(1))));
-      Assertions.assertEquals(4,
+      assertEquals(4,
           tableCache.get(new CacheKey<>(Long.toString(1))).getEpoch());
     }
   }
@@ -551,11 +554,11 @@ public class TestTableCache {
     tableCache.put(new CacheKey<>("1"),
         CacheValue.get(1, "1"));
 
-    Assertions.assertNotNull(tableCache.get(new CacheKey<>("0")));
-    Assertions.assertNotNull(tableCache.get(new CacheKey<>("0")));
-    Assertions.assertNotNull(tableCache.get(new CacheKey<>("1")));
-    Assertions.assertNull(tableCache.get(new CacheKey<>("2")));
-    Assertions.assertNull(tableCache.get(new CacheKey<>("3")));
+    assertNotNull(tableCache.get(new CacheKey<>("0")));
+    assertNotNull(tableCache.get(new CacheKey<>("0")));
+    assertNotNull(tableCache.get(new CacheKey<>("1")));
+    assertNull(tableCache.get(new CacheKey<>("2")));
+    assertNull(tableCache.get(new CacheKey<>("3")));
 
     tableCache.iterator();
     tableCache.iterator();

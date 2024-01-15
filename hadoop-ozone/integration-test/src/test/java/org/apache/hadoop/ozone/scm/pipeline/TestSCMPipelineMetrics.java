@@ -31,7 +31,6 @@ import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -40,9 +39,14 @@ import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.TimeoutException;
 
-import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
-import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
-import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.apache.ozone.test.MetricsAsserts.assertCounter;
+import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test cases to verify the metrics exposed by SCMPipelineManager.
@@ -73,7 +77,7 @@ public class TestSCMPipelineMetrics {
     long numPipelineCreated =
         getLongCounter("NumPipelineCreated", metrics);
     // Pipelines are created in background when the cluster starts.
-    Assertions.assertTrue(numPipelineCreated > 0);
+    assertTrue(numPipelineCreated > 0);
   }
 
   /**
@@ -85,11 +89,13 @@ public class TestSCMPipelineMetrics {
         .getStorageContainerManager().getPipelineManager();
     Optional<Pipeline> pipeline = pipelineManager
         .getPipelines().stream().findFirst();
-    Assertions.assertTrue(pipeline.isPresent());
-    Assertions.assertDoesNotThrow(() ->
-        cluster.getStorageContainerManager()
-            .getPipelineManager()
-            .closePipeline(pipeline.get(), false));
+    assertTrue(pipeline.isPresent());
+    assertDoesNotThrow(() -> {
+      PipelineManager pm = cluster.getStorageContainerManager()
+          .getPipelineManager();
+      pm.closePipeline(pipeline.get().getId());
+      pm.deletePipeline(pipeline.get().getId());
+    });
     MetricsRecordBuilder metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
     assertCounter("NumPipelineDestroyed", 1L, metrics);
@@ -105,23 +111,20 @@ public class TestSCMPipelineMetrics {
     MetricsRecordBuilder metrics =
         getMetrics(SCMPipelineMetrics.class.getSimpleName());
     Pipeline pipeline = block.getPipeline();
-    long numBlocksAllocated = getLongCounter(
-        SCMPipelineMetrics.getBlockAllocationMetricName(pipeline), metrics);
-    Assertions.assertEquals(numBlocksAllocated, 1);
+    final String metricName = SCMPipelineMetrics.getBlockAllocationMetricName(pipeline);
+    long numBlocksAllocated = getLongCounter(metricName, metrics);
+    assertEquals(1, numBlocksAllocated);
 
     // destroy the pipeline
-    Assertions.assertDoesNotThrow(() ->
+    assertDoesNotThrow(() ->
         cluster.getStorageContainerManager().getClientProtocolServer()
             .closePipeline(pipeline.getId().getProtobuf()));
 
     MetricsRecordBuilder finalMetrics =
         getMetrics(SCMPipelineMetrics.class.getSimpleName());
-    Throwable t = Assertions.assertThrows(AssertionError.class, () ->
-        getLongCounter(SCMPipelineMetrics
-            .getBlockAllocationMetricName(pipeline), finalMetrics));
-    Assertions.assertTrue(t.getMessage().contains(
-        "Expected exactly one metric for name " + SCMPipelineMetrics
-            .getBlockAllocationMetricName(block.getPipeline())));
+    Throwable t = assertThrows(AssertionError.class, () ->
+        getLongCounter(metricName, finalMetrics));
+    assertThat(t).hasMessageContaining(metricName);
   }
 
   @AfterEach

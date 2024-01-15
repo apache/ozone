@@ -33,7 +33,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import com.google.common.util.concurrent.MoreExecutors;
@@ -91,22 +93,27 @@ public class StorageVolumeChecker {
 
   private final ExecutorService checkVolumeResultHandlerExecutorService;
 
+  private final DatanodeConfiguration dnConf;
+
   /**
    * An executor for periodic disk checks.
    */
   private final ScheduledExecutorService diskCheckerservice;
-  private final ScheduledFuture<?> periodicDiskChecker;
+  private ScheduledFuture<?> periodicDiskChecker;
   private final List<VolumeSet> registeredVolumeSets;
+
+  private final AtomicBoolean started;
 
   /**
    * @param conf  Configuration object.
    * @param timer {@link Timer} object used for throttling checks.
    */
-  public StorageVolumeChecker(ConfigurationSource conf, Timer timer) {
+  public StorageVolumeChecker(ConfigurationSource conf, Timer timer,
+      String threadNamePrefix) {
 
     this.timer = timer;
 
-    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    dnConf = conf.getObject(DatanodeConfiguration.class);
 
     maxAllowedTimeForCheckMs = dnConf.getDiskCheckTimeout().toMillis();
 
@@ -120,29 +127,38 @@ public class StorageVolumeChecker {
         timer, minDiskCheckGapMs, maxAllowedTimeForCheckMs,
         Executors.newCachedThreadPool(
             new ThreadFactoryBuilder()
-                .setNameFormat("DataNode DiskChecker thread %d")
+                .setNameFormat(threadNamePrefix + "DataNodeDiskChecker" +
+                    "Thread-%d")
                 .setDaemon(true)
                 .build()));
 
     checkVolumeResultHandlerExecutorService = Executors.newCachedThreadPool(
         new ThreadFactoryBuilder()
-            .setNameFormat("VolumeCheck ResultHandler thread %d")
+            .setNameFormat(threadNamePrefix + "VolumeCheckResultHandler" +
+                "Thread-%d")
             .setDaemon(true)
             .build());
 
-    this.diskCheckerservice = Executors.newScheduledThreadPool(
-        1, r -> {
-          Thread t = new Thread(r, "Periodic HDDS volume checker");
-          t.setDaemon(true);
-          return t;
-        });
+    ThreadFactory threadFactory = r -> {
+      Thread t = new Thread(r, threadNamePrefix + "PeriodicHDDSVolumeChecker");
+      t.setDaemon(true);
+      return t;
+    };
+    this.diskCheckerservice = Executors.newSingleThreadScheduledExecutor(
+        threadFactory);
 
-    long periodicDiskCheckIntervalMinutes =
-        dnConf.getPeriodicDiskCheckIntervalMinutes();
-    this.periodicDiskChecker =
-        diskCheckerservice.scheduleWithFixedDelay(this::checkAllVolumeSets,
-            periodicDiskCheckIntervalMinutes, periodicDiskCheckIntervalMinutes,
-            TimeUnit.MINUTES);
+    started = new AtomicBoolean(false);
+  }
+
+  public void start() {
+    if (started.compareAndSet(false, true)) {
+      long periodicDiskCheckIntervalMinutes =
+          dnConf.getPeriodicDiskCheckIntervalMinutes();
+      periodicDiskChecker =
+          diskCheckerservice.scheduleWithFixedDelay(this::checkAllVolumeSets,
+              periodicDiskCheckIntervalMinutes,
+              periodicDiskCheckIntervalMinutes, TimeUnit.MINUTES);
+    }
   }
 
   public synchronized void registerVolumeSet(VolumeSet volumeSet) {
@@ -318,6 +334,7 @@ public class StorageVolumeChecker {
         switch (result) {
         case HEALTHY:
         case DEGRADED:
+          // Ozone does not currently use this state.
           if (LOG.isDebugEnabled()) {
             LOG.debug("Volume {} is {}.", volume, result);
           }
@@ -343,8 +360,12 @@ public class StorageVolumeChecker {
           t.getCause() : t;
       LOG.warn("Exception running disk checks against volume {}",
           volume, exception);
-      markFailed();
-      cleanup();
+      // If the scan was interrupted, do not count it as a volume failure.
+      // This should only happen if the volume checker is being shut down.
+      if (!(t instanceof InterruptedException)) {
+        markFailed();
+        cleanup();
+      }
     }
 
     private void markHealthy() {
@@ -379,15 +400,17 @@ public class StorageVolumeChecker {
    * of the parameters.
    */
   public void shutdownAndWait(int gracePeriod, TimeUnit timeUnit) {
-    periodicDiskChecker.cancel(true);
-    diskCheckerservice.shutdownNow();
-    checkVolumeResultHandlerExecutorService.shutdownNow();
-    try {
-      delegateChecker.shutdownAndWait(gracePeriod, timeUnit);
-    } catch (InterruptedException e) {
-      LOG.warn("{} interrupted during shutdown.",
-          this.getClass().getSimpleName());
-      Thread.currentThread().interrupt();
+    if (started.compareAndSet(true, false)) {
+      periodicDiskChecker.cancel(true);
+      diskCheckerservice.shutdownNow();
+      checkVolumeResultHandlerExecutorService.shutdownNow();
+      try {
+        delegateChecker.shutdownAndWait(gracePeriod, timeUnit);
+      } catch (InterruptedException e) {
+        LOG.warn("{} interrupted during shutdown.",
+            this.getClass().getSimpleName());
+        Thread.currentThread().interrupt();
+      }
     }
   }
 

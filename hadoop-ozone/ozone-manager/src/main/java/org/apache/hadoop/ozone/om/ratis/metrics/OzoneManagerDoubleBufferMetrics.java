@@ -80,6 +80,10 @@ public class OzoneManagerDoubleBufferMetrics {
     this.totalNumOfFlushOperations.incr();
   }
 
+  public void incrTotalNumOfFlushOperations(long flushedOperations) {
+    this.totalNumOfFlushOperations.incr(flushedOperations);
+  }
+
   public void incrTotalSizeOfFlushedTransactions(
       long flushedTransactions) {
     this.totalNumOfFlushedTransactions.incr(flushedTransactions);

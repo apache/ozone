@@ -302,7 +302,12 @@ message SCMCloseContainerRequestProto {
 }
 
 message SCMCloseContainerResponseProto {
-  // Empty response
+  enum Status {
+    OK = 1;
+    CONTAINER_ALREADY_CLOSED = 2;
+    CONTAINER_ALREADY_CLOSING = 3;
+  }
+  optional Status status = 1;
 }
 
 /*
@@ -532,7 +537,8 @@ message ContainerTokenSecretProto {
     required string ownerId = 1;
     required ContainerID containerId = 2;
     required uint64 expiryDate = 3;
-    required string certSerialId = 4;
+    optional string certSerialId = 4 [deprecated=true];
+    optional UUID secretKeyId = 5;
 }
 
 message GetContainerTokenRequestProto {

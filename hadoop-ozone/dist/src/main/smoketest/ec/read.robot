@@ -23,16 +23,16 @@ ${VOLUME}    vol${PREFIX}
 
 *** Test Cases ***
 Read 1MB EC Key
-    Key Should Match Local File    /${VOLUME}/ecbucket/1mb      /tmp/1mb
+    Key Should Match Local File    /${VOLUME}/ecbucket/dir/1mb      /tmp/1mb
 
 Read 2MB EC Key
-    Key Should Match Local File    /${VOLUME}/ecbucket/2mb      /tmp/2mb
+    Key Should Match Local File    /${VOLUME}/ecbucket/dir/2mb      /tmp/2mb
 
 Read 3MB EC Key
-    Key Should Match Local File    /${VOLUME}/ecbucket/3mb      /tmp/3mb
+    Key Should Match Local File    /${VOLUME}/ecbucket/dir/3mb      /tmp/3mb
 
 Read 100MB EC Key
-    Key Should Match Local File    /${VOLUME}/ecbucket/100mb    /tmp/100mb
+    Key Should Match Local File    /${VOLUME}/ecbucket/dir/100mb    /tmp/100mb
 
 Read EC Key in Ratis Bucket
-    Key Should Match Local File    /${VOLUME}/ratis/1mbEC    /tmp/1mb
+    Key Should Match Local File    /${VOLUME}/ratis/dir2/1mbEC    /tmp/1mb

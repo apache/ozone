@@ -23,28 +23,43 @@ REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/dependency"}
 mkdir -p "$REPORT_DIR"
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
-hadoop-ozone/dist/src/main/license/update-jar-report.sh current.txt
+src_dir=hadoop-ozone/dist/src/main/license
 
-cp hadoop-ozone/dist/src/main/license/jar-report.txt "$REPORT_DIR"
-cp hadoop-ozone/dist/src/main/license/current.txt "$REPORT_DIR"
+${src_dir}/update-jar-report.sh
+
+cp ${src_dir}/jar-report.txt "$REPORT_DIR"/
+cp ${src_dir}/current.txt "$REPORT_DIR"/
 
 #implementation of sort cli is not exactly the same everywhere. It's better to sort with the same command locally
-(diff -uw <(sort hadoop-ozone/dist/src/main/license/jar-report.txt) <(sort hadoop-ozone/dist/src/main/license/current.txt) || true ) > "$REPORT_FILE"
-
+(diff -uw \
+  <(sort ${src_dir}/jar-report.txt) \
+  <(sort ${src_dir}/current.txt) \
+  || true) \
+  > "$REPORT_FILE"
 
 if [ -s "$REPORT_FILE" ]; then
-  echo ""
-   echo "Jar files are added/removed to/from the binary package."
-   echo ""
-   echo "Please update the hadoop-ozone/dist/src/main/license/bin/LICENSE.txt file with the modification"
-   echo "   AND execute hadoop-ozone/dist/src/main/license/update-jar-report.sh when you are ready (after a full build)"
-   echo ""
-   echo "Generated hadoop-ozone/dist/src/main/license/jar-report.txt file should be added to your pull-request. It will be used as the base of future comparison."
-   echo ""
-   echo "This check may also report positive for PRs if the source is not up-to-date with the base branch (eg. \`master\`).  In this case please merge the base branch into your source branch."
-   echo ""
-   echo "Changed jars:"
-   echo ""
-   cat $REPORT_FILE
-   exit 1
+  cat <<-EOF
+Jar files under share/ozone/lib in the build have changed.
+
+Please update:
+
+ * ${src_dir}/bin/LICENSE.txt
+   (add new dependencies with the appropriate license, delete any removed dependencies)
+
+ * ${src_dir}/jar-report.txt
+   (based on the diff shown below)
+
+If you notice unexpected differences (can happen when the check is run in a
+fork), please first update your branch from upstream master to get any other
+recent dependency changes.
+
+If you are running this locally after build with -DskipShade, please ignore any
+ozone-filesystem jars reported to be missing.
+
+Changes detected:
+
+EOF
+
+  cat "$REPORT_FILE"
+  exit 1
 fi

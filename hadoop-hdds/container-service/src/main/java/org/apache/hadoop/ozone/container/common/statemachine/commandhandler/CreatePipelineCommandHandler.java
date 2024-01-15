@@ -174,6 +174,11 @@ public class CreatePipelineCommandHandler implements CommandHandler {
   }
 
   @Override
+  public long getTotalRunTime() {
+    return totalTime;
+  }
+
+  @Override
   public int getQueuedCount() {
     return queuedCount.get();
   }

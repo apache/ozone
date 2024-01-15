@@ -31,12 +31,10 @@ import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.List;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_KEY;
@@ -164,8 +162,8 @@ public final class OMNodeDetails extends NodeDetails {
     }
   }
 
-  public URL getOMDBCheckpointEndpointUrl(boolean isHttp, boolean flush,
-      List<String> sstList) throws IOException {
+  public URL getOMDBCheckpointEndpointUrl(boolean isHttp, boolean flush)
+      throws IOException {
     URL url;
     try {
       URIBuilder urlBuilder = new URIBuilder().
@@ -175,12 +173,7 @@ public final class OMNodeDetails extends NodeDetails {
           addParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA, "true").
           addParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH,
               flush ? "true" : "false");
-      if (sstList != null && !sstList.isEmpty()) {
-        for (String s: sstList) {
-          urlBuilder.addParameter(
-              OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST, s);
-        }
-      }
+
       url = urlBuilder.build().toURL();
     } catch (URISyntaxException | MalformedURLException e) {
       throw new IOException("Could not get OM DB Checkpoint Endpoint Url", e);

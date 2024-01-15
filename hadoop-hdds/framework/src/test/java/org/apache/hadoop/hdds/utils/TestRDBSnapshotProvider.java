@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -46,6 +45,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -56,8 +56,10 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.writeDBCheckpointToStream;
 import static org.apache.hadoop.hdds.utils.db.TestRDBStore.newRDBStore;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -86,6 +88,8 @@ public class TestRDBSnapshotProvider {
 
   @BeforeEach
   public void init(@TempDir File tempDir) throws Exception {
+    CodecBuffer.enableLeakDetection();
+
     options = getNewDBOptions();
     configSet = new HashSet<>();
     for (String name : families) {
@@ -98,7 +102,7 @@ public class TestRDBSnapshotProvider {
         MAX_DB_UPDATES_SIZE_THRESHOLD);
     rdbSnapshotProvider = new RDBSnapshotProvider(testDir, "test.db") {
       @Override
-      public void close() throws IOException {
+      public void close() {
       }
 
       @Override
@@ -157,8 +161,8 @@ public class TestRDBSnapshotProvider {
     checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(leaderId);
     int second = HAUtils.getExistingSstFiles(
         rdbSnapshotProvider.getCandidateDir()).size();
-    assertTrue(second > first, "The second snapshot should" +
-        " have more SST files");
+    assertThat(second).withFailMessage("The second snapshot should have more SST files")
+        .isGreaterThan(first);
     DBCheckpoint latestCheckpoint = latestCK.get();
     compareDB(latestCheckpoint.getCheckpointLocation().toFile(),
         checkpoint.getCheckpointLocation().toFile(), numUsedCF);
@@ -167,8 +171,8 @@ public class TestRDBSnapshotProvider {
     checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(leaderId);
     int third = HAUtils.getExistingSstFiles(
         rdbSnapshotProvider.getCandidateDir()).size();
-    assertTrue(third > second, "The third snapshot should" +
-        " have more SST files");
+    assertThat(third).withFailMessage("The third snapshot should have more SST files")
+        .isGreaterThan(second);
     compareDB(latestCK.get().getCheckpointLocation().toFile(),
         checkpoint.getCheckpointLocation().toFile(), numUsedCF);
 
@@ -224,7 +228,7 @@ public class TestRDBSnapshotProvider {
       throws IOException {
     try (Table<byte[], byte[]> firstTable = dbStore.getTable(families.
         get(familyIndex))) {
-      Assertions.assertNotNull(firstTable, "Table cannot be null");
+      assertNotNull(firstTable, "Table cannot be null");
       for (int x = 0; x < 100; x++) {
         byte[] key =
             RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
@@ -235,5 +239,29 @@ public class TestRDBSnapshotProvider {
     } catch (Exception e) {
       throw new IOException(e);
     }
+  }
+
+  @Test
+  public void testCheckLeaderConsistency() throws IOException {
+    // Leader initialized to null at startup.
+    assertEquals(1, rdbSnapshotProvider.getInitCount());
+    File dummyFile = new File(rdbSnapshotProvider.getCandidateDir(),
+        "file1.sst");
+    Files.write(dummyFile.toPath(),
+        "dummyData".getBytes(StandardCharsets.UTF_8));
+    assertTrue(dummyFile.exists());
+
+    // Set the leader.
+    rdbSnapshotProvider.checkLeaderConsistency("node1");
+    assertEquals(2, rdbSnapshotProvider.getInitCount());
+    assertFalse(dummyFile.exists());
+
+    // Confirm setting the same leader doesn't reinitialize.
+    rdbSnapshotProvider.checkLeaderConsistency("node1");
+    assertEquals(2, rdbSnapshotProvider.getInitCount());
+
+    // Confirm setting different leader does reinitialize.
+    rdbSnapshotProvider.checkLeaderConsistency("node2");
+    assertEquals(3, rdbSnapshotProvider.getInitCount());
   }
 }

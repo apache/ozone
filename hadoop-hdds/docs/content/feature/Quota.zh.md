@@ -61,12 +61,42 @@ menu:
 
  f. 如果集群从小于1.1.0的旧版本升级而来，则不建议在旧volume和bucket(可以通过查看volume或者bucket的info确认，如果quota值是-2，那么这个volume或者bucket就是旧的)上使用配额。由于旧的key没有计算到bucket的命名空间配额中，所以此时配额设置是不准确的。
 
+g. 对于FSO bucket, 对移动到垃圾桶的文件和目录，垃圾桶将在以下情况下占用额外的命名空间：
+- 对于桶中垃圾的内部目录路径，即 `/.trash/<user>/<current or timestamp>`
+- 用于将文件/目录移动到垃圾桶中对应层次结构时创建的额外路径。例如：
+
+```
+- 来源：/<vol>/<bucket>/dir1/dir2/file.txt
+场景 1：
+- 将 file.txt 移至回收站（删除操作时）
+- 使用“dir1”和“dir2” 在垃圾桶中创建与来源相同的路径
+  /<vol>/<bucket>/.trash/<user>/current/dir1/dir2/file.txt
+  所以这将消耗“2”的额外名称空间
+  
+场景 2：
+- 将 dir2 移至垃圾箱（删除操作时）
+- 使用“dir1”在垃圾桶中创建与来源相同的路径
+  /<vol>/<bucket>/.trash/<user>/current/dir1/dir2/file.txt
+  所以这将为 dir1 消耗额外的命名空间“1”
+  
+场景 3：
+- 将 dir1 移动到垃圾桶（删除操作时），在这种情况下，不需要额外的命名空间
+  /<vol>/<bucket>/.trash/<user>/current/dir1/dir2/file.txt
+
+```
+
 ### 笔记
 - 对于FSO bucket，当递归删除目录时，配额将在子目录和文件被异步删除后释放（当目录被删除时，递归删除在后台进行）。
+- 当配额即将达到限制，多个ozone 客户端（并行）提交文件时，后端按先到先得的顺序进行验证，满足配额的文件将成功提交。
 
 ## 客户端用法
 ### Storage space级别配额
 Storage space级别配额允许使用 B, KB ，MB ，GB ，TB 等单位。表示将使用多少个存储空间。
+
+#### 注意:
+- Volume 和 Bucket 不支持设置带小数点的配额值，例如 1.5 TB.
+- 最小的有效空间配额，是一个数据块需要的存储空间，即默认块大小 * 副本数. 请确保设置的空间配额不小于这个数值，不然对象/文件写入操作，会失败。
+
 #### Volume Space quota用法
 ```shell
 bin/ozone sh volume create --space-quota 5MB /volume1
