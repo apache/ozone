@@ -252,6 +252,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
 
     <!-- Plugin versions and config -->
     <maven-surefire-plugin.argLine>-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
+    <maven-surefire-plugin.argLineAccessArgs></maven-surefire-plugin.argLineAccessArgs>
     <unstable-test-groups>flaky | slow | unhealthy</unstable-test-groups>
     <maven-surefire-plugin.version>3.2.2</maven-surefire-plugin.version>
     <maven-surefire-report-plugin.version>${maven-surefire-plugin.version}</maven-surefire-report-plugin.version>
@@ -1973,7 +1974,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <reuseForks>false</reuseForks>
           <forkedProcessTimeoutInSeconds>${surefire.fork.timeout}</forkedProcessTimeoutInSeconds>
           <!-- @argLine is filled by jacoco maven plugin. @{} means late evaluation -->
-          <argLine>${maven-surefire-plugin.argLine} @{argLine}</argLine>
+          <argLine>${maven-surefire-plugin.argLine} ${maven-surefire-plugin.argLineAccessArgs} @{argLine}</argLine>
           <environmentVariables>
             <MALLOC_ARENA_MAX>4</MALLOC_ARENA_MAX>
           </environmentVariables>
