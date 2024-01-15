@@ -81,32 +81,21 @@ class TestOzoneManagerDoubleBuffer {
 
   private OzoneManagerDoubleBuffer doubleBuffer;
   private OzoneManager ozoneManager;
-  private OmMetadataManagerImpl omMetadataManager;
   private S3SecretLockedManager secretManager;
-  private CreateSnapshotResponse snapshotResponse1 =
-      mock(CreateSnapshotResponse.class);
-  private CreateSnapshotResponse snapshotResponse2 =
-      mock(CreateSnapshotResponse.class);
-  private OMResponse omKeyResponse = mock(OMResponse.class);
-  private OMResponse omBucketResponse = mock(OMResponse.class);
-  private OMResponse omSnapshotResponse1 = mock(OMResponse.class);
-  private OMResponse omSnapshotResponse2 = mock(OMResponse.class);
-  private static OMClientResponse omKeyCreateResponse =
-      mock(OMKeyCreateResponse.class);
-  private static OMClientResponse omBucketCreateResponse =
-      mock(OMBucketCreateResponse.class);
-  private static OMClientResponse omSnapshotCreateResponse1 =
-      mock(OMSnapshotCreateResponse.class);
-  private static OMClientResponse omSnapshotCreateResponse2 =
-      mock(OMSnapshotCreateResponse.class);
+  private final CreateSnapshotResponse snapshotResponse1 = mock(CreateSnapshotResponse.class);
+  private final CreateSnapshotResponse snapshotResponse2 = mock(CreateSnapshotResponse.class);
+  private final OMResponse omKeyResponse = mock(OMResponse.class);
+  private final OMResponse omBucketResponse = mock(OMResponse.class);
+  private final OMResponse omSnapshotResponse1 = mock(OMResponse.class);
+  private final OMResponse omSnapshotResponse2 = mock(OMResponse.class);
+  private static final OMClientResponse omKeyCreateResponse = mock(OMKeyCreateResponse.class);
+  private static final OMClientResponse omBucketCreateResponse = mock(OMBucketCreateResponse.class);
+  private static final OMClientResponse omSnapshotCreateResponse1 = mock(OMSnapshotCreateResponse.class);
+  private static final OMClientResponse omSnapshotCreateResponse2 = mock(OMSnapshotCreateResponse.class);
   @TempDir
   private File tempDir;
   private OzoneManagerDoubleBuffer.FlushNotifier flushNotifier;
   private OzoneManagerDoubleBuffer.FlushNotifier spyFlushNotifier;
-
-  private static String userPrincipalId1 = "alice@EXAMPLE.COM";
-  private static String userPrincipalId2 = "messi@EXAMPLE.COM";
-  private static String userPrincipalId3 = "ronaldo@EXAMPLE.COM";
 
   @BeforeEach
   public void setup() throws IOException {
@@ -117,8 +106,8 @@ class TestOzoneManagerDoubleBuffer {
 
     ozoneManager = mock(OzoneManager.class);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
-    omMetadataManager =
-        new OmMetadataManagerImpl(ozoneConfiguration, ozoneManager);
+
+    final OmMetadataManagerImpl omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getMaxUserVolumeCount()).thenReturn(10L);
     AuditLogger auditLogger = mock(AuditLogger.class);
@@ -244,12 +233,10 @@ class TestOzoneManagerDoubleBuffer {
     // Flush the current buffer.
     doubleBuffer.flushCurrentBuffer();
 
-    assertEquals(expectedFlushCounts, doubleBuffer.getFlushIterations());
-    assertEquals(expectedFlushedTransactionCount,
-        doubleBuffer.getFlushedTransactionCount());
+    assertEquals(expectedFlushCounts, doubleBuffer.getFlushIterationsForTesting());
+    assertEquals(expectedFlushedTransactionCount, doubleBuffer.getFlushedTransactionCountForTesting());
 
-    OzoneManagerDoubleBufferMetrics bufferMetrics =
-        doubleBuffer.getOzoneManagerDoubleBufferMetrics();
+    final OzoneManagerDoubleBufferMetrics bufferMetrics = doubleBuffer.getMetrics();
 
     assertEquals(expectedFlushCountsInMetric,
         bufferMetrics.getTotalNumOfFlushOperations());
@@ -259,6 +246,9 @@ class TestOzoneManagerDoubleBuffer {
         bufferMetrics.getMaxNumberOfTransactionsFlushedInOneIteration());
     assertEquals(expectedAvgFlushTransactionsInMetric,
         bufferMetrics.getAvgFlushTransactionsInOneIteration(), 0.001);
+
+    // reset max
+    bufferMetrics.setMaxNumberOfTransactionsFlushedInOneIteration(0);
   }
 
   @Test
@@ -318,6 +308,10 @@ class TestOzoneManagerDoubleBuffer {
 
   @Test
   public void testS3SecretCacheSizePostDoubleBufferFlush() throws IOException {
+    final String userPrincipalId1 = "alice@EXAMPLE.COM";
+    final String userPrincipalId2 = "messi@EXAMPLE.COM";
+    final String userPrincipalId3 = "ronaldo@EXAMPLE.COM";
+
     // Create a secret for "alice".
     // This effectively makes alice an S3 admin.
     KerberosName.setRuleMechanism(DEFAULT_MECHANISM);
@@ -338,9 +332,9 @@ class TestOzoneManagerDoubleBuffer {
       doubleBuffer.stopDaemon();
 
       // Create 3 secrets and store them in the cache and double buffer.
-      processSuccessSecretRequest(userPrincipalId1, 1, true);
-      processSuccessSecretRequest(userPrincipalId2, 2, true);
-      processSuccessSecretRequest(userPrincipalId3, 3, true);
+      processSuccessSecretRequest(userPrincipalId1, 1);
+      processSuccessSecretRequest(userPrincipalId2, 2);
+      processSuccessSecretRequest(userPrincipalId3, 3);
 
       S3SecretCache cache = secretManager.cache();
       // Check if all the three secrets are cached.
@@ -357,8 +351,7 @@ class TestOzoneManagerDoubleBuffer {
       assertNull(cache.get(userPrincipalId1));
     } finally {
       // cleanup metrics
-      OzoneManagerDoubleBufferMetrics metrics =
-          doubleBuffer.getOzoneManagerDoubleBufferMetrics();
+      final OzoneManagerDoubleBufferMetrics metrics = doubleBuffer.getMetrics();
       metrics.setMaxNumberOfTransactionsFlushedInOneIteration(0);
       metrics.setAvgFlushTransactionsInOneIteration(0);
       metrics.incrTotalSizeOfFlushedTransactions(
@@ -368,10 +361,7 @@ class TestOzoneManagerDoubleBuffer {
     }
   }
 
-  private void processSuccessSecretRequest(
-      String userPrincipalId,
-      int txLogIndex,
-      boolean shouldHaveResponse) throws IOException {
+  private void processSuccessSecretRequest(String userPrincipalId, int txLogIndex) throws IOException {
     S3GetSecretRequest s3GetSecretRequest =
         new S3GetSecretRequest(
             new S3GetSecretRequest(
