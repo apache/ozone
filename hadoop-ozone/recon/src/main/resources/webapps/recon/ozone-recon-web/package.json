@@ -63,7 +63,7 @@
     ]
   },
   "devDependencies": {
-    "@types/react-plotly.js": "^2.2.4",
+    "@types/react-plotly.js": "^2.6.3",
     "@types/react-select": "^3.0.13",
     "@typescript-eslint/eslint-plugin": "^2.31.0",
     "@typescript-eslint/parser": "^2.31.0",
