@@ -227,7 +227,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <!-- Maven protoc compiler -->
     <protobuf-maven-plugin.version>0.5.1</protobuf-maven-plugin.version>
     <grpc.protobuf-compile.version>3.19.6</grpc.protobuf-compile.version>
-    <os-maven-plugin.version>1.5.0.Final</os-maven-plugin.version>
+    <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
 
     <!-- Use netty version known to work with grpc-netty. See table: -->
     <!-- https://github.com/grpc/grpc-java/blob/master/SECURITY.md#netty -->
