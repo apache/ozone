@@ -6440,7 +6440,9 @@
   },
   "keydeletePending3": {
     "lastKey": "",
-    "deletedKeyInfo": []
+    "replicatedDataSize": 0,
+    "unreplicatedDataSize": 0,
+    "status": "OK"
   },
 
   "deleted": {
