@@ -217,7 +217,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <objenesis.version>1.0</objenesis.version>
     <okhttp.version>2.7.5</okhttp.version>
     <okio.version>3.6.0</okio.version>
-    <mockito.version>3.5.9</mockito.version>
+    <mockito.version>4.11.0</mockito.version>
     <hamcrest.version>2.2</hamcrest.version>
     <jmockit.version>1.24</jmockit.version>
     <junit4.version>4.13.1</junit4.version>
