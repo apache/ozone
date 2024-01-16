@@ -50,6 +50,7 @@ final class ObjectEndpointStreaming {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ObjectEndpointStreaming.class);
+  private static final S3GatewayMetrics METRICS = S3GatewayMetrics.getMetrics();
 
   private ObjectEndpointStreaming() {
   }
@@ -97,13 +98,12 @@ final class ObjectEndpointStreaming {
       Map<String, String> keyMetadata,
       DigestInputStream body, PerformanceStringBuilder perf)
       throws IOException {
-    S3GatewayMetrics metrics = S3GatewayMetrics.create();
     long startNanos = Time.monotonicNowNanos();
     long writeLen;
     String eTag;
     try (OzoneDataStreamOutput streamOutput = bucket.createStreamKey(keyPath,
         length, replicationConfig, keyMetadata)) {
-      long metadataLatencyNs = metrics.updatePutKeyMetadataStats(startNanos);
+      long metadataLatencyNs = METRICS.updatePutKeyMetadataStats(startNanos);
       writeLen = writeToStreamOutput(streamOutput, body, bufferSize, length);
       eTag = DatatypeConverter.printHexBinary(body.getMessageDigest().digest())
           .toLowerCase();
@@ -124,11 +124,10 @@ final class ObjectEndpointStreaming {
       InputStream body, PerformanceStringBuilder perf, long startNanos)
       throws IOException {
     long writeLen = 0;
-    S3GatewayMetrics metrics = S3GatewayMetrics.create();
     try (OzoneDataStreamOutput streamOutput = bucket.createStreamKey(keyPath,
         length, replicationConfig, keyMetadata)) {
       long metadataLatencyNs =
-          metrics.updateCopyKeyMetadataStats(startNanos);
+          METRICS.updateCopyKeyMetadataStats(startNanos);
       perf.appendMetaLatencyNanos(metadataLatencyNs);
       writeLen = writeToStreamOutput(streamOutput, body, bufferSize, length);
     }
@@ -160,17 +159,21 @@ final class ObjectEndpointStreaming {
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     String eTag;
-    S3GatewayMetrics metrics = S3GatewayMetrics.create();
+    // OmMultipartCommitUploadPartInfo can only be gotten after the
+    // OzoneDataStreamOutput is closed, so we need to save the
+    // KeyDataStreamOutput in the OzoneDataStreamOutput and use it to get the
+    // OmMultipartCommitUploadPartInfo after OzoneDataStreamOutput is closed.
+    KeyDataStreamOutput keyDataStreamOutput = null;
     try {
       try (OzoneDataStreamOutput streamOutput = ozoneBucket
           .createMultipartStreamKey(key, length, partNumber, uploadID)) {
-        long metadataLatencyNs = metrics.updatePutKeyMetadataStats(startNanos);
+        long metadataLatencyNs = METRICS.updatePutKeyMetadataStats(startNanos);
         long putLength =
             writeToStreamOutput(streamOutput, body, chunkSize, length);
         eTag = DatatypeConverter.printHexBinary(
             body.getMessageDigest().digest()).toLowerCase();
         ((KeyMetadataAware)streamOutput).getMetadata().put("ETag", eTag);
-        metrics.incPutKeySuccessLength(putLength);
+        METRICS.incPutKeySuccessLength(putLength);
         perf.appendMetaLatencyNanos(metadataLatencyNs);
         perf.appendSizeBytes(putLength);
       }

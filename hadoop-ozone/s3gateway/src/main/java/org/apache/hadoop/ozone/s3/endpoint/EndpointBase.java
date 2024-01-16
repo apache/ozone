@@ -387,7 +387,7 @@ public abstract class EndpointBase implements Auditor {
 
   @VisibleForTesting
   public S3GatewayMetrics getMetrics() {
-    return S3GatewayMetrics.create();
+    return S3GatewayMetrics.getMetrics();
   }
 
   protected Map<String, String> getAuditParameters() {

@@ -29,14 +29,11 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.util.HashMap;
 import java.util.concurrent.TimeoutException;
@@ -51,17 +48,13 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
  * Test the behaviour of the datanode and scm when communicating
  * with refresh volume usage command.
  */
+@Timeout(300)
 public class TestRefreshVolumeUsageHandler {
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     //setup a cluster (1G free space is enough for a unit test)
     conf = new OzoneConfiguration();
@@ -78,7 +71,7 @@ public class TestRefreshVolumeUsageHandler {
     cluster.waitForPipelineTobeReady(ONE, 30000);
   }
 
-  @After
+  @AfterEach
   public void teardown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -108,7 +101,7 @@ public class TestRefreshVolumeUsageHandler {
       //a new key is created, but the datanode default REFRESH_PERIOD is 1 hour,
       //still the cache is updated, so the scm will eventually get the new
       //used space from the datanode through node report.
-      Assert.assertTrue(cluster.getStorageContainerManager()
+      Assertions.assertTrue(cluster.getStorageContainerManager()
           .getScmNodeManager().getUsageInfo(datanodeDetails)
           .getScmNodeStat().getScmUsed().isEqual(currentScmUsed));
 
@@ -123,7 +116,7 @@ public class TestRefreshVolumeUsageHandler {
 
       //after waiting for several node report , this usage info
       //in SCM should be updated as we have updated the DN's cached usage info.
-      Assert.assertTrue(cluster.getStorageContainerManager()
+      Assertions.assertTrue(cluster.getStorageContainerManager()
           .getScmNodeManager().getUsageInfo(datanodeDetails)
           .getScmNodeStat().getScmUsed().isGreater(currentScmUsed));
 

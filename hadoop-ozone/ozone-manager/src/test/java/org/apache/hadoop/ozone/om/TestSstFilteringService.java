@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ratis.util.ExitUtils;
-import org.awaitility.core.ConditionTimeoutException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,7 +47,6 @@ import org.rocksdb.LiveFileMetaData;
 
 import java.io.File;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -57,13 +55,14 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
-import static org.awaitility.Awaitility.with;
+import static org.apache.ozone.test.LambdaTestUtils.await;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -136,7 +135,7 @@ public class TestSstFilteringService {
    */
   @Test
   public void testIrrelevantSstFileDeletion()
-      throws IOException, InterruptedException {
+      throws Exception {
     RDBStore activeDbStore = (RDBStore) om.getMetadataManager().getStore();
     SstFilteringService filteringService =
         keyManager.getSnapshotSstFilteringService();
@@ -192,11 +191,7 @@ public class TestSstFilteringService {
     SnapshotInfo snapshotInfo = om.getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(volumeName, bucketName2, snapshotName1));
     assertFalse(snapshotInfo.isSstFiltered());
-    with().atMost(Duration.ofSeconds(120))
-        .pollInterval(Duration.ofSeconds(1))
-        .await()
-        .until(() -> filteringService.getSnapshotFilteredCount().get() >= 1);
-
+    waitForSnapshotsAtLeast(filteringService, 1);
     assertEquals(1, filteringService.getSnapshotFilteredCount().get());
 
     Set<String> keysFromActiveDb = getKeysFromDb(om.getMetadataManager(),
@@ -225,26 +220,18 @@ public class TestSstFilteringService {
     assertTrue(snapshotInfo.isSstFiltered());
 
     String snapshotName2 = "snapshot2";
-    long count;
+    final long count;
     try (BootstrapStateHandler.Lock lock =
              filteringService.getBootstrapStateLock().lock()) {
       count = filteringService.getSnapshotFilteredCount().get();
       writeClient.createSnapshot(volumeName, bucketName2, snapshotName2);
 
-      assertThrows(ConditionTimeoutException.class, () -> with()
-          .atMost(Duration.ofSeconds(10))
-          .pollInterval(Duration.ofSeconds(1))
-          .await()
-          .until(() ->
-              filteringService.getSnapshotFilteredCount().get() > count));
-
+      assertThrows(TimeoutException.class,
+          () -> waitForSnapshotsAtLeast(filteringService, count + 1));
       assertEquals(count, filteringService.getSnapshotFilteredCount().get());
     }
 
-    with().atMost(Duration.ofSeconds(10))
-        .pollInterval(Duration.ofSeconds(1))
-        .await()
-        .until(() -> filteringService.getSnapshotFilteredCount().get() > count);
+    waitForSnapshotsAtLeast(filteringService, count + 1);
 
     Set<String> keysFromActiveDb2 = getKeysFromDb(om.getMetadataManager(),
         volumeName, bucketName2);
@@ -254,7 +241,7 @@ public class TestSstFilteringService {
   }
 
   @Test
-  public void testActiveAndDeletedSnapshotCleanup() throws IOException {
+  public void testActiveAndDeletedSnapshotCleanup() throws Exception {
     RDBStore activeDbStore = (RDBStore) om.getMetadataManager().getStore();
     String volumeName = "volume1";
     List<String> bucketNames = Arrays.asList("bucket1", "bucket2");
@@ -295,8 +282,7 @@ public class TestSstFilteringService {
     File snap2Current = new File(snapshot2Dir, "CURRENT");
 
     // wait till both checkpoints are created
-    with().atMost(Duration.ofSeconds(10)).pollInterval(Duration.ofSeconds(1))
-        .await().until(() -> snap1Current.exists() && snap2Current.exists());
+    await(10_000, 1_000, () -> snap1Current.exists() && snap2Current.exists());
 
     long snap1SstFileCountBeforeFilter = Arrays.stream(snapshot1Dir.listFiles())
         .filter(f -> f.getName().endsWith(".sst")).count();
@@ -307,9 +293,7 @@ public class TestSstFilteringService {
     writeClient.deleteSnapshot(volumeName, bucketNames.get(0), "snap1");
     sstFilteringService.resume();
     // Filtering service will only act on snap2 as it is an active snaphot
-    with().atMost(Duration.ofSeconds(10)).pollInterval(Duration.ofSeconds(1))
-        .await()
-        .until(() -> sstFilteringService.getSnapshotFilteredCount().get() >= 2);
+    waitForSnapshotsAtLeast(sstFilteringService, 2);
     long snap1SstFileCountAfterFilter = Arrays.stream(snapshot1Dir.listFiles())
         .filter(f -> f.getName().endsWith(SST_FILE_EXTENSION)).count();
     long snap2SstFileCountAfterFilter = Arrays.stream(snapshot2Dir.listFiles())
@@ -383,7 +367,7 @@ public class TestSstFilteringService {
    * snapshot bucket.
    */
   @Test
-  public void testSstFilteringService() throws IOException {
+  public void testSstFilteringService() throws Exception {
     RDBStore activeDbStore = (RDBStore) om.getMetadataManager().getStore();
     String volumeName = "volume";
     List<String> bucketNames = Arrays.asList("bucket", "bucket1", "bucket2");
@@ -431,10 +415,7 @@ public class TestSstFilteringService {
     SstFilteringService sstFilteringService =
         keyManager.getSnapshotSstFilteringService();
 
-    with().atMost(Duration.ofSeconds(10))
-        .pollInterval(Duration.ofSeconds(1))
-        .await()
-        .until(() -> sstFilteringService.getSnapshotFilteredCount().get() >= 3);
+    waitForSnapshotsAtLeast(sstFilteringService, 3);
     assertEquals(3, sstFilteringService.getSnapshotFilteredCount().get());
 
     Set<String> keyInBucketAfterFilteringRun =
@@ -449,6 +430,11 @@ public class TestSstFilteringService {
     assertEquals(keyInBucket, keyInBucketAfterFilteringRun);
     assertEquals(keyInBucket1, keyInBucket1AfterFilteringRun);
     assertEquals(keyInBucket2, keyInBucket2AfterFilteringRun);
+  }
+
+  private static void waitForSnapshotsAtLeast(SstFilteringService filteringService, long n)
+      throws Exception {
+    await(10_000, 1_000, () -> filteringService.getSnapshotFilteredCount().get() >= n);
   }
 
   private Set<String> getKeysFromDb(OMMetadataManager omMetadataReader,
