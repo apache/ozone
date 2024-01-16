@@ -359,11 +359,11 @@ public final class RocksDatabase implements Closeable {
     this.dbOptions = dbOptions;
     this.writeOptions = writeOptions;
     this.descriptors = descriptors;
-    this.columnFamilies = newMap(handles);
-    this.columnFamilyNames = MemoizedSupplier.valueOf(() -> toMap(columnFamilies.values()));
+    this.columnFamilies = toColumnFamilyMap(handles);
+    this.columnFamilyNames = MemoizedSupplier.valueOf(() -> toColumnFamilyNameMap(columnFamilies.values()));
   }
 
-  private Map<String, ColumnFamily> newMap(List<ColumnFamilyHandle> handles) throws RocksDBException {
+  private Map<String, ColumnFamily> toColumnFamilyMap(List<ColumnFamilyHandle> handles) throws RocksDBException {
     final Map<String, ColumnFamily> map = new HashMap<>();
     for (ColumnFamilyHandle h : handles) {
       final ColumnFamily f = new ColumnFamily(h);
@@ -372,7 +372,7 @@ public final class RocksDatabase implements Closeable {
     return Collections.unmodifiableMap(map);
   }
 
-  private static Map<Integer, String> toMap(Collection<ColumnFamily> families) {
+  private static Map<Integer, String> toColumnFamilyNameMap(Collection<ColumnFamily> families) {
     return Collections.unmodifiableMap(families.stream()
         .collect(Collectors.toMap(f -> f.getHandle().getID(), ColumnFamily::getName)));
   }
