@@ -398,6 +398,12 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
   private boolean checkContainersReplicatedOnNode(TrackedNode dn)
       throws NodeNotFoundException {
+    Map<String, List<ContainerID>> containerOnDn = getContainersReplicatedOnNode(dn, true);
+    return (containerOnDn.get("UnderReplicated").size() == 0) && (containerOnDn.get("UnClosed").size() == 0);
+  }
+
+  public Map<String, List<ContainerID>> getContainersReplicatedOnNode(TrackedNode dn, boolean updateMetrics)
+      throws NodeNotFoundException {
     int sufficientlyReplicated = 0;
     int deleting = 0;
     int underReplicated = 0;
@@ -423,9 +429,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
         boolean isHealthy = replicaSet.isHealthyEnoughForOffline();
         if (!isHealthy) {
-          if (LOG.isDebugEnabled()) {
-            unClosedIDs.add(cid);
-          }
+          unClosedIDs.add(cid);
           if (unclosed < containerDetailsLoggingLimit
               || LOG.isDebugEnabled()) {
             LOG.info("Unclosed Container {} {}; {}", cid, replicaSet, replicaDetails(replicaSet.getReplicas()));
@@ -448,86 +452,42 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
           replicationManager.checkContainerStatus(replicaSet.getContainer(), report);
           replicatedOK = report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED) == 0;
         }
-
         if (replicatedOK) {
           sufficientlyReplicated++;
         } else {
-          if (LOG.isDebugEnabled()) {
-            underReplicatedIDs.add(cid);
-          }
+          underReplicatedIDs.add(cid);
           if (underReplicated < containerDetailsLoggingLimit || LOG.isDebugEnabled()) {
             LOG.info("Under Replicated Container {} {}; {}", cid, replicaSet, replicaDetails(replicaSet.getReplicas()));
           }
           underReplicated++;
         }
       } catch (ContainerNotFoundException e) {
-        LOG.warn("ContainerID {} present in node list for {} but not found in containerManager", cid, dn);
+        LOG.warn("ContainerID {} present in node list for {} but not found in containerManager", cid,
+            dn.getDatanodeDetails());
       }
     }
-    LOG.info("{} has {} sufficientlyReplicated, {} deleting, {} " +
-            "underReplicated and {} unclosed containers",
-        dn, sufficientlyReplicated, deleting, underReplicated, unclosed);
-    containerStateByHost.put(dn.getDatanodeDetails().getHostName(),
-        new ContainerStateInWorkflow(dn.getDatanodeDetails().getHostName(),
-            sufficientlyReplicated,
-            underReplicated,
-            unclosed,
-            0L, dn.getStartTime()));
-    sufficientlyReplicatedContainers += sufficientlyReplicated;
-    underReplicatedContainers += underReplicated;
-    unClosedContainers += unclosed;
-    if (LOG.isDebugEnabled() && underReplicatedIDs.size() < 10000 &&
-        unClosedIDs.size() < 10000) {
-      LOG.debug("{} has {} underReplicated [{}] and {} unclosed [{}] " +
-              "containers", dn, underReplicated,
-          underReplicatedIDs.stream().map(
-              Object::toString).collect(Collectors.joining(", ")),
-          unclosed, unClosedIDs.stream().map(
-              Object::toString).collect(Collectors.joining(", ")));
-    }
-    return underReplicated == 0 && unclosed == 0;
-  }
 
-  public Map<String, List<ContainerID>> containersReplicatedOnNode(DatanodeDetails dn)
-      throws NodeNotFoundException {
-    List<ContainerID> underReplicatedIDs = new ArrayList<>();
-    List<ContainerID> unClosedIDs = new ArrayList<>();
-    Set<ContainerID> containers =
-        nodeManager.getContainers(dn);
-    for (ContainerID cid : containers) {
-      try {
-        ContainerReplicaCount replicaSet =
-            replicationManager.getContainerReplicaCount(cid);
-
-        HddsProtos.LifeCycleState containerState
-            = replicaSet.getContainer().getState();
-        if (containerState == HddsProtos.LifeCycleState.DELETED
-            || containerState == HddsProtos.LifeCycleState.DELETING) {
-          continue;
-        }
-
-        boolean isHealthy = replicaSet.isHealthyEnoughForOffline();
-        if (!isHealthy) {
-          unClosedIDs.add(cid);
-          continue;
-        }
-
-        boolean legacyEnabled = conf.getBoolean("hdds.scm.replication.enable" +
-            ".legacy", false);
-        boolean replicatedOK;
-        if (legacyEnabled) {
-          replicatedOK = replicaSet.isSufficientlyReplicatedForOffline(dn, nodeManager);
-        } else {
-          ReplicationManagerReport report = new ReplicationManagerReport();
-          replicationManager.checkContainerStatus(replicaSet.getContainer(), report);
-          replicatedOK = report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED) == 0;
-        }
-
-        if (!replicatedOK) {
-          underReplicatedIDs.add(cid);
-        }
-      } catch (ContainerNotFoundException e) {
-        LOG.warn("ContainerID {} present in node list for {} but not found in containerManager", cid, dn);
+    if (updateMetrics) {
+      LOG.info("{} has {} sufficientlyReplicated, {} deleting, {} " +
+              "underReplicated and {} unclosed containers",
+          dn, sufficientlyReplicated, deleting, underReplicated, unclosed);
+      containerStateByHost.put(dn.getDatanodeDetails().getHostName(),
+          new ContainerStateInWorkflow(dn.getDatanodeDetails().getHostName(),
+              sufficientlyReplicated,
+              underReplicated,
+              unclosed,
+              0L, dn.getStartTime()));
+      sufficientlyReplicatedContainers += sufficientlyReplicated;
+      underReplicatedContainers += underReplicated;
+      unClosedContainers += unclosed;
+      if (LOG.isDebugEnabled() && underReplicatedIDs.size() < 10000 &&
+          unClosedIDs.size() < 10000) {
+        LOG.debug("{} has {} underReplicated [{}] and {} unclosed [{}] " +
+                "containers", dn, underReplicated,
+            underReplicatedIDs.stream().map(
+                Object::toString).collect(Collectors.joining(", ")),
+            unclosed, unClosedIDs.stream().map(
+                Object::toString).collect(Collectors.joining(", ")));
       }
     }
     Map<String, List<ContainerID>> containerList = new HashMap<>();
