@@ -51,6 +51,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import static org.apache.ozone.test.GenericTestUtils.getTempPath;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -224,8 +225,9 @@ public class TestSecureOzoneManager {
     config.set(OZONE_OM_ADDRESS_KEY, "om-unknown");
     RuntimeException rte = assertThrows(RuntimeException.class,
         () -> OzoneManager.initializeSecurity(config, omStorage, scmId));
-    assertEquals("Can't get SCM signed certificate. omRpcAdd:" +
-        " om-unknown:9862", rte.getMessage());
+    assertThat(rte)
+        .hasMessageStartingWith("Can't get SCM signed certificate. omRpcAdd: om-unknown")
+        .hasMessageEndingWith(":9862");
   }
 
 }
