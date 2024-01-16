@@ -60,7 +60,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * Test secure Ozone Manager operation in distributed handler scenario.
  */
 @Timeout(25)
-public class TestSecureOzoneManager {
+class TestSecureOzoneManager {
 
   private static final String COMPONENT = "om";
   private OzoneConfiguration conf;
@@ -71,7 +71,7 @@ public class TestSecureOzoneManager {
   private HddsProtos.OzoneManagerDetailsProto omInfo;
 
   @BeforeEach
-  public void init() throws Exception {
+  void init() throws Exception {
     conf = new OzoneConfiguration();
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
@@ -89,7 +89,7 @@ public class TestSecureOzoneManager {
   }
 
   @AfterEach
-  public void shutdown() {
+  void shutdown() {
     FileUtils.deleteQuietly(metaDir.toFile());
   }
 
@@ -97,7 +97,7 @@ public class TestSecureOzoneManager {
    * Test failure cases for secure OM initialization.
    */
   @Test
-  public void testSecureOmInitFailures() throws Exception {
+  void testSecureOmInitFailures() throws Exception {
     PrivateKey privateKey;
     PublicKey publicKey;
     LogCapturer omLogs =
@@ -204,7 +204,7 @@ public class TestSecureOzoneManager {
    * Test om bind socket address.
    */
   @Test
-  public void testSecureOmInitFailure() throws Exception {
+  void testSecureOmInitFailure() throws Exception {
     OzoneConfiguration config = new OzoneConfiguration(conf);
     OMStorage omStorage = new OMStorage(config);
     omStorage.setClusterId(clusterId);
