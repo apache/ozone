@@ -324,7 +324,6 @@ public class TestStorageContainerManager {
         OzoneTestUtils.closeContainers(keyInfo.getKeyLocationVersions(),
             cluster.getStorageContainerManager());
       }
-      Thread.sleep(3000);
       Map<Long, List<Long>> containerBlocks = createDeleteTXLog(
           cluster.getStorageContainerManager(),
           delLog, keyLocations, helper);
