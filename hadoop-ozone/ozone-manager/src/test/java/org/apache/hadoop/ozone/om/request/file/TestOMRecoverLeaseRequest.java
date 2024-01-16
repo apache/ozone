@@ -49,6 +49,8 @@ import org.apache.hadoop.util.Time;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -65,6 +67,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
 
   private long parentId;
+  private boolean forceRecovery = false;
 
   @Override
   public BucketLayout getBucketLayout() {
@@ -298,22 +301,35 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
     verifyTables(false, false);
   }
 
-  @Test
-  public void testLeaseSoftLimitForHsyncRecoverFile() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testLeaseSoftLimitForHsyncRecoverFile(boolean force) throws Exception {
+    forceRecovery = force;
     populateNamespace(true, true, true, true);
 
     // update soft limit to high value
     ozoneManager.getConfiguration().set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "2s");
-    // Call recovery inside soft limit period it should fail
     OMClientResponse omClientResponse = validateAndUpdateCache();
     OMResponse omResponse = omClientResponse.getOMResponse();
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD,
-        omResponse.getStatus());
-    // Call second time inside soft limit period also should fail
+    if (force) {
+      // In case of force it should always succeed irrespective of soft limit value.
+      Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+          omResponse.getStatus());
+    } else {
+      // Call recovery inside soft limit period it should fail
+      Assertions.assertEquals(OzoneManagerProtocolProtos.Status.KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD,
+          omResponse.getStatus());
+    }
     omClientResponse = validateAndUpdateCache();
     omResponse = omClientResponse.getOMResponse();
-    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD,
-        omResponse.getStatus());
+    if (force) {
+      Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+          omResponse.getStatus());
+    } else {
+      // Call second time inside soft limit period also should fail
+      Assertions.assertEquals(OzoneManagerProtocolProtos.Status.KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD,
+          omResponse.getStatus());
+    }
     Thread.sleep(2000);
     // Call recovery after soft limit period it should succeed
     omClientResponse = validateAndUpdateCache();
@@ -413,9 +429,9 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
 
   @NotNull
   protected OMRequest createRecoverLeaseRequest(
-      String volumeName, String bucketName, String keyName) {
+      String volumeName, String bucketName, String keyName, boolean force) {
     RecoverLeaseRequest.Builder rb = RecoverLeaseRequest.newBuilder();
-    rb.setVolumeName(volumeName).setBucketName(bucketName).setKeyName(keyName);
+    rb.setVolumeName(volumeName).setBucketName(bucketName).setKeyName(keyName).setForce(force);
     return OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.RecoverLease)
         .setClientId(UUID.randomUUID().toString())
@@ -424,7 +440,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
 
   private OMClientResponse validateAndUpdateCache() throws Exception {
     OMRequest modifiedOmRequest = doPreExecute(createRecoverLeaseRequest(
-        volumeName, bucketName, keyName));
+        volumeName, bucketName, keyName, forceRecovery));
     assertNotNull(modifiedOmRequest.getUserInfo());
 
     OMRecoverLeaseRequest omRecoverLeaseRequest = getOmRecoverLeaseRequest(
