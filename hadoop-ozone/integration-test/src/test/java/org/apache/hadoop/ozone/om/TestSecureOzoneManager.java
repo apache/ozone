@@ -28,10 +28,10 @@ import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.apache.hadoop.ozone.security.OMCertificateClient;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.bouncycastle.cert.X509CertificateHolder;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -49,7 +49,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import static org.apache.ozone.test.GenericTestUtils.getTempPath;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -67,6 +66,7 @@ class TestSecureOzoneManager {
   private String clusterId;
   private String scmId;
   private String omId;
+  @TempDir
   private Path metaDir;
   private HddsProtos.OzoneManagerDetailsProto omInfo;
 
@@ -81,16 +81,9 @@ class TestSecureOzoneManager {
     conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.toString());
     conf.setInt(IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, 2);
     conf.set(OZONE_SCM_NAMES, "localhost");
-    final String path = getTempPath(UUID.randomUUID().toString());
-    metaDir = Paths.get(path, "om-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.toString());
     OzoneManager.setTestSecureOmFlag(true);
     omInfo = OzoneManager.getOmDetailsProto(conf, omId);
-  }
-
-  @AfterEach
-  void shutdown() {
-    FileUtils.deleteQuietly(metaDir.toFile());
   }
 
   /**
