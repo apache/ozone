@@ -70,11 +70,6 @@ public class TestSecureOzoneManager {
   private Path metaDir;
   private HddsProtos.OzoneManagerDetailsProto omInfo;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   */
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
@@ -93,9 +88,6 @@ public class TestSecureOzoneManager {
     omInfo = OzoneManager.getOmDetailsProto(conf, omId);
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     FileUtils.deleteQuietly(metaDir.toFile());
