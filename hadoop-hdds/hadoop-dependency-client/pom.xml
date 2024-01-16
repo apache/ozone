@@ -132,10 +132,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <artifactId>commons-lang3</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>org.apache.commons</groupId>
-          <artifactId>commons-text</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>org.slf4j</groupId>
           <artifactId>*</artifactId>
         </exclusion>
