@@ -529,6 +529,8 @@ enum Status {
 
     KEY_UNDER_LEASE_RECOVERY = 95;
     KEY_ALREADY_CLOSED = 96;
+    KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD = 97;
+
 }
 
 /**
@@ -2075,6 +2077,7 @@ message RecoverLeaseRequest {
   optional string volumeName = 1;
   optional string bucketName = 2;
   optional string keyName = 3;
+  optional bool force = 4;
 }
 
 message RecoverLeaseResponse {

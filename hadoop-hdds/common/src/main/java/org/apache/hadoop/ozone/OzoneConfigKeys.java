@@ -128,6 +128,14 @@ public final class OzoneConfigKeys {
   public static final boolean OZONE_FS_HSYNC_ENABLED_DEFAULT
       = false;
 
+  /**
+   * hsync lease soft limit.
+   */
+  public static final String OZONE_OM_LEASE_SOFT_LIMIT
+      = "ozone.om.lease.soft.limit";
+  public static final String OZONE_OM_LEASE_SOFT_LIMIT_DEFAULT
+      = "60s";
+
 
   /**
    * When set to true, allocate a random free port for ozone container, so that
