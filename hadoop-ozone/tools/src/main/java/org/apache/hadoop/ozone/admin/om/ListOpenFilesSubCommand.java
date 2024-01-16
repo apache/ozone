@@ -47,19 +47,17 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
   private OMAdmin parent;
 
   @CommandLine.Option(
-      names = {"-id", "--service-id"},
+      names = {"--service-id", "--om-service-id"},
       description = "Ozone Manager Service ID",
       required = false
   )
   private String omServiceId;
 
   @CommandLine.Option(
-      names = {"-host", "--service-host"},
-      description = "Ozone Manager Host. If OM HA is enabled, use -id instead. "
-          + "If insists on using -host with OM HA, this must point directly "
-          + "to the leader OM. "
-          + "This option is required when -id is not provided or "
-          + "when HA is not enabled."
+      names = {"--service-host"},
+      description = "Ozone Manager Host. If OM HA is enabled, use --service-id instead. "
+          + "If you must use --service-host with OM HA, this must point directly to the leader OM. "
+          + "This option is required when --service-id is not provided or when HA is not enabled."
   )
   private String omHost;
 
@@ -68,7 +66,7 @@ public class ListOpenFilesSubCommand implements Callable<Void> {
       description = "Format output as JSON")
   private boolean json;
 
-  // Conforms to ListOptions, but not all in ListOptions applies here so
+  // Conforms to ListOptions, but not all in ListOptions applies here thus
   // not using that directly
   @CommandLine.Option(
       names = {"-p", "--prefix"},

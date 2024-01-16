@@ -45,7 +45,6 @@ import org.apache.hadoop.fs.ozone.OzoneFsShell;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -94,7 +93,10 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -111,6 +113,7 @@ import picocli.CommandLine.RunLast;
  * Inspired by TestS3Shell
  */
 @Timeout(300)
+@TestMethodOrder(OrderAnnotation.class)
 public class TestOzoneShellHA {
 
   private static final Logger LOG =
@@ -556,14 +559,14 @@ public class TestOzoneShellHA {
   }
 
   @Test
-  public void testOzoneAdminCmdListOpenFiles()
+  public void testAdminCmdListOpenFiles()
       throws IOException, InterruptedException {
 
     OzoneConfiguration conf = cluster.getConf();
     final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
 
     OzoneConfiguration clientConf = getClientConfForOFS(hostPrefix, conf);
-    clientConf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
+    clientConf.setBoolean(OZONE_FS_HSYNC_ENABLED, true);
     FileSystem fs = FileSystem.get(clientConf);
 
     assertNotEquals(fs.getConf().get(OZONE_FS_HSYNC_ENABLED),
@@ -573,8 +576,10 @@ public class TestOzoneShellHA {
     final String volumeName = "volume-lof";
     final String bucketName = "buck1";
 
-    String dir1 = hostPrefix + OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX +
-        bucketName + OM_KEY_PREFIX + "dir1";
+    String dir1 = hostPrefix +
+        OM_KEY_PREFIX + volumeName +
+        OM_KEY_PREFIX + bucketName +
+        OM_KEY_PREFIX + "dir1";
     // Create volume, bucket, dir
     assertTrue(fs.mkdirs(new Path(dir1)));
     String keyPrefix = OM_KEY_PREFIX + "key";
@@ -587,23 +592,23 @@ public class TestOzoneShellHA {
     }
 
     int pageSize = 3;
-
+    String pathToBucket = "/" +  volumeName + "/" + bucketName;
     FSDataOutputStream[] streams = new FSDataOutputStream[numKeys];
-    // Create multiple keys and hold them open
-    for (int i = 0; i < numKeys; i++) {
-      streams[i] = fs.create(new Path(keys[i]));
-      streams[i].write(1);
-    }
 
-    String path = "/" +  volumeName + "/" + bucketName;
     try {
+      // Create multiple keys and hold them open
+      for (int i = 0; i < numKeys; i++) {
+        streams[i] = fs.create(new Path(keys[i]));
+        streams[i].write(1);
+      }
+
       // Wait for DB flush
       cluster.getOzoneManager().awaitDoubleBufferFlush();
 
       String[] args = new String[] {"om", "lof",
-          "-id", omServiceId,
+          "--service-id", omServiceId,
           "-l", String.valueOf(numKeys + 1),  // pagination
-          "-p", path};
+          "-p", pathToBucket};
       // Run listopenfiles
       execute(ozoneAdminShell, args);
       String cmdRes = getStdOut();
@@ -614,9 +619,9 @@ public class TestOzoneShellHA {
 
       // Try pagination
       args = new String[] {"om", "lof",
-          "-id", omServiceId,
+          "--service-id", omServiceId,
           "-l", String.valueOf(pageSize),  // pagination
-          "-p", path};
+          "-p", pathToBucket};
       execute(ozoneAdminShell, args);
       cmdRes = getStdOut();
 
@@ -638,9 +643,9 @@ public class TestOzoneShellHA {
           nextCmd.substring(nextCmd.lastIndexOf(kw) + kw.length());
 
       args = new String[] {"om", "lof",
-          "-id", omServiceId,
+          "--service-id", omServiceId,
           "-l", String.valueOf(pageSize),  // pagination
-          "-p", path,
+          "-p", pathToBucket,
           "-s", contToken};
       execute(ozoneAdminShell, args);
       cmdRes = getStdOut();
@@ -667,9 +672,7 @@ public class TestOzoneShellHA {
       assertTrue(cmdRes.contains("\tNo\t"), "One key should not be hsync'ed");
     } finally {
       // Cleanup
-      for (int i = 0; i < numKeys; i++) {
-        streams[i].close();
-      }
+      IOUtils.closeQuietly(streams);
     }
 
   }
@@ -1585,7 +1588,9 @@ public class TestOzoneShellHA {
   }
 
   @Test
-  public void testZRecursiveBucketDelete()
+  // Run this UT last. This interferes with testAdminCmdListOpenFiles
+  @Order(Integer.MAX_VALUE)
+  public void testRecursiveBucketDelete()
       throws Exception {
     String volume1 = "volume50";
     String bucket1 = "bucketfso";

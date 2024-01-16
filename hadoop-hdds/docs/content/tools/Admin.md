@@ -72,19 +72,12 @@ Argument `--prefix` could be root (`/`), path to a bucket (`/vol1/buck`) or a ke
 
 ```bash
 $ ozone admin om lof --help
-Usage: ozone admin om list-open-files [-hV] [--json] [-host=<omHost>]
-                                      [-id=<omServiceId>] [-l=<limit>]
+Usage: ozone admin om list-open-files [-hV] [--json] [-l=<limit>]
                                       [-p=<pathPrefix>] [-s=<startItem>]
+                                      [--service-host=<omHost>]
+                                      [--service-id=<omServiceId>]
 Lists open files (keys) in Ozone Manager.
   -h, --help                Show this help message and exit.
-      -host, --service-host=<omHost>
-                            Ozone Manager Host. If OM HA is enabled, use -id
-                              instead. If insists on using -host with OM HA,
-                              this must point directly to the leader OM. This
-                              option is required when -id is not provided or
-                              when HA is not enabled.
-      -id, --service-id=<omServiceId>
-                            Ozone Manager Service ID
       --json                Format output as JSON
   -l, --length=<limit>      Maximum number of items to list
   -p, --prefix=<pathPrefix> Filter results by the specified path on the server
@@ -92,6 +85,15 @@ Lists open files (keys) in Ozone Manager.
   -s, --start=<startItem>   The item to start the listing from.
                             i.e. continuation token. This will be excluded from
                               the result.
+      --service-host=<omHost>
+                            Ozone Manager Host. If OM HA is enabled, use
+                              --service-id instead. If you must use
+                              --service-host with OM HA, this must point
+                              directly to the leader OM. This option is
+                              required when --service-id is not provided or
+                              when HA is not enabled.
+      --service-id, --om-service-id=<omServiceId>
+                            Ozone Manager Service ID
   -V, --version             Print version information and exit.
 ```
 
@@ -100,7 +102,7 @@ Lists open files (keys) in Ozone Manager.
 - In human-readable format, list open files (keys) under bucket `/volumelof/buck1` with a batch size of 3:
 
 ```bash
-$ ozone admin om lof -id=om-service-test1 --length=3 --prefix=/volumelof/buck1
+$ ozone admin om lof --service-id=om-service-test1 --length=3 --prefix=/volumelof/buck1
 ```
 
 ```bash
@@ -119,7 +121,7 @@ To get the next batch of open keys, run:
 - In JSON, list open files (keys) under bucket `/volumelof/buck1` with a batch size of 3:
 
 ```bash
-$ ozone admin om lof -id=om-service-test1 --length=3 --prefix=/volumelof/buck1 --json
+$ ozone admin om lof --service-id=om-service-test1 --length=3 --prefix=/volumelof/buck1 --json
 ```
 
 ```json

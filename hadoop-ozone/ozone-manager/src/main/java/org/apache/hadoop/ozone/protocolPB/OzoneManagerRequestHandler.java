@@ -937,9 +937,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
     ListOpenFilesResult res =
         impl.listOpenFiles(req.getPath(), req.getCount(), req.getToken());
-    // TODO: Is there a way to avoid ser-de in this case:
-    //  OM:     ListOpenFilesResult -> ListOpenFilesResponse
-    //  Client: ListOpenFilesResponse -> ListOpenFilesResult
+    // TODO: Is there a clean way to avoid ser-de for responses:
+    //  OM does: ListOpenFilesResult -> ListOpenFilesResponse
+    //  Client : ListOpenFilesResponse -> ListOpenFilesResult
 
     resp.setTotalOpenKeyCount(res.getTotalOpenKeyCount());
     resp.setHasMore(res.hasMore());

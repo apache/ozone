@@ -3232,9 +3232,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       try {
         // as expected, getBucketInfo throws if volume or bucket does not exist
         bucketInfo = getBucketInfo(volumeName, bucketName);
-      } catch (Exception ex) {
+      } catch (OMException ex) {
         metrics.incNumListOpenFilesFails();
         throw ex;
+      } catch (IOException ex) {
+        // Wrap IOException in OMException
+        metrics.incNumListOpenFilesFails();
+        throw new OMException(ex.getMessage(), NOT_SUPPORTED_OPERATION);
       }
 
       final String keyPrefix;

@@ -46,6 +46,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.File;
@@ -561,29 +562,14 @@ public class TestOmMetadataManager {
 
   }
 
-  @Test
-  public void testListOpenFilesFSO() throws Exception {
-    testListOpenFiles(BucketLayout.FILE_SYSTEM_OPTIMIZED);
-  }
-
-  @Test
-  public void testListOpenFilesOBS() throws Exception {
-    testListOpenFiles(BucketLayout.OBJECT_STORE);
-  }
-
-  @Test
-  public void testListOpenFilesLegacy() throws Exception {
-    // OBS and LEGACY should share the same internal structure for the most part
-    // still, testing both here for the sake of completeness
-    testListOpenFiles(BucketLayout.LEGACY);
-  }
-
   /**
    * Tests inner impl of listOpenFiles with different bucket types with and
-   * without pagination. NOTE: This UT does NOT test hsync in this since hsync
+   * without pagination. NOTE: This UT does NOT test hsync here since the hsync
    * status check is done purely on the client side.
    * @param bucketLayout BucketLayout
    */
+  @ParameterizedTest
+  @EnumSource
   public void testListOpenFiles(BucketLayout bucketLayout) throws Exception {
     final long clientID = 1000L;
 
@@ -687,32 +673,9 @@ public class TestOmMetadataManager {
     return BucketLayout.DEFAULT;
   }
 
-  @Test
-  public void testGetExpiredOpenKeys() throws Exception {
-    testGetExpiredOpenKeys(BucketLayout.DEFAULT);
-  }
-
-  @Test
-  public void testGetExpiredOpenKeysExcludeMPUs() throws Exception {
-    testGetExpiredOpenKeysExcludeMPUKeys(BucketLayout.DEFAULT);
-  }
-
-  @Test
-  public void testGetExpiredOpenKeysFSO() throws Exception {
-    testGetExpiredOpenKeys(BucketLayout.FILE_SYSTEM_OPTIMIZED);
-  }
-
-  @Test
-  public void testGetExpiredOpenKeysExcludeMPUsFSO() throws Exception {
-    testGetExpiredOpenKeysExcludeMPUKeys(BucketLayout.FILE_SYSTEM_OPTIMIZED);
-  }
-
-  @Test
-  public void testGetExpiredMultipartUploads() throws Exception {
-    testGetExpiredMPUs();
-  }
-
-  private void testGetExpiredOpenKeys(BucketLayout bucketLayout)
+  @ParameterizedTest
+  @EnumSource
+  public void testGetExpiredOpenKeys(BucketLayout bucketLayout)
       throws Exception {
     final String bucketName = UUID.randomUUID().toString();
     final String volumeName = UUID.randomUUID().toString();
@@ -790,7 +753,9 @@ public class TestOmMetadataManager {
     assertThat(expiredKeys).containsAll(names);
   }
 
-  private void testGetExpiredOpenKeysExcludeMPUKeys(
+  @ParameterizedTest
+  @EnumSource
+  public void testGetExpiredOpenKeysExcludeMPUKeys(
       BucketLayout bucketLayout) throws Exception {
     final String bucketName = UUID.randomUUID().toString();
     final String volumeName = UUID.randomUUID().toString();
@@ -878,7 +843,8 @@ public class TestOmMetadataManager {
         .isEmpty());
   }
 
-  private void testGetExpiredMPUs() throws Exception {
+  @Test
+  public void testGetExpiredMPUs() throws Exception {
     final String bucketName = UUID.randomUUID().toString();
     final String volumeName = UUID.randomUUID().toString();
     final int numExpiredMPUs = 4;
