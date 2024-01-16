@@ -29,10 +29,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.ratis.server.protocol.TermIndex;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -95,13 +93,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     KeyArgs keyArgs = commitKeyRequest.getKeyArgs();
 
     // Verify key name
-    final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
-         .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
-                 OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
-    if (checkKeyNameEnabled) {
-      OmUtils.validateKeyName(StringUtils.removeEnd(keyArgs.getKeyName(),
-              OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX));
-    }
+    validateKeyName(ozoneManager, StringUtils.removeEnd(keyArgs.getKeyName(),
+        OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX));
+
     boolean isHsync = commitKeyRequest.hasHsync() &&
         commitKeyRequest.getHsync();
     boolean enableHsync = ozoneManager.getConfiguration().getBoolean(

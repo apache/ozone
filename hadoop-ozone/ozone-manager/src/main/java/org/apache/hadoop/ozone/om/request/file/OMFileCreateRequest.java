@@ -32,7 +32,6 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -96,13 +95,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
     // Verify key name
     OmUtils.verifyKeyNameWithSnapshotReservedWord(keyArgs.getKeyName());
-    final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
-         .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
-                 OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
-    if (checkKeyNameEnabled) {
-      OmUtils.validateKeyName(StringUtils.removeEnd(keyArgs.getKeyName(),
-              OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX));
-    }
+    validateKeyName(ozoneManager, StringUtils.removeEnd(keyArgs.getKeyName(),
+        OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX));
 
     UserInfo userInfo = getUserInfo();
     if (keyArgs.getKeyName().length() == 0) {
