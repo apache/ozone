@@ -47,6 +47,7 @@ import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
+import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -138,7 +139,7 @@ public class TestOzoneClient {
   @Test
   public void testCreateBucket()
       throws IOException {
-    Instant testStartTime = Instant.now();
+    Instant testStartTime = getTestStartTime();
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
@@ -152,7 +153,7 @@ public class TestOzoneClient {
 
   @Test
   public void testPutKeyRatisOneNode() throws IOException {
-    Instant testStartTime = Instant.now();
+    Instant testStartTime = getTestStartTime();
     String value = "sample value";
     OzoneBucket bucket = getOzoneBucket();
 
