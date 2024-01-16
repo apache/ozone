@@ -95,7 +95,6 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
   public ClosableIterator<Map.Entry<K, V>> iterator(Optional<K> lowerBound,
                                                     Optional<K> upperBound) {
     final ManagedReadOptions readOptions = new ManagedReadOptions();
-    ManagedRocksIterator iterator;
     final ManagedSlice lowerBoundSlice;
     final ManagedSlice upperBoundSlice;
     try {
@@ -119,8 +118,8 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
       throw new RuntimeException(exception);
     }
 
-    iterator = ManagedRocksIterator.managed(
-        db.get().newIterator(columnFamilyHandle, readOptions));
+    ManagedRocksIterator iterator = ManagedRocksIterator.managed(db.get().newIterator(columnFamilyHandle, readOptions),
+        readOptions, lowerBoundSlice, upperBoundSlice);
 
     iterator.get().seekToFirst();
 
@@ -170,13 +169,6 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
       @Override
       public void close() {
         iterator.close();
-        readOptions.close();
-        if (upperBoundSlice != null) {
-          upperBoundSlice.close();
-        }
-        if (lowerBoundSlice != null) {
-          lowerBoundSlice.close();
-        }
       }
     };
   }

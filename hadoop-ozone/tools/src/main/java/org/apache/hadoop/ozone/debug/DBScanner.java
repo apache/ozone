@@ -371,18 +371,16 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
     }
 
     ManagedRocksIterator iterator = null;
-    ManagedReadOptions readOptions = null;
-    ManagedSlice slice = null;
     try {
       if (containerId > 0L && schemaV3) {
         // Handle SchemaV3 DN DB
-        readOptions = new ManagedReadOptions();
-        slice = new ManagedSlice(
+        ManagedReadOptions readOptions = new ManagedReadOptions();
+        ManagedSlice slice = new ManagedSlice(
             DatanodeSchemaThreeDBDefinition.getContainerKeyPrefixBytes(
                 containerId + 1L));
         readOptions.setIterateUpperBound(slice);
-        iterator = new ManagedRocksIterator(
-            rocksDB.get().newIterator(columnFamilyHandle, readOptions));
+        iterator = new ManagedRocksIterator(rocksDB.get().newIterator(columnFamilyHandle, readOptions),
+            readOptions, slice);
         iterator.get().seek(
             DatanodeSchemaThreeDBDefinition.getContainerKeyPrefixBytes(
                 containerId));
@@ -394,7 +392,7 @@ public class DBScanner implements Callable<Void>, SubcommandWithParent {
 
       return displayTable(iterator, columnFamilyDefinition, schemaV3);
     } finally {
-      IOUtils.closeQuietly(iterator, readOptions, slice);
+      IOUtils.closeQuietly(iterator);
     }
   }
 

@@ -24,11 +24,14 @@ import org.rocksdb.RocksIterator;
  */
 public class ManagedRocksIterator extends ManagedObject<RocksIterator> {
 
-  public ManagedRocksIterator(RocksIterator original) {
-    super(original);
+  public ManagedRocksIterator(RocksIterator original, AutoCloseable... baggage) {
+    super(original, baggage);
   }
 
-  public static ManagedRocksIterator managed(RocksIterator iterator) {
-    return new ManagedRocksIterator(iterator);
+  /**
+   * @param baggage (optional) objects to be closed when the iterator is closed (readOptions, slice, etc.)
+   */
+  public static ManagedRocksIterator managed(RocksIterator iterator, AutoCloseable... baggage) {
+    return new ManagedRocksIterator(iterator, baggage);
   }
 }
