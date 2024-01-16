@@ -471,7 +471,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       for (HddsProtos.ContainerID id : containersProto.getIdList()) {
         containerIds.add(ContainerID.getFromProtobuf(id));
       }
-      containerMap.put(containersProto.getName(),containerIds);
+      containerMap.put(containersProto.getName(), containerIds);
     }
     return containerMap;
   }

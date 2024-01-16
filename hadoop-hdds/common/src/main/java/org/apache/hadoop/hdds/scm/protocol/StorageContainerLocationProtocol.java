@@ -221,7 +221,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
   void deleteContainer(long containerID) throws IOException;
 
   /**
-   * Gets the list of underReplicated and unClosed containers on a decommissioning node
+   * Gets the list of underReplicated and unClosed containers on a decommissioning node.
    *
    * @param dn - Datanode detail
    * @return Lists of underReplicated and unClosed containers
