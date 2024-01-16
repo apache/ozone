@@ -36,35 +36,7 @@ public final class MockSpaceUsageSource {
 
   public static SpaceUsageSource fixed(long capacity, long available,
       long used) {
-    return new Fixed(capacity, available, used);
-  }
-
-  private static final class Fixed implements SpaceUsageSource {
-
-    private final long capacity;
-    private final long available;
-    private final long used;
-
-    Fixed(long capacity, long available, long used) {
-      this.capacity = capacity;
-      this.available = available;
-      this.used = used;
-    }
-
-    @Override
-    public long getCapacity() {
-      return capacity;
-    }
-
-    @Override
-    public long getAvailable() {
-      return available;
-    }
-
-    @Override
-    public long getUsedSpace() {
-      return used;
-    }
+    return new SpaceUsageSource.Fixed(capacity, available, used);
   }
 
   private MockSpaceUsageSource() {

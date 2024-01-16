@@ -43,13 +43,14 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.Assertions;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * This class tests container report with DN container state info.
@@ -128,9 +129,9 @@ public class TestContainerReportWithKeys {
     Set<ContainerReplica> replicas =
         scm.getContainerManager().getContainerReplicas(
             ContainerID.valueOf(keyInfo.getContainerID()));
-    Assertions.assertEquals(1, replicas.size());
+    assertEquals(1, replicas.size());
     replicas.stream().forEach(rp ->
-        Assertions.assertNotNull(rp.getDatanodeDetails().getParent()));
+        assertNotNull(rp.getDatanodeDetails().getParent()));
 
     LOG.info("SCM Container Info keyCount: {} usedBytes: {}",
         cinfo.getNumberOfKeys(), cinfo.getUsedBytes());

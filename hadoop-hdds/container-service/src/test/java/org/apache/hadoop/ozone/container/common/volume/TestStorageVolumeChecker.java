@@ -60,11 +60,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult.FAILED;
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Matchers.anyObject;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.isNull;
 import static org.mockito.Mockito.mock;
@@ -151,20 +149,20 @@ public class TestStorageVolumeChecker {
           numCallbackInvocations.incrementAndGet();
           if (expectedVolumeHealth != null &&
               expectedVolumeHealth != FAILED) {
-            assertThat(healthyVolumes.size(), is(1));
-            assertThat(failedVolumes.size(), is(0));
+            assertThat(healthyVolumes.size()).isEqualTo(1);
+            assertThat(failedVolumes.size()).isEqualTo(0);
           } else {
-            assertThat(healthyVolumes.size(), is(0));
-            assertThat(failedVolumes.size(), is(1));
+            assertThat(healthyVolumes.size()).isEqualTo(0);
+            assertThat(failedVolumes.size()).isEqualTo(1);
           }
         });
 
     GenericTestUtils.waitFor(() -> numCallbackInvocations.get() > 0, 5, 10000);
 
     // Ensure that the check was invoked at least once.
-    verify(volume, times(1)).check(anyObject());
+    verify(volume, times(1)).check(any());
     if (result) {
-      assertThat(numCallbackInvocations.get(), is(1L));
+      assertThat(numCallbackInvocations.get()).isEqualTo(1L);
     }
 
     checker.shutdownAndWait(0, TimeUnit.SECONDS);
@@ -194,14 +192,14 @@ public class TestStorageVolumeChecker {
     LOG.info("Got back {} failed volumes", failedVolumes.size());
 
     if (expectedVolumeHealth == null || expectedVolumeHealth == FAILED) {
-      assertThat(failedVolumes.size(), is(NUM_VOLUMES));
+      assertThat(failedVolumes.size()).isEqualTo(NUM_VOLUMES);
     } else {
       assertTrue(failedVolumes.isEmpty());
     }
 
     // Ensure each volume's check() method was called exactly once.
     for (HddsVolume volume : volumes) {
-      verify(volume, times(1)).check(anyObject());
+      verify(volume, times(1)).check(any());
     }
 
     checker.shutdownAndWait(0, TimeUnit.SECONDS);

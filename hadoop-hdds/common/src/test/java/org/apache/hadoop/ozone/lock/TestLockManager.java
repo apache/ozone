@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Timeout;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -33,23 +34,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Test-cases to test LockManager.
  */
-public class TestLockManager {
+class TestLockManager {
 
   @Test
   @Timeout(1)
-  public void testWriteLockWithDifferentResource() {
+  void testWriteLockWithDifferentResource() {
     final LockManager<String> manager =
         new LockManager<>(new OzoneConfiguration());
     manager.writeLock("/resourceOne");
     // This should work, as they are different resource.
-    manager.writeLock("/resourceTwo");
+    assertDoesNotThrow(() -> manager.writeLock("/resourceTwo"));
     manager.writeUnlock("/resourceOne");
     manager.writeUnlock("/resourceTwo");
-    assertTrue(true);
   }
 
   @Test
-  public void testWriteLockWithSameResource() throws Exception {
+  void testWriteLockWithSameResource() throws Exception {
     final LockManager<String> manager =
         new LockManager<>(new OzoneConfiguration());
     final AtomicBoolean gotLock = new AtomicBoolean(false);
@@ -74,18 +74,17 @@ public class TestLockManager {
 
   @Test
   @Timeout(1)
-  public void testReadLockWithDifferentResource() {
+  void testReadLockWithDifferentResource() {
     final LockManager<String> manager =
         new LockManager<>(new OzoneConfiguration());
     manager.readLock("/resourceOne");
-    manager.readLock("/resourceTwo");
+    assertDoesNotThrow(() -> manager.readLock("/resourceTwo"));
     manager.readUnlock("/resourceOne");
     manager.readUnlock("/resourceTwo");
-    assertTrue(true);
   }
 
   @Test
-  public void testReadLockWithSameResource() throws Exception {
+  void testReadLockWithSameResource() throws Exception {
     final LockManager<String> manager =
         new LockManager<>(new OzoneConfiguration());
     final AtomicBoolean gotLock = new AtomicBoolean(false);
@@ -103,7 +102,7 @@ public class TestLockManager {
   }
 
   @Test
-  public void testWriteReadLockWithSameResource() throws Exception {
+  void testWriteReadLockWithSameResource() throws Exception {
     final LockManager<String> manager =
         new LockManager<>(new OzoneConfiguration());
     final AtomicBoolean gotLock = new AtomicBoolean(false);
@@ -127,7 +126,7 @@ public class TestLockManager {
   }
 
   @Test
-  public void testReadWriteLockWithSameResource() throws Exception {
+  void testReadWriteLockWithSameResource() throws Exception {
     final LockManager<String> manager =
         new LockManager<>(new OzoneConfiguration());
     final AtomicBoolean gotLock = new AtomicBoolean(false);
@@ -151,7 +150,7 @@ public class TestLockManager {
   }
 
   @Test
-  public void testMultiReadWriteLockWithSameResource() throws Exception {
+  void testMultiReadWriteLockWithSameResource() throws Exception {
     final LockManager<String> manager =
         new LockManager<>(new OzoneConfiguration());
     final AtomicBoolean gotLock = new AtomicBoolean(false);
@@ -180,7 +179,7 @@ public class TestLockManager {
   }
 
   @Test
-  public void testConcurrentWriteLockWithDifferentResource() throws Exception {
+  void testConcurrentWriteLockWithDifferentResource() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     final int count = 100;
     final LockManager<Integer> manager = new LockManager<>(conf);

@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.resource;
 
 import org.apache.hadoop.hdds.utils.LeakDetector;
-import org.apache.hadoop.hdds.utils.LeakTracker;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -28,18 +28,21 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * Test LeakDetector.
  */
-public class TestLeakDetector {
+class TestLeakDetector {
   private static final LeakDetector LEAK_DETECTOR = new LeakDetector("test");
-  private AtomicInteger leaks = new AtomicInteger(0);
+  private final AtomicInteger leaks = new AtomicInteger(0);
 
   @Test
-  public void testLeakDetector() throws Exception {
+  void testNoLeaks() throws Exception {
     // create and close resource => no leaks.
     createResource(true);
     System.gc();
     Thread.sleep(100);
     assertEquals(0, leaks.get());
+  }
 
+  @Test
+  void testLeaks() throws Exception {
     // create and not close => leaks.
     createResource(false);
     System.gc();
@@ -47,7 +50,7 @@ public class TestLeakDetector {
     assertEquals(1, leaks.get());
   }
 
-  private void createResource(boolean close) throws Exception {
+  private void createResource(boolean close) {
     MyResource resource = new MyResource(leaks);
     if (close) {
       resource.close();
@@ -55,14 +58,14 @@ public class TestLeakDetector {
   }
 
   private static final class MyResource implements AutoCloseable {
-    private final LeakTracker leakTracker;
+    private final UncheckedAutoCloseable leakTracker;
 
     private MyResource(final AtomicInteger leaks) {
       leakTracker = LEAK_DETECTOR.track(this, () -> leaks.incrementAndGet());
     }
 
     @Override
-    public void close() throws Exception {
+    public void close() {
       leakTracker.close();
     }
   }

@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -52,8 +51,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
-import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
-import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test cases to verify the SCM pipeline bytesWritten metrics.
@@ -106,8 +106,8 @@ public class TestSCMPipelineBytesWrittenMetrics {
         .setKeyName(keyName);
 
     OzoneKeyDetails keyDetails = bucket.getKey(keyName);
-    Assertions.assertEquals(keyName, keyDetails.getName());
-    Assertions.assertEquals(value.getBytes(UTF_8).length, keyDetails
+    assertEquals(keyName, keyDetails.getName());
+    assertEquals(value.getBytes(UTF_8).length, keyDetails
         .getOzoneKeyLocations().get(0).getLength());
   }
 
@@ -126,7 +126,7 @@ public class TestSCMPipelineBytesWrittenMetrics {
     List<Pipeline> pipelines = cluster.getStorageContainerManager()
         .getPipelineManager().getPipelines();
 
-    Assertions.assertEquals(1, pipelines.size());
+    assertEquals(1, pipelines.size());
     Pipeline pipeline = pipelines.get(0);
 
     final String metricName =

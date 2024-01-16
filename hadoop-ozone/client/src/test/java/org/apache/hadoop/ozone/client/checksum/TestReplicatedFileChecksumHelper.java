@@ -70,8 +70,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType.CRC32;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.mock;
 import static org.mockito.ArgumentMatchers.any;
@@ -157,7 +157,7 @@ public class TestReplicatedFileChecksumHelper {
         mockVolume, bucket, "dummy", 10, combineMode, mockRpcClient);
     helper.compute();
     FileChecksum fileChecksum = helper.getFileChecksum();
-    assertTrue(fileChecksum instanceof MD5MD5CRC32GzipFileChecksum);
+    assertInstanceOf(MD5MD5CRC32GzipFileChecksum.class, fileChecksum);
     assertEquals(DataChecksum.Type.CRC32,
         ((MD5MD5CRC32GzipFileChecksum)fileChecksum).getCrcType());
 
@@ -244,7 +244,7 @@ public class TestReplicatedFileChecksumHelper {
 
     helper.compute();
     FileChecksum fileChecksum = helper.getFileChecksum();
-    assertTrue(fileChecksum instanceof MD5MD5CRC32GzipFileChecksum);
+    assertInstanceOf(MD5MD5CRC32GzipFileChecksum.class, fileChecksum);
     assertEquals(1, helper.getKeyLocationInfoList().size());
 
     FileChecksum cachedChecksum = new MD5MD5CRC32GzipFileChecksum();
@@ -274,7 +274,7 @@ public class TestReplicatedFileChecksumHelper {
 
     helper.compute();
     fileChecksum = helper.getFileChecksum();
-    assertTrue(fileChecksum instanceof MD5MD5CRC32GzipFileChecksum);
+    assertInstanceOf(MD5MD5CRC32GzipFileChecksum.class, fileChecksum);
     assertEquals(1, helper.getKeyLocationInfoList().size());
   }
 
@@ -362,7 +362,6 @@ public class TestReplicatedFileChecksumHelper {
 
       helper.compute();
       FileChecksum fileChecksum = helper.getFileChecksum();
-      //assertTrue(fileChecksum instanceof MD5MD5CRC32GzipFileChecksum);
       assertEquals(DataChecksum.Type.CRC32C,
           ((MD5MD5CRC32FileChecksum)fileChecksum).getCrcType());
       assertEquals(1, helper.getKeyLocationInfoList().size());

@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -54,8 +53,10 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto.DISK;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -83,7 +84,7 @@ public class TestSCMCommonPlacementPolicy {
     List<DatanodeDetails> list = nodeManager.getAllNodes();
     List<DatanodeDetails> result = dummyPlacementPolicy.getResultSet(3, list);
     Set<DatanodeDetails> resultSet = new HashSet<>(result);
-    Assertions.assertNotEquals(1, resultSet.size());
+    assertNotEquals(1, resultSet.size());
   }
 
   private Set<ContainerReplica> testReplicasToFixMisreplication(
@@ -104,7 +105,7 @@ public class TestSCMCommonPlacementPolicy {
           Map<Node, Integer> expectedNumberOfCopyOperationFromRack) {
     Set<ContainerReplica> replicasToCopy = placementPolicy
             .replicasToCopyToFixMisreplication(replicas);
-    Assertions.assertEquals(expectedNumberOfReplicasToCopy,
+    assertEquals(expectedNumberOfReplicasToCopy,
             replicasToCopy.size());
     Map<Node, Long> rackCopyMap =
             replicasToCopy.stream().collect(Collectors.groupingBy(
@@ -116,7 +117,7 @@ public class TestSCMCommonPlacementPolicy {
             .map(placementPolicy::getPlacementGroup)
             .collect(Collectors.toSet());
     for (Node rack: racks) {
-      Assertions.assertEquals(
+      assertEquals(
               expectedNumberOfCopyOperationFromRack.getOrDefault(rack, 0),
               rackCopyMap.getOrDefault(rack, 0L).intValue());
     }
@@ -278,7 +279,7 @@ public class TestSCMCommonPlacementPolicy {
     Map<ContainerReplica, Boolean> replicaMap = replicas.stream().distinct()
             .collect(Collectors.toMap(Function.identity(), r -> false));
     replicaMap.put(replicas.get(0), true);
-    Assertions.assertEquals(testReplicasToFixMisreplication(replicaMap,
+    assertEquals(testReplicasToFixMisreplication(replicaMap,
             dummyPlacementPolicy, 1,
             ImmutableMap.of(racks.get(0), 1)),
             Sets.newHashSet(replicas.get(0)));
@@ -298,7 +299,7 @@ public class TestSCMCommonPlacementPolicy {
                     .collect(Collectors.toMap(Function.identity(), r -> true));
     Set<ContainerReplica> replicasToCopy = dummyPlacementPolicy
             .replicasToCopyToFixMisreplication(replicas);
-    Assertions.assertEquals(0, replicasToCopy.size());
+    assertEquals(0, replicasToCopy.size());
   }
 
   @Test
@@ -318,8 +319,8 @@ public class TestSCMCommonPlacementPolicy {
 
     Set<ContainerReplica> replicasToRemove = dummyPlacementPolicy
             .replicasToRemoveToFixOverreplication(replicas, 1);
-    Assertions.assertEquals(replicasToRemove.size(), 1);
-    Assertions.assertEquals(replicasToRemove.toArray()[0], replica);
+    assertEquals(1, replicasToRemove.size());
+    assertEquals(replicasToRemove.toArray()[0], replica);
   }
 
   @Test
@@ -339,8 +340,8 @@ public class TestSCMCommonPlacementPolicy {
 
     Set<ContainerReplica> replicasToRemove = dummyPlacementPolicy
             .replicasToRemoveToFixOverreplication(replicas, 1);
-    Assertions.assertEquals(replicasToRemove.size(), 2);
-    Assertions.assertEquals(replicasToRemove, replicasToBeRemoved);
+    assertEquals(2, replicasToRemove.size());
+    assertEquals(replicasToRemove, replicasToBeRemoved);
   }
 
   @Test
@@ -365,8 +366,8 @@ public class TestSCMCommonPlacementPolicy {
 
     Set<ContainerReplica> replicasToRemove = dummyPlacementPolicy
             .replicasToRemoveToFixOverreplication(replicas, 2);
-    Assertions.assertEquals(replicasToRemove.size(), 2);
-    Assertions.assertEquals(replicasToRemove, replicasToBeRemoved);
+    assertEquals(2, replicasToRemove.size());
+    assertEquals(replicasToRemove, replicasToBeRemoved);
   }
 
   @Test
@@ -380,10 +381,10 @@ public class TestSCMCommonPlacementPolicy {
 
     Set<ContainerReplica> replicasToRemove = dummyPlacementPolicy
             .replicasToRemoveToFixOverreplication(replicas, 3);
-    Assertions.assertEquals(replicasToRemove.size(), 2);
+    assertEquals(2, replicasToRemove.size());
     Set<Node> racksToBeRemoved = Arrays.asList(0, 1).stream()
             .map(dummyPlacementPolicy.racks::get).collect(Collectors.toSet());
-    Assertions.assertEquals(replicasToRemove.stream()
+    assertEquals(replicasToRemove.stream()
             .map(ContainerReplica::getDatanodeDetails)
             .map(dummyPlacementPolicy::getPlacementGroup)
             .collect(Collectors.toSet()), racksToBeRemoved);
@@ -419,10 +420,10 @@ public class TestSCMCommonPlacementPolicy {
             .map(dummyPlacementPolicy::getPlacementGroup)
             .collect(Collectors.groupingBy(Function.identity(),
                     Collectors.counting()));
-    Assertions.assertEquals(replicasToRemove.size(), 2);
+    assertEquals(2, replicasToRemove.size());
     assertThat(Sets.newHashSet(1L, 2L)).contains(
             removedReplicasRackCntMap.get(dummyPlacementPolicy.racks.get(0)));
-    Assertions.assertEquals(
+    assertEquals(
             removedReplicasRackCntMap.get(dummyPlacementPolicy.racks.get(1)),
             removedReplicasRackCntMap.get(dummyPlacementPolicy.racks.get(0))
                     == 2 ? 0 : 1);
@@ -439,7 +440,7 @@ public class TestSCMCommonPlacementPolicy {
 
     Set<ContainerReplica> replicasToRemove = dummyPlacementPolicy
             .replicasToRemoveToFixOverreplication(replicas, 1);
-    Assertions.assertEquals(replicasToRemove.size(), 0);
+    assertEquals(replicasToRemove.size(), 0);
   }
 
   @Test
@@ -461,7 +462,7 @@ public class TestSCMCommonPlacementPolicy {
     dummyPlacementPolicy.chooseDatanodes(null, null, 1, 1, 1);
     assertFalse(usedNodesIdentity.get());
     dummyPlacementPolicy.chooseDatanodes(null, null, null, 1, 1, 1);
-    Assertions.assertTrue(usedNodesIdentity.get());
+    assertTrue(usedNodesIdentity.get());
   }
 
   @Test

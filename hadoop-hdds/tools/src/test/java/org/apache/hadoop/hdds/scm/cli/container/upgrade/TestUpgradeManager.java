@@ -49,7 +49,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -70,6 +69,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests for UpgradeManager class.
@@ -124,14 +124,13 @@ public class TestUpgradeManager {
       volumes.add(hddsVolume);
     }
 
-    DatanodeDetails datanodeDetails = Mockito.mock(DatanodeDetails.class);
-    Mockito.when(datanodeDetails.getUuidString())
-        .thenReturn(datanodeId.toString());
-    Mockito.when(datanodeDetails.getUuid()).thenReturn(datanodeId);
+    DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
+    when(datanodeDetails.getUuidString()).thenReturn(datanodeId.toString());
+    when(datanodeDetails.getUuid()).thenReturn(datanodeId);
 
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
     final AtomicInteger loopCount = new AtomicInteger(0);
-    Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenAnswer(invocation -> {
           final int ii = loopCount.getAndIncrement() % volumes.size();
           return volumes.get(ii);
@@ -159,9 +158,9 @@ public class TestUpgradeManager {
     shutdownAllVolume();
 
     final UpgradeManager upgradeManager = new UpgradeManager();
-    upgradeManager.initVolumeStoreMap(volumeSet, CONF);
     final List<UpgradeManager.Result> results =
-        upgradeManager.upgradeAll(volumeSet, CONF);
+        upgradeManager.run(CONF,
+            StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()));
 
     checkV3MetaData(keyValueContainerBlockDataMap, results, upgradeManager);
   }
@@ -269,8 +268,7 @@ public class TestUpgradeManager {
 
   private void checkV3MetaData(Map<KeyValueContainerData,
       Map<String, BlockData>> blockDataMap, List<UpgradeManager.Result> results,
-                               UpgradeManager upgradeManager)
-      throws IOException {
+      UpgradeManager upgradeManager) throws IOException {
     Map<Long, UpgradeTask.UpgradeContainerResult> resultMap = new HashMap<>();
 
     for (UpgradeManager.Result result : results) {

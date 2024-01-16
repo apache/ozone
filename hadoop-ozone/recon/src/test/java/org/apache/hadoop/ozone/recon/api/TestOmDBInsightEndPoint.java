@@ -69,8 +69,8 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandom
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -589,7 +589,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
                 repeatedOmKeyInfo -> repeatedOmKeyInfo.getOmKeyInfoList().get(0)
                     .getKeyName())
             .collect(Collectors.toList());
-    assertFalse(pendingDeleteKeys.contains("key_one"));
+    assertThat(pendingDeleteKeys).doesNotContain("key_one");
   }
 
   @Test

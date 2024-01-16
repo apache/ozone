@@ -41,7 +41,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -51,6 +50,8 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.
     OZONE_SCM_STALENODE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * This class tests the 2 way commit in Ratis.
@@ -145,8 +146,8 @@ public class Test2WayCommitInRatis {
             HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
     XceiverClientSpi xceiverClient = clientManager
         .acquireClient(container1.getPipeline());
-    Assertions.assertEquals(1, xceiverClient.getRefcount());
-    Assertions.assertEquals(container1.getPipeline(),
+    assertEquals(1, xceiverClient.getRefcount());
+    assertEquals(container1.getPipeline(),
         xceiverClient.getPipeline());
     Pipeline pipeline = xceiverClient.getPipeline();
     XceiverClientRatis ratisClient = (XceiverClientRatis) xceiverClient;
@@ -155,7 +156,7 @@ public class Test2WayCommitInRatis {
             container1.getContainerInfo().getContainerID(),
             xceiverClient.getPipeline()));
     reply.getResponse().get();
-    Assertions.assertEquals(3, ratisClient.getCommitInfoMap().size());
+    assertEquals(3, ratisClient.getCommitInfoMap().size());
     // wait for the container to be created on all the nodes
     xceiverClient.watchForCommit(reply.getLogIndex());
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
@@ -172,11 +173,10 @@ public class Test2WayCommitInRatis {
     xceiverClient.watchForCommit(reply.getLogIndex());
 
     // commitInfo Map will be reduced to 2 here
-    Assertions.assertEquals(2, ratisClient.getCommitInfoMap().size());
+    assertEquals(2, ratisClient.getCommitInfoMap().size());
     clientManager.releaseClient(xceiverClient, false);
-    Assertions.assertTrue(logCapturer.getOutput().contains("3 way commit failed"));
-    Assertions
-        .assertTrue(logCapturer.getOutput().contains("Committed by majority"));
+    assertThat(logCapturer.getOutput()).contains("3 way commit failed");
+    assertThat(logCapturer.getOutput()).contains("Committed by majority");
     logCapturer.stopCapturing();
     shutdown();
   }

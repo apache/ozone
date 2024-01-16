@@ -31,7 +31,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.function.Supplier;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -40,8 +40,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * Test {@link SelectorOutputStream}.
  */
 @Timeout(30)
-public class TestSelectorOutputStream {
-  static final Logger LOG = LoggerFactory.getLogger(
+class TestSelectorOutputStream {
+  private static final Logger LOG = LoggerFactory.getLogger(
       TestSelectorOutputStream.class);
 
   enum Op {
@@ -116,48 +116,48 @@ public class TestSelectorOutputStream {
   }
 
   @Test
-  public void testFlush() throws Exception {
+  void testFlush() throws Exception {
     runTestSelector(10, 2, Op.FLUSH);
     runTestSelector(10, 10, Op.FLUSH);
     runTestSelector(10, 20, Op.FLUSH);
   }
 
   @Test
-  public void testClose() throws Exception {
+  void testClose() throws Exception {
     runTestSelector(10, 2, Op.CLOSE);
     runTestSelector(10, 10, Op.CLOSE);
     runTestSelector(10, 20, Op.CLOSE);
   }
 
   @Test
-  public void testHflushSyncable() throws Exception {
+  void testHflushSyncable() throws Exception {
     runTestSelector(10, 2, Op.HFLUSH, true);
     runTestSelector(10, 10, Op.HFLUSH, true);
     runTestSelector(10, 20, Op.HFLUSH, true);
   }
 
   @Test
-  public void testHflushNonSyncable() {
+  void testHflushNonSyncable() {
     final IllegalStateException thrown = assertThrows(
         IllegalStateException.class,
         () -> runTestSelector(10, 2, Op.HFLUSH, false));
     LOG.info("thrown", thrown);
-    assertTrue(thrown.getMessage().contains("not Syncable"));
+    assertThat(thrown).hasMessageContaining("not Syncable");
   }
 
   @Test
-  public void testHSyncSyncable() throws Exception {
+  void testHSyncSyncable() throws Exception {
     runTestSelector(10, 2, Op.HSYNC, true);
     runTestSelector(10, 10, Op.HSYNC, true);
     runTestSelector(10, 20, Op.HSYNC, true);
   }
 
   @Test
-  public void testHSyncNonSyncable() {
+  void testHSyncNonSyncable() {
     final IllegalStateException thrown = assertThrows(
         IllegalStateException.class,
         () -> runTestSelector(10, 2, Op.HSYNC, false));
     LOG.info("thrown", thrown);
-    assertTrue(thrown.getMessage().contains("not Syncable"));
+    assertThat(thrown).hasMessageContaining("not Syncable");
   }
 }

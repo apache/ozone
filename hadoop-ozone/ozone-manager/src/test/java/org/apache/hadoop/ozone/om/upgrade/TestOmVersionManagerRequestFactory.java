@@ -23,7 +23,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Set;
 
@@ -71,9 +70,6 @@ public class TestOmVersionManagerRequestFactory {
       if (Modifier.isAbstract(requestClass.getModifiers())) {
         continue;
       }
-      Method getRequestTypeMethod = requestClass.getMethod(
-          "getRequestType");
-      assertNotNull(getRequestTypeMethod);
 
       Constructor<? extends OMClientRequest> constructorWithOmRequestArg =
           requestClass.getDeclaredConstructor(OMRequest.class);

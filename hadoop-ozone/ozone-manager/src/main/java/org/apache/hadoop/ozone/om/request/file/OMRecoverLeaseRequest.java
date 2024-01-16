@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.OmFSOFile;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -96,6 +96,13 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
         validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
             keyPath, getBucketLayout());
 
+    // check ACL
+    checkKeyAcls(ozoneManager,
+        recoverLeaseRequest.getVolumeName(),
+        recoverLeaseRequest.getBucketName(),
+        recoverLeaseRequest.getKeyName(),
+        IAccessAuthorizer.ACLType.WRITE, OzoneObj.ResourceType.KEY);
+
     return request.toBuilder()
         .setRecoverLeaseRequest(
             recoverLeaseRequest.toBuilder()
@@ -125,10 +132,6 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
 
     boolean acquiredLock = false;
     try {
-      // check ACL
-      checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
-          IAccessAuthorizer.ACLType.WRITE, OzoneObj.ResourceType.KEY);
-
       // acquire lock
       mergeOmLockDetails(
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
@@ -181,17 +184,20 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
 
   private String doWork(OzoneManager ozoneManager, long transactionLogIndex)
       throws IOException {
+    
+    String errMsg = "Cannot recover file : " + keyName 
+        + " as parent directory doesn't exist";
 
-    final long volumeId = omMetadataManager.getVolumeId(volumeName);
-    final long bucketId = omMetadataManager.getBucketId(
-        volumeName, bucketName);
-
-    long parentID = OMFileRequest.getParentID(volumeId, bucketId, keyName,
-        omMetadataManager, "Cannot recover file : " + keyName
-            + " as parent directory doesn't exist");
-    String fileName = OzoneFSUtils.getFileName(keyName);
-    dbFileKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
-        parentID, fileName);
+    OmFSOFile fsoFile =  new OmFSOFile.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setOmMetadataManager(omMetadataManager)
+        .setErrMsg(errMsg)
+        .build();
+  
+    String fileName = fsoFile.getFileName();
+    dbFileKey = fsoFile.getOzonePathKey();
 
     keyInfo = getKey(dbFileKey);
     if (keyInfo == null) {
@@ -204,8 +210,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       LOG.warn("Key:" + keyName + " is already closed");
       return null;
     }
-    String openFileDBKey = omMetadataManager.getOpenFileName(
-            volumeId, bucketId, parentID, fileName, Long.parseLong(clientId));
+    String openFileDBKey = fsoFile.getOpenFileName(Long.parseLong(clientId));
     if (openFileDBKey != null) {
       commitKey(dbFileKey, keyInfo, fileName, ozoneManager,
           transactionLogIndex);

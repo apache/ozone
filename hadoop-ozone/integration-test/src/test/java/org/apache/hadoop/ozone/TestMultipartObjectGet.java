@@ -27,9 +27,10 @@ import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadResponse;
 import org.apache.hadoop.ozone.s3.endpoint.MultipartUploadInitiateResponse;
 import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,8 +51,8 @@ import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.when;
 
 /**
@@ -76,7 +77,7 @@ public class TestMultipartObjectGet {
 
   private static final ObjectEndpoint REST = new ObjectEndpoint();
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     clusterId = UUID.randomUUID().toString();
@@ -101,6 +102,7 @@ public class TestMultipartObjectGet {
     REST.setClient(client);
     REST.setOzoneConfiguration(conf);
     REST.setContext(context);
+    S3GatewayMetrics.create(conf);
   }
 
   private static void startCluster()
@@ -118,7 +120,7 @@ public class TestMultipartObjectGet {
     cluster.waitForClusterToBeReady();
   }
 
-  @AfterClass
+  @AfterAll
   public static void stop() {
     IOUtils.close(LOG, client);
     if (cluster != null) {

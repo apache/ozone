@@ -40,7 +40,6 @@ import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -56,6 +55,8 @@ import java.util.Date;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ACK_TIMEOUT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ENABLED;
@@ -65,13 +66,14 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOK
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
 import static org.slf4j.event.Level.INFO;
 
 /**
@@ -108,40 +110,35 @@ public class TestRootCARotationManager {
     ozoneConfig
         .setBoolean(HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED, false);
     ozoneConfig.setBoolean(HDDS_X509_CA_ROTATION_ENABLED, true);
-    scm = Mockito.mock(StorageContainerManager.class);
+    scm = mock(StorageContainerManager.class);
     securityConfig = new SecurityConfig(ozoneConfig);
     scmCertClient = new SCMCertificateClient(securityConfig, null, scmID, cID,
         certID.toString(), "localhost");
     scmServiceManager = new SCMServiceManager();
-    scmContext = Mockito.mock(SCMContext.class);
-    scmhaManager = Mockito.mock(SCMHAManager.class);
-    sequenceIdGenerator = Mockito.mock(SequenceIdGenerator.class);
+    scmContext = mock(SCMContext.class);
+    scmhaManager = mock(SCMHAManager.class);
+    sequenceIdGenerator = mock(SequenceIdGenerator.class);
     scmStorageConfig = new SCMStorageConfig(ozoneConfig);
     scmStorageConfig.setScmId(scmID);
     scmStorageConfig.setClusterId(cID);
-    scmSecurityProtocolServer = Mockito.mock(SCMSecurityProtocolServer.class);
-    handler = Mockito.mock(RootCARotationHandlerImpl.class);
-    statefulServiceStateManager =
-        Mockito.mock(StatefulServiceStateManager.class);
+    scmSecurityProtocolServer = mock(SCMSecurityProtocolServer.class);
+    handler = mock(RootCARotationHandlerImpl.class);
+    statefulServiceStateManager = mock(StatefulServiceStateManager.class);
     when(scmContext.isLeader()).thenReturn(true);
     when(scm.getConfiguration()).thenReturn(ozoneConfig);
     when(scm.getScmCertificateClient()).thenReturn(scmCertClient);
     when(scm.getScmContext()).thenReturn(scmContext);
     when(scm.getSCMServiceManager()).thenReturn(scmServiceManager);
     when(scm.getScmHAManager()).thenReturn(scmhaManager);
-    when(scmhaManager.getRatisServer())
-        .thenReturn(Mockito.mock(SCMRatisServerImpl.class));
+    when(scmhaManager.getRatisServer()).thenReturn(mock(SCMRatisServerImpl.class));
     when(scm.getSequenceIdGen()).thenReturn(sequenceIdGenerator);
-    when(sequenceIdGenerator.getNextId(Mockito.anyString())).thenReturn(2L);
+    when(sequenceIdGenerator.getNextId(anyString())).thenReturn(2L);
     when(scm.getScmStorageConfig()).thenReturn(scmStorageConfig);
     when(scm.getSecurityProtocolServer()).thenReturn(scmSecurityProtocolServer);
-    Mockito.doNothing().when(scmSecurityProtocolServer)
-        .setRootCertificateServer(Mockito.anyObject());
-    Mockito.doNothing().when(handler).rotationPrepare(Mockito.anyString());
-    when(scm.getStatefulServiceStateManager())
-        .thenReturn(statefulServiceStateManager);
-    when(statefulServiceStateManager.readConfiguration(Mockito.anyString()))
-        .thenReturn(null);
+    doNothing().when(scmSecurityProtocolServer).setRootCertificateServer(any());
+    doNothing().when(handler).rotationPrepare(anyString());
+    when(scm.getStatefulServiceStateManager()).thenReturn(statefulServiceStateManager);
+    when(statefulServiceStateManager.readConfiguration(anyString())).thenReturn(null);
   }
 
   @AfterEach
@@ -302,7 +299,7 @@ public class TestRootCARotationManager {
                 "configuration found in stateful storage"),
         100, 10000);
 
-    when(statefulServiceStateManager.readConfiguration(Mockito.anyString()))
+    when(statefulServiceStateManager.readConfiguration(anyString()))
         .thenReturn(new CertInfo.Builder().setX509Certificate(cert)
             .setTimestamp(cert.getNotBefore().getTime())
             .build().getProtobuf().toByteString());
@@ -330,14 +327,12 @@ public class TestRootCARotationManager {
         () -> logs.getOutput().contains("isPostProcessing is true for"),
         100, 20000);
 
-    doNothing().when(statefulServiceStateManager)
-        .deleteConfiguration(Mockito.anyString());
+    doNothing().when(statefulServiceStateManager).deleteConfiguration(anyString());
     GenericTestUtils.waitFor(
         () -> logs.getOutput().contains("isPostProcessing is false") &&
             logs.getOutput().contains("Stateful configuration is deleted"),
         100, 20000);
-    verify(statefulServiceStateManager, times(1))
-        .deleteConfiguration(Mockito.anyString());
+    verify(statefulServiceStateManager, times(1)).deleteConfiguration(anyString());
   }
 
   private X509Certificate generateX509Cert(
