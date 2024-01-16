@@ -48,7 +48,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
-import static org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -93,12 +92,9 @@ class TestSecureOzoneManager {
   void testSecureOmInitFailures() throws Exception {
     PrivateKey privateKey;
     PublicKey publicKey;
-    LogCapturer omLogs =
-        LogCapturer.captureLogs(OzoneManager.getLogger());
     OMStorage omStorage = new OMStorage(conf);
     omStorage.setClusterId(clusterId);
     omStorage.setOmId(omId);
-    omLogs.clearOutput();
 
     // Case 1: When keypair as well as certificate is missing. Initial keypair
     // boot-up. Get certificate will fail when SCM is not running.
