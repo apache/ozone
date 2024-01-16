@@ -106,10 +106,6 @@
     <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" />
   </Match>
   <Match>
-    <Class name="org.apache.hadoop.ozone.om.TestSecureOzoneManager"/>
-    <Bug pattern="UWF_NULL_FIELD" />
-  </Match>
-  <Match>
     <Class name="org.apache.hadoop.ozone.om.TestOmMetrics"/>
     <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT" />
   </Match>
