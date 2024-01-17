@@ -171,4 +171,4 @@ $ ozone admin om lof --service-id=om-service-test1 --length=3 --prefix=/volumelo
 }
 ```
 
-Note in JSON output mode, field `contToken` won't show up at all in the result if there are no more entries to be after the batch.
+Note in JSON output mode, field `contToken` won't show up at all in the result if there are no more entries after the batch (i.e. when `hasMore` is `false`).
