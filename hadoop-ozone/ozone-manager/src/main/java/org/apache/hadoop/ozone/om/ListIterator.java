@@ -206,7 +206,7 @@ public class ListIterator {
 
       populateCacheMap(cacheIter);
 
-      cacheCreatedKeyIter = cacheKeyMap.entrySet().iterator();
+      cacheCreatedKeyIter = cacheKeyMap.entrySet().stream().filter(e -> e.getValue() != null).iterator();
     }
 
     private void populateCacheMap(Iterator<Map.Entry<CacheKey<String>,
@@ -247,9 +247,6 @@ public class ListIterator {
     private void getNextKey() throws IOException {
       while (cacheCreatedKeyIter.hasNext() && currentEntry == null) {
         Map.Entry<String, Value> entry = cacheCreatedKeyIter.next();
-        if (null == entry.getValue()) {
-          continue;
-        }
         currentEntry = new HeapEntry(this.entryIteratorId, this.tableName,
             entry.getKey(), entry.getValue());
       }
