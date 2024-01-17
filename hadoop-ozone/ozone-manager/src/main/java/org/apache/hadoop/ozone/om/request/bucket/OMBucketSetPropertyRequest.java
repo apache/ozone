@@ -23,12 +23,16 @@ import java.nio.file.InvalidPathException;
 import java.util.List;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.common.BekInfoUtils;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
@@ -86,6 +90,18 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
         setBucketPropertyRequestBuilder = getOmRequest()
         .getSetBucketPropertyRequest().toBuilder()
         .setModificationTime(modificationTime);
+
+    BucketArgs bucketArgs =
+        getOmRequest().getSetBucketPropertyRequest().getBucketArgs();
+
+    if (bucketArgs.hasBekInfo()) {
+      KeyProviderCryptoExtension kmsProvider = ozoneManager.getKmsProvider();
+      BucketArgs.Builder bucketArgsBuilder =
+          setBucketPropertyRequestBuilder.getBucketArgsBuilder();
+      bucketArgsBuilder.setBekInfo(
+          BekInfoUtils.getBekInfo(kmsProvider, bucketArgs.getBekInfo()));
+      setBucketPropertyRequestBuilder.setBucketArgs(bucketArgsBuilder.build());
+    }
 
     return getOmRequest().toBuilder()
         .setSetBucketPropertyRequest(setBucketPropertyRequestBuilder)
@@ -188,6 +204,11 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       if (defaultReplicationConfig != null) {
         // Resetting the default replication config.
         bucketInfoBuilder.setDefaultReplicationConfig(defaultReplicationConfig);
+      }
+
+      BucketEncryptionKeyInfo bek = omBucketArgs.getBucketEncryptionKeyInfo();
+      if (bek != null && bek.getKeyName() != null) {
+        bucketInfoBuilder.setBucketEncryptionKey(bek);
       }
 
       omBucketInfo = bucketInfoBuilder.build();

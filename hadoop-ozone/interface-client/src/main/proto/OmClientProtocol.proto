@@ -805,6 +805,7 @@ message BucketArgs {
     optional uint64 quotaInNamespace = 9;
     optional string ownerName = 10;
     optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 11;
+    optional BucketEncryptionInfoProto bekInfo = 12;
 }
 
 message PrefixInfo {

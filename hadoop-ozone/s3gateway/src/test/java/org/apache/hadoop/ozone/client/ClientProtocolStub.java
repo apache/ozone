@@ -574,6 +574,13 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public void setEncryptionKey(String volumeName, String bucketName,
+                               String bekName)
+      throws IOException {
+
+  }
+
+  @Override
   public OzoneKey headObject(String volumeName, String bucketName,
                              String keyName) throws IOException {
     return getBucket(volumeName, bucketName).headObject(keyName);

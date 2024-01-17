@@ -997,6 +997,9 @@ public interface ClientProtocol {
   void setReplicationConfig(String volumeName, String bucketName,
       ReplicationConfig replicationConfig) throws IOException;
 
+  void setEncryptionKey(String volumeName, String bucketName,
+                        String bekName) throws IOException;
+
   /**
    * Returns OzoneKey that contains the application generated/visible
    * metadata for an Ozone Object.

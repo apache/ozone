@@ -1214,6 +1214,21 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public void setEncryptionKey(String volumeName, String bucketName,
+                               String bekName) throws IOException {
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    OmBucketArgs.Builder builder = OmBucketArgs.newBuilder();
+    BucketEncryptionKeyInfo bek = new BucketEncryptionKeyInfo.Builder()
+        .setKeyName(bekName).build();
+    builder.setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setBucketEncryptionKey(bek);
+    OmBucketArgs finalArgs = builder.build();
+    ozoneManagerClient.setBucketProperty(finalArgs);
+  }
+
+  @Override
   public void setReplicationConfig(
       String volumeName, String bucketName, ReplicationConfig replicationConfig)
       throws IOException {
