@@ -131,6 +131,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   //number of buffers used before doing a flush/putBlock.
   private int flushPeriod;
   private final Token<? extends TokenIdentifier> token;
+  private final String tokenString;
   private final DataStreamOutput out;
   private CompletableFuture<DataStreamReply> dataStreamCloseReply;
   private List<CompletableFuture<DataStreamReply>> futures = new ArrayList<>();
@@ -168,6 +169,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     this.xceiverClient =
         (XceiverClientRatis)xceiverClientManager.acquireClient(pipeline, true);
     this.token = token;
+    this.tokenString = (this.token == null) ? null :
+        this.token.encodeToUrlString();
     // Alternatively, stream setup can be delayed till the first chunk write.
     this.out = setupStream(pipeline);
     this.bufferList = bufferList;
@@ -207,8 +210,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
             .setContainerID(blockID.get().getContainerID())
             .setDatanodeUuid(id).setWriteChunk(writeChunkRequest);
 
-    if (token != null) {
-      builder.setEncodedToken(token.encodeToUrlString());
+    if (tokenString != null) {
+      builder.setEncodedToken(tokenString);
     }
 
     ContainerCommandRequestMessage message =
@@ -374,7 +377,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
    * @return minimum commit index replicated to all nodes
    * @throws IOException IOException in case watch gets timed out
    */
-  private void watchForCommit(boolean bufferFull) throws IOException {
+  public void watchForCommit(boolean bufferFull) throws IOException {
     checkOpen();
     try {
       XceiverClientReply reply = bufferFull ?
@@ -402,7 +405,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
    * @param force true if no data was written since most recent putBlock and
    *            stream is being closed
    */
-  private void executePutBlock(boolean close,
+  public void executePutBlock(boolean close,
       boolean force) throws IOException {
     checkOpen();
     long flushPos = totalDataFlushedLength;
@@ -420,7 +423,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     if (close) {
       final ContainerCommandRequestProto putBlockRequest
           = ContainerProtocolCalls.getPutBlockRequest(
-              xceiverClient.getPipeline(), blockData, true, token);
+              xceiverClient.getPipeline(), blockData, true, tokenString);
       dataStreamCloseReply = executePutBlockClose(putBlockRequest,
           PUT_BLOCK_REQUEST_LENGTH_MAX, out);
       dataStreamCloseReply.whenComplete((reply, e) -> {
@@ -437,7 +440,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
 
     try {
       XceiverClientReply asyncReply =
-          putBlockAsync(xceiverClient, blockData, close, token);
+          putBlockAsync(xceiverClient, blockData, close, tokenString);
       final CompletableFuture<ContainerCommandResponseProto> flushFuture
           = asyncReply.getResponse().thenApplyAsync(e -> {
             try {

@@ -50,8 +50,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -129,8 +129,7 @@ public class TestDiscardPreallocatedBlocks {
     OzoneOutputStream key =
         createKey(keyName, ReplicationType.RATIS, 2 * blockSize);
     KeyOutputStream keyOutputStream =
-        (KeyOutputStream) key.getOutputStream();
-    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
+        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     // With the initial size provided, it should have pre allocated 2 blocks
     assertEquals(2, keyOutputStream.getStreamEntries().size());
     long containerID1 = keyOutputStream.getStreamEntries().get(0)

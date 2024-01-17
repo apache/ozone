@@ -22,6 +22,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -36,6 +37,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.statemachine.StateMachine;
+import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -100,16 +102,17 @@ public class OMPrepareRequest extends OMClientRequest {
 
       OzoneManagerRatisServer omRatisServer = ozoneManager.getOmRatisServer();
       final RaftServer.Division division = omRatisServer.getServerDivision();
+      final OzoneManagerStateMachine stateMachine = (OzoneManagerStateMachine) division.getStateMachine();
 
-      // Wait for outstanding double buffer entries to flush to disk,
-      // so they will not be purged from the log before being persisted to
-      // the DB.
-      // Since the response for this request was added to the double buffer
-      // already, once this index reaches the state machine, we know all
-      // transactions have been flushed.
-      waitForLogIndex(transactionLogIndex, ozoneManager, division,
+      // Wait for outstanding double buffer entries
+      // - to be flushed to db, and
+      // - to be notified by Ratis.
+      // The log index returned, will be used as the prepare index, is the last Ratis commit index
+      // which can be higher than the transactionLogIndex of this request.
+      final long prepareIndex = waitForLogIndex(transactionLogIndex, ozoneManager, stateMachine,
           flushTimeout, flushCheckInterval);
-      takeSnapshotAndPurgeLogs(transactionLogIndex, division);
+      Preconditions.assertTrue(prepareIndex >= transactionLogIndex);
+      takeSnapshotAndPurgeLogs(prepareIndex, division);
 
       // Save prepare index to a marker file, so if the OM restarts,
       // it will remain in prepare mode as long as the file exists and its
@@ -150,11 +153,15 @@ public class OMPrepareRequest extends OMClientRequest {
   }
 
   /**
-   * Waits for the specified index to be flushed to the state machine on
-   * disk, and to be applied to Ratis's state machine.
+   * Waits for the specified index to be applied to {@link OzoneManagerStateMachine}.
+   * Note that
+   * - the applied index is updated after the transaction is flushed to db.
+   * - after a transaction (i) is committed, ratis will append another ratis-metadata transaction (i+1).
+   *
+   * @return the last Ratis commit index
    */
-  private static void waitForLogIndex(long minOMDBFlushIndex,
-      OzoneManager om, RaftServer.Division division,
+  private static long waitForLogIndex(long minOMDBFlushIndex,
+      OzoneManager om, OzoneManagerStateMachine stateMachine,
       Duration flushTimeout, Duration flushCheckInterval)
       throws InterruptedException, IOException {
 
@@ -168,8 +175,10 @@ public class OMPrepareRequest extends OMClientRequest {
     // snapshot is taken.
     // If we purge logs without waiting for this index, it may not make it to
     // the RocksDB snapshot, and then the log entry is lost on this OM.
-    long minRatisStateMachineIndex = minOMDBFlushIndex + 1;
+    long minRatisStateMachineIndex = minOMDBFlushIndex + 1; // for the ratis-metadata transaction
     long lastRatisCommitIndex = RaftLog.INVALID_LOG_INDEX;
+
+    // Wait OM state machine to apply the given index.
     long lastOMDBFlushIndex = RaftLog.INVALID_LOG_INDEX;
 
     LOG.info("{} waiting for index {} to flush to OM DB and index {} to flush" +
@@ -184,8 +193,7 @@ public class OMPrepareRequest extends OMClientRequest {
           lastOMDBFlushIndex);
 
       // Check ratis state machine.
-      lastRatisCommitIndex =
-          division.getStateMachine().getLastAppliedTermIndex().getIndex();
+      lastRatisCommitIndex = stateMachine.getLastNotifiedTermIndex().getIndex();
       ratisStateMachineApplied = (lastRatisCommitIndex >=
           minRatisStateMachineIndex);
       LOG.debug("{} Current Ratis state machine transaction index {}.",
@@ -211,6 +219,7 @@ public class OMPrepareRequest extends OMClientRequest {
           flushTimeout.getSeconds(), lastRatisCommitIndex,
           minRatisStateMachineIndex));
     }
+    return lastRatisCommitIndex;
   }
 
   /**
@@ -226,6 +235,7 @@ public class OMPrepareRequest extends OMClientRequest {
       RaftServer.Division division) throws IOException {
     StateMachine stateMachine = division.getStateMachine();
     long snapshotIndex = stateMachine.takeSnapshot();
+    LOG.info("takeSnapshot at {} for prepareIndex {}", snapshotIndex, prepareIndex);
 
     if (snapshotIndex < prepareIndex) {
       throw new IOException(String.format("OM DB snapshot index %d is less " +
@@ -244,12 +254,6 @@ public class OMPrepareRequest extends OMClientRequest {
         LOG.warn("Actual purge index {} does not " +
               "match specified purge index {}. ", actualPurgeIndex,
             snapshotIndex);
-      }
-
-      if (actualPurgeIndex < prepareIndex) {
-        throw new IOException(String.format("Actual purge index %d is less " +
-          "than prepare index %d. Some required logs may not have" +
-            " been removed.", actualPurgeIndex, prepareIndex));
       }
     } catch (ExecutionException e) {
       // Ozone manager error handler does not respect exception chaining and

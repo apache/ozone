@@ -56,7 +56,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 /**
  * Tests MultiBlock Writes with Dn failures by Ozone Client.
@@ -147,9 +147,8 @@ public class TestMultiBlockWritesWithDnFailures {
     key.write(data.getBytes(UTF_8));
 
     // get the name of a valid container
-    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream groupOutputStream =
-        (KeyOutputStream) key.getOutputStream();
+        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     List<OmKeyLocationInfo> locationInfoList =
         groupOutputStream.getLocationInfoList();
     assertEquals(2, locationInfoList.size());
@@ -192,9 +191,8 @@ public class TestMultiBlockWritesWithDnFailures {
     key.write(data.getBytes(UTF_8));
 
     // get the name of a valid container
-    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream keyOutputStream =
-        (KeyOutputStream) key.getOutputStream();
+        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     List<BlockOutputStreamEntry> streamEntryList =
         keyOutputStream.getStreamEntries();
 

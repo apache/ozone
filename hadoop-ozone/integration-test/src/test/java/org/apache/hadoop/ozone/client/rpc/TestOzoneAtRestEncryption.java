@@ -78,9 +78,12 @@ import org.apache.ozone.test.GenericTestUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
+import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -227,7 +230,7 @@ class TestOzoneAtRestEncryption {
 
   static void createAndVerifyStreamKeyData(OzoneBucket bucket)
       throws Exception {
-    Instant testStartTime = Instant.now();
+    Instant testStartTime = getTestStartTime();
     String keyName = UUID.randomUUID().toString();
     String value = "sample value";
     try (OzoneDataStreamOutput out = bucket.createStreamKey(keyName,
@@ -240,7 +243,7 @@ class TestOzoneAtRestEncryption {
   }
 
   static void createAndVerifyKeyData(OzoneBucket bucket) throws Exception {
-    Instant testStartTime = Instant.now();
+    Instant testStartTime = getTestStartTime();
     String keyName = UUID.randomUUID().toString();
     String value = "sample value";
     try (OzoneOutputStream out = bucket.createKey(keyName,
@@ -316,7 +319,7 @@ class TestOzoneAtRestEncryption {
     //Step 1
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    Instant testStartTime = Instant.now();
+    Instant testStartTime = getTestStartTime();
 
     String value = "sample value";
     store.createVolume(volumeName);
@@ -381,9 +384,9 @@ class TestOzoneAtRestEncryption {
     assertNotNull(deletedKeys);
     Map<String, String> deletedKeyMetadata =
         deletedKeys.getOmKeyInfoList().get(0).getMetadata();
-    assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_FLAG));
-    assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_SECRET));
-    assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_ALGORITHM));
+    assertThat(deletedKeyMetadata).doesNotContainKey(OzoneConsts.GDPR_FLAG);
+    assertThat(deletedKeyMetadata).doesNotContainKey(OzoneConsts.GDPR_SECRET);
+    assertThat(deletedKeyMetadata).doesNotContainKey(OzoneConsts.GDPR_ALGORITHM);
     assertNull(deletedKeys.getOmKeyInfoList().get(0).getFileEncryptionInfo());
   }
 
@@ -560,8 +563,7 @@ class TestOzoneAtRestEncryption {
     // Create an input stream to read the data
     try (OzoneInputStream inputStream = bucket.readKey(keyName)) {
 
-      assertTrue(inputStream.getInputStream()
-          instanceof MultipartInputStream);
+      assertInstanceOf(MultipartInputStream.class, inputStream.getInputStream());
 
       // Test complete read
       byte[] completeRead = new byte[keySize];

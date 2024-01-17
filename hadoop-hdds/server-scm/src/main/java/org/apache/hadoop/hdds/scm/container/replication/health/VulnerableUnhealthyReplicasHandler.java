@@ -37,9 +37,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.R
 
 /**
  * A QUASI_CLOSED container may have some UNHEALTHY replicas with the
- * same Sequence ID as the container. RM should try to maintain one
- * copy of such replicas when there are no healthy replicas that
- * match the container's Sequence ID.
+ * same Sequence ID as the container and on unique origins. RM should try to maintain one
+ * copy of such replicas.
  */
 public class VulnerableUnhealthyReplicasHandler extends AbstractCheck {
   public static final Logger LOG = LoggerFactory.getLogger(VulnerableUnhealthyReplicasHandler.class);
@@ -52,8 +51,8 @@ public class VulnerableUnhealthyReplicasHandler extends AbstractCheck {
   /**
    * Checks if the container is QUASI_CLOSED has some vulnerable UNHEALTHY replicas that need to replicated to
    * other Datanodes. These replicas have the same sequence ID as the container while other healthy replicas don't.
-   * If the node hosting such a replica is being taken offline, then the replica may have to be replicated to another
-   * node.
+   * Or, these replicas have unique origin Datanodes. If the node hosting such a replica is being taken offline, then
+   * the replica may have to be replicated to another node.
    * @param request ContainerCheckRequest object representing the container
    * @return true if some vulnerable UNHEALTHY replicas were found, else false
    */

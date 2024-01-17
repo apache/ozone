@@ -50,8 +50,8 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.
     OZONE_SCM_STALENODE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class tests the 2 way commit in Ratis.
@@ -175,8 +175,8 @@ public class Test2WayCommitInRatis {
     // commitInfo Map will be reduced to 2 here
     assertEquals(2, ratisClient.getCommitInfoMap().size());
     clientManager.releaseClient(xceiverClient, false);
-    assertTrue(logCapturer.getOutput().contains("3 way commit failed"));
-    assertTrue(logCapturer.getOutput().contains("Committed by majority"));
+    assertThat(logCapturer.getOutput()).contains("3 way commit failed");
+    assertThat(logCapturer.getOutput()).contains("Committed by majority");
     logCapturer.stopCapturing();
     shutdown();
   }

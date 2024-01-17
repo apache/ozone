@@ -65,13 +65,11 @@ import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.NodeComparator;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 import org.rocksdb.Checkpoint;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
@@ -103,6 +101,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Test RocksDBCheckpointDiffer basic functionality.
@@ -161,14 +161,14 @@ public class TestRocksDBCheckpointDiffer {
     sstBackUpDir = new File(metadataDirName, sstBackUpDirName);
     createDir(sstBackUpDir, metadataDirName + "/" + sstBackUpDirName);
 
-    config = Mockito.mock(ConfigurationSource.class);
+    config = mock(ConfigurationSource.class);
 
-    Mockito.when(config.getTimeDuration(
+    when(config.getTimeDuration(
         OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED,
         OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT,
         TimeUnit.MILLISECONDS)).thenReturn(MINUTES.toMillis(10));
 
-    Mockito.when(config.getTimeDuration(
+    when(config.getTimeDuration(
         OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL,
         OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS)).thenReturn(0L);
@@ -500,8 +500,8 @@ public class TestRocksDBCheckpointDiffer {
     }
 
     // Check same and different SST files result
-    Assertions.assertEquals(expectedSameSstFiles, actualSameSstFiles);
-    Assertions.assertEquals(expectedDiffSstFiles, actualDiffSstFiles);
+    assertEquals(expectedSameSstFiles, actualSameSstFiles);
+    assertEquals(expectedDiffSstFiles, actualDiffSstFiles);
 
     if (expectingException && !exceptionThrown) {
       fail("Expecting exception but none thrown.");
@@ -534,7 +534,7 @@ public class TestRocksDBCheckpointDiffer {
     try (Stream<Path> sstPathStream = Files.list(sstBackUpDir.toPath())) {
       List<String> expectedLinks = sstPathStream.map(Path::getFileName)
               .map(Object::toString).sorted().collect(Collectors.toList());
-      Assertions.assertEquals(expectedLinks, asList(
+      assertEquals(expectedLinks, asList(
               "000017.sst", "000019.sst", "000021.sst", "000023.sst",
           "000024.sst", "000026.sst", "000029.sst"));
     }
@@ -581,7 +581,7 @@ public class TestRocksDBCheckpointDiffer {
         Collections.singletonList("000031"),
         Collections.emptyList()
     );
-    Assertions.assertEquals(snapshots.size(), expectedDifferResult.size());
+    assertEquals(snapshots.size(), expectedDifferResult.size());
 
     int index = 0;
     for (DifferSnapshotInfo snap : snapshots) {
@@ -590,7 +590,7 @@ public class TestRocksDBCheckpointDiffer {
       LOG.info("SST diff list from '{}' to '{}': {}",
           src.getDbPath(), snap.getDbPath(), sstDiffList);
 
-      Assertions.assertEquals(expectedDifferResult.get(index), sstDiffList);
+      assertEquals(expectedDifferResult.get(index), sstDiffList);
       ++index;
     }
   }
@@ -1008,8 +1008,8 @@ public class TestRocksDBCheckpointDiffer {
                                    Set<String> expectedFileNodesRemoved) {
     Set<String> actualFileNodesRemoved =
         rocksDBCheckpointDiffer.pruneBackwardDag(originalDag, levelToBeRemoved);
-    Assertions.assertEquals(expectedDag, originalDag);
-    Assertions.assertEquals(actualFileNodesRemoved, expectedFileNodesRemoved);
+    assertEquals(expectedDag, originalDag);
+    assertEquals(actualFileNodesRemoved, expectedFileNodesRemoved);
   }
 
 
@@ -1063,8 +1063,8 @@ public class TestRocksDBCheckpointDiffer {
                                   Set<String> expectedFileNodesRemoved) {
     Set<String> actualFileNodesRemoved =
         rocksDBCheckpointDiffer.pruneForwardDag(originalDag, levelToBeRemoved);
-    Assertions.assertEquals(expectedDag, originalDag);
-    Assertions.assertEquals(actualFileNodesRemoved, expectedFileNodesRemoved);
+    assertEquals(expectedDag, originalDag);
+    assertEquals(actualFileNodesRemoved, expectedFileNodesRemoved);
   }
 
   @SuppressWarnings("methodlength")
@@ -1762,8 +1762,8 @@ public class TestRocksDBCheckpointDiffer {
         actualDiffSstFiles);
 
     // Check same and different SST files result
-    Assertions.assertEquals(expectedSameSstFiles, actualSameSstFiles);
-    Assertions.assertEquals(expectedDiffSstFiles, actualDiffSstFiles);
+    assertEquals(expectedSameSstFiles, actualSameSstFiles);
+    assertEquals(expectedDiffSstFiles, actualDiffSstFiles);
   }
 
   private static Stream<Arguments> shouldSkipNodeCases() {
