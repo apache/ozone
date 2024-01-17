@@ -69,8 +69,13 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.fail;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -233,8 +238,8 @@ public class TestDeleteWithInAdequateDN {
         leader = dn;
       }
     }
-    Assertions.assertNotNull(follower);
-    Assertions.assertNotNull(leader);
+    assertNotNull(follower);
+    assertNotNull(leader);
     //ensure that the chosen follower is still a follower
     Assumptions.assumeTrue(RatisTestHelper.isRatisFollower(follower, pipeline));
     // shutdown the  follower node
@@ -291,12 +296,11 @@ public class TestDeleteWithInAdequateDN {
                 null);
       }
     } catch (IOException ioe) {
-      Assertions.fail("Exception should not be thrown.");
+      fail("Exception should not be thrown.");
     }
     long numReadStateMachineOps =
         stateMachine.getMetrics().getNumReadStateMachineOps();
-    Assertions.assertEquals(0,
-        stateMachine.getMetrics().getNumReadStateMachineFails());
+    assertEquals(0, stateMachine.getMetrics().getNumReadStateMachineFails());
     stateMachine.evictStateMachineCache();
     cluster.restartHddsDatanode(follower.getDatanodeDetails(), false);
     // wait for the raft server to come up and join the ratis ring
@@ -304,10 +308,9 @@ public class TestDeleteWithInAdequateDN {
 
     // Make sure the readStateMachine call got triggered after the follower
     // caught up
-    Assertions.assertTrue(stateMachine.getMetrics().getNumReadStateMachineOps()
-        > numReadStateMachineOps);
-    Assertions.assertEquals(0,
-        stateMachine.getMetrics().getNumReadStateMachineFails());
+    assertThat(stateMachine.getMetrics().getNumReadStateMachineOps())
+        .isGreaterThan(numReadStateMachineOps);
+    assertEquals(0, stateMachine.getMetrics().getNumReadStateMachineFails());
     // wait for the chunk to get deleted now
     Thread.sleep(10000);
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
@@ -321,11 +324,10 @@ public class TestDeleteWithInAdequateDN {
           keyValueHandler.getChunkManager().readChunk(container, blockID,
               ChunkInfo.getFromProtoBuf(chunkInfo), null);
         }
-        Assertions.fail("Expected exception is not thrown");
+        fail("Expected exception is not thrown");
       } catch (IOException ioe) {
-        Assertions.assertTrue(ioe instanceof StorageContainerException);
-        Assertions.assertSame(((StorageContainerException) ioe).getResult(),
-            ContainerProtos.Result.UNABLE_TO_FIND_CHUNK);
+        StorageContainerException e = assertInstanceOf(StorageContainerException.class, ioe);
+        assertSame(ContainerProtos.Result.UNABLE_TO_FIND_CHUNK, e.getResult());
       }
     }
   }

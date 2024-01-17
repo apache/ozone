@@ -41,11 +41,11 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.Assertions;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests the idempotent operations in ContainerStateMachine.
@@ -115,7 +115,7 @@ public class TestContainerStateMachineIdempotency {
       ContainerProtocolCalls.closeContainer(client, containerID, null);
       ContainerProtocolCalls.closeContainer(client, containerID, null);
     } catch (IOException ioe) {
-      Assertions.fail("Container operation failed" + ioe);
+      fail("Container operation failed" + ioe);
     }
     xceiverClientManager.releaseClient(client, false);
   }

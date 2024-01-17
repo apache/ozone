@@ -64,7 +64,7 @@ public class TestNodeDecommissionManager {
     conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.getAbsolutePath());
     nodeManager = createNodeManager(conf);
-    decom = new NodeDecommissionManager(conf, nodeManager, null,
+    decom = new NodeDecommissionManager(conf, nodeManager,
         SCMContext.emptyContext(), new EventQueue(), null);
   }
 

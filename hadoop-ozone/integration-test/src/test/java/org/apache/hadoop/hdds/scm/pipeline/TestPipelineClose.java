@@ -50,7 +50,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.List;
@@ -64,6 +63,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.verify;
 
 /**
  * Tests for Pipeline Closing.
@@ -213,7 +216,7 @@ public class TestPipelineClose {
       throws IOException, TimeoutException {
     EventQueue eventQ = (EventQueue) scm.getEventQueue();
     PipelineActionHandler pipelineActionTest =
-        Mockito.mock(PipelineActionHandler.class);
+        mock(PipelineActionHandler.class);
     eventQ.addHandler(SCMEvents.PIPELINE_ACTIONS, pipelineActionTest);
     ArgumentCaptor<PipelineActionsFromDatanode> actionCaptor =
         ArgumentCaptor.forClass(PipelineActionsFromDatanode.class);
@@ -245,10 +248,10 @@ public class TestPipelineClose {
      * This is expected to trigger an immediate pipeline actions report to SCM
      */
     xceiverRatis.handleNodeLogFailure(groupId, null);
-    Mockito.verify(pipelineActionTest, Mockito.timeout(1500).atLeastOnce())
+    verify(pipelineActionTest, timeout(1500).atLeastOnce())
         .onMessage(
             actionCaptor.capture(),
-            Mockito.any(EventPublisher.class));
+            any(EventPublisher.class));
 
     PipelineActionsFromDatanode actionsFromDatanode =
         actionCaptor.getValue();

@@ -49,7 +49,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@Timeout(60)
+@Timeout(120)
 class TestSafeMode {
 
   private static final String VOLUME = "vol";

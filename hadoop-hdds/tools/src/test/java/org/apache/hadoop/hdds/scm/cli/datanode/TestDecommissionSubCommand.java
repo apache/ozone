@@ -32,13 +32,13 @@ import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.mockito.Mockito;
 import picocli.CommandLine;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.Matchers.anyListOf;
+import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Unit tests to validate the DecommissionSubCommand class includes the
@@ -69,7 +69,7 @@ public class TestDecommissionSubCommand {
   @Test
   public void testNoErrorsWhenDecommissioning() throws IOException  {
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.decommissionNodes(anyListOf(String.class)))
+    when(scmClient.decommissionNodes(anyList()))
         .thenAnswer(invocation -> new ArrayList<DatanodeAdminError>());
 
     CommandLine c = new CommandLine(cmd);
@@ -93,7 +93,7 @@ public class TestDecommissionSubCommand {
   @Test
   public void testErrorsReportedWhenDecommissioning() throws IOException  {
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.decommissionNodes(anyListOf(String.class)))
+    when(scmClient.decommissionNodes(anyList()))
         .thenAnswer(invocation -> {
           ArrayList<DatanodeAdminError> e = new ArrayList<>();
           e.add(new DatanodeAdminError("host1", "host1 error"));

@@ -34,9 +34,8 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 
-import org.junit.Assert;
-
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * The contract of Rooted Ozone FileSystem (OFS).
@@ -96,7 +95,7 @@ class RootedOzoneContract extends AbstractFSContract {
   @Override
   public FileSystem getTestFileSystem() throws IOException {
     //assumes cluster is not null
-    Assert.assertNotNull("cluster not created", cluster);
+    assertNotNull(cluster);
 
     String uri = String.format("%s://localhost:%s/",
         OzoneConsts.OZONE_OFS_URI_SCHEME,

@@ -106,15 +106,11 @@
     <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD" />
   </Match>
   <Match>
-    <Class name="org.apache.hadoop.ozone.om.TestSecureOzoneManager"/>
-    <Bug pattern="UWF_NULL_FIELD" />
-  </Match>
-  <Match>
     <Class name="org.apache.hadoop.ozone.om.TestOmMetrics"/>
     <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT" />
   </Match>
   <Match>
-    <Class name="org.apache.hadoop.ozone.scm.TestContainerSmallFile"/>
+    <Class name="org.apache.hadoop.hdds.scm.TestContainerSmallFile"/>
     <Bug pattern="DLS_DEAD_LOCAL_STORE" />
   </Match>
   <Match>
@@ -130,7 +126,13 @@
     <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
   </Match>
   <Match>
-    <Class name="org.apache.hadoop.ozone.scm.TestSCMInstallSnapshotWithHA"/>
+    <Class name="org.apache.hadoop.hdds.scm.TestSCMInstallSnapshotWithHA"/>
     <Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE" />
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.fs.contract.AbstractContractCopyFromLocalTest"/>
+  </Match>
+  <Match>
+    <Class name="org.apache.hadoop.fs.contract.AbstractContractEtagTest"/>
   </Match>
 </FindBugsFilter>

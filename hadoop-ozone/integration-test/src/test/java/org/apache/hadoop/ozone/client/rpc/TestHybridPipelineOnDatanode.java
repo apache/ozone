@@ -38,13 +38,17 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import java.util.List;
 import java.util.UUID;
 import java.util.HashMap;
@@ -143,18 +147,18 @@ public class TestHybridPipelineOnDatanode {
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(pipelineID1);
     List<DatanodeDetails> dns = pipeline1.getNodes();
-    Assertions.assertEquals(1, dns.size());
+    assertEquals(1, dns.size());
 
     Pipeline pipeline2 =
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipeline(pipelineID2);
-    Assertions.assertNotEquals(pipeline1, pipeline2);
-    Assertions.assertSame(pipeline1.getType(),
+    assertNotEquals(pipeline1, pipeline2);
+    assertSame(pipeline1.getType(),
         HddsProtos.ReplicationType.RATIS);
-    Assertions.assertSame(pipeline1.getType(), pipeline2.getType());
+    assertSame(pipeline1.getType(), pipeline2.getType());
     // assert that the pipeline Id1 and pipelineId2 are on the same node
     // but different replication factor
-    Assertions.assertTrue(pipeline2.getNodes().contains(dns.get(0)));
+    assertThat(pipeline2.getNodes()).contains(dns.get(0));
     byte[] b1 = new byte[data.length];
     byte[] b2 = new byte[data.length];
     // now try to read both the keys
@@ -166,8 +170,8 @@ public class TestHybridPipelineOnDatanode {
     is = bucket.readKey(keyName2);
     is.read(b2);
     is.close();
-    Assertions.assertArrayEquals(b1, data);
-    Assertions.assertArrayEquals(b1, b2);
+    assertArrayEquals(b1, data);
+    assertArrayEquals(b1, b2);
   }
 }
 
