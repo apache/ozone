@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.scm;
+package org.apache.hadoop.hdds.scm;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
@@ -35,11 +35,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
-import org.apache.hadoop.hdds.scm.HddsTestUtils;
-import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.ScmInfo;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -78,6 +74,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.states.endpoint.HeartbeatEndpointTask;
@@ -139,6 +136,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_C
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils.setInternalState;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -275,26 +273,36 @@ public class TestStorageContainerManager {
   public void testBlockDeletionTransactions() throws Exception {
     int numKeys = 5;
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 100,
+    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
         TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 100,
+    DatanodeConfiguration datanodeConfiguration = conf.getObject(
+        DatanodeConfiguration.class);
+    datanodeConfiguration.setBlockDeletionInterval(Duration.ofMillis(100));
+    conf.setFromObject(datanodeConfiguration);
+    ScmConfig scmConfig = conf.getObject(ScmConfig.class);
+    scmConfig.setBlockDeletionInterval(Duration.ofMillis(100));
+    conf.setFromObject(scmConfig);
+
+    conf.setTimeDuration(RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY
+        + ".client.request.write.timeout", 30, TimeUnit.SECONDS);
+    conf.setTimeDuration(RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY
+        + ".client.request.watch.timeout", 30, TimeUnit.SECONDS);
+    conf.setInt("hdds.datanode.block.delete.threads.max", 5);
+    conf.setInt("hdds.datanode.block.delete.queue.limit", 32);
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 50,
         TimeUnit.MILLISECONDS);
-    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
-        3000,
+    conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
+        TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
     conf.setInt(ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 5);
-    conf.setTimeDuration(OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
-        1, TimeUnit.SECONDS);
-    ScmConfig scmConfig = conf.getObject(ScmConfig.class);
-    scmConfig.setBlockDeletionInterval(Duration.ofSeconds(1));
-    conf.setFromObject(scmConfig);
     // Reset container provision size, otherwise only one container
     // is created by default.
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
         numKeys);
 
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
-        .setHbInterval(100)
+        .setHbInterval(50)
         .build();
     cluster.waitForClusterToBeReady();
 
@@ -313,7 +321,6 @@ public class TestStorageContainerManager {
         OzoneTestUtils.closeContainers(keyInfo.getKeyLocationVersions(),
             cluster.getStorageContainerManager());
       }
-
       Map<Long, List<Long>> containerBlocks = createDeleteTXLog(
           cluster.getStorageContainerManager(),
           delLog, keyLocations, helper);
@@ -336,7 +343,7 @@ public class TestStorageContainerManager {
         } catch (IOException e) {
           return false;
         }
-      }, 1000, 10000);
+      }, 1000, 22000);
       assertTrue(helper.verifyBlocksWithTxnTable(containerBlocks));
       // Continue the work, add some TXs that with known container names,
       // but unknown block IDs.
@@ -458,7 +465,7 @@ public class TestStorageContainerManager {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 1, TimeUnit.SECONDS);
     conf.setInt(ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 5);
-    conf.setTimeDuration(OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
+    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
         100, TimeUnit.MILLISECONDS);
     ScmConfig scmConfig = conf.getObject(ScmConfig.class);
     scmConfig.setBlockDeletionInterval(Duration.ofMillis(100));
@@ -841,7 +848,7 @@ public class TestStorageContainerManager {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 1, TimeUnit.SECONDS);
     conf.setInt(ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 5);
-    conf.setTimeDuration(OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
+    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
         100, TimeUnit.MILLISECONDS);
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
         numKeys);

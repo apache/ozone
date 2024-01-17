@@ -149,6 +149,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentity
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
 
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
+import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -597,7 +598,7 @@ public abstract class TestOzoneRpcClientAbstract {
   @Test
   public void testCreateBucket()
       throws IOException {
-    Instant testStartTime = Instant.now();
+    Instant testStartTime = getTestStartTime();
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     store.createVolume(volumeName);
@@ -612,7 +613,7 @@ public abstract class TestOzoneRpcClientAbstract {
   @Test
   public void testCreateS3Bucket()
       throws IOException {
-    Instant testStartTime = Instant.now();
+    Instant testStartTime = getTestStartTime();
     String bucketName = UUID.randomUUID().toString();
     store.createS3Bucket(bucketName);
     OzoneBucket bucket = store.getS3Bucket(bucketName);
@@ -624,7 +625,7 @@ public abstract class TestOzoneRpcClientAbstract {
   @Test
   public void testDeleteS3Bucket()
       throws Exception {
-    Instant testStartTime = Instant.now();
+    Instant testStartTime = getTestStartTime();
     String bucketName = UUID.randomUUID().toString();
     store.createS3Bucket(bucketName);
     OzoneBucket bucket = store.getS3Bucket(bucketName);
@@ -1019,7 +1020,7 @@ public abstract class TestOzoneRpcClientAbstract {
   public void testPutKey() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    Instant testStartTime = Instant.now();
+    Instant testStartTime = getTestStartTime();
 
     String value = "sample value";
     store.createVolume(volumeName);
@@ -1560,7 +1561,7 @@ public abstract class TestOzoneRpcClientAbstract {
   public void testPutKeyRatisOneNode() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    Instant testStartTime = Instant.now();
+    Instant testStartTime = getTestStartTime();
 
     String value = "sample value";
     store.createVolume(volumeName);
@@ -1595,7 +1596,7 @@ public abstract class TestOzoneRpcClientAbstract {
   public void testPutKeyRatisThreeNodes() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    Instant testStartTime = Instant.now();
+    Instant testStartTime = getTestStartTime();
 
     String value = "sample value";
     store.createVolume(volumeName);
@@ -1632,7 +1633,7 @@ public abstract class TestOzoneRpcClientAbstract {
       InterruptedException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    Instant testStartTime = Instant.now();
+    Instant testStartTime = getTestStartTime();
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);

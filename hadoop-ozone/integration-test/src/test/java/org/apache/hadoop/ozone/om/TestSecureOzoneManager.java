@@ -25,14 +25,13 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.security.OMCertificateClient;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.bouncycastle.cert.X509CertificateHolder;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -49,8 +48,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
-import static org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import static org.apache.ozone.test.GenericTestUtils.getTempPath;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -60,24 +58,19 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * Test secure Ozone Manager operation in distributed handler scenario.
  */
 @Timeout(25)
-public class TestSecureOzoneManager {
+class TestSecureOzoneManager {
 
   private static final String COMPONENT = "om";
-  private MiniOzoneCluster cluster = null;
   private OzoneConfiguration conf;
   private String clusterId;
   private String scmId;
   private String omId;
+  @TempDir
   private Path metaDir;
   private HddsProtos.OzoneManagerDetailsProto omInfo;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   */
   @BeforeEach
-  public void init() throws Exception {
+  void init() throws Exception {
     conf = new OzoneConfiguration();
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
@@ -87,37 +80,21 @@ public class TestSecureOzoneManager {
     conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.toString());
     conf.setInt(IPC_CLIENT_CONNECT_MAX_RETRIES_KEY, 2);
     conf.set(OZONE_SCM_NAMES, "localhost");
-    final String path = getTempPath(UUID.randomUUID().toString());
-    metaDir = Paths.get(path, "om-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.toString());
     OzoneManager.setTestSecureOmFlag(true);
     omInfo = OzoneManager.getOmDetailsProto(conf, omId);
   }
 
   /**
-   * Shutdown MiniDFSCluster.
-   */
-  @AfterEach
-  public void shutdown() {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
-    FileUtils.deleteQuietly(metaDir.toFile());
-  }
-
-  /**
    * Test failure cases for secure OM initialization.
    */
   @Test
-  public void testSecureOmInitFailures() throws Exception {
+  void testSecureOmInitFailures() throws Exception {
     PrivateKey privateKey;
     PublicKey publicKey;
-    LogCapturer omLogs =
-        LogCapturer.captureLogs(OzoneManager.getLogger());
     OMStorage omStorage = new OMStorage(conf);
     omStorage.setClusterId(clusterId);
     omStorage.setOmId(omId);
-    omLogs.clearOutput();
 
     // Case 1: When keypair as well as certificate is missing. Initial keypair
     // boot-up. Get certificate will fail when SCM is not running.
@@ -216,7 +193,7 @@ public class TestSecureOzoneManager {
    * Test om bind socket address.
    */
   @Test
-  public void testSecureOmInitFailure() throws Exception {
+  void testSecureOmInitFailure() throws Exception {
     OzoneConfiguration config = new OzoneConfiguration(conf);
     OMStorage omStorage = new OMStorage(config);
     omStorage.setClusterId(clusterId);
@@ -224,8 +201,9 @@ public class TestSecureOzoneManager {
     config.set(OZONE_OM_ADDRESS_KEY, "om-unknown");
     RuntimeException rte = assertThrows(RuntimeException.class,
         () -> OzoneManager.initializeSecurity(config, omStorage, scmId));
-    assertEquals("Can't get SCM signed certificate. omRpcAdd:" +
-        " om-unknown:9862", rte.getMessage());
+    assertThat(rte)
+        .hasMessageStartingWith("Can't get SCM signed certificate. omRpcAdd: om-unknown")
+        .hasMessageEndingWith(":9862");
   }
 
 }
