@@ -98,16 +98,18 @@ public class ReplicationServer {
         new LinkedBlockingQueue<>(replicationQueueLimit),
         threadFactory);
 
-    init();
+    init(replicationConfig.isZeroCopyEnable());
   }
 
-  public void init() {
+  public void init(boolean enableZeroCopy) {
+    GrpcReplicationService grpcReplicationService = new GrpcReplicationService(
+        new OnDemandContainerReplicationSource(controller), importer,
+        enableZeroCopy);
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
-        .addService(ServerInterceptors.intercept(new GrpcReplicationService(
-            new OnDemandContainerReplicationSource(controller),
-            importer
-        ), new GrpcServerInterceptor()))
+        .addService(ServerInterceptors.intercept(
+            grpcReplicationService.bindServiceWithZeroCopy(),
+            new GrpcServerInterceptor()))
         .executor(executor);
 
     if (secConf.isSecurityEnabled() && secConf.isGrpcTlsEnabled()) {
@@ -177,6 +179,11 @@ public class ReplicationServer {
     static final String REPLICATION_OUTOFSERVICE_FACTOR_KEY =
         PREFIX + "." + OUTOFSERVICE_FACTOR_KEY;
 
+    public static final String ZEROCOPY_ENABLE_KEY = "zerocopy.enabled";
+    private static final boolean ZEROCOPY_ENABLE_DEFAULT = false;
+    private static final String ZEROCOPY_ENABLE_DEFAULT_VALUE =
+        "false";
+
     /**
      * The maximum number of replication commands a single datanode can execute
      * simultaneously.
@@ -218,6 +225,15 @@ public class ReplicationServer {
     )
     private double outOfServiceFactor = OUTOFSERVICE_FACTOR_DEFAULT;
 
+    @Config(key = ZEROCOPY_ENABLE_KEY,
+        type = ConfigType.BOOLEAN,
+        defaultValue =  ZEROCOPY_ENABLE_DEFAULT_VALUE,
+        tags = {DATANODE, SCM},
+        description = "Specify if zero-copy should be enabled for " +
+            "replication protocol."
+    )
+    private boolean zeroCopyEnable = ZEROCOPY_ENABLE_DEFAULT;
+
     public double getOutOfServiceFactor() {
       return outOfServiceFactor;
     }
@@ -249,6 +265,14 @@ public class ReplicationServer {
 
     public void setReplicationQueueLimit(int limit) {
       this.replicationQueueLimit = limit;
+    }
+
+    public boolean isZeroCopyEnable() {
+      return zeroCopyEnable;
+    }
+
+    public void setZeroCopyEnable(boolean zeroCopyEnable) {
+      this.zeroCopyEnable = zeroCopyEnable;
     }
 
     @PostConstruct

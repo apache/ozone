@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.container.replication;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
@@ -28,11 +30,18 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContai
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc;
 
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.ratis.grpc.util.ZeroCopyMessageMarshaller;
+import org.apache.ratis.thirdparty.com.google.protobuf.MessageLite;
+import org.apache.ratis.thirdparty.io.grpc.MethodDescriptor;
+import org.apache.ratis.thirdparty.io.grpc.ServerCallHandler;
+import org.apache.ratis.thirdparty.io.grpc.ServerServiceDefinition;
 import org.apache.ratis.thirdparty.io.grpc.stub.CallStreamObserver;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc.getDownloadMethod;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc.getUploadMethod;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.fromProto;
 
 /**
@@ -49,10 +58,71 @@ public class GrpcReplicationService extends
   private final ContainerReplicationSource source;
   private final ContainerImporter importer;
 
+  private final boolean zeroCopyEnabled;
+
+  private final ZeroCopyMessageMarshaller<SendContainerRequest>
+      sendContainerZeroCopyMessageMarshaller = new ZeroCopyMessageMarshaller<>(
+      SendContainerRequest.getDefaultInstance());
+
+  private final ZeroCopyMessageMarshaller<CopyContainerRequestProto>
+      copyContainerZeroCopyMessageMarshaller = new ZeroCopyMessageMarshaller<>(
+      CopyContainerRequestProto.getDefaultInstance());
+
   public GrpcReplicationService(ContainerReplicationSource source,
-      ContainerImporter importer) {
+      ContainerImporter importer, boolean zeroCopyEnabled) {
     this.source = source;
     this.importer = importer;
+    this.zeroCopyEnabled = zeroCopyEnabled;
+  }
+
+  public ServerServiceDefinition bindServiceWithZeroCopy() {
+    ServerServiceDefinition orig = super.bindService();
+    if (!zeroCopyEnabled) {
+      LOG.info("Zerocopy is not enabled.");
+      return orig;
+    }
+
+    Set<String> methodNames = new HashSet<>();
+    ServerServiceDefinition.Builder builder =
+        ServerServiceDefinition.builder(orig.getServiceDescriptor().getName());
+
+    // Add `upload` method with zerocopy marshaller.
+    MethodDescriptor<SendContainerRequest, SendContainerResponse> uploadMethod =
+        getUploadMethod();
+    addZeroCopyMethod(orig, builder, uploadMethod,
+        sendContainerZeroCopyMessageMarshaller);
+    methodNames.add(uploadMethod.getFullMethodName());
+
+    // Add `download` method with zerocopy marshaller.
+    MethodDescriptor<CopyContainerRequestProto, CopyContainerResponseProto>
+        downloadMethod = getDownloadMethod();
+    addZeroCopyMethod(orig, builder, downloadMethod,
+        copyContainerZeroCopyMessageMarshaller);
+    methodNames.add(downloadMethod.getFullMethodName());
+
+    // Add other methods as is.
+    orig.getMethods().stream().filter(
+        x -> !methodNames.contains(x.getMethodDescriptor().getFullMethodName())
+    ).forEach(
+        builder::addMethod
+    );
+
+    return builder.build();
+  }
+
+  private static <Req extends MessageLite, Resp> void addZeroCopyMethod(
+      ServerServiceDefinition orig,
+      ServerServiceDefinition.Builder newServiceBuilder,
+      MethodDescriptor<Req, Resp> origMethod,
+      ZeroCopyMessageMarshaller<Req> zeroCopyMarshaller) {
+    MethodDescriptor<Req, Resp> newMethod = origMethod.toBuilder()
+        .setRequestMarshaller(zeroCopyMarshaller)
+        .build();
+    @SuppressWarnings("unchecked")
+    ServerCallHandler<Req, Resp> serverCallHandler =
+        (ServerCallHandler<Req, Resp>) orig.getMethod(
+            newMethod.getFullMethodName()).getServerCallHandler();
+    newServiceBuilder.addMethod(newMethod, serverCallHandler);
   }
 
   @Override

@@ -51,7 +51,7 @@ class TestGrpcReplicationService {
     };
     ContainerImporter importer = mock(ContainerImporter.class);
     GrpcReplicationService subject =
-        new GrpcReplicationService(source, importer);
+        new GrpcReplicationService(source, importer, false);
 
     CopyContainerRequestProto request = CopyContainerRequestProto.newBuilder()
         .setContainerID(1)
