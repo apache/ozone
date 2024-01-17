@@ -60,6 +60,7 @@ import java.util.concurrent.TimeoutException;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
+import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -175,7 +176,7 @@ public class TestStorageContainerManagerHA {
   private void doPutKey() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    Instant testStartTime = Instant.now();
+    Instant testStartTime = getTestStartTime();
     try (OzoneClient client = cluster.newClient()) {
       ObjectStore store = client.getObjectStore();
       String value = "sample value";
