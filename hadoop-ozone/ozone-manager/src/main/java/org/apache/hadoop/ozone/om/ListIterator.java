@@ -190,7 +190,6 @@ public class ListIterator {
     private final String prefixKey;
     private final String startKey;
     private final String tableName;
-    private HeapEntry currentEntry;
     private final int entryIteratorId;
 
     CacheIter(int entryIteratorId, String tableName,
@@ -198,7 +197,6 @@ public class ListIterator {
                   CacheValue<Value>>> cacheIter, String startKey,
               String prefixKey) {
       this.cacheKeyMap = new TreeMap<>();
-      this.currentEntry = null;
       this.startKey = startKey;
       this.prefixKey = prefixKey;
       this.tableName = tableName;
@@ -244,30 +242,14 @@ public class ListIterator {
       return cacheKeyMap.containsKey(key);
     }
 
-    private void getNextKey() throws IOException {
-      while (cacheCreatedKeyIter.hasNext() && currentEntry == null) {
-        Map.Entry<String, Value> entry = cacheCreatedKeyIter.next();
-        currentEntry = new HeapEntry(this.entryIteratorId, this.tableName,
-            entry.getKey(), entry.getValue());
-      }
-    }
-
     public boolean hasNext() {
-      try {
-        getNextKey();
-      } catch (IOException t) {
-        throw new UncheckedIOException(t);
-      }
-      return currentEntry != null;
+      return cacheCreatedKeyIter.hasNext();
     }
 
     public HeapEntry next() {
-      if (hasNext()) {
-        HeapEntry ret = currentEntry;
-        currentEntry = null;
-        return ret;
-      }
-      throw new NoSuchElementException();
+      Map.Entry<String, Value> entry = cacheCreatedKeyIter.next();
+      return new HeapEntry(this.entryIteratorId, this.tableName,
+          entry.getKey(), entry.getValue());
     }
 
     public void close() {
