@@ -664,7 +664,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         throws InterruptedException {
       // First lock all the handlers.
       keyDeletingService.getBootstrapStateLock().lock();
-      sstFilteringService.getBootstrapStateLock().lock();
+      if (sstFilteringService != null) {
+        sstFilteringService.getBootstrapStateLock().lock();
+      }
       rocksDbCheckpointDiffer.getBootstrapStateLock().lock();
       snapshotDeletingService.getBootstrapStateLock().lock();
 
@@ -677,7 +679,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     public void unlock() {
       snapshotDeletingService.getBootstrapStateLock().unlock();
       rocksDbCheckpointDiffer.getBootstrapStateLock().unlock();
-      sstFilteringService.getBootstrapStateLock().unlock();
+      if (sstFilteringService != null) {
+        sstFilteringService.getBootstrapStateLock().unlock();
+      }
       keyDeletingService.getBootstrapStateLock().unlock();
     }
   }
