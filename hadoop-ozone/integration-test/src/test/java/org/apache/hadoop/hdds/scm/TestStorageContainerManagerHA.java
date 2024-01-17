@@ -16,13 +16,12 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.scm;
+package org.apache.hadoop.hdds.scm;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.ha.SCMHAMetrics;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
@@ -196,7 +195,7 @@ public class TestStorageContainerManagerHA {
       assertEquals(keyName, key.getName());
       OzoneInputStream is = bucket.readKey(keyName);
       byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-      is.read(fileContent);
+      assertEquals(fileContent.length, is.read(fileContent));
       assertEquals(value, new String(fileContent, UTF_8));
       assertFalse(key.getCreationTime().isBefore(testStartTime));
       assertFalse(key.getModificationTime().isBefore(testStartTime));
