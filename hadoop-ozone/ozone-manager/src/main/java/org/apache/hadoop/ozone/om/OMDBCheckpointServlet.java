@@ -36,7 +36,7 @@ import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
-import org.apache.ratis.thirdparty.com.google.common.base.Preconditions;
+import com.google.common.base.Preconditions;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
