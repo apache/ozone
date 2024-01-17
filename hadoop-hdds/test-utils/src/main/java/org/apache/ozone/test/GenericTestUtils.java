@@ -24,6 +24,7 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
@@ -71,6 +72,18 @@ public abstract class GenericTestUtils {
   static {
     DEFAULT_TEST_DATA_DIR =
         "target" + File.separator + "test" + File.separator + "data";
+  }
+
+  /**
+   * Return current time in millis as an {@code Instant}.  This may be
+   * before {@link Instant#now()}, since the latter includes nanoseconds, too.
+   * This is needed for some tests that verify volume/bucket creation time,
+   * which also uses {@link Instant#ofEpochMilli(long)}.
+   *
+   * @return current time as {@code Instant};
+   */
+  public static Instant getTestStartTime() {
+    return Instant.ofEpochMilli(System.currentTimeMillis());
   }
 
   /**

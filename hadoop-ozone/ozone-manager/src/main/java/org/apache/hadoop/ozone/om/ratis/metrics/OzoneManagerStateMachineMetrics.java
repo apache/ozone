@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.ratis.metrics;
 
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
@@ -61,16 +60,6 @@ public final class OzoneManagerStateMachineMetrics implements MetricsSource {
           metrics);
       return instance;
     }
-  }
-
-  @VisibleForTesting
-  public long getApplyTransactionMapSize() {
-    return applyTransactionMapSize.value();
-  }
-
-  @VisibleForTesting
-  public long getRatisTransactionMapSize() {
-    return ratisTransactionMapSize.value();
   }
 
   public void updateApplyTransactionMapSize(long size) {

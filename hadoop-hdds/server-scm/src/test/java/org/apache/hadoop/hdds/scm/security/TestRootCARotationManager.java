@@ -72,8 +72,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyString;
-import static org.mockito.Mockito.anyObject;
 import static org.slf4j.event.Level.INFO;
 
 /**
@@ -135,7 +135,7 @@ public class TestRootCARotationManager {
     when(sequenceIdGenerator.getNextId(anyString())).thenReturn(2L);
     when(scm.getScmStorageConfig()).thenReturn(scmStorageConfig);
     when(scm.getSecurityProtocolServer()).thenReturn(scmSecurityProtocolServer);
-    doNothing().when(scmSecurityProtocolServer).setRootCertificateServer(anyObject());
+    doNothing().when(scmSecurityProtocolServer).setRootCertificateServer(any());
     doNothing().when(handler).rotationPrepare(anyString());
     when(scm.getStatefulServiceStateManager()).thenReturn(statefulServiceStateManager);
     when(statefulServiceStateManager.readConfiguration(anyString())).thenReturn(null);

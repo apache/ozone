@@ -32,11 +32,11 @@ import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.when;
 
 /**
  * Unit tests to validate the TestListInfoSubCommand class includes the
@@ -68,10 +68,8 @@ public class TestListInfoSubcommand {
   public void testDataNodeOperationalStateAndHealthIncludedInOutput()
       throws Exception {
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.queryNode(any(), any(), any(), any()))
-        .thenAnswer(invocation -> getNodeDetails());
-    Mockito.when(scmClient.listPipelines())
-        .thenReturn(new ArrayList<>());
+    when(scmClient.queryNode(any(), any(), any(), any())).thenAnswer(invocation -> getNodeDetails());
+    when(scmClient.listPipelines()).thenReturn(new ArrayList<>());
 
     cmd.execute(scmClient);
 
