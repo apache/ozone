@@ -234,7 +234,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
             if (LOG.isDebugEnabled()) {
               LOG.debug("sendCommandAsync {}", message);
             }
-            return getClient().async().send(message, RaftProtos.ReplicationLevel.MAJORITY_COMMITTED);
+            return getClient().async().send(message, RaftProtos.ReplicationLevel.ALL_COMMITTED);
           }
 
         }
