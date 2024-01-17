@@ -667,8 +667,12 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       if (sstFilteringService != null) {
         sstFilteringService.getBootstrapStateLock().lock();
       }
-      rocksDbCheckpointDiffer.getBootstrapStateLock().lock();
-      snapshotDeletingService.getBootstrapStateLock().lock();
+      if (rocksDbCheckpointDiffer != null) {
+        rocksDbCheckpointDiffer.getBootstrapStateLock().lock();
+      }
+      if (snapshotDeletingService != null) {
+        snapshotDeletingService.getBootstrapStateLock().lock();
+      }
 
       // Then wait for the double buffer to be flushed.
       om.awaitDoubleBufferFlush();
@@ -677,8 +681,12 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
     @Override
     public void unlock() {
-      snapshotDeletingService.getBootstrapStateLock().unlock();
-      rocksDbCheckpointDiffer.getBootstrapStateLock().unlock();
+      if (snapshotDeletingService != null) {
+        snapshotDeletingService.getBootstrapStateLock().unlock();
+      }
+      if (rocksDbCheckpointDiffer != null) {
+        rocksDbCheckpointDiffer.getBootstrapStateLock().unlock();
+      }
       if (sstFilteringService != null) {
         sstFilteringService.getBootstrapStateLock().unlock();
       }
