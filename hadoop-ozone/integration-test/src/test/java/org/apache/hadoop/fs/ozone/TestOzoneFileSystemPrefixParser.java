@@ -35,10 +35,11 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.Assertions;
 
 import java.io.IOException;
 import java.net.URI;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test Ozone Prefix Parser.
@@ -115,18 +116,12 @@ public class TestOzoneFileSystemPrefixParser {
   private void assertPrefixStats(PrefixParser parser, int volumeCount,
       int bucketCount, int intermediateDirCount, int nonExistentDirCount,
       int fileCount, int dirCount) {
-    Assertions.assertEquals(volumeCount,
-        parser.getParserStats(PrefixParser.Types.VOLUME));
-    Assertions.assertEquals(bucketCount,
-        parser.getParserStats(PrefixParser.Types.BUCKET));
-    Assertions.assertEquals(intermediateDirCount,
-        parser.getParserStats(PrefixParser.Types.INTERMEDIATE_DIRECTORY));
-    Assertions.assertEquals(nonExistentDirCount,
-        parser.getParserStats(PrefixParser.Types.NON_EXISTENT_DIRECTORY));
-    Assertions.assertEquals(fileCount,
-        parser.getParserStats(PrefixParser.Types.FILE));
-    Assertions.assertEquals(dirCount,
-        parser.getParserStats(PrefixParser.Types.DIRECTORY));
+    assertEquals(volumeCount, parser.getParserStats(PrefixParser.Types.VOLUME));
+    assertEquals(bucketCount, parser.getParserStats(PrefixParser.Types.BUCKET));
+    assertEquals(intermediateDirCount, parser.getParserStats(PrefixParser.Types.INTERMEDIATE_DIRECTORY));
+    assertEquals(nonExistentDirCount, parser.getParserStats(PrefixParser.Types.NON_EXISTENT_DIRECTORY));
+    assertEquals(fileCount, parser.getParserStats(PrefixParser.Types.FILE));
+    assertEquals(dirCount, parser.getParserStats(PrefixParser.Types.DIRECTORY));
   }
 
   private void testPrefixParseWithInvalidPaths() throws Exception {

@@ -47,7 +47,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,6 +61,9 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZ
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_PATH_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -132,7 +134,7 @@ public class TestReconInsightsForDeletedDirectories {
         fs.delete(fileStatus.getPath(), true);
       }
     } catch (IOException ex) {
-      Assertions.fail("Failed to cleanup files.");
+      fail("Failed to cleanup files.");
     }
   }
 
@@ -201,7 +203,7 @@ public class TestReconInsightsForDeletedDirectories {
     }
 
     if (directoryObjectId == null) {
-      Assertions.fail("directoryObjectId is null. Test case cannot proceed.");
+      fail("directoryObjectId is null. Test case cannot proceed.");
     } else {
       // Retrieve Namespace Summary for dir1 from Recon.
       ReconNamespaceSummaryManagerImpl namespaceSummaryManager =
@@ -210,8 +212,8 @@ public class TestReconInsightsForDeletedDirectories {
       NSSummary summary =
           namespaceSummaryManager.getNSSummary(directoryObjectId);
       // Assert that the directory dir1 has 10 sub-files and size of 1000 bytes.
-      Assertions.assertEquals(10, summary.getNumOfFiles());
-      Assertions.assertEquals(10, summary.getSizeOfFiles());
+      assertEquals(10, summary.getNumOfFiles());
+      assertEquals(10, summary.getSizeOfFiles());
     }
 
     // Delete the entire directory dir1.
@@ -238,7 +240,7 @@ public class TestReconInsightsForDeletedDirectories {
     KeyInsightInfoResponse entity =
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
     // Assert the size of deleted directory is 10.
-    Assertions.assertEquals(10, entity.getUnreplicatedDataSize());
+    assertEquals(10, entity.getUnreplicatedDataSize());
 
     // Cleanup the tables.
     cleanupTables();
@@ -327,7 +329,7 @@ public class TestReconInsightsForDeletedDirectories {
     KeyInsightInfoResponse entity =
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
     // Assert the size of deleted directory is 3.
-    Assertions.assertEquals(3, entity.getUnreplicatedDataSize());
+    assertEquals(3, entity.getUnreplicatedDataSize());
 
     // Cleanup the tables.
     cleanupTables();
@@ -368,7 +370,7 @@ public class TestReconInsightsForDeletedDirectories {
     fs.delete(rootDir, true);
 
     // Verify that the directory is deleted
-    Assertions.assertFalse(fs.exists(rootDir), "Directory was not deleted");
+    assertFalse(fs.exists(rootDir), "Directory was not deleted");
 
     // Sync data from Ozone Manager to Recon.
     syncDataFromOM();
@@ -389,7 +391,7 @@ public class TestReconInsightsForDeletedDirectories {
     KeyInsightInfoResponse entity =
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
     // Assert the size of deleted directory is 100.
-    Assertions.assertEquals(100, entity.getUnreplicatedDataSize());
+    assertEquals(100, entity.getUnreplicatedDataSize());
 
     // Cleanup the tables.
     cleanupTables();
@@ -471,7 +473,7 @@ public class TestReconInsightsForDeletedDirectories {
       LOG.info("{} actual row count={}, expectedCount={}", table.getName(),
           count, expectedCount);
     } catch (IOException ex) {
-      Assertions.fail("Test failed with: " + ex);
+      fail("Test failed with: " + ex);
     }
     return count == expectedCount;
   }
