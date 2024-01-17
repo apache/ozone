@@ -108,6 +108,8 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
           "Bucket layout couldn't be verified for path: " + ofsPath +
               ". Exception: " + e);
       return false;
+    } finally {
+      ozoneClient.close();
     }
   }
 
@@ -137,6 +139,8 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
           "Bucket layout couldn't be verified for path: " + ofsPath +
               ". Exception: " + e);
       return false;
+    } finally {
+      ozoneClient.close();
     }
   }
 
@@ -165,6 +169,8 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
           "Bucket layout couldn't be verified for path: " + ofsPath +
               ". Exception: " + e);
       return false;
+    } finally {
+      ozoneClient.close();
     }
   }
 
