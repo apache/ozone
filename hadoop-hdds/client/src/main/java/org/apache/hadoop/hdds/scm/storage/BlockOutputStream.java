@@ -589,7 +589,9 @@ public class BlockOutputStream extends OutputStream {
       executePutBlock(true, true);
     }
     waitOnFlushFutures();
-//    watchForCommit(false);
+    // No need to call watchForCommit here since Ratis client send() call
+    // alone should suffice with a small API change. See RATIS-1994
+
     // just check again if the exception is hit while waiting for the
     // futures to ensure flush has indeed succeeded
 
