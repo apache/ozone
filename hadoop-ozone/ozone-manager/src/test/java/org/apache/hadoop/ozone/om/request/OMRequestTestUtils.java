@@ -1327,21 +1327,22 @@ public final class OMRequestTestUtils {
 
   /**
    * Create OMRequest for Rename Snapshot.
+   *
    * @param volumeName vol to be used
    * @param bucketName bucket to be used
-   * @param fromSnapshotName name of the snapshot to be renamed
-   * @param toSnapshotName new name to be used for the snapshot
+   * @param snapshotOldName Old name of the snapshot
+   * @param snapshotNewName New name of the snapshot
    */
   public static OMRequest renameSnapshotRequest(String volumeName,
                                                 String bucketName,
-                                                String fromSnapshotName,
-                                                String toSnapshotName) {
+                                                String snapshotOldName,
+                                                String snapshotNewName) {
     OzoneManagerProtocolProtos.RenameSnapshotRequest renameSnapshotRequest =
         OzoneManagerProtocolProtos.RenameSnapshotRequest.newBuilder()
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
-            .setFromSnapshotName(fromSnapshotName)
-            .setToSnapshotName(toSnapshotName)
+            .setSnapshotOldName(snapshotOldName)
+            .setSnapshotNewName(snapshotNewName)
             .build();
 
     OzoneManagerProtocolProtos.UserInfo userInfo =

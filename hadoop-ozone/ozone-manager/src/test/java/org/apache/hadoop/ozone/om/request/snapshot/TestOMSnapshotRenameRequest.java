@@ -234,30 +234,31 @@ public class TestOMSnapshotRenameRequest {
     assertEquals(bucketUsedBytes,
         snapshotInfoProto.getReferencedReplicatedSize());
 
-    SnapshotInfo snapshotInfoFromProto = getFromProtobuf(snapshotInfoProto);
+    SnapshotInfo snapshotInfoOldProto = getFromProtobuf(snapshotInfoProto);
 
     String key2 = getTableKey(volumeName, bucketName, snapshotName2);
 
     // Get value from cache
-    SnapshotInfo newNameSnapshotInfoInCache =
+    SnapshotInfo snapshotInfoNewInCache =
         omMetadataManager.getSnapshotInfoTable().get(key2);
-    assertNotNull(newNameSnapshotInfoInCache);
-    assertEquals(snapshotInfoFromProto, newNameSnapshotInfoInCache);
+    assertNotNull(snapshotInfoNewInCache);
+    assertEquals(snapshotInfoOldProto, snapshotInfoNewInCache);
+    assertEquals(snapshotInfo.getSnapshotId(), snapshotInfoNewInCache.getSnapshotId());
 
-    SnapshotInfo oldNameSnapshotInfoInCache =
+    SnapshotInfo snapshotInfoOldInCache =
         omMetadataManager.getSnapshotInfoTable().get(key);
-    assertNull(oldNameSnapshotInfoInCache);
+    assertNull(snapshotInfoOldInCache);
   }
 
   @Test
   public void testEntryExists() throws Exception {
     when(ozoneManager.isAdmin(any())).thenReturn(true);
 
-    String keyFrom = getTableKey(volumeName, bucketName, snapshotName1);
-    String keyTo = getTableKey(volumeName, bucketName, snapshotName2);
+    String keyNameOld = getTableKey(volumeName, bucketName, snapshotName1);
+    String keyNameNew = getTableKey(volumeName, bucketName, snapshotName2);
 
-    assertNull(omMetadataManager.getSnapshotInfoTable().get(keyFrom));
-    assertNull(omMetadataManager.getSnapshotInfoTable().get(keyTo));
+    assertNull(omMetadataManager.getSnapshotInfoTable().get(keyNameOld));
+    assertNull(omMetadataManager.getSnapshotInfoTable().get(keyNameNew));
 
     // First make sure we have two snapshots.
     OzoneManagerProtocolProtos.OMRequest createOmRequest =
@@ -272,8 +273,8 @@ public class TestOMSnapshotRenameRequest {
         TestOMSnapshotCreateRequest.doPreExecute(createOmRequest, ozoneManager);
     omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 2);
 
-    assertNotNull(omMetadataManager.getSnapshotInfoTable().get(keyFrom));
-    assertNotNull(omMetadataManager.getSnapshotInfoTable().get(keyTo));
+    assertNotNull(omMetadataManager.getSnapshotInfoTable().get(keyNameOld));
+    assertNotNull(omMetadataManager.getSnapshotInfoTable().get(keyNameNew));
 
     // Now try renaming and get an error.
     OzoneManagerProtocolProtos.OMRequest omRequest =
@@ -283,8 +284,8 @@ public class TestOMSnapshotRenameRequest {
     OMClientResponse omClientResponse =
         omSnapshotRenameRequest.validateAndUpdateCache(ozoneManager, 3);
 
-    assertNotNull(omMetadataManager.getSnapshotInfoTable().get(keyFrom));
-    assertNotNull(omMetadataManager.getSnapshotInfoTable().get(keyTo));
+    assertNotNull(omMetadataManager.getSnapshotInfoTable().get(keyNameOld));
+    assertNotNull(omMetadataManager.getSnapshotInfoTable().get(keyNameNew));
 
     OzoneManagerProtocolProtos.OMResponse omResponse = omClientResponse.getOMResponse();
     assertNotNull(omResponse.getRenameSnapshotResponse());
@@ -296,11 +297,11 @@ public class TestOMSnapshotRenameRequest {
   public void testEntryNotFound() throws Exception {
     when(ozoneManager.isAdmin(any())).thenReturn(true);
 
-    String keyFrom = getTableKey(volumeName, bucketName, snapshotName1);
-    String keyTo = getTableKey(volumeName, bucketName, snapshotName2);
+    String keyNameOld = getTableKey(volumeName, bucketName, snapshotName1);
+    String keyNameNew = getTableKey(volumeName, bucketName, snapshotName2);
 
-    assertNull(omMetadataManager.getSnapshotInfoTable().get(keyFrom));
-    assertNull(omMetadataManager.getSnapshotInfoTable().get(keyTo));
+    assertNull(omMetadataManager.getSnapshotInfoTable().get(keyNameOld));
+    assertNull(omMetadataManager.getSnapshotInfoTable().get(keyNameNew));
 
     // Now try renaming and get an error.
     OzoneManagerProtocolProtos.OMRequest omRequest =
@@ -310,8 +311,8 @@ public class TestOMSnapshotRenameRequest {
     OMClientResponse omClientResponse =
         omSnapshotRenameRequest.validateAndUpdateCache(ozoneManager, 3);
 
-    assertNull(omMetadataManager.getSnapshotInfoTable().get(keyFrom));
-    assertNull(omMetadataManager.getSnapshotInfoTable().get(keyTo));
+    assertNull(omMetadataManager.getSnapshotInfoTable().get(keyNameOld));
+    assertNull(omMetadataManager.getSnapshotInfoTable().get(keyNameNew));
 
     OzoneManagerProtocolProtos.OMResponse omResponse = omClientResponse.getOMResponse();
     assertNotNull(omResponse.getRenameSnapshotResponse());

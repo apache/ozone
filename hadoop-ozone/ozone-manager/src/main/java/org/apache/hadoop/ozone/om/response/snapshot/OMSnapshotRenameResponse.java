@@ -34,17 +34,17 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 @CleanupTableInfo(cleanupTables = {SNAPSHOT_INFO_TABLE})
 public class OMSnapshotRenameResponse extends OMClientResponse {
 
-  private String fromName;
-  private String toName;
-  private SnapshotInfo renameInfo;
+  private String snapshotOldName;
+  private String snapshotNewName;
+  private SnapshotInfo renamedInfo;
 
   public OMSnapshotRenameResponse(OzoneManagerProtocolProtos.OMResponse omResponse,
-                                  String fromName, String toName,
-                                  @Nonnull SnapshotInfo renameInfo) {
+                                  String snapshotOldName, String snapshotNewName,
+                                  @Nonnull SnapshotInfo renamedInfo) {
     super(omResponse);
-    this.fromName = fromName;
-    this.toName = toName;
-    this.renameInfo = renameInfo;
+    this.snapshotOldName = snapshotOldName;
+    this.snapshotNewName = snapshotNewName;
+    this.renamedInfo = renamedInfo;
   }
 
   /**
@@ -60,8 +60,8 @@ public class OMSnapshotRenameResponse extends OMClientResponse {
   protected void addToDBBatch(OMMetadataManager omMetadataManager, BatchOperation batchOperation)
       throws IOException {
     omMetadataManager.getSnapshotInfoTable()
-        .putWithBatch(batchOperation, toName, renameInfo);
+        .putWithBatch(batchOperation, snapshotNewName, renamedInfo);
     omMetadataManager.getSnapshotInfoTable()
-        .deleteWithBatch(batchOperation, fromName);
+        .deleteWithBatch(batchOperation, snapshotOldName);
   }
 }

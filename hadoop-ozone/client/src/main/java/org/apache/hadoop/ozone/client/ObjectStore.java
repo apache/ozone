@@ -567,17 +567,17 @@ public class ObjectStore {
 
   /**
    * Rename snapshot.
+   *
    * @param volumeName vol to be used
    * @param bucketName bucket to be used
-   * @param fromSnapshotName name of the snapshot to be renamed
-   * @param toSnapshotName new name to be used for the snapshot
+   * @param snapshotOldName Old name of the snapshot
+   * @param snapshotNewName New name of the snapshot
    *
    * @throws IOException
    */
   public void renameSnapshot(String volumeName,
-      String bucketName, String fromSnapshotName,
-      String toSnapshotName) throws IOException {
-    proxy.renameSnapshot(volumeName, bucketName, fromSnapshotName, toSnapshotName);
+      String bucketName, String snapshotOldName, String snapshotNewName) throws IOException {
+    proxy.renameSnapshot(volumeName, bucketName, snapshotOldName, snapshotNewName);
   }
 
   /**

@@ -30,8 +30,9 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -69,9 +70,9 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
     final RenameSnapshotRequest renameSnapshotRequest =
         omRequest.getRenameSnapshotRequest();
 
-    final String newSnapshotName = renameSnapshotRequest.getToSnapshotName();
+    final String snapshotNewName = renameSnapshotRequest.getSnapshotNewName();
 
-    OmUtils.validateSnapshotName(newSnapshotName);
+    OmUtils.validateSnapshotName(snapshotNewName);
 
     String volumeName = renameSnapshotRequest.getVolumeName();
     String bucketName = renameSnapshotRequest.getBucketName();
@@ -94,8 +95,8 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
             RenameSnapshotRequest.newBuilder()
                 .setVolumeName(volumeName)
                 .setBucketName(bucketName)
-                .setToSnapshotName(newSnapshotName)
-                .setFromSnapshotName(renameSnapshotRequest.getFromSnapshotName())
+                .setSnapshotNewName(snapshotNewName)
+                .setSnapshotOldName(renameSnapshotRequest.getSnapshotOldName())
                 .setRenameTime(Time.now()));
 
     return omRequestBuilder.build();
@@ -109,7 +110,8 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
     boolean acquiredSnapshotOldLock = false;
     boolean acquiredSnapshotNewLock = false;
     Exception exception = null;
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
+        ozoneManager.getMetadataManager();
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
@@ -123,11 +125,10 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
 
     final String volumeName = request.getVolumeName();
     final String bucketName = request.getBucketName();
-    final String newSnapshotName = request.getToSnapshotName();
-    final String oldSnapshotName = request.getFromSnapshotName();
+    final String snapshotNewName = request.getSnapshotNewName();
+    final String snapshotOldName = request.getSnapshotOldName();
 
-    SnapshotInfo fromSnapshotInfo = null;
-    SnapshotInfo toSnapshotInfo = null;
+    SnapshotInfo snapshotOldInfo = null;
 
     try {
       // Acquire bucket lock
@@ -137,38 +138,34 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
       acquiredBucketLock = getOmLockDetails().isLockAcquired();
 
       mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(SNAPSHOT_LOCK,
-                                                       volumeName, bucketName, oldSnapshotName));
+                                                       volumeName, bucketName, snapshotOldName));
       acquiredSnapshotOldLock = getOmLockDetails().isLockAcquired();
 
       mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(SNAPSHOT_LOCK,
-                                                       volumeName, bucketName, newSnapshotName));
+                                                       volumeName, bucketName, snapshotNewName));
       acquiredSnapshotNewLock = getOmLockDetails().isLockAcquired();
 
       // Retrieve SnapshotInfo from the table
-      String toTableKey = SnapshotInfo.getTableKey(volumeName, bucketName,
-                                                    newSnapshotName);
-      toSnapshotInfo =
-          omMetadataManager.getSnapshotInfoTable().get(toTableKey);
+      String snapshotNewTableKey = SnapshotInfo.getTableKey(volumeName, bucketName, snapshotNewName);
 
-      if (toSnapshotInfo != null) {
-        // Snapshot does not exist
-        throw new OMException("Snapshot with name " + newSnapshotName + "already exist",
+      if (omMetadataManager.getSnapshotInfoTable().isExist(snapshotNewTableKey)) {
+        throw new OMException("Snapshot with name " + snapshotNewName + "already exist",
             FILE_ALREADY_EXISTS);
       }
 
       // Retrieve SnapshotInfo from the table
-      String fromTableKey = SnapshotInfo.getTableKey(volumeName, bucketName,
-                                                 oldSnapshotName);
-      fromSnapshotInfo =
-          omMetadataManager.getSnapshotInfoTable().get(fromTableKey);
+      String snapshotOldTableKey = SnapshotInfo.getTableKey(volumeName, bucketName,
+                                                 snapshotOldName);
+      snapshotOldInfo =
+          omMetadataManager.getSnapshotInfoTable().get(snapshotOldTableKey);
 
-      if (fromSnapshotInfo == null) {
+      if (snapshotOldInfo == null) {
         // Snapshot does not exist
-        throw new OMException("Snapshot with name " + oldSnapshotName + "does not exist",
+        throw new OMException("Snapshot with name " + snapshotOldName + "does not exist",
             FILE_NOT_FOUND);
       }
 
-      switch (fromSnapshotInfo.getSnapshotStatus()) {
+      switch (snapshotOldInfo.getSnapshotStatus()) {
       case SNAPSHOT_DELETED:
         throw new OMException("Snapshot is already deleted. "
             + "Pending reclamation.", FILE_NOT_FOUND);
@@ -180,21 +177,26 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
             FILE_NOT_FOUND);
       }
 
-      fromSnapshotInfo.setName(newSnapshotName);
+      snapshotOldInfo.setName(snapshotNewName);
 
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(
-          new CacheKey<>(fromTableKey),
+          new CacheKey<>(snapshotOldTableKey),
           CacheValue.get(termIndex.getIndex()));
 
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(
-          new CacheKey<>(toTableKey),
-          CacheValue.get(termIndex.getIndex(), fromSnapshotInfo));
+          new CacheKey<>(snapshotNewTableKey),
+          CacheValue.get(termIndex.getIndex(), snapshotOldInfo));
+
+      updateSnapshotInChainManager(omMetadataManager, snapshotOldInfo);
+
+      ozoneManager.getOmSnapshotManager().getSnapshotCache().invalidate(snapshotOldTableKey);
 
       omResponse.setRenameSnapshotResponse(
           OzoneManagerProtocolProtos.RenameSnapshotResponse.newBuilder()
-              .setSnapshotInfo(fromSnapshotInfo.getProtobuf()));
+              .setSnapshotInfo(snapshotOldInfo.getProtobuf()));
       omClientResponse = new OMSnapshotRenameResponse(
-          omResponse.build(), fromTableKey, toTableKey, fromSnapshotInfo);
+          omResponse.build(), snapshotOldTableKey, snapshotNewTableKey, snapshotOldInfo);
+
     } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new OMSnapshotRenameResponse(
@@ -202,11 +204,11 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
     } finally {
       if (acquiredSnapshotNewLock) {
         mergeOmLockDetails(omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_LOCK, volumeName,
-                                                     bucketName, newSnapshotName));
+                                                     bucketName, snapshotNewName));
       }
       if (acquiredSnapshotOldLock) {
         mergeOmLockDetails(omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_LOCK, volumeName,
-                                                     bucketName, oldSnapshotName));
+                                                     bucketName, snapshotOldName));
       }
       if (acquiredBucketLock) {
         mergeOmLockDetails(omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
@@ -217,15 +219,25 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
       }
     }
 
-    if (fromSnapshotInfo == null) {
+    if (snapshotOldInfo == null) {
       // Dummy SnapshotInfo for logging and audit logging when erred
-      fromSnapshotInfo = SnapshotInfo.newInstance(volumeName, bucketName,
-                                              oldSnapshotName, null, Time.now());
+      snapshotOldInfo = SnapshotInfo.newInstance(volumeName, bucketName,
+                                              snapshotOldName, null, Time.now());
     }
 
     // Perform audit logging outside the lock
     auditLog(auditLogger, buildAuditMessage(OMAction.RENAME_SNAPSHOT,
-                                            fromSnapshotInfo.toAuditMap(), exception, userInfo));
+                                            snapshotOldInfo.toAuditMap(), exception, userInfo));
     return omClientResponse;
   }
+
+  private void updateSnapshotInChainManager(OmMetadataManagerImpl omMetadataManager, SnapshotInfo snapshotInfo) {
+    synchronized (omMetadataManager.getSnapshotChainManager()) {
+      SnapshotChainManager snapshotChainManager =
+          omMetadataManager.getSnapshotChainManager();
+
+      snapshotChainManager.updateSnapshot(snapshotInfo);
+    }
+  }
+
 }

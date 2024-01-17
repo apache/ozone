@@ -89,8 +89,7 @@ public interface OzoneClientAdapter {
 
   String createSnapshot(String pathStr, String snapshotName) throws IOException;
 
-  void renameSnapshot(String pathStr, String oldSnapshotName,
-                      String newSnapshotName) throws IOException;
+  void renameSnapshot(String pathStr, String snapshotOldName, String snapshotNewName) throws IOException;
 
   void deleteSnapshot(String pathStr, String snapshotName) throws IOException;
 

@@ -1237,13 +1237,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    */
   @Override
   public void renameSnapshot(String volumeName, String bucketName,
-      String fromSnapshotName, String toSnapshotName) throws IOException {
+      String snapshotOldName, String snapshotNewName) throws IOException {
     RenameSnapshotRequest.Builder requestBuilder =
         RenameSnapshotRequest.newBuilder()
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
-            .setFromSnapshotName(fromSnapshotName)
-            .setToSnapshotName(toSnapshotName);
+            .setSnapshotOldName(snapshotOldName)
+            .setSnapshotNewName(snapshotNewName);
 
     final OMRequest omRequest = createOMRequest(Type.RenameSnapshot)
         .setRenameSnapshotRequest(requestBuilder)

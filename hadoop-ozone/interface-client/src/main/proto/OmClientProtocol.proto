@@ -1832,8 +1832,8 @@ message CreateSnapshotRequest {
 message RenameSnapshotRequest {
   optional string volumeName = 1;
   optional string bucketName = 2;
-  optional string fromSnapshotName = 3;
-  optional string toSnapshotName = 4;
+  optional string snapshotOldName = 3;
+  optional string snapshotNewName = 4;
   optional uint64 renameTime = 5;
 }
 

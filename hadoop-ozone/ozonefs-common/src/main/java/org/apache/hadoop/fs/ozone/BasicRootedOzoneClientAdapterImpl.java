@@ -1255,13 +1255,13 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   @Override
-  public void renameSnapshot(String pathStr, String oldSnapshotName, String newSnapshotName)
+  public void renameSnapshot(String pathStr, String snapshotOldName, String snapshotNewName)
       throws IOException {
     OFSPath ofsPath = new OFSPath(pathStr, config);
     proxy.renameSnapshot(ofsPath.getVolumeName(),
-                         ofsPath.getBucketName(),
-                         oldSnapshotName,
-                         newSnapshotName);
+        ofsPath.getBucketName(),
+        snapshotOldName,
+        snapshotNewName);
   }
 
   @Override
