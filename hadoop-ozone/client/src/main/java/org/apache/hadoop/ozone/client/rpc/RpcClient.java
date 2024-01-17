@@ -1213,6 +1213,7 @@ public class RpcClient implements ClientProtocol {
 
   }
 
+  @Deprecated
   @Override
   public void setEncryptionKey(String volumeName, String bucketName,
                                String bekName) throws IOException {

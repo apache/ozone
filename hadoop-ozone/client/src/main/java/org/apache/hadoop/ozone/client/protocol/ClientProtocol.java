@@ -997,6 +997,7 @@ public interface ClientProtocol {
   void setReplicationConfig(String volumeName, String bucketName,
       ReplicationConfig replicationConfig) throws IOException;
 
+  @Deprecated
   void setEncryptionKey(String volumeName, String bucketName,
                         String bekName) throws IOException;
 

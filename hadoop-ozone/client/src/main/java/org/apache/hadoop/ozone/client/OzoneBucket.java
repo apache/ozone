@@ -413,6 +413,7 @@ public class OzoneBucket extends WithMetadata {
     this.listCacheSize = listCacheSize;
   }
 
+  @Deprecated
   public void setEncryptionKey(String bekName) throws IOException {
     proxy.setEncryptionKey(volumeName, name, bekName);
     encryptionKeyName = bekName;

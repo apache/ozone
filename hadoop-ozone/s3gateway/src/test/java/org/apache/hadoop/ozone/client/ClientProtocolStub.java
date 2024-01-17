@@ -573,6 +573,7 @@ public class ClientProtocolStub implements ClientProtocol {
 
   }
 
+  @Deprecated
   @Override
   public void setEncryptionKey(String volumeName, String bucketName,
                                String bekName)

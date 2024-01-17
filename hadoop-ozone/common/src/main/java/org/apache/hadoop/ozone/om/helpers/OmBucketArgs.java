@@ -177,6 +177,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     this.quotaInNamespace = quotaInNamespace;
   }
 
+  @Deprecated
   private void setBucketEncryptionKey(BucketEncryptionKeyInfo bekInfo) {
     this.bekInfo = bekInfo;
   }
@@ -255,6 +256,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
       return this;
     }
 
+    @Deprecated
     public Builder setBucketEncryptionKey(BucketEncryptionKeyInfo info) {
       this.bekInfo = info;
       return this;

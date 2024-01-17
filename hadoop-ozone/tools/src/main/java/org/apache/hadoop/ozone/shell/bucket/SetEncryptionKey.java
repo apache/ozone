@@ -28,6 +28,7 @@ import java.io.IOException;
 /**
  * set encryption key of the bucket.
  */
+@Deprecated
 @CommandLine.Command(name = "set-encryption-key",
     description = "Set encryption key on bucket")
 public class SetEncryptionKey extends BucketHandler {
