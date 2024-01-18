@@ -46,7 +46,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -70,6 +69,10 @@ import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_SST_BACKUP_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DIR;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getColumnFamilyToKeyPrefixMap;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 
 /**
  * Tests Freon, with MiniOzoneCluster.
@@ -178,9 +181,8 @@ public class TestOMSnapshotDAG {
         "--validate-writes"
     );
 
-    Assertions.assertEquals(500L, randomKeyGenerator.getNumberOfKeysAdded());
-    Assertions.assertEquals(500L,
-        randomKeyGenerator.getSuccessfulValidationCount());
+    assertEquals(500L, randomKeyGenerator.getNumberOfKeysAdded());
+    assertEquals(500L, randomKeyGenerator.getSuccessfulValidationCount());
 
     List<OmVolumeArgs> volList = cluster.getOzoneManager()
         .listAllVolumes("", "", 2);
@@ -263,7 +265,7 @@ public class TestOMSnapshotDAG {
 
     // Same snapshot. Result should be empty list
     List<String> sstDiffList22 = differ.getSSTDiffList(snap2, snap2);
-    Assertions.assertTrue(sstDiffList22.isEmpty());
+    assertThat(sstDiffList22).isEmpty();
     snapDB1.close();
     snapDB2.close();
     snapDB3.close();
@@ -292,13 +294,13 @@ public class TestOMSnapshotDAG {
         ((RDBStore)((OmSnapshot)snapDB3.get())
             .getMetadataManager().getStore()).getDb().getManagedRocksDb());
     List<String> sstDiffList21Run2 = differ.getSSTDiffList(snap2, snap1);
-    Assertions.assertEquals(sstDiffList21, sstDiffList21Run2);
+    assertEquals(sstDiffList21, sstDiffList21Run2);
 
     List<String> sstDiffList32Run2 = differ.getSSTDiffList(snap3, snap2);
-    Assertions.assertEquals(sstDiffList32, sstDiffList32Run2);
+    assertEquals(sstDiffList32, sstDiffList32Run2);
 
     List<String> sstDiffList31Run2 = differ.getSSTDiffList(snap3, snap1);
-    Assertions.assertEquals(sstDiffList31, sstDiffList31Run2);
+    assertEquals(sstDiffList31, sstDiffList31Run2);
     snapDB1.close();
     snapDB2.close();
     snapDB3.close();
@@ -324,9 +326,8 @@ public class TestOMSnapshotDAG {
         "--validate-writes"
     );
 
-    Assertions.assertEquals(1000L, randomKeyGenerator.getNumberOfKeysAdded());
-    Assertions.assertEquals(1000L,
-        randomKeyGenerator.getSuccessfulValidationCount());
+    assertEquals(1000L, randomKeyGenerator.getNumberOfKeysAdded());
+    assertEquals(1000L, randomKeyGenerator.getSuccessfulValidationCount());
 
     String omMetadataDir =
         cluster.getOzoneManager().getConfiguration().get(OZONE_METADATA_DIRS);
@@ -338,7 +339,7 @@ public class TestOMSnapshotDAG {
     if (fileList != null) {
       for (File file : fileList) {
         if (file != null && file.isFile() && file.getName().endsWith(".log")) {
-          Assertions.assertEquals(0L, file.length());
+          assertEquals(0L, file.length());
         }
       }
     }
@@ -346,8 +347,8 @@ public class TestOMSnapshotDAG {
     Path sstBackupPath = Paths.get(omMetadataDir, OM_SNAPSHOT_DIFF_DIR,
         DB_COMPACTION_SST_BACKUP_DIR);
     fileList = sstBackupPath.toFile().listFiles();
-    Assertions.assertNotNull(fileList);
-    Assertions.assertEquals(0L, fileList.length);
+    assertNotNull(fileList);
+    assertEquals(0L, fileList.length);
   }
 
 }
