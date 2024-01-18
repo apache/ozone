@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.fs.LeaseRecoverable;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.SafeMode;
@@ -32,12 +33,15 @@ import org.apache.hadoop.fs.StorageStatistics;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.security.token.DelegationTokenIssuer;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.List;
+
+import static org.apache.hadoop.ozone.OzoneConsts.FORCE_LEASE_RECOVERY_ENV;
 
 /**
  * The Rooted Ozone Filesystem (OFS) implementation.
@@ -53,9 +57,12 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
     implements KeyProviderTokenIssuer, LeaseRecoverable, SafeMode {
 
   private OzoneFSStorageStatistics storageStatistics;
+  private boolean forceRecovery;
 
   public RootedOzoneFileSystem() {
     this.storageStatistics = new OzoneFSStorageStatistics();
+    String force = System.getProperty(FORCE_LEASE_RECOVERY_ENV);
+    forceRecovery = Strings.isNullOrEmpty(force) ? false : Boolean.parseBoolean(force);
   }
 
   @Override
@@ -139,9 +146,9 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
     LOG.trace("recoverLease() path:{}", f);
     Path qualifiedPath = makeQualified(f);
     String key = pathToKey(qualifiedPath);
-    List<OmKeyInfo> infoList = null;
+    OmKeyInfo keyInfo = null;
     try {
-      infoList = getAdapter().recoverFilePrepare(key);
+      keyInfo = getAdapter().recoverFilePrepare(key);
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.KEY_ALREADY_CLOSED) {
         // key is already closed, let's just return success
@@ -149,12 +156,26 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
       }
       throw e;
     }
-    // TODO: query DN to get the final block length
-    OmKeyInfo keyInfo = infoList.get(0);
+
+    // finalize the final block and get block length
+    List<OmKeyLocationInfo> locationInfoList = keyInfo.getLatestVersionLocations().getLocationList();
+    OmKeyLocationInfo block = locationInfoList.get(locationInfoList.size() - 1);
+    try {
+      block.setLength(getAdapter().finalizeBlock(block));
+    } catch (Throwable e) {
+      if (!forceRecovery) {
+        throw e;
+      }
+      LOG.warn("Failed to finalize block. Continue to recover the file since {} is enabled.",
+          FORCE_LEASE_RECOVERY_ENV, e);
+    }
+
+    // recover and commit file
+    long keyLength = locationInfoList.stream().mapToLong(OmKeyLocationInfo::getLength).sum();
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(keyInfo.getVolumeName())
         .setBucketName(keyInfo.getBucketName()).setKeyName(keyInfo.getKeyName())
-        .setReplicationConfig(keyInfo.getReplicationConfig()).setDataSize(keyInfo.getDataSize())
-        .setLocationInfoList(keyInfo.getLatestVersionLocations().getLocationList())
+        .setReplicationConfig(keyInfo.getReplicationConfig()).setDataSize(keyLength)
+        .setLocationInfoList(locationInfoList)
         .build();
     getAdapter().recoverFile(keyArgs);
     return true;

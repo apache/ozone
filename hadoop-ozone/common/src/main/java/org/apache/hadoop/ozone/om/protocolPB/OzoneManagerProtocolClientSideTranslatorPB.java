@@ -2447,7 +2447,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public List<OmKeyInfo> recoverLease(String volumeName, String bucketName, String keyName) throws IOException {
+  public OmKeyInfo recoverLease(String volumeName, String bucketName, String keyName) throws IOException {
     RecoverLeaseRequest recoverLeaseRequest =
         RecoverLeaseRequest.newBuilder()
             .setVolumeName(volumeName)
@@ -2460,10 +2460,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     RecoverLeaseResponse recoverLeaseResponse =
         handleError(submitRequest(omRequest)).getRecoverLeaseResponse();
-    ArrayList<OmKeyInfo> list = new ArrayList();
-    list.add(OmKeyInfo.getFromProtobuf(recoverLeaseResponse.getKeyInfo()));
-    list.add(OmKeyInfo.getFromProtobuf(recoverLeaseResponse.getOpenKeyInfo()));
-    return list;
+
+    return OmKeyInfo.getFromProtobuf(recoverLeaseResponse.getKeyInfo());
   }
 
   @Override

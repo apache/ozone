@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.om.request.file;
 
 import com.google.common.base.Preconditions;
 
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -31,6 +33,8 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmFSOFile;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -40,6 +44,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverLeaseRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RecoverLeaseResponse;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.RecoverLease;
@@ -55,7 +61,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -200,7 +208,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
 
     keyInfo = getKey(dbFileKey);
     if (keyInfo == null) {
-      throw new OMException("Key:" + keyName + " not found in keyTable", KEY_NOT_FOUND);
+      throw new OMException("Key:" + keyName + " not found in keyTable.", KEY_NOT_FOUND);
     }
 
     final String writerId = keyInfo.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
@@ -215,6 +223,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       throw new OMException("Open Key " + dbOpenFileKey + " not found in openKeyTable", KEY_NOT_FOUND);
     }
 
+    long openKeyModificationTime = openKeyInfo.getModificationTime();
     if (openKeyInfo.getMetadata().containsKey(OzoneConsts.LEASE_RECOVERY)) {
       LOG.debug("Key: " + keyName + " is already under recovery");
     } else {
@@ -227,15 +236,44 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       openKeyInfo.getMetadata().put(OzoneConsts.LEASE_RECOVERY, "true");
       openKeyInfo.setUpdateID(transactionLogIndex, ozoneManager.isRatisEnabled());
       openKeyInfo.setModificationTime(Time.now());
-      // Add to cache.
+      // add to cache.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           new CacheKey<>(dbOpenFileKey), CacheValue.get(transactionLogIndex, openKeyInfo));
     }
+    // override key name with normalizedKeyPath
     keyInfo.setKeyName(keyName);
     openKeyInfo.setKeyName(keyName);
-    RecoverLeaseResponse.Builder rb = RecoverLeaseResponse.newBuilder()
-        .setOpenKeyInfo(openKeyInfo.getNetworkProtobuf(getOmRequest().getVersion(), true))
-        .setKeyInfo(keyInfo.getNetworkProtobuf(getOmRequest().getVersion(), true));
+
+    OmKeyLocationInfoGroup keyLatestVersionLocations = keyInfo.getLatestVersionLocations();
+    List<OmKeyLocationInfo> keyLocationInfoList = keyLatestVersionLocations.getLocationList();
+    OmKeyLocationInfoGroup openKeyLatestVersionLocations = openKeyInfo.getLatestVersionLocations();
+    List<OmKeyLocationInfo> openKeyLocationInfoList = openKeyLatestVersionLocations.getLocationList();
+    OmKeyLocationInfo finalBlock;
+    boolean returnKeyInfo = true;
+    if (openKeyLocationInfoList.size() > keyLocationInfoList.size() &&
+        openKeyModificationTime > keyInfo.getModificationTime()) {
+      finalBlock = openKeyLocationInfoList.get(openKeyLocationInfoList.size() - 1);
+      returnKeyInfo = false;
+    } else {
+      finalBlock = keyLocationInfoList.get(keyLocationInfoList.size() - 1);
+    }
+
+    // set token to last block if enabled
+    if (ozoneManager.isGrpcBlockTokenEnabled()) {
+      String remoteUser = getRemoteUser().getShortUserName();
+      OzoneBlockTokenSecretManager secretManager = ozoneManager.getBlockTokenSecretManager();
+      finalBlock.setToken(secretManager.generateToken(remoteUser, finalBlock.getBlockID(),
+          EnumSet.of(READ, WRITE), finalBlock.getLength()));
+    }
+
+    // refresh last block pipeline
+    ContainerWithPipeline containerWithPipeline =
+        ozoneManager.getScmClient().getContainerClient().getContainerWithPipeline(finalBlock.getContainerID());
+    finalBlock.setPipeline(containerWithPipeline.getPipeline());
+
+    RecoverLeaseResponse.Builder rb = RecoverLeaseResponse.newBuilder();
+    rb.setKeyInfo(returnKeyInfo ? keyInfo.getNetworkProtobuf(getOmRequest().getVersion(), true) :
+        openKeyInfo.getNetworkProtobuf(getOmRequest().getVersion(), true));
 
     return rb.build();
   }

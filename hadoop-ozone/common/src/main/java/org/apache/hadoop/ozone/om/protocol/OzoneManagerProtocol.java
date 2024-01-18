@@ -1103,7 +1103,7 @@ public interface OzoneManagerProtocol
    * @return OmKeyInfo KeyInfo is file under recovery
    * @throws IOException if an error occurs
    */
-  List<OmKeyInfo> recoverLease(String volumeName, String bucketName, String keyName) throws IOException;
+  OmKeyInfo recoverLease(String volumeName, String bucketName, String keyName) throws IOException;
 
   /**
    * Update modification time and access time of a file.
