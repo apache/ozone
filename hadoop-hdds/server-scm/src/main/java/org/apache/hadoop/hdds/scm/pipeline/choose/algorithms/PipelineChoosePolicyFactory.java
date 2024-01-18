@@ -76,7 +76,7 @@ public final class PipelineChoosePolicyFactory {
       Class<? extends PipelineChoosePolicy> policyClass) throws SCMException {
     Constructor<? extends PipelineChoosePolicy> constructor;
     try {
-      constructor = policyClass.getDeclaredConstructor(NodeManager.class);
+      constructor = policyClass.getDeclaredConstructor();
       LOG.info("Create pipeline choose policy of type {}",
           policyClass.getCanonicalName());
     } catch (NoSuchMethodException e) {
@@ -88,7 +88,7 @@ public final class PipelineChoosePolicyFactory {
     }
 
     try {
-      return constructor.newInstance(nodeManager);
+      return constructor.newInstance().init(nodeManager);
     } catch (Exception e) {
       throw new RuntimeException("Failed to instantiate class " +
           policyClass.getCanonicalName() + " for " + e.getMessage());

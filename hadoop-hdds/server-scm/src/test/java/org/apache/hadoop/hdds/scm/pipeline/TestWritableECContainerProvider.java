@@ -113,9 +113,9 @@ public class TestWritableECContainerProvider {
         .collect(Collectors.toList());
     nodeManager = new MockNodeManager(cluster, datanodes, false, count);
 
-    policies.add(new RandomPipelineChoosePolicy(nodeManager));
-    policies.add(new HealthyPipelineChoosePolicy(nodeManager));
-    policies.add(new CapacityPipelineChoosePolicy(nodeManager));
+    policies.add(new RandomPipelineChoosePolicy());
+    policies.add(new HealthyPipelineChoosePolicy());
+    policies.add(new CapacityPipelineChoosePolicy().init(nodeManager));
     return policies;
   }
 

@@ -879,7 +879,7 @@ public class TestPipelineManagerImpl {
     ReplicationConfig repConfig =
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
     PipelineChoosePolicy pipelineChoosingPolicy
-        = new HealthyPipelineChoosePolicy(nodeManager);
+        = new HealthyPipelineChoosePolicy();
     ContainerManager containerManager
         = mock(ContainerManager.class);
     

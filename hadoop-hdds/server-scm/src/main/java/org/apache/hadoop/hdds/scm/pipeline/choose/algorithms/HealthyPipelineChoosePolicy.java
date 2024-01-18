@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.pipeline.choose.algorithms;
 
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
 import java.util.ArrayList;
@@ -31,11 +30,7 @@ import java.util.List;
  */
 public class HealthyPipelineChoosePolicy implements PipelineChoosePolicy {
 
-  private PipelineChoosePolicy randomPolicy;
-
-  public HealthyPipelineChoosePolicy(NodeManager nodeManager) {
-    randomPolicy = new RandomPipelineChoosePolicy(nodeManager);
-  }
+  private PipelineChoosePolicy randomPolicy = new RandomPipelineChoosePolicy();
 
   @Override
   public Pipeline choosePipeline(List<Pipeline> pipelineList,

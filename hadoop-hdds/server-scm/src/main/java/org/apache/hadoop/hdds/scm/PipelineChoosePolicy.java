@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
 import java.util.List;
@@ -25,6 +26,15 @@ import java.util.List;
  * A {@link PipelineChoosePolicy} support choosing pipeline from exist list.
  */
 public interface PipelineChoosePolicy {
+
+  /**
+   * Updates the policy with NodeManager.
+   * @return updated policy.
+   */
+  default PipelineChoosePolicy init(final NodeManager nodeManager) {
+    // override if the policy requires nodeManager
+    return this;
+  }
 
   /**
    * Given an initial list of pipelines, return one of the pipelines.

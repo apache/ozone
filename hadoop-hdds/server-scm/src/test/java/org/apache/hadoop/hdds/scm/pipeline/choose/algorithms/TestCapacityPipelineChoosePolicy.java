@@ -23,15 +23,16 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -48,18 +49,17 @@ public class TestCapacityPipelineChoosePolicy {
     }
     //          dn0   dn1   dn2   dn3
     // used       0   10    20    30
-    NodeManager mockNodeManager = Mockito.mock(NodeManager.class);
+    NodeManager mockNodeManager = mock(NodeManager.class);
     when(mockNodeManager.getNodeStat(datanodes.get(0)))
-        .thenReturn(new SCMNodeMetric(100L, 0L, 100L));
+        .thenReturn(new SCMNodeMetric(100L, 0, 100L, 0, 0));
     when(mockNodeManager.getNodeStat(datanodes.get(1)))
-        .thenReturn(new SCMNodeMetric(100L, 10L, 90L));
+        .thenReturn(new SCMNodeMetric(100L, 10L, 90L, 0, 0));
     when(mockNodeManager.getNodeStat(datanodes.get(2)))
-        .thenReturn(new SCMNodeMetric(100L, 20L, 80L));
+        .thenReturn(new SCMNodeMetric(100L, 20L, 80L, 0, 0));
     when(mockNodeManager.getNodeStat(datanodes.get(3)))
-        .thenReturn(new SCMNodeMetric(100L, 30L, 70L));
+        .thenReturn(new SCMNodeMetric(100L, 30L, 70L, 0 ,0));
 
-    CapacityPipelineChoosePolicy policy =
-        new CapacityPipelineChoosePolicy(mockNodeManager);
+    CapacityPipelineChoosePolicy policy = new CapacityPipelineChoosePolicy();
 
     // generate 4 pipelines, and every pipeline has 3 datanodes
     //
@@ -92,21 +92,14 @@ public class TestCapacityPipelineChoosePolicy {
     for (int i = 0; i < 1000; i++) {
       // choosePipeline
       Pipeline pipeline = policy.choosePipeline(pipelines, null);
-      Assertions.assertNotNull(pipeline);
+      assertNotNull(pipeline);
       selectedCount.put(pipeline, selectedCount.get(pipeline) + 1);
     }
 
     // The selected count from most to least should be :
     // pipeline3 > pipeline2 > pipeline1 > pipeline0
-    for (int i = 0; i < pipelines.size(); i++) {
-      System.out.println("pipeline" + i + " selected count: "
-          + selectedCount.get(pipelines.get(i)));
-    }
-    Assertions.assertTrue(selectedCount.get(pipelines.get(3))
-        > selectedCount.get(pipelines.get(2)));
-    Assertions.assertTrue(selectedCount.get(pipelines.get(2))
-        > selectedCount.get(pipelines.get(1)));
-    Assertions.assertTrue(selectedCount.get(pipelines.get(1))
-        > selectedCount.get(pipelines.get(0)));
+    assertThat(selectedCount.get(pipelines.get(3))).isGreaterThan(selectedCount.get(pipelines.get(2)));
+    assertThat(selectedCount.get(pipelines.get(2))).isGreaterThan(selectedCount.get(pipelines.get(1)));
+    assertThat(selectedCount.get(pipelines.get(1))).isGreaterThan(selectedCount.get(pipelines.get(0)));
   }
 }

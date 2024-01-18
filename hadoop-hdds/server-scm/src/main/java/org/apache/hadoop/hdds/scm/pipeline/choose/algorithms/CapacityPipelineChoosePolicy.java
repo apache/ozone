@@ -52,13 +52,18 @@ public class CapacityPipelineChoosePolicy implements PipelineChoosePolicy {
   private static final Logger LOG =
       LoggerFactory.getLogger(PipelineChoosePolicy.class);
 
-  private final NodeManager nodeManager;
+  private NodeManager nodeManager;
 
   private final PipelineChoosePolicy healthPolicy;
 
-  public CapacityPipelineChoosePolicy(NodeManager nodeManager) {
-    this.nodeManager = nodeManager;
-    healthPolicy = new HealthyPipelineChoosePolicy(nodeManager);
+  public CapacityPipelineChoosePolicy() {
+    healthPolicy = new HealthyPipelineChoosePolicy();
+  }
+
+  @Override
+  public PipelineChoosePolicy init(final NodeManager scmNodeManager) {
+    this.nodeManager = scmNodeManager;
+    return this;
   }
 
   @Override
