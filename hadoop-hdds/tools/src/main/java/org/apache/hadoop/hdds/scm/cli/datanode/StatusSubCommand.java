@@ -40,6 +40,8 @@ import java.util.concurrent.Callable;
 @MetaInfServices(SubcommandWithParent.class)
 public class StatusSubCommand implements Callable<Void>, SubcommandWithParent {
 
+  @CommandLine.ParentCommand
+  private DatanodeCommands parent;
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
 
@@ -47,6 +49,10 @@ public class StatusSubCommand implements Callable<Void>, SubcommandWithParent {
   public Void call() throws Exception {
     GenericCli.missingSubcommand(spec);
     return null;
+  }
+
+  public DatanodeCommands getParent() {
+    return parent;
   }
 
   @Override

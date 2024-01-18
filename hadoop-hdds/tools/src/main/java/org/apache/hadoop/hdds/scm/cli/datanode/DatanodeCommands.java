@@ -46,6 +46,9 @@ import java.util.concurrent.Callable;
 @MetaInfServices(SubcommandWithParent.class)
 public class DatanodeCommands implements Callable<Void>, SubcommandWithParent {
 
+  @CommandLine.ParentCommand
+  private OzoneAdmin parent;
+
   @Spec
   private CommandSpec spec;
 
@@ -53,6 +56,10 @@ public class DatanodeCommands implements Callable<Void>, SubcommandWithParent {
   public Void call() throws Exception {
     GenericCli.missingSubcommand(spec);
     return null;
+  }
+
+  public OzoneAdmin getParent() {
+    return parent;
   }
 
   @Override
