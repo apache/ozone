@@ -217,13 +217,16 @@ public abstract class TestOzoneManagerHA {
    */
   public static String createKey(OzoneBucket ozoneBucket) throws IOException {
     String keyName = "key" + RandomStringUtils.randomNumeric(5);
+    createKey(ozoneBucket, keyName);
+    return keyName;
+  }
+
+  public static void createKey(OzoneBucket ozoneBucket, String keyName) throws IOException {
     String data = "data" + RandomStringUtils.randomNumeric(5);
-    OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(keyName,
-        data.length(), ReplicationType.RATIS,
+    OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(keyName, data.length(), ReplicationType.RATIS,
         ReplicationFactor.ONE, new HashMap<>());
     ozoneOutputStream.write(data.getBytes(UTF_8), 0, data.length());
     ozoneOutputStream.close();
-    return keyName;
   }
 
   protected OzoneBucket setupBucket() throws Exception {
