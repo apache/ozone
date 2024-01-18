@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.request.bucket;
 
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;

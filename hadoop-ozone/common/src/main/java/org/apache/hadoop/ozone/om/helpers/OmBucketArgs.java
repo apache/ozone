@@ -178,8 +178,9 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
   }
 
   @Deprecated
-  private void setBucketEncryptionKey(BucketEncryptionKeyInfo bekInfo) {
-    this.bekInfo = bekInfo;
+  private void setBucketEncryptionKey(
+      BucketEncryptionKeyInfo bucketEncryptionKey) {
+    this.bekInfo = bucketEncryptionKey;
   }
 
   /**
