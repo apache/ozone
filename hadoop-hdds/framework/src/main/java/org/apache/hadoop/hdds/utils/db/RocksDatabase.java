@@ -774,11 +774,10 @@ public final class RocksDatabase implements Closeable {
 
   public ManagedRocksIterator newIterator(ColumnFamily family,
       boolean fillCache) throws IOException {
-    try (UncheckedAutoCloseable ignored = acquire()) {
-      ManagedReadOptions readOptions = new ManagedReadOptions();
+    try (UncheckedAutoCloseable ignored = acquire();
+         ManagedReadOptions readOptions = new ManagedReadOptions()) {
       readOptions.setFillCache(fillCache);
-      return managed(db.get().newIterator(family.getHandle(), readOptions),
-          readOptions);
+      return managed(db.get().newIterator(family.getHandle(), readOptions));
     }
   }
 

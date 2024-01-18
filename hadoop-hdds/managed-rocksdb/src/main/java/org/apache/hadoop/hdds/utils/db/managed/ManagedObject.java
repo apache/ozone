@@ -18,7 +18,6 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.RocksObject;
 
@@ -29,23 +28,11 @@ import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.tr
  * @param <T>
  */
 class ManagedObject<T extends RocksObject> implements AutoCloseable {
-
-  private static final AutoCloseable[] EMPTY_CLOSEABLES = new AutoCloseable[0];
-
   private final T original;
-  private final AutoCloseable[] baggage;
   private final UncheckedAutoCloseable leakTracker = track(this);
 
   ManagedObject(T original) {
-    this(original, EMPTY_CLOSEABLES);
-  }
-
-  /**
-   * @param baggage (optional) additional objects to be closed when this object is closed
-   */
-  ManagedObject(T original, AutoCloseable... baggage) {
     this.original = original;
-    this.baggage = baggage;
   }
 
   public T get() {
@@ -55,7 +42,6 @@ class ManagedObject<T extends RocksObject> implements AutoCloseable {
   @Override
   public void close() {
     original.close();
-    IOUtils.close(ManagedRocksObjectUtils.LOG, baggage);
     leakTracker.close();
   }
 }
