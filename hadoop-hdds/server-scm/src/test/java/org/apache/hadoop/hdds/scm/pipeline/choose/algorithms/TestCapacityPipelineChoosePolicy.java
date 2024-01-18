@@ -18,6 +18,7 @@ package org.apache.hadoop.hdds.scm.pipeline.choose.algorithms;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
@@ -39,8 +40,9 @@ import static org.mockito.Mockito.when;
  * Test for the capacity pipeline choose policy.
  */
 public class TestCapacityPipelineChoosePolicy {
+
   @Test
-  public void choosePipeline() throws Exception {
+  public void testChoosePipeline() throws Exception {
 
     // given 4 datanode
     List<DatanodeDetails> datanodes = new ArrayList<>();
@@ -59,7 +61,7 @@ public class TestCapacityPipelineChoosePolicy {
     when(mockNodeManager.getNodeStat(datanodes.get(3)))
         .thenReturn(new SCMNodeMetric(100L, 30L, 70L, 0 ,0));
 
-    CapacityPipelineChoosePolicy policy = new CapacityPipelineChoosePolicy();
+    PipelineChoosePolicy policy = new CapacityPipelineChoosePolicy().init(mockNodeManager);
 
     // generate 4 pipelines, and every pipeline has 3 datanodes
     //
