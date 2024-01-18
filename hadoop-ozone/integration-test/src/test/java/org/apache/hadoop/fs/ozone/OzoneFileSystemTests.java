@@ -30,8 +30,8 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Common test cases for Ozone file systems.
@@ -89,12 +89,10 @@ final class OzoneFileSystemTests {
         FileStatus fileStatus = iterator.next();
         iCount++;
         String filename = fileStatus.getPath().getName();
-        assertTrue(filename + " not found", paths.contains(filename));
+        assertThat(paths).contains(filename);
       }
     }
 
-    assertEquals(
-        "Total directories listed do not match the existing directories",
-        total, iCount);
+    assertEquals(total, iCount);
   }
 }

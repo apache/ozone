@@ -39,10 +39,8 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 
 import java.io.IOException;
@@ -65,9 +63,12 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doAnswer;
 
 /**
@@ -85,8 +86,8 @@ public class TestECOverReplicationHandler {
       CommandTargetOverloadedException {
     staleNode = null;
 
-    replicationManager = Mockito.mock(ReplicationManager.class);
-    Mockito.when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
+    replicationManager = mock(ReplicationManager.class);
+    when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocation -> {
           DatanodeDetails dd = invocation.getArgument(0);
           if (staleNode != null && staleNode.equals(dd)) {
@@ -202,9 +203,8 @@ public class TestECOverReplicationHandler {
     ContainerReplica toReturn = ReplicationTestUtil.createContainerReplica(
         container.containerID(), 1, IN_SERVICE,
         ContainerReplicaProto.State.CLOSED);
-    policy = Mockito.mock(PlacementPolicy.class);
-    Mockito.when(policy.replicasToRemoveToFixOverreplication(
-        Mockito.any(), Mockito.anyInt()))
+    policy = mock(PlacementPolicy.class);
+    when(policy.replicasToRemoveToFixOverreplication(any(), anyInt()))
         .thenReturn(ImmutableSet.of(toReturn));
     testOverReplicationWithIndexes(availableReplicas, Collections.emptyMap(),
         ImmutableList.of());
@@ -314,7 +314,7 @@ public class TestECOverReplicationHandler {
     try {
       ecORH.processAndSendCommands(availableReplicas, ImmutableList.of(),
           health, 1);
-      Assertions.fail("Expected CommandTargetOverloadedException");
+      fail("Expected CommandTargetOverloadedException");
     } catch (CommandTargetOverloadedException e) {
       // This is expected.
     }
@@ -329,8 +329,8 @@ public class TestECOverReplicationHandler {
     ECOverReplicationHandler ecORH =
         new ECOverReplicationHandler(policy, replicationManager);
     ContainerHealthResult.OverReplicatedHealthResult result =
-        Mockito.mock(ContainerHealthResult.OverReplicatedHealthResult.class);
-    Mockito.when(result.getContainerInfo()).thenReturn(container);
+        mock(ContainerHealthResult.OverReplicatedHealthResult.class);
+    when(result.getContainerInfo()).thenReturn(container);
 
     ecORH.processAndSendCommands(availableReplicas, pendingOps,
             result, 1);

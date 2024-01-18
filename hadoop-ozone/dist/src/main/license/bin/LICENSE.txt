@@ -423,7 +423,6 @@ Apache License 2.0
    org.eclipse.jetty:jetty-util-ajax
    org.eclipse.jetty:jetty-webapp
    org.eclipse.jetty:jetty-xml
-   org.hamcrest:hamcrest-all
    org.javassist:javassist
    org.jetbrains:annotations
    org.jetbrains.kotlin:kotlin-stdlib
@@ -442,7 +441,6 @@ Apache License 2.0
    org.xerial:sqlite-jdbc
    org.yaml:snakeyaml
    software.amazon.ion:ion-java
-   org.awaitility:awaitility
 
 MIT
 =====================

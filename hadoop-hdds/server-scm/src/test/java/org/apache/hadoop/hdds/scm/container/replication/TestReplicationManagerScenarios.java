@@ -44,12 +44,10 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.TestClock;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -70,6 +68,12 @@ import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * This class tests the replication manager using a set of scenarios defined in
@@ -115,7 +119,7 @@ public class TestReplicationManagerScenarios {
         .getResource(TEST_RESOURCE_PATH)
         .toURI())).listFiles();
     if (fileList == null) {
-      Assertions.fail("No test file resources found");
+      fail("No test file resources found");
       // Make findbugs happy.
       return Collections.emptyList();
     }
@@ -152,7 +156,7 @@ public class TestReplicationManagerScenarios {
       Set<String> names = new HashSet<>();
       for (Scenario scenario : scenarios) {
         if (!names.add(scenario.getDescription())) {
-          Assertions.fail("Duplicate test name: " + scenario.getDescription() + " in file: " + file);
+          fail("Duplicate test name: " + scenario.getDescription() + " in file: " + file);
         }
         scenario.setResourceName(file.toString());
       }
@@ -164,36 +168,36 @@ public class TestReplicationManagerScenarios {
   public void setup() throws IOException, NodeNotFoundException {
     configuration = new OzoneConfiguration();
     configuration.set(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "0s");
-    containerManager = Mockito.mock(ContainerManager.class);
+    containerManager = mock(ContainerManager.class);
 
-    scmContext = Mockito.mock(SCMContext.class);
-    nodeManager = Mockito.mock(NodeManager.class);
+    scmContext = mock(SCMContext.class);
+    nodeManager = mock(NodeManager.class);
 
     ratisPlacementPolicy = ReplicationTestUtil.getSimpleTestPlacementPolicy(nodeManager, configuration);
     ecPlacementPolicy = ReplicationTestUtil.getSimpleTestPlacementPolicy(nodeManager, configuration);
 
     commandsSent = new HashSet<>();
-    eventPublisher = Mockito.mock(EventPublisher.class);
-    Mockito.doAnswer(invocation -> {
+    eventPublisher = mock(EventPublisher.class);
+    doAnswer(invocation -> {
       commandsSent.add(Pair.of(invocation.getArgument(0),
           invocation.getArgument(1)));
       return null;
     }).when(nodeManager).addDatanodeCommand(any(), any());
 
-    legacyReplicationManager = Mockito.mock(LegacyReplicationManager.class);
+    legacyReplicationManager = mock(LegacyReplicationManager.class);
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
     containerReplicaPendingOps = new ContainerReplicaPendingOps(clock);
 
-    Mockito.when(containerManager.getContainerReplicas(Mockito.any(ContainerID.class))).thenAnswer(
+    when(containerManager.getContainerReplicas(any(ContainerID.class))).thenAnswer(
         invocation -> {
           ContainerID cid = invocation.getArgument(0);
           return containerReplicaMap.get(cid);
         });
 
-    Mockito.when(containerManager.getContainers()).thenAnswer(
+    when(containerManager.getContainers()).thenAnswer(
         invocation -> new ArrayList<>(containerInfoSet));
 
-    Mockito.when(nodeManager.getNodeStatus(any(DatanodeDetails.class)))
+    when(nodeManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocation -> {
           DatanodeDetails dn = invocation.getArgument(0);
           return NODE_STATUS_MAP.getOrDefault(dn, NodeStatus.inServiceHealthy());
@@ -203,14 +207,14 @@ public class TestReplicationManagerScenarios {
     for (SCMCommandProto.Type type : SCMCommandProto.Type.values()) {
       countMap.put(type, 0);
     }
-    Mockito.when(
+    when(
         nodeManager.getTotalDatanodeCommandCounts(any(DatanodeDetails.class),
             any(SCMCommandProto.Type.class), any(SCMCommandProto.Type.class)))
         .thenReturn(countMap);
 
     // Ensure that RM will run when asked.
-    Mockito.when(scmContext.isLeaderReady()).thenReturn(true);
-    Mockito.when(scmContext.isInSafeMode()).thenReturn(false);
+    when(scmContext.isLeaderReady()).thenReturn(true);
+    when(scmContext.isInSafeMode()).thenReturn(false);
     containerReplicaMap = new HashMap<>();
     containerInfoSet = new HashSet<>();
     ORIGINS.clear();
@@ -287,9 +291,9 @@ public class TestReplicationManagerScenarios {
     // Check the results in the report and queue against the expected results.
     assertExpectations(scenario, repReport);
     Expectation expectation = scenario.getExpectation();
-    Assertions.assertEquals(expectation.getUnderReplicatedQueue(), repQueue.underReplicatedQueueSize(),
+    assertEquals(expectation.getUnderReplicatedQueue(), repQueue.underReplicatedQueueSize(),
         "Test: " + scenario + ": Unexpected count for underReplicatedQueue");
-    Assertions.assertEquals(expectation.getOverReplicatedQueue(), repQueue.overReplicatedQueueSize(),
+    assertEquals(expectation.getOverReplicatedQueue(), repQueue.overReplicatedQueueSize(),
         "Test: " + scenario + ": Unexpected count for overReplicatedQueue");
 
     assertExpectedCommands(scenario, scenario.getCheckCommands());
@@ -297,7 +301,7 @@ public class TestReplicationManagerScenarios {
 
     ReplicationManagerReport roReport = new ReplicationManagerReport();
     replicationManager.checkContainerStatus(containerInfo, roReport);
-    Assertions.assertEquals(0, commandsSent.size());
+    assertEquals(0, commandsSent.size());
     assertExpectations(scenario, roReport);
 
     // Now run the replication manager execute phase, where we expect commands
@@ -315,14 +319,14 @@ public class TestReplicationManagerScenarios {
     Expectation expectation = scenario.getExpectation();
     for (ReplicationManagerReport.HealthState state :
         ReplicationManagerReport.HealthState.values()) {
-      Assertions.assertEquals(expectation.getExpected(state), report.getStat(state),
+      assertEquals(expectation.getExpected(state), report.getStat(state),
           "Test: " + scenario + ": Unexpected count for " + state);
     }
   }
 
   private void assertExpectedCommands(Scenario scenario,
       List<ExpectedCommands> expectedCommands) {
-    Assertions.assertEquals(expectedCommands.size(), commandsSent.size(),
+    assertEquals(expectedCommands.size(), commandsSent.size(),
         "Test: " + scenario + ": Unexpected count for commands sent");
     // Iterate the expected commands and check that they were all sent. If we
     // have a target datanode, then we need to check that the command was sent
@@ -349,7 +353,7 @@ public class TestReplicationManagerScenarios {
           }
         }
       }
-      Assertions.assertTrue(found, "Test: " + scenario + ": Expected command not sent: " + expectedCommand.getType());
+      assertTrue(found, "Test: " + scenario + ": Expected command not sent: " + expectedCommand.getType());
     }
   }
 
@@ -570,7 +574,7 @@ public class TestReplicationManagerScenarios {
       }
       DatanodeDetails datanodeDetails = DATANODE_ALIASES.get(this.datanode);
       if (datanodeDetails == null) {
-        Assertions.fail("Unable to find a datanode for the alias: " + datanode + " in the expected commands.");
+        fail("Unable to find a datanode for the alias: " + datanode + " in the expected commands.");
       }
       return datanodeDetails;
     }

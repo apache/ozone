@@ -18,9 +18,9 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
-import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
-import static org.apache.hadoop.test.MetricsAsserts.getDoubleGauge;
-import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.apache.ozone.test.MetricsAsserts.assertCounter;
+import static org.apache.ozone.test.MetricsAsserts.getDoubleGauge;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 
 import java.io.File;
 import java.io.IOException;
@@ -53,8 +53,8 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.util.ExitUtils;
@@ -64,9 +64,9 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 
 import org.apache.ratis.util.function.CheckedBiFunction;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.Assert;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Assertions;
 
 /**
  * This class tests the metrics of ContainerStateMachine.
@@ -76,7 +76,7 @@ public class TestCSMMetrics {
       GenericTestUtils.getTestDir("dfs").getAbsolutePath()
           + File.separator;
 
-  @BeforeClass
+  @BeforeAll
   public static void setup() {
     ExitUtils.disableSystemExit();
   }
@@ -142,7 +142,7 @@ public class TestCSMMetrics {
               pipeline, blockID, 1024);
       ContainerCommandResponseProto response =
           client.sendCommand(writeChunkRequest);
-      Assert.assertEquals(ContainerProtos.Result.SUCCESS,
+      Assertions.assertEquals(ContainerProtos.Result.SUCCESS,
           response.getResult());
 
       metric = getMetrics(CSMMetrics.SOURCE_NAME +
@@ -160,7 +160,7 @@ public class TestCSMMetrics {
           ContainerTestHelper.getReadChunkRequest(pipeline, writeChunkRequest
               .getWriteChunk());
       response = client.sendCommand(readChunkRequest);
-      Assert.assertEquals(ContainerProtos.Result.SUCCESS,
+      Assertions.assertEquals(ContainerProtos.Result.SUCCESS,
           response.getResult());
 
       metric = getMetrics(CSMMetrics.SOURCE_NAME +

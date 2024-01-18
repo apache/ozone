@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -42,6 +41,8 @@ import java.util.concurrent.TimeoutException;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests for RatisPipelineUtils.
@@ -80,7 +81,7 @@ public class TestRatisPipelineCreateAndDestroy {
     init(numOfDatanodes);
     // make sure two pipelines are created
     waitForPipelines(2);
-    Assertions.assertEquals(numOfDatanodes, pipelineManager.getPipelines(
+    assertEquals(numOfDatanodes, pipelineManager.getPipelines(
         RatisReplicationConfig.getInstance(
             ReplicationFactor.ONE)).size());
 
@@ -102,7 +103,7 @@ public class TestRatisPipelineCreateAndDestroy {
     // make sure two pipelines are created
     waitForPipelines(2);
     // No Factor ONE pipeline is auto created.
-    Assertions.assertEquals(0, pipelineManager.getPipelines(
+    assertEquals(0, pipelineManager.getPipelines(
         RatisReplicationConfig.getInstance(
             ReplicationFactor.ONE)).size());
 
@@ -139,12 +140,11 @@ public class TestRatisPipelineCreateAndDestroy {
                     100, 10 * 1000);
 
     // try creating another pipeline now
-    SCMException ioe = Assertions.assertThrows(SCMException.class, () ->
+    SCMException ioe = assertThrows(SCMException.class, () ->
         pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE)),
         "pipeline creation should fail after shutting down pipeline");
-    Assertions.assertEquals(
-        SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES, ioe.getResult());
+    assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES, ioe.getResult());
 
     // make sure pipelines is destroyed
     waitForPipelines(0);

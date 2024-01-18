@@ -43,7 +43,6 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
@@ -67,6 +66,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test for RatisPipelineProvider.
@@ -123,8 +124,7 @@ public class TestRatisPipelineProvider {
       Pipeline.PipelineState expectedState) {
     assertEquals(expectedState, pipeline.getPipelineState());
     assertEquals(expectedReplicationType, pipeline.getType());
-    assertEquals(expectedFactor.getNumber(),
-        pipeline.getReplicationConfig().getRequiredNodes());
+    assertEquals(expectedFactor.getNumber(), pipeline.getReplicationConfig().getRequiredNodes());
     assertEquals(expectedFactor.getNumber(), pipeline.getNodes().size());
   }
 
@@ -237,8 +237,8 @@ public class TestRatisPipelineProvider {
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
         replicas);
 
-    Assertions.assertEquals(pipeline1.getNodeSet(), pipeline2.getNodeSet());
-    Assertions.assertEquals(pipeline2.getNodeSet(), pipeline3.getNodeSet());
+    assertEquals(pipeline1.getNodeSet(), pipeline2.getNodeSet());
+    assertEquals(pipeline2.getNodeSet(), pipeline3.getNodeSet());
   }
 
   @Test
@@ -325,7 +325,7 @@ public class TestRatisPipelineProvider {
     init(0, conf);
     List<DatanodeDetails> excludedNodes = new ArrayList<>();
 
-    Assertions.assertThrows(SCMException.class, () ->
+    assertThrows(SCMException.class, () ->
         provider.create(RatisReplicationConfig
                 .getInstance(ReplicationFactor.THREE),
             excludedNodes, Collections.EMPTY_LIST));
@@ -347,7 +347,7 @@ public class TestRatisPipelineProvider {
       }
       try {
         provider.create(RatisReplicationConfig.getInstance(factor));
-        Assertions.fail("Expected SCMException for large container size with " +
+        fail("Expected SCMException for large container size with " +
             "replication factor " + factor.toString());
       } catch (SCMException ex) {
         assertThat(ex.getMessage()).contains(expectedErrorSubstring);
@@ -363,7 +363,7 @@ public class TestRatisPipelineProvider {
       }
       try {
         provider.create(RatisReplicationConfig.getInstance(factor));
-        Assertions.fail("Expected SCMException for large metadata size with " +
+        fail("Expected SCMException for large metadata size with " +
             "replication factor " + factor.toString());
       } catch (SCMException ex) {
         assertThat(ex.getMessage()).contains(expectedErrorSubstring);

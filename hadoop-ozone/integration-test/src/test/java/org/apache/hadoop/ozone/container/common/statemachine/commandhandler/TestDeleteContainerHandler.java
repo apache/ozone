@@ -56,14 +56,11 @@ import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.JUnit5AwareTimeout;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.File;
 import java.io.IOException;
@@ -84,23 +81,17 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 /**
  * Tests DeleteContainerCommand Handler.
  */
+@Timeout(300)
 public class TestDeleteContainerHandler {
 
   private static OzoneClient client;
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
-
-
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
   private static ObjectStore objectStore;
   private static String volumeName = UUID.randomUUID().toString();
   private static String bucketName = UUID.randomUUID().toString();
 
-  @BeforeClass
+  @BeforeAll
   public static void setup() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CONTAINER_SIZE, "1GB");
@@ -129,7 +120,7 @@ public class TestDeleteContainerHandler {
     objectStore.getVolume(volumeName).createBucket(bucketName);
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -174,7 +165,7 @@ public class TestDeleteContainerHandler {
     HddsDatanodeService hddsDatanodeService =
         cluster.getHddsDatanodes().get(0);
 
-    Assert.assertFalse(isContainerClosed(hddsDatanodeService,
+    Assertions.assertFalse(isContainerClosed(hddsDatanodeService,
         containerId.getId()));
 
     DatanodeDetails datanodeDetails = hddsDatanodeService.getDatanodeDetails();
@@ -198,7 +189,7 @@ public class TestDeleteContainerHandler {
         500, 5 * 1000);
 
     //double check if it's really closed (waitFor also throws an exception)
-    Assert.assertTrue(isContainerClosed(hddsDatanodeService,
+    Assertions.assertTrue(isContainerClosed(hddsDatanodeService,
         containerId.getId()));
 
     // Delete key, which will make isEmpty flag to true in containerData
@@ -226,7 +217,7 @@ public class TestDeleteContainerHandler {
     lingeringBlock.createNewFile();
 
     // Check container exists before sending delete container command
-    Assert.assertFalse(isContainerDeleted(hddsDatanodeService,
+    Assertions.assertFalse(isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
 
     // Set container blockCount to 0 to mock that it is empty as per RocksDB
@@ -252,9 +243,9 @@ public class TestDeleteContainerHandler {
                 contains("Files still part of the container on delete"),
         500,
         5 * 2000);
-    Assert.assertTrue(!isContainerDeleted(hddsDatanodeService,
+    Assertions.assertTrue(!isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
-    Assert.assertTrue(beforeDeleteFailedCount <
+    Assertions.assertTrue(beforeDeleteFailedCount <
         metrics.getContainerDeleteFailedNonEmpty());
     // Send the delete command. It should pass with force flag.
     // Deleting a non-empty container should pass on the DN when the force flag
@@ -269,9 +260,9 @@ public class TestDeleteContainerHandler {
     GenericTestUtils.waitFor(() ->
             isContainerDeleted(hddsDatanodeService, containerId.getId()),
         500, 5 * 1000);
-    Assert.assertTrue(isContainerDeleted(hddsDatanodeService,
+    Assertions.assertTrue(isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
-    Assert.assertTrue(beforeForceCount <
+    Assertions.assertTrue(beforeForceCount <
         metrics.getContainerForceDelete());
 
     kv.setCheckChunksFilePath(false);
@@ -306,7 +297,7 @@ public class TestDeleteContainerHandler {
     HddsDatanodeService hddsDatanodeService =
         cluster.getHddsDatanodes().get(0);
 
-    Assert.assertFalse(isContainerClosed(hddsDatanodeService,
+    Assertions.assertFalse(isContainerClosed(hddsDatanodeService,
         containerId.getId()));
 
     DatanodeDetails datanodeDetails = hddsDatanodeService.getDatanodeDetails();
@@ -322,7 +313,7 @@ public class TestDeleteContainerHandler {
         500, 5 * 1000);
 
     //double check if it's really closed (waitFor also throws an exception)
-    Assert.assertTrue(isContainerClosed(hddsDatanodeService,
+    Assertions.assertTrue(isContainerClosed(hddsDatanodeService,
         containerId.getId()));
 
     // Delete key, which will make isEmpty flag to true in containerData
@@ -350,7 +341,7 @@ public class TestDeleteContainerHandler {
     lingeringBlock.createNewFile();
 
     // Check container exists before sending delete container command
-    Assert.assertFalse(isContainerDeleted(hddsDatanodeService,
+    Assertions.assertFalse(isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
 
     // send delete container to the datanode
@@ -366,7 +357,7 @@ public class TestDeleteContainerHandler {
     GenericTestUtils.waitFor(() ->
             isContainerDeleted(hddsDatanodeService, containerId.getId()),
         500, 5 * 1000);
-    Assert.assertTrue(isContainerDeleted(hddsDatanodeService,
+    Assertions.assertTrue(isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
   }
 
@@ -393,7 +384,7 @@ public class TestDeleteContainerHandler {
     HddsDatanodeService hddsDatanodeService =
         cluster.getHddsDatanodes().get(0);
 
-    Assert.assertFalse(isContainerClosed(hddsDatanodeService,
+    Assertions.assertFalse(isContainerClosed(hddsDatanodeService,
         containerId.getId()));
 
     DatanodeDetails datanodeDetails = hddsDatanodeService.getDatanodeDetails();
@@ -427,11 +418,11 @@ public class TestDeleteContainerHandler {
         500, 5 * 1000);
 
     //double check if it's really closed (waitFor also throws an exception)
-    Assert.assertTrue(isContainerClosed(hddsDatanodeService,
+    Assertions.assertTrue(isContainerClosed(hddsDatanodeService,
         containerId.getId()));
 
     // Check container exists before sending delete container command
-    Assert.assertFalse(isContainerDeleted(hddsDatanodeService,
+    Assertions.assertFalse(isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
 
     long containerDeleteFailedNonEmptyBlockDB =
@@ -455,9 +446,9 @@ public class TestDeleteContainerHandler {
                 contains("the container is not empty with blockCount"),
         500,
         5 * 2000);
-    Assert.assertTrue(!isContainerDeleted(hddsDatanodeService,
+    Assertions.assertTrue(!isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
-    Assert.assertTrue(containerDeleteFailedNonEmptyBlockDB <
+    Assertions.assertTrue(containerDeleteFailedNonEmptyBlockDB <
         metrics.getContainerDeleteFailedNonEmpty());
 
     // Now empty the container Dir and try with a non-empty block table
@@ -479,7 +470,7 @@ public class TestDeleteContainerHandler {
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     nodeManager.addDatanodeCommand(datanodeDetails.getUuid(), command);
     Thread.sleep(5000);
-    Assert.assertTrue(!isContainerDeleted(hddsDatanodeService,
+    Assertions.assertTrue(!isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
     // Send the delete command. It should pass with force flag.
     long beforeForceCount = metrics.getContainerForceDelete();
@@ -492,9 +483,9 @@ public class TestDeleteContainerHandler {
     GenericTestUtils.waitFor(() ->
             isContainerDeleted(hddsDatanodeService, containerId.getId()),
         500, 5 * 1000);
-    Assert.assertTrue(isContainerDeleted(hddsDatanodeService,
+    Assertions.assertTrue(isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
-    Assert.assertTrue(beforeForceCount <
+    Assertions.assertTrue(beforeForceCount <
         metrics.getContainerForceDelete());
   }
 
@@ -516,7 +507,7 @@ public class TestDeleteContainerHandler {
     HddsDatanodeService hddsDatanodeService =
         cluster.getHddsDatanodes().get(0);
 
-    Assert.assertFalse(isContainerClosed(hddsDatanodeService,
+    Assertions.assertFalse(isContainerClosed(hddsDatanodeService,
         containerId.getId()));
 
     DatanodeDetails datanodeDetails = hddsDatanodeService.getDatanodeDetails();
@@ -534,11 +525,11 @@ public class TestDeleteContainerHandler {
         500, 5 * 1000);
 
     //double check if it's really closed (waitFor also throws an exception)
-    Assert.assertTrue(isContainerClosed(hddsDatanodeService,
+    Assertions.assertTrue(isContainerClosed(hddsDatanodeService,
         containerId.getId()));
 
     // Check container exists before sending delete container command
-    Assert.assertFalse(isContainerDeleted(hddsDatanodeService,
+    Assertions.assertFalse(isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
 
     // Clear block table
@@ -570,7 +561,7 @@ public class TestDeleteContainerHandler {
     GenericTestUtils.waitFor(() ->
             isContainerDeleted(hddsDatanodeService, containerId.getId()),
         500, 5 * 1000);
-    Assert.assertTrue(isContainerDeleted(hddsDatanodeService,
+    Assertions.assertTrue(isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
 
   }
@@ -621,7 +612,7 @@ public class TestDeleteContainerHandler {
     HddsDatanodeService hddsDatanodeService =
         cluster.getHddsDatanodes().get(0);
 
-    Assert.assertFalse(isContainerClosed(hddsDatanodeService,
+    Assertions.assertFalse(isContainerClosed(hddsDatanodeService,
         containerId.getId()));
 
     DatanodeDetails datanodeDetails = hddsDatanodeService.getDatanodeDetails();
@@ -639,11 +630,11 @@ public class TestDeleteContainerHandler {
         500, 5 * 1000);
 
     //double check if it's really closed (waitFor also throws an exception)
-    Assert.assertTrue(isContainerClosed(hddsDatanodeService,
+    Assertions.assertTrue(isContainerClosed(hddsDatanodeService,
         containerId.getId()));
 
     // Check container exists before sending delete container command
-    Assert.assertFalse(isContainerDeleted(hddsDatanodeService,
+    Assertions.assertFalse(isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
 
     // send delete container to the datanode
@@ -665,7 +656,7 @@ public class TestDeleteContainerHandler {
     ContainerMetrics metrics =
         hddsDatanodeService
             .getDatanodeStateMachine().getContainer().getMetrics();
-    Assert.assertEquals(1,
+    Assertions.assertEquals(1,
         metrics.getContainerDeleteFailedNonEmpty());
 
     // Delete key, which will make isEmpty flag to true in containerData
@@ -687,7 +678,7 @@ public class TestDeleteContainerHandler {
             isContainerDeleted(hddsDatanodeService, containerId.getId()),
         500, 5 * 1000);
 
-    Assert.assertTrue(isContainerDeleted(hddsDatanodeService,
+    Assertions.assertTrue(isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
   }
 
@@ -732,7 +723,7 @@ public class TestDeleteContainerHandler {
       }
     }
 
-    Assert.assertFalse(isContainerDeleted(hddsDatanodeService,
+    Assertions.assertFalse(isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
 
 
@@ -747,7 +738,7 @@ public class TestDeleteContainerHandler {
             isContainerDeleted(hddsDatanodeService, containerId.getId()),
         500, 5 * 1000);
 
-    Assert.assertTrue(isContainerDeleted(hddsDatanodeService,
+    Assertions.assertTrue(isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
 
   }

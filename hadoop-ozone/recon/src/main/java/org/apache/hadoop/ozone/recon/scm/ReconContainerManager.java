@@ -459,4 +459,8 @@ public class ReconContainerManager extends ContainerManagerImpl {
     return pipelineToOpenContainer;
   }
 
+  @VisibleForTesting
+  public StorageContainerServiceProvider getScmClient() {
+    return scmClient;
+  }
 }

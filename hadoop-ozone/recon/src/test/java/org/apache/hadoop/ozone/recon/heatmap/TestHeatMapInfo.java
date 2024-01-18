@@ -45,9 +45,9 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -761,7 +761,7 @@ public class TestHeatMapInfo {
         Arrays.stream(entities).collect(Collectors.toList());
     EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse =
         heatMapUtil.generateHeatMap(entityMetaDataList);
-    assertTrue(entityReadAccessHeatMapResponse.getChildren().size() > 0);
+    assertThat(entityReadAccessHeatMapResponse.getChildren().size()).isGreaterThan(0);
     assertEquals(12, entityReadAccessHeatMapResponse.getChildren().size());
     assertEquals(25600, entityReadAccessHeatMapResponse.getSize());
     assertEquals(2924, entityReadAccessHeatMapResponse.getMinAccessCount());
@@ -870,7 +870,7 @@ public class TestHeatMapInfo {
       //}
       EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse =
           heatMapUtil.generateHeatMap(entityMetaDataList);
-      assertTrue(entityReadAccessHeatMapResponse.getChildren().size() > 0);
+      assertThat(entityReadAccessHeatMapResponse.getChildren().size()).isGreaterThan(0);
       assertEquals(2, entityReadAccessHeatMapResponse.getChildren().size());
       assertEquals(512, entityReadAccessHeatMapResponse.getSize());
       assertEquals(8590, entityReadAccessHeatMapResponse.getMinAccessCount());
@@ -1098,8 +1098,7 @@ public class TestHeatMapInfo {
       //}
       EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse =
           heatMapUtil.generateHeatMap(entityMetaDataList);
-      assertTrue(
-          entityReadAccessHeatMapResponse.getChildren().size() > 0);
+      assertThat(entityReadAccessHeatMapResponse.getChildren().size()).isGreaterThan(0);
       assertEquals(2,
           entityReadAccessHeatMapResponse.getChildren().size());
       assertEquals(0.0,

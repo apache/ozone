@@ -36,10 +36,11 @@ import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test http server os SCM with various HTTP option.
@@ -95,15 +96,15 @@ public class TestStorageContainerManagerHttpServer {
       server = new StorageContainerManagerHttpServer(conf, null);
       server.start();
 
-      Assertions.assertTrue(implies(policy.isHttpEnabled(),
+      assertTrue(implies(policy.isHttpEnabled(),
           canAccess("http", server.getHttpAddress())));
-      Assertions.assertTrue(implies(policy.isHttpEnabled() &&
+      assertTrue(implies(policy.isHttpEnabled() &&
               !policy.isHttpsEnabled(),
           !canAccess("https", server.getHttpsAddress())));
 
-      Assertions.assertTrue(implies(policy.isHttpsEnabled(),
+      assertTrue(implies(policy.isHttpsEnabled(),
           canAccess("https", server.getHttpsAddress())));
-      Assertions.assertTrue(implies(policy.isHttpsEnabled() &&
+      assertTrue(implies(policy.isHttpsEnabled() &&
               !policy.isHttpEnabled(),
           !canAccess("http", server.getHttpAddress())));
 

@@ -17,17 +17,24 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
-import static org.apache.hadoop.test.MetricsAsserts.assertCounter;
-import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.apache.ozone.test.MetricsAsserts.assertCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.spy;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -35,6 +42,10 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -51,10 +62,13 @@ import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -66,12 +80,15 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.ozone.test.MetricsAsserts;
+import org.apache.ozone.test.GenericTestUtils;
 import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.mockito.Mockito;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Test for OM metrics.
@@ -127,7 +144,7 @@ public class TestOmMetrics {
     VolumeManager volumeManager =
         (VolumeManager) HddsWhiteboxTestUtils.getInternalState(
             ozoneManager, "volumeManager");
-    VolumeManager mockVm = Mockito.spy(volumeManager);
+    VolumeManager mockVm = spy(volumeManager);
 
     OmVolumeArgs volumeArgs = createVolumeArgs();
     doVolumeOps(volumeArgs);
@@ -155,8 +172,8 @@ public class TestOmMetrics {
 
 
     // inject exception to test for Failure Metrics on the read path
-    Mockito.doThrow(exception).when(mockVm).getVolumeInfo(any());
-    Mockito.doThrow(exception).when(mockVm).listVolumes(any(), any(),
+    doThrow(exception).when(mockVm).getVolumeInfo(any());
+    doThrow(exception).when(mockVm).listVolumes(any(), any(),
         any(), anyInt());
 
     HddsWhiteboxTestUtils.setInternalState(ozoneManager,
@@ -196,7 +213,7 @@ public class TestOmMetrics {
     BucketManager bucketManager =
         (BucketManager) HddsWhiteboxTestUtils.getInternalState(
             ozoneManager, "bucketManager");
-    BucketManager mockBm = Mockito.spy(bucketManager);
+    BucketManager mockBm = spy(bucketManager);
 
     OmBucketInfo bucketInfo = createBucketInfo(false);
     doBucketOps(bucketInfo);
@@ -230,8 +247,8 @@ public class TestOmMetrics {
     assertCounter("NumBuckets", 2L, omMetrics);
 
     // inject exception to test for Failure Metrics on the read path
-    Mockito.doThrow(exception).when(mockBm).getBucketInfo(any(), any());
-    Mockito.doThrow(exception).when(mockBm).listBuckets(any(), any(),
+    doThrow(exception).when(mockBm).getBucketInfo(any(), any());
+    doThrow(exception).when(mockBm).listBuckets(any(), any(),
         any(), anyInt(), eq(false));
 
     HddsWhiteboxTestUtils.setInternalState(
@@ -280,8 +297,9 @@ public class TestOmMetrics {
     String bucketName = UUID.randomUUID().toString();
     KeyManager keyManager = (KeyManager) HddsWhiteboxTestUtils
         .getInternalState(ozoneManager, "keyManager");
-    KeyManager mockKm = Mockito.spy(keyManager);
-    TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);
+    KeyManager mockKm = spy(keyManager);
+    // see HDDS-10078 for making this work with FILE_SYSTEM_OPTIMIZED layout
+    TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName, BucketLayout.LEGACY);
     OmKeyArgs keyArgs = createKeyArgs(volumeName, bucketName,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
     doKeyOps(keyArgs);
@@ -332,10 +350,10 @@ public class TestOmMetrics {
     assertCounter("NumBlockAllocationFails", 1L, omMetrics);
 
     // inject exception to test for Failure Metrics on the read path
-    Mockito.doThrow(exception).when(mockKm).lookupKey(any(), any(), any());
-    Mockito.doThrow(exception).when(mockKm).listKeys(
+    doThrow(exception).when(mockKm).lookupKey(any(), any(), any());
+    doThrow(exception).when(mockKm).listKeys(
         any(), any(), any(), any(), anyInt());
-    Mockito.doThrow(exception).when(mockKm).listTrash(
+    doThrow(exception).when(mockKm).listTrash(
         any(), any(), any(), any(), anyInt());
     OmMetadataReader omMetadataReader =
         (OmMetadataReader) ozoneManager.getOmMetadataReader().get();
@@ -382,6 +400,107 @@ public class TestOmMetrics {
     cluster.restartOzoneManager();
     assertCounter("NumKeys", 2L, omMetrics);
 
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = BucketLayout.class, names = {"FILE_SYSTEM_OPTIMIZED", "LEGACY"})
+  public void testDirectoryOps(BucketLayout bucketLayout) throws Exception {
+    clusterBuilder.setNumDatanodes(3);
+    conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, true);
+    // Speed up background directory deletion for this test.
+    conf.setTimeDuration(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
+    conf.set(OzoneConfigKeys.OZONE_CLIENT_FS_DEFAULT_BUCKET_LAYOUT, bucketLayout.name());
+    // For testing fs operations with legacy buckets.
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
+    startCluster();
+
+    // How long to wait for directory deleting service to clean up the files before aborting the test.
+    final int timeoutMillis =
+        (int)conf.getTimeDuration(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 0, TimeUnit.MILLISECONDS) * 3;
+    assertTrue(timeoutMillis > 0, "Failed to read directory deleting service interval. Retrieved " + timeoutMillis +
+        " milliseconds");
+
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    // Cluster should be empty.
+    MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
+    assertCounter("NumKeys", 0L, omMetrics);
+    assertCounter("NumCreateDirectory", 0L, omMetrics);
+    // These key operations include directory operations.
+    assertCounter("NumKeyDeletes", 0L, omMetrics);
+    assertCounter("NumKeyRenames", 0L, omMetrics);
+
+    // Create bucket with 2 nested directories.
+    String rootPath = String.format("%s://%s/",
+        OzoneConsts.OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    FileSystem fs = FileSystem.get(conf);
+    Path bucketPath = new Path(OZONE_ROOT, String.join(OZONE_URI_DELIMITER, volumeName, bucketName));
+    Path dirPath = new Path(bucketPath, String.join(OZONE_URI_DELIMITER, "dir1", "dir2"));
+    fs.mkdirs(dirPath);
+    assertEquals(bucketLayout,
+        client.getObjectStore().getVolume(volumeName).getBucket(bucketName).getBucketLayout());
+    omMetrics = getMetrics("OMMetrics");
+    assertCounter("NumKeys", 2L, omMetrics);
+    // Only one directory create command is given, even though it created two directories.
+    assertCounter("NumCreateDirectory", 1L, omMetrics);
+    assertCounter("NumKeyDeletes", 0L, omMetrics);
+    assertCounter("NumKeyRenames", 0L, omMetrics);
+
+    // Add 2 files at different parts of the tree.
+    ContractTestUtils.touch(fs, new Path(dirPath, "file1"));
+    ContractTestUtils.touch(fs, new Path(dirPath.getParent(), "file2"));
+    omMetrics = getMetrics("OMMetrics");
+    assertCounter("NumKeys", 4L, omMetrics);
+    assertCounter("NumCreateDirectory", 1L, omMetrics);
+    assertCounter("NumKeyDeletes", 0L, omMetrics);
+    assertCounter("NumKeyRenames", 0L, omMetrics);
+
+    // Rename the child directory.
+    fs.rename(dirPath, new Path(dirPath.getParent(), "new-name"));
+    omMetrics = getMetrics("OMMetrics");
+    assertCounter("NumKeys", 4L, omMetrics);
+    assertCounter("NumCreateDirectory", 1L, omMetrics);
+    assertCounter("NumKeyDeletes", 0L, omMetrics);
+    long expectedRenames = 1;
+    if (bucketLayout == BucketLayout.LEGACY) {
+      // Legacy bucket must rename keys individually.
+      expectedRenames = 2;
+    }
+    assertCounter("NumKeyRenames", expectedRenames, omMetrics);
+
+    // Delete metric should be decremented by directory deleting service in the background.
+    fs.delete(dirPath.getParent(), true);
+    GenericTestUtils.waitFor(() -> {
+      long keyCount = MetricsAsserts.getLongCounter("NumKeys", getMetrics("OMMetrics"));
+      return keyCount == 0;
+    }, timeoutMillis / 5, timeoutMillis);
+    omMetrics = getMetrics("OMMetrics");
+    assertCounter("NumKeys", 0L, omMetrics);
+    // This is the number of times the create directory command was given, not the current number of directories.
+    assertCounter("NumCreateDirectory", 1L, omMetrics);
+    // Directory delete counts as key delete. One command was given so the metric is incremented once.
+    assertCounter("NumKeyDeletes", 1L, omMetrics);
+    assertCounter("NumKeyRenames", expectedRenames, omMetrics);
+
+    // Re-create the same tree as before, but this time delete the bucket recursively.
+    // All metrics should still be properly updated.
+    fs.mkdirs(dirPath);
+    ContractTestUtils.touch(fs, new Path(dirPath, "file1"));
+    ContractTestUtils.touch(fs, new Path(dirPath.getParent(), "file2"));
+    assertCounter("NumKeys", 4L, getMetrics("OMMetrics"));
+    fs.delete(bucketPath, true);
+    GenericTestUtils.waitFor(() -> {
+      long keyCount = MetricsAsserts.getLongCounter("NumKeys", getMetrics("OMMetrics"));
+      return keyCount == 0;
+    }, timeoutMillis / 5, timeoutMillis);
+    omMetrics = getMetrics("OMMetrics");
+    assertCounter("NumKeys", 0L, omMetrics);
+    assertCounter("NumCreateDirectory", 2L, omMetrics);
+    // One more keys delete request is given as part of the bucket delete to do a batch delete of its keys.
+    assertCounter("NumKeyDeletes", 2L, omMetrics);
+    assertCounter("NumKeyRenames", expectedRenames, omMetrics);
   }
 
   @Test
@@ -477,16 +596,16 @@ public class TestOmMetrics {
     }
     OMMetadataManager metadataManager = (OMMetadataManager)
         HddsWhiteboxTestUtils.getInternalState(ozoneManager, "metadataManager");
-    OMMetadataManager mockMm = Mockito.spy(metadataManager);
+    OMMetadataManager mockMm = spy(metadataManager);
     @SuppressWarnings("unchecked")
     Table<String, T> table = (Table<String, T>)
         HddsWhiteboxTestUtils.getInternalState(metadataManager, tableName);
-    Table<String, T> mockTable = Mockito.spy(table);
-    Mockito.doThrow(exception).when(mockTable).isExist(any());
+    Table<String, T> mockTable = spy(table);
+    doThrow(exception).when(mockTable).isExist(any());
     if (klass == OmBucketInfo.class) {
-      Mockito.doReturn(mockTable).when(mockMm).getBucketTable();
+      doReturn(mockTable).when(mockMm).getBucketTable();
     } else {
-      Mockito.doReturn(mockTable).when(mockMm).getVolumeTable();
+      doReturn(mockTable).when(mockMm).getVolumeTable();
     }
     HddsWhiteboxTestUtils.setInternalState(
         ozoneManager, "metadataManager", mockMm);

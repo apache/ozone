@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.server.RaftServer;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -35,6 +34,8 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests on {@link org.apache.hadoop.hdds.scm.metadata.Replicate}.
@@ -127,9 +128,9 @@ public class TestReplicationAnnotation {
 
     try {
       proxy.addContainer(HddsProtos.ContainerInfoProto.getDefaultInstance());
-      Assertions.fail("Cannot reach here: should have seen a IOException");
+      fail("Cannot reach here: should have seen a IOException");
     } catch (IOException e) {
-      Assertions.assertNotNull(e.getMessage());
+      assertNotNull(e.getMessage());
       assertThat(e.getMessage()).contains("submitRequest is called");
     }
   }

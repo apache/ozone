@@ -70,7 +70,7 @@ import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.util.ExitUtils;
-import org.awaitility.Awaitility;
+import org.apache.ratis.util.TimeDuration;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -155,6 +155,7 @@ import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.FA
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.QUEUED;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.REJECTED;
+import static org.apache.ratis.util.JavaUtils.attempt;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -1310,15 +1311,13 @@ public class TestSnapshotDiffManager {
     spy.loadJobsOnStartUp();
 
     // Wait for sometime to make sure that job finishes.
-    Awaitility.await()
-        .atMost(10, TimeUnit.SECONDS)
-        .untilAsserted(() -> {
-          verify(spy, atLeast(1))
-              .generateSnapshotDiffReport(anyString(), anyString(),
-                  eq(VOLUME_NAME), eq(BUCKET_NAME), eq(snapshotInfo.getName()),
-                  eq(snapshotInfoList.get(1).getName()), eq(false),
-                  eq(false));
-        });
+    attempt(() ->
+        verify(spy, atLeast(1))
+            .generateSnapshotDiffReport(anyString(), anyString(),
+                eq(VOLUME_NAME), eq(BUCKET_NAME), eq(snapshotInfo.getName()),
+                eq(snapshotInfoList.get(1).getName()), eq(false),
+                eq(false)),
+        10, TimeDuration.ONE_SECOND, null, null);
 
     SnapshotDiffJob snapDiffJob = getSnapshotDiffJobFromDb(snapshotInfo,
         snapshotInfoList.get(1));

@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.time.Duration;
 import java.util.List;
 
 import com.google.common.collect.Lists;
@@ -134,11 +133,8 @@ import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.CA
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
+import static org.apache.ozone.test.LambdaTestUtils.await;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.awaitility.Awaitility.with;
-import static org.awaitility.Awaitility.await;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -146,8 +142,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Abstract class to test OmSnapshot.
@@ -165,8 +161,8 @@ public abstract class TestOmSnapshot {
   private static final String SNAPSHOT_KEY_PATTERN_STRING = "(.+)/(.+)/(.+)";
   private static final Pattern SNAPSHOT_KEY_PATTERN =
       Pattern.compile(SNAPSHOT_KEY_PATTERN_STRING);
-  private static final Duration POLL_INTERVAL_DURATION = Duration.ofMillis(500);
-  private static final Duration POLL_MAX_DURATION = Duration.ofSeconds(10);
+  private static final int POLL_INTERVAL_MILLIS = 500;
+  private static final int POLL_MAX_WAIT_MILLIS = 120_000;
 
   private MiniOzoneCluster cluster;
   private OzoneClient client;
@@ -275,8 +271,8 @@ public abstract class TestOmSnapshot {
   private static void assertFinalizationException(OMException omException) {
     assertEquals(NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
         omException.getResult());
-    assertThat(omException.getMessage(),
-        containsString("cannot be invoked before finalization."));
+    assertThat(omException.getMessage())
+        .contains("cannot be invoked before finalization.");
   }
 
   /**
@@ -296,15 +292,12 @@ public abstract class TestOmSnapshot {
     // Wait for the finalization to be marked as done.
     // 10s timeout should be plenty.
     try {
-      with().atMost(POLL_MAX_DURATION)
-          .pollInterval(POLL_INTERVAL_DURATION)
-          .await()
-          .until(() -> {
-            final UpgradeFinalizer.StatusAndMessages progress =
-                omClient.queryUpgradeFinalizationProgress(
-                    upgradeClientID, false, false);
-            return isDone(progress.status());
-          });
+      await(POLL_MAX_WAIT_MILLIS, POLL_INTERVAL_MILLIS, () -> {
+        final UpgradeFinalizer.StatusAndMessages progress =
+            omClient.queryUpgradeFinalizationProgress(
+                upgradeClientID, false, false);
+        return isDone(progress.status());
+      });
     } catch (Exception e) {
       fail("Unexpected exception while waiting for "
           + "the OM upgrade to finalize: " + e.getMessage());
@@ -1434,9 +1427,9 @@ public abstract class TestOmSnapshot {
     IOException ioException = assertThrows(IOException.class,
         () -> store.snapshotDiff(volume, bucket, snap6,
             snap7, "3", 0, forceFullSnapshotDiff, disableNativeDiff));
-    assertThat(ioException.getMessage(), containsString("Index (given: 3) " +
+    assertThat(ioException.getMessage()).contains("Index (given: 3) " +
         "should be a number >= 0 and < totalDiffEntries: 2. Page size " +
-        "(given: 1000) should be a positive number > 0."));
+        "(given: 1000) should be a positive number > 0.");
 
   }
 
@@ -2081,8 +2074,8 @@ public abstract class TestOmSnapshot {
     // job finishes.
     cluster.restartOzoneManager();
     stopKeyManager();
-    await().atMost(Duration.ofSeconds(120)).
-        until(() -> cluster.getOzoneManager().isRunning());
+    await(POLL_MAX_WAIT_MILLIS, POLL_INTERVAL_MILLIS,
+        () -> cluster.getOzoneManager().isRunning());
 
     response = store.snapshotDiff(volumeName, bucketName,
         snapshot1, snapshot2, null, 0, forceFullSnapshotDiff,
@@ -2126,8 +2119,8 @@ public abstract class TestOmSnapshot {
     // the restart.
     cluster.restartOzoneManager();
     stopKeyManager();
-    await().atMost(Duration.ofSeconds(120)).
-        until(() -> cluster.getOzoneManager().isRunning());
+    await(POLL_MAX_WAIT_MILLIS, POLL_INTERVAL_MILLIS,
+        () -> cluster.getOzoneManager().isRunning());
 
     while (nextToken == null || StringUtils.isNotEmpty(nextToken)) {
       diffReport = fetchReportPage(volumeName, bucketName, snapshot1,
