@@ -86,7 +86,7 @@ public class TestS3MultipartRequest {
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     auditLogger = mock(AuditLogger.class);
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmMetadataReader =
+    ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcOmMetadataReader =
         mock(ReferenceCounted.class);
     when(ozoneManager.getOmMetadataReader()).thenReturn(rcOmMetadataReader);
     // Init OmMetadataReader to let the test pass

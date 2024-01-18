@@ -268,7 +268,7 @@ public class TestSnapshotBackgroundServices {
 
     // get snapshot c
     OmSnapshot snapC;
-    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcC = newLeaderOM
+    try (ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcC = newLeaderOM
         .getOmSnapshotManager()
         .checkForSnapshot(volumeName, bucketName,
             getSnapshotPrefix(snapshotInfoC.getName()), true)) {
@@ -294,7 +294,7 @@ public class TestSnapshotBackgroundServices {
 
     // get snapshot d
     OmSnapshot snapD;
-    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcD = newLeaderOM
+    try (ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcD = newLeaderOM
         .getOmSnapshotManager()
         .checkForSnapshot(volumeName, bucketName,
             getSnapshotPrefix(snapshotInfoD.getName()), true)) {

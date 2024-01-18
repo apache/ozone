@@ -580,14 +580,26 @@ public final class OMConfigKeys {
 
   public static final String OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL
       = "ozone.om.snapshot.diff.cleanup.service.run.internal";
+  public static final String
+      OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL
+      = "ozone.om.snapshot.cache.cleanup.service.run.internal";
   public static final long
       OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT
+      = TimeUnit.MINUTES.toMillis(1);
+  public static final long
+      OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT
       = TimeUnit.MINUTES.toMillis(1);
 
   public static final String OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT
       = "ozone.om.snapshot.diff.cleanup.service.timeout";
+
+  public static final String OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_TIMEOUT
+      = "ozone.om.snapshot.cache.cleanup.service.timeout";
   public static final long
       OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT_DEFAULT
+      = TimeUnit.MINUTES.toMillis(5);
+  public static final long
+      OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_TIMEOUT_DEFAULT
       = TimeUnit.MINUTES.toMillis(5);
 
   public static final String

@@ -95,7 +95,7 @@ class TestSnapshotCache {
   @DisplayName("01. get()")
   void testGet() throws IOException {
     final String dbKey1 = "dbKey1";
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> omSnapshot =
+    ReferenceCounted<IOmMetadataReader, SnapshotCache, String> omSnapshot =
         snapshotCache.get(dbKey1);
     assertNotNull(omSnapshot);
     assertNotNull(omSnapshot.get());
@@ -107,12 +107,12 @@ class TestSnapshotCache {
   @DisplayName("02. get() same entry twice yields one cache entry only")
   void testGetTwice() throws IOException {
     final String dbKey1 = "dbKey1";
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> omSnapshot1 =
+    ReferenceCounted<IOmMetadataReader, SnapshotCache, String> omSnapshot1 =
         snapshotCache.get(dbKey1);
     assertNotNull(omSnapshot1);
     assertEquals(1, snapshotCache.size());
 
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> omSnapshot1again =
+    ReferenceCounted<IOmMetadataReader, SnapshotCache, String> omSnapshot1again =
         snapshotCache.get(dbKey1);
     // Should be the same instance
     assertEquals(omSnapshot1, omSnapshot1again);
@@ -124,7 +124,7 @@ class TestSnapshotCache {
   @DisplayName("03. release(String)")
   void testReleaseByDbKey() throws IOException {
     final String dbKey1 = "dbKey1";
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> omSnapshot1 =
+    ReferenceCounted<IOmMetadataReader, SnapshotCache, String> omSnapshot1 =
         snapshotCache.get(dbKey1);
     assertNotNull(omSnapshot1);
     assertNotNull(omSnapshot1.get());
@@ -139,7 +139,7 @@ class TestSnapshotCache {
   @DisplayName("04. release(OmSnapshot)")
   void testReleaseByOmSnapshotInstance() throws IOException {
     final String dbKey1 = "dbKey1";
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> omSnapshot1 =
+    ReferenceCounted<IOmMetadataReader, SnapshotCache, String> omSnapshot1 =
         snapshotCache.get(dbKey1);
     assertNotNull(omSnapshot1);
     assertEquals(1, snapshotCache.size());
@@ -153,7 +153,7 @@ class TestSnapshotCache {
   @DisplayName("05. invalidate()")
   void testInvalidate() throws IOException {
     final String dbKey1 = "dbKey1";
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> omSnapshot =
+    ReferenceCounted<IOmMetadataReader, SnapshotCache, String> omSnapshot =
         snapshotCache.get(dbKey1);
     assertNotNull(omSnapshot);
     assertEquals(1, snapshotCache.size());
@@ -170,13 +170,13 @@ class TestSnapshotCache {
   @DisplayName("06. invalidateAll()")
   void testInvalidateAll() throws IOException {
     final String dbKey1 = "dbKey1";
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> omSnapshot1 =
+    ReferenceCounted<IOmMetadataReader, SnapshotCache, String> omSnapshot1 =
         snapshotCache.get(dbKey1);
     assertNotNull(omSnapshot1);
     assertEquals(1, snapshotCache.size());
 
     final String dbKey2 = "dbKey2";
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> omSnapshot2 =
+    ReferenceCounted<IOmMetadataReader, SnapshotCache, String> omSnapshot2 =
         snapshotCache.get(dbKey2);
     assertNotNull(omSnapshot2);
     assertEquals(2, snapshotCache.size());
@@ -184,7 +184,7 @@ class TestSnapshotCache {
     assertNotEquals(omSnapshot1, omSnapshot2);
 
     final String dbKey3 = "dbKey3";
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> omSnapshot3 =
+    ReferenceCounted<IOmMetadataReader, SnapshotCache, String> omSnapshot3 =
         snapshotCache.get(dbKey3);
     assertNotNull(omSnapshot3);
     assertEquals(3, snapshotCache.size());
@@ -279,7 +279,7 @@ class TestSnapshotCache {
   void testEviction3WithClose() throws IOException {
 
     final String dbKey1 = "dbKey1";
-    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot = snapshotCache.get(dbKey1)) {
+    try (ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcOmSnapshot = snapshotCache.get(dbKey1)) {
       assertEquals(1L, rcOmSnapshot.getTotalRefCount());
       assertEquals(1, snapshotCache.size());
     }
@@ -289,11 +289,11 @@ class TestSnapshotCache {
     assertEquals(1, snapshotCache.size());
 
     final String dbKey2 = "dbKey2";
-    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot = snapshotCache.get(dbKey2)) {
+    try (ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcOmSnapshot = snapshotCache.get(dbKey2)) {
       assertEquals(1L, rcOmSnapshot.getTotalRefCount());
       assertEquals(2, snapshotCache.size());
       // Get dbKey2 entry a second time
-      try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot2 = snapshotCache.get(dbKey2)) {
+      try (ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcOmSnapshot2 = snapshotCache.get(dbKey2)) {
         assertEquals(2L, rcOmSnapshot.getTotalRefCount());
         assertEquals(2L, rcOmSnapshot2.getTotalRefCount());
         assertEquals(2, snapshotCache.size());
@@ -304,7 +304,7 @@ class TestSnapshotCache {
     assertEquals(2, snapshotCache.size());
 
     final String dbKey3 = "dbKey3";
-    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot = snapshotCache.get(dbKey3)) {
+    try (ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcOmSnapshot = snapshotCache.get(dbKey3)) {
       assertEquals(1L, rcOmSnapshot.getTotalRefCount());
       assertEquals(3, snapshotCache.size());
     }
@@ -312,7 +312,7 @@ class TestSnapshotCache {
     assertEquals(3, snapshotCache.size());
 
     final String dbKey4 = "dbKey4";
-    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot = snapshotCache.get(dbKey4)) {
+    try (ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcOmSnapshot = snapshotCache.get(dbKey4)) {
       assertEquals(1L, rcOmSnapshot.getTotalRefCount());
       assertEquals(1, snapshotCache.size());
     }

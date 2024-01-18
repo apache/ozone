@@ -213,11 +213,11 @@ public class TestOMSnapshotDAG {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     RDBStore rdbStore = (RDBStore) omMetadataManager.getStore();
     RocksDBCheckpointDiffer differ = rdbStore.getRocksDBCheckpointDiffer();
-    ReferenceCounted<IOmMetadataReader, SnapshotCache>
+    ReferenceCounted<IOmMetadataReader, SnapshotCache, String>
         snapDB1 = ozoneManager.getOmSnapshotManager()
         .getSnapshotCache().get(
             SnapshotInfo.getTableKey(volumeName, bucketName, "snap1"));
-    ReferenceCounted<IOmMetadataReader, SnapshotCache>
+    ReferenceCounted<IOmMetadataReader, SnapshotCache, String>
         snapDB2 = ozoneManager.getOmSnapshotManager()
         .getSnapshotCache().get(
             SnapshotInfo.getTableKey(volumeName, bucketName, "snap2"));
@@ -245,7 +245,7 @@ public class TestOMSnapshotDAG {
 
     resp = store.createSnapshot(volumeName, bucketName, "snap3");
     LOG.debug("Snapshot created: {}", resp);
-    ReferenceCounted<IOmMetadataReader, SnapshotCache>
+    ReferenceCounted<IOmMetadataReader, SnapshotCache, String>
         snapDB3 = ozoneManager.getOmSnapshotManager()
         .getSnapshotCache().get(
             SnapshotInfo.getTableKey(volumeName, bucketName, "snap3"));

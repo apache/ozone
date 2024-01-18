@@ -86,7 +86,7 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
           ((OmMetadataManagerImpl) metadataManager)
               .getOzoneManager().getOmSnapshotManager();
 
-      try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
+      try (ReferenceCounted<IOmMetadataReader, SnapshotCache, String>
           rcFromSnapshotInfo = omSnapshotManager.checkForSnapshot(
               fromSnapshotInfo.getVolumeName(),
               fromSnapshotInfo.getBucketName(),

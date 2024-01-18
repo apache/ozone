@@ -548,7 +548,7 @@ t
 
     keyDeletingService.resume();
 
-    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot =
+    try (ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcOmSnapshot =
         om.getOmSnapshotManager().checkForSnapshot(
             volumeName, bucketName, getSnapshotPrefix("snap3"), true)) {
       OmSnapshot snap3 = (OmSnapshot) rcOmSnapshot.get();

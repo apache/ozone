@@ -238,7 +238,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
           getOzoneManager().getMetadataManager();
 
-      try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcLatestSnapshot =
+      try (ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcLatestSnapshot =
           metadataManager.getLatestActiveSnapshot(
               deletedDirInfo.getVolumeName(),
               deletedDirInfo.getBucketName(),

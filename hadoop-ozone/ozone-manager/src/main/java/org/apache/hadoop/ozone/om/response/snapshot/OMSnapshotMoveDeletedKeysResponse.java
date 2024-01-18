@@ -93,7 +93,7 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
         ((OmMetadataManagerImpl) omMetadataManager)
             .getOzoneManager().getOmSnapshotManager();
 
-    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmFromSnapshot =
+    try (ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcOmFromSnapshot =
         omSnapshotManager.checkForSnapshot(
             fromSnapshot.getVolumeName(),
             fromSnapshot.getBucketName(),
@@ -103,7 +103,7 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
       OmSnapshot fromOmSnapshot = (OmSnapshot) rcOmFromSnapshot.get();
 
       if (nextSnapshot != null) {
-        try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
+        try (ReferenceCounted<IOmMetadataReader, SnapshotCache, String>
             rcOmNextSnapshot = omSnapshotManager.checkForSnapshot(
                 nextSnapshot.getVolumeName(),
                 nextSnapshot.getBucketName(),

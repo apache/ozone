@@ -462,7 +462,7 @@ public class TestSstFilteringService {
                                           String snapshot) throws IOException {
     SnapshotInfo snapshotInfo = om.getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(volume, bucket, snapshot));
-    try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
+    try (ReferenceCounted<IOmMetadataReader, SnapshotCache, String>
              snapshotMetadataReader = om.getOmSnapshotManager()
         .getSnapshotCache()
         .get(snapshotInfo.getTableKey())) {

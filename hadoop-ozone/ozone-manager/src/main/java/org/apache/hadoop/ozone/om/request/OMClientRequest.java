@@ -296,7 +296,7 @@ public abstract class OMClientRequest implements RequestAuditor {
         contextBuilder.setOwnerName(bucketOwner);
       }
 
-      try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcMetadataReader =
+      try (ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcMetadataReader =
           ozoneManager.getOmMetadataReader()) {
         OmMetadataReader omMetadataReader =
             (OmMetadataReader) rcMetadataReader.get();
@@ -362,7 +362,7 @@ public abstract class OMClientRequest implements RequestAuditor {
       String bucketOwner)
       throws IOException {
 
-    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcMetadataReader =
+    try (ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcMetadataReader =
         ozoneManager.getOmMetadataReader()) {
       OzoneAclUtils.checkAllAcls((OmMetadataReader) rcMetadataReader.get(),
           resType, storeType, aclType,

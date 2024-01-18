@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
@@ -37,7 +38,7 @@ import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNA
 /**
  * Thread-safe custom unbounded LRU cache to manage open snapshot DB instances.
  */
-public class SnapshotCache {
+public class SnapshotCache implements ReferenceCountedCallback {
 
   static final Logger LOG = LoggerFactory.getLogger(SnapshotCache.class);
 
@@ -45,13 +46,15 @@ public class SnapshotCache {
   // Key:   DB snapshot table key
   // Value: OmSnapshot instance, each holds a DB instance handle inside
   // TODO: [SNAPSHOT] Consider wrapping SoftReference<> around IOmMetadataReader
-  private final ConcurrentHashMap<String, ReferenceCounted<IOmMetadataReader, SnapshotCache>> dbMap;
+  private final ConcurrentHashMap<String, ReferenceCounted<IOmMetadataReader, SnapshotCache, String>> dbMap;
 
   private final OmSnapshotManager omSnapshotManager;
   private final CacheLoader<String, OmSnapshot> cacheLoader;
   // Soft-limit of the total number of snapshot DB instances allowed to be
   // opened on the OM.
   private final int cacheSizeLimit;
+
+  private final Set<String> pendingEvictionQueue;
 
   public SnapshotCache(
       OmSnapshotManager omSnapshotManager,
@@ -61,10 +64,11 @@ public class SnapshotCache {
     this.omSnapshotManager = omSnapshotManager;
     this.cacheLoader = cacheLoader;
     this.cacheSizeLimit = cacheSizeLimit;
+    this.pendingEvictionQueue = ConcurrentHashMap.newKeySet();
   }
 
   @VisibleForTesting
-  ConcurrentHashMap<String, ReferenceCounted<IOmMetadataReader, SnapshotCache>> getDbMap() {
+  ConcurrentHashMap<String, ReferenceCounted<IOmMetadataReader, SnapshotCache, String>> getDbMap() {
     return dbMap;
   }
 
@@ -98,11 +102,11 @@ public class SnapshotCache {
    * Immediately invalidate all entries and close their DB instances in cache.
    */
   public void invalidateAll() {
-    Iterator<Map.Entry<String, ReferenceCounted<IOmMetadataReader, SnapshotCache>>>
+    Iterator<Map.Entry<String, ReferenceCounted<IOmMetadataReader, SnapshotCache, String>>>
         it = dbMap.entrySet().iterator();
 
     while (it.hasNext()) {
-      Map.Entry<String, ReferenceCounted<IOmMetadataReader, SnapshotCache>> entry = it.next();
+      Map.Entry<String, ReferenceCounted<IOmMetadataReader, SnapshotCache, String>> entry = it.next();
       OmSnapshot omSnapshot = (OmSnapshot) entry.getValue().get();
       try {
         // TODO: If wrapped with SoftReference<>, omSnapshot could be null?
@@ -125,7 +129,7 @@ public class SnapshotCache {
     GARBAGE_COLLECTION_WRITE
   }
 
-  public ReferenceCounted<IOmMetadataReader, SnapshotCache> get(String key) throws IOException {
+  public ReferenceCounted<IOmMetadataReader, SnapshotCache, String> get(String key) throws IOException {
     return get(key, false);
   }
 
@@ -135,16 +139,16 @@ public class SnapshotCache {
    * @param key snapshot table key
    * @return an OmSnapshot instance, or null on error
    */
-  public ReferenceCounted<IOmMetadataReader, SnapshotCache> get(String key, boolean skipActiveCheck)
+  public ReferenceCounted<IOmMetadataReader, SnapshotCache, String> get(String key, boolean skipActiveCheck)
       throws IOException {
     // Atomic operation to initialize the OmSnapshot instance (once) if the key
     // does not exist, and increment the reference count on the instance.
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot =
+    ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcOmSnapshot =
         dbMap.compute(key, (k, v) -> {
           if (v == null) {
             LOG.info("Loading snapshot. Table key: {}", k);
             try {
-              v = new ReferenceCounted<>(cacheLoader.load(k), false, this);
+              v = new ReferenceCounted<>(cacheLoader.load(k), false, this, k);
             } catch (OMException omEx) {
               // Return null if the snapshot is no longer active
               if (!omEx.getResult().equals(FILE_NOT_FOUND)) {
@@ -178,17 +182,11 @@ public class SnapshotCache {
     // when called from SDT (and some) if the snapshot is not active anymore.
     if (!skipActiveCheck && !omSnapshotManager.isSnapshotStatus(key, SNAPSHOT_ACTIVE)) {
       // Ref count was incremented. Need to decrement on exception here.
-      rcOmSnapshot.decrementRefCount();
+      rcOmSnapshot.close();
       throw new OMException("Unable to load snapshot. " +
           "Snapshot with table key '" + key + "' is no longer active",
           FILE_NOT_FOUND);
     }
-
-    // Check if any entries can be cleaned up.
-    // At this point, cache size might temporarily exceed cacheSizeLimit
-    // even if there are entries that can be evicted, which is fine since it
-    // is a soft limit.
-    cleanup();
 
     return rcOmSnapshot;
   }
@@ -198,18 +196,12 @@ public class SnapshotCache {
    * @param key snapshot table key
    */
   public void release(String key) {
-    dbMap.compute(key, (k, v) -> {
-      if (v == null) {
-        throw new IllegalArgumentException("Key '" + key + "' does not exist in cache.");
-      } else {
-        v.decrementRefCount();
-      }
-      return v;
-    });
-
-    // The cache size might have already exceeded the soft limit
-    // Thus triggering cleanup() to check and evict if applicable
-    cleanup();
+    ReferenceCounted<IOmMetadataReader, SnapshotCache, String> val = dbMap.get(key);
+    if (val == null) {
+      throw new IllegalArgumentException("Key '" + key + "' does not " +
+          "exist in cache.");
+    }
+    val.decrementRefCount();
   }
 
   /**
@@ -222,10 +214,23 @@ public class SnapshotCache {
   }
 
   /**
+   * Callback method used to enqueue or dequeue ReferenceCounted from
+   * pendingEvictionList.
+   * @param referenceCounted ReferenceCounted object
+   */
+  @Override
+  public void callback(ReferenceCounted referenceCounted) {
+    if (referenceCounted.getTotalRefCount() == 0L) {
+      // Reference count reaches zero, add to pendingEvictionList
+      pendingEvictionQueue.add((String) referenceCounted.getParentKey());
+    }
+  }
+
+  /**
    * Wrapper for cleanupInternal() that is synchronized to prevent multiple
    * threads from interleaving into the cleanup method.
    */
-  private synchronized void cleanup() {
+  public synchronized void cleanup() {
     if (dbMap.size() > cacheSizeLimit) {
       cleanupInternal();
     }
@@ -237,8 +242,9 @@ public class SnapshotCache {
    * TODO: [SNAPSHOT] Add new ozone debug CLI command to trigger this directly.
    */
   private void cleanupInternal() {
-    for (Map.Entry<String, ReferenceCounted<IOmMetadataReader, SnapshotCache>> entry : dbMap.entrySet()) {
-      dbMap.compute(entry.getKey(), (k, v) -> {
+    for (String evictionKey : pendingEvictionQueue) {
+      dbMap.compute(evictionKey, (k, v) -> {
+        pendingEvictionQueue.remove(k);
         if (v == null) {
           throw new IllegalStateException("Key '" + k + "' does not exist in cache. The RocksDB " +
               "instance of the Snapshot may not be closed properly.");

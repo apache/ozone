@@ -1536,7 +1536,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           OmBucketInfo bucketInfo = getBucketTable().get(bucketKey);
 
           // Get the latest snapshot in snapshot path.
-          try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
+          try (ReferenceCounted<IOmMetadataReader, SnapshotCache, String>
               rcLatestSnapshot = getLatestActiveSnapshot(
                   keySplit[1], keySplit[2], omSnapshotManager)) {
 
@@ -1647,7 +1647,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * Get the latest OmSnapshot for a snapshot path.
    */
   public ReferenceCounted<
-      IOmMetadataReader, SnapshotCache> getLatestActiveSnapshot(
+      IOmMetadataReader, SnapshotCache, String> getLatestActiveSnapshot(
           String volumeName, String bucketName,
           OmSnapshotManager snapshotManager)
       throws IOException {
@@ -1681,7 +1681,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       }
     }
 
-    Optional<ReferenceCounted<IOmMetadataReader, SnapshotCache>> rcOmSnapshot =
+    Optional<ReferenceCounted<IOmMetadataReader, SnapshotCache, String>> rcOmSnapshot =
         snapshotInfo.isPresent() ?
             Optional.ofNullable(
                 snapshotManager.checkForSnapshot(volumeName,

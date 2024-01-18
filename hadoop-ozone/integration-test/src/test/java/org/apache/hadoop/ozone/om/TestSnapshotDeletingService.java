@@ -391,7 +391,7 @@ public class TestSnapshotDeletingService {
     assertTableRowCount(renamedTable, 4);
     assertTableRowCount(deletedDirTable, 3);
 
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcSnap1 =
+    ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcSnap1 =
         om.getOmSnapshotManager().checkForSnapshot(
             VOLUME_NAME, BUCKET_NAME_TWO, getSnapshotPrefix("snap1"), true);
     OmSnapshot snap1 = (OmSnapshot) rcSnap1.get();

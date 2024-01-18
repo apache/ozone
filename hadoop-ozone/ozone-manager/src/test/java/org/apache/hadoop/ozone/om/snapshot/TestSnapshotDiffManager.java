@@ -444,9 +444,9 @@ public class TestSnapshotDiffManager {
         eq(diffDir))
     ).thenReturn(Lists.newArrayList(randomStrings));
 
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcFromSnapshot =
+    ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcFromSnapshot =
         snapshotCache.get(snap1.toString());
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcToSnapshot =
+    ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcToSnapshot =
         snapshotCache.get(snap2.toString());
     OmSnapshot fromSnapshot = (OmSnapshot) rcFromSnapshot.get();
     OmSnapshot toSnapshot = (OmSnapshot) rcToSnapshot.get();
@@ -509,9 +509,9 @@ public class TestSnapshotDiffManager {
             .thenReturn(Collections.emptyList());
       }
 
-      ReferenceCounted<IOmMetadataReader, SnapshotCache> rcFromSnapshot =
+      ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcFromSnapshot =
           snapshotCache.get(snap1.toString());
-      ReferenceCounted<IOmMetadataReader, SnapshotCache> rcToSnapshot =
+      ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcToSnapshot =
           snapshotCache.get(snap2.toString());
       OmSnapshot fromSnapshot = (OmSnapshot) rcFromSnapshot.get();
       OmSnapshot toSnapshot = (OmSnapshot) rcToSnapshot.get();
@@ -572,9 +572,9 @@ public class TestSnapshotDiffManager {
               any(DifferSnapshotInfo.class),
               anyString());
 
-      ReferenceCounted<IOmMetadataReader, SnapshotCache> rcFromSnapshot =
+      ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcFromSnapshot =
           snapshotCache.get(snap1.toString());
-      ReferenceCounted<IOmMetadataReader, SnapshotCache> rcToSnapshot =
+      ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcToSnapshot =
           snapshotCache.get(snap2.toString());
       OmSnapshot fromSnapshot = (OmSnapshot) rcFromSnapshot.get();
       OmSnapshot toSnapshot = (OmSnapshot) rcToSnapshot.get();
