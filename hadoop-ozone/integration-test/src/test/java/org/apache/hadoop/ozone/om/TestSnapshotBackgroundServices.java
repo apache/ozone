@@ -88,7 +88,6 @@ import static org.junit.jupiter.api.Assertions.fail;
  * Tests snapshot background services.
  */
 @Timeout(5000)
-@Flaky("HDDS-9455")
 public class TestSnapshotBackgroundServices {
 
   private MiniOzoneHAClusterImpl cluster = null;

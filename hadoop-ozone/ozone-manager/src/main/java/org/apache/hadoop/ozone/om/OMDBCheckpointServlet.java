@@ -253,7 +253,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     } finally {
       // Unpause the compaction threads.
       differ.decrementTarballRequestCount();
-      differ.notifyAll();
+      synchronized (getDbStore().getRocksDBCheckpointDiffer()) {
+        differ.notifyAll();
+      }
       long elapsedTime = System.currentTimeMillis() - startTime;
       LOG.info("Compaction pausing {} ended. Elapsed ms: {}", pauseCounter, elapsedTime);
     }
