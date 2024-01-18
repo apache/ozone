@@ -56,7 +56,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
@@ -646,10 +645,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   }
 
   static class Lock extends BootstrapStateHandler.Lock {
-    private final Optional<BootstrapStateHandler> keyDeletingService;
-    private final Optional<BootstrapStateHandler> sstFilteringService;
-    private final Optional<BootstrapStateHandler> rocksDbCheckpointDiffer;
-    private final Optional<BootstrapStateHandler> snapshotDeletingService;
+    private final List<BootstrapStateHandler.Lock> locks;
     private final OzoneManager om;
 
     Lock(OzoneManager om) {
@@ -659,28 +655,24 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       Preconditions.checkNotNull(om.getMetadataManager().getStore());
 
       this.om = om;
-      keyDeletingService = Optional.ofNullable(om.getKeyManager().getDeletingService());
-      sstFilteringService = Optional.ofNullable(om.getKeyManager().getSnapshotSstFilteringService());
-      rocksDbCheckpointDiffer = Optional.ofNullable(om.getMetadataManager().getStore()
-          .getRocksDBCheckpointDiffer());
-      snapshotDeletingService = Optional.ofNullable(om.getKeyManager().getSnapshotDeletingService());
+
+      locks = Stream.of(
+          om.getKeyManager().getDeletingService(),
+          om.getKeyManager().getSnapshotSstFilteringService(),
+          om.getMetadataManager().getStore().getRocksDBCheckpointDiffer(),
+          om.getKeyManager().getSnapshotDeletingService()
+      )
+          .filter(Objects::nonNull)
+          .map(BootstrapStateHandler::getBootstrapStateLock)
+          .collect(Collectors.toList());
     }
 
     @Override
     public BootstrapStateHandler.Lock lock()
         throws InterruptedException {
       // First lock all the handlers.
-      if (keyDeletingService.isPresent()) {
-        keyDeletingService.get().getBootstrapStateLock().lock();
-      }
-      if (sstFilteringService.isPresent()) {
-        sstFilteringService.get().getBootstrapStateLock().lock();
-      }
-      if (rocksDbCheckpointDiffer.isPresent()) {
-        rocksDbCheckpointDiffer.get().getBootstrapStateLock().lock();
-      }
-      if (snapshotDeletingService.isPresent()) {
-        snapshotDeletingService.get().getBootstrapStateLock().lock();
+      for (BootstrapStateHandler.Lock lock : locks) {
+        lock.lock();
       }
 
       // Then wait for the double buffer to be flushed.
@@ -690,11 +682,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
     @Override
     public void unlock() {
-      snapshotDeletingService.ifPresent(deletingService -> deletingService.getBootstrapStateLock().unlock());
-      rocksDbCheckpointDiffer.ifPresent(
-          rocksDBCheckpointDiffer -> rocksDBCheckpointDiffer.getBootstrapStateLock().unlock());
-      sstFilteringService.ifPresent(filteringService -> filteringService.getBootstrapStateLock().unlock());
-      keyDeletingService.ifPresent(deletingService -> deletingService.getBootstrapStateLock().unlock());
+      locks.forEach(BootstrapStateHandler.Lock::unlock);
     }
   }
 }
