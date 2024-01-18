@@ -54,7 +54,7 @@ import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
-import org.apache.hadoop.ozone.scm.node.TestNodeUtil;
+import org.apache.hadoop.hdds.scm.node.TestNodeUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
@@ -483,4 +483,3 @@ public class TestReconAndAdminContainerCLI {
     CONF.setFromObject(replicationConf);
   }
 }
-
