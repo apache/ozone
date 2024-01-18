@@ -252,8 +252,8 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       checkpoint = getDbStore().getCheckpoint(flush);
     } finally {
       // Unpause the compaction threads.
-      differ.decrementTarballRequestCount();
       synchronized (getDbStore().getRocksDBCheckpointDiffer()) {
+        differ.decrementTarballRequestCount();
         differ.notifyAll();
       }
       long elapsedTime = System.currentTimeMillis() - startTime;
