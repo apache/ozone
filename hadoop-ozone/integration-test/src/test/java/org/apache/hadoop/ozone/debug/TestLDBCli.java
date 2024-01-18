@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
@@ -62,6 +61,8 @@ import java.util.TreeMap;
 import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class tests `ozone debug ldb` CLI that reads from a RocksDB directory.
@@ -218,7 +219,7 @@ public class TestLDBCli {
     int exitCode = cmd.execute(completeScanArgs.toArray(new String[0]));
     // Check exit code. Print stderr if not expected
     int expectedExitCode = expectedExitCodeStderrPair.getLeft();
-    Assertions.assertEquals(expectedExitCode, exitCode, stderr.toString());
+    assertEquals(expectedExitCode, exitCode, stderr.toString());
 
     // Construct expected result map given test param input
     Map<String, Map<String, ?>> expectedMap;
@@ -235,7 +236,7 @@ public class TestLDBCli {
 
     // Check stderr
     final String stderrShouldContain = expectedExitCodeStderrPair.getRight();
-    Assertions.assertTrue(stderr.toString().contains(stderrShouldContain));
+    assertTrue(stderr.toString().contains(stderrShouldContain));
   }
 
   @Test
@@ -251,13 +252,13 @@ public class TestLDBCli {
 
     int exitCode = cmd.execute(completeScanArgs.toArray(new String[0]));
     // Check exit code. Print stderr if not expected
-    Assertions.assertEquals(0, exitCode, stderr.toString());
+    assertEquals(0, exitCode, stderr.toString());
 
     // Check stdout
-    Assertions.assertEquals("{  }\n", stdout.toString());
+    assertEquals("{  }\n", stdout.toString());
 
     // Check stderr
-    Assertions.assertEquals("", stderr.toString());
+    assertEquals("", stderr.toString());
   }
 
   /**
@@ -271,7 +272,7 @@ public class TestLDBCli {
     Map<Object, ? extends Map<Object, ?>> actualMap = MAPPER.readValue(
         actualStr, new TypeReference<Map<Object, Map<Object, ?>>>() { });
 
-    Assertions.assertEquals(expected, actualMap);
+    assertEquals(expected, actualMap);
   }
 
   /**

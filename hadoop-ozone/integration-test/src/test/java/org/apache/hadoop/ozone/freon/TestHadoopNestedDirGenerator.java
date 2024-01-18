@@ -32,7 +32,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
 import java.util.LinkedList;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -44,6 +43,7 @@ import java.io.IOException;
 import java.net.URI;
 
 import static org.apache.ozone.test.GenericTestUtils.getTempPath;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test for HadoopNestedDirGenerator.
@@ -142,7 +142,7 @@ public class TestHadoopNestedDirGenerator {
       // verify the num of peer directories and span directories
       p = depthBFS(fileSystem, fileStatuses, span, actualDepth);
       int actualSpan = spanCheck(fileSystem, span, p);
-      Assertions.assertEquals(span, actualSpan, "Mismatch span in a path");
+      assertEquals(span, actualSpan, "Mismatch span in a path");
     }
   }
 
@@ -182,7 +182,7 @@ public class TestHadoopNestedDirGenerator {
         p = f.getPath().getParent();
       }
     }
-    Assertions.assertEquals(depth, actualDepth, "Mismatch depth in a path");
+    assertEquals(depth, actualDepth, "Mismatch depth in a path");
     return p;
   }
 

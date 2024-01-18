@@ -71,11 +71,13 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_F
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.Assertions;
+
 /**
  * Integration test class to verify block token CLI commands functionality in a
  * secure cluster.
@@ -264,7 +266,7 @@ public final class TestBlockTokensCLI {
     // rotating.
     String currentKey =
         getScmSecretKeyManager().getCurrentSecretKey().toString();
-    Assertions.assertEquals(initialKey, currentKey);
+    assertEquals(initialKey, currentKey);
 
     // Rotate the secret key.
     ozoneAdmin.execute(args);
@@ -280,9 +282,9 @@ public final class TestBlockTokensCLI {
     // Otherwise, both keys should be the same.
     if (isForceFlagPresent(args) ||
         shouldRotate(getScmSecretKeyManager().getCurrentSecretKey())) {
-      Assertions.assertNotEquals(initialKey, newKey);
+      assertNotEquals(initialKey, newKey);
     } else {
-      Assertions.assertEquals(initialKey, newKey);
+      assertEquals(initialKey, newKey);
     }
   }
 
