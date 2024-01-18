@@ -59,7 +59,7 @@ public class TestCapacityPipelineChoosePolicy {
     when(mockNodeManager.getNodeStat(datanodes.get(2)))
         .thenReturn(new SCMNodeMetric(100L, 20L, 80L, 0, 0));
     when(mockNodeManager.getNodeStat(datanodes.get(3)))
-        .thenReturn(new SCMNodeMetric(100L, 30L, 70L, 0 ,0));
+        .thenReturn(new SCMNodeMetric(100L, 30L, 70L, 0, 0));
 
     PipelineChoosePolicy policy = new CapacityPipelineChoosePolicy().init(mockNodeManager);
 
