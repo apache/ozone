@@ -23,10 +23,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.PrintStream;
-import java.io.UnsupportedEncodingException;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
@@ -47,6 +44,7 @@ import static org.mockito.Mockito.when;
 public class TestDecommissionSubCommand {
 
   private DecommissionSubCommand cmd;
+  private ScmClient scmClient;
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
   private final PrintStream originalOut = System.out;
@@ -56,6 +54,7 @@ public class TestDecommissionSubCommand {
   @BeforeEach
   public void setup() throws UnsupportedEncodingException {
     cmd = new DecommissionSubCommand();
+    scmClient = mock(ScmClient.class);
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
   }
@@ -67,8 +66,36 @@ public class TestDecommissionSubCommand {
   }
 
   @Test
+  public void testMultipleHostnamesCanBeReadFromStdin() throws Exception {
+    when(scmClient.decommissionNodes(anyList()))
+            .thenAnswer(invocation -> new ArrayList<DatanodeAdminError>());
+
+    String input = "host1\nhost2\nhost3\n";
+    System.setIn(new ByteArrayInputStream(input.getBytes(DEFAULT_ENCODING)));
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("-");
+    cmd.execute(scmClient);
+
+    Pattern p = Pattern.compile(
+            "^Started\\sdecommissioning\\sdatanode\\(s\\)", Pattern.MULTILINE);
+    Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
+
+    p = Pattern.compile("^host1$", Pattern.MULTILINE);
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
+
+    p = Pattern.compile("^host2$", Pattern.MULTILINE);
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
+
+    p = Pattern.compile("^host3$", Pattern.MULTILINE);
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
+  }
+
+  @Test
   public void testNoErrorsWhenDecommissioning() throws IOException  {
-    ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.decommissionNodes(anyList()))
         .thenAnswer(invocation -> new ArrayList<DatanodeAdminError>());
 
@@ -92,7 +119,6 @@ public class TestDecommissionSubCommand {
 
   @Test
   public void testErrorsReportedWhenDecommissioning() throws IOException  {
-    ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.decommissionNodes(anyList()))
         .thenAnswer(invocation -> {
           ArrayList<DatanodeAdminError> e = new ArrayList<>();
