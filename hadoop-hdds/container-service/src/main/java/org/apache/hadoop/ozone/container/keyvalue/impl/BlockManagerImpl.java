@@ -364,6 +364,7 @@ public class BlockManagerImpl implements BlockManager {
 
   private BlockData getBlockByID(DBHandle db, BlockID blockID,
       KeyValueContainerData containerData) throws IOException {
-    return db.getStore().getBlockByID(blockID, containerData);
+    String blockKey = containerData.getBlockKey(blockID.getLocalID());
+    return db.getStore().getBlockByID(blockID, blockKey);
   }
 }
