@@ -86,92 +86,52 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
     return OzoneAdmin.class;
   }
 
-  public boolean isFileSystemOptimizedBucket(String path) throws IOException {
-    OFSPath ofsPath = new OFSPath(path,
-        OzoneConfiguration.of(getOzoneConfig()));
-
-    OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(getOzoneConfig());
-    ObjectStore objectStore = ozoneClient.getObjectStore();
-
-    try {
-      OzoneBucket bucket = objectStore.getVolume(ofsPath.getVolumeName())
-          .getBucket(ofsPath.getBucketName());
-
-      // Resolve the bucket layout in case this is a Link Bucket.
-      BucketLayout resolvedBucketLayout =
-          OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore,
-              new HashSet<>());
-
-      return resolvedBucketLayout.isFileSystemOptimized();
-    } catch (IOException e) {
-      System.out.println(
-          "Bucket layout couldn't be verified for path: " + ofsPath +
-              ". Exception: " + e);
-      return false;
-    } finally {
-      ozoneClient.close();
-    }
-  }
-
-  public boolean isObjectStoreBucket(String path) throws IOException {
-    OFSPath ofsPath = new OFSPath(path,
-        OzoneConfiguration.of(getOzoneConfig()));
-
+  private boolean isObjectStoreBucket(OzoneBucket bucket, ObjectStore objectStore) {
     boolean enableFileSystemPaths = getOzoneConfig()
         .getBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
             OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS_DEFAULT);
-
-    OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(getOzoneConfig());
-    ObjectStore objectStore = ozoneClient.getObjectStore();
-
     try {
-      OzoneBucket bucket = objectStore.getVolume(ofsPath.getVolumeName())
-          .getBucket(ofsPath.getBucketName());
-
       // Resolve the bucket layout in case this is a Link Bucket.
       BucketLayout resolvedBucketLayout =
           OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore,
               new HashSet<>());
-
       return resolvedBucketLayout.isObjectStore(enableFileSystemPaths);
     } catch (IOException e) {
       System.out.println(
-          "Bucket layout couldn't be verified for path: " + ofsPath +
-              ". Exception: " + e);
+          "Bucket layout couldn't be resolved. Exception thrown: " + e);
       return false;
-    } finally {
-      ozoneClient.close();
     }
   }
 
   /**
-   * Checking if the bucket is part of the path.
+   * Checks if bucket is OBS bucket or if bucket is part of the path.
    * Return false if path is root, just a volume or invalid.
+   * Returns false if bucket is part of path but not a OBS bucket.
    * @param path
-   * @return true if the bucket
-   * is not part of the given path.
+   * @return true if bucket is OBS bucket or not part of provided path.
    * @throws IOException
    */
-  public boolean bucketIsPresentInThePath(String path) throws IOException {
+  public boolean isOBSBucketOrNotPresentInPath(String path) throws IOException {
     OFSPath ofsPath = new OFSPath(path,
         OzoneConfiguration.of(getOzoneConfig()));
 
     OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(getOzoneConfig());
     ObjectStore objectStore = ozoneClient.getObjectStore();
-
+    OzoneBucket bucket;
     try {
-      OzoneBucket bucket = objectStore.getVolume(ofsPath.getVolumeName())
+      // Checks if the bucket is part of the path.
+      bucket = objectStore.getVolume(ofsPath.getVolumeName())
           .getBucket(ofsPath.getBucketName());
-
-      return Objects.nonNull(bucket);
     } catch (IOException e) {
       System.out.println(
           "Bucket layout couldn't be verified for path: " + ofsPath +
               ". Exception: " + e);
-      return false;
+      bucket = null;
     } finally {
       ozoneClient.close();
     }
+    boolean isOBSBucket = bucket != null ? isObjectStoreBucket(bucket, objectStore) : false;
+    return isOBSBucket || !Objects.nonNull(bucket);
   }
 
   /**

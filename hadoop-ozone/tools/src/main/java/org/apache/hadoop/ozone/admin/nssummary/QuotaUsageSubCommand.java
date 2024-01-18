@@ -80,8 +80,7 @@ public class QuotaUsageSubCommand implements Callable {
     } else if (quotaResponse.get("status").equals("TYPE_NOT_APPLICABLE")) {
       printTypeNA("Quota");
     } else {
-      if (parent.isObjectStoreBucket(path) ||
-          !parent.bucketIsPresentInThePath(path)) {
+      if (parent.isOBSBucketOrNotPresentInPath(path)) {
         printBucketReminder();
       }
 
