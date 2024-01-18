@@ -1517,8 +1517,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
      *                for cache.
      */
     public static void invalidateCacheEntry(String cacheKey) {
-      IOUtils.closeQuietly(INSTANCE_MAP.get(cacheKey));
-      INSTANCE_MAP.remove(cacheKey);
+      IOUtils.close(LOG, INSTANCE_MAP.remove(cacheKey));
     }
   }
 
