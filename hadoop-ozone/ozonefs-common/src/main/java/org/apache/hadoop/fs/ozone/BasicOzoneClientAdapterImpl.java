@@ -691,11 +691,11 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   @Override
-  public OmKeyInfo recoverFilePrepare(final String pathStr) throws IOException {
+  public OmKeyInfo recoverFilePrepare(final String pathStr, boolean force) throws IOException {
     incrementCounter(Statistic.INVOCATION_RECOVER_FILE_PREPARE, 1);
 
     return ozoneClient.getProxy().getOzoneManagerClient().recoverLease(
-        volume.getName(), bucket.getName(), pathStr);
+        volume.getName(), bucket.getName(), pathStr, force);
   }
 
   @Override

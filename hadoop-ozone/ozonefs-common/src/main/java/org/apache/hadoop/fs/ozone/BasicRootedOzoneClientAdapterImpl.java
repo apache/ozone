@@ -1364,14 +1364,14 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   @Override
-  public OmKeyInfo recoverFilePrepare(final String pathStr) throws IOException {
+  public OmKeyInfo recoverFilePrepare(final String pathStr, boolean force) throws IOException {
     incrementCounter(Statistic.INVOCATION_RECOVER_FILE_PREPARE, 1);
     OFSPath ofsPath = new OFSPath(pathStr, config);
 
     OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
     OzoneBucket bucket = getBucket(ofsPath, false);
     return ozoneClient.getProxy().getOzoneManagerClient().recoverLease(
-            volume.getName(), bucket.getName(), ofsPath.getKeyName());
+        volume.getName(), bucket.getName(), ofsPath.getKeyName(), force);
   }
 
   @Override

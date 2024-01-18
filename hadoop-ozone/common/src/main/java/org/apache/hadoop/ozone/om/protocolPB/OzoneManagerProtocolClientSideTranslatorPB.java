@@ -2447,12 +2447,14 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public OmKeyInfo recoverLease(String volumeName, String bucketName, String keyName) throws IOException {
+  public OmKeyInfo recoverLease(String volumeName, String bucketName, String keyName, boolean force)
+      throws IOException {
     RecoverLeaseRequest recoverLeaseRequest =
         RecoverLeaseRequest.newBuilder()
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setKeyName(keyName)
+            .setForce(force)
             .build();
 
     OMRequest omRequest = createOMRequest(Type.RecoverLease)

@@ -144,7 +144,7 @@ public class OzoneFileSystem extends BasicOzoneFileSystem
     String key = pathToKey(qualifiedPath);
     OmKeyInfo keyInfo = null;
     try {
-      keyInfo = getAdapter().recoverFilePrepare(key);
+      keyInfo = getAdapter().recoverFilePrepare(key, forceRecovery);
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.KEY_ALREADY_CLOSED) {
         // key is already closed, let's just return success

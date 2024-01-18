@@ -89,6 +89,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.ozone.OzoneConsts.FORCE_LEASE_RECOVERY_ENV;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -250,8 +251,9 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     }
   }
 
-  @Test
-  public void testFileRecovery() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testFileRecovery(boolean forceRecovery) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
@@ -270,6 +272,9 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     final String rootPath = String.format("%s://%s/",
         OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    // force recovery file
+    System.setProperty(FORCE_LEASE_RECOVERY_ENV, String.valueOf(forceRecovery));
+    conf.setBoolean(String.format("fs.%s.impl.disable.cache", OZONE_OFS_URI_SCHEME), true);
     RootedOzoneFileSystem fs = (RootedOzoneFileSystem) FileSystem.get(conf);
     OzoneOutputStream out = null;
     try {
@@ -277,11 +282,20 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
           ReplicationFactor.THREE, new HashMap<>());
       out.write(value.getBytes(UTF_8));
       out.hsync();
-      fs.recoverLease(file);
+
+      if (forceRecovery) {
+        fs.recoverLease(file);
+      } else {
+        assertThrows(OMException.class, () -> fs.recoverLease(file));
+      }
     } finally {
       if (out != null) {
-        // close failure because the key is already committed
-        assertThrows(OMException.class, out::close);
+        if (forceRecovery) {
+          // close failure because the key is already committed
+          assertThrows(OMException.class, out::close);
+        } else {
+          out.close();
+        }
       }
     }
   }

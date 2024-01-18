@@ -98,7 +98,7 @@ public interface OzoneClientAdapter {
       String fromSnapshot, String toSnapshot)
       throws IOException, InterruptedException;
 
-  OmKeyInfo recoverFilePrepare(String pathStr) throws IOException;
+  OmKeyInfo recoverFilePrepare(String pathStr, boolean force) throws IOException;
 
   void recoverFile(OmKeyArgs keyArgs) throws IOException;
 

@@ -60,6 +60,7 @@ import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.FORCE_LEASE_RECOVERY_ENV;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -288,7 +289,7 @@ public class TestLeaseRecovery {
     // reduce read timeout
     conf.set(OZONE_CLIENT_READ_TIMEOUT, "2s");
     // set force recovery
-    System.setProperty("OZONE.CLIENT.RECOVER.LEASE.FORCE", String.valueOf(forceRecovery));
+    System.setProperty(FORCE_LEASE_RECOVERY_ENV, String.valueOf(forceRecovery));
     RootedOzoneFileSystem fs = (RootedOzoneFileSystem)FileSystem.get(conf);
     int dataSize = 100;
     final byte[] data = getData(dataSize);
