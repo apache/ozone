@@ -32,14 +32,14 @@ import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.mockito.Mockito;
 import picocli.CommandLine;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.Matchers.anyInt;
-import static org.mockito.Matchers.anyListOf;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Unit tests to validate the DecommissionSubCommand class includes the
@@ -70,8 +70,7 @@ public class TestMaintenanceSubCommand {
   @Test
   public void testNoErrorsWhenEnteringMaintenance() throws IOException  {
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.startMaintenanceNodes(
-        anyListOf(String.class), anyInt()))
+    when(scmClient.startMaintenanceNodes(anyList(), anyInt()))
         .thenAnswer(invocation -> new ArrayList<DatanodeAdminError>());
 
     CommandLine c = new CommandLine(cmd);
@@ -96,8 +95,7 @@ public class TestMaintenanceSubCommand {
   @Test
   public void testErrorsReportedWhenEnteringMaintenance() throws IOException  {
     ScmClient scmClient = mock(ScmClient.class);
-    Mockito.when(scmClient.startMaintenanceNodes(
-        anyListOf(String.class), anyInt()))
+    when(scmClient.startMaintenanceNodes(anyList(), anyInt()))
         .thenAnswer(invocation -> {
           ArrayList<DatanodeAdminError> e = new ArrayList<>();
           e.add(new DatanodeAdminError("host1", "host1 error"));

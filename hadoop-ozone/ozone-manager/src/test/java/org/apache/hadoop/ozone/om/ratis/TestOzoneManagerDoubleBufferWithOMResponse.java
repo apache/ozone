@@ -87,8 +87,6 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
   private OMMetadataManager omMetadataManager;
   private OzoneManagerDoubleBuffer doubleBuffer;
   private final AtomicLong trxId = new AtomicLong(0);
-  private OzoneManagerRatisSnapshot ozoneManagerRatisSnapshot;
-  private volatile long lastAppliedIndex;
   private long term = 1L;
 
   @TempDir
@@ -109,12 +107,8 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
-    ozoneManagerRatisSnapshot = index -> {
-      lastAppliedIndex = index.get(index.size() - 1);
-    };
     doubleBuffer = new OzoneManagerDoubleBuffer.Builder()
         .setOmMetadataManager(omMetadataManager)
-        .setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
         .setmaxUnFlushedTransactionCount(100000)
         .enableRatis(true)
         .build();
@@ -198,16 +192,21 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     checkDeletedBuckets(deleteBucketQueue);
 
     // Check lastAppliedIndex is updated correctly or not.
-    GenericTestUtils.waitFor(() ->
-        bucketCount + deleteCount + 1 == lastAppliedIndex,
+    final long expectedIndex = bucketCount + deleteCount + 1;
+    GenericTestUtils.waitFor(() -> assertTransactionInfo(expectedIndex),
         100, 30000);
+  }
 
-    TransactionInfo transactionInfo =
-        omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
-    assertNotNull(transactionInfo);
-
-    assertEquals(lastAppliedIndex, transactionInfo.getTransactionIndex());
-    assertEquals(term, transactionInfo.getTerm());
+  private boolean assertTransactionInfo(long lastAppliedIndex) {
+    final TransactionInfo info;
+    try {
+      info = omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
+    } catch (IOException e) {
+      return false;
+    }
+    return info != null
+        && info.getTransactionIndex() == lastAppliedIndex
+        && info.getTerm() == term;
   }
 
   /**
@@ -275,7 +274,8 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     // running in parallel, so lastAppliedIndex cannot be always
     // total transaction count. So, just checking here whether it is less
     // than total transaction count.
-    assertThat(lastAppliedIndex).isLessThanOrEqualTo(bucketCount + deleteCount + 2);
+    final TransactionInfo info = omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
+    assertThat(info.getTransactionIndex()).isLessThanOrEqualTo(bucketCount + deleteCount + 2);
   }
 
   /**

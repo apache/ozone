@@ -39,7 +39,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.MethodOrderer;
@@ -62,6 +61,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -193,7 +193,7 @@ public class TestOzoneRpcClientForAclAuditLog {
     OzoneVolume retVolumeinfo = store.getVolume(volumeName);
     verifyLog(OMAction.READ_VOLUME.name(), volumeName,
         AuditEventStatus.SUCCESS.name());
-    Assertions.assertTrue(retVolumeinfo.getName().equalsIgnoreCase(volumeName));
+    assertTrue(retVolumeinfo.getName().equalsIgnoreCase(volumeName));
 
     OzoneObj volObj = new OzoneObjInfo.Builder()
         .setVolumeName(volumeName)
@@ -205,7 +205,7 @@ public class TestOzoneRpcClientForAclAuditLog {
     List<OzoneAcl> acls = store.getAcl(volObj);
     verifyLog(OMAction.GET_ACL.name(), volumeName,
         AuditEventStatus.SUCCESS.name());
-    Assertions.assertTrue(acls.size() > 0);
+    assertThat(acls.size()).isGreaterThan(0);
 
     //Testing addAcl
     store.addAcl(volObj, USER_ACL);
@@ -287,7 +287,7 @@ public class TestOzoneRpcClientForAclAuditLog {
       // that must be equal to the expected string
       assertNotEquals(0, lines.size());
       for (String exp: expected) {
-        assertTrue(lines.get(0).contains(exp));
+        assertThat(lines.get(0)).contains(exp);
       }
     } catch (AssertionError ex) {
       LOG.error("Error occurred in log verification", ex);

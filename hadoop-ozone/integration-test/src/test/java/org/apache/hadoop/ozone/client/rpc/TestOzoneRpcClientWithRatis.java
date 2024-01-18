@@ -53,7 +53,6 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
-import org.apache.hadoop.ozone.om.ratis.metrics.OzoneManagerStateMachineMetrics;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -302,7 +301,6 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
         .captureLogs(OzoneManagerStateMachine.LOG);
     OzoneManagerStateMachine omSM = getCluster().getOzoneManager()
         .getOmRatisServer().getOmStateMachine();
-    OzoneManagerStateMachineMetrics metrics = omSM.getMetrics();
 
     Thread thread1 = new Thread(() -> {
       try {
@@ -326,8 +324,6 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
     omSM.getHandler().setInjector(injector);
     thread1.start();
     thread2.start();
-    GenericTestUtils.waitFor(() -> metrics.getApplyTransactionMapSize() > 0,
-        100, 5000);
     Thread.sleep(2000);
     injector.resume();
 
@@ -349,8 +345,6 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
     }
 
     assertThat(omSMLog.getOutput()).contains("Failed to write, Exception occurred");
-    GenericTestUtils.waitFor(() -> metrics.getApplyTransactionMapSize() == 0,
-        100, 5000);
   }
 
   private static class OMRequestHandlerPauseInjector extends FaultInjector {

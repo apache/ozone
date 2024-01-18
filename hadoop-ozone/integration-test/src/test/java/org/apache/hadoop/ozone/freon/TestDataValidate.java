@@ -23,11 +23,14 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
 
 import java.time.Duration;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests Freon, with MiniOzoneCluster and validate data.
@@ -76,10 +79,10 @@ public abstract class TestDataValidate {
         "--validate-writes"
     );
 
-    Assertions.assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
-    Assertions.assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
-    Assertions.assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
-    Assertions.assertEquals(0, randomKeyGenerator.getUnsuccessfulValidationCount());
+    assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
+    assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
+    assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
+    assertEquals(0, randomKeyGenerator.getUnsuccessfulValidationCount());
   }
 
   @Test
@@ -95,14 +98,12 @@ public abstract class TestDataValidate {
         "--validate-writes"
     );
 
-    Assertions.assertEquals(2, randomKeyGenerator.getNumberOfVolumesCreated());
-    Assertions.assertEquals(10, randomKeyGenerator.getNumberOfBucketsCreated());
-    Assertions.assertEquals(100, randomKeyGenerator.getNumberOfKeysAdded());
-    Assertions.assertTrue(randomKeyGenerator.getValidateWrites());
-    Assertions.assertNotEquals(0, randomKeyGenerator.getTotalKeysValidated());
-    Assertions.assertNotEquals(0, randomKeyGenerator
-        .getSuccessfulValidationCount());
-    Assertions.assertEquals(0, randomKeyGenerator
-        .getUnsuccessfulValidationCount());
+    assertEquals(2, randomKeyGenerator.getNumberOfVolumesCreated());
+    assertEquals(10, randomKeyGenerator.getNumberOfBucketsCreated());
+    assertEquals(100, randomKeyGenerator.getNumberOfKeysAdded());
+    assertTrue(randomKeyGenerator.getValidateWrites());
+    assertNotEquals(0, randomKeyGenerator.getTotalKeysValidated());
+    assertNotEquals(0, randomKeyGenerator.getSuccessfulValidationCount());
+    assertEquals(0, randomKeyGenerator.getUnsuccessfulValidationCount());
   }
 }

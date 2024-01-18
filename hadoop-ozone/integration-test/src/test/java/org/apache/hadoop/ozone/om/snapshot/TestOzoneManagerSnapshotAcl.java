@@ -50,7 +50,6 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -66,6 +65,9 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConsts.ADMIN;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
@@ -153,8 +155,7 @@ public class TestOzoneManagerSnapshotAcl {
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
 
     // WHEN-THEN
-    Assertions.assertDoesNotThrow(
-        () -> ozoneManager.lookupKey(snapshotKeyArgs));
+    assertDoesNotThrow(() -> ozoneManager.lookupKey(snapshotKeyArgs));
   }
 
   @ParameterizedTest
@@ -168,14 +169,14 @@ public class TestOzoneManagerSnapshotAcl {
 
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
-    final OMException ex = Assertions.assertThrows(OMException.class,
+    final OMException ex = assertThrows(OMException.class,
         () -> ozoneManager.lookupKey(snapshotKeyArgs));
 
     // THEN
-    Assertions.assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
         ex.getResult());
     // when same user reads same key from active fs, read allowed.
-    Assertions.assertDoesNotThrow(() -> ozoneManager.lookupKey(keyArgs));
+    assertDoesNotThrow(() -> ozoneManager.lookupKey(keyArgs));
   }
 
   @ParameterizedTest
@@ -188,7 +189,7 @@ public class TestOzoneManagerSnapshotAcl {
     final boolean assumeS3Context = false;
 
     // WHEN-THEN
-    Assertions.assertDoesNotThrow(
+    assertDoesNotThrow(
         () -> ozoneManager.getKeyInfo(snapshotKeyArgs, assumeS3Context));
   }
 
@@ -205,15 +206,15 @@ public class TestOzoneManagerSnapshotAcl {
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
     final OMException ex =
-        Assertions.assertThrows(OMException.class,
+        assertThrows(OMException.class,
             () -> ozoneManager.getKeyInfo(snapshotKeyOmKeyArgs,
                 assumeS3Context));
 
     // THEN
-    Assertions.assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
         ex.getResult());
     // when same user reads same key from active fs, read allowed.
-    Assertions.assertDoesNotThrow(
+    assertDoesNotThrow(
         () -> ozoneManager.getKeyInfo(omKeyArgs, assumeS3Context));
   }
 
@@ -228,7 +229,7 @@ public class TestOzoneManagerSnapshotAcl {
     final long numEntries = Long.parseLong(RandomStringUtils.randomNumeric(1));
 
     // WHEN-THEN
-    Assertions.assertDoesNotThrow(
+    assertDoesNotThrow(
         () -> ozoneManager.listStatus(snapshotKeyArgs, recursive,
             snapshotKeyArgs.getKeyName(), numEntries,
             allowPartialPrefixes));
@@ -248,16 +249,16 @@ public class TestOzoneManagerSnapshotAcl {
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
     final OMException ex =
-        Assertions.assertThrows(OMException.class,
+        assertThrows(OMException.class,
             () -> ozoneManager.listStatus(snapshotKeyArgs, recursive,
                 snapshotKeyArgs.getKeyName(), numEntries,
                 allowPartialPrefixes));
 
     // THEN
-    Assertions.assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
         ex.getResult());
     // when same user reads same key from active fs, read allowed.
-    Assertions.assertDoesNotThrow(() -> ozoneManager.listStatus(keyArgs,
+    assertDoesNotThrow(() -> ozoneManager.listStatus(keyArgs,
         recursive, keyName, numEntries, allowPartialPrefixes));
   }
 
@@ -270,7 +271,7 @@ public class TestOzoneManagerSnapshotAcl {
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
 
     // WHEN-THEN
-    Assertions.assertDoesNotThrow(
+    assertDoesNotThrow(
         () -> ozoneManager.lookupFile(snapshotKeyArgs));
   }
 
@@ -285,14 +286,14 @@ public class TestOzoneManagerSnapshotAcl {
 
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
-    final OMException ex = Assertions.assertThrows(OMException.class,
+    final OMException ex = assertThrows(OMException.class,
         () -> ozoneManager.lookupFile(snapshotKeyArgs));
 
     // THEN
-    Assertions.assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
         ex.getResult());
     // when same user reads same key from active fs, read allowed.
-    Assertions.assertDoesNotThrow(() -> ozoneManager.lookupFile(keyArgs));
+    assertDoesNotThrow(() -> ozoneManager.lookupFile(keyArgs));
   }
 
   @ParameterizedTest
@@ -305,7 +306,7 @@ public class TestOzoneManagerSnapshotAcl {
     final int maxKeys = Integer.parseInt(RandomStringUtils.randomNumeric(1));
 
     // WHEN-THEN
-    Assertions.assertDoesNotThrow(() -> ozoneManager.listKeys(volumeName,
+    assertDoesNotThrow(() -> ozoneManager.listKeys(volumeName,
         bucketName, snapshotKeyArgs.getKeyName(), snapshotKeyPrefix, maxKeys));
   }
 
@@ -322,10 +323,10 @@ public class TestOzoneManagerSnapshotAcl {
     UserGroupInformation.setLoginUser(UGI2);
 
     // THEN
-    Assertions.assertDoesNotThrow(
+    assertDoesNotThrow(
         () -> ozoneManager.listKeys(volumeName, bucketName,
             snapshotKeyArgs.getKeyName(), snapshotKeyPrefix, maxKeys));
-    Assertions.assertDoesNotThrow(() -> ozoneManager.listKeys(volumeName,
+    assertDoesNotThrow(() -> ozoneManager.listKeys(volumeName,
         bucketName, keyName, KEY_PREFIX, maxKeys));
   }
 
@@ -345,7 +346,7 @@ public class TestOzoneManagerSnapshotAcl {
         .build();
 
     // WHEN-THEN
-    Assertions.assertDoesNotThrow(() -> ozoneManager.getAcl(ozoneObj));
+    assertDoesNotThrow(() -> ozoneManager.getAcl(ozoneObj));
   }
 
   @ParameterizedTest
@@ -371,14 +372,14 @@ public class TestOzoneManagerSnapshotAcl {
 
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
-    final OMException ex = Assertions.assertThrows(OMException.class,
+    final OMException ex = assertThrows(OMException.class,
         () -> ozoneManager.getAcl(snapshotObj));
 
     // THEN
-    Assertions.assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
         ex.getResult());
     // when same user reads same key from active fs, read allowed.
-    Assertions.assertDoesNotThrow(() -> ozoneManager.getAcl(keyObj));
+    assertDoesNotThrow(() -> ozoneManager.getAcl(keyObj));
   }
 
   private void setup(BucketLayout bucketLayout)

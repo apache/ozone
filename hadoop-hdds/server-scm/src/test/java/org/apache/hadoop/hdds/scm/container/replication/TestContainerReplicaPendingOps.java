@@ -38,7 +38,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -387,6 +387,6 @@ public class TestContainerReplicaPendingOps {
     pendingOps.removeExpiredEntries();
     // no entries have expired, so there should be zero interactions with the
     // subscriber
-    verifyZeroInteractions(subscriber1);
+    verifyNoMoreInteractions(subscriber1);
   }
 }
