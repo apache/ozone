@@ -93,8 +93,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     KeyArgs keyArgs = commitKeyRequest.getKeyArgs();
 
     // Verify key name
-    validateKeyName(ozoneManager, StringUtils.removeEnd(keyArgs.getKeyName(),
-        OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX));
+    validateKeyName(ozoneManager, keyArgs,
+        StringUtils.removeEnd(keyArgs.getKeyName(),
+            OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX));
 
     boolean isHsync = commitKeyRequest.hasHsync() &&
         commitKeyRequest.getHsync();

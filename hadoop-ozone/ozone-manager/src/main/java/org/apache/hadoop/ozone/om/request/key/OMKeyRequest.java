@@ -174,8 +174,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return resolvedArgs;
   }
 
-  protected void validateKeyName(OzoneManager ozoneManager, String keyName)
-      throws OMException {
+  protected void validateKeyName(OzoneManager ozoneManager, KeyArgs keyArgs,
+      String keyName) throws OMException {
     final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
         .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
             OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);

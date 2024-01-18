@@ -94,7 +94,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
     // Verify key name
     OmUtils.verifyKeyNameWithSnapshotReservedWord(keyArgs.getKeyName());
-    validateKeyName(ozoneManager, keyArgs.getKeyName());
+    validateKeyName(ozoneManager, keyArgs, keyArgs.getKeyName());
 
     String keyPath = keyArgs.getKeyName();
     keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
