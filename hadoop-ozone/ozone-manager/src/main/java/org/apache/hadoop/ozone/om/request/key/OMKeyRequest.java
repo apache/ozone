@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -61,7 +62,9 @@ import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.lock.OzoneLockStrategy;
 import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
+import org.apache.hadoop.ozone.om.request.file.OMFileCreateRequest;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -174,12 +177,26 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return resolvedArgs;
   }
 
-  protected void validateKeyName(OzoneManager ozoneManager, KeyArgs keyArgs,
-      String keyName) throws OMException {
+  protected void validateKeyName(OzoneManager ozoneManager, KeyArgs keyArgs)
+      throws OMException {
     final boolean checkKeyNameEnabled = ozoneManager.getConfiguration()
         .getBoolean(OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_KEY,
             OMConfigKeys.OZONE_OM_KEYNAME_CHARACTER_CHECK_ENABLED_DEFAULT);
     if (checkKeyNameEnabled) {
+      String keyName = null;
+      if (this instanceof OMKeyCreateRequest) {
+        keyName = keyArgs.getKeyName();
+      } else if (this instanceof OMKeyRenameRequest) {
+        OzoneManagerProtocolProtos.RenameKeyRequest renameKeyRequest =
+            this.getOmRequest().getRenameKeyRequest();
+        keyName = renameKeyRequest.getToKeyName();
+      } else if (this instanceof OMKeyCommitRequest) {
+        keyName = StringUtils.removeEnd(keyArgs.getKeyName(),
+            OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX);
+      } else if (this instanceof OMFileCreateRequest) {
+        keyName = StringUtils.removeEnd(keyArgs.getKeyName(),
+            OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX);
+      }
       OmUtils.validateKeyName(keyName);
     }
   }

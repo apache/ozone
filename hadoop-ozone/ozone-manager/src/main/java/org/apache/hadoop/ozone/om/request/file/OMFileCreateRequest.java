@@ -95,9 +95,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
     // Verify key name
     OmUtils.verifyKeyNameWithSnapshotReservedWord(keyArgs.getKeyName());
-    validateKeyName(ozoneManager, keyArgs,
-        StringUtils.removeEnd(keyArgs.getKeyName(),
-            OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX));
+    validateKeyName(ozoneManager, keyArgs);
 
     UserInfo userInfo = getUserInfo();
     if (keyArgs.getKeyName().length() == 0) {

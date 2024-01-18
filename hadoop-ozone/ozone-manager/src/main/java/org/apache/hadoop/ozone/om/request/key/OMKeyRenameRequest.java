@@ -80,11 +80,9 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     RenameKeyRequest renameKeyRequest = super.preExecute(ozoneManager)
         .getRenameKeyRequest();
     Preconditions.checkNotNull(renameKeyRequest);
-
     // Verify key name
     KeyArgs renameKeyArgs = renameKeyRequest.getKeyArgs();
-    validateKeyName(ozoneManager, renameKeyArgs,
-        renameKeyRequest.getToKeyName());
+    validateKeyName(ozoneManager, renameKeyArgs);
 
     String srcKey = extractSrcKey(renameKeyArgs);
     String dstKey = extractDstKey(renameKeyRequest);
