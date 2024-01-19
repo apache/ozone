@@ -46,6 +46,7 @@ import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -62,6 +63,7 @@ import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LEASE_HARD_LIMIT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -96,6 +98,9 @@ class TestOpenKeyCleanupService {
         SERVICE_INTERVAL, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_OM_OPEN_KEY_EXPIRE_THRESHOLD,
         EXPIRE_THRESHOLD_MS, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(OZONE_OM_LEASE_HARD_LIMIT,
+        EXPIRE_THRESHOLD_MS, TimeUnit.MILLISECONDS);
+    conf.set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "0s");
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     conf.setQuietMode(false);
     OmTestManagers omTestManagers = new OmTestManagers(conf);
@@ -151,8 +156,8 @@ class TestOpenKeyCleanupService {
     assertEquals(0, metrics.getNumOpenKeysCleaned());
     assertEquals(0, metrics.getNumOpenKeysHSyncCleaned());
     final int keyCount = numDEFKeys + numFSOKeys;
-    createOpenKeys(numDEFKeys, false, BucketLayout.DEFAULT);
-    createOpenKeys(numFSOKeys, hsync, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    createOpenKeys(numDEFKeys, false, BucketLayout.DEFAULT, false);
+    createOpenKeys(numFSOKeys, hsync, BucketLayout.FILE_SYSTEM_OPTIMIZED, false);
 
     // wait for open keys to expire
     Thread.sleep(EXPIRE_THRESHOLD_MS);
@@ -182,6 +187,46 @@ class TestOpenKeyCleanupService {
       assertEquals(0, metrics.getNumOpenKeysHSyncCleaned());
       assertEquals(0, metrics.getNumKeyHSyncs());
     }
+  }
+
+  /**
+   * In this test, we create a bunch of hsync keys with some keys having recover flag set.
+   * OpenKeyCleanupService should commit keys which don't have recovery flag and has expired.
+   * Keys with recovery flag and expired should be ignored by OpenKeyCleanupService.
+   * @throws IOException - on Failure.
+   */
+  @Test
+  @Timeout(300)
+  public void testIgnoreExpiredRecoverhsyncKeys() throws Exception {
+    OpenKeyCleanupService openKeyCleanupService =
+        (OpenKeyCleanupService) keyManager.getOpenKeyCleanupService();
+
+    openKeyCleanupService.suspend();
+    // wait for submitted tasks to complete
+    Thread.sleep(SERVICE_INTERVAL);
+    final long oldkeyCount = openKeyCleanupService.getSubmittedOpenKeyCount();
+    LOG.info("oldkeyCount={}", oldkeyCount);
+    assertEquals(0, oldkeyCount);
+
+    final OMMetrics metrics = om.getMetrics();
+    assertEquals(0, metrics.getNumOpenKeysHSyncCleaned());
+    int keyCount = 10;
+    createOpenKeys(keyCount, true, BucketLayout.FILE_SYSTEM_OPTIMIZED, false);
+    // create 2 more key and mark recovery flag set
+    createOpenKeys(2, true, BucketLayout.FILE_SYSTEM_OPTIMIZED, true);
+
+    // wait for open keys to expire
+    Thread.sleep(EXPIRE_THRESHOLD_MS);
+
+    // Only 10 keys should be returned after hard limit period, as 2 key is having recovery flag set
+    assertEquals(keyCount, getExpiredOpenKeys(true, BucketLayout.FILE_SYSTEM_OPTIMIZED));
+    assertExpiredOpenKeys(false, true,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    openKeyCleanupService.resume();
+
+    // 10 keys should be recovered and there should not be any expired key pending
+    waitForOpenKeyCleanup(true, BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   /**
@@ -326,7 +371,7 @@ class TestOpenKeyCleanupService {
   private int getExpiredOpenKeys(boolean hsync, BucketLayout layout) {
     try {
       final ExpiredOpenKeys expired = keyManager.getExpiredOpenKeys(
-          EXPIRE_THRESHOLD, 100, layout);
+          EXPIRE_THRESHOLD, 100, layout, EXPIRE_THRESHOLD);
       return (hsync ? expired.getHsyncKeys() : expired.getOpenKeyBuckets())
           .size();
     } catch (IOException e) {
@@ -341,7 +386,7 @@ class TestOpenKeyCleanupService {
   }
 
   private void createOpenKeys(int keyCount, boolean hsync,
-      BucketLayout bucketLayout) throws IOException {
+      BucketLayout bucketLayout, boolean recovery) throws IOException {
     String volume = UUID.randomUUID().toString();
     String bucket = UUID.randomUUID().toString();
     for (int x = 0; x < keyCount; x++) {
@@ -356,7 +401,7 @@ class TestOpenKeyCleanupService {
 
       final int numBlocks = RandomUtils.nextInt(0, 3);
       // Create the key
-      createOpenKey(volume, bucket, key, numBlocks, hsync);
+      createOpenKey(volume, bucket, key, numBlocks, hsync, recovery);
     }
   }
 
@@ -380,7 +425,7 @@ class TestOpenKeyCleanupService {
   }
 
   private void createOpenKey(String volumeName, String bucketName,
-      String keyName, int numBlocks, boolean hsync) throws IOException {
+      String keyName, int numBlocks, boolean hsync, boolean recovery) throws IOException {
     OmKeyArgs keyArg =
         new OmKeyArgs.Builder()
             .setVolumeName(volumeName)
@@ -400,6 +445,9 @@ class TestOpenKeyCleanupService {
     }
     if (hsync) {
       writeClient.hsyncKey(keyArg, session.getId());
+      if (recovery) {
+        writeClient.recoverLease(volumeName, bucketName, keyName);
+      }
     }
   }
 

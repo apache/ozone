@@ -643,7 +643,7 @@ public class TestOmMetadataManager {
     // Test retrieving fewer expired keys than actually exist.
     final Collection<OpenKeyBucket.Builder> someExpiredKeys =
         omMetadataManager.getExpiredOpenKeys(expireThreshold,
-            numExpiredOpenKeys - 1, bucketLayout).getOpenKeyBuckets();
+            numExpiredOpenKeys - 1, bucketLayout, expireThreshold).getOpenKeyBuckets();
     List<String> names = getOpenKeyNames(someExpiredKeys);
     assertEquals(numExpiredOpenKeys - 1, names.size());
     assertThat(expiredKeys).containsAll(names);
@@ -651,7 +651,7 @@ public class TestOmMetadataManager {
     // Test attempting to retrieving more expired keys than actually exist.
     Collection<OpenKeyBucket.Builder> allExpiredKeys =
         omMetadataManager.getExpiredOpenKeys(expireThreshold,
-            numExpiredOpenKeys + 1, bucketLayout).getOpenKeyBuckets();
+            numExpiredOpenKeys + 1, bucketLayout, expireThreshold).getOpenKeyBuckets();
     names = getOpenKeyNames(allExpiredKeys);
     assertEquals(numExpiredOpenKeys, names.size());
     assertThat(expiredKeys).containsAll(names);
@@ -659,7 +659,7 @@ public class TestOmMetadataManager {
     // Test retrieving exact amount of expired keys that exist.
     allExpiredKeys =
         omMetadataManager.getExpiredOpenKeys(expireThreshold,
-            numExpiredOpenKeys, bucketLayout).getOpenKeyBuckets();
+            numExpiredOpenKeys, bucketLayout, expireThreshold).getOpenKeyBuckets();
     names = getOpenKeyNames(allExpiredKeys);
     assertEquals(numExpiredOpenKeys, names.size());
     assertThat(expiredKeys).containsAll(names);
@@ -715,7 +715,7 @@ public class TestOmMetadataManager {
 
     // Return empty since only MPU-related open keys exist.
     assertTrue(omMetadataManager.getExpiredOpenKeys(expireThreshold,
-        numExpiredMPUOpenKeys, bucketLayout).getOpenKeyBuckets().isEmpty());
+        numExpiredMPUOpenKeys, bucketLayout, expireThreshold).getOpenKeyBuckets().isEmpty());
 
 
     // This is for MPU-related open keys prior to isMultipartKey fix in
@@ -749,7 +749,7 @@ public class TestOmMetadataManager {
     // MPU-related open keys should not be fetched regardless of isMultipartKey
     // flag if has the multipart upload characteristics
     assertTrue(omMetadataManager.getExpiredOpenKeys(expireThreshold,
-            numExpiredMPUOpenKeys, bucketLayout).getOpenKeyBuckets()
+            numExpiredMPUOpenKeys, bucketLayout, expireThreshold).getOpenKeyBuckets()
         .isEmpty());
   }
 

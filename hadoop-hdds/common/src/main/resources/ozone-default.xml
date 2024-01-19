@@ -1440,6 +1440,17 @@
   </property>
 
   <property>
+    <name>ozone.om.lease.hard.limit</name>
+    <value>7d</value>
+    <tag>OZONE, OM, PERFORMANCE</tag>
+    <description>
+      Controls how long an open hsync key is considered as active. Specifically, if a hsync key
+      has been open longer than the value of this config entry, that open hsync key is considered as
+      expired (e.g. due to client crash). Unit could be defined with postfix (ns,ms,s,m,h,d)
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.open.key.cleanup.limit.per.task</name>
     <value>1000</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
