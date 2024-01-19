@@ -618,21 +618,19 @@ public class SCMClientProtocolServer implements
   public HddsProtos.Node queryNode(UUID uuid)
       throws IOException {
     HddsProtos.Node result = null;
-    for (DatanodeDetails node : scm.getScmNodeManager().getAllNodes()) {
-      try {
-        if (node.getUuid().equals(uuid)) {
-          NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
-          result = HddsProtos.Node.newBuilder()
-              .setNodeID(node.getProtoBufMessage())
-              .addNodeStates(ns.getHealth())
-              .addNodeOperationalStates(ns.getOperationalState())
-              .build();
-          break;
-        }
-      } catch (NodeNotFoundException e) {
-        throw new IOException(
-            "An unexpected error occurred querying the NodeStatus", e);
+    try {
+      DatanodeDetails node = scm.getScmNodeManager().getNodeByUuid(uuid);
+      if (node != null) {
+        NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
+        result = HddsProtos.Node.newBuilder()
+            .setNodeID(node.getProtoBufMessage())
+            .addNodeStates(ns.getHealth())
+            .addNodeOperationalStates(ns.getOperationalState())
+            .build();
       }
+    } catch (NodeNotFoundException e) {
+      throw new IOException(
+          "An unexpected error occurred querying the NodeStatus", e);
     }
     return result;
   }
