@@ -54,8 +54,7 @@ public class TestOMDBDefinition {
     ArrayList<String> missingDBDefTables = new ArrayList<>();
 
     // Get list of tables from the RocksDB Store
-    Collection<String> missingOmDBTables =
-        store.getTableNames().values();
+    final Collection<String> missingOmDBTables = new ArrayList<>(store.getTableNames().values());
     missingOmDBTables.remove("default");
     int countOmDBTables = missingOmDBTables.size();
     // Remove the file if it is found in both the datastructures

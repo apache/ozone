@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -34,6 +33,8 @@ import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests snapshots in SCM HA.
@@ -75,18 +76,17 @@ public class TestSCMSnapshot {
     long snapshotInfo2 = scm.getScmHAManager().asSCMHADBTransactionBuffer()
         .getLatestTrxInfo().getTransactionIndex();
 
-    Assertions.assertTrue(snapshotInfo2 > snapshotInfo1,
+    assertTrue(snapshotInfo2 > snapshotInfo1,
         String.format("Snapshot index 2 %d should greater than Snapshot " +
             "index 1 %d", snapshotInfo2, snapshotInfo1));
 
     cluster.restartStorageContainerManager(false);
     TransactionInfo trxInfoAfterRestart =
         scm.getScmHAManager().asSCMHADBTransactionBuffer().getLatestTrxInfo();
-    Assertions.assertTrue(
-        trxInfoAfterRestart.getTransactionIndex() >= snapshotInfo2);
-    Assertions.assertDoesNotThrow(() ->
+    assertTrue(trxInfoAfterRestart.getTransactionIndex() >= snapshotInfo2);
+    assertDoesNotThrow(() ->
         pipelineManager.getPipeline(ratisPipeline1.getId()));
-    Assertions.assertDoesNotThrow(() ->
+    assertDoesNotThrow(() ->
         pipelineManager.getPipeline(ratisPipeline2.getId()));
   }
 

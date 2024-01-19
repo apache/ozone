@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.recon.api.filters;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -67,7 +68,7 @@ public class TestAdminFilter {
     Set<Class<?>> allEndpoints =
         reflections.getTypesAnnotatedWith(Path.class);
 
-    assertFalse(allEndpoints.isEmpty());
+    assertThat(allEndpoints).isNotEmpty();
 
     // If an endpoint is added, it must be explicitly added to this set or be
     // marked with @AdminOnly for this test to pass.
@@ -80,7 +81,7 @@ public class TestAdminFilter {
     nonAdminEndpoints.add(TaskStatusService.class);
     nonAdminEndpoints.add(TriggerDBSyncEndpoint.class);
 
-    assertTrue(allEndpoints.containsAll(nonAdminEndpoints));
+    assertThat(allEndpoints).containsAll(nonAdminEndpoints);
 
     Set<Class<?>> adminEndpoints = Sets.difference(allEndpoints,
         nonAdminEndpoints);

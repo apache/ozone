@@ -17,13 +17,13 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.util.TimeDuration;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -36,7 +36,7 @@ public class TestOmConf {
     final OzoneConfiguration conf = new OzoneConfiguration();
     final OzoneManagerRatisServerConfig ratisConf = conf.getObject(
         OzoneManagerRatisServerConfig.class);
-    Assertions.assertEquals(0, ratisConf.getLogAppenderWaitTimeMin(),
+    assertEquals(0, ratisConf.getLogAppenderWaitTimeMin(),
         "getLogAppenderWaitTimeMin");
     assertWaitTimeMin(TimeDuration.ZERO, conf);
 
@@ -51,7 +51,7 @@ public class TestOmConf {
     final RaftProperties p = OzoneManagerRatisServer.newRaftProperties(
         conf, 1000, "dummy/dir");
     final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);
-    Assertions.assertEquals(expected, t,
+    assertEquals(expected, t,
         RaftServerConfigKeys.Log.Appender.WAIT_TIME_MIN_KEY);
   }
 }

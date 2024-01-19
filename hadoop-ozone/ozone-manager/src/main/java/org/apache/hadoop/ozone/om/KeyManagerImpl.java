@@ -1462,10 +1462,6 @@ public class KeyManagerImpl implements KeyManager {
         && omKeyInfoCacheValue.getCacheValue() == null;
   }
 
-  public static boolean isKeyInCache(String key, Table keyTable) {
-    return keyTable.getCacheValue(new CacheKey(key)) != null;
-  }
-
   /**
    * Helper function for listStatus to find key in TableCache.
    */
@@ -1684,9 +1680,7 @@ public class KeyManagerImpl implements KeyManager {
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator;
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
         cacheIter = keyTable.cacheIterator();
-    String startCacheKey = OZONE_URI_DELIMITER + volumeName +
-        OZONE_URI_DELIMITER + bucketName + OZONE_URI_DELIMITER +
-        ((startKey.equals(OZONE_URI_DELIMITER)) ? "" : startKey);
+    String startCacheKey = metadataManager.getOzoneKey(volumeName, bucketName, startKey);
 
     // First, find key in TableCache
     listStatusFindKeyInTableCache(cacheIter, keyArgs, startCacheKey,

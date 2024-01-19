@@ -46,8 +46,8 @@ import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTPS_ADD
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_DEFAULT;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.server.http.HttpConfig.getHttpPolicy;
-import static org.apache.hadoop.http.HttpServer2.HTTPS_SCHEME;
-import static org.apache.hadoop.http.HttpServer2.HTTP_SCHEME;
+import static org.apache.hadoop.hdds.server.http.HttpServer2.HTTPS_SCHEME;
+import static org.apache.hadoop.hdds.server.http.HttpServer2.HTTP_SCHEME;
 
 /**
  * Subcommand for admin operations related to OM.

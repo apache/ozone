@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.debug.OzoneDebug;
 import org.apache.hadoop.ozone.debug.RDBParser;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
@@ -185,7 +186,8 @@ public class TestOzoneDebugShell {
   private static void writeKey(String volumeName, String bucketName,
       String keyName) throws IOException {
     try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
-      TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);
+      // see HDDS-10091 for making this work with FILE_SYSTEM_OPTIMIZED layout
+      TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName, BucketLayout.LEGACY);
       TestDataUtil.createKey(
           client.getObjectStore().getVolume(volumeName).getBucket(bucketName),
           keyName, ReplicationFactor.THREE, ReplicationType.RATIS, "test");

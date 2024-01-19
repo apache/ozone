@@ -591,9 +591,10 @@ public final class OzoneManagerRatisServer {
   }
 
   public void stop() {
+    LOG.info("Stopping {} at port {}", this, port);
     try {
+      // Ratis will also close the state machine
       server.close();
-      omStateMachine.close();
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

@@ -66,9 +66,10 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -175,13 +176,11 @@ public class TestFailureHandlingByClient {
     key.write(data);
 
     // get the name of a valid container
-    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
+    KeyOutputStream groupOutputStream =
+        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     // assert that the exclude list's expire time equals to
     // default value 600000 ms in OzoneClientConfig.java
-    assertEquals(((KeyOutputStream) key.getOutputStream())
-        .getExcludeList().getExpiryTime(), 600000);
-    KeyOutputStream groupOutputStream =
-        (KeyOutputStream) key.getOutputStream();
+    assertEquals(groupOutputStream.getExcludeList().getExpiryTime(), 600000);
     List<OmKeyLocationInfo> locationInfoList =
         groupOutputStream.getLocationInfoList();
     assertEquals(1, locationInfoList.size());
@@ -279,7 +278,7 @@ public class TestFailureHandlingByClient {
               .getLocalID()));
       // The first Block could have 1 or 2 chunkSize of data
       int block1NumChunks = blockData1.getChunks().size();
-      assertTrue(block1NumChunks >= 1);
+      assertThat(block1NumChunks).isGreaterThanOrEqualTo(1);
 
       assertEquals(chunkSize * block1NumChunks, blockData1.getSize());
       assertEquals(1, containerData1.getBlockCount());
@@ -320,9 +319,8 @@ public class TestFailureHandlingByClient {
         .getFixedLengthString(keyString,  chunkSize / 2);
     key.write(data.getBytes(UTF_8));
     // get the name of a valid container
-    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream keyOutputStream =
-        (KeyOutputStream) key.getOutputStream();
+        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     List<OmKeyLocationInfo> locationInfoList =
         keyOutputStream.getLocationInfoList();
     long containerId = locationInfoList.get(0).getContainerID();
@@ -367,9 +365,8 @@ public class TestFailureHandlingByClient {
         .getFixedLengthString(keyString,  chunkSize);
 
     // get the name of a valid container
-    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream keyOutputStream =
-        (KeyOutputStream) key.getOutputStream();
+        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     List<BlockOutputStreamEntry> streamEntryList =
         keyOutputStream.getStreamEntries();
 
@@ -391,10 +388,10 @@ public class TestFailureHandlingByClient {
     key.write(data.getBytes(UTF_8));
     key.flush();
 
-    assertTrue(keyOutputStream.getExcludeList().getContainerIds()
-        .contains(ContainerID.valueOf(containerId)));
-    assertTrue(keyOutputStream.getExcludeList().getDatanodes().isEmpty());
-    assertTrue(keyOutputStream.getExcludeList().getPipelineIds().isEmpty());
+    assertThat(keyOutputStream.getExcludeList().getContainerIds())
+        .contains(ContainerID.valueOf(containerId));
+    assertThat(keyOutputStream.getExcludeList().getDatanodes()).isEmpty();
+    assertThat(keyOutputStream.getExcludeList().getPipelineIds()).isEmpty();
 
     // The close will just write to the buffer
     key.close();
@@ -423,9 +420,8 @@ public class TestFailureHandlingByClient {
         .getFixedLengthString(keyString,  chunkSize);
 
     // get the name of a valid container
-    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream keyOutputStream =
-        (KeyOutputStream) key.getOutputStream();
+        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     List<BlockOutputStreamEntry> streamEntryList =
         keyOutputStream.getStreamEntries();
 
@@ -451,10 +447,10 @@ public class TestFailureHandlingByClient {
     key.write(data.getBytes(UTF_8));
     key.flush();
 
-    assertTrue(keyOutputStream.getExcludeList().getDatanodes()
-        .contains(datanodes.get(0)));
-    assertTrue(keyOutputStream.getExcludeList().getContainerIds().isEmpty());
-    assertTrue(keyOutputStream.getExcludeList().getPipelineIds().isEmpty());
+    assertThat(keyOutputStream.getExcludeList().getDatanodes())
+        .contains(datanodes.get(0));
+    assertThat(keyOutputStream.getExcludeList().getContainerIds()).isEmpty();
+    assertThat(keyOutputStream.getExcludeList().getPipelineIds()).isEmpty();
     // The close will just write to the buffer
     key.close();
 
@@ -484,9 +480,8 @@ public class TestFailureHandlingByClient {
         .getFixedLengthString(keyString,  chunkSize);
 
     // get the name of a valid container
-    assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream keyOutputStream =
-        (KeyOutputStream) key.getOutputStream();
+        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     List<BlockOutputStreamEntry> streamEntryList =
         keyOutputStream.getStreamEntries();
 
@@ -512,10 +507,10 @@ public class TestFailureHandlingByClient {
     key.write(data.getBytes(UTF_8));
     key.write(data.getBytes(UTF_8));
     key.flush();
-    assertTrue(keyOutputStream.getExcludeList().getPipelineIds()
-        .contains(pipeline.getId()));
-    assertTrue(keyOutputStream.getExcludeList().getContainerIds().isEmpty());
-    assertTrue(keyOutputStream.getExcludeList().getDatanodes().isEmpty());
+    assertThat(keyOutputStream.getExcludeList().getPipelineIds())
+        .contains(pipeline.getId());
+    assertThat(keyOutputStream.getExcludeList().getContainerIds()).isEmpty();
+    assertThat(keyOutputStream.getExcludeList().getDatanodes()).isEmpty();
     // The close will just write to the buffer
     key.close();
 
