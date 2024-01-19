@@ -46,7 +46,6 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
   @Override
   public void handlePutEvent(OMDBUpdateEvent<String, Object> event,
                              String tableName,
-                             Collection<String> sizeRelatedTables,
                              HashMap<String, Long> objectCountMap,
                              HashMap<String, Long> unReplicatedSizeMap,
                              HashMap<String, Long> replicatedSizeMap) {
@@ -79,7 +78,6 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
   @Override
   public void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
                                 String tableName,
-                                Collection<String> sizeRelatedTables,
                                 HashMap<String, Long> objectCountMap,
                                 HashMap<String, Long> unReplicatedSizeMap,
                                 HashMap<String, Long> replicatedSizeMap) {
@@ -112,7 +110,6 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
   @Override
   public void handleUpdateEvent(OMDBUpdateEvent<String, Object> event,
                                 String tableName,
-                                Collection<String> sizeRelatedTables,
                                 HashMap<String, Long> objectCountMap,
                                 HashMap<String, Long> unReplicatedSizeMap,
                                 HashMap<String, Long> replicatedSizeMap) {

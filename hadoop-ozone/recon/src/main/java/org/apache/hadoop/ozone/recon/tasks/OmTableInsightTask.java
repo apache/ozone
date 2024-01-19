@@ -154,7 +154,7 @@ public class OmTableInsightTask implements ReconOmTask {
    * Returns a collection of table names that require data size calculation.
    */
   public Collection<String> getTablesToCalculateSize() {
-    java.util.List<String> taskTables = new ArrayList<>();
+    List<String> taskTables = new ArrayList<>();
     taskTables.add(OPEN_KEY_TABLE);
     taskTables.add(OPEN_FILE_TABLE);
     taskTables.add(DELETED_TABLE);
@@ -247,8 +247,8 @@ public class OmTableInsightTask implements ReconOmTask {
     OmTableHandler tableHandler = tableHandlers.get(tableName);
 
     if (sizeRelatedTables.contains(tableName) && tableHandler != null) {
-      tableHandler.handlePutEvent(event, tableName, sizeRelatedTables,
-          objectCountMap, unReplicatedSizeMap, replicatedSizeMap);
+      tableHandler.handlePutEvent(event, tableName, objectCountMap,
+          unReplicatedSizeMap, replicatedSizeMap);
     } else {
       String countKey = getTableCountKeyFromTable(tableName);
       objectCountMap.computeIfPresent(countKey, (k, count) -> count + 1L);
@@ -266,8 +266,8 @@ public class OmTableInsightTask implements ReconOmTask {
 
     if (event.getValue() != null) {
       if (sizeRelatedTables.contains(tableName)) {
-        tableHandler.handleDeleteEvent(event, tableName, sizeRelatedTables,
-            objectCountMap, unReplicatedSizeMap, replicatedSizeMap);
+        tableHandler.handleDeleteEvent(event, tableName, objectCountMap,
+            unReplicatedSizeMap, replicatedSizeMap);
       } else {
         String countKey = getTableCountKeyFromTable(tableName);
         objectCountMap.computeIfPresent(countKey,
@@ -292,8 +292,8 @@ public class OmTableInsightTask implements ReconOmTask {
     if (event.getValue() != null) {
       if (sizeRelatedTables.contains(tableName)) {
         // Handle update for only size related tables
-        tableHandler.handleUpdateEvent(event, tableName, sizeRelatedTables,
-            objectCountMap, unReplicatedSizeMap, replicatedSizeMap);
+        tableHandler.handleUpdateEvent(event, tableName, objectCountMap,
+            unReplicatedSizeMap, replicatedSizeMap);
       }
     }
   }
