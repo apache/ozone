@@ -24,39 +24,30 @@ import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 
-import org.apache.ozone.test.UnhealthyTest;
 import org.apache.ozone.test.tag.Unhealthy;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.experimental.categories.Category;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class tests container balancer operations
  * from cblock clients.
  */
+@Timeout(value = 300, unit = TimeUnit.MILLISECONDS)
 public class TestContainerBalancerOperations {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private static ScmClient containerBalancerClient;
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration ozoneConf;
 
-  @BeforeClass
+  @BeforeAll
   public static void setup() throws Exception {
     ozoneConf = new OzoneConfiguration();
     ozoneConf.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
@@ -66,7 +57,7 @@ public class TestContainerBalancerOperations {
     cluster.waitForClusterToBeReady();
   }
 
-  @AfterClass
+  @AfterAll
   public static void cleanup() throws Exception {
     if (cluster != null) {
       cluster.shutdown();
@@ -78,7 +69,7 @@ public class TestContainerBalancerOperations {
    * @throws Exception
    */
   @Test
-  @Category(UnhealthyTest.class) @Unhealthy("Since the cluster doesn't have " +
+  @Unhealthy("Since the cluster doesn't have " +
       "unbalanced nodes, ContainerBalancer stops before the assertion checks " +
       "whether balancer is running.")
   public void testContainerBalancerCLIOperations() throws Exception {

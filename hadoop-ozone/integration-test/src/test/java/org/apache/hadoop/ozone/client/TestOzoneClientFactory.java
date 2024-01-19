@@ -16,12 +16,12 @@
  */
 package org.apache.hadoop.ozone.client;
 
+import static org.junit.jupiter.api.Assertions.fail;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
@@ -59,14 +59,14 @@ public class TestOzoneClientFactory {
         public Void run() throws IOException {
           conf.set("ozone.security.enabled", "true");
           try (OzoneClient ozoneClient =
-              OzoneClientFactory.getRpcClient("localhost",
-                  Integer.parseInt(omPort), conf)) {
+                   OzoneClientFactory.getRpcClient("localhost",
+                       Integer.parseInt(omPort), conf)) {
             ozoneClient.getObjectStore().listVolumes("/");
           }
           return null;
         }
       });
-      Assert.fail("Should throw exception here");
+      fail("Should throw exception here");
     } catch (IOException | InterruptedException e) {
       assert e instanceof AccessControlException;
     }

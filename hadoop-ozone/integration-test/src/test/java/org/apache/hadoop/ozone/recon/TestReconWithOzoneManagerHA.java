@@ -17,13 +17,6 @@
  */
 package org.apache.hadoop.ozone.recon;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
-
-import java.util.HashMap;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicReference;
-
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -45,21 +38,25 @@ import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Timeout;
 
+import java.util.HashMap;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 /**
  * This class sets up a MiniOzoneOMHACluster to test with Recon.
  */
+@Timeout(300)
 public class TestReconWithOzoneManagerHA {
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private MiniOzoneHAClusterImpl cluster;
   private ObjectStore objectStore;
@@ -67,7 +64,7 @@ public class TestReconWithOzoneManagerHA {
   private static final String VOL_NAME = "testrecon";
   private OzoneClient client;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, Boolean.TRUE.toString());
@@ -96,7 +93,7 @@ public class TestReconWithOzoneManagerHA {
             .build());
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -113,10 +110,9 @@ public class TestReconWithOzoneManagerHA {
       ozoneManager.set(om);
       return om != null;
     }, 100, 120000);
-    Assert.assertNotNull("Timed out waiting OM leader election to finish: "
-        + "no leader or more than one leader.", ozoneManager);
-    Assert.assertTrue("Should have gotten the leader!",
-        ozoneManager.get().isLeaderReady());
+    assertNotNull(ozoneManager, "Timed out waiting OM leader election to finish: "
+        + "no leader or more than one leader.");
+    assertTrue(ozoneManager.get().isLeaderReady(), "Should have gotten the leader!");
 
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
         cluster.getReconServer().getOzoneManagerServiceProvider();
@@ -128,8 +124,7 @@ public class TestReconWithOzoneManagerHA {
         ozoneManager.get().getHttpServer().getHttpAddress().getPort() +
         OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
     String snapshotUrl = impl.getOzoneManagerSnapshotUrl();
-    Assert.assertEquals("OM Snapshot should be requested from the leader.",
-        expectedUrl, snapshotUrl);
+    assertEquals(expectedUrl, snapshotUrl);
     // Write some data
     String keyPrefix = "ratis";
     OzoneOutputStream key = objectStore.getVolume(VOL_NAME)
@@ -152,7 +147,7 @@ public class TestReconWithOzoneManagerHA {
             (Table.KeyValue<ContainerKeyPrefix, Integer>) iterator.next();
         reconKeyPrefix = keyValue.getKey().getKeyPrefix();
       }
-      Assert.assertEquals("Container data should be synced to recon.",
+      assertEquals(
           String.format("/%s/%s/%s", VOL_NAME, VOL_NAME, keyPrefix),
           reconKeyPrefix);
     }

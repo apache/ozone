@@ -18,13 +18,14 @@
 
 package org.apache.hadoop.ozone.recon;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import java.io.IOException;
 
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.spi.impl.ContainerKeyPrefixCodec;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.IntegerCodec;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -39,10 +40,10 @@ public class TestReconCodecs {
 
     Codec<ContainerKeyPrefix> codec = ContainerKeyPrefixCodec.get();
     byte[] persistedFormat = codec.toPersistedFormat(containerKeyPrefix);
-    Assertions.assertTrue(persistedFormat != null);
+    assertNotNull(persistedFormat);
     ContainerKeyPrefix fromPersistedFormat =
         codec.fromPersistedFormat(persistedFormat);
-    Assertions.assertEquals(containerKeyPrefix, fromPersistedFormat);
+    assertEquals(containerKeyPrefix, fromPersistedFormat);
   }
 
   @Test
@@ -50,9 +51,9 @@ public class TestReconCodecs {
     Integer i = 1000;
     Codec<Integer> codec = IntegerCodec.get();
     byte[] persistedFormat = codec.toPersistedFormat(i);
-    Assertions.assertTrue(persistedFormat != null);
+    assertNotNull(persistedFormat);
     Integer fromPersistedFormat =
         codec.fromPersistedFormat(persistedFormat);
-    Assertions.assertEquals(i, fromPersistedFormat);
+    assertEquals(i, fromPersistedFormat);
   }
 }

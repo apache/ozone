@@ -79,22 +79,6 @@ function ozonecmd_case
   # This parameter significantly reduces GC pressure for Datanode.
   # Corresponding Ratis issue https://issues.apache.org/jira/browse/RATIS-534.
   RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.allocator.useCacheForAllThreads=false ${RATIS_OPTS}"
-  # Add JVM parameter for Java 17
-  OZONE_MODULE_ACCESS_ARGS=""
-
-  # Get the version string
-  JAVA_VERSION_STRING=$(java -version 2>&1 | head -n 1)
-
-  # Extract the major version number
-  JAVA_MAJOR_VERSION=$(echo "$JAVA_VERSION_STRING" | sed -E -n 's/.* version "([^.-]*).*"/\1/p' | cut -d' ' -f1)
-
-  # populate JVM args based on java version
-  if [[ "${JAVA_MAJOR_VERSION}" == "17" ]]; then
-      OZONE_MODULE_ACCESS_ARGS="--add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED --add-exports java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED"
-  fi
-  if [[ "${JAVA_MAJOR_VERSION}" -ge 9 ]]; then
-    OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --add-opens java.base/java.nio=ALL-UNNAMED"
-  fi
 
   case ${subcmd} in
     auditparser)

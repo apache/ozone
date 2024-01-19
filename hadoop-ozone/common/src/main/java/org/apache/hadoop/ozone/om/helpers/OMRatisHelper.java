@@ -17,22 +17,23 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.TextFormat;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
+import org.apache.hadoop.hdds.utils.io.ByteBufferInputStream;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
-import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+
 /**
- * Ratis helper methods for OM Ratis server and client.
+ * Helper methods for converting between proto 2 (OM) and proto 3 (Ratis) messages.
  */
 public final class OMRatisHelper {
   private static final Logger LOG = LoggerFactory.getLogger(
@@ -41,50 +42,47 @@ public final class OMRatisHelper {
   private OMRatisHelper() {
   }
 
-  static RaftPeerId getRaftPeerId(String omId) {
-    return RaftPeerId.valueOf(omId);
-  }
-
+  /** Convert the given proto 2 request to a proto 3 {@link ByteString}. */
   public static ByteString convertRequestToByteString(OMRequest request) {
-    byte[] requestBytes = request.toByteArray();
-    return ByteString.copyFrom(requestBytes);
+    return UnsafeByteOperations.unsafeWrap(request.toByteString().asReadOnlyByteBuffer());
   }
 
-  public static OMRequest convertByteStringToOMRequest(ByteString byteString)
-      throws InvalidProtocolBufferException {
-    byte[] bytes = byteString.toByteArray();
-    return OMRequest.parseFrom(bytes);
+  /** Convert the given proto 3 {@link ByteString} to a proto 2 request. */
+  public static OMRequest convertByteStringToOMRequest(ByteString bytes) throws IOException {
+    final ByteBuffer buffer = bytes.asReadOnlyByteBuffer();
+    return OMRequest.parseFrom(new ByteBufferInputStream(buffer));
   }
 
+  /** Convert the given proto 2 response to a proto 3 {@link ByteString}. */
   public static Message convertResponseToMessage(OMResponse response) {
-    byte[] requestBytes = response.toByteArray();
-    return Message.valueOf(ByteString.copyFrom(requestBytes));
+    return () -> UnsafeByteOperations.unsafeWrap(response.toByteString().asReadOnlyByteBuffer());
   }
 
-  public static OMResponse getOMResponseFromRaftClientReply(
-      RaftClientReply reply) throws InvalidProtocolBufferException {
-    byte[] bytes = reply.getMessage().getContent().toByteArray();
-    return OMResponse.newBuilder(OMResponse.parseFrom(bytes))
+  /** Convert the given proto 3 {@link ByteString} to a proto 2 response. */
+  public static OMResponse convertByteStringToOMResponse(ByteString bytes) throws IOException {
+    final ByteBuffer buffer = bytes.asReadOnlyByteBuffer();
+    return OMResponse.parseFrom(new ByteBufferInputStream(buffer));
+  }
+
+  /** Convert the given reply with proto 3 {@link ByteString} to a proto 2 response. */
+  public static OMResponse getOMResponseFromRaftClientReply(RaftClientReply reply) throws IOException {
+    final OMResponse response = convertByteStringToOMResponse(reply.getMessage().getContent());
+    if (reply.getReplierId().equals(response.getLeaderOMNodeId())) {
+      return response;
+    }
+    return OMResponse.newBuilder(response)
         .setLeaderOMNodeId(reply.getReplierId())
         .build();
   }
 
-  /**
-   * Convert StateMachineLogEntryProto to String.
-   * @param proto - {@link StateMachineLogEntryProto}
-   * @return String
-   */
+  /** Convert the given {@link StateMachineLogEntryProto} to a short {@link String}. */
   public static String smProtoToString(StateMachineLogEntryProto proto) {
-    StringBuilder builder = new StringBuilder();
     try {
-      builder.append(TextFormat.shortDebugString(
-          OMRatisHelper.convertByteStringToOMRequest(proto.getLogData())));
-
+      final OMRequest request = convertByteStringToOMRequest(proto.getLogData());
+      return TextFormat.shortDebugString(request);
     } catch (Throwable ex) {
       LOG.info("smProtoToString failed", ex);
-      builder.append("smProtoToString failed with");
-      builder.append(ex.getMessage());
+      return "Failed to smProtoToString: " + ex;
     }
-    return builder.toString();
   }
 }

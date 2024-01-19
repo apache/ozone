@@ -390,6 +390,18 @@ public final class OMConfigKeys {
   public static final String OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT
       = "60s";
 
+  /**
+   * Configuration properties for Snapshot Directory Service.
+   */
+  public static final String OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL =
+      "ozone.snapshot.directory.service.interval";
+  public static final String OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL_DEFAULT
+      = "24h";
+  public static final String OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT =
+      "ozone.snapshot.directory.service.timeout";
+  public static final String
+      OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT_DEFAULT = "300s";
+
   public static final String OZONE_PATH_DELETING_LIMIT_PER_TASK =
       "ozone.path.deleting.limit.per.task";
   // default is 6000 taking account of 32MB buffer size, and assuming

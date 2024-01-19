@@ -85,7 +85,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -1879,7 +1878,7 @@ public class TestOzoneShellHA {
     final ArrayList<LinkedTreeMap<String, String>> bucketListOut =
         parseOutputIntoArrayList();
 
-    Assert.assertTrue(bucketListOut.size() == 1);
+    assertEquals(1, bucketListOut.size());
     boolean link =
         String.valueOf(bucketListOut.get(0).get("link")).equals("false");
     assertTrue(link);
@@ -1898,7 +1897,7 @@ public class TestOzoneShellHA {
     final ArrayList<LinkedTreeMap<String, String>> bucketListLinked =
         parseOutputIntoArrayList();
 
-    Assert.assertTrue(bucketListLinked.size() == 2);
+    assertEquals(2, bucketListLinked.size());
     link = String.valueOf(bucketListLinked.get(1).get("link")).equals("true");
     assertTrue(link);
 

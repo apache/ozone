@@ -81,7 +81,9 @@ public final class TestableCluster {
           ? storageUnit * RANDOM.nextInt(10, 60)
           : (long) (datanodeUsedSpace / nodeUtilizationList[i]);
 
-      SCMNodeStat stat = new SCMNodeStat(datanodeCapacity, datanodeUsedSpace, datanodeCapacity - datanodeUsedSpace);
+      SCMNodeStat stat = new SCMNodeStat(datanodeCapacity, datanodeUsedSpace,
+          datanodeCapacity - datanodeUsedSpace, 0,
+          datanodeCapacity - datanodeUsedSpace - 1);
       nodesInCluster[i].setScmNodeStat(stat);
       clusterUsedSpace += datanodeUsedSpace;
       clusterCapacity += datanodeCapacity;

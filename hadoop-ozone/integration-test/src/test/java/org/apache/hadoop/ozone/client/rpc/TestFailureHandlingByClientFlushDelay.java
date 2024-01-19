@@ -47,13 +47,9 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -65,17 +61,16 @@ import java.util.concurrent.TimeUnit;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /**
  * Tests Exception handling by Ozone Client by set flush delay.
  */
+@Timeout(300)
 public class TestFailureHandlingByClientFlushDelay {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
@@ -132,7 +127,7 @@ public class TestFailureHandlingByClientFlushDelay {
     conf.setClass(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
         StaticMapping.class, DNSToSwitchMapping.class);
     StaticMapping.addNodeToRack(NetUtils.normalizeHostNames(
-        Collections.singleton(HddsUtils.getHostName(conf))).get(0),
+            Collections.singleton(HddsUtils.getHostName(conf))).get(0),
         "/rack1");
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(10)
@@ -160,7 +155,7 @@ public class TestFailureHandlingByClientFlushDelay {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -178,14 +173,13 @@ public class TestFailureHandlingByClientFlushDelay {
         .getFixedLengthString(keyString,  chunkSize);
 
     // get the name of a valid container
-    Assert.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
     KeyOutputStream keyOutputStream =
-        (KeyOutputStream) key.getOutputStream();
+        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     List<BlockOutputStreamEntry> streamEntryList =
         keyOutputStream.getStreamEntries();
 
     // Assert that 1 block will be preallocated
-    Assert.assertEquals(1, streamEntryList.size());
+    assertEquals(1, streamEntryList.size());
     key.write(data.getBytes(UTF_8));
     key.flush();
     long containerId = streamEntryList.get(0).getBlockID().getContainerID();
@@ -205,12 +199,9 @@ public class TestFailureHandlingByClientFlushDelay {
 
     key.write(data.getBytes(UTF_8));
     key.flush();
-    Assert.assertTrue(
-        keyOutputStream.getExcludeList().getContainerIds().isEmpty());
-    Assert.assertTrue(
-        keyOutputStream.getExcludeList().getDatanodes().isEmpty());
-    Assert.assertTrue(
-        keyOutputStream.getExcludeList().getDatanodes().isEmpty());
+    assertThat(keyOutputStream.getExcludeList().getContainerIds()).isEmpty();
+    assertThat(keyOutputStream.getExcludeList().getDatanodes()).isEmpty();
+    assertThat(keyOutputStream.getExcludeList().getDatanodes()).isEmpty();
     key.write(data.getBytes(UTF_8));
     // The close will just write to the buffer
     key.close();
@@ -225,15 +216,15 @@ public class TestFailureHandlingByClientFlushDelay {
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
 
     // Make sure a new block is written
-    Assert.assertNotEquals(
+    assertNotEquals(
         keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly().get(0)
             .getBlockID(), blockId);
-    Assert.assertEquals(3 * data.getBytes(UTF_8).length, keyInfo.getDataSize());
+    assertEquals(3 * data.getBytes(UTF_8).length, keyInfo.getDataSize());
     validateData(keyName, data.concat(data).concat(data).getBytes(UTF_8));
   }
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,
-      long size) throws Exception {
+                                      long size) throws Exception {
     return TestHelper
         .createKey(keyName, type, size, objectStore, volumeName, bucketName);
   }

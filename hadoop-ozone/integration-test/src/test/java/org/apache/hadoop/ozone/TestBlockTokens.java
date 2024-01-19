@@ -47,13 +47,10 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,6 +61,7 @@ import java.net.InetAddress;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 
@@ -90,28 +88,25 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
-import static org.apache.ozone.test.GenericTestUtils.assertExceptionContains;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration test to verify block tokens in a secure cluster.
  */
 @InterfaceAudience.Private
+@Timeout(value = 180, unit = TimeUnit.SECONDS)
 public final class TestBlockTokens {
-  private static final Logger LOG = LoggerFactory
-      .getLogger(TestBlockTokens.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TestBlockTokens.class);
   private static final String TEST_VOLUME = "testvolume";
   private static final String TEST_BUCKET = "testbucket";
   private static final String TEST_FILE = "testfile";
   private static final int ROTATE_DURATION_IN_MS = 3000;
   private static final int EXPIRY_DURATION_IN_MS = 10000;
   private static final int ROTATION_CHECK_DURATION_IN_MS = 100;
-
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(180));
 
   private static MiniKdc miniKdc;
   private static OzoneConfiguration conf;
@@ -128,7 +123,7 @@ public final class TestBlockTokens {
   private static BlockInputStreamFactory blockInputStreamFactory =
       new BlockInputStreamFactoryImpl();
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
@@ -160,7 +155,7 @@ public final class TestBlockTokens {
     }
   }
 
-  @AfterClass
+  @AfterAll
   public static void stop() {
     miniKdc.stop();
     IOUtils.close(LOG, client);
@@ -207,8 +202,7 @@ public final class TestBlockTokens {
     StorageContainerException ex = assertThrows(StorageContainerException.class,
         () -> readDataWithoutRetry(keyInfo));
     assertEquals(BLOCK_TOKEN_VERIFICATION_FAILED, ex.getResult());
-    assertExceptionContains(
-        "Token can't be verified due to expired secret key", ex);
+    assertThat(ex).hasMessageContaining("Token can't be verified due to expired secret key");
   }
 
   @Test
@@ -254,7 +248,7 @@ public final class TestBlockTokens {
         assertThrows(StorageContainerException.class,
             () -> readDataWithoutRetry(keyInfo));
     assertEquals(BLOCK_TOKEN_VERIFICATION_FAILED, ex.getResult());
-    assertExceptionContains("Can't find the signing secret key", ex);
+    assertThat(ex).hasMessageContaining("Can't find the signing secret key");
   }
 
   @Test
@@ -277,7 +271,7 @@ public final class TestBlockTokens {
         assertThrows(StorageContainerException.class,
             () -> readDataWithoutRetry(keyInfo));
     assertEquals(BLOCK_TOKEN_VERIFICATION_FAILED, ex.getResult());
-    assertExceptionContains("Invalid token for user", ex);
+    assertThat(ex).hasMessageContaining("Invalid token for user");
   }
 
   private UUID extractSecretKeyId(OmKeyInfo keyInfo) throws IOException {

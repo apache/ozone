@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -85,11 +86,7 @@ public class ContainerBalancerSelectionCriteria {
    * 3. Container size should be closer to 5GB.
    * 4. Container must not be in the configured exclude containers list.
    * 5. Container should be closed.
-   * 6. Container should not be an EC container
-   * //TODO Temporarily not considering EC containers as candidates
-   * @see
-   * <a href="https://issues.apache.org/jira/browse/HDDS-6940">HDDS-6940</a>
-   *
+   * 6. If the {@link LegacyReplicationManager} is enabled, then the container should not be an EC container.
    * @param node DatanodeDetails for which to find candidate containers.
    * @return NavigableSet of candidate containers that satisfy the criteria.
    */
@@ -158,12 +155,12 @@ public class ContainerBalancerSelectionCriteria {
 
   /**
    * Checks whether a Container has the ReplicationType
-   * {@link HddsProtos.ReplicationType#EC}.
+   * {@link HddsProtos.ReplicationType#EC} and the Legacy Replication Manger is enabled.
    * @param container container to check
    * @return true if the ReplicationType is EC and "hdds.scm.replication
    * .enable.legacy" is true, else false
    */
-  private boolean isECContainer(ContainerInfo container) {
+  private boolean isECContainerAndLegacyRMEnabled(ContainerInfo container) {
     return container.getReplicationType().equals(HddsProtos.ReplicationType.EC)
         && replicationManager.getConfig().isLegacyEnabled();
   }
@@ -178,7 +175,7 @@ public class ContainerBalancerSelectionCriteria {
           "candidate container. Excluding it.", containerID);
       return true;
     }
-    return !isContainerClosed(container, node) || isECContainer(container) ||
+    return !isContainerClosed(container, node) || isECContainerAndLegacyRMEnabled(container) ||
         isContainerReplicatingOrDeleting(containerID) ||
         !findSourceStrategy.canSizeLeaveSource(node, container.getUsedBytes())
         || breaksMaxSizeToMoveLimit(container.containerID(),

@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,6 +38,10 @@ import java.util.Set;
 
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test for NSSummary manager.
@@ -84,31 +87,29 @@ public class TestReconNamespaceSummaryManagerImpl {
     NSSummary summary = reconNamespaceSummaryManager.getNSSummary(1L);
     NSSummary summary2 = reconNamespaceSummaryManager.getNSSummary(2L);
     NSSummary summary3 = reconNamespaceSummaryManager.getNSSummary(3L);
-    Assertions.assertEquals(1, summary.getNumOfFiles());
-    Assertions.assertEquals(2, summary.getSizeOfFiles());
-    Assertions.assertEquals(3, summary2.getNumOfFiles());
-    Assertions.assertEquals(4, summary2.getSizeOfFiles());
-    Assertions.assertEquals(5, summary3.getNumOfFiles());
-    Assertions.assertEquals(6, summary3.getSizeOfFiles());
+    assertEquals(1, summary.getNumOfFiles());
+    assertEquals(2, summary.getSizeOfFiles());
+    assertEquals(3, summary2.getNumOfFiles());
+    assertEquals(4, summary2.getSizeOfFiles());
+    assertEquals(5, summary3.getNumOfFiles());
+    assertEquals(6, summary3.getSizeOfFiles());
 
-    Assertions.assertEquals("dir1", summary.getDirName());
-    Assertions.assertEquals("dir2", summary2.getDirName());
-    Assertions.assertEquals("dir3", summary3.getDirName());
+    assertEquals("dir1", summary.getDirName());
+    assertEquals("dir2", summary2.getDirName());
+    assertEquals("dir3", summary3.getDirName());
 
     // test child dir is written
-    Assertions.assertEquals(3, summary.getChildDir().size());
+    assertEquals(3, summary.getChildDir().size());
     // non-existent key
-    Assertions.assertNull(reconNamespaceSummaryManager.getNSSummary(0L));
+    assertNull(reconNamespaceSummaryManager.getNSSummary(0L));
   }
 
   @Test
   public void testInitNSSummaryTable() throws IOException {
     putThreeNSMetadata();
-    Assertions.assertFalse(
-            reconNamespaceSummaryManager.getNSSummaryTable().isEmpty());
+    assertFalse(reconNamespaceSummaryManager.getNSSummaryTable().isEmpty());
     reconNamespaceSummaryManager.clearNSSummaryTable();
-    Assertions.assertTrue(
-            reconNamespaceSummaryManager.getNSSummaryTable().isEmpty());
+    assertTrue(reconNamespaceSummaryManager.getNSSummaryTable().isEmpty());
   }
 
   private void putThreeNSMetadata() throws IOException {

@@ -16,6 +16,8 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -23,7 +25,6 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -153,8 +154,8 @@ public class TestOMStartupWithBucketLayout {
 
   private void verifyBucketLayout(OzoneBucket bucket,
       BucketLayout metadataLayout) {
-    Assertions.assertNotNull(bucket);
-    Assertions.assertEquals(metadataLayout, bucket.getBucketLayout());
+    assertNotNull(bucket);
+    assertEquals(metadataLayout, bucket.getBucketLayout());
   }
 
 }

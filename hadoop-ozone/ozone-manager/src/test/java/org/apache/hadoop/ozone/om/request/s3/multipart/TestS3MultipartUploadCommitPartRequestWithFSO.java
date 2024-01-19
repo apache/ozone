@@ -19,6 +19,10 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -27,7 +31,6 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
-import org.junit.jupiter.api.Assertions;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -110,12 +113,12 @@ public class TestS3MultipartUploadCommitPartRequestWithFSO
     OMRequest modifiedRequest =
             s3InitiateMultipartUploadRequest.preExecute(ozoneManager);
 
-    Assertions.assertNotEquals(omRequest, modifiedRequest);
-    Assertions.assertTrue(modifiedRequest.hasInitiateMultiPartUploadRequest());
-    Assertions.assertNotNull(modifiedRequest.getInitiateMultiPartUploadRequest()
+    assertNotEquals(omRequest, modifiedRequest);
+    assertTrue(modifiedRequest.hasInitiateMultiPartUploadRequest());
+    assertNotNull(modifiedRequest.getInitiateMultiPartUploadRequest()
             .getKeyArgs().getMultipartUploadID());
-    Assertions.assertTrue(modifiedRequest.getInitiateMultiPartUploadRequest()
-            .getKeyArgs().getModificationTime() > 0);
+    assertThat(modifiedRequest.getInitiateMultiPartUploadRequest()
+            .getKeyArgs().getModificationTime()).isGreaterThan(0);
 
     return modifiedRequest;
   }

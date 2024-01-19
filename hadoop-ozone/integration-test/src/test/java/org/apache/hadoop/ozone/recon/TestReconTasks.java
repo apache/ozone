@@ -72,8 +72,8 @@ public class TestReconTasks {
     taskConfig.setMissingContainerTaskInterval(Duration.ofSeconds(15));
     conf.setFromObject(taskConfig);
 
-    conf.set("ozone.scm.stale.node.interval", "10s");
-    conf.set("ozone.scm.dead.node.interval", "20s");
+    conf.set("ozone.scm.stale.node.interval", "6s");
+    conf.set("ozone.scm.dead.node.interval", "10s");
     cluster =  MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1)
         .includeRecon(true).build();
     cluster.waitForClusterToBeReady();
@@ -100,9 +100,6 @@ public class TestReconTasks {
         RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE), "admin");
     final ContainerInfo container2 = scmContainerManager.allocateContainer(
-        RatisReplicationConfig.getInstance(
-            HddsProtos.ReplicationFactor.ONE), "admin");
-    reconContainerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE), "admin");
     scmContainerManager.updateContainerState(container1.containerID(),
