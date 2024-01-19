@@ -113,11 +113,10 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
   public boolean isNotValidBucketOrOBSBucket(String path) {
     OFSPath ofsPath = new OFSPath(path,
         OzoneConfiguration.of(getOzoneConfig()));
-    OzoneBucket bucket;
     try (OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(getOzoneConfig())) {
       ObjectStore objectStore = ozoneClient.getObjectStore();
       // Checks if the bucket is part of the path.
-      bucket = objectStore.getVolume(ofsPath.getVolumeName())
+      OzoneBucket bucket = objectStore.getVolume(ofsPath.getVolumeName())
           .getBucket(ofsPath.getBucketName());
       return isObjectStoreBucket(bucket, objectStore);
     } catch (IOException e) {
@@ -125,7 +124,7 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
           "Bucket layout couldn't be verified for path: " + ofsPath +
               ". Exception: " + e);
     }
-    return false;
+    return true;
   }
 
   /**
