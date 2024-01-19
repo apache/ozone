@@ -2106,7 +2106,6 @@ message RecoverLeaseRequest {
 
 message RecoverLeaseResponse {
   optional KeyInfo keyInfo = 1;
-  optional KeyInfo openKeyInfo = 2;
 }
 
 message SetTimesRequest {

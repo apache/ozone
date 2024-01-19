@@ -1112,10 +1112,11 @@ public interface OzoneManagerProtocol
    * @param volumeName - The volume name.
    * @param bucketName - The bucket name.
    * @param keyName - The key user want to recover.
-   * @return OmKeyInfo KeyInfo is file under recovery
+   * @param force - force recover the file.
+   * @return OmKeyInfo KeyInfo of file under recovery
    * @throws IOException if an error occurs
    */
-  List<OmKeyInfo> recoverLease(String volumeName, String bucketName, String keyName) throws IOException;
+  OmKeyInfo recoverLease(String volumeName, String bucketName, String keyName, boolean force) throws IOException;
 
   /**
    * Update modification time and access time of a file.

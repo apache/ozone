@@ -398,6 +398,7 @@ public final class OzoneConsts {
   /** Metadata stored in OmKeyInfo. */
   public static final String HSYNC_CLIENT_ID = "hsyncClientId";
   public static final String LEASE_RECOVERY = "leaseRecovery";
+  public static final String FORCE_LEASE_RECOVERY_ENV = "OZONE.CLIENT.RECOVER.LEASE.FORCE";
 
   //GDPR
   public static final String GDPR_FLAG = "gdprEnabled";
