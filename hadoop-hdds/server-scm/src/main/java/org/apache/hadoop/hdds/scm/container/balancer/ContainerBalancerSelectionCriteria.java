@@ -32,7 +32,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeSet;
@@ -52,6 +54,7 @@ public class ContainerBalancerSelectionCriteria {
   private Set<ContainerID> selectedContainers;
   private Set<ContainerID> excludeContainers;
   private FindSourceStrategy findSourceStrategy;
+  private Map<DatanodeDetails, NavigableSet<ContainerID>> setMap;
 
   public ContainerBalancerSelectionCriteria(
       ContainerBalancerConfiguration balancerConfiguration,
@@ -66,6 +69,7 @@ public class ContainerBalancerSelectionCriteria {
     selectedContainers = new HashSet<>();
     excludeContainers = balancerConfiguration.getExcludeContainers();
     this.findSourceStrategy = findSourceStrategy;
+    this.setMap = new HashMap<>();
   }
 
   /**
@@ -92,15 +96,31 @@ public class ContainerBalancerSelectionCriteria {
    */
   public NavigableSet<ContainerID> getCandidateContainers(
       DatanodeDetails node, long sizeMovedAlready) {
-    NavigableSet<ContainerID> containerIDSet =
-        new TreeSet<>(orderContainersByUsedBytes().reversed());
+    // Initialize containerSet for node
+    if (!setMap.containsKey(node)) {
+      NavigableSet<ContainerID> newSet =
+          new TreeSet<>(orderContainersByUsedBytes().reversed());
+      try {
+        newSet.addAll(nodeManager.getContainers(node));
+      } catch (NodeNotFoundException e) {
+        LOG.warn("Could not find Datanode {} while selecting candidate " +
+            "containers for Container Balancer.", node.toString(), e);
+        return newSet;
+      }
+      setMap.put(node, newSet);
+    }
+
+    // In case the node is removed
     try {
-      containerIDSet.addAll(nodeManager.getContainers(node));
+      nodeManager.getContainers(node);
     } catch (NodeNotFoundException e) {
       LOG.warn("Could not find Datanode {} while selecting candidate " +
           "containers for Container Balancer.", node.toString(), e);
-      return containerIDSet;
+      setMap.remove(node);
+      return new TreeSet<>();
     }
+
+    NavigableSet<ContainerID> containerIDSet = setMap.get(node);
     if (excludeContainers != null) {
       containerIDSet.removeAll(excludeContainers);
     }
