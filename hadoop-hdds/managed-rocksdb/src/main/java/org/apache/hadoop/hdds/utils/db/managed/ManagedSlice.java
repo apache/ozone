@@ -40,9 +40,12 @@ public class ManagedSlice extends Slice {
 
   @Override
   protected void disposeInternal() {
-    super.disposeInternal();
     // RocksMutableObject.close is final thus can't be decorated.
     // So, we decorate disposeInternal instead to track closure.
-    leakTracker.close();
+    try {
+      super.disposeInternal();
+    } finally {
+      leakTracker.close();
+    }
   }
 }

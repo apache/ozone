@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
+import com.google.common.base.Preconditions;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -644,29 +645,35 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   }
 
   static class Lock extends BootstrapStateHandler.Lock {
-    private final BootstrapStateHandler keyDeletingService;
-    private final BootstrapStateHandler sstFilteringService;
-    private final BootstrapStateHandler rocksDbCheckpointDiffer;
-    private final BootstrapStateHandler snapshotDeletingService;
+    private final List<BootstrapStateHandler.Lock> locks;
     private final OzoneManager om;
 
     Lock(OzoneManager om) {
+      Preconditions.checkNotNull(om);
+      Preconditions.checkNotNull(om.getKeyManager());
+      Preconditions.checkNotNull(om.getMetadataManager());
+      Preconditions.checkNotNull(om.getMetadataManager().getStore());
+
       this.om = om;
-      keyDeletingService = om.getKeyManager().getDeletingService();
-      sstFilteringService = om.getKeyManager().getSnapshotSstFilteringService();
-      rocksDbCheckpointDiffer = om.getMetadataManager().getStore()
-          .getRocksDBCheckpointDiffer();
-      snapshotDeletingService = om.getKeyManager().getSnapshotDeletingService();
+
+      locks = Stream.of(
+          om.getKeyManager().getDeletingService(),
+          om.getKeyManager().getSnapshotSstFilteringService(),
+          om.getMetadataManager().getStore().getRocksDBCheckpointDiffer(),
+          om.getKeyManager().getSnapshotDeletingService()
+      )
+          .filter(Objects::nonNull)
+          .map(BootstrapStateHandler::getBootstrapStateLock)
+          .collect(Collectors.toList());
     }
 
     @Override
     public BootstrapStateHandler.Lock lock()
         throws InterruptedException {
       // First lock all the handlers.
-      keyDeletingService.getBootstrapStateLock().lock();
-      sstFilteringService.getBootstrapStateLock().lock();
-      rocksDbCheckpointDiffer.getBootstrapStateLock().lock();
-      snapshotDeletingService.getBootstrapStateLock().lock();
+      for (BootstrapStateHandler.Lock lock : locks) {
+        lock.lock();
+      }
 
       // Then wait for the double buffer to be flushed.
       om.awaitDoubleBufferFlush();
@@ -675,10 +682,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
 
     @Override
     public void unlock() {
-      snapshotDeletingService.getBootstrapStateLock().unlock();
-      rocksDbCheckpointDiffer.getBootstrapStateLock().unlock();
-      sstFilteringService.getBootstrapStateLock().unlock();
-      keyDeletingService.getBootstrapStateLock().unlock();
+      locks.forEach(BootstrapStateHandler.Lock::unlock);
     }
   }
 }

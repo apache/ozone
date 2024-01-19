@@ -31,7 +31,10 @@ public class ManagedBloomFilter extends BloomFilter {
 
   @Override
   public void close() {
-    super.close();
-    leakTracker.close();
+    try {
+      super.close();
+    } finally {
+      leakTracker.close();
+    }
   }
 }

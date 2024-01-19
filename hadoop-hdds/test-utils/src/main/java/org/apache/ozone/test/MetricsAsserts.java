@@ -47,6 +47,8 @@ import java.util.Objects;
 
 /**
  * Helpers for metrics source tests.
+ * <p/>
+ * Copied from Hadoop and migrated to AssertJ.
  */
 public final class MetricsAsserts {
 
