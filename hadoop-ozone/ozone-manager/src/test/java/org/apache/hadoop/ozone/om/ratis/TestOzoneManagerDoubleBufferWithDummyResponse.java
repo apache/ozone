@@ -75,9 +75,9 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
         folder.toAbsolutePath().toString());
     omMetadataManager =
         new OmMetadataManagerImpl(configuration, null);
-    doubleBuffer = new OzoneManagerDoubleBuffer.Builder()
+    doubleBuffer = OzoneManagerDoubleBuffer.newBuilder()
         .setOmMetadataManager(omMetadataManager)
-        .setmaxUnFlushedTransactionCount(10000)
+        .setMaxUnFlushedTransactionCount(10000)
         .enableRatis(true)
         .build();
   }

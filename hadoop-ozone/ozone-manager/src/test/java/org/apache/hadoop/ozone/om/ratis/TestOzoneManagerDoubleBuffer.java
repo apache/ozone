@@ -131,10 +131,10 @@ class TestOzoneManagerDoubleBuffer {
 
     flushNotifier = new OzoneManagerDoubleBuffer.FlushNotifier();
     spyFlushNotifier = spy(flushNotifier);
-    doubleBuffer = new OzoneManagerDoubleBuffer.Builder()
+    doubleBuffer = OzoneManagerDoubleBuffer.newBuilder()
         .setOmMetadataManager(omMetadataManager)
         .setS3SecretManager(secretManager)
-        .setmaxUnFlushedTransactionCount(1000)
+        .setMaxUnFlushedTransactionCount(1000)
         .enableRatis(true)
         .setFlushNotifier(spyFlushNotifier)
         .build();
@@ -289,7 +289,7 @@ class TestOzoneManagerDoubleBuffer {
         doubleBuffer.getCurrentBufferSize());
 
     // Start double buffer and wait for flush.
-    final Future<?> await = awaitFlush();
+    final Future<?> await = doubleBuffer.awaitFlushAsync();
     Future<Boolean> flusher = flushTransactions(executorService);
     await.get();
 
@@ -302,7 +302,7 @@ class TestOzoneManagerDoubleBuffer {
     assertEquals(0, doubleBuffer.getReadyBufferSize());
 
     // Run again to make sure it works when double buffer is empty
-    awaitFlush().get();
+    doubleBuffer.awaitFlushAsync().get();
 
     // Clean up.
     flusher.cancel(false);
@@ -323,8 +323,7 @@ class TestOzoneManagerDoubleBuffer {
         "RULE:[2:$1@$0](.*@EXAMPLE.COM)s/@.*//\n" +
             "RULE:[1:$1@$0](.*@EXAMPLE.COM)s/@.*//\n" +
             "DEFAULT");
-    UserGroupInformation ugiAlice;
-    ugiAlice = UserGroupInformation.createRemoteUser(userPrincipalId1);
+    final UserGroupInformation ugiAlice = UserGroupInformation.createRemoteUser(userPrincipalId1);
     UserGroupInformation.createRemoteUser(userPrincipalId2);
     UserGroupInformation.createRemoteUser(userPrincipalId3);
     assertEquals("alice", ugiAlice.getShortUserName());
@@ -391,11 +390,6 @@ class TestOzoneManagerDoubleBuffer {
                 .setCreateIfNotExist(true)
                 .build()
         ).build();
-  }
-
-  // Return a future that waits for the flush.
-  private Future<?> awaitFlush() {
-    return doubleBuffer.awaitFlushAsync();
   }
 
   private Future<Boolean> flushTransactions(ExecutorService executorService) {
