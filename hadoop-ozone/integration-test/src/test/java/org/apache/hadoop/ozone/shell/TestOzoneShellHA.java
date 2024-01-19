@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
@@ -71,6 +72,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -80,6 +83,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLU
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -89,7 +93,10 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,6 +113,7 @@ import picocli.CommandLine.RunLast;
  * Inspired by TestS3Shell
  */
 @Timeout(300)
+@TestMethodOrder(OrderAnnotation.class)
 public class TestOzoneShellHA {
 
   private static final Logger LOG =
@@ -140,6 +148,7 @@ public class TestOzoneShellHA {
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OZONE_FS_HSYNC_ENABLED, true);
     startCluster(conf);
   }
 
@@ -547,6 +556,134 @@ public class TestOzoneShellHA {
         "localhost:" + cluster.getStorageContainerManager().getClientRpcPort(),
         factor, "--type=RATIS"};
     execute(ozoneAdminShell, args);
+  }
+
+  @Test
+  public void testAdminCmdListOpenFiles()
+      throws IOException, InterruptedException {
+
+    OzoneConfiguration conf = cluster.getConf();
+    final String hostPrefix = OZONE_OFS_URI_SCHEME + "://" + omServiceId;
+
+    OzoneConfiguration clientConf = getClientConfForOFS(hostPrefix, conf);
+    clientConf.setBoolean(OZONE_FS_HSYNC_ENABLED, true);
+    FileSystem fs = FileSystem.get(clientConf);
+
+    assertNotEquals(fs.getConf().get(OZONE_FS_HSYNC_ENABLED),
+        "false", OZONE_FS_HSYNC_ENABLED + " is set to false " +
+            "by external force. Must be true to allow hsync to function");
+
+    final String volumeName = "volume-lof";
+    final String bucketName = "buck1";
+
+    String dir1 = hostPrefix +
+        OM_KEY_PREFIX + volumeName +
+        OM_KEY_PREFIX + bucketName +
+        OM_KEY_PREFIX + "dir1";
+    // Create volume, bucket, dir
+    assertTrue(fs.mkdirs(new Path(dir1)));
+    String keyPrefix = OM_KEY_PREFIX + "key";
+
+    final int numKeys = 5;
+    String[] keys = new String[numKeys];
+
+    for (int i = 0; i < numKeys; i++) {
+      keys[i] = dir1 + keyPrefix + i;
+    }
+
+    int pageSize = 3;
+    String pathToBucket = "/" +  volumeName + "/" + bucketName;
+    FSDataOutputStream[] streams = new FSDataOutputStream[numKeys];
+
+    try {
+      // Create multiple keys and hold them open
+      for (int i = 0; i < numKeys; i++) {
+        streams[i] = fs.create(new Path(keys[i]));
+        streams[i].write(1);
+      }
+
+      // Wait for DB flush
+      cluster.getOzoneManager().awaitDoubleBufferFlush();
+
+      String[] args = new String[] {"om", "lof",
+          "--service-id", omServiceId,
+          "-l", String.valueOf(numKeys + 1),  // pagination
+          "-p", pathToBucket};
+      // Run listopenfiles
+      execute(ozoneAdminShell, args);
+      String cmdRes = getStdOut();
+      // Should have retrieved all 5 open keys
+      for (int i = 0; i < numKeys; i++) {
+        assertTrue(cmdRes.contains(keyPrefix + i));
+      }
+
+      // Try pagination
+      args = new String[] {"om", "lof",
+          "--service-id", omServiceId,
+          "-l", String.valueOf(pageSize),  // pagination
+          "-p", pathToBucket};
+      execute(ozoneAdminShell, args);
+      cmdRes = getStdOut();
+
+      // Should have retrieved the 1st page only (3 keys)
+      for (int i = 0; i < pageSize; i++) {
+        assertTrue(cmdRes.contains(keyPrefix + i));
+      }
+      for (int i = pageSize; i < numKeys; i++) {
+        assertFalse(cmdRes.contains(keyPrefix + i));
+      }
+      // No hsync'ed file/key at this point
+      assertFalse(cmdRes.contains("\tYes\t"));
+
+      // Get last line of the output which has the continuation token
+      String[] lines = cmdRes.split("\n");
+      String nextCmd = lines[lines.length - 1].trim();
+      String kw = "--start=";
+      String contToken =
+          nextCmd.substring(nextCmd.lastIndexOf(kw) + kw.length());
+
+      args = new String[] {"om", "lof",
+          "--service-id", omServiceId,
+          "-l", String.valueOf(pageSize),  // pagination
+          "-p", pathToBucket,
+          "-s", contToken};
+      execute(ozoneAdminShell, args);
+      cmdRes = getStdOut();
+
+      // Should have retrieved the 2nd page only (2 keys)
+      for (int i = 0; i < pageSize - 1; i++) {
+        assertFalse(cmdRes.contains(keyPrefix + i));
+      }
+      // Note: key2 is shown in the continuation token prompt
+      for (int i = pageSize - 1; i < numKeys; i++) {
+        assertTrue(cmdRes.contains(keyPrefix + i));
+      }
+
+      // hsync last key
+      streams[numKeys - 1].hsync();
+      // Wait for flush
+      cluster.getOzoneManager().awaitDoubleBufferFlush();
+
+      execute(ozoneAdminShell, args);
+      cmdRes = getStdOut();
+
+      // Verify that only one key is hsync'ed
+      assertTrue(cmdRes.contains("\tYes\t"), "One key should be hsync'ed");
+      assertTrue(cmdRes.contains("\tNo\t"), "One key should not be hsync'ed");
+    } finally {
+      // Cleanup
+      IOUtils.closeQuietly(streams);
+    }
+
+  }
+
+  /**
+   * Return stdout as a String, then clears existing output.
+   */
+  private String getStdOut() throws UnsupportedEncodingException {
+    String res = out.toString(UTF_8.name());
+    out.reset();
+    return res;
   }
 
   /**
@@ -1451,6 +1588,8 @@ public class TestOzoneShellHA {
   }
 
   @Test
+  // Run this UT last. This interferes with testAdminCmdListOpenFiles
+  @Order(Integer.MAX_VALUE)
   public void testRecursiveBucketDelete()
       throws Exception {
     String volume1 = "volume50";

@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.om.codec.TokenIdentifierCodec;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
+import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
@@ -75,6 +76,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
@@ -102,6 +104,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
+import static org.apache.hadoop.ozone.OzoneConsts.HSYNC_CLIENT_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT;
@@ -273,14 +276,14 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table bucketTable;
   private Table<String, OmKeyInfo> keyTable;
   private Table deletedTable;
-  private Table openKeyTable;
+  private Table<String, OmKeyInfo> openKeyTable;
   private Table<String, OmMultipartKeyInfo> multipartInfoTable;
   private Table<String, S3SecretValue> s3SecretTable;
   private Table dTokenTable;
   private Table prefixTable;
   private Table<String, OmDirectoryInfo> dirTable;
   private Table<String, OmKeyInfo> fileTable;
-  private Table openFileTable;
+  private Table<String, OmKeyInfo> openFileTable;
   private Table transactionInfoTable;
   private Table metaTable;
 
@@ -475,7 +478,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public Table getOpenKeyTable(BucketLayout bucketLayout) {
+  public Table<String, OmKeyInfo> getOpenKeyTable(BucketLayout bucketLayout) {
     if (bucketLayout.isFileSystemOptimized()) {
       return openFileTable;
     }
@@ -843,6 +846,18 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
+  public String getOzoneKeyFSO(String volumeName,
+                               String bucketName,
+                               String keyPrefix)
+      throws IOException {
+    final long volumeId = getVolumeId(volumeName);
+    final long bucketId = getBucketId(volumeName, bucketName);
+    // FSO keyPrefix could look like: -9223372036854774527/key1
+    return getOzoneKey(Long.toString(volumeId),
+        Long.toString(bucketId), keyPrefix);
+  }
+
+  @Override
   public String getOzoneDirKey(String volume, String bucket, String key) {
     key = OzoneFSUtils.addTrailingSlashIfNeeded(key);
     return getOzoneKey(volume, bucket, key);
@@ -1173,6 +1188,94 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   public TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
       getKeyIterator() throws IOException {
     return keyTable.iterator();
+  }
+
+  @Override
+  public ListOpenFilesResult listOpenFiles(BucketLayout bucketLayout,
+                                           int maxKeys,
+                                           String dbOpenKeyPrefix,
+                                           boolean hasContToken,
+                                           String dbContTokenPrefix)
+      throws IOException {
+
+    List<OpenKeySession> openKeySessionList = new ArrayList<>();
+    int currentCount = 0;
+    final boolean hasMore;
+    final String retContToken;
+
+    // TODO: If we want "better" results, we want to iterate cache like
+    //  listKeys do. But that complicates the iteration logic by quite a bit.
+    //  And if we do that, we need to refactor listKeys as well to dedup.
+
+    final Table<String, OmKeyInfo> okTable, kTable;
+    okTable = getOpenKeyTable(bucketLayout);
+    // keyTable required to check key hsync metadata. TODO: HDDS-10077
+    kTable = getKeyTable(bucketLayout);
+
+    // No lock required since table iterator creates a "snapshot"
+    try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
+             openKeyIter = okTable.iterator()) {
+      KeyValue<String, OmKeyInfo> kv;
+      kv = openKeyIter.seek(dbContTokenPrefix);
+      if (hasContToken && kv.getKey().equals(dbContTokenPrefix)) {
+        // Skip one entry when cont token is specified and the current entry
+        // key is exactly the same as cont token.
+        openKeyIter.next();
+      }
+      while (currentCount < maxKeys && openKeyIter.hasNext()) {
+        kv = openKeyIter.next();
+        if (kv != null && kv.getKey().startsWith(dbOpenKeyPrefix)) {
+          String dbKey = kv.getKey();
+          long clientID = OMMetadataManager.getClientIDFromOpenKeyDBKey(dbKey);
+          OmKeyInfo omKeyInfo = kv.getValue();
+
+          // Trim client ID to get the keyTable dbKey
+          int lastSlashIdx = dbKey.lastIndexOf(OM_KEY_PREFIX);
+          String ktDbKey = dbKey.substring(0, lastSlashIdx);
+          // Check whether the key has been hsync'ed by checking keyTable
+          checkAndUpdateKeyHsyncStatus(omKeyInfo, ktDbKey, kTable);
+
+          openKeySessionList.add(
+              new OpenKeySession(clientID, omKeyInfo,
+                  omKeyInfo.getLatestVersionLocations().getVersion()));
+          currentCount++;
+        }
+      }
+
+      // Set hasMore flag as a hint for client-side pagination
+      if (openKeyIter.hasNext()) {
+        KeyValue<String, OmKeyInfo> nextKv = openKeyIter.next();
+        hasMore = nextKv != null && nextKv.getKey().startsWith(dbOpenKeyPrefix);
+      } else {
+        hasMore = false;
+      }
+
+      // Set continuation token
+      retContToken = hasMore ? kv.getKey() : null;
+    }
+
+    return new ListOpenFilesResult(
+        getTotalOpenKeyCount(),
+        hasMore,
+        retContToken,
+        openKeySessionList);
+  }
+
+  /**
+   * Check and update OmKeyInfo from OpenKeyTable with hsync status in KeyTable.
+   */
+  private void checkAndUpdateKeyHsyncStatus(OmKeyInfo omKeyInfo,
+                                            String dbKey,
+                                            Table<String, OmKeyInfo> kTable)
+      throws IOException {
+    OmKeyInfo ktOmKeyInfo = kTable.get(dbKey);
+    if (ktOmKeyInfo != null) {
+      // The same key in OpenKeyTable also exists in KeyTable, indicating
+      // the key has been hsync'ed
+      String hsyncClientId = ktOmKeyInfo.getMetadata().get(HSYNC_CLIENT_ID);
+      // Append HSYNC_CLIENT_ID to OmKeyInfo to be returned to the client
+      omKeyInfo.getMetadata().put(HSYNC_CLIENT_ID, hsyncClientId);
+    }
   }
 
   @Override
@@ -1730,6 +1833,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     // since the MPU abort and complete requests require the open MPU keys
     // to exist in the open key/file table.
     return getMultipartInfoTable().isExist(multipartInfoDbKey);
+  }
+
+  @Override
+  public long getTotalOpenKeyCount() throws IOException {
+    // Get an estimated key count of OpenKeyTable + OpenFileTable
+    return openKeyTable.getEstimatedKeyCount()
+        + openFileTable.getEstimatedKeyCount();
   }
 
   @Override

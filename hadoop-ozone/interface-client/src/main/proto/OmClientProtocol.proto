@@ -146,6 +146,8 @@ enum Type {
   SetSnapshotProperty = 128;
   ListStatusLight = 129;
   GetSnapshotInfo = 130;
+
+  ListOpenFiles = 132;
 }
 
 enum SafeMode {
@@ -281,6 +283,8 @@ message OMRequest {
   optional MultipartUploadsExpiredAbortRequest multipartUploadsExpiredAbortRequest = 126;
   optional SetSnapshotPropertyRequest       SetSnapshotPropertyRequest     = 127;
   optional SnapshotInfoRequest              SnapshotInfoRequest            = 128;
+
+  optional ListOpenFilesRequest             ListOpenFilesRequest           = 132;
 }
 
 message OMResponse {
@@ -403,6 +407,8 @@ message OMResponse {
   optional ListStatusLightResponse           listStatusLightResponse       = 129;
   optional SnapshotInfoResponse              SnapshotInfoResponse          = 130;
   optional OMLockDetailsProto                omLockDetails                 = 131;
+
+  optional ListOpenFilesResponse             ListOpenFilesResponse         = 132;
 }
 
 enum Status {
@@ -1527,6 +1533,24 @@ message CancelPrepareRequest {
 
 message CancelPrepareResponse {
 
+}
+
+message ListOpenFilesRequest {
+  optional string path = 1;
+  optional uint32 count = 2;
+  optional string token = 3;
+}
+
+message ListOpenFilesResponse {
+  // size of openKeyTable and openFileTable combined
+  optional uint64 totalOpenKeyCount = 1;
+  // indicates if there are more entries to be retrieved under the given path
+  optional bool hasMore = 2;
+  // continuation token should match a dbKey in openKeyTable or openFileTable
+  optional string continuationToken = 3;
+  // result
+  repeated uint64 clientID = 4;
+  repeated KeyInfo keyInfo = 5;
 }
 
 message ServicePort {

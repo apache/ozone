@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
+import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
@@ -421,6 +422,17 @@ public interface OzoneManagerProtocol
   List<ServiceInfo> getServiceList() throws IOException;
 
   ServiceInfoEx getServiceInfo() throws IOException;
+
+  /**
+   * List open files in OM.
+   * @param path One of: root "/", path to a bucket, key path, or key prefix
+   * @param maxKeys Limit the number of keys that can be returned in this batch.
+   * @param contToken Continuation token.
+   * @return ListOpenFilesResult
+   * @throws IOException
+   */
+  ListOpenFilesResult listOpenFiles(String path, int maxKeys, String contToken)
+      throws IOException;
 
   /**
    * Transfer the raft leadership.
