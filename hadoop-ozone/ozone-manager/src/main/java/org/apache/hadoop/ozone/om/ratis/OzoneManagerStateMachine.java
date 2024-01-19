@@ -20,10 +20,8 @@ package org.apache.hadoop.ozone.om.ratis;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -37,16 +35,13 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
-import org.apache.hadoop.ozone.om.ratis.metrics.OzoneManagerStateMachineMetrics;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.response.DummyOMClientResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.hadoop.ozone.protocolPB.RequestHandler;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -90,7 +85,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       LoggerFactory.getLogger(OzoneManagerStateMachine.class);
   private final SimpleStateMachineStorage storage =
       new SimpleStateMachineStorage();
-  private final OzoneManagerRatisServer omRatisServer;
   private final OzoneManager ozoneManager;
   private RequestHandler handler;
   private RaftGroupId raftGroupId;
@@ -106,14 +100,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   /** The last index skipped by {@link #notifyTermIndexUpdated(long, long)}. */
   private volatile long lastSkippedIndex = RaftLog.INVALID_LOG_INDEX;
 
-  private OzoneManagerStateMachineMetrics metrics;
-
-
   public OzoneManagerStateMachine(OzoneManagerRatisServer ratisServer,
       boolean isTracingEnabled) throws IOException {
-    this.omRatisServer = ratisServer;
     this.isTracingEnabled = isTracingEnabled;
-    this.ozoneManager = omRatisServer.getOzoneManager();
+    this.ozoneManager = ratisServer.getOzoneManager();
 
     loadSnapshotInfoFromDB();
     this.threadPrefix = ozoneManager.getThreadNamePrefix();
@@ -132,7 +122,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .setNameFormat(threadPrefix + "InstallSnapshotThread").build();
     this.installSnapshotExecutor =
         HadoopExecutors.newSingleThreadExecutor(installSnapshotThreadFactory);
-    this.metrics = OzoneManagerStateMachineMetrics.create();
   }
 
   /**
@@ -270,7 +259,14 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       ctxt.setException(ioe);
       return ctxt;
     }
-    return handleStartTransactionRequests(raftClientRequest, omRequest);
+
+    return TransactionContext.newBuilder()
+        .setClientRequest(raftClientRequest)
+        .setStateMachine(this)
+        .setServerRole(RaftProtos.RaftPeerRole.LEADER)
+        .setLogData(raftClientRequest.getMessage().getContent())
+        .setStateMachineContext(omRequest)
+        .build();
   }
 
   @Override
@@ -499,18 +495,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     LOG.info("Received install snapshot notification from OM leader: {} with " +
             "term index: {}", leaderNodeId, firstTermIndexInLog);
 
-    CompletableFuture<TermIndex> future = CompletableFuture.supplyAsync(
+    return CompletableFuture.supplyAsync(
         () -> ozoneManager.installSnapshotFromLeader(leaderNodeId),
         installSnapshotExecutor);
-    return future;
-  }
-
-  /**
-   * Notifies the state machine that the raft peer is no longer leader.
-   */
-  @Override
-  public void notifyNotLeader(Collection<TransactionContext> pendingEntries)
-      throws IOException {
   }
 
   @Override
@@ -531,28 +518,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   /**
-   * Handle the RaftClientRequest and return TransactionContext object.
-   * @param raftClientRequest
-   * @param omRequest
-   * @return TransactionContext
-   */
-  private TransactionContext handleStartTransactionRequests(
-      RaftClientRequest raftClientRequest, OMRequest omRequest) {
-
-    return TransactionContext.newBuilder()
-        .setClientRequest(raftClientRequest)
-        .setStateMachine(this)
-        .setServerRole(RaftProtos.RaftPeerRole.LEADER)
-        .setLogData(raftClientRequest.getMessage().getContent())
-        .setStateMachineContext(omRequest)
-        .build();
-  }
-
-  /**
    * Submits write request to OM and returns the response Message.
    * @param request OMRequest
    * @return response from OM
-   * @throws ServiceException
    */
   private OMResponse runCommand(OMRequest request, TermIndex termIndex) {
     try {
@@ -635,23 +603,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     return (OzoneManagerRequestHandler) this.handler;
   }
 
-  @VisibleForTesting
-  public void setRaftGroupId(RaftGroupId raftGroupId) {
-    this.raftGroupId = raftGroupId;
-  }
-
-  @VisibleForTesting
-  public OzoneManagerStateMachineMetrics getMetrics() {
-    return this.metrics;
-  }
-
   public void stop() {
     ozoneManagerDoubleBuffer.stop();
     HadoopExecutors.shutdown(executorService, LOG, 5, TimeUnit.SECONDS);
     HadoopExecutors.shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
-    if (metrics != null) {
-      metrics.unRegister();
-    }
   }
 
   /**

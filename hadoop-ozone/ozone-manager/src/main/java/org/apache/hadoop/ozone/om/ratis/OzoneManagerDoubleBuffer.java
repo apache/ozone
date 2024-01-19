@@ -106,11 +106,7 @@ public final class OzoneManagerDoubleBuffer {
 
   private final Daemon daemon;
   private final OMMetadataManager omMetadataManager;
-  private final AtomicLong flushedTransactionCount = new AtomicLong(0);
-  private final AtomicLong flushIterations = new AtomicLong(0);
   private final AtomicBoolean isRunning = new AtomicBoolean(false);
-  private final OzoneManagerDoubleBufferMetrics ozoneManagerDoubleBufferMetrics;
-  private long maxFlushedTransactionsInOneIteration;
 
   private final Consumer<TermIndex> updateLastAppliedIndex;
   private final boolean isRatisEnabled;
@@ -189,6 +185,13 @@ public final class OzoneManagerDoubleBuffer {
     }
   }
 
+  private final OzoneManagerDoubleBufferMetrics metrics = OzoneManagerDoubleBufferMetrics.create();
+
+  /** Accumulative count (for testing and debug only). */
+  private final AtomicLong flushedTransactionCount = new AtomicLong();
+  /** The number of flush iterations (for testing and debug only). */
+  private final AtomicLong flushIterations = new AtomicLong();
+
   @SuppressWarnings("checkstyle:parameternumber")
   private OzoneManagerDoubleBuffer(OMMetadataManager omMetadataManager,
       Consumer<TermIndex> updateLastAppliedIndex,
@@ -203,8 +206,6 @@ public final class OzoneManagerDoubleBuffer {
     this.unFlushedTransactions = new Semaphore(maxUnFlushedTransactions);
     this.omMetadataManager = omMetadataManager;
     this.updateLastAppliedIndex = updateLastAppliedIndex;
-    this.ozoneManagerDoubleBufferMetrics =
-        OzoneManagerDoubleBufferMetrics.create();
     this.flushNotifier = flushNotifier;
     isRunning.set(true);
     // Daemon thread which runs in background and flushes transactions to DB.
@@ -354,8 +355,7 @@ public final class OzoneManagerDoubleBuffer {
           () -> omMetadataManager.getStore()
               .commitBatchOperation(batchOperation));
 
-      ozoneManagerDoubleBufferMetrics.updateFlushTime(
-          Time.monotonicNow() - startTime);
+      metrics.updateFlushTime(Time.monotonicNow() - startTime);
     }
 
     // Complete futures first and then do other things.
@@ -367,14 +367,10 @@ public final class OzoneManagerDoubleBuffer {
           .forEach(f -> f.complete(null));
     }
 
-    flushedTransactionCount.addAndGet(flushedTransactionsSize);
-    flushIterations.incrementAndGet();
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Sync iteration {} flushed transactions in this iteration {}",
-          flushIterations.get(),
-          flushedTransactionsSize);
-    }
+    final long accumulativeCount = flushedTransactionCount.addAndGet(flushedTransactionsSize);
+    final long flushedIterations = flushIterations.incrementAndGet();
+    LOG.debug("Sync iteration: {}, size in this iteration: {}, accumulative count: {}",
+        flushedIterations, flushedTransactionsSize, accumulativeCount);
 
     // Clean up committed transactions.
     cleanupCache(cleanupEpochs);
@@ -386,7 +382,7 @@ public final class OzoneManagerDoubleBuffer {
     updateLastAppliedIndex.accept(lastTransaction);
 
     // set metrics.
-    updateMetrics(flushedTransactionsSize);
+    metrics.updateFlush(flushedTransactionsSize);
   }
 
   private String addToBatch(Queue<Entry> buffer, BatchOperation batchOperation) {
@@ -492,25 +488,6 @@ public final class OzoneManagerDoubleBuffer {
   private synchronized void clearReadyBuffer() {
     readyBuffer.clear();
   }
-  /**
-   * Update OzoneManagerDoubleBuffer metrics values.
-   */
-  private void updateMetrics(int flushedTransactionsSize) {
-    ozoneManagerDoubleBufferMetrics.incrTotalNumOfFlushOperations();
-    ozoneManagerDoubleBufferMetrics.incrTotalSizeOfFlushedTransactions(
-        flushedTransactionsSize);
-    ozoneManagerDoubleBufferMetrics.setAvgFlushTransactionsInOneIteration(
-        (float) ozoneManagerDoubleBufferMetrics
-            .getTotalNumOfFlushedTransactions() /
-            ozoneManagerDoubleBufferMetrics.getTotalNumOfFlushOperations());
-    if (maxFlushedTransactionsInOneIteration < flushedTransactionsSize) {
-      maxFlushedTransactionsInOneIteration = flushedTransactionsSize;
-      ozoneManagerDoubleBufferMetrics
-          .setMaxNumberOfTransactionsFlushedInOneIteration(
-              flushedTransactionsSize);
-    }
-    ozoneManagerDoubleBufferMetrics.updateQueueSize(flushedTransactionsSize);
-  }
 
   /**
    * Stop OM DoubleBuffer flush thread.
@@ -520,7 +497,7 @@ public final class OzoneManagerDoubleBuffer {
   @SuppressWarnings("squid:S2142")
   public void stop() {
     stopDaemon();
-    ozoneManagerDoubleBufferMetrics.unRegister();
+    metrics.unRegister();
   }
 
   @VisibleForTesting
@@ -551,22 +528,6 @@ public final class OzoneManagerDoubleBuffer {
       message.append(" when handling OMRequest: ").append(omResponse);
     }
     ExitUtils.terminate(status, message.toString(), t, LOG);
-  }
-
-  /**
-   * Returns the flushed transaction count to OM DB.
-   * @return flushedTransactionCount
-   */
-  public long getFlushedTransactionCount() {
-    return flushedTransactionCount.get();
-  }
-
-  /**
-   * Returns total number of flush iterations run by sync thread.
-   * @return flushIterations
-   */
-  public long getFlushIterations() {
-    return flushIterations.get();
   }
 
   /**
@@ -623,8 +584,20 @@ public final class OzoneManagerDoubleBuffer {
   }
 
   @VisibleForTesting
-  public OzoneManagerDoubleBufferMetrics getOzoneManagerDoubleBufferMetrics() {
-    return ozoneManagerDoubleBufferMetrics;
+  OzoneManagerDoubleBufferMetrics getMetrics() {
+    return metrics;
+  }
+
+  /** @return the flushed transaction count to OM DB. */
+  @VisibleForTesting
+  long getFlushedTransactionCountForTesting() {
+    return flushedTransactionCount.get();
+  }
+
+  /** @return total number of flush iterations run by sync thread. */
+  @VisibleForTesting
+  long getFlushIterationsForTesting() {
+    return flushIterations.get();
   }
 
   @VisibleForTesting
