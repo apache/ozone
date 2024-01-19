@@ -1250,6 +1250,29 @@ public class TestOzoneShellHA {
   }
 
   @Test
+  public void testPutKeyWithECReplicationConfig() throws Exception {
+    final String volumeName = UUID.randomUUID().toString();
+    final String bucketName = UUID.randomUUID().toString();
+    final String keyName = UUID.randomUUID().toString();
+    getVolume(volumeName);
+    String bucketPath =
+            Path.SEPARATOR + volumeName + Path.SEPARATOR + bucketName;
+    String[] args =
+            new String[] {"bucket", "create", bucketPath};
+    execute(ozoneShell, args);
+
+    args = new String[] {"key", "put", "-r", "rs-3-2-1024k", "-t", "EC",
+        bucketPath + Path.SEPARATOR + keyName, testFilePathString};
+    execute(ozoneShell, args);
+
+    OzoneKeyDetails key =
+            client.getObjectStore().getVolume(volumeName)
+                    .getBucket(bucketName).getKey(keyName);
+    assertEquals(HddsProtos.ReplicationType.EC,
+            key.getReplicationConfig().getReplicationType());
+  }
+
+  @Test
   public void testCreateBucketWithRatisReplicationConfig() throws Exception {
     final String volumeName = "volume101";
     getVolume(volumeName);
