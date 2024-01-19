@@ -1262,7 +1262,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
 
     args = new String[] {"key", "put", "-r", "rs-3-2-1024k", "-t", "EC",
-            bucketPath + Path.SEPARATOR + keyName, testFilePathString};
+        bucketPath + Path.SEPARATOR + keyName, testFilePathString};
     execute(ozoneShell, args);
 
     OzoneKeyDetails key =
