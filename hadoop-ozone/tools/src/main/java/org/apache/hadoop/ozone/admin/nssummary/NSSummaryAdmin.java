@@ -37,7 +37,6 @@ import picocli.CommandLine;
 
 import java.io.IOException;
 import java.util.HashSet;
-import java.util.Objects;
 
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_DEFAULT;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
@@ -111,7 +110,7 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
    * @return true if bucket is OBS bucket or not part of provided path.
    * @throws IOException
    */
-  public boolean isOBSBucketOrNotPresentInPath(String path) throws IOException {
+  public boolean isNotValidBucketOrOBSBucket(String path) throws IOException {
     OFSPath ofsPath = new OFSPath(path,
         OzoneConfiguration.of(getOzoneConfig()));
 
@@ -130,8 +129,7 @@ public class NSSummaryAdmin extends GenericCli implements SubcommandWithParent {
     } finally {
       ozoneClient.close();
     }
-    boolean isOBSBucket = bucket != null ? isObjectStoreBucket(bucket, objectStore) : false;
-    return isOBSBucket || !Objects.nonNull(bucket);
+    return (null == bucket) || isObjectStoreBucket(bucket, objectStore);
   }
 
   /**
