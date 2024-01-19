@@ -89,6 +89,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartMaintenanceNodesResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SingleNodeQueryRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SingleNodeQueryResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerRequestProto;
@@ -114,6 +116,7 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.util.ProtobufUtils;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -123,6 +126,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto.Status.CONTAINER_ALREADY_CLOSED;
@@ -484,6 +488,18 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         builder1 -> builder1.setNodeQueryRequest(request))
         .getNodeQueryResponse();
     return response.getDatanodesList();
+  }
+
+  @Override
+  public HddsProtos.Node queryNode(UUID uuid) throws IOException {
+    SingleNodeQueryRequestProto request = SingleNodeQueryRequestProto.newBuilder()
+        .setUuid(ProtobufUtils.toProtobuf(uuid))
+        .build();
+    SingleNodeQueryResponseProto response =
+        submitRequest(Type.SingleNodeQuery,
+            builder -> builder.setSingleNodeQueryRequest(request))
+            .getSingleNodeQueryResponse();
+    return response.getDatanode();
   }
 
   /**
