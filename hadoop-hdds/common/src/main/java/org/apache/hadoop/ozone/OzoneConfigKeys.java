@@ -675,6 +675,8 @@ public final class OzoneConfigKeys {
   public static final String HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY =
       "hdds.scmclient.failover.max.retry";
 
+  public static final String OZONE_XCEIVER_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY =
+      "ozone.xceiver.metrics.percentiles.intervals.seconds";
 
   /**
    * There is no need to instantiate this class.
