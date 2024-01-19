@@ -219,6 +219,7 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
   @VisibleForTesting
   public void setParent() {
     parent = new StatusSubCommand();
+    parent.setParent();
   }
 
 }

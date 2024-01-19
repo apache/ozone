@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
@@ -62,6 +63,10 @@ public class DatanodeCommands implements Callable<Void>, SubcommandWithParent {
     return parent;
   }
 
+  @VisibleForTesting
+  public void setParent() {
+    parent = new OzoneAdmin();
+  }
   @Override
   public Class<?> getParentType() {
     return OzoneAdmin.class;

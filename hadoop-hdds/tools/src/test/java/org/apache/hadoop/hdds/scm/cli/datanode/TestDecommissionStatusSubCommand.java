@@ -59,6 +59,7 @@ public class TestDecommissionStatusSubCommand {
   @BeforeEach
   public void setup() throws UnsupportedEncodingException {
     cmd = new DecommissionStatusSubCommand();
+    cmd.setParent();
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
   }

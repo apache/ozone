@@ -17,6 +17,7 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
  * limitations under the License.
  */
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
@@ -53,6 +54,12 @@ public class StatusSubCommand implements Callable<Void>, SubcommandWithParent {
 
   public DatanodeCommands getParent() {
     return parent;
+  }
+
+  @VisibleForTesting
+  public void setParent() {
+    parent = new DatanodeCommands();
+    parent.setParent();
   }
 
   @Override
