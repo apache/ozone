@@ -217,7 +217,18 @@ public final class OmPrefixInfo extends WithObjectID {
 
   @Override
   public int hashCode() {
-    return Objects.hash(name);
+    return Objects.hash(name, acls, metadata, objectID, updateID);
+  }
+
+  @Override
+  public String toString() {
+    return "OmPrefixInfo{" +
+        "name='" + name + '\'' +
+        ", acls=" + acls +
+        ", metadata=" + metadata +
+        ", objectID=" + objectID +
+        ", updateID=" + updateID +
+        '}';
   }
 
   /**
