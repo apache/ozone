@@ -27,6 +27,7 @@ import java.util.Map;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -92,7 +93,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     KeyArgs keyArgs = commitKeyRequest.getKeyArgs();
 
     // Verify key name
-    validateKeyName(ozoneManager, keyArgs);
+    validateKeyName(ozoneManager, StringUtils.removeEnd(keyArgs.getKeyName(),
+        OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX));
 
     boolean isHsync = commitKeyRequest.hasHsync() &&
         commitKeyRequest.getHsync();
