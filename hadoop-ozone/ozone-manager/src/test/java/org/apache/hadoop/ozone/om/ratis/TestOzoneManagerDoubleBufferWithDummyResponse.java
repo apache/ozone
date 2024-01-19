@@ -96,8 +96,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
   public void testDoubleBufferWithDummyResponse() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     int bucketCount = 100;
-    OzoneManagerDoubleBufferMetrics metrics =
-        doubleBuffer.getOzoneManagerDoubleBufferMetrics();
+    final OzoneManagerDoubleBufferMetrics metrics = doubleBuffer.getMetrics();
 
     // As we have not flushed/added any transactions, all metrics should have
     // value zero.
@@ -113,11 +112,11 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
         100, 60000);
 
     assertThat(metrics.getTotalNumOfFlushOperations()).isGreaterThan(0);
-    assertEquals(bucketCount, doubleBuffer.getFlushedTransactionCount());
+    assertEquals(bucketCount, doubleBuffer.getFlushedTransactionCountForTesting());
     assertThat(metrics.getMaxNumberOfTransactionsFlushedInOneIteration()).isGreaterThan(0);
     assertEquals(bucketCount, omMetadataManager.countRowsInTable(
         omMetadataManager.getBucketTable()));
-    assertThat(doubleBuffer.getFlushIterations()).isGreaterThan(0);
+    assertThat(doubleBuffer.getFlushIterationsForTesting()).isGreaterThan(0);
     assertThat(metrics.getFlushTime().lastStat().numSamples()).isGreaterThan(0);
     assertThat(metrics.getAvgFlushTransactionsInOneIteration()).isGreaterThan(0);
     assertEquals(bucketCount, (long) metrics.getQueueSize().lastStat().total());
