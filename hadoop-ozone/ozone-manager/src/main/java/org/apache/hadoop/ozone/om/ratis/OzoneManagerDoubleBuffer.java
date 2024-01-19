@@ -97,7 +97,7 @@ public final class OzoneManagerDoubleBuffer {
   /**
    *  Builder for creating OzoneManagerDoubleBuffer.
    */
-  public static class Builder {
+  public static final class Builder {
     private OMMetadataManager omMetadataManager;
     private Consumer<TermIndex> updateLastAppliedIndex = termIndex -> { };
     private boolean isRatisEnabled = false;
@@ -107,7 +107,7 @@ public final class OzoneManagerDoubleBuffer {
     private S3SecretManager s3SecretManager;
     private String threadPrefix = "";
 
-    private Builder() {}
+    private Builder() { }
 
     public Builder setOmMetadataManager(OMMetadataManager omMetadataManager) {
       this.omMetadataManager = omMetadataManager;
@@ -166,7 +166,7 @@ public final class OzoneManagerDoubleBuffer {
   }
 
   static Semaphore newSemaphore(int permits) {
-    return permits > 0? new Semaphore(permits) : null;
+    return permits > 0 ? new Semaphore(permits) : null;
   }
 
   private Queue<Entry> currentBuffer;

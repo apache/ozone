@@ -105,7 +105,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     this.transactionIndex = new AtomicLong(lastTransactionIndexForNonRatis);
 
     // When ratis is enabled, the handler does not require a double-buffer since it only handle read requests.
-    this.ozoneManagerDoubleBuffer = enableRatis? null
+    this.ozoneManagerDoubleBuffer = enableRatis ? null
         : OzoneManagerDoubleBuffer.newBuilder()
           .setOmMetadataManager(ozoneManager.getMetadataManager())
           .enableTracing(TracingUtil.isTracingEnabled(ozoneManager.getConfiguration()))
