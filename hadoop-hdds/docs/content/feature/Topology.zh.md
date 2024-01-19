@@ -26,12 +26,12 @@ summary: 机架感知配置可以提高读/写性能
 Ozone可以使用拓扑相关信息（例如机架位置）来优化读写管道。要获得完全的机架感知集群，Ozone需要三种不同的配置。
 
  1. 拓扑信息应由 Ozone 配置。
- 2. 当Ozone为特定管道/容器选择3个不同的数据节点时，与拓扑相关信息就会被使用.(写入)
+ 2. 当Ozone为特定管道/容器选择3个不同的数据节点时，拓扑相关信息就会被使用.(写入)
  3. 当Ozone读取一个Key时，它应该优先从最近的节点读取。
 
 <div class="alert alert-warning" role="alert">
 
-Ozone 对开放式容器（写）使用 RAFT 复制，对封闭的、不可变的容器（冷数据）使用异步复制。由于RAFT需要低延迟的网络，因此只有封闭式容器才能使用拓扑感知布置。有关开放式与封闭式容器的更多信息，请参阅[容器]({{< ref "concept/Containers.md">}}) 页面。
+Ozone 对OPEN容器（写）使用 RAFT 复制，对CLOSED的、不可变的容器（冷数据）使用异步复制。由于RAFT需要低延迟的网络，因此只有CLOSED容器才能使用拓扑感知布置。有关OPEN与CLOSED容器的更多信息，请参阅[容器]({{< ref "concept/Containers.zh.md">}}) 页面。
 
 </div>
 
@@ -54,7 +54,7 @@ Ozone 对开放式容器（写）使用 RAFT 复制，对封闭的、不可变�
 </property>
 ```
 
-第二个配置选项应指向一个文本文件。文件格式为两列文本文件，各列之间用空格隔开。第一列是 IP 地址，第二列指定地址映射的机架。如果找不到与群集中主机相对应的条目，则会使用 /default-rack。
+第二个配置选项应指向一个文本文件。文件格式为两列文本文件，各列之间用空格隔开。第一列是 IP 地址，第二列指定地址映射的机架。如果找不到与集群中主机相对应的条目，则会使用 /default-rack。
 
 ### 动态列表 
 
@@ -76,9 +76,9 @@ Ozone 对开放式容器（写）使用 RAFT 复制，对封闭的、不可变�
 
 ## 写入路径
 
-封闭容器实现可以通过 `ozone.scm.container.placement.impl` 配置键进行配置。 可用的容器放置策略可在 `org.apache.hdds.scm.container.placement` 包中找到。[包](https://github.com/apache/ozone/tree/master/hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/container/placement/algorithms).
+CLOSED容器放置可以通过 `ozone.scm.container.placement.impl` 配置键进行配置。 可用的容器放置策略可在 `org.apache.hdds.scm.container.placement` 包中找到。[包](https://github.com/apache/ozone/tree/master/hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/container/placement/algorithms).
 
-默认情况下， `SCMContainerPlacementRandom` 被用于拓扑感知。但 `SCMContainerPlacementRackAware` 也可用于拓扑感知：
+默认情况下， CLOSED容器使用 `SCMContainerPlacementRandom` 放置策略，该策略不支持拓扑感知。为了启用拓扑感知，可配置 `SCMContainerPlacementRackAware` 作为CLOSED容器放置策略：
 
 ```XML
 <property>
@@ -105,4 +105,4 @@ Ozone 对开放式容器（写）使用 RAFT 复制，对封闭的、不可变�
 ## 参考文献
 
  * 关于 `net.topology.node.switch.mapping.impl` 的 Hadoop 文档： https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/RackAwareness.html
- * [设计文档] ({{< ref "design/topology.md">}})
+ * [设计文档]({{< ref path="design/topology.md" lang="en">}})
