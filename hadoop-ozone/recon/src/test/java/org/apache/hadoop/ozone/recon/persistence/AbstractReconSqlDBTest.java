@@ -47,8 +47,6 @@ import com.google.inject.Injector;
 import com.google.inject.Module;
 import com.google.inject.Provider;
 import org.junit.jupiter.api.io.TempDir;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.util.FileSystemUtils;
 
 /**
@@ -56,8 +54,6 @@ import org.springframework.util.FileSystemUtils;
  * to access the DAOs easily.
  */
 public class AbstractReconSqlDBTest {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(AbstractReconSqlDBTest.class);
   private Injector injector;
   private DSLContext dslContext;
   private Provider<DataSourceConfiguration> configurationProvider;
@@ -72,7 +68,6 @@ public class AbstractReconSqlDBTest {
           new DerbyDataSourceConfigurationProvider(Files.createDirectory(
               temporaryFolder.resolve("Config")).toFile());
     } catch (IOException e) {
-      LOG.error("IOException thrown: {}", e);
       fail();
     }
   }
