@@ -1999,7 +1999,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
   @Test
   void testRenameFile() throws Exception {
-    final String dir = "/dir" + RandomUtils.nextInt(0,1000);
+    final String dir = "/dir" + RandomUtils.nextInt(0, 1000);
     Path dirPath = new Path(getBucketPath() + dir);
     Path file1Source = new Path(getBucketPath() + dir
         + "/file1_Copy");
@@ -2025,7 +2025,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
    */
   @Test
   void testRenameFileToDir() throws Exception {
-    final String dir = "/dir" + RandomUtils.nextInt(0,1000);
+    final String dir = "/dir" + RandomUtils.nextInt(0, 1000);
     Path dirPath = new Path(getBucketPath() + dir);
     getFs().mkdirs(dirPath);
 

@@ -180,7 +180,7 @@ public class TestLeaderChoosePolicy {
           .getPipelines(RatisReplicationConfig.getInstance(
               ReplicationFactor.THREE), Pipeline.PipelineState.OPEN);
 
-      int destroyNum = RandomUtils.nextInt(0,pipelines.size());
+      int destroyNum = RandomUtils.nextInt(0, pipelines.size());
       for (int k = 0; k <= destroyNum; k++) {
         pipelineManager.closePipeline(pipelines.get(k), false);
       }

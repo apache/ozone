@@ -347,8 +347,8 @@ public abstract class AbstractContractSeekTest extends AbstractFSContractTestBas
     int[] reads = new int[10];
     try (FSDataInputStream stm = getFileSystem().open(randomSeekFile)) {
       for (int i = 0; i < limit; i++) {
-        int seekOff = RandomUtils.nextInt(0,buf.length);
-        int toRead = RandomUtils.nextInt(0,Math.min(buf.length - seekOff, 32000));
+        int seekOff = RandomUtils.nextInt(0, buf.length);
+        int toRead = RandomUtils.nextInt(0, Math.min(buf.length - seekOff, 32000));
 
         seeks[i % seeks.length] = seekOff;
         reads[i % reads.length] = toRead;
