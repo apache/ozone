@@ -41,7 +41,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.net.URL;
-import java.util.Random;
+import org.apache.commons.lang3.RandomUtils;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -206,9 +206,8 @@ public class TestReconUtils {
       assertNextClosestPowerIndexOfTwo(n - 1);
     }
 
-    final Random random = new Random();
     for (int i = 0; i < 10; i++) {
-      assertNextClosestPowerIndexOfTwo(random.nextLong());
+      assertNextClosestPowerIndexOfTwo(RandomUtils.nextLong());
     }
   }
 

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -34,7 +35,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Random;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE;
@@ -172,7 +172,6 @@ public class TestLeaderChoosePolicy {
     // each datanode has leaderNumOfEachDn leaders after balance
     checkLeaderBalance(dnNum, leaderNumOfEachDn);
 
-    Random r = new Random(0);
     for (int i = 0; i < 10; i++) {
       // destroy some pipelines, wait new pipelines created,
       // then check leader balance
@@ -181,7 +180,7 @@ public class TestLeaderChoosePolicy {
           .getPipelines(RatisReplicationConfig.getInstance(
               ReplicationFactor.THREE), Pipeline.PipelineState.OPEN);
 
-      int destroyNum = r.nextInt(pipelines.size());
+      int destroyNum = RandomUtils.nextInt(0,pipelines.size());
       for (int k = 0; k <= destroyNum; k++) {
         pipelineManager.closePipeline(pipelines.get(k), false);
       }
