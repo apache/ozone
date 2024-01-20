@@ -24,8 +24,7 @@ import java.util.Scanner;
 
 import org.junit.jupiter.api.Test;
 
-import static org.hamcrest.CoreMatchers.containsString;
-import static org.hamcrest.MatcherAssert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Test the ConfigFileGenerator.
@@ -44,22 +43,19 @@ public class TestConfigFileGenerator {
             .useDelimiter("//Z")
             .next();
 
-    assertThat("Generated config should have entry based on the annotation",
-        generatedXml,
-        containsString("<name>ozone.scm.client.bind.host</name>"));
+    assertThat(generatedXml)
+        .as("annotation in ConfigurationExample")
+        .contains("<name>ozone.scm.client.bind.host</name>");
 
-    assertThat("Generated config should have entry based on the annotation " +
-            "from the parent class",
-        generatedXml,
-        containsString("<name>ozone.scm.client.secure</name>"));
+    assertThat(generatedXml)
+        .as("annotation in ConfigurationExampleParent")
+        .contains("<name>ozone.scm.client.secure</name>");
 
-    assertThat("Generated config should have entry based on the annotation " +
-            "from the grand-parent class.",
-        generatedXml,
-        containsString("<name>ozone.scm.client.number</name>"));
+    assertThat(generatedXml)
+        .as("annotation in ConfigurationExampleGrandParent")
+        .contains("<name>ozone.scm.client.number</name>");
 
-    assertThat("Generated config should contain tags",
-        generatedXml,
-        containsString("<tag>MANAGEMENT</tag>"));
+    assertThat(generatedXml)
+        .contains("<tag>MANAGEMENT</tag>");
   }
 }

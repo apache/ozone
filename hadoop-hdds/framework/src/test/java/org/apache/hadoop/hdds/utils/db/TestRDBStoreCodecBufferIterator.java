@@ -38,6 +38,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -361,7 +362,7 @@ public class TestRDBStoreCodecBufferIterator {
         i.seekToLast();
         fail("Prefixed iterator does not support seekToLast");
       } catch (Exception e) {
-        assertTrue(e instanceof UnsupportedOperationException);
+        assertInstanceOf(UnsupportedOperationException.class, e);
       }
     }
 

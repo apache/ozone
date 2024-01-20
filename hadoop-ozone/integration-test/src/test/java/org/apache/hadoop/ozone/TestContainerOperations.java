@@ -1,4 +1,4 @@
-/**
+ /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -29,39 +29,34 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.Rule;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.REPLICATION;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * This class tests container operations (TODO currently only supports create)
  * from cblock clients.
  */
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
 public class TestContainerOperations {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
-
   private static ScmClient storageClient;
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration ozoneConf;
 
-  @BeforeClass
+  @BeforeAll
   public static void setup() throws Exception {
     ozoneConf = new OzoneConfiguration();
     ozoneConf.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
@@ -71,7 +66,7 @@ public class TestContainerOperations {
     cluster.waitForClusterToBeReady();
   }
 
-  @AfterClass
+  @AfterAll
   public static void cleanup() throws Exception {
     if (cluster != null) {
       cluster.shutdown();
@@ -100,13 +95,13 @@ public class TestContainerOperations {
   public void testGetPipeline() throws Exception {
     try {
       storageClient.getPipeline(PipelineID.randomId().getProtobuf());
-      Assert.fail("Get Pipeline should fail");
+      fail("Get Pipeline should fail");
     } catch (Exception e) {
       assertTrue(
           SCMHAUtils.unwrapException(e) instanceof PipelineNotFoundException);
     }
 
-    Assert.assertFalse(storageClient.listPipelines().isEmpty());
+    assertFalse(storageClient.listPipelines().isEmpty());
   }
 
   @Test

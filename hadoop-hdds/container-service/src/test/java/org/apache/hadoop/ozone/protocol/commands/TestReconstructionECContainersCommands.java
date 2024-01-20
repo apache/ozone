@@ -21,13 +21,16 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test ECReconstructionContainersCommand.
@@ -42,7 +45,7 @@ public class TestReconstructionECContainersCommands {
     List<DatanodeDetails> targetDns = new ArrayList<>();
     targetDns.add(MockDatanodeDetails.randomDatanodeDetails());
 
-    Assertions.assertThrows(IllegalArgumentException.class,
+    assertThrows(IllegalArgumentException.class,
         () -> new ReconstructECContainersCommand(1L, Collections.emptyList(),
         targetDns, missingContainerIndexes, ecReplicationConfig));
   }
@@ -76,27 +79,27 @@ public class TestReconstructionECContainersCommands {
     List<DatanodeDetails> targetDnsFromProto = proto.getTargetsList().stream()
         .map(a -> DatanodeDetails.getFromProtoBuf(a))
         .collect(Collectors.toList());
-    Assertions.assertEquals(1L, proto.getContainerID());
-    Assertions.assertEquals(sources, srcDnsFromProto);
-    Assertions.assertEquals(targets, targetDnsFromProto);
-    Assertions.assertArrayEquals(missingContainerIndexes,
+    assertEquals(1L, proto.getContainerID());
+    assertEquals(sources, srcDnsFromProto);
+    assertEquals(targets, targetDnsFromProto);
+    assertArrayEquals(missingContainerIndexes,
         proto.getMissingContainerIndexes().toByteArray());
-    Assertions.assertEquals(ecReplicationConfig,
+    assertEquals(ecReplicationConfig,
         new ECReplicationConfig(proto.getEcReplicationConfig()));
 
     ReconstructECContainersCommand fromProtobuf =
         ReconstructECContainersCommand.getFromProtobuf(proto);
 
-    Assertions.assertEquals(reconstructECContainersCommand.getContainerID(),
+    assertEquals(reconstructECContainersCommand.getContainerID(),
         fromProtobuf.getContainerID());
-    Assertions.assertEquals(reconstructECContainersCommand.getSources(),
+    assertEquals(reconstructECContainersCommand.getSources(),
         fromProtobuf.getSources());
-    Assertions.assertEquals(reconstructECContainersCommand.getTargetDatanodes(),
+    assertEquals(reconstructECContainersCommand.getTargetDatanodes(),
         fromProtobuf.getTargetDatanodes());
-    Assertions.assertArrayEquals(
+    assertArrayEquals(
         reconstructECContainersCommand.getMissingContainerIndexes(),
         fromProtobuf.getMissingContainerIndexes());
-    Assertions.assertEquals(
+    assertEquals(
         reconstructECContainersCommand.getEcReplicationConfig(),
         fromProtobuf.getEcReplicationConfig());
   }

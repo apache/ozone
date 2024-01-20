@@ -28,8 +28,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -42,7 +42,9 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.DeleteBlockResult;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.net.Node;
+import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
@@ -68,7 +70,9 @@ import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.IO_EXCEPTION;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.NODE_COST_DEFAULT;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
@@ -103,9 +107,9 @@ public class SCMBlockProtocolServer implements
       StorageContainerManager scm) throws IOException {
     this.scm = scm;
     this.conf = conf;
-    final int handlerCount =
-        conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,
-            OZONE_SCM_HANDLER_COUNT_DEFAULT);
+    final int handlerCount = conf.getInt(OZONE_SCM_BLOCK_HANDLER_COUNT_KEY,
+        OZONE_SCM_HANDLER_COUNT_KEY, OZONE_SCM_HANDLER_COUNT_DEFAULT,
+            LOG::info);
 
     RPC.setProtocolEngine(conf, ScmBlockLocationProtocolPB.class,
         ProtobufRpcEngine.class);
@@ -179,13 +183,15 @@ public class SCMBlockProtocolServer implements
   public List<AllocatedBlock> allocateBlock(
       long size, int num,
       ReplicationConfig replicationConfig,
-      String owner, ExcludeList excludeList
+      String owner, ExcludeList excludeList,
+      String clientMachine
   ) throws IOException {
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("size", String.valueOf(size));
     auditMap.put("num", String.valueOf(num));
     auditMap.put("replication", replicationConfig.toString());
     auditMap.put("owner", owner);
+    auditMap.put("client", clientMachine);
     List<AllocatedBlock> blocks = new ArrayList<>(num);
 
     if (LOG.isDebugEnabled()) {
@@ -198,6 +204,14 @@ public class SCMBlockProtocolServer implements
             .allocateBlock(size, replicationConfig, owner, excludeList);
         if (block != null) {
           blocks.add(block);
+          // Sort the datanodes if client machine is specified
+          final Node client = getClientNode(clientMachine);
+          if (client != null) {
+            final List<DatanodeDetails> nodes = block.getPipeline().getNodes();
+            final List<DatanodeDetails> sorted = scm.getClusterMap()
+                .sortByDistanceCost(client, nodes, nodes.size());
+            block.getPipeline().setNodesInOrder(sorted);
+          }
         }
       }
 
@@ -345,23 +359,16 @@ public class SCMBlockProtocolServer implements
     auditMap.put("nodes", String.valueOf(nodes));
     try {
       NodeManager nodeManager = scm.getScmNodeManager();
-      Node client = null;
-      List<DatanodeDetails> possibleClients =
-          nodeManager.getNodesByAddress(clientMachine);
-      if (possibleClients.size() > 0) {
-        client = possibleClients.get(0);
-      }
-      List<Node> nodeList = new ArrayList();
-      nodes.stream().forEach(uuid -> {
+      final Node client = getClientNode(clientMachine);
+      List<DatanodeDetails> nodeList = new ArrayList<>();
+      nodes.forEach(uuid -> {
         DatanodeDetails node = nodeManager.getNodeByUuid(uuid);
         if (node != null) {
           nodeList.add(node);
         }
       });
-      List<? extends Node> sortedNodeList = scm.getClusterMap()
+      return scm.getClusterMap()
           .sortByDistanceCost(client, nodeList, nodeList.size());
-      return sortedNodeList.stream().map(r -> (DatanodeDetails) r).collect(
-          Collectors.toList());
     } catch (Exception ex) {
       auditSuccess = false;
       AUDIT.logReadFailure(
@@ -375,6 +382,34 @@ public class SCMBlockProtocolServer implements
         );
       }
     }
+  }
+
+  private Node getClientNode(String clientMachine) {
+    if (StringUtils.isEmpty(clientMachine)) {
+      return null;
+    }
+    List<DatanodeDetails> datanodes = scm.getScmNodeManager()
+        .getNodesByAddress(clientMachine);
+    return !datanodes.isEmpty() ? datanodes.get(0) :
+        getOtherNode(clientMachine);
+  }
+
+  private Node getOtherNode(String clientMachine) {
+    try {
+      String clientLocation = scm.resolveNodeLocation(clientMachine);
+      if (clientLocation != null) {
+        Node rack = scm.getClusterMap().getNode(clientLocation);
+        if (rack instanceof InnerNode) {
+          return new NodeImpl(clientMachine, clientLocation,
+              (InnerNode) rack, rack.getLevel() + 1,
+              NODE_COST_DEFAULT);
+        }
+      }
+    } catch (Exception e) {
+      LOG.info("Could not resolve client {}: {}",
+          clientMachine, e.getMessage());
+    }
+    return null;
   }
 
   @Override

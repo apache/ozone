@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -51,13 +52,13 @@ import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
 import org.apache.hadoop.ozone.recon.common.CommonUtils;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -67,6 +68,8 @@ import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayo
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -116,6 +119,8 @@ public class TestOpenContainerCount {
 
   private List<ContainerWithPipeline> cpw;
   private CommonUtils commonUtils;
+  private PipelineManager pipelineManager;
+  private ReconPipelineManager reconPipelineManager;
 
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
@@ -219,6 +224,10 @@ public class TestOpenContainerCount {
     nodeEndpoint = reconTestInjector.getInstance(NodeEndpoint.class);
     reconScm = (ReconStorageContainerManagerFacade)
             reconTestInjector.getInstance(OzoneStorageContainerManager.class);
+    pipelineManager = reconScm.getPipelineManager();
+    reconPipelineManager = (ReconPipelineManager) pipelineManager;
+    reconPipelineManager.addPipeline(pipeline);
+    reconPipelineManager.addPipeline(pipeline2);
   }
 
   @BeforeEach
@@ -329,7 +338,7 @@ public class TestOpenContainerCount {
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
     } catch (Exception ex) {
-      Assertions.fail(ex.getMessage());
+      fail(ex.getMessage());
     }
   }
 
@@ -352,7 +361,7 @@ public class TestOpenContainerCount {
       --expectedCnt;
       closeContainer(id);
       DatanodeMetadata metadata = getDatanodeMetadata();
-      Assertions.assertEquals(expectedCnt, metadata.getOpenContainers());
+      assertEquals(expectedCnt, metadata.getOpenContainers());
     }
   }
 
@@ -421,7 +430,7 @@ public class TestOpenContainerCount {
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
     } catch (Exception ex) {
-      Assertions.fail(ex.getMessage());
+      fail(ex.getMessage());
     }
   }
 

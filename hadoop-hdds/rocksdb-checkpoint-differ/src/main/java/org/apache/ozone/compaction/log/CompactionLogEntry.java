@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
 public final class CompactionLogEntry implements
     CopyObject<CompactionLogEntry> {
   private static final Codec<CompactionLogEntry> CODEC = new DelegatedCodec<>(
-      Proto2Codec.get(CompactionLogEntryProto.class),
+      Proto2Codec.get(CompactionLogEntryProto.getDefaultInstance()),
       CompactionLogEntry::getFromProtobuf,
       CompactionLogEntry::getProtobuf);
 

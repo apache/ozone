@@ -58,6 +58,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 
+import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
 import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
@@ -690,7 +691,10 @@ public final class OMFileRequest {
 
       if (omDirInfo != null) {
         lastKnownParentId = omDirInfo.getObjectID();
-      } else if (!elements.hasNext()) {
+      } else if (!elements.hasNext() && 
+          (!keyName.endsWith(PATH_SEPARATOR_STR))) {
+        // If the requested keyName contains "/" at the end then we need to
+        // just check the directory table.
         // reached last path component. Check file exists for the given path.
         OmKeyInfo omKeyInfo = OMFileRequest.getOmKeyInfoFromFileTable(false,
                 omMetadataMgr, dbNodeName, keyName);
@@ -969,19 +973,16 @@ public final class OMFileRequest {
    *
    * @param volumeId       volume id
    * @param bucketId       bucket id
-   * @param pathComponents fie path elements
    * @param keyName        user given key name
    * @param omMetadataManager   om metadata manager
    * @return lastKnownParentID
    * @throws IOException DB failure or parent not exists in DirectoryTable
    */
   public static long getParentID(long volumeId, long bucketId,
-                                 Iterator<Path> pathComponents,
                                  String keyName,
                                  OMMetadataManager omMetadataManager)
       throws IOException {
-
-    return getParentID(volumeId, bucketId, pathComponents, keyName,
+    return getParentID(volumeId, bucketId, keyName,
             omMetadataManager, null);
   }
 
@@ -989,18 +990,17 @@ public final class OMFileRequest {
    * Get parent id for the user given path.
    *
    * @param bucketId       bucket id
-   * @param pathComponents fie path elements
    * @param keyName        user given key name
    * @param omMetadataManager   om metadata manager
    * @return lastKnownParentID
    * @throws IOException DB failure or parent not exists in DirectoryTable
    */
-  public static long getParentID(long volumeId, long bucketId,
-      Iterator<Path> pathComponents, String keyName,
+  public static long getParentID(long volumeId, long bucketId, String keyName,
       OMMetadataManager omMetadataManager, String errMsg)
       throws IOException {
 
     long lastKnownParentId = bucketId;
+    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
 
     // If no sub-dirs then bucketID is the root/parent.
     if (!pathComponents.hasNext()) {
@@ -1060,9 +1060,8 @@ public final class OMFileRequest {
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omMetadataManager.getBucketId(volumeName,
             bucketName);
-    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
     return OMFileRequest.getParentID(volumeId, bucketId,
-            pathComponents, keyName, omMetadataManager);
+            keyName, omMetadataManager);
   }
 
   /**

@@ -33,6 +33,10 @@ public final class OMConfigKeys {
       "ozone.om.snapshot.sst_dumptool.pool.size";
   public static final int
       OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_POOL_SIZE_DEFAULT = 1;
+
+  public static final String OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB =
+      "ozone.om.snapshot.load.native.lib";
+  public static final boolean OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT = true;
   public static final String
       OZONE_OM_SNAPSHOT_SST_DUMPTOOL_EXECUTOR_BUFFER_SIZE =
       "ozone.om.snapshot.sst_dumptool.buffer.size";
@@ -386,6 +390,18 @@ public final class OMConfigKeys {
   public static final String OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT
       = "60s";
 
+  /**
+   * Configuration properties for Snapshot Directory Service.
+   */
+  public static final String OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL =
+      "ozone.snapshot.directory.service.interval";
+  public static final String OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL_DEFAULT
+      = "24h";
+  public static final String OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT =
+      "ozone.snapshot.directory.service.timeout";
+  public static final String
+      OZONE_SNAPSHOT_DIRECTORY_SERVICE_TIMEOUT_DEFAULT = "300s";
+
   public static final String OZONE_PATH_DELETING_LIMIT_PER_TASK =
       "ozone.path.deleting.limit.per.task";
   // default is 6000 taking account of 32MB buffer size, and assuming
@@ -586,4 +602,8 @@ public final class OMConfigKeys {
 
   public static final boolean OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE_DEFAULT
       = true;
+
+  public static final String OZONE_OM_MAX_BUCKET =
+      "ozone.om.max.buckets";
+  public static final int OZONE_OM_MAX_BUCKET_DEFAULT = 100000;
 }

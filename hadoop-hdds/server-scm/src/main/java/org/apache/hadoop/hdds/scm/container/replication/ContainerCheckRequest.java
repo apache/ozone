@@ -36,7 +36,7 @@ public final class ContainerCheckRequest {
   private final int maintenanceRedundancy;
   private final ReplicationManagerReport report;
   private final ReplicationQueue replicationQueue;
-
+  private final boolean readOnly;
 
   private ContainerCheckRequest(Builder builder) {
     this.containerInfo = builder.containerInfo;
@@ -46,6 +46,7 @@ public final class ContainerCheckRequest {
     this.maintenanceRedundancy = builder.maintenanceRedundancy;
     this.report = builder.report;
     this.replicationQueue = builder.replicationQueue;
+    this.readOnly = builder.readOnly;
   }
 
   public List<ContainerReplicaOp> getPendingOps() {
@@ -72,6 +73,10 @@ public final class ContainerCheckRequest {
     return replicationQueue;
   }
 
+  public boolean isReadOnly() {
+    return readOnly;
+  }
+
   /**
    * Builder class for ContainerCheckRequest.
    */
@@ -83,6 +88,7 @@ public final class ContainerCheckRequest {
     private int maintenanceRedundancy;
     private ReplicationManagerReport report;
     private ReplicationQueue replicationQueue;
+    private boolean readOnly = false;
 
     public Builder setContainerInfo(ContainerInfo containerInfo) {
       this.containerInfo = containerInfo;
@@ -112,6 +118,11 @@ public final class ContainerCheckRequest {
 
     public Builder setReport(ReplicationManagerReport report) {
       this.report = report;
+      return this;
+    }
+
+    public Builder setReadOnly(boolean readOnly) {
+      this.readOnly = readOnly;
       return this;
     }
 

@@ -629,16 +629,18 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
       filename += SST_FILE_EXTENSION;
     }
 
-    Options option = new Options();
-    SstFileReader reader = new SstFileReader(option);
+    try (
+        ManagedOptions option = new ManagedOptions();
+        SstFileReader reader = new SstFileReader(option)) {
 
-    reader.open(getAbsoluteSstFilePath(filename));
+      reader.open(getAbsoluteSstFilePath(filename));
 
-    TableProperties properties = reader.getTableProperties();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("{} has {} keys", filename, properties.getNumEntries());
+      TableProperties properties = reader.getTableProperties();
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("{} has {} keys", filename, properties.getNumEntries());
+      }
+      return properties.getNumEntries();
     }
-    return properties.getNumEntries();
   }
 
   private String getAbsoluteSstFilePath(String filename)

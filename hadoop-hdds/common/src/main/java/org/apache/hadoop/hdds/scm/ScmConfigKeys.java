@@ -67,10 +67,6 @@ public final class ScmConfigKeys {
       "dfs.container.ratis.segment.size";
   public static final String DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT =
       "64MB";
-  public static final String DFS_CONTAINER_RATIS_SEGMENT_BUFFER_SIZE_KEY =
-      "dfs.container.ratis.segment.buffer.size";
-  public static final String DFS_CONTAINER_RATIS_SEGMENT_BUFFER_SIZE_DEFAULT =
-      "2MB";
   public static final String DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY =
       "dfs.container.ratis.segment.preallocated.size";
   public static final String
@@ -84,8 +80,6 @@ public final class ScmConfigKeys {
   public static final String
       DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES =
       "dfs.container.ratis.statemachinedata.sync.retries";
-  public static final int
-      DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES_DEFAULT = -1;
   public static final String
       DFS_CONTAINER_RATIS_STATEMACHINE_MAX_PENDING_APPLY_TXNS =
       "dfs.container.ratis.statemachine.max.pending.apply-transactions";
@@ -145,7 +139,11 @@ public final class ScmConfigKeys {
   public static final String OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_KEY =
       "ozone.chunk.read.buffer.default.size";
   public static final String OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_DEFAULT =
-      "64KB";
+      "1MB";
+  public static final String OZONE_CHUNK_READ_MAPPED_BUFFER_THRESHOLD_KEY =
+      "ozone.chunk.read.mapped.buffer.threshold";
+  public static final String OZONE_CHUNK_READ_MAPPED_BUFFER_THRESHOLD_DEFAULT =
+      "32KB";
 
   public static final String OZONE_SCM_CONTAINER_LAYOUT_KEY =
       "ozone.scm.container.layout";
@@ -238,6 +236,12 @@ public final class ScmConfigKeys {
 
   public static final String OZONE_SCM_HANDLER_COUNT_KEY =
       "ozone.scm.handler.count.key";
+  public static final String OZONE_SCM_CLIENT_HANDLER_COUNT_KEY =
+      "ozone.scm.client.handler.count.key";
+  public static final String OZONE_SCM_BLOCK_HANDLER_COUNT_KEY =
+      "ozone.scm.block.handler.count.key";
+  public static final String OZONE_SCM_DATANODE_HANDLER_COUNT_KEY =
+      "ozone.scm.datanode.handler.count.key";
   public static final int OZONE_SCM_HANDLER_COUNT_DEFAULT = 100;
 
   public static final String OZONE_SCM_SECURITY_HANDLER_COUNT_KEY =
@@ -420,8 +424,12 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_PIPELINE_DESTROY_TIMEOUT =
       "ozone.scm.pipeline.destroy.timeout";
 
+  // We wait for 150s before closing containers
+  // OzoneConfigKeys#OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION.
+  // So, we are waiting for another 150s before deleting the pipeline
+  // (150 + 150) = 300s
   public static final String OZONE_SCM_PIPELINE_DESTROY_TIMEOUT_DEFAULT =
-      "66s";
+      "300s";
 
   public static final String OZONE_SCM_PIPELINE_CREATION_INTERVAL =
       "ozone.scm.pipeline.creation.interval";
@@ -431,7 +439,7 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_PIPELINE_SCRUB_INTERVAL =
       "ozone.scm.pipeline.scrub.interval";
   public static final String OZONE_SCM_PIPELINE_SCRUB_INTERVAL_DEFAULT =
-      "5m";
+      "150s";
 
 
   // Allow SCM to auto create factor ONE ratis pipeline.
@@ -479,6 +487,10 @@ public final class ScmConfigKeys {
       "ozone.scm.datanode.admin.monitor.interval";
   public static final String OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT =
       "30s";
+  public static final String OZONE_SCM_DATANODE_ADMIN_MONITOR_LOGGING_LIMIT =
+      "ozone.scm.datanode.admin.monitor.logging.limit";
+  public static final int
+      OZONE_SCM_DATANODE_ADMIN_MONITOR_LOGGING_LIMIT_DEFAULT = 1000;
 
   public static final String OZONE_SCM_INFO_WAIT_DURATION =
       "ozone.scm.info.wait.duration";

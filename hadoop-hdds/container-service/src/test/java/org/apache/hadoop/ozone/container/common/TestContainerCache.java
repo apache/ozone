@@ -27,7 +27,6 @@ import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -40,6 +39,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test ContainerCache with evictions.
@@ -118,8 +122,8 @@ public class TestContainerCache {
     assertEquals(1, db4.getReferenceCount());
 
     assertEquals(2, cache.size());
-    Assertions.assertNotNull(cache.get(containerDir1.getPath()));
-    Assertions.assertNull(cache.get(containerDir2.getPath()));
+    assertNotNull(cache.get(containerDir1.getPath()));
+    assertNull(cache.get(containerDir2.getPath()));
 
     // Now close both the references for container1
     db1.close();
@@ -131,7 +135,7 @@ public class TestContainerCache {
     ReferenceCountedDB db5 = cache.getDB(1, "RocksDB",
         containerDir1.getPath(),
         VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(), conf);
-    Assertions.assertThrows(IllegalArgumentException.class, () -> {
+    assertThrows(IllegalArgumentException.class, () -> {
       assertEquals(1, db5.getReferenceCount());
       assertEquals(db1, db5);
       db5.close();
@@ -159,9 +163,9 @@ public class TestContainerCache {
         ReferenceCountedDB db1 = cache.getDB(1, "RocksDB",
             containerDir.getPath(),
             VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(), conf);
-        Assertions.assertNotNull(db1);
+        assertNotNull(db1);
       } catch (IOException e) {
-        Assertions.fail("Should get the DB instance");
+        fail("Should get the DB instance");
       }
     };
     List<Future> futureList = new ArrayList<>();
@@ -171,7 +175,7 @@ public class TestContainerCache {
       try {
         future.get();
       } catch (InterruptedException | ExecutionException e) {
-        Assertions.fail("Should get the DB instance");
+        fail("Should get the DB instance");
       }
     }
 
@@ -213,7 +217,7 @@ public class TestContainerCache {
     ReferenceCountedDB db4 = cache.getDB(100, "RocksDB",
         containerDir1.getPath(),
         VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(), conf);
-    Assertions.assertNotEquals(db3, db2);
+    assertNotEquals(db3, db2);
     assertEquals(db4, db3);
     db1.close();
     db2.close();

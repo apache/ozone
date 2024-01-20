@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -274,7 +275,7 @@ public abstract class SCMCommonPlacementPolicy implements
       int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
       throws SCMException {
     List<DatanodeDetails> nodesWithSpace = nodes.stream().filter(d ->
-        hasEnoughSpace(d, metadataSizeRequired, dataSizeRequired))
+        hasEnoughSpace(d, metadataSizeRequired, dataSizeRequired, conf))
         .collect(Collectors.toList());
 
     if (nodesWithSpace.size() < nodesRequired) {
@@ -283,7 +284,7 @@ public abstract class SCMCommonPlacementPolicy implements
               "data in healthy node set. Required %d. Found %d.",
           metadataSizeRequired, dataSizeRequired, nodesRequired,
           nodesWithSpace.size());
-      LOG.error(msg);
+      LOG.warn(msg);
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_NODES_WITH_SPACE);
     }
@@ -298,7 +299,9 @@ public abstract class SCMCommonPlacementPolicy implements
    * @return true if we have enough space.
    */
   public static boolean hasEnoughSpace(DatanodeDetails datanodeDetails,
-      long metadataSizeRequired, long dataSizeRequired) {
+                                       long metadataSizeRequired,
+                                       long dataSizeRequired,
+                                       ConfigurationSource conf) {
     Preconditions.checkArgument(datanodeDetails instanceof DatanodeInfo);
 
     boolean enoughForData = false;
@@ -308,7 +311,9 @@ public abstract class SCMCommonPlacementPolicy implements
 
     if (dataSizeRequired > 0) {
       for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
-        if (reportProto.getRemaining() > dataSizeRequired) {
+        if (VolumeUsage.hasVolumeEnoughSpace(reportProto.getRemaining(),
+              reportProto.getCommitted(), dataSizeRequired,
+              reportProto.getFreeSpaceToSpare())) {
           enoughForData = true;
           break;
         }
@@ -460,6 +465,16 @@ public abstract class SCMCommonPlacementPolicy implements
     }
     int maxReplicasPerRack = getMaxReplicasPerRack(replicas,
             Math.min(requiredRacks, numRacks));
+
+    // There are scenarios where there could be excessive replicas on a rack due to nodes
+    // in decommission or maintenance or over-replication in general.
+    // In these cases, ReplicationManager shouldn't report mis-replication.
+    // The original intention of mis-replication was to indicate that there isn't enough rack tolerance.
+    // In case of over-replication, this isn't an issue.
+    // Mis-replication should be an issue once over-replication is fixed, not before.
+    // Adjust the maximum number of replicas per rack to allow containers
+    // with excessive replicas to not be reported as mis-replicated.
+    maxReplicasPerRack += Math.max(0, dns.size() - replicas);
     return new ContainerPlacementStatusDefault(
         currentRackCount.size(), requiredRacks, numRacks, maxReplicasPerRack,
             currentRackCount);
@@ -494,7 +509,7 @@ public abstract class SCMCommonPlacementPolicy implements
     NodeStatus nodeStatus = datanodeInfo.getNodeStatus();
     if (nodeStatus.isNodeWritable() &&
         (hasEnoughSpace(datanodeInfo, metadataSizeRequired,
-            dataSizeRequired))) {
+            dataSizeRequired, conf))) {
       LOG.debug("Datanode {} is chosen. Required metadata size is {} and " +
               "required data size is {} and NodeStatus is {}",
           datanodeDetails, metadataSizeRequired, dataSizeRequired, nodeStatus);

@@ -92,9 +92,6 @@ import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD;
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION;
-import static org.apache.hadoop.ozone.MiniOzoneCluster.PortAllocator.anyHostWithFreePort;
-import static org.apache.hadoop.ozone.MiniOzoneCluster.PortAllocator.getFreePort;
-import static org.apache.hadoop.ozone.MiniOzoneCluster.PortAllocator.localhostWithFreePort;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_PORT;
@@ -104,8 +101,11 @@ import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
+import static org.apache.ozone.test.GenericTestUtils.PortAllocator.anyHostWithFreePort;
+import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
+import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
+
 import org.hadoop.ozone.recon.codegen.ReconSqlDbConfig;
-import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -447,15 +447,14 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   public void shutdown() {
     try {
       LOG.info("Shutting down the Mini Ozone Cluster");
+      CodecTestUtil.gc();
       IOUtils.closeQuietly(clients);
       final File baseDir = new File(getBaseDir());
       stop();
       FileUtils.deleteDirectory(baseDir);
       ContainerCache.getInstance(conf).shutdownCache();
       DefaultMetricsSystem.shutdown();
-
       ManagedRocksObjectMetrics.INSTANCE.assertNoLeaks();
-      CodecTestUtil.gc();
     } catch (Exception e) {
       LOG.error("Exception while shutting down the cluster.", e);
     }
@@ -980,9 +979,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     protected void configureRecon() throws IOException {
       ConfigurationProvider.resetConfiguration();
 
-      TemporaryFolder tempFolder = new TemporaryFolder();
-      tempFolder.create();
-      File tempNewFolder = tempFolder.newFolder();
+      File tempNewFolder = new File(path, "recon");
       conf.set(OZONE_RECON_DB_DIR,
           tempNewFolder.getAbsolutePath());
       conf.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR, tempNewFolder

@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.OzoneConsts.KB;
 import static org.apache.ozone.test.GenericTestUtils.getTestDir;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -42,14 +43,14 @@ public class TestDU {
   private static final File DIR = getTestDir(TestDU.class.getSimpleName());
 
   @BeforeEach
-  public void setUp() {
+  void setUp() {
     assumeFalse(Shell.WINDOWS);
     FileUtil.fullyDelete(DIR);
     assertTrue(DIR.mkdirs());
   }
 
   @AfterEach
-  public void tearDown() throws IOException {
+  void tearDown() throws IOException {
     FileUtil.fullyDelete(DIR);
   }
 
@@ -77,7 +78,7 @@ public class TestDU {
    * This is true for most file systems.
    */
   @Test
-  public void testGetUsed() throws Exception {
+  void testGetUsed() throws Exception {
     final long writtenSize = 32 * KB;
     File file = new File(DIR, "data");
     createFile(file, (int) writtenSize);
@@ -89,7 +90,7 @@ public class TestDU {
   }
 
   @Test
-  public void testExcludePattern() throws IOException {
+  void testExcludePattern() throws IOException {
     createFile(new File(DIR, "include.txt"), (int) (4 * KB));
     createFile(new File(DIR, "exclude.tmp"), (int) (100 * KB));
     SpaceUsageSource du = new DU(DIR, "*.tmp");
@@ -103,10 +104,9 @@ public class TestDU {
     // Allow for extra 8K on-disk slack for local file systems
     // that may store additional file metadata (eg ext attrs).
     final long max = expected + 8 * KB;
-    assertTrue(expected <= actual && actual <= max, () ->
-        String.format(
-            "Invalid on-disk size: %d, expected to be in [%d, %d]",
-            actual, expected, max));
+    assertThat(actual)
+        .isGreaterThanOrEqualTo(expected)
+        .isLessThanOrEqualTo(max);
   }
 
 }

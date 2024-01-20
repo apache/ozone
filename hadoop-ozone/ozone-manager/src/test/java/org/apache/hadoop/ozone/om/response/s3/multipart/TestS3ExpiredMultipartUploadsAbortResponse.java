@@ -19,6 +19,8 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
@@ -36,7 +38,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.util.Time;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -92,9 +93,9 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
         // MPUs with no associated parts should have been removed
         // from the multipartInfoTable. Since there are no parts
         // these parts will not added to the deletedTable
-        Assertions.assertFalse(omMetadataManager.getMultipartInfoTable()
+        assertFalse(omMetadataManager.getMultipartInfoTable()
             .isExist(abortInfo.getMultipartKey()));
-        Assertions.assertFalse(omMetadataManager.getOpenKeyTable(
+        assertFalse(omMetadataManager.getOpenKeyTable(
             getBucketLayout()).isExist(abortInfo.getMultipartOpenKey()));
       }
     }
@@ -102,9 +103,9 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
     for (List<OmMultipartAbortInfo> abortInfos: mpusToKeep.values()) {
       for (OmMultipartAbortInfo abortInfo: abortInfos) {
         // These MPUs should not have been removed from the multipartInfoTable
-        Assertions.assertTrue(omMetadataManager.getMultipartInfoTable().isExist(
+        assertTrue(omMetadataManager.getMultipartInfoTable().isExist(
             abortInfo.getMultipartKey()));
-        Assertions.assertTrue(omMetadataManager.getOpenKeyTable(
+        assertTrue(omMetadataManager.getOpenKeyTable(
             getBucketLayout()).isExist(abortInfo.getMultipartOpenKey()));
       }
     }
@@ -134,9 +135,9 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
       for (OmMultipartAbortInfo abortInfo: abortInfos) {
         // All the associated parts of the MPU should have been moved from
         // the multipartInfoTable to the deleted table.
-        Assertions.assertFalse(omMetadataManager.getMultipartInfoTable()
+        assertFalse(omMetadataManager.getMultipartInfoTable()
             .isExist(abortInfo.getMultipartKey()));
-        Assertions.assertFalse(omMetadataManager.getOpenKeyTable(
+        assertFalse(omMetadataManager.getOpenKeyTable(
             getBucketLayout()).isExist(abortInfo.getMultipartOpenKey()));
 
         for (PartKeyInfo partKeyInfo: abortInfo
@@ -145,7 +146,7 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
               OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
           String deleteKey = omMetadataManager.getOzoneDeletePathKey(
               currentPartKeyInfo.getObjectID(), abortInfo.getMultipartKey());
-          Assertions.assertTrue(omMetadataManager.getDeletedTable().isExist(
+          assertTrue(omMetadataManager.getDeletedTable().isExist(
               deleteKey));
         }
 
@@ -156,9 +157,9 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
       for (OmMultipartAbortInfo abortInfo: abortInfos) {
         // These MPUs should not have been removed from the multipartInfoTable
         // and its parts should not be in the deletedTable.
-        Assertions.assertTrue(omMetadataManager.getMultipartInfoTable().isExist(
+        assertTrue(omMetadataManager.getMultipartInfoTable().isExist(
             abortInfo.getMultipartKey()));
-        Assertions.assertTrue(omMetadataManager.getOpenKeyTable(
+        assertTrue(omMetadataManager.getOpenKeyTable(
             getBucketLayout()).isExist(abortInfo.getMultipartOpenKey()));
 
         for (PartKeyInfo partKeyInfo: abortInfo
@@ -167,7 +168,7 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
               OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
           String deleteKey = omMetadataManager.getOzoneDeletePathKey(
               currentPartKeyInfo.getObjectID(), abortInfo.getMultipartKey());
-          Assertions.assertFalse(omMetadataManager.getDeletedTable().isExist(
+          assertFalse(omMetadataManager.getDeletedTable().isExist(
               deleteKey));
         }
       }
@@ -197,7 +198,7 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
         // if an error occurs in the response, the batch operation moving MPUs
         // parts from the multipartInfoTable to the deleted table should not be
         // committed
-        Assertions.assertTrue(
+        assertTrue(
             omMetadataManager.getMultipartInfoTable().isExist(
                 multipartAbortInfo.getMultipartKey()));
 
@@ -208,7 +209,7 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
           String deleteKey = omMetadataManager.getOzoneDeletePathKey(
               currentPartKeyInfo.getObjectID(), multipartAbortInfo
                   .getMultipartKey());
-          Assertions.assertFalse(omMetadataManager.getDeletedTable()
+          assertFalse(omMetadataManager.getDeletedTable()
               .isExist(deleteKey));
         }
       }

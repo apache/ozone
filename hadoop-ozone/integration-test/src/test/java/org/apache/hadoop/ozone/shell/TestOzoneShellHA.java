@@ -85,7 +85,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import org.junit.Assert;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -1251,6 +1250,29 @@ public class TestOzoneShellHA {
   }
 
   @Test
+  public void testPutKeyWithECReplicationConfig() throws Exception {
+    final String volumeName = UUID.randomUUID().toString();
+    final String bucketName = UUID.randomUUID().toString();
+    final String keyName = UUID.randomUUID().toString();
+    getVolume(volumeName);
+    String bucketPath =
+            Path.SEPARATOR + volumeName + Path.SEPARATOR + bucketName;
+    String[] args =
+            new String[] {"bucket", "create", bucketPath};
+    execute(ozoneShell, args);
+
+    args = new String[] {"key", "put", "-r", "rs-3-2-1024k", "-t", "EC",
+        bucketPath + Path.SEPARATOR + keyName, testFilePathString};
+    execute(ozoneShell, args);
+
+    OzoneKeyDetails key =
+            client.getObjectStore().getVolume(volumeName)
+                    .getBucket(bucketName).getKey(keyName);
+    assertEquals(HddsProtos.ReplicationType.EC,
+            key.getReplicationConfig().getReplicationType());
+  }
+
+  @Test
   public void testCreateBucketWithRatisReplicationConfig() throws Exception {
     final String volumeName = "volume101";
     getVolume(volumeName);
@@ -1879,7 +1901,7 @@ public class TestOzoneShellHA {
     final ArrayList<LinkedTreeMap<String, String>> bucketListOut =
         parseOutputIntoArrayList();
 
-    Assert.assertTrue(bucketListOut.size() == 1);
+    assertEquals(1, bucketListOut.size());
     boolean link =
         String.valueOf(bucketListOut.get(0).get("link")).equals("false");
     assertTrue(link);
@@ -1898,7 +1920,7 @@ public class TestOzoneShellHA {
     final ArrayList<LinkedTreeMap<String, String>> bucketListLinked =
         parseOutputIntoArrayList();
 
-    Assert.assertTrue(bucketListLinked.size() == 2);
+    assertEquals(2, bucketListLinked.size());
     link = String.valueOf(bucketListLinked.get(1).get("link")).equals("true");
     assertTrue(link);
 

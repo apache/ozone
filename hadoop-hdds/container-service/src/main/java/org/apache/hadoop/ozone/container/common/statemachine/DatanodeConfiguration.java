@@ -108,8 +108,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       ROCKSDB_DELETE_OBSOLETE_FILES_PERIOD_MICRO_SECONDS_KEY =
       "hdds.datanode.rocksdb.delete_obsolete_files_period";
   public static final Boolean
-      OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT =
-      false;
+      OZONE_DATANODE_CHECK_EMPTY_CONTAINER_DIR_ON_DELETE_DEFAULT = false;
 
   /**
    * Number of threads per volume that Datanode will use for chunk read.
@@ -185,7 +184,11 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "5",
       tags = {DATANODE},
       description = "The maximum number of block delete commands queued on " +
-          " a datanode"
+          " a datanode, This configuration is also used by the SCM to " +
+          "control whether to send delete commands to the DN. If the DN" +
+          " has more commands waiting in the queue than this value, " +
+          "the SCM will not send any new block delete commands. until the " +
+          "DN has processed some commands and the queue length is reduced."
   )
   private int blockDeleteQueueLimit = 5;
 
@@ -537,7 +540,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
    * Whether to check container directory or not to determine
    * container is empty.
    */
-  @Config(key = "hdds.datanode.check.empty.container.dir.on.delete",
+  @Config(key = "check.empty.container.dir.on.delete",
       type = ConfigType.BOOLEAN,
       defaultValue = "false",
       tags = { DATANODE },

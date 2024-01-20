@@ -18,6 +18,7 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
@@ -63,5 +64,15 @@ public class ManagedRocksObjectMetrics {
 
   void increaseManagedObject() {
     totalManagedObjects.incr();
+  }
+
+  @VisibleForTesting
+  long totalLeakObjects() {
+    return totalLeakObjects.value();
+  }
+
+  @VisibleForTesting
+  long totalManagedObjects() {
+    return totalManagedObjects.value();
   }
 }

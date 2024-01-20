@@ -17,15 +17,17 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test {@link CodecBuffer.LeakDetector}.
  */
-public final class TestLeakDetector {
+final class TestLeakDetector {
   @Test
-  public void test() throws Exception {
+  void test() throws Exception {
     CodecBuffer.enableLeakDetection();
     // allocate a buffer and then release it.
     CodecBuffer.allocateHeap(2).release();
@@ -35,9 +37,8 @@ public final class TestLeakDetector {
     // allocate a buffer but NOT release it.
     CodecBuffer.allocateHeap(3);
     // It should detect a buffer leak.
-    final AssertionError e = Assertions.assertThrows(
-        AssertionError.class, CodecTestUtil::gc);
+    final AssertionError e = assertThrows(AssertionError.class, CodecTestUtil::gc);
     e.printStackTrace(System.out);
-    Assertions.assertTrue(e.getMessage().startsWith("Found 1 leak"));
+    assertThat(e).hasMessageStartingWith("Found 1 leak");
   }
 }

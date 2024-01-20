@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -45,7 +46,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -68,6 +68,10 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.any;
 
 /**
  * Tests for the RatisReplicationCheckHandler class.
@@ -85,15 +89,15 @@ public class TestRatisReplicationCheckHandler {
 
   @BeforeEach
   public void setup() throws IOException, NodeNotFoundException {
-    containerPlacementPolicy = Mockito.mock(PlacementPolicy.class);
-    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
-        Mockito.any(),
-        Mockito.anyInt()
+    containerPlacementPolicy = mock(PlacementPolicy.class);
+    when(containerPlacementPolicy.validateContainerPlacement(
+        any(),
+        anyInt()
     )).thenAnswer(invocation ->
         new ContainerPlacementStatusDefault(2, 2, 3));
 
-    replicationManager = Mockito.mock(ReplicationManager.class);
-    Mockito.when(replicationManager.getNodeStatus(Mockito.any()))
+    replicationManager = mock(ReplicationManager.class);
+    when(replicationManager.getNodeStatus(any()))
         .thenReturn(NodeStatus.inServiceHealthy());
     healthCheck = new RatisReplicationCheckHandler(containerPlacementPolicy,
         replicationManager);
@@ -500,6 +504,43 @@ public class TestRatisReplicationCheckHandler {
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
   }
 
+  @Test
+  public void shouldQueueForOverReplicationOnlyWhenSafe() {
+    ContainerInfo container =
+        createContainerInfo(repConfig, 1L, HddsProtos.LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(),
+        ContainerReplicaProto.State.CLOSED, 0, 0);
+    ContainerReplica unhealthyReplica =
+        createContainerReplica(container.containerID(), 0, IN_SERVICE,
+            ContainerReplicaProto.State.UNHEALTHY);
+    ContainerReplica mismatchedReplica =
+        createContainerReplica(container.containerID(), 0, IN_SERVICE,
+            ContainerReplicaProto.State.QUASI_CLOSED);
+    replicas.add(mismatchedReplica);
+    replicas.add(unhealthyReplica);
+
+    requestBuilder.setContainerReplicas(replicas)
+        .setContainerInfo(container);
+
+    ContainerHealthResult.OverReplicatedHealthResult
+        result = (ContainerHealthResult.OverReplicatedHealthResult)
+        healthCheck.checkHealth(requestBuilder.build());
+
+    assertEquals(ContainerHealthResult.HealthState.OVER_REPLICATED,
+        result.getHealthState());
+    assertEquals(1, result.getExcessRedundancy());
+    assertFalse(result.isReplicatedOkAfterPending());
+
+    // not safe for over replication because we don't have 3 matching replicas
+    assertFalse(result.isSafelyOverReplicated());
+
+    assertTrue(healthCheck.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+  }
+
   /**
    * Scenario: CLOSED container with 2 CLOSED, 1 CLOSING and 3 UNHEALTHY
    * replicas.
@@ -538,6 +579,44 @@ public class TestRatisReplicationCheckHandler {
     // it should not be queued for over replication because there's a mis
     // matched replica
     assertEquals(0, repQueue.overReplicatedQueueSize());
+    assertEquals(1, report.getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    assertEquals(0, report.getStat(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+  }
+
+  /**
+   * There is a CLOSED container with 3 CLOSED replicas and 1 QUASI_CLOSED
+   * replica with incorrect sequence ID. This container is over replicated
+   * because of the QUASI_CLOSED replica and should be queued for over
+   * replication.
+   */
+  @Test
+  public void testExcessQuasiClosedWithIncorrectSequenceID() {
+    ContainerInfo container = createContainerInfo(repConfig);
+    Set<ContainerReplica> replicas
+        = createReplicas(container.containerID(), State.CLOSED, 0, 0, 0);
+    ContainerReplica quasiClosed =
+        createContainerReplica(container.containerID(), 0,
+            IN_SERVICE, State.QUASI_CLOSED, container.getSequenceId() - 1);
+    replicas.add(quasiClosed);
+    requestBuilder.setContainerReplicas(replicas)
+        .setContainerInfo(container);
+    ContainerHealthResult result =
+        healthCheck.checkHealth(requestBuilder.build());
+
+    // there's an excess QUASI_CLOSED replica with incorrect sequence ID, so
+    // it's over replicated
+    assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
+    OverReplicatedHealthResult overRepResult =
+        (OverReplicatedHealthResult) result;
+    assertEquals(1, overRepResult.getExcessRedundancy());
+    assertFalse(overRepResult.hasMismatchedReplicas());
+    assertFalse(overRepResult.isReplicatedOkAfterPending());
+
+    assertTrue(healthCheck.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.underReplicatedQueueSize());
+    assertEquals(1, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
     assertEquals(0, report.getStat(
@@ -662,9 +741,9 @@ public class TestRatisReplicationCheckHandler {
    */
   @Test
   public void testOverReplicatedWithMisReplication() {
-    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
-        Mockito.any(),
-        Mockito.anyInt()
+    when(containerPlacementPolicy.validateContainerPlacement(
+        any(),
+        anyInt()
     )).thenAnswer(invocation ->
         new ContainerPlacementStatusDefault(1, 2, 3));
 
@@ -700,9 +779,9 @@ public class TestRatisReplicationCheckHandler {
 
   @Test
   public void testUnderReplicatedWithMisReplication() {
-    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
-        Mockito.any(),
-        Mockito.anyInt()
+    when(containerPlacementPolicy.validateContainerPlacement(
+        any(),
+        anyInt()
     )).thenAnswer(invocation ->
         new ContainerPlacementStatusDefault(1, 2, 3));
 
@@ -729,9 +808,9 @@ public class TestRatisReplicationCheckHandler {
 
   @Test
   public void testUnderReplicatedWithMisReplicationFixedByPending() {
-    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
-        Mockito.any(),
-        Mockito.anyInt()
+    when(containerPlacementPolicy.validateContainerPlacement(
+        any(),
+        anyInt()
     )).thenAnswer(invocation -> {
       List<DatanodeDetails> dns = invocation.getArgument(0);
       // If the number of DNs is 3 or less make it be mis-replicated
@@ -773,9 +852,9 @@ public class TestRatisReplicationCheckHandler {
 
   @Test
   public void testMisReplicated() {
-    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
-        Mockito.any(),
-        Mockito.anyInt()
+    when(containerPlacementPolicy.validateContainerPlacement(
+        any(),
+        anyInt()
     )).thenAnswer(invocation ->
         new ContainerPlacementStatusDefault(1, 2, 3));
 
@@ -800,9 +879,9 @@ public class TestRatisReplicationCheckHandler {
 
   @Test
   public void testMisReplicatedFixedByPending() {
-    Mockito.when(containerPlacementPolicy.validateContainerPlacement(
-        Mockito.any(),
-        Mockito.anyInt()
+    when(containerPlacementPolicy.validateContainerPlacement(
+        any(),
+        anyInt()
     )).thenAnswer(invocation -> {
       List<DatanodeDetails> dns = invocation.getArgument(0);
       // If the number of DNs is 3 or less make it be mis-replicated

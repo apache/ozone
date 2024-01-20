@@ -62,7 +62,7 @@ public final class Pipeline {
    * -- the creation time may change.
    */
   private static final Codec<Pipeline> CODEC = new DelegatedCodec<>(
-      Proto2Codec.get(HddsProtos.Pipeline.class),
+      Proto2Codec.get(HddsProtos.Pipeline.getDefaultInstance()),
       Pipeline::getFromProtobufSetCreationTimestamp,
       p -> p.getProtobufMessage(ClientVersion.CURRENT_VERSION),
       DelegatedCodec.CopyType.UNSUPPORTED);
@@ -79,7 +79,7 @@ public final class Pipeline {
   private Map<DatanodeDetails, Long> nodeStatus;
   private Map<DatanodeDetails, Integer> replicaIndexes;
   // nodes with ordered distance to client
-  private ThreadLocal<List<DatanodeDetails>> nodesInOrder = new ThreadLocal<>();
+  private List<DatanodeDetails> nodesInOrder = new ArrayList<>();
   // Current reported Leader for the pipeline
   private UUID leaderId;
   // Timestamp for pipeline upon creation
@@ -87,10 +87,21 @@ public final class Pipeline {
   // suggested leader id with high priority
   private final UUID suggestedLeaderId;
 
+  private final Instant stateEnterTime;
+
   /**
    * The immutable properties of pipeline object is used in
    * ContainerStateManager#getMatchingContainerByPipeline to take a lock on
    * the container allocations for a particular pipeline.
+   * <br><br>
+   * Since the Pipeline class is immutable, if we want to change the state of
+   * the Pipeline we should create a new Pipeline object with the new state.
+   * Make sure that you set the value of <i>creationTimestamp</i> properly while
+   * creating the new Pipeline object.
+   * <br><br>
+   * There is no need to worry about the value of <i>stateEnterTime</i> as it's
+   * set to <i>Instant.now</i> when you crate the Pipeline object as part of
+   * state change.
    */
   private Pipeline(PipelineID id,
       ReplicationConfig replicationConfig, PipelineState state,
@@ -102,6 +113,7 @@ public final class Pipeline {
     this.creationTimestamp = Instant.now();
     this.suggestedLeaderId = suggestedLeaderId;
     this.replicaIndexes = new HashMap<>();
+    this.stateEnterTime = Instant.now();
   }
 
   /**
@@ -138,6 +150,10 @@ public final class Pipeline {
    */
   public Instant getCreationTimestamp() {
     return creationTimestamp;
+  }
+
+  public Instant getStateEnterTime() {
+    return stateEnterTime;
   }
 
   /**
@@ -271,11 +287,11 @@ public final class Pipeline {
     if (excluded == null) {
       excluded = Collections.emptySet();
     }
-    if (nodesInOrder.get() == null || nodesInOrder.get().isEmpty()) {
+    if (nodesInOrder.isEmpty()) {
       LOG.debug("Nodes in order is empty, delegate to getFirstNode");
       return getFirstNode(excluded);
     }
-    for (DatanodeDetails d : nodesInOrder.get()) {
+    for (DatanodeDetails d : nodesInOrder) {
       if (!excluded.contains(d)) {
         return d;
       }
@@ -300,15 +316,19 @@ public final class Pipeline {
   }
 
   public void setNodesInOrder(List<DatanodeDetails> nodes) {
-    nodesInOrder.set(nodes);
+    nodesInOrder.clear();
+    if (null == nodes) {
+      return;
+    }
+    nodesInOrder.addAll(nodes);
   }
 
   public List<DatanodeDetails> getNodesInOrder() {
-    if (nodesInOrder.get() == null || nodesInOrder.get().isEmpty()) {
+    if (nodesInOrder.isEmpty()) {
       LOG.debug("Nodes in order is empty, delegate to getNodes");
       return getNodes();
     }
-    return nodesInOrder.get();
+    return nodesInOrder;
   }
 
   void reportDatanode(DatanodeDetails dn) throws IOException {
@@ -386,8 +406,8 @@ public final class Pipeline {
 
     // To save the message size on wire, only transfer the node order based on
     // network topology
-    List<DatanodeDetails> nodes = nodesInOrder.get();
-    if (nodes != null && !nodes.isEmpty()) {
+    List<DatanodeDetails> nodes = nodesInOrder;
+    if (!nodes.isEmpty()) {
       for (int i = 0; i < nodes.size(); i++) {
         Iterator<DatanodeDetails> it = nodeStatus.keySet().iterator();
         for (int j = 0; j < nodeStatus.keySet().size(); j++) {
@@ -535,7 +555,7 @@ public final class Pipeline {
       this.replicationConfig = pipeline.replicationConfig;
       this.state = pipeline.state;
       this.nodeStatus = pipeline.nodeStatus;
-      this.nodesInOrder = pipeline.nodesInOrder.get();
+      this.nodesInOrder = pipeline.nodesInOrder;
       this.leaderId = pipeline.getLeaderId();
       this.creationTimestamp = pipeline.getCreationTimestamp();
       this.suggestedLeaderId = pipeline.getSuggestedLeaderId();
