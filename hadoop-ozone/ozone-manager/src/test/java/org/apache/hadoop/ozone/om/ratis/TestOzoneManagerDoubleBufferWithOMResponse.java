@@ -107,9 +107,9 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
-    doubleBuffer = new OzoneManagerDoubleBuffer.Builder()
+    doubleBuffer = OzoneManagerDoubleBuffer.newBuilder()
         .setOmMetadataManager(omMetadataManager)
-        .setmaxUnFlushedTransactionCount(100000)
+        .setMaxUnFlushedTransactionCount(100000)
         .enableRatis(true)
         .build();
   }
