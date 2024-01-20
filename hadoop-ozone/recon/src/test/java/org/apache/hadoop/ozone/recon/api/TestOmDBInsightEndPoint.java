@@ -92,6 +92,10 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private OzoneConfiguration ozoneConfiguration;
   private Set<Long> generatedIds = new HashSet<>();
 
+  public TestOmDBInsightEndPoint() {
+    super();
+  }
+
   private long generateUniqueRandomLong() {
     long newValue;
     do {

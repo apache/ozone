@@ -52,6 +52,10 @@ import org.junit.jupiter.api.Test;
  */
 public class TestUtilizationSchemaDefinition extends AbstractReconSqlDBTest {
 
+  public TestUtilizationSchemaDefinition() {
+    super();
+  }
+
   @Test
   public void testReconSchemaCreated() throws Exception {
     Connection connection = getConnection();
