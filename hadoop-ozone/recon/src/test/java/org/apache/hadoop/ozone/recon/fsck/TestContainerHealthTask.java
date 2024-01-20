@@ -69,6 +69,10 @@ import org.junit.jupiter.api.Test;
  */
 public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
+  public TestContainerHealthTask() {
+    super();
+  }
+
   @SuppressWarnings("checkstyle:methodlength")
   @Test
   public void testRun() throws Exception {

@@ -39,6 +39,10 @@ import java.util.List;
 public class TestTaskStatusService extends AbstractReconSqlDBTest {
   private TaskStatusService taskStatusService;
 
+  public TestTaskStatusService() {
+    super();
+  }
+
   @BeforeEach
   public void setUp() {
     Injector parentInjector = getInjector();

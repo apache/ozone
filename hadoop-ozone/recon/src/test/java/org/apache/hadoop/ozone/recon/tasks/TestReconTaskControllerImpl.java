@@ -47,6 +47,10 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
   private ReconTaskController reconTaskController;
   private ReconTaskStatusDao reconTaskStatusDao;
 
+  public TestReconTaskControllerImpl() {
+    super();
+  }
+
   @BeforeEach
   public void setUp() {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();

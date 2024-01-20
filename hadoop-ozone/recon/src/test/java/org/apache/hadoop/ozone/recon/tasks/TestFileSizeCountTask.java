@@ -60,6 +60,10 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
   private FileSizeCountTask fileSizeCountTask;
   private DSLContext dslContext;
 
+  public TestFileSizeCountTask() {
+    super();
+  }
+
   @BeforeEach
   public void setUp() {
     fileCountBySizeDao = getDao(FileCountBySizeDao.class);
