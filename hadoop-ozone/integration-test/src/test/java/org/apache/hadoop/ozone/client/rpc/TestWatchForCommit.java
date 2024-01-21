@@ -22,7 +22,7 @@ import java.io.OutputStream;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
+import org.apache.commons.lang3.RandomUtils;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -280,7 +280,7 @@ public class TestWatchForCommit {
         // as well as there is no logIndex generate in Ratis.
         // The basic idea here is just to test if its throws an exception.
         xceiverClient
-            .watchForCommit(index + new Random().nextInt(100) + 10);
+            .watchForCommit(index + RandomUtils.nextInt(0, 100) + 10);
         fail("expected exception not thrown");
       } catch (Exception e) {
         assertInstanceOf(ExecutionException.class, e);
@@ -374,7 +374,7 @@ public class TestWatchForCommit {
         // The basic idea here is just to test if its throws an exception.
         xceiverClient
             .watchForCommit(reply.getLogIndex() +
-                new Random().nextInt(100) + 10);
+                RandomUtils.nextInt(0, 100) + 10);
         fail("Expected exception not thrown");
       } catch (Exception e) {
         assertInstanceOf(GroupMismatchException.class, HddsClientUtils.checkForException(e));
