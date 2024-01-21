@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.shell;
 
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -52,7 +53,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.RandomUtils;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;

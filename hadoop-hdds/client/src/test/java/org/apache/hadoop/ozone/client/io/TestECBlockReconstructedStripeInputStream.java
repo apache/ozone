@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.collect.ImmutableSet;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -41,7 +42,6 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.lang3.RandomUtils;
 import java.util.Set;
 import java.util.SplittableRandom;
 import java.util.concurrent.ExecutorService;

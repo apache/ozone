@@ -59,10 +59,9 @@ public class TestChecksumByteBuffer {
 
       checkBytes("hello world!".getBytes(StandardCharsets.UTF_8));
 
-      final byte[] bytes = new byte[1 << 10];
+      final int len = 1 << 10;
       for (int i = 0; i < 1000; i++) {
-        RandomUtils.nextBytes(bytes.length);
-        checkBytes(bytes, RandomUtils.nextInt(0, bytes.length));
+        checkBytes(RandomUtils.nextBytes(len), RandomUtils.nextInt(0, len));
       }
     }
 
