@@ -22,8 +22,8 @@ Resource            ../commonlib.robot
 Resource            ./commonawslib.robot
 Test Timeout        5 minutes
 Default Tags        no-bucket-type
-Test Setup          Run Keyword          Setup v4 headers
-
+Test Setup          Run Keywords       Kinit test user    testuser    testuser.keytab
+...                 AND                Revoke S3 secrets
 
 *** Variables ***
 ${ENDPOINT_URL}       http://s3g:9878
@@ -33,11 +33,18 @@ ${SECURITY_ENABLED}   true
 
 S3 Gateway Revoke Secret
     Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
+                        Execute                             ozone s3 getsecret ${OM_HA_PARAM}
     ${result} =         Execute                             curl -X DELETE --negotiate -u : -v ${ENDPOINT_URL}/secret
                         Should contain      ${result}       HTTP/1.1 200 OK    ignore_case=True
 
 S3 Gateway Revoke Secret By Username
     Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
-    [Setup]             Execute                             curl -X PUT --negotiate -u : -v ${ENDPOINT_URL}/secret/testuser
+                        Execute                             ozone s3 getsecret -u testuser ${OM_HA_PARAM}
     ${result} =         Execute                             curl -X DELETE --negotiate -u : -v ${ENDPOINT_URL}/secret/testuser
+                        Should contain      ${result}       HTTP/1.1 200 OK    ignore_case=True
+
+S3 Gateway Revoke Secret By Username For Other User
+    Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skipping this check as security is not enabled
+                        Execute                             ozone s3 getsecret -u testuser2 ${OM_HA_PARAM}
+    ${result} =         Execute                             curl -X DELETE --negotiate -u : -v ${ENDPOINT_URL}/secret/testuser2
                         Should contain      ${result}       HTTP/1.1 200 OK    ignore_case=True

@@ -211,4 +211,5 @@ Verify Multipart Upload
 Revoke S3 secrets
     Execute and Ignore Error             ozone s3 revokesecret -y
     Execute and Ignore Error             ozone s3 revokesecret -y -u testuser
+    Execute and Ignore Error             ozone s3 revokesecret -y -u testuser2
 
