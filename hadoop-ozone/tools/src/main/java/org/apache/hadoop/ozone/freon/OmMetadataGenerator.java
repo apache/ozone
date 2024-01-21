@@ -17,13 +17,13 @@
 package org.apache.hadoop.ozone.freon;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.NoSuchFileException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
@@ -44,8 +44,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
-import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs.Builder;
@@ -60,6 +58,8 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
+import static java.util.Collections.emptyMap;
+
 
 /**
  * Data generator tool test om performance.
@@ -167,7 +167,7 @@ public class OmMetadataGenerator extends BaseFreonGenerator
   private Operation[] operations;
   private boolean mixedOperation = false;
 
-  private final ReplicationConfig defaultReplicationConfig =
+  private final ReplicationConfig ratisThree =
       ReplicationConfig.fromProtoTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.THREE);
 
   @Override
@@ -322,206 +322,136 @@ public class OmMetadataGenerator extends BaseFreonGenerator
     };
   }
 
-  @SuppressWarnings({"checkstyle:EmptyBlock", "checkstyle:MethodLength"})
   private void applyOperation(long counter) throws Exception {
     OmKeyArgs keyArgs;
-    String keyName;
-    long threadSeqId;
+    final long threadSeqId = getThreadSequenceId();
     String startKeyName;
     if (mixedOperation) {
-      threadSeqId = getThreadSequenceId();
       operation = operations[(int)threadSeqId];
     }
     if (randomOp) {
       counter = ThreadLocalRandom.current().nextLong(getTestNo());
     }
+    final String keyName = getPath(counter);
     switch (operation) {
     case CREATE_KEY:
-      keyName = getPath(counter);
-      getMetrics().timer(operation.name()).time(() -> {
-        try (OutputStream stream = bucket.createKey(keyName,
-            dataSize.toBytes())) {
-          contentGenerator.write(stream);
-        }
-        return null;
-      });
+      getMetrics().timer(operation.name()).time(() -> performWriteOperation(() ->
+          bucket.createKey(keyName, dataSize.toBytes(), ratisThree, emptyMap()), contentGenerator));
       break;
     case CREATE_STREAM_KEY:
-      keyName = getPath(counter);
-      getMetrics().timer(operation.name()).time(() -> {
-        try (OzoneDataStreamOutput stream = bucket.createStreamKey(
-            keyName, dataSize.toBytes(), defaultReplicationConfig, Collections.emptyMap())) {
-          contentGenerator.write(stream);
-        }
-        return null;
-      });
+      getMetrics().timer(operation.name()).time(() -> performWriteOperation(() ->
+          bucket.createStreamKey(keyName, dataSize.toBytes(), ratisThree, emptyMap()), contentGenerator));
       break;
     case LOOKUP_KEY:
-      keyName = getPath(counter);
       keyArgs = omKeyArgsBuilder.get().setKeyName(keyName).build();
-      getMetrics().timer(operation.name()).time(() -> {
-        ozoneManagerClient.lookupKey(keyArgs);
-        return null;
-      });
+      getMetrics().timer(operation.name()).time(() -> ozoneManagerClient.lookupKey(keyArgs));
       break;
     case GET_KEYINFO:
-      keyName = getPath(counter);
       keyArgs = omKeyArgsBuilder.get().setKeyName(keyName).build();
-      getMetrics().timer(operation.name()).time(() -> {
-        ozoneManagerClient.getKeyInfo(keyArgs, false);
-        return null;
-      });
+      getMetrics().timer(operation.name()).time(() -> ozoneManagerClient.getKeyInfo(keyArgs, false));
       break;
     case HEAD_KEY:
-      keyName = getPath(counter);
       keyArgs = omKeyArgsBuilder.get()
           .setKeyName(keyName).setHeadOp(true).build();
-      getMetrics().timer(operation.name()).time(() -> {
-        ozoneManagerClient.getKeyInfo(keyArgs, false);
-        return null;
-      });
+      getMetrics().timer(operation.name()).time(() -> ozoneManagerClient.getKeyInfo(keyArgs, false));
       break;
     case READ_KEY:
-      keyName = getPath(counter);
-      getMetrics().timer(operation.name()).time(() -> {
-        try (OzoneInputStream stream = bucket.readKey(keyName)) {
-          while ((stream.read(readBuffer)) >= 0) {
-          }
-        }
-        return null;
-      });
+      getMetrics().timer(operation.name()).time(() -> performReadOperation(() -> bucket.readKey(keyName), readBuffer));
       break;
     case READ_FILE:
-      keyName = getPath(counter);
-      getMetrics().timer(operation.name()).time(() -> {
-        try (OzoneInputStream stream = bucket.readFile(keyName)) {
-          while ((stream.read(readBuffer)) >= 0) {
-          }
-        }
-        return null;
-      });
+      getMetrics().timer(operation.name()).time(() -> performReadOperation(() -> bucket.readFile(keyName), readBuffer));
       break;
     case CREATE_FILE:
-      keyName = getPath(counter);
-      getMetrics().timer(operation.name()).time(() -> {
-        try (
-            OutputStream stream = bucket.createFile(keyName, dataSize.toBytes(),
-                replicationConfig, true, false)) {
-          contentGenerator.write(stream);
-        }
-        return null;
-      });
+      getMetrics().timer(operation.name()).time(() -> performWriteOperation(() ->
+          bucket.createFile(keyName, dataSize.toBytes(), ratisThree, true, false), contentGenerator));
       break;
     case CREATE_STREAM_FILE:
-      keyName = getPath(counter);
-      getMetrics().timer(operation.name()).time(() -> {
-        try (
-            OzoneDataStreamOutput stream = bucket.createStreamFile(keyName, dataSize.toBytes(),
-                replicationConfig, true, false)) {
-          contentGenerator.write(stream);
-        }
-        return null;
-      });
+      getMetrics().timer(operation.name()).time(() -> performWriteOperation(() ->
+          bucket.createStreamFile(keyName, dataSize.toBytes(), ratisThree, true, false), contentGenerator));
       break;
     case LOOKUP_FILE:
-      keyName = getPath(counter);
       keyArgs = omKeyArgsBuilder.get().setKeyName(keyName).build();
-      getMetrics().timer(operation.name()).time(() -> {
-        ozoneManagerClient.lookupFile(keyArgs);
-        return null;
-      });
+      getMetrics().timer(operation.name()).time(() -> ozoneManagerClient.lookupFile(keyArgs));
       break;
     case LIST_KEYS:
-      threadSeqId = getThreadSequenceId();
       startKeyName = getPath(threadSeqId * batchSize);
       getMetrics().timer(operation.name()).time(() -> {
         List<OmKeyInfo> keyInfoList =
-            ozoneManagerClient.listKeys(volumeName, bucketName, startKeyName,
-                "", batchSize).getKeys();
+            ozoneManagerClient.listKeys(volumeName, bucketName, startKeyName, "", batchSize).getKeys();
         if (keyInfoList.size() + 1 < batchSize) {
-          throw new NoSuchFileException(
-              "There are not enough files for testing you should use "
-                  + "CREATE_FILE to create at least batch-size * threads = "
-                  + batchSize * getThreadNo());
+          throw new NoSuchFileException("There are not enough files for testing you should use "
+                  + "CREATE_FILE to create at least batch-size * threads = " + batchSize * getThreadNo());
         }
         return null;
       });
       break;
     case LIST_KEYS_LIGHT:
-      threadSeqId = getThreadSequenceId();
       startKeyName = getPath(threadSeqId * batchSize);
       getMetrics().timer(operation.name()).time(() -> {
         List<BasicOmKeyInfo> keyInfoList =
-            ozoneManagerClient.listKeysLight(volumeName, bucketName, startKeyName,
-                "", batchSize).getKeys();
+            ozoneManagerClient.listKeysLight(volumeName, bucketName, startKeyName, "", batchSize).getKeys();
         if (keyInfoList.size() + 1 < batchSize) {
-          throw new NoSuchFileException(
-              "There are not enough files for testing you should use "
-                  + "CREATE_FILE to create at least batch-size * threads = "
-                  + batchSize * getThreadNo());
+          throw new NoSuchFileException("There are not enough files for testing you should use "
+                  + "CREATE_FILE to create at least batch-size * threads = " + batchSize * getThreadNo());
         }
         return null;
       });
       break;
     case LIST_STATUS:
-      threadSeqId = getThreadSequenceId();
       startKeyName = getPath(threadSeqId * batchSize);
       keyArgs = omKeyArgsBuilder.get().setKeyName("").build();
       getMetrics().timer(operation.name()).time(() -> {
         List<OzoneFileStatus> fileStatusList = ozoneManagerClient.listStatus(
             keyArgs, false, startKeyName, batchSize);
         if (fileStatusList.size() + 1 < batchSize) {
-          throw new NoSuchFileException(
-              "There are not enough files for testing you should use "
-                  + "CREATE_FILE to create at least batch-size * threads = "
-                  + batchSize * getThreadNo());
+          throw new NoSuchFileException("There are not enough files for testing you should use "
+                  + "CREATE_FILE to create at least batch-size * threads = " + batchSize * getThreadNo());
         }
         return null;
       });
       break;
     case INFO_BUCKET:
-      getMetrics().timer(operation.name()).time(() -> {
-            try {
-              ozoneManagerClient.getBucketInfo(volumeName, bucketName);
-            } catch (IOException e) {
-              throw new RuntimeException(e);
-            }
-          }
+      getMetrics().timer(operation.name()).time(() -> ozoneManagerClient.getBucketInfo(volumeName, bucketName)
       );
       break;
     case INFO_VOLUME:
-      getMetrics().timer(operation.name()).time(() -> {
-            try {
-              ozoneManagerClient.getVolumeInfo(volumeName);
-            } catch (IOException e) {
-              throw new RuntimeException(e);
-            }
-          }
-      );
+      getMetrics().timer(operation.name()).time(() -> ozoneManagerClient.getVolumeInfo(volumeName));
       break;
     case EMPTY_RPC:
-      getMetrics().timer(operation.name()).time(() -> {
-            try {
-              ozoneManagerClient.echoRPCReq(new byte[] {}, 0, false);
-            } catch (IOException e) {
-              throw new RuntimeException(e);
-            }
-          }
-      );
+      getMetrics().timer(operation.name()).time(() -> ozoneManagerClient.echoRPCReq(new byte[] {}, 0, false));
       break;
     case EMPTY_RPC_WRITE_RATIS:
-      getMetrics().timer(operation.name()).time(() -> {
-            try {
-              ozoneManagerClient.echoRPCReq(new byte[] {}, 0, true);
-            } catch (IOException e) {
-              throw new RuntimeException(e);
-            }
-          }
-      );
+      getMetrics().timer(operation.name()).time(() -> ozoneManagerClient.echoRPCReq(new byte[] {}, 0, true));
       break;
     default:
       throw new IllegalStateException("Unrecognized write command " +
           "type request " + operation);
+    }
+  }
+
+  @FunctionalInterface
+  interface WriteOperation {
+    OutputStream createStream() throws IOException;
+  }
+
+  @FunctionalInterface
+  interface ReadOperation {
+    InputStream createStream() throws IOException;
+  }
+
+  private Void performWriteOperation(WriteOperation writeOp, ContentGenerator contentGen) throws IOException {
+    try (OutputStream stream = writeOp.createStream()) {
+      contentGen.write(stream);
+    }
+    return null;
+  }
+
+  @SuppressWarnings("checkstyle:EmptyBlock")
+  private Void performReadOperation(ReadOperation readOp, byte[] buffer) throws IOException {
+    try (InputStream stream = readOp.createStream()) {
+      while (stream.read(buffer) >= 0) {
+      }
+      return null;
     }
   }
 
