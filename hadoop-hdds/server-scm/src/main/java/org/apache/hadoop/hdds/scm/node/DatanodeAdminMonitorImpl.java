@@ -497,7 +497,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     return underReplicated == 0 && unclosed == 0;
   }
 
-  public Map<String, List<ContainerID>> getContainersReplicatedOnNode(TrackedNode dn, boolean updateMetrics) {
+  public Map<String, List<ContainerID>> getContainersReplicatedOnNode(TrackedNode dn) {
     Iterator<TrackedNode> iterator = trackedNodes.iterator();
     while (iterator.hasNext()) {
       TrackedNode trackedNode = iterator.next();

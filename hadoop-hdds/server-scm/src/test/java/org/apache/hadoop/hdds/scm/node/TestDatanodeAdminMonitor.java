@@ -865,9 +865,9 @@ public class TestDatanodeAdminMonitor {
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
         nodeManager.getNodeStatus(dn1).getOperationalState());
     assertEquals(monitor.getContainersReplicatedOnNode(new
-        DatanodeAdminMonitorImpl.TrackedNode(dn1, 0L), false).get("UnderReplicated").size(), 2);
+        DatanodeAdminMonitorImpl.TrackedNode(dn1, 0L)).get("UnderReplicated").size(), 2);
     assertEquals(monitor.getContainersReplicatedOnNode(new
-        DatanodeAdminMonitorImpl.TrackedNode(dn1, 0L), false).get("UnClosed").size(), 0);
+        DatanodeAdminMonitorImpl.TrackedNode(dn1, 0L)).get("UnClosed").size(), 0);
 
     Set<ContainerID> containers2 = new HashSet<>();
     containers2.add(ContainerID.valueOf(3));
@@ -884,9 +884,9 @@ public class TestDatanodeAdminMonitor {
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
         nodeManager.getNodeStatus(dn1).getOperationalState());
     assertEquals(monitor.getContainersReplicatedOnNode(new
-        DatanodeAdminMonitorImpl.TrackedNode(dn1, 0L), false).get("UnClosed").size(), 2);
+        DatanodeAdminMonitorImpl.TrackedNode(dn1, 0L)).get("UnClosed").size(), 2);
     assertEquals(monitor.getContainersReplicatedOnNode(new
-        DatanodeAdminMonitorImpl.TrackedNode(dn1, 0L), false).get("UnderReplicated").size(), 0);
+        DatanodeAdminMonitorImpl.TrackedNode(dn1, 0L)).get("UnderReplicated").size(), 0);
   }
 
   /**

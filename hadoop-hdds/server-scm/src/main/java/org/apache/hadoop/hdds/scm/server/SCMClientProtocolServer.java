@@ -593,7 +593,7 @@ public class SCMClientProtocolServer implements
   public Map<String, List<ContainerID>> getContainersOnDecomNode(DatanodeDetails dn) throws IOException {
     try {
       return scm.getScmDecommissionManager().getContainersReplicatedOnNode(
-          new DatanodeAdminMonitorImpl.TrackedNode(dn, 0L), false);
+          new DatanodeAdminMonitorImpl.TrackedNode(dn, 0L));
     } catch (NodeNotFoundException e) {
       throw new IOException("Failed to get containers list. Unable to find required node", e);
     }

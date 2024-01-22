@@ -294,10 +294,9 @@ public class NodeDecommissionManager {
         TimeUnit.SECONDS);
   }
 
-  public Map<String, List<ContainerID>> getContainersReplicatedOnNode(DatanodeAdminMonitorImpl.TrackedNode dn,
-                                                                      boolean updateMetrics)
+  public Map<String, List<ContainerID>> getContainersReplicatedOnNode(DatanodeAdminMonitorImpl.TrackedNode dn)
       throws NodeNotFoundException {
-    return getMonitor().getContainersReplicatedOnNode(dn, updateMetrics);
+    return getMonitor().getContainersReplicatedOnNode(dn);
   }
 
   @VisibleForTesting
