@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -23,6 +24,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -39,6 +41,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -291,8 +294,15 @@ public class NodeDecommissionManager {
         TimeUnit.SECONDS);
   }
 
+  @VisibleForTesting
   public DatanodeAdminMonitor getMonitor() {
     return monitor;
+  }
+
+  public Map<String, List<ContainerID>> getContainersReplicatedOnNode(DatanodeAdminMonitorImpl.TrackedNode dn,
+                                                                      boolean updateMetrics)
+      throws NodeNotFoundException {
+    return getMonitor().getContainersReplicatedOnNode(dn, updateMetrics);
   }
 
   public synchronized List<DatanodeAdminError> decommissionNodes(
