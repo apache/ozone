@@ -77,6 +77,10 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   private boolean isSetupDone = false;
   private ReconOMMetadataManager reconOMMetadataManager;
 
+  public TestOmTableInsightTask() {
+    super();
+  }
+
   private void initializeInjector() throws IOException {
     reconOMMetadataManager = getTestReconOmMetadataManager(
         initializeNewOmMetadataManager(Files.createDirectory(

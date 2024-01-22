@@ -697,10 +697,12 @@ public class KeyManagerImpl implements KeyManager {
     return multipartUploadCleanupService;
   }
 
+  @Override
   public SstFilteringService getSnapshotSstFilteringService() {
     return snapshotSstFilteringService;
   }
 
+  @Override
   public SnapshotDeletingService getSnapshotDeletingService() {
     return snapshotDeletingService;
   }
