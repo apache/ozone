@@ -147,6 +147,11 @@ public class TestOzoneShellHA {
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    startKMS();
+    startCluster(conf);
+  }
+
+  protected static void startKMS() throws Exception {
     testDir = GenericTestUtils.getTestDir(
         TestOzoneShellHA.class.getSimpleName());
     File kmsDir = new File(testDir, UUID.randomUUID().toString());
@@ -154,8 +159,6 @@ public class TestOzoneShellHA {
     MiniKMS.Builder miniKMSBuilder = new MiniKMS.Builder();
     miniKMS = miniKMSBuilder.setKmsConfDir(kmsDir).build();
     miniKMS.start();
-
-    startCluster(conf);
   }
 
   protected static void startCluster(OzoneConfiguration conf) throws Exception {
