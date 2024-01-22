@@ -33,7 +33,7 @@ specifiers:
   json-server: ^0.15.1
   less: ^3.13.1
   less-loader: ^5.0.0
-  moment: ^2.29.4
+  moment: ^2.30.1
   npm-run-all: ^4.1.5
   plotly.js: ^1.58.5
   pretty-ms: ^5.1.0
@@ -69,7 +69,7 @@ dependencies:
   filesize: 6.4.0
   less: 3.13.1
   less-loader: 5.0.0_less@3.13.1
-  moment: 2.29.4
+  moment: 2.30.1
   plotly.js: 1.58.5
   pretty-ms: 5.1.0
   react: 16.14.0
@@ -3543,7 +3543,7 @@ packages:
       enquire.js: 2.1.6
       is-mobile: 2.2.2
       lodash: 4.17.21
-      moment: 2.29.4
+      moment: 2.30.1
       omit.js: 1.0.2
       prop-types: 15.8.1
       raf: 3.4.1
@@ -4224,6 +4224,7 @@ packages:
 
   /bindings/1.5.0:
     resolution: {integrity: sha512-p2q/t/mhvuOj/UeLlV6566GD/guowlr0hHxClI0W9m7MWYkL1F0hLo+0Aexs9HSPCtR1SXQ0TD3MMKrXZajbiQ==}
+    requiresBuild: true
     dependencies:
       file-uri-to-path: 1.0.0
     dev: false
@@ -7592,6 +7593,7 @@ packages:
 
   /file-uri-to-path/1.0.0:
     resolution: {integrity: sha512-0Zt+s3L7Vf1biwWZ29aARiVYLx7iMGnEUl9x33fbB/j3jR81u/O2LbqK+Bm1CDSNDKVtJ/YjwY7TUd5SkeLQLw==}
+    requiresBuild: true
     dev: false
     optional: true
 
@@ -11332,8 +11334,8 @@ packages:
     dependencies:
       minimist: 1.2.8
 
-  /moment/2.29.4:
-    resolution: {integrity: sha512-5LC9SOxjSc2HF6vO2CyuTDNivEdoz2IvyJJGj6X8DJ0eFyfszE0QiEd+iXmBvUP3WHxSjFH/vIsA0EN00cgr8w==}
+  /moment/2.30.1:
+    resolution: {integrity: sha512-uEmtNhbDOrWPFS+hdjFCBfy9f2YoyzRpwcl+DqpC6taX21FzsTLQVbMV/W7PzNSX6x/bhC1zA3c2UQ5NzH6how==}
     dev: false
 
   /monotone-convex-hull-2d/1.0.1:
@@ -11433,6 +11435,7 @@ packages:
 
   /nan/2.17.0:
     resolution: {integrity: sha512-2ZTgtl0nJsO0KQCjEpxcIr5D+Yv90plTitZt9JBfQvVJDS5seMl3FOvsh3+9CoYWXf/1l5OaZzzF6nDm4cagaQ==}
+    requiresBuild: true
     dev: false
     optional: true
 
@@ -13487,7 +13490,7 @@ packages:
     dependencies:
       babel-runtime: 6.26.0
       classnames: 2.3.2
-      moment: 2.29.4
+      moment: 2.30.1
       prop-types: 15.8.1
       rc-trigger: 2.6.5_wcqkhtmu7mswc6yz4uyexck3ty
       rc-util: 4.21.1
@@ -13827,7 +13830,7 @@ packages:
     resolution: {integrity: sha512-Lv1Mvzp9fRXhXEnRLO4nW6GLNxUkfAZ3RsiIBsWjGjXXvMNjdr4BX/ayElHAFK0DoJqOhm7c5tjmIYpEOwcUXg==}
     dependencies:
       classnames: 2.3.2
-      moment: 2.29.4
+      moment: 2.30.1
       prop-types: 15.8.1
       raf: 3.4.1
       rc-trigger: 2.6.5_wcqkhtmu7mswc6yz4uyexck3ty
