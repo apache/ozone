@@ -19,7 +19,7 @@
     "axios": "^0.27.2",
     "babel-jest": "^24.9.0",
     "babel-plugin-import": "^1.13.8",
-    "classnames": "^2.3.2",
+    "classnames": "^2.5.1",
     "customize-cra": "^0.2.14",
     "filesize": "^6.4.0",
     "less": "^3.13.1",
