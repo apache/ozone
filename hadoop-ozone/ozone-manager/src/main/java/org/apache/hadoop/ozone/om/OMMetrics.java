@@ -1102,7 +1102,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   @VisibleForTesting
   public void resetNumKeyHSyncs() {
-    numKeyHSyncs.incr( - numKeyHSyncs.value());
+    numKeyHSyncs.incr(-numKeyHSyncs.value());
   }
 
   @VisibleForTesting
