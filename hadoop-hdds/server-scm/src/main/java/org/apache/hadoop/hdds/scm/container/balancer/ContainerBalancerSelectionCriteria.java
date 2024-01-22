@@ -258,7 +258,14 @@ public class ContainerBalancerSelectionCriteria {
       throws NodeNotFoundException {
     NavigableSet<ContainerID> newSet =
         new TreeSet<>(orderContainersByUsedBytes().reversed());
-    newSet.addAll(nodeManager.getContainers(node));
+    Set<ContainerID> idSet = nodeManager.getContainers(node);
+    if (excludeContainers != null) {
+      idSet.removeAll(excludeContainers);
+    }
+    if (selectedContainers != null) {
+      idSet.removeAll(selectedContainers);
+    }
+    newSet.addAll(idSet);
     setMap.put(node, newSet);
   }
 }
