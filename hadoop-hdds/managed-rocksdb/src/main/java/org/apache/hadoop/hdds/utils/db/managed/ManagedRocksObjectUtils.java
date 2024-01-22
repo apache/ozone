@@ -54,7 +54,7 @@ public final class ManagedRocksObjectUtils {
 
   static void reportLeak(Class<?> clazz, String stackTrace) {
     ManagedRocksObjectMetrics.INSTANCE.increaseLeakObject();
-    String warning = String.format("%s is not closed properly", clazz.getSimpleName());
+      String warning = String.format("%s is not closed properly", clazz.getSimpleName());
     if (stackTrace != null && LOG.isDebugEnabled()) {
       String debugMessage = String.format("%nStackTrace for unclosed instance: %s", stackTrace);
       warning = warning.concat(debugMessage);

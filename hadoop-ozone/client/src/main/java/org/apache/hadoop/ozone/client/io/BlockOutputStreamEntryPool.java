@@ -25,7 +25,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
@@ -85,6 +89,8 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
   private final ExcludeList excludeList;
   private final ContainerClientMetrics clientMetrics;
   private final StreamBufferArgs streamBufferArgs;
+  // update blocks on OM
+  private ContainerBlockID lastUpdatedBlockId = new ContainerBlockID(-1, -1);
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public BlockOutputStreamEntryPool(
@@ -368,7 +374,16 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
       if (keyArgs.getIsMultipartKey()) {
         throw new IOException("Hsync is unsupported for multipart keys.");
       } else {
-        omClient.hsyncKey(keyArgs, openID);
+        if (keyArgs.getLocationInfoList().size() == 0) {
+          omClient.hsyncKey(keyArgs, openID);
+        } else {
+          ContainerBlockID lastBLockId = keyArgs.getLocationInfoList().get(keyArgs.getLocationInfoList().size() - 1)
+              .getBlockID().getContainerBlockID();
+          if (!lastUpdatedBlockId.equals(lastBLockId)) {
+            omClient.hsyncKey(keyArgs, openID);
+            lastUpdatedBlockId = lastBLockId;
+          }
+        }
       }
     } else {
       LOG.warn("Closing KeyOutputStream, but key args is null");
