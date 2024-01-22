@@ -198,13 +198,13 @@ public class TestOMRatisSnapshots {
     }
   }
 
-  @ParameterizedTest
-  @ValueSource(ints = {100})
+  @Test
+
   // tried up to 1000 snapshots and this test works, but some of the
   //  timeouts have to be increased.
-  @Unhealthy("HDDS-10059")
-  void testInstallSnapshot(int numSnapshotsToCreate, @TempDir Path tempDir) throws Exception {
+  public void testInstallSnapshot(@TempDir Path tempDir) throws Exception {
     // Get the leader OM
+    int numSnapshotsToCreate = 100;
     String leaderOMNodeId = OmFailoverProxyUtil
         .getFailoverProxyProvider(objectStore.getClientProxy())
         .getCurrentProxyOMNodeId();
