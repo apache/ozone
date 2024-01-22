@@ -460,6 +460,18 @@ public class TrashOzoneFileSystem extends FileSystem {
     }
   }
 
+  /**
+   * Returns a OMRequest builder with specified type.
+   * @param cmdType type of the request
+   */
+  private OzoneManagerProtocolProtos.OMRequest.Builder
+       createOMRequest(OzoneManagerProtocolProtos.Type cmdType) throws IOException {
+    return OzoneManagerProtocolProtos.OMRequest.newBuilder()
+        .setClientId(CLIENT_ID.toString())
+        .setVersion(ClientVersion.CURRENT_VERSION)
+        .setUserInfo(getUserInfo())
+        .setCmdType(cmdType);
+  }
 
   private OzoneManagerProtocolProtos.OMRequest
       getRenameKeyRequest(
@@ -483,12 +495,8 @@ public class TrashOzoneFileSystem extends FileSystem {
     OzoneManagerProtocolProtos.OMRequest omRequest =
         null;
     try {
-      omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
-              .setClientId(CLIENT_ID.toString())
-              .setVersion(ClientVersion.CURRENT_VERSION)
-              .setUserInfo(getUserInfo())
+      omRequest = createOMRequest(OzoneManagerProtocolProtos.Type.RenameKey)
               .setRenameKeyRequest(renameKeyRequest)
-              .setCmdType(OzoneManagerProtocolProtos.Type.RenameKey)
               .build();
     } catch (IOException e) {
       LOG.error("Couldn't get userinfo", e);
@@ -549,13 +557,8 @@ public class TrashOzoneFileSystem extends FileSystem {
     OzoneManagerProtocolProtos.OMRequest omRequest =
         null;
     try {
-      omRequest =
-          OzoneManagerProtocolProtos.OMRequest.newBuilder()
-              .setClientId(CLIENT_ID.toString())
-              .setVersion(ClientVersion.CURRENT_VERSION)
-              .setUserInfo(getUserInfo())
+      omRequest = createOMRequest(OzoneManagerProtocolProtos.Type.DeleteKey)
               .setDeleteKeyRequest(deleteKeyRequest)
-              .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKey)
               .build();
     } catch (IOException e) {
       LOG.error("Couldn't get userinfo", e);
@@ -619,12 +622,8 @@ public class TrashOzoneFileSystem extends FileSystem {
       OzoneManagerProtocolProtos.OMRequest omRequest =
           null;
       try {
-        omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
-            .setClientId(CLIENT_ID.toString())
-            .setVersion(ClientVersion.CURRENT_VERSION)
-            .setUserInfo(getUserInfo())
+        omRequest = createOMRequest(OzoneManagerProtocolProtos.Type.DeleteKeys)
             .setDeleteKeysRequest(deleteKeysRequest)
-            .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKeys)
             .build();
       } catch (IOException e) {
         LOG.error("Couldn't get userinfo", e);

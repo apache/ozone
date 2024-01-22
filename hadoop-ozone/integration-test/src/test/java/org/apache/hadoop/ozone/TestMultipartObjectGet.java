@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone;
 
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -41,7 +42,6 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.UUID;
 import java.util.List;
@@ -217,8 +217,7 @@ public class TestMultipartObjectGet {
 
   private static String generateRandomContent(int sizeInMB) {
     int bytesToGenerate = sizeInMB * 1024 * 1024;
-    byte[] randomBytes = new byte[bytesToGenerate];
-    new SecureRandom().nextBytes(randomBytes);
+    byte[] randomBytes = RandomUtils.nextBytes(bytesToGenerate);
     return Base64.getEncoder().encodeToString(randomBytes);
   }
 }
