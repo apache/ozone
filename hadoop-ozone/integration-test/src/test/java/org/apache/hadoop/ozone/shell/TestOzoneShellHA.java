@@ -29,12 +29,17 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.crypto.key.KeyProvider;
+import org.apache.hadoop.crypto.key.kms.KMSClientProvider;
+import org.apache.hadoop.crypto.key.kms.server.MiniKMS;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -60,7 +65,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ToolRunner;
-import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 
 import com.google.common.base.Strings;
@@ -118,6 +122,8 @@ public class TestOzoneShellHA {
   private static File testFile;
   private static String testFilePathString;
   private static MiniOzoneCluster cluster = null;
+  private static File testDir;
+  private static MiniKMS miniKMS;
   private static OzoneClient client;
   private OzoneShell ozoneShell = null;
   private OzoneAdmin ozoneAdminShell = null;
@@ -141,6 +147,14 @@ public class TestOzoneShellHA {
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    testDir = GenericTestUtils.getTestDir(
+        TestOzoneShellHA.class.getSimpleName());
+    File kmsDir = new File(testDir, UUID.randomUUID().toString());
+    assertTrue(kmsDir.mkdirs());
+    MiniKMS.Builder miniKMSBuilder = new MiniKMS.Builder();
+    miniKMS = miniKMSBuilder.setKmsConfDir(kmsDir).build();
+    miniKMS.start();
+
     startCluster(conf);
   }
 
@@ -161,6 +175,8 @@ public class TestOzoneShellHA {
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
     final int numDNs = 5;
+    conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH,
+        getKeyProviderURI(miniKMS));
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(clusterId)
         .setScmId(scmId)
@@ -182,8 +198,16 @@ public class TestOzoneShellHA {
       cluster.shutdown();
     }
 
+    if (miniKMS != null) {
+      miniKMS.stop();
+    }
+
     if (baseDir != null) {
       FileUtil.fullyDelete(baseDir, true);
+    }
+
+    if (testDir != null) {
+      FileUtil.fullyDelete(testDir, true);
     }
   }
 
@@ -1302,9 +1326,9 @@ public class TestOzoneShellHA {
 
   @Test
   public void testSetEncryptionKey() throws Exception {
-    final String volumeName = "volume110";
+    final String volumeName = "volume111";
     getVolume(volumeName);
-    String bucketPath = "/volume110/bucket0";
+    String bucketPath = "/volume111/bucket0";
     String[] args = new String[]{"bucket", "create", bucketPath};
     execute(ozoneShell, args);
 
@@ -1313,6 +1337,14 @@ public class TestOzoneShellHA {
     OzoneBucket bucket = volume.getBucket("bucket0");
     assertNull(bucket.getEncryptionKeyName());
     String newEncKey = "enckey1";
+
+    KeyProvider provider = cluster.getOzoneManager().getKmsProvider();
+    KeyProvider.Options options = KeyProvider.options(cluster.getConf());
+    options.setDescription(newEncKey);
+    options.setBitLength(128);
+    provider.createKey(newEncKey, options);
+    provider.flush();
+
     args = new String[]{"bucket", "set-encryption-key", bucketPath, "-k",
         newEncKey};
     execute(ozoneShell, args);
@@ -1931,5 +1963,10 @@ public class TestOzoneShellHA {
     execute(ozoneShell,
         new String[]{"volume", "delete", "/volume1"});
     out.reset();
+  }
+
+  private static String getKeyProviderURI(MiniKMS kms) {
+    return KMSClientProvider.SCHEME_NAME + "://" +
+        kms.getKMSUrl().toExternalForm().replace("://", "@");
   }
 }
