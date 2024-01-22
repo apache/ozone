@@ -50,7 +50,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -692,7 +691,7 @@ public class ContainerBalancerTask implements Runnable {
    * @return ContainerMoveSelection containing the selected target and container
    */
   private ContainerMoveSelection matchSourceWithTarget(DatanodeDetails source) {
-    NavigableSet<ContainerID> candidateContainers =
+    Set<ContainerID> candidateContainers =
         selectionCriteria.getCandidateContainers(source,
             sizeScheduledForMoveInLatestIteration);
 

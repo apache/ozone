@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -92,32 +93,22 @@ public class ContainerBalancerSelectionCriteria {
    * 5. Container should be closed.
    * 6. If the {@link LegacyReplicationManager} is enabled, then the container should not be an EC container.
    * @param node DatanodeDetails for which to find candidate containers.
-   * @return NavigableSet of candidate containers that satisfy the criteria.
+   * @return Set of candidate containers that satisfy the criteria.
    */
-  public NavigableSet<ContainerID> getCandidateContainers(
+  public Set<ContainerID> getCandidateContainers(
       DatanodeDetails node, long sizeMovedAlready) {
-    // Initialize containerSet for node
-    if (!setMap.containsKey(node)) {
-      NavigableSet<ContainerID> newSet =
-          new TreeSet<>(orderContainersByUsedBytes().reversed());
-      try {
-        newSet.addAll(nodeManager.getContainers(node));
-      } catch (NodeNotFoundException e) {
-        LOG.warn("Could not find Datanode {} while selecting candidate " +
-            "containers for Container Balancer.", node.toString(), e);
-        return newSet;
-      }
-      setMap.put(node, newSet);
-    }
-
-    // In case the node is removed
     try {
+      // Initialize containerSet for node
+      if (!setMap.containsKey(node)) {
+        addNodeToSetMap(node);
+      }
+      // In case the node is removed
       nodeManager.getContainers(node);
     } catch (NodeNotFoundException e) {
       LOG.warn("Could not find Datanode {} while selecting candidate " +
           "containers for Container Balancer.", node.toString(), e);
       setMap.remove(node);
-      return new TreeSet<>();
+      return Collections.emptySet();
     }
 
     NavigableSet<ContainerID> containerIDSet = setMap.get(node);
@@ -262,4 +253,12 @@ public class ContainerBalancerSelectionCriteria {
     this.selectedContainers = selectedContainers;
   }
 
+
+  private void addNodeToSetMap(DatanodeDetails node)
+      throws NodeNotFoundException {
+    NavigableSet<ContainerID> newSet =
+        new TreeSet<>(orderContainersByUsedBytes().reversed());
+    newSet.addAll(nodeManager.getContainers(node));
+    setMap.put(node, newSet);
+  }
 }
