@@ -52,7 +52,6 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.assertj.core.api.Fail;
 import org.junit.jupiter.api.AfterEach;
@@ -61,8 +60,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
@@ -202,12 +199,12 @@ public class TestOMRatisSnapshots {
   }
 
   @Test
-
   // tried up to 1000 snapshots and this test works, but some of the
   //  timeouts have to be increased.
+  static int numSnapshotsToCreate = 100;
+
   public void testInstallSnapshot(@TempDir Path tempDir) throws Exception {
     // Get the leader OM
-    int numSnapshotsToCreate = 100;
     String leaderOMNodeId = OmFailoverProxyUtil
         .getFailoverProxyProvider(objectStore.getClientProxy())
         .getCurrentProxyOMNodeId();
@@ -350,15 +347,17 @@ public class TestOMRatisSnapshots {
     Path leaderActiveDir = Paths.get(leaderMetaDir.toString(), OM_DB_NAME);
     Path leaderSnapshotDir =
         Paths.get(getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo));
-    // Get the list of hardlinks from the leader.  Then confirm those links
-    //  are on the follower
+
+    // Get list of live files on the leader.
     RocksDB activeRocksDB = ((RDBStore)leaderOM.getMetadataManager().getStore()).getDb().getManagedRocksDb()
         .get();
     List<String> liveSstFiles = new ArrayList<>();
+    // strip the leading "/".
     liveSstFiles.addAll(activeRocksDB.getLiveFiles().files.stream().map(s -> s.substring(1)).collect(
         Collectors.toList()));
 
-
+    // Get the list of hardlinks from the leader.  Then confirm those links
+    //  are on the follower
     int hardLinkCount = 0;
     try (Stream<Path>list = Files.list(leaderSnapshotDir)) {
       for (Path leaderSnapshotSST: list.collect(Collectors.toList())) {
