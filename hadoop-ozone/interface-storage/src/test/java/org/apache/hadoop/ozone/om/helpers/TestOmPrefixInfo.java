@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.helpers;
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.junit.jupiter.api.Assertions;
@@ -37,15 +38,15 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
  */
 public class TestOmPrefixInfo {
 
-  private static OzoneManagerStorageProtos.OzoneAclInfo buildTestOzoneAclInfo(
+  private static OzoneManagerProtocolProtos.OzoneAclInfo buildTestOzoneAclInfo(
       String aclString) {
     OzoneAcl oacl = OzoneAcl.parseAcl(aclString);
     ByteString rights = ByteString.copyFrom(oacl.getAclBitSet().toByteArray());
-    return OzoneManagerStorageProtos.OzoneAclInfo.newBuilder()
-        .setType(OzoneManagerStorageProtos.OzoneAclInfo.OzoneAclType.USER)
+    return OzoneManagerProtocolProtos.OzoneAclInfo.newBuilder()
+        .setType(OzoneManagerProtocolProtos.OzoneAclInfo.OzoneAclType.USER)
         .setName(oacl.getName())
         .setRights(rights)
-        .setAclScope(OzoneManagerStorageProtos.
+        .setAclScope(OzoneManagerProtocolProtos.
             OzoneAclInfo.OzoneAclScope.ACCESS)
         .build();
   }
