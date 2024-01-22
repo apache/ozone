@@ -113,6 +113,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeData
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDeletedKeysToOm;
 import static org.apache.hadoop.ozone.recon.spi.impl.PrometheusServiceProviderImpl.PROMETHEUS_INSTANT_QUERY_API;
 import static org.hadoop.ozone.recon.schema.tables.GlobalStatsTable.GLOBAL_STATS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -187,6 +188,10 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private CommonUtils commonUtils;
   private PipelineManager pipelineManager;
   private ReconPipelineManager reconPipelineManager;
+
+  public TestEndpoints() {
+    super();
+  }
 
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
@@ -899,7 +904,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     // Test fetching non-existent container size
     response = utilizationEndpoint.getContainerCounts(8192L);
     resultSet = (List<ContainerCountBySize>) response.getEntity();
-    assertTrue(resultSet.isEmpty());
+    assertThat(resultSet).isEmpty();
 
   }
 

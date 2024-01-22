@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.Test;
@@ -53,6 +52,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests the containerStateMachine stream handling.
@@ -177,7 +177,7 @@ public class TestContainerStateMachineStream {
         .getContainer(omKeyLocationInfo.getContainerID()).
         getContainerData().getBytesUsed();
 
-    Assertions.assertEquals(bytesUsed, size);
+    assertEquals(bytesUsed, size);
   }
 
 
@@ -208,7 +208,7 @@ public class TestContainerStateMachineStream {
         .getContainer(omKeyLocationInfo.getContainerID()).
         getContainerData().getBytesUsed();
 
-    Assertions.assertEquals(bytesUsed, size);
+    assertEquals(bytesUsed, size);
   }
 
 }

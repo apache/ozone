@@ -60,10 +60,13 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import org.apache.ratis.statemachine.impl.StatemachineImplTestUtil;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -163,7 +166,7 @@ public class TestValidateBCSIDOnRestart {
     KeyOutputStream groupOutputStream = (KeyOutputStream) key.getOutputStream();
     List<OmKeyLocationInfo> locationInfoList =
         groupOutputStream.getLocationInfoList();
-    Assertions.assertEquals(1, locationInfoList.size());
+    assertEquals(1, locationInfoList.size());
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
     HddsDatanodeService dn = TestHelper.getDatanodeService(omKeyLocationInfo,
         cluster);
@@ -173,9 +176,8 @@ public class TestValidateBCSIDOnRestart {
             .getContainer().getContainerSet()
             .getContainer(omKeyLocationInfo.getContainerID())
             .getContainerData();
-    Assertions.assertTrue(containerData instanceof KeyValueContainerData);
     KeyValueContainerData keyValueContainerData =
-        (KeyValueContainerData) containerData;
+        assertInstanceOf(KeyValueContainerData.class, containerData);
     key.close();
 
     long containerID = omKeyLocationInfo.getContainerID();
@@ -200,14 +202,12 @@ public class TestValidateBCSIDOnRestart {
     stateMachine.buildMissingContainerSet(parentPath.toFile());
     // Since the snapshot threshold is set to 1, since there are
     // applyTransactions, we should see snapshots
-    Assertions.assertTrue(parentPath.getParent().toFile().listFiles().length > 0);
+    assertThat(parentPath.getParent().toFile().listFiles().length).isGreaterThan(0);
 
     // make sure the missing containerSet is not empty
     HddsDispatcher dispatcher = (HddsDispatcher) ozoneContainer.getDispatcher();
-    Assertions.assertFalse(dispatcher.getMissingContainerSet().isEmpty());
-    Assertions
-        .assertTrue(dispatcher.getMissingContainerSet()
-            .contains(containerID));
+    assertThat(dispatcher.getMissingContainerSet()).isNotEmpty();
+    assertThat(dispatcher.getMissingContainerSet()).contains(containerID);
     // write a new key
     key = objectStore.getVolume(volumeName).getBucket(bucketName)
         .createKey("ratis", 1024,
@@ -218,7 +218,7 @@ public class TestValidateBCSIDOnRestart {
     key.flush();
     groupOutputStream = (KeyOutputStream) key.getOutputStream();
     locationInfoList = groupOutputStream.getLocationInfoList();
-    Assertions.assertEquals(1, locationInfoList.size());
+    assertEquals(1, locationInfoList.size());
     omKeyLocationInfo = locationInfoList.get(0);
     key.close();
     containerID = omKeyLocationInfo.getContainerID();
@@ -228,8 +228,7 @@ public class TestValidateBCSIDOnRestart {
         .getContainer().getContainerSet()
         .getContainer(omKeyLocationInfo.getContainerID())
         .getContainerData();
-    Assertions.assertTrue(containerData instanceof KeyValueContainerData);
-    keyValueContainerData = (KeyValueContainerData) containerData;
+    keyValueContainerData = assertInstanceOf(KeyValueContainerData.class, containerData);
     try (DBHandle db = BlockUtils.getDB(keyValueContainerData, conf)) {
 
       // modify the bcsid for the container in the ROCKS DB thereby inducing
@@ -243,7 +242,7 @@ public class TestValidateBCSIDOnRestart {
     index = cluster.getHddsDatanodeIndex(dn.getDatanodeDetails());
     cluster.restartHddsDatanode(dn.getDatanodeDetails(), true);
     // Make sure the container is marked unhealthy
-    Assertions.assertSame(cluster.getHddsDatanodes().get(index)
+    assertSame(cluster.getHddsDatanodes().get(index)
             .getDatanodeStateMachine()
             .getContainer().getContainerSet().getContainer(containerID)
             .getContainerState(),

@@ -88,7 +88,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -96,7 +95,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
@@ -106,6 +104,13 @@ import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileNa
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COMPACTION_LOG_FILE_NAME_SUFFIX;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -207,7 +212,7 @@ public class TestOMDbCheckpointServlet {
     BootstrapStateHandler.Lock lock =
         new OMDBCheckpointServlet.Lock(cluster.getOzoneManager());
     doCallRealMethod().when(omDbCheckpointServletMock).init();
-    Assertions.assertNull(
+    assertNull(
         doCallRealMethod().when(omDbCheckpointServletMock).getDbStore());
 
     requestMock = mock(HttpServletRequest.class);
@@ -284,7 +289,7 @@ public class TestOMDbCheckpointServlet {
     assertThat(omMetrics.getDBCheckpointMetrics().getNumCheckpoints())
         .isGreaterThan(initialCheckpointCount);
 
-    Mockito.verify(omDbCheckpointServletMock).writeDbDataToStream(any(),
+    verify(omDbCheckpointServletMock).writeDbDataToStream(any(),
         any(), any(), eq(toExcludeList), any(), any());
   }
 
@@ -322,7 +327,7 @@ public class TestOMDbCheckpointServlet {
     omDbCheckpointServletMock.init();
     omDbCheckpointServletMock.doPost(requestMock, responseMock);
 
-    Mockito.verify(responseMock).setStatus(HttpServletResponse.SC_BAD_REQUEST);
+    verify(responseMock).setStatus(HttpServletResponse.SC_BAD_REQUEST);
   }
 
   @ParameterizedTest
@@ -454,10 +459,10 @@ public class TestOMDbCheckpointServlet {
     when(responseMock.getOutputStream()).thenReturn(servletOutputStream);
     long tmpHardLinkFileCount = tmpHardLinkFileCount();
     omDbCheckpointServletMock.doGet(requestMock, responseMock);
-    Assertions.assertEquals(tmpHardLinkFileCount, tmpHardLinkFileCount());
+    assertEquals(tmpHardLinkFileCount, tmpHardLinkFileCount());
 
     // Verify that tarball request count reaches to zero once doGet completes.
-    Assertions.assertEquals(0,
+    assertEquals(0,
         dbStore.getRocksDBCheckpointDiffer().getTarballRequestCount());
     dbCheckpoint = realCheckpoint.get();
 
@@ -467,11 +472,11 @@ public class TestOMDbCheckpointServlet {
     String newDbDirName = testDirName + OM_KEY_PREFIX + OM_DB_NAME;
     int newDbDirLength = newDbDirName.length() + 1;
     File newDbDir = new File(newDbDirName);
-    Assertions.assertTrue(newDbDir.mkdirs());
+    assertTrue(newDbDir.mkdirs());
     FileUtil.unTar(tempFile, newDbDir);
 
     // Move snapshot dir to correct location.
-    Assertions.assertTrue(new File(newDbDirName, OM_SNAPSHOT_DIR)
+    assertTrue(new File(newDbDirName, OM_SNAPSHOT_DIR)
         .renameTo(new File(newDbDir.getParent(), OM_SNAPSHOT_DIR)));
 
     // Confirm the checkpoint directories match, (after remove extras).
@@ -485,7 +490,7 @@ public class TestOMDbCheckpointServlet {
     assertThat(finalCheckpointSet).withFailMessage("hardlink file exists in checkpoint dir")
         .contains(OM_HARDLINK_FILE);
     finalCheckpointSet.remove(OM_HARDLINK_FILE);
-    Assertions.assertEquals(initialCheckpointSet, finalCheckpointSet);
+    assertEquals(initialCheckpointSet, finalCheckpointSet);
 
     String shortSnapshotLocation =
         truncateFileName(metaDirLength, Paths.get(snapshotDirName));
@@ -503,7 +508,7 @@ public class TestOMDbCheckpointServlet {
         OM_HARDLINK_FILE))) {
 
       for (String line : lines.collect(Collectors.toList())) {
-        Assertions.assertFalse(line.contains("CURRENT"),
+        assertFalse(line.contains("CURRENT"),
             "CURRENT file is not a hard link");
         if (line.contains(FABRICATED_FILE_NAME)) {
           fabricatedLinkLines.add(line);
@@ -530,7 +535,7 @@ public class TestOMDbCheckpointServlet {
     // from the expected data.
     initialFullSet.remove(unExpectedLogStr);
     initialFullSet.remove(unExpectedSstStr);
-    Assertions.assertEquals(initialFullSet, finalFullSet,
+    assertEquals(initialFullSet, finalFullSet,
         "expected snapshot files not found");
   }
 
@@ -579,7 +584,7 @@ public class TestOMDbCheckpointServlet {
     Set<String> finalCheckpointSet = getFiles(finalCheckpointLocation,
         testDirLength);
 
-    Assertions.assertEquals(initialCheckpointSet, finalCheckpointSet);
+    assertEquals(initialCheckpointSet, finalCheckpointSet);
   }
 
   @Test
@@ -597,7 +602,7 @@ public class TestOMDbCheckpointServlet {
         new FileOutputStream(dummyFile), StandardCharsets.UTF_8)) {
       writer.write("Dummy data.");
     }
-    Assertions.assertTrue(dummyFile.exists());
+    assertTrue(dummyFile.exists());
     List<String> toExcludeList = new ArrayList<>();
     List<String> excludedList = new ArrayList<>();
     toExcludeList.add(dummyFile.getName());
@@ -690,7 +695,7 @@ public class TestOMDbCheckpointServlet {
     // Use generated form data as input stream to the HTTP request
     InputStream input = new ByteArrayInputStream(
         sb.toString().getBytes(StandardCharsets.UTF_8));
-    ServletInputStream inputStream = Mockito.mock(ServletInputStream.class);
+    ServletInputStream inputStream = mock(ServletInputStream.class);
     when(requestMock.getInputStream()).thenReturn(inputStream);
     when(inputStream.read(any(byte[].class), anyInt(), anyInt()))
         .thenAnswer(invocation -> {
@@ -735,7 +740,7 @@ public class TestOMDbCheckpointServlet {
         new File(snapshotDirName).getParent(),
         "fabricatedSnapshot");
     fabricatedSnapshot.toFile().mkdirs();
-    Assertions.assertTrue(Paths.get(fabricatedSnapshot.toString(),
+    assertTrue(Paths.get(fabricatedSnapshot.toString(),
         FABRICATED_FILE_NAME).toFile().createNewFile());
 
     // Create fabricated links to snapshot dirs
@@ -823,32 +828,31 @@ public class TestOMDbCheckpointServlet {
     String realDir = null;
     for (String dir: directories) {
       if (Paths.get(testDirName, dir, FABRICATED_FILE_NAME).toFile().exists()) {
-        Assertions.assertNull(realDir,
-            "Exactly one copy of the fabricated file exists in the tarball");
+        assertNull(realDir, "Exactly one copy of the fabricated file exists in the tarball");
         realDir = dir;
       }
     }
 
-    Assertions.assertNotNull(realDir, "real directory found");
+    assertNotNull(realDir, "real directory found");
     directories.remove(realDir);
     Iterator<String> directoryIterator = directories.iterator();
     String dir0 = directoryIterator.next();
     String dir1 = directoryIterator.next();
-    Assertions.assertNotEquals("link directories are different", dir0, dir1);
+    assertNotEquals("link directories are different", dir0, dir1);
 
     for (String line : lines) {
       String[] files = line.split("\t");
-      Assertions.assertTrue(
+      assertTrue(
           files[0].startsWith(dir0) || files[0].startsWith(dir1),
           "fabricated entry contains valid first directory: " + line);
-      Assertions.assertTrue(files[1].startsWith(realDir),
+      assertTrue(files[1].startsWith(realDir),
           "fabricated entry contains correct real directory: " + line);
       Path path0 = Paths.get(files[0]);
       Path path1 = Paths.get(files[1]);
-      Assertions.assertEquals(FABRICATED_FILE_NAME,
+      assertEquals(FABRICATED_FILE_NAME,
           String.valueOf(path0.getFileName()),
           "fabricated entries contains correct file name: " + line);
-      Assertions.assertEquals(FABRICATED_FILE_NAME,
+      assertEquals(FABRICATED_FILE_NAME,
           String.valueOf(path1.getFileName()),
           "fabricated entries contains correct file name: " + line);
     }
@@ -860,13 +864,13 @@ public class TestOMDbCheckpointServlet {
                             String shortSnapshotLocation2,
                             String line) {
     String[] files = line.split("\t");
-    Assertions.assertTrue(files[0].startsWith(shortSnapshotLocation) ||
+    assertTrue(files[0].startsWith(shortSnapshotLocation) ||
         files[0].startsWith(shortSnapshotLocation2),
         "hl entry starts with valid snapshot dir: " + line);
 
     String file0 = files[0].substring(shortSnapshotLocation.length() + 1);
     String file1 = files[1];
-    Assertions.assertEquals(file0, file1, "hl filenames are the same");
+    assertEquals(file0, file1, "hl filenames are the same");
   }
 
   @Test
@@ -922,7 +926,7 @@ public class TestOMDbCheckpointServlet {
     // Confirm that servlet takes the lock when none of the other
     //  handlers have it.
     Future<Boolean> servletTest = checkLock(spyServlet, executorService);
-    Assertions.assertTrue(servletTest.get(10000, TimeUnit.MILLISECONDS));
+    assertTrue(servletTest.get(10000, TimeUnit.MILLISECONDS));
 
     executorService.shutdownNow();
 
@@ -934,7 +938,7 @@ public class TestOMDbCheckpointServlet {
       ExecutorService executorService) {
     Future<Boolean> test = checkLock(handler, executorService);
     // Handler should fail to take the lock because the servlet has taken it.
-    Assertions.assertThrows(TimeoutException.class,
+    assertThrows(TimeoutException.class,
          () -> test.get(500, TimeUnit.MILLISECONDS));
   }
 
@@ -946,7 +950,7 @@ public class TestOMDbCheckpointServlet {
         handler.getBootstrapStateLock().lock()) {
       Future<Boolean> test = checkLock(servlet, executorService);
       // Servlet should fail to lock when other handler has taken it.
-      Assertions.assertThrows(TimeoutException.class,
+      assertThrows(TimeoutException.class,
           () -> test.get(500, TimeUnit.MILLISECONDS));
     }
   }

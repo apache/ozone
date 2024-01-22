@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.security.Principal;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.MultivaluedHashMap;
+import javax.ws.rs.core.Response;
 import javax.ws.rs.core.SecurityContext;
 import javax.ws.rs.core.UriInfo;
 
@@ -30,6 +31,7 @@ import org.apache.hadoop.ozone.client.ObjectStoreStub;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,6 +40,7 @@ import org.mockito.Mock;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -94,6 +97,21 @@ public class TestSecretGenerate {
             (S3SecretResponse) endpoint.generate().getEntity();
     assertEquals(USER_SECRET, response.getAwsSecret());
     assertEquals(USER_NAME, response.getAwsAccessKey());
+  }
+
+  @Test
+  void testIfSecretAlreadyExists() throws IOException {
+    when(principal.getName()).thenReturn(USER_NAME);
+    when(securityContext.getUserPrincipal()).thenReturn(principal);
+    when(context.getSecurityContext()).thenReturn(securityContext);
+    when(proxy.getS3Secret(any())).thenThrow(new OMException("Secret already exists",
+        OMException.ResultCodes.S3_SECRET_ALREADY_EXISTS));
+
+    Response response = endpoint.generate();
+
+    assertEquals(BAD_REQUEST.getStatusCode(), response.getStatus());
+    assertEquals(OMException.ResultCodes.S3_SECRET_ALREADY_EXISTS.toString(),
+        response.getStatusInfo().getReasonPhrase());
   }
 
   @Test

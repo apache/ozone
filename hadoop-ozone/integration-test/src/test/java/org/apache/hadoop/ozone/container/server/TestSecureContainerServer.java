@@ -101,17 +101,17 @@ import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.CheckedBiConsumer;
 import org.apache.ratis.util.function.CheckedBiFunction;
-import org.junit.After;
+import org.junit.jupiter.api.AfterEach;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test Container servers when security is enabled.
@@ -125,7 +125,7 @@ public class TestSecureContainerServer {
   private static OzoneBlockTokenSecretManager blockTokenSecretManager;
   private static ContainerTokenSecretManager containerTokenSecretManager;
 
-  @BeforeClass
+  @BeforeAll
   public static void setup() throws Exception {
     DefaultMetricsSystem.setMiniClusterMode(true);
     ExitUtils.disableSystemExit();
@@ -144,12 +144,12 @@ public class TestSecureContainerServer {
         tokenLifetime, secretKeyClient);
   }
 
-  @AfterClass
+  @AfterAll
   public static void deleteTestDir() {
     FileUtils.deleteQuietly(new File(TEST_DIR));
   }
 
-  @After
+  @AfterEach
   public void cleanUp() throws IOException {
     FileUtils.deleteQuietly(new File(CONF.get(HDDS_DATANODE_DIR_KEY)));
   }
@@ -318,9 +318,9 @@ public class TestSecureContainerServer {
       ContainerCommandResponseProto response = client.sendCommand(request);
       assertNotEquals(response.getResult(), ContainerProtos.Result.SUCCESS);
       String msg = response.getMessage();
-      assertTrue(msg, msg.contains(BLOCK_TOKEN_VERIFICATION_FAILED.name()));
+      assertTrue(msg.contains(BLOCK_TOKEN_VERIFICATION_FAILED.name()), msg);
     } else {
-      final Throwable t = Assert.assertThrows(Throwable.class,
+      final Throwable t = Assertions.assertThrows(Throwable.class,
           () -> client.sendCommand(request));
       assertRootCauseMessage(BLOCK_TOKEN_VERIFICATION_FAILED.name(), t);
     }
@@ -331,7 +331,7 @@ public class TestSecureContainerServer {
     Throwable rootCause = ExceptionUtils.getRootCause(t);
     assertNotNull(rootCause);
     String msg = rootCause.getMessage();
-    assertTrue(msg, msg.contains(contained));
+    assertTrue(msg.contains(contained), msg);
   }
 
   private static String getToken(ContainerID containerID) throws IOException {

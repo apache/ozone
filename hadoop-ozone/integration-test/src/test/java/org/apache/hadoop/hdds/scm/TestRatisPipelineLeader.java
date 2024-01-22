@@ -33,12 +33,14 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverSe
 import org.apache.ozone.test.GenericTestUtils;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.GroupInfoReply;
 import org.apache.ratis.protocol.GroupInfoRequest;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -79,11 +81,11 @@ public class TestRatisPipelineLeader {
     List<Pipeline> pipelines = cluster.getStorageContainerManager()
         .getPipelineManager().getPipelines(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE));
-    Assertions.assertFalse(pipelines.isEmpty());
+    assertFalse(pipelines.isEmpty());
     Optional<Pipeline> optional = pipelines.stream()
         .filter(Pipeline::isHealthy)
         .findFirst();
-    Assertions.assertTrue(optional.isPresent());
+    assertTrue(optional.isPresent());
     Pipeline ratisPipeline = optional.get();
     // Verify correct leader info populated
     GenericTestUtils.waitFor(() -> {
@@ -91,7 +93,7 @@ public class TestRatisPipelineLeader {
         return verifyLeaderInfo(ratisPipeline);
       } catch (Exception e) {
         LOG.error("Failed verifying the leader info.", e);
-        Assertions.fail("Failed verifying the leader info.");
+        fail("Failed verifying the leader info.");
         return false;
       }
     }, 200, 20000);
@@ -107,7 +109,7 @@ public class TestRatisPipelineLeader {
       ContainerProtocolCalls.createContainer(xceiverClientRatis, 1L, null);
     }
     logCapturer.stopCapturing();
-    Assertions.assertFalse(
+    assertFalse(
         logCapturer.getOutput().contains(
             "org.apache.ratis.protocol.NotLeaderException"),
         "Client should connect to pipeline leader on first try.");
@@ -118,17 +120,17 @@ public class TestRatisPipelineLeader {
     List<Pipeline> pipelines = cluster.getStorageContainerManager()
         .getPipelineManager().getPipelines(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE));
-    Assertions.assertFalse(pipelines.isEmpty());
+    assertFalse(pipelines.isEmpty());
     Optional<Pipeline> optional = pipelines.stream()
         .filter(Pipeline::isHealthy)
         .findFirst();
-    Assertions.assertTrue(optional.isPresent());
+    assertTrue(optional.isPresent());
     Pipeline ratisPipeline = optional.get();
     Optional<HddsDatanodeService> dnToStop =
         cluster.getHddsDatanodes().stream().filter(s ->
             !s.getDatanodeStateMachine().getDatanodeDetails().getUuid().equals(
                 ratisPipeline.getLeaderId())).findAny();
-    Assertions.assertTrue(dnToStop.isPresent());
+    assertTrue(dnToStop.isPresent());
     dnToStop.get().stop();
     // wait long enough based on leader election min timeout
     Thread.sleep(4000 * conf.getTimeDuration(
@@ -139,7 +141,7 @@ public class TestRatisPipelineLeader {
         return verifyLeaderInfo(ratisPipeline);
       } catch (Exception e) {
         LOG.error("Failed verifying the leader info.", e);
-        Assertions.fail("Failed getting leader info.");
+        fail("Failed getting leader info.");
         return false;
       }
     }, 200, 20000);
@@ -150,7 +152,7 @@ public class TestRatisPipelineLeader {
         cluster.getHddsDatanodes().stream().filter(s ->
             s.getDatanodeStateMachine().getDatanodeDetails().getUuid()
                 .equals(ratisPipeline.getLeaderId())).findFirst();
-    Assertions.assertTrue(hddsDatanodeService.isPresent());
+    assertTrue(hddsDatanodeService.isPresent());
 
     XceiverServerRatis serverRatis =
         (XceiverServerRatis) hddsDatanodeService.get()

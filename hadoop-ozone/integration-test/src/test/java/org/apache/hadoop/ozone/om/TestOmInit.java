@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.util.UUID;
 
@@ -23,7 +24,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -85,7 +85,7 @@ public class TestOmInit {
     // Stop the Ozone Manager
     cluster.getOzoneManager().stop();
     // Now try to init the OM again. It should succeed
-    Assertions.assertTrue(OzoneManager.omInit(conf));
+    assertTrue(OzoneManager.omInit(conf));
   }
 
 }

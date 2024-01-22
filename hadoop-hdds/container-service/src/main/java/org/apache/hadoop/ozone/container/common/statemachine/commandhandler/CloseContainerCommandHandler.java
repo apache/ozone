@@ -102,7 +102,8 @@ public class CloseContainerCommandHandler implements CommandHandler {
         final Container container = controller.getContainer(containerId);
 
         if (container == null) {
-          LOG.error("Container #{} does not exist in datanode. "
+          LOG.info("Container #{} does not exist in datanode. "
+              + "Its pipeline may have closed before it was created. "
               + "Container close failed.", containerId);
           return;
         }

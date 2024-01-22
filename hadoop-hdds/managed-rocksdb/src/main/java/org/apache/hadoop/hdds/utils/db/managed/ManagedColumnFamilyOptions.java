@@ -79,8 +79,11 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
 
   @Override
   public void close() {
-    super.close();
-    leakTracker.close();
+    try {
+      super.close();
+    } finally {
+      leakTracker.close();
+    }
   }
 
   /**

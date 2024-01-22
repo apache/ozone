@@ -109,10 +109,12 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageContainerLocationProtocolService.newReflectiveBlockingService;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmUtils.checkIfCertSignRequestAllowed;
 import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMRatisTLSConfig;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
@@ -140,9 +142,9 @@ public class SCMClientProtocolServer implements
       ReconfigurationHandler reconfigurationHandler) throws IOException {
     this.scm = scm;
     this.config = conf;
-    final int handlerCount =
-        conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,
-            OZONE_SCM_HANDLER_COUNT_DEFAULT);
+    final int handlerCount = conf.getInt(OZONE_SCM_CLIENT_HANDLER_COUNT_KEY,
+        OZONE_SCM_HANDLER_COUNT_KEY, OZONE_SCM_HANDLER_COUNT_DEFAULT,
+            LOG::info);
     RPC.setProtocolEngine(conf, StorageContainerLocationProtocolPB.class,
         ProtobufRpcEngine.class);
 
@@ -608,6 +610,27 @@ public class SCMClientProtocolServer implements
         throw new IOException(
             "An unexpected error occurred querying the NodeStatus", e);
       }
+    }
+    return result;
+  }
+
+  @Override
+  public HddsProtos.Node queryNode(UUID uuid)
+      throws IOException {
+    HddsProtos.Node result = null;
+    try {
+      DatanodeDetails node = scm.getScmNodeManager().getNodeByUuid(uuid);
+      if (node != null) {
+        NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
+        result = HddsProtos.Node.newBuilder()
+            .setNodeID(node.getProtoBufMessage())
+            .addNodeStates(ns.getHealth())
+            .addNodeOperationalStates(ns.getOperationalState())
+            .build();
+      }
+    } catch (NodeNotFoundException e) {
+      throw new IOException(
+          "An unexpected error occurred querying the NodeStatus", e);
     }
     return result;
   }

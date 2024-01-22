@@ -44,6 +44,7 @@ import static org.apache.hadoop.ozone.client.rpc.TestBlockOutputStream.getKeyNam
 import static org.apache.hadoop.ozone.client.rpc.TestBlockOutputStream.newClient;
 import static org.apache.hadoop.ozone.client.rpc.TestBlockOutputStream.newClientConfig;
 import static org.apache.hadoop.ozone.container.TestHelper.validateData;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -118,11 +119,13 @@ class TestBlockOutputStreamWithFailures {
     // since data equals to maxBufferSize is written, this will be a blocking
     // call and hence will wait for atleast flushSize worth of data to get
     // ack'd by all servers right here
-    assertTrue(blockOutputStream.getTotalAckDataLength() >= FLUSH_SIZE);
+    assertThat(blockOutputStream.getTotalAckDataLength())
+        .isGreaterThanOrEqualTo(FLUSH_SIZE);
 
     // watchForCommit will clean up atleast one entry from the map where each
     // entry corresponds to flushSize worth of data
-    assertTrue(blockOutputStream.getCommitIndex2flushedDataMap().size() <= 1);
+    assertThat(blockOutputStream.getCommitIndex2flushedDataMap().size())
+        .isLessThanOrEqualTo(1);
 
     // This will flush the data and update the flush length and the map.
     key.flush();
@@ -136,7 +139,8 @@ class TestBlockOutputStreamWithFailures {
 
     assertEquals(dataLength, blockOutputStream.getTotalDataFlushedLength());
     // flush will make sure one more entry gets updated in the map
-    assertTrue(blockOutputStream.getCommitIndex2flushedDataMap().size() <= 2);
+    assertThat(blockOutputStream.getCommitIndex2flushedDataMap().size())
+        .isLessThanOrEqualTo(2);
 
     XceiverClientRatis raftClient =
         (XceiverClientRatis) blockOutputStream.getXceiverClient();
@@ -205,11 +209,13 @@ class TestBlockOutputStreamWithFailures {
       // since data equals to maxBufferSize is written, this will be a blocking
       // call and hence will wait for atleast flushSize worth of data to get
       // ack'd by all servers right here
-      assertTrue(blockOutputStream.getTotalAckDataLength() >= FLUSH_SIZE);
+      assertThat(blockOutputStream.getTotalAckDataLength())
+          .isGreaterThanOrEqualTo(FLUSH_SIZE);
 
       // watchForCommit will clean up atleast flushSize worth of data buffer
       // where each entry corresponds to flushSize worth of data
-      assertTrue(blockOutputStream.getCommitIndex2flushedDataMap().size() <= 2);
+      assertThat(blockOutputStream.getCommitIndex2flushedDataMap().size())
+          .isLessThanOrEqualTo(2);
 
       // This will flush the data and update the flush length and the map.
       key.flush();
@@ -284,11 +290,13 @@ class TestBlockOutputStreamWithFailures {
       // since data equals to maxBufferSize is written, this will be a blocking
       // call and hence will wait for atleast flushSize worth of data to get
       // acked by all servers right here
-      assertTrue(blockOutputStream.getTotalAckDataLength() >= FLUSH_SIZE);
+      assertThat(blockOutputStream.getTotalAckDataLength())
+          .isGreaterThanOrEqualTo(FLUSH_SIZE);
 
       // watchForCommit will clean up atleast one entry from the map where each
       // entry corresponds to flushSize worth of data
-      assertTrue(blockOutputStream.getCommitIndex2flushedDataMap().size() <= 1);
+      assertThat(blockOutputStream.getCommitIndex2flushedDataMap().size())
+          .isLessThanOrEqualTo(1);
 
       // This will flush the data and update the flush length and the map.
       key.flush();
@@ -301,7 +309,8 @@ class TestBlockOutputStreamWithFailures {
 
       assertEquals(dataLength, blockOutputStream.getTotalDataFlushedLength());
       // flush will make sure one more entry gets updated in the map
-      assertTrue(blockOutputStream.getCommitIndex2flushedDataMap().size() <= 2);
+      assertThat(blockOutputStream.getCommitIndex2flushedDataMap().size())
+          .isLessThanOrEqualTo(2);
 
       XceiverClientRatis raftClient =
           (XceiverClientRatis) blockOutputStream.getXceiverClient();
@@ -454,8 +463,6 @@ class TestBlockOutputStreamWithFailures {
 
     assertInstanceOf(ContainerNotOpenException.class,
         checkForException(blockOutputStream.getIoException()));
-    assertTrue(checkForException(blockOutputStream
-        .getIoException()) instanceof ContainerNotOpenException);
     // Make sure the retryCount is reset after the exception is handled
     assertEquals(0, keyOutputStream.getRetryCount());
     // make sure the bufferPool is empty
@@ -497,11 +504,13 @@ class TestBlockOutputStreamWithFailures {
     // since data equals to maxBufferSize is written, this will be a blocking
     // call and hence will wait for atleast flushSize worth of data to get
     // ack'd by all servers right here
-    assertTrue(blockOutputStream.getTotalAckDataLength() >= FLUSH_SIZE);
+    assertThat(blockOutputStream.getTotalAckDataLength())
+        .isGreaterThanOrEqualTo(FLUSH_SIZE);
 
     // watchForCommit will clean up atleast one entry from the map where each
     // entry corresponds to flushSize worth of data
-    assertTrue(blockOutputStream.getCommitIndex2flushedDataMap().size() <= 1);
+    assertThat(blockOutputStream.getCommitIndex2flushedDataMap().size())
+        .isLessThanOrEqualTo(1);
 
     // This will flush the data and update the flush length and the map.
     key.flush();
@@ -514,7 +523,8 @@ class TestBlockOutputStreamWithFailures {
 
     assertEquals(dataLength, blockOutputStream.getTotalDataFlushedLength());
     // flush will make sure one more entry gets updated in the map
-    assertTrue(blockOutputStream.getCommitIndex2flushedDataMap().size() <= 2);
+    assertThat(blockOutputStream.getCommitIndex2flushedDataMap().size())
+        .isLessThanOrEqualTo(2);
 
     XceiverClientRatis raftClient =
         (XceiverClientRatis) blockOutputStream.getXceiverClient();
@@ -532,8 +542,6 @@ class TestBlockOutputStreamWithFailures {
 
     assertInstanceOf(ContainerNotOpenException.class,
         checkForException(blockOutputStream.getIoException()));
-    assertTrue(checkForException(blockOutputStream
-        .getIoException()) instanceof ContainerNotOpenException);
     // Make sure the retryCount is reset after the exception is handled
     assertEquals(0, keyOutputStream.getRetryCount());
     // commitInfoMap will remain intact as there is no server failure
@@ -586,11 +594,13 @@ class TestBlockOutputStreamWithFailures {
       // since data equals to maxBufferSize is written, this will be a blocking
       // call and hence will wait for atleast flushSize worth of data to get
       // ack'd by all servers right here
-      assertTrue(blockOutputStream.getTotalAckDataLength() >= FLUSH_SIZE);
+      assertThat(blockOutputStream.getTotalAckDataLength())
+          .isGreaterThanOrEqualTo(FLUSH_SIZE);
 
       // watchForCommit will clean up atleast flushSize worth of data buffer
       // where each entry corresponds to flushSize worth of data
-      assertTrue(blockOutputStream.getCommitIndex2flushedDataMap().size() <= 2);
+      assertThat(blockOutputStream.getCommitIndex2flushedDataMap().size())
+          .isLessThanOrEqualTo(2);
 
       // This will flush the data and update the flush length and the map.
       key.flush();
@@ -675,11 +685,13 @@ class TestBlockOutputStreamWithFailures {
       // since data equals to maxBufferSize is written, this will be a blocking
       // call and hence will wait for atleast flushSize worth of data to get
       // ack'd by all servers right here
-      assertTrue(blockOutputStream.getTotalAckDataLength() >= FLUSH_SIZE);
+      assertThat(blockOutputStream.getTotalAckDataLength())
+          .isGreaterThanOrEqualTo(FLUSH_SIZE);
 
       // watchForCommit will clean up atleast flushSize worth of data buffer
       // where each entry corresponds to flushSize worth of data
-      assertTrue(blockOutputStream.getCommitIndex2flushedDataMap().size() <= 2);
+      assertThat(blockOutputStream.getCommitIndex2flushedDataMap().size())
+          .isLessThanOrEqualTo(2);
 
       // This will flush the data and update the flush length and
       // the map.
