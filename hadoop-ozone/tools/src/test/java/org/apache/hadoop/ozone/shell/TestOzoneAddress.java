@@ -27,6 +27,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 
 /**
  * Test ozone URL parsing.
@@ -131,6 +133,6 @@ public class TestOzoneAddress {
     OzoneClientException exception = Assertions
         .assertThrows(OzoneClientException.class,
             () -> address.ensureSnapshotAddress());
-    Assertions.assertTrue(exception.getMessage().contains(message));
+    assertThat(exception.getMessage()).contains(message);
   }
 }

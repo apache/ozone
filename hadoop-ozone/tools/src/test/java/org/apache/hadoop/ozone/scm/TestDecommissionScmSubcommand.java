@@ -27,7 +27,7 @@ import java.io.IOException;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import org.mockito.Mockito;
 
 import static org.junit.jupiter.api.Assertions.fail;
@@ -52,8 +52,8 @@ public class TestDecommissionScmSubcommand {
              new GenericTestUtils.SystemErrCapturer()) {
       String[] args = {"scm", "decommission"};
       admin.execute(args);
-      assertTrue(capture.getOutput().contains(
-          "Usage: ozone admin scm decommission"));
+      assertThat(capture.getOutput()).contains(
+          "Usage: ozone admin scm decommission");
     }
 
     // now give required String <nodeId>
@@ -73,8 +73,7 @@ public class TestDecommissionScmSubcommand {
     try (GenericTestUtils.SystemOutCapturer capture =
              new GenericTestUtils.SystemOutCapturer()) {
       cmd.execute(client);
-      assertTrue(capture.getOutput().contains(
-          scmId));
+      assertThat(capture.getOutput()).contains(scmId);
     }
   }
 
@@ -103,7 +102,7 @@ public class TestDecommissionScmSubcommand {
       cmd.execute(client);
       fail();
     } catch (IOException ex) {
-      assertTrue(ex.getMessage().contains("remove current leader"));
+      assertThat(ex.getMessage()).contains("remove current leader");
     }
   }
 }
