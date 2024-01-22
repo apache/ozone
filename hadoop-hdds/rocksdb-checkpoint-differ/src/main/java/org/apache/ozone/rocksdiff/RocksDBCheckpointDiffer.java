@@ -1453,8 +1453,13 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     tarballRequestCount.incrementAndGet();
   }
 
-  public void decrementTarballRequestCount() {
-    tarballRequestCount.decrementAndGet();
+  public void decrementTarballRequestCountAndNotify() {
+    // Synchronized block is used to ensure that lock is on the same instance notifyAll is being called.
+    synchronized (this) {
+      tarballRequestCount.decrementAndGet();
+      // Notify compaction threads to continue.
+      notifyAll();
+    }
   }
 
   public boolean shouldRun() {
