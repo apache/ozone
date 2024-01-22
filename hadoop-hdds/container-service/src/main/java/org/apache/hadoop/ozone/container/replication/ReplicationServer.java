@@ -180,9 +180,9 @@ public class ReplicationServer {
         PREFIX + "." + OUTOFSERVICE_FACTOR_KEY;
 
     public static final String ZEROCOPY_ENABLE_KEY = "zerocopy.enabled";
-    private static final boolean ZEROCOPY_ENABLE_DEFAULT = false;
+    private static final boolean ZEROCOPY_ENABLE_DEFAULT = true;
     private static final String ZEROCOPY_ENABLE_DEFAULT_VALUE =
-        "false";
+        "true";
 
     /**
      * The maximum number of replication commands a single datanode can execute
