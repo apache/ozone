@@ -66,13 +66,12 @@ public class TestOmSnapshotInfo {
         .setSnapshotPath(SNAPSHOT_PATH)
         .setCheckpointDir(CHECKPOINT_DIR)
         .setDbTxSequenceNumber(DB_TX_SEQUENCE_NUMBER)
-        .setDeepClean(false)
+        .setDeepClean(true)
         .setSstFiltered(false)
         .setReferencedSize(2000L)
         .setReferencedReplicatedSize(6000L)
         .setExclusiveSize(1000L)
         .setExclusiveReplicatedSize(3000L)
-        .setDeepCleanedDeletedDir(false)
         .build();
   }
 
@@ -90,13 +89,12 @@ public class TestOmSnapshotInfo {
         .setSnapshotPath(SNAPSHOT_PATH)
         .setCheckpointDir(CHECKPOINT_DIR)
         .setDbTxSequenceNumber(DB_TX_SEQUENCE_NUMBER)
-        .setDeepClean(false)
+        .setDeepClean(true)
         .setSstFiltered(false)
         .setReferencedSize(2000L)
         .setReferencedReplicatedSize(6000L)
         .setExclusiveSize(1000L)
         .setExclusiveReplicatedSize(3000L)
-        .setDeepCleanedDeletedDir(false)
         .build();
   }
 
@@ -142,9 +140,6 @@ public class TestOmSnapshotInfo {
     assertEquals(
         snapshotInfoEntryExpected.getExclusiveReplicatedSize(),
         snapshotInfoEntryActual.getExclusiveReplicatedSize());
-    assertEquals(
-        snapshotInfoEntryExpected.getDeepCleanedDeletedDir(),
-        snapshotInfoEntryActual.getDeepCleanedDeletedDir());
 
     assertEquals(snapshotInfoEntryExpected, snapshotInfoEntryActual);
   }
@@ -181,8 +176,6 @@ public class TestOmSnapshotInfo {
         snapshotInfoActual.getExclusiveSize());
     assertEquals(snapshotInfoExpected.getExclusiveReplicatedSize(),
         snapshotInfoActual.getExclusiveReplicatedSize());
-    assertEquals(snapshotInfoExpected.getDeepCleanedDeletedDir(),
-        snapshotInfoActual.getDeepCleanedDeletedDir());
 
     assertEquals(snapshotInfoExpected, snapshotInfoActual);
   }
