@@ -65,7 +65,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
 
     String ozoneKey = getOzoneKey();
     OMKeyCommitResponse omKeyCommitResponse = getOmKeyCommitResponse(
-            omKeyInfo, omResponse, openKey, ozoneKey, keysToDelete, false);
+            omKeyInfo, omResponse, openKey, ozoneKey, keysToDelete, false, false);
 
     omKeyCommitResponse.addToDBBatch(omMetadataManager, batchOperation);
 
@@ -94,7 +94,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
     String ozoneKey = getOzoneKey();
 
     OMKeyCommitResponse omKeyCommitResponse = getOmKeyCommitResponse(
-            omKeyInfo, omResponse, openKey, ozoneKey, null, false);
+            omKeyInfo, omResponse, openKey, ozoneKey, null, false, false);
 
     // As during commit Key, entry will be already there in openKeyTable.
     // Adding it here.
@@ -148,7 +148,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
   @NotNull
   protected OMKeyCommitResponse getOmKeyCommitResponse(OmKeyInfo omKeyInfo,
           OzoneManagerProtocolProtos.OMResponse omResponse, String openKey,
-          String ozoneKey, RepeatedOmKeyInfo deleteKeys, Boolean isHSync)
+          String ozoneKey, RepeatedOmKeyInfo deleteKeys, Boolean isHSync, Boolean updateOpenKeyTable)
           throws IOException {
     assertNotNull(omBucketInfo);
     Map<String, RepeatedOmKeyInfo> deleteKeyMap = new HashMap<>();
@@ -158,6 +158,6 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
           new RepeatedOmKeyInfo(e)));
     }
     return new OMKeyCommitResponse(omResponse, omKeyInfo, ozoneKey, openKey,
-        omBucketInfo, deleteKeyMap, isHSync);
+        omBucketInfo, deleteKeyMap, isHSync, updateOpenKeyTable);
   }
 }

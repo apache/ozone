@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.request.util.OmKeyHSyncUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
@@ -81,8 +82,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
 public class OMKeyCommitRequest extends OMKeyRequest {
 
   @VisibleForTesting
-  public static final Logger LOG =
-      LoggerFactory.getLogger(OMKeyCommitRequest.class);
+  public static final Logger LOG = LoggerFactory.getLogger(OMKeyCommitRequest.class);
 
   public OMKeyCommitRequest(OMRequest omRequest, BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
@@ -237,6 +237,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       final String clientIdString = String.valueOf(writerClientId);
       if (null != keyToDelete) {
+        // TODO: Replace Optional with a helper method call
         isPreviousCommitHsync = java.util.Optional.ofNullable(keyToDelete)
             .map(WithMetadata::getMetadata)
             .map(meta -> meta.get(OzoneConsts.HSYNC_CLIENT_ID))
@@ -263,10 +264,18 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       omKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
           commitKeyArgs.getMetadataList()));
 
+      // flag to indicate whether it is necessary to update the value (ozone key) in OpenKeyTable
+      boolean updateOpenKeyTable = false;
+
       if (isHSync) {
+        updateOpenKeyTable = !OmKeyHSyncUtil.isHSyncedPreviously(omKeyInfo, clientIdString, dbOpenKey);
         omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID, clientIdString);
       } else if (isRecovery) {
+        // Q for Sammi/Wei-Chiu: The following line won't do anything (before this PR) because HSYNC_CLIENT_ID was never
+        // added to OpenKeyTable right? Have I missed something?
         omKeyInfo.getMetadata().remove(OzoneConsts.HSYNC_CLIENT_ID);
+        // In HDDS-9638, I see LEASE_RECOVERY being added to OpenKeyTable in OMRecoverLeaseRequest. But
+        // not HSYNC_CLIENT_ID there.
         omKeyInfo.getMetadata().remove(OzoneConsts.LEASE_RECOVERY);
       }
       omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
@@ -337,6 +346,13 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         // So that this key can't be committed again.
         omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
             dbOpenKey, trxnLogIndex);
+
+        // Prevent hsync metadata from getting committed to the final key
+        omKeyInfo.getMetadata().remove(OzoneConsts.HSYNC_CLIENT_ID);
+      } else if (updateOpenKeyTable) {
+        // Both isHSync and updateOpenKeyTable are true, update OpenKeyTable
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
+            dbOpenKey, omKeyInfo, trxnLogIndex);
       }
 
       omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
@@ -346,7 +362,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       omClientResponse = new OMKeyCommitResponse(omResponse.build(),
           omKeyInfo, dbOzoneKey, dbOpenKey, omBucketInfo.copyObject(),
-          oldKeyVersionsToDeleteMap, isHSync);
+          oldKeyVersionsToDeleteMap, isHSync, updateOpenKeyTable);
 
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {
