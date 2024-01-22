@@ -869,10 +869,6 @@ public class TestDatanodeAdminMonitor {
     assertEquals(monitor.getContainersReplicatedOnNode(new
         DatanodeAdminMonitorImpl.TrackedNode(dn1, 0L)).get("UnClosed").size(), 0);
 
-    Set<ContainerID> containers2 = new HashSet<>();
-    containers2.add(ContainerID.valueOf(3));
-    containers2.add(ContainerID.valueOf(4));
-    nodeManager.setContainers(dn1, containers);
     DatanodeAdminMonitorTestUtil
         .mockGetContainerReplicaCount(repManager,
             true,
@@ -884,9 +880,9 @@ public class TestDatanodeAdminMonitor {
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
         nodeManager.getNodeStatus(dn1).getOperationalState());
     assertEquals(monitor.getContainersReplicatedOnNode(new
-        DatanodeAdminMonitorImpl.TrackedNode(dn1, 0L)).get("UnClosed").size(), 2);
-    assertEquals(monitor.getContainersReplicatedOnNode(new
         DatanodeAdminMonitorImpl.TrackedNode(dn1, 0L)).get("UnderReplicated").size(), 0);
+    assertEquals(monitor.getContainersReplicatedOnNode(new
+        DatanodeAdminMonitorImpl.TrackedNode(dn1, 0L)).get("UnClosed").size(), 2);
   }
 
   /**

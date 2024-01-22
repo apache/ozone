@@ -103,8 +103,6 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     public TrackedNode(DatanodeDetails datanodeDetails, long startTime) {
       this.datanodeDetails = datanodeDetails;
       this.startTime = startTime;
-      this.containersReplicatedOnNode.put("UnderReplicated", new ArrayList<>());
-      this.containersReplicatedOnNode.put("UnClosed", new ArrayList<>());
     }
 
     @Override
