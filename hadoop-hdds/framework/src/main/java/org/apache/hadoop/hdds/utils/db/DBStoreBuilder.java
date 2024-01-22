@@ -415,9 +415,10 @@ public final class DBStoreBuilder {
 
     // Create statistics.
     if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
-      ManagedStatistics statistics = new ManagedStatistics();
-      statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
-      dbOptions.setStatistics(statistics);
+      try (ManagedStatistics statistics = new ManagedStatistics()) {
+        statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
+        dbOptions.setStatistics(statistics);
+      }
     }
 
     return dbOptions;

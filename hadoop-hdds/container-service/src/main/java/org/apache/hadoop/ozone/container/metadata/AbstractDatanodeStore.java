@@ -118,9 +118,10 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
           OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT);
 
       if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
-        ManagedStatistics statistics = new ManagedStatistics();
-        statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
-        options.setStatistics(statistics);
+        try (ManagedStatistics statistics = new ManagedStatistics()) {
+          statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
+          options.setStatistics(statistics);
+        }
       }
 
       DatanodeConfiguration dc =
