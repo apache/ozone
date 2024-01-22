@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -96,12 +97,14 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   public static final class TrackedNode {
 
     private DatanodeDetails datanodeDetails;
-
     private long startTime = 0L;
+    private Map<String, List<ContainerID>> containersReplicatedOnNode = new HashMap<>();
 
     public TrackedNode(DatanodeDetails datanodeDetails, long startTime) {
       this.datanodeDetails = datanodeDetails;
       this.startTime = startTime;
+      this.containersReplicatedOnNode.put("UnderReplicated", new ArrayList<>());
+      this.containersReplicatedOnNode.put("UnClosed", new ArrayList<>());
     }
 
     @Override
@@ -121,6 +124,15 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
     public long getStartTime() {
       return startTime;
+    }
+
+    public Map<String, List<ContainerID>> getContainersReplicatedOnNode() {
+      return containersReplicatedOnNode;
+    }
+
+    public void setContainersReplicatedOnNode(List<ContainerID> underReplicated, List<ContainerID> unClosed) {
+      this.containersReplicatedOnNode.put("UnderReplicated", ImmutableList.copyOf(underReplicated));
+      this.containersReplicatedOnNode.put("UnClosed", ImmutableList.copyOf(unClosed));
     }
   }
 
@@ -398,12 +410,6 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
   private boolean checkContainersReplicatedOnNode(TrackedNode dn)
       throws NodeNotFoundException {
-    Map<String, List<ContainerID>> containerOnDn = getContainersReplicatedOnNode(dn, true);
-    return (containerOnDn.get("UnderReplicated").size() == 0) && (containerOnDn.get("UnClosed").size() == 0);
-  }
-
-  public Map<String, List<ContainerID>> getContainersReplicatedOnNode(TrackedNode dn, boolean updateMetrics)
-      throws NodeNotFoundException {
     int sufficientlyReplicated = 0;
     int deleting = 0;
     int underReplicated = 0;
@@ -466,34 +472,40 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
             dn.getDatanodeDetails());
       }
     }
+    LOG.info("{} has {} sufficientlyReplicated, {} deleting, {} " +
+            "underReplicated and {} unclosed containers",
+        dn, sufficientlyReplicated, deleting, underReplicated, unclosed);
+    containerStateByHost.put(dn.getDatanodeDetails().getHostName(),
+        new ContainerStateInWorkflow(dn.getDatanodeDetails().getHostName(),
+            sufficientlyReplicated,
+            underReplicated,
+            unclosed,
+            0L, dn.getStartTime()));
+    sufficientlyReplicatedContainers += sufficientlyReplicated;
+    underReplicatedContainers += underReplicated;
+    unClosedContainers += unclosed;
+    if (LOG.isDebugEnabled() && underReplicatedIDs.size() < 10000 &&
+        unClosedIDs.size() < 10000) {
+      LOG.debug("{} has {} underReplicated [{}] and {} unclosed [{}] " +
+              "containers", dn, underReplicated,
+          underReplicatedIDs.stream().map(
+              Object::toString).collect(Collectors.joining(", ")),
+          unclosed, unClosedIDs.stream().map(
+              Object::toString).collect(Collectors.joining(", ")));
+    }
+    dn.setContainersReplicatedOnNode(underReplicatedIDs, unClosedIDs);
+    return underReplicated == 0 && unclosed == 0;
+  }
 
-    if (updateMetrics) {
-      LOG.info("{} has {} sufficientlyReplicated, {} deleting, {} " +
-              "underReplicated and {} unclosed containers",
-          dn, sufficientlyReplicated, deleting, underReplicated, unclosed);
-      containerStateByHost.put(dn.getDatanodeDetails().getHostName(),
-          new ContainerStateInWorkflow(dn.getDatanodeDetails().getHostName(),
-              sufficientlyReplicated,
-              underReplicated,
-              unclosed,
-              0L, dn.getStartTime()));
-      sufficientlyReplicatedContainers += sufficientlyReplicated;
-      underReplicatedContainers += underReplicated;
-      unClosedContainers += unclosed;
-      if (LOG.isDebugEnabled() && underReplicatedIDs.size() < 10000 &&
-          unClosedIDs.size() < 10000) {
-        LOG.debug("{} has {} underReplicated [{}] and {} unclosed [{}] " +
-                "containers", dn, underReplicated,
-            underReplicatedIDs.stream().map(
-                Object::toString).collect(Collectors.joining(", ")),
-            unclosed, unClosedIDs.stream().map(
-                Object::toString).collect(Collectors.joining(", ")));
+  public Map<String, List<ContainerID>> getContainersReplicatedOnNode(TrackedNode dn, boolean updateMetrics) {
+    Iterator<TrackedNode> iterator = trackedNodes.iterator();
+    while (iterator.hasNext()) {
+      TrackedNode trackedNode = iterator.next();
+      if (trackedNode.equals(dn)) {
+        return trackedNode.getContainersReplicatedOnNode();
       }
     }
-    Map<String, List<ContainerID>> containerList = new HashMap<>();
-    containerList.put("UnderReplicated", underReplicatedIDs);
-    containerList.put("UnClosed", unClosedIDs);
-    return containerList;
+    return new HashMap<>();
   }
 
   private String replicaDetails(Collection<ContainerReplica> replicas) {
