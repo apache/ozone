@@ -388,7 +388,6 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   );
 
   handleExistsAtChange = (e: any) => {
-    console.log("handleExistsAtChange", e.key);
     this.setState({
       pageDisplayCount: 1
     }, () => {
@@ -445,7 +444,6 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   );
 
   handlefsoNonfsoMenuChange = (e: any) => {
-    console.log("Non FSO handle", e.key);
     this.setState({
       pageDisplayCount: 1
     }, () => {
