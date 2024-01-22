@@ -62,21 +62,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This class is the server-side translator that forwards requests received on
- * {@link OzoneManagerProtocolPB}
- * to the OzoneManagerService server implementation.
+ * This is the server-side translator that forwards requests received
+ * from {@link OzoneManagerProtocolPB} to {@link OzoneManager}.
  */
-public class OzoneManagerProtocolServerSideTranslatorPB implements
-    OzoneManagerProtocolPB {
-  private static final Logger LOG = LoggerFactory
-      .getLogger(OzoneManagerProtocolServerSideTranslatorPB.class);
-  private static final String OM_REQUESTS_PACKAGE = 
-      "org.apache.hadoop.ozone";
+public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerProtocolPB {
+  private static final Logger LOG = LoggerFactory .getLogger(OzoneManagerProtocolServerSideTranslatorPB.class);
+  private static final String OM_REQUESTS_PACKAGE = "org.apache.hadoop.ozone";
 
   private final OzoneManagerRatisServer omRatisServer;
   private final RequestHandler handler;
-  private final boolean isRatisEnabled;
   private final OzoneManager ozoneManager;
+  /**
+   * Only used to handle write requests when ratis is disabled.
+   * When ratis is enabled, write requests are handled by the state machine.
+   */
   private final OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
   private final AtomicLong transactionIndex;
   private final OzoneProtocolMessageDispatcher<OMRequest, OMResponse,
@@ -100,44 +99,31 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
       long lastTransactionIndexForNonRatis) {
     this.ozoneManager = impl;
     this.perfMetrics = impl.getPerfMetrics();
-    this.isRatisEnabled = enableRatis;
     // Update the transactionIndex with the last TransactionIndex read from DB.
     // New requests should have transactionIndex incremented from this index
     // onwards to ensure unique objectIDs.
     this.transactionIndex = new AtomicLong(lastTransactionIndexForNonRatis);
 
-    if (isRatisEnabled) {
-      // In case of ratis is enabled, handler in ServerSideTransaltorPB is used
-      // only for read requests and read requests does not require
-      // double-buffer to be initialized.
-      this.ozoneManagerDoubleBuffer = null;
-      handler = new OzoneManagerRequestHandler(impl, null);
-    } else {
-      this.ozoneManagerDoubleBuffer = new OzoneManagerDoubleBuffer.Builder()
+    // When ratis is enabled, the handler does not require a double-buffer since it only handle read requests.
+    this.ozoneManagerDoubleBuffer = enableRatis ? null
+        : OzoneManagerDoubleBuffer.newBuilder()
           .setOmMetadataManager(ozoneManager.getMetadataManager())
-          // Do nothing.
-          // For OM NON-HA code, there is no need to save transaction index.
-          // As we wait until the double buffer flushes DB to disk.
-          .setOzoneManagerRatisSnapShot((i) -> {
-          })
-          .enableRatis(isRatisEnabled)
-          .enableTracing(TracingUtil.isTracingEnabled(
-              ozoneManager.getConfiguration()))
+          .enableTracing(TracingUtil.isTracingEnabled(ozoneManager.getConfiguration()))
           .build();
-      handler = new OzoneManagerRequestHandler(impl, ozoneManagerDoubleBuffer);
-    }
+    this.handler = new OzoneManagerRequestHandler(impl, ozoneManagerDoubleBuffer);
     this.omRatisServer = ratisServer;
     dispatcher = new OzoneProtocolMessageDispatcher<>("OzoneProtocol",
         metrics, LOG, OMPBHelper::processForDebug, OMPBHelper::processForDebug);
-    // TODO: make this injectable for testing...
-    requestValidations =
-        new RequestValidations()
-            .fromPackage(OM_REQUESTS_PACKAGE)
-            .withinContext(
-                ValidationContext.of(ozoneManager.getVersionManager(),
-                    ozoneManager.getMetadataManager()))
-            .load();
 
+    // TODO: make this injectable for testing...
+    this.requestValidations = new RequestValidations()
+        .fromPackage(OM_REQUESTS_PACKAGE)
+        .withinContext(ValidationContext.of(ozoneManager.getVersionManager(), ozoneManager.getMetadataManager()))
+        .load();
+  }
+
+  private boolean isRatisEnabled() {
+    return ozoneManagerDoubleBuffer == null;
   }
 
   /**
@@ -202,7 +188,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
         }
       }
 
-      if (!isRatisEnabled) {
+      if (!isRatisEnabled()) {
         return submitRequestDirectlyToOM(request);
       }
 
@@ -325,13 +311,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
     return omClientResponse.getOMResponse();
   }
 
-  /**
-   * Create OMResponse from the specified OMRequest and exception.
-   *
-   * @param omRequest
-   * @param exception
-   * @return OMResponse
-   */
+  /** @return an {@link OMResponse} from the given {@link OMRequest} and the given exception. */
   private OMResponse createErrorResponse(
       OMRequest omRequest, IOException exception) {
     // Added all write command types here, because in future if any of the
@@ -349,7 +329,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   }
 
   public void stop() {
-    if (!isRatisEnabled) {
+    if (ozoneManagerDoubleBuffer != null) {
       ozoneManagerDoubleBuffer.stop();
     }
   }
@@ -368,12 +348,10 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements
   }
 
   @VisibleForTesting
-  public OzoneManagerDoubleBuffer getOzoneManagerDoubleBuffer() {
-    return ozoneManagerDoubleBuffer;
-  }
-
-  @VisibleForTesting
   public void setShouldFlushCache(boolean shouldFlushCache) {
+    if (ozoneManagerDoubleBuffer != null) {
+      ozoneManagerDoubleBuffer.stopDaemon();
+    }
     this.shouldFlushCache = shouldFlushCache;
   }
 }

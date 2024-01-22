@@ -189,6 +189,10 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private PipelineManager pipelineManager;
   private ReconPipelineManager reconPipelineManager;
 
+  public TestEndpoints() {
+    super();
+  }
+
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
         initializeNewOmMetadataManager(Files.createDirectory(

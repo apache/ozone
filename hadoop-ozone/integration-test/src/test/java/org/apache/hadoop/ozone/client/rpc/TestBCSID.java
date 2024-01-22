@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -53,6 +52,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.
 import static org.apache.hadoop.hdds.HddsConfigKeys
     .HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests the validity BCSID of a container.
@@ -130,7 +131,7 @@ public class TestBCSID {
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
     List<OmKeyLocationInfo> keyLocationInfos =
         keyInfo.getKeyLocationVersions().get(0).getBlocksLatestVersionOnly();
-    Assertions.assertEquals(1, keyLocationInfos.size());
+    assertEquals(1, keyLocationInfos.size());
     OmKeyLocationInfo omKeyLocationInfo = keyLocationInfos.get(0);
 
     long blockCommitSequenceId =
@@ -138,16 +139,16 @@ public class TestBCSID {
             .getContainer().getContainerSet()
             .getContainer(omKeyLocationInfo.getContainerID())
             .getContainerReport().getBlockCommitSequenceId();
-    Assertions.assertTrue(blockCommitSequenceId > 0);
+    assertThat(blockCommitSequenceId).isGreaterThan(0);
 
     // make sure the persisted block Id in OM is same as that seen in the
     // container report to be reported to SCM.
-    Assertions.assertEquals(blockCommitSequenceId,
+    assertEquals(blockCommitSequenceId,
         omKeyLocationInfo.getBlockCommitSequenceId());
 
     // verify that on restarting the datanode, it reloads the BCSID correctly.
     cluster.restartHddsDatanode(0, true);
-    Assertions.assertEquals(blockCommitSequenceId,
+    assertEquals(blockCommitSequenceId,
         cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
             .getContainer().getContainerSet()
             .getContainer(omKeyLocationInfo.getContainerID())

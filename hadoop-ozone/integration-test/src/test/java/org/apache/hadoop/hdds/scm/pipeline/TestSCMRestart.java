@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -37,6 +36,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 
 /**
  * Test SCM restart and recovery wrt pipelines.
@@ -112,17 +113,16 @@ public class TestSCMRestart {
         pipelineManager.getPipeline(ratisPipeline1.getId());
     Pipeline ratisPipeline2AfterRestart =
         pipelineManager.getPipeline(ratisPipeline2.getId());
-    Assertions.assertNotSame(ratisPipeline1AfterRestart, ratisPipeline1);
-    Assertions.assertNotSame(ratisPipeline2AfterRestart, ratisPipeline2);
-    Assertions.assertEquals(ratisPipeline1AfterRestart, ratisPipeline1);
-    Assertions.assertEquals(ratisPipeline2AfterRestart, ratisPipeline2);
+    assertNotSame(ratisPipeline1AfterRestart, ratisPipeline1);
+    assertNotSame(ratisPipeline2AfterRestart, ratisPipeline2);
+    assertEquals(ratisPipeline1AfterRestart, ratisPipeline1);
+    assertEquals(ratisPipeline2AfterRestart, ratisPipeline2);
 
     // Try creating a new container, it should be from the same pipeline
     // as was before restart
     ContainerInfo containerInfo = newContainerManager
         .allocateContainer(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), "Owner1");
-    Assertions.assertEquals(ratisPipeline1.getId(),
-        containerInfo.getPipelineID());
+    assertEquals(ratisPipeline1.getId(), containerInfo.getPipelineID());
   }
 }

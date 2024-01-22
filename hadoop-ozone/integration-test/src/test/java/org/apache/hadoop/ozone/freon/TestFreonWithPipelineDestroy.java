@@ -31,13 +31,13 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
-
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests Freon with Pipeline destroy.
@@ -114,11 +114,10 @@ public class TestFreonWithPipelineDestroy {
         "--validate-writes"
     );
 
-    Assertions.assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
-    Assertions.assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
-    Assertions.assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
-    Assertions.assertEquals(0,
-        randomKeyGenerator.getUnsuccessfulValidationCount());
+    assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
+    assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
+    assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
+    assertEquals(0, randomKeyGenerator.getUnsuccessfulValidationCount());
   }
 
   private void destroyPipeline() throws Exception {

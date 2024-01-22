@@ -60,9 +60,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERV
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.container.TestHelper.validateData;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(300)
@@ -528,10 +528,10 @@ class TestBlockOutputStream {
 
       // since its hitting the full bufferCondition, it will call watchForCommit
       // and completes atleast putBlock for first flushSize worth of data
-      assertTrue(metrics.getPendingContainerOpCountMetrics(WriteChunk)
-          <= pendingWriteChunkCount + 2);
-      assertTrue(metrics.getPendingContainerOpCountMetrics(PutBlock)
-          <= pendingPutBlockCount + 1);
+      assertThat(metrics.getPendingContainerOpCountMetrics(WriteChunk))
+          .isLessThanOrEqualTo(pendingWriteChunkCount + 2);
+      assertThat(metrics.getPendingContainerOpCountMetrics(PutBlock))
+          .isLessThanOrEqualTo(pendingPutBlockCount + 1);
       KeyOutputStream keyOutputStream =
           assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
 
@@ -551,12 +551,14 @@ class TestBlockOutputStream {
       // since data equals to maxBufferSize is written, this will be a blocking
       // call and hence will wait for atleast flushSize worth of data to get
       // ack'd by all servers right here
-      assertTrue(blockOutputStream.getTotalAckDataLength() >= FLUSH_SIZE);
+      assertThat(blockOutputStream.getTotalAckDataLength())
+          .isGreaterThanOrEqualTo(FLUSH_SIZE);
 
       // watchForCommit will clean up atleast one entry from the map where each
       // entry corresponds to flushSize worth of data
 
-      assertTrue(blockOutputStream.getCommitIndex2flushedDataMap().size() <= 1);
+      assertThat(blockOutputStream.getCommitIndex2flushedDataMap().size())
+          .isLessThanOrEqualTo(1);
 
       // This will flush the data and update the flush length and the map.
       key.flush();
@@ -570,7 +572,8 @@ class TestBlockOutputStream {
       assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
 
       assertEquals(dataLength, blockOutputStream.getTotalDataFlushedLength());
-      assertTrue(blockOutputStream.getCommitIndex2flushedDataMap().size() <= 1);
+      assertThat(blockOutputStream.getCommitIndex2flushedDataMap().size())
+          .isLessThanOrEqualTo(1);
 
       // now close the stream, it will update ack length after watchForCommit
       key.close();
@@ -618,10 +621,10 @@ class TestBlockOutputStream {
 
       // since it's hitting full-buffer, it will call watchForCommit
       // and completes putBlock at least for first flushSize worth of data
-      assertTrue(metrics.getPendingContainerOpCountMetrics(WriteChunk)
-          <= pendingWriteChunkCount + 2);
-      assertTrue(metrics.getPendingContainerOpCountMetrics(PutBlock)
-          <= pendingPutBlockCount + 1);
+      assertThat(metrics.getPendingContainerOpCountMetrics(WriteChunk))
+          .isLessThanOrEqualTo(pendingWriteChunkCount + 2);
+      assertThat(metrics.getPendingContainerOpCountMetrics(PutBlock))
+          .isLessThanOrEqualTo(pendingPutBlockCount + 1);
       assertEquals(writeChunkCount + 4,
           metrics.getContainerOpCountMetrics(WriteChunk));
       assertEquals(putBlockCount + 2,
@@ -642,11 +645,13 @@ class TestBlockOutputStream {
       // since data equals to maxBufferSize is written, this will be a blocking
       // call and hence will wait for atleast flushSize worth of data to get
       // ack'd by all servers right here
-      assertTrue(blockOutputStream.getTotalAckDataLength() >= FLUSH_SIZE);
+      assertThat(blockOutputStream.getTotalAckDataLength())
+          .isGreaterThanOrEqualTo(FLUSH_SIZE);
 
       // watchForCommit will clean up atleast one entry from the map where each
       // entry corresponds to flushSize worth of data
-      assertTrue(blockOutputStream.getCommitIndex2flushedDataMap().size() <= 1);
+      assertThat(blockOutputStream.getCommitIndex2flushedDataMap().size())
+          .isLessThanOrEqualTo(1);
 
       // Now do a flush.
       key.flush();
@@ -664,7 +669,8 @@ class TestBlockOutputStream {
       // dataLength > MAX_FLUSH_SIZE
       assertEquals(flushDelay ? MAX_FLUSH_SIZE : dataLength,
           blockOutputStream.getTotalDataFlushedLength());
-      assertTrue(blockOutputStream.getCommitIndex2flushedDataMap().size() <= 2);
+      assertThat(blockOutputStream.getCommitIndex2flushedDataMap().size())
+          .isLessThanOrEqualTo(2);
 
       // now close the stream, it will update ack length after watchForCommit
       key.close();

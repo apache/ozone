@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -50,6 +49,9 @@ import java.util.concurrent.TimeUnit;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 /**
  * Tests BlockDataStreamOutput class.
@@ -176,7 +178,7 @@ public class TestBlockDataStreamOutput {
         (KeyDataStreamOutput) key.getByteBufStreamOutput();
     ByteBufferStreamOutput stream =
         keyDataStreamOutput.getStreamEntries().get(0).getByteBufStreamOutput();
-    Assertions.assertTrue(stream instanceof BlockDataStreamOutput);
+    assertInstanceOf(BlockDataStreamOutput.class, stream);
     TestHelper.waitForContainerClose(key, cluster);
     key.write(b);
     key.close();
@@ -200,13 +202,12 @@ public class TestBlockDataStreamOutput {
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
             .getBytes(UTF_8);
     key.write(ByteBuffer.wrap(data));
-    Assertions.assertTrue(
-        metrics.getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock)
-            <= pendingPutBlockCount + 1);
+    assertThat(metrics.getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock))
+        .isLessThanOrEqualTo(pendingPutBlockCount + 1);
     key.close();
     // Since data length is 500 , first putBlock will be at 400(flush boundary)
     // and the other at 500
-    Assertions.assertEquals(
+    assertEquals(
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock),
         putBlockCount + 2);
     validateData(keyName, data);
@@ -237,10 +238,10 @@ public class TestBlockDataStreamOutput {
             .getBytes(UTF_8);
     key.write(ByteBuffer.wrap(data));
     // minPacketSize= 100, so first write of 50 wont trigger a writeChunk
-    Assertions.assertEquals(writeChunkCount,
+    assertEquals(writeChunkCount,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
     key.write(ByteBuffer.wrap(data));
-    Assertions.assertEquals(writeChunkCount + 1,
+    assertEquals(writeChunkCount + 1,
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
     // now close the stream, It will update the key length.
     key.close();
@@ -263,7 +264,7 @@ public class TestBlockDataStreamOutput {
         keyDataStreamOutput.getStreamEntries().get(0);
     key.write(ByteBuffer.wrap(data));
     key.close();
-    Assertions.assertEquals(dataLength, stream.getTotalAckDataLength());
+    assertEquals(dataLength, stream.getTotalAckDataLength());
   }
 
 }

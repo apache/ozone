@@ -31,7 +31,7 @@ if [[ ${ITERATIONS} -le 0 ]]; then
 fi
 
 export MAVEN_OPTS="-Xmx4096m $MAVEN_OPTS"
-MAVEN_OPTIONS='-B -Dskip.npx -Dskip.installnpx -Dnative.lib.tmp.dir=/tmp --no-transfer-progress'
+MAVEN_OPTIONS="-B -V -Dskip.npx -Dskip.installnpx -Dnative.lib.tmp.dir=/tmp --no-transfer-progress"
 
 if [[ "${OZONE_WITH_COVERAGE}" != "true" ]]; then
   MAVEN_OPTIONS="${MAVEN_OPTIONS} -Djacoco.skip"
@@ -41,6 +41,13 @@ if [[ "${FAIL_FAST}" == "true" ]]; then
   MAVEN_OPTIONS="${MAVEN_OPTIONS} --fail-fast -Dsurefire.skipAfterFailureCount=1"
 else
   MAVEN_OPTIONS="${MAVEN_OPTIONS} --fail-at-end"
+fi
+
+# apply module access args (for Java 9+)
+OZONE_MODULE_ACCESS_ARGS=""
+if [[ -f hadoop-ozone/dist/src/shell/ozone/ozone-functions.sh ]]; then
+  source hadoop-ozone/dist/src/shell/ozone/ozone-functions.sh
+  ozone_java_setup
 fi
 
 if [[ "${CHECK}" == "integration" ]] || [[ ${ITERATIONS} -gt 1 ]]; then
@@ -61,7 +68,7 @@ for i in $(seq 1 ${ITERATIONS}); do
     mkdir -p "${REPORT_DIR}"
   fi
 
-  mvn ${MAVEN_OPTIONS} "$@" test \
+  mvn ${MAVEN_OPTIONS} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" "$@" test \
     | tee "${REPORT_DIR}/output.log"
   irc=$?
 

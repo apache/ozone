@@ -236,6 +236,12 @@ public final class ScmConfigKeys {
 
   public static final String OZONE_SCM_HANDLER_COUNT_KEY =
       "ozone.scm.handler.count.key";
+  public static final String OZONE_SCM_CLIENT_HANDLER_COUNT_KEY =
+      "ozone.scm.client.handler.count.key";
+  public static final String OZONE_SCM_BLOCK_HANDLER_COUNT_KEY =
+      "ozone.scm.block.handler.count.key";
+  public static final String OZONE_SCM_DATANODE_HANDLER_COUNT_KEY =
+      "ozone.scm.datanode.handler.count.key";
   public static final int OZONE_SCM_HANDLER_COUNT_DEFAULT = 100;
 
   public static final String OZONE_SCM_SECURITY_HANDLER_COUNT_KEY =

@@ -26,7 +26,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -198,6 +197,7 @@ public class RDBStore implements DBStore {
     return snapshotsParentDir;
   }
 
+  @Override
   public RocksDBCheckpointDiffer getRocksDBCheckpointDiffer() {
     return rocksDBCheckpointDiffer;
   }
@@ -344,13 +344,7 @@ public class RDBStore implements DBStore {
 
   @Override
   public Map<Integer, String> getTableNames() {
-    Map<Integer, String> tableNames = new HashMap<>();
-    StringCodec stringCodec = StringCodec.get();
-
-    for (ColumnFamily columnFamily : getColumnFamilies()) {
-      tableNames.put(columnFamily.getID(), columnFamily.getName(stringCodec));
-    }
-    return tableNames;
+    return db.getColumnFamilyNames();
   }
 
   public Collection<ColumnFamily> getColumnFamilies() {

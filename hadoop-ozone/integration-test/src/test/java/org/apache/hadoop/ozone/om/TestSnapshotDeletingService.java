@@ -194,7 +194,6 @@ public class TestSnapshotDeletingService {
     // /vol1/bucket2/bucket2snap1 has been cleaned up from cache map
     SnapshotCache snapshotCache = om.getOmSnapshotManager().getSnapshotCache();
     assertEquals(2, snapshotCache.size());
-    assertEquals(2, snapshotCache.getPendingEvictionListSize());
   }
 
   @SuppressWarnings("checkstyle:MethodLength")

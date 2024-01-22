@@ -125,8 +125,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import org.mockito.Mockito;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -137,6 +135,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -202,7 +203,7 @@ public class TestKeyManagerImpl {
     conf.setLong(OZONE_KEY_PREALLOCATION_BLOCKS_MAX, 10);
 
     mockScmContainerClient =
-        Mockito.mock(StorageContainerLocationProtocol.class);
+        mock(StorageContainerLocationProtocol.class);
     
     OmTestManagers omTestManagers
         = new OmTestManagers(conf, scm.getBlockProtocolServer(),
@@ -215,12 +216,12 @@ public class TestKeyManagerImpl {
 
     mockContainerClient();
 
-    Mockito.when(mockScmBlockLocationProtocol
-        .allocateBlock(Mockito.anyLong(), Mockito.anyInt(),
+    when(mockScmBlockLocationProtocol
+        .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class),
-            Mockito.anyString(),
+            anyString(),
             any(ExcludeList.class),
-            Mockito.anyString())).thenThrow(
+            anyString())).thenThrow(
                 new SCMException("SafeModePrecheck failed for allocateBlock",
             ResultCodes.SAFE_MODE_EXCEPTION));
     createVolume(VOLUME_NAME);
@@ -581,13 +582,13 @@ public class TestKeyManagerImpl {
     assertEquals(2, matchEntries);
 
     boolean result = writeClient.removeAcl(ozPrefix1, ozAcl4);
-    assertEquals(true, result);
+    assertTrue(result);
 
     ozAclGet = writeClient.getAcl(ozPrefix1);
     assertEquals(2, ozAclGet.size());
 
     result = writeClient.removeAcl(ozPrefix1, ozAcl3);
-    assertEquals(true, result);
+    assertTrue(result);
     ozAclGet = writeClient.getAcl(ozPrefix1);
     assertEquals(1, ozAclGet.size());
 
@@ -717,7 +718,7 @@ public class TestKeyManagerImpl {
     assertEquals(ozAcl1, prefixInfos.get(6).getAcls().get(0));
     // All other nodes don't have acl value associate with it
     for (int i = 0; i < 6; i++) {
-      assertEquals(null, prefixInfos.get(i));
+      assertNull(prefixInfos.get(i));
     }
     // cleanup
     writeClient.removeAcl(ozPrefix1, ozAcl1);
@@ -1523,13 +1524,10 @@ public class TestKeyManagerImpl {
     KeyManagerImpl keyManagerImpl =
         new KeyManagerImpl(ozoneManager, scmClientMock, conf, metrics);
 
-    try {
-      keyManagerImpl.refresh(omKeyInfo);
-      fail();
-    } catch (OMException omEx) {
-      assertEquals(SCM_GET_PIPELINE_EXCEPTION, omEx.getResult());
-      assertTrue(omEx.getMessage().equals(errorMessage));
-    }
+    OMException omEx = assertThrows(OMException.class,
+        () -> keyManagerImpl.refresh(omKeyInfo));
+    assertEquals(SCM_GET_PIPELINE_EXCEPTION, omEx.getResult());
+    assertEquals(errorMessage, omEx.getMessage());
   }
 
   /**
