@@ -198,11 +198,11 @@ public class TestOMRatisSnapshots {
     }
   }
 
-  @Test
   // tried up to 1000 snapshots and this test works, but some of the
   //  timeouts have to be increased.
-  static int numSnapshotsToCreate = 100;
+  private static int numSnapshotsToCreate = 100;
 
+  @Test
   public void testInstallSnapshot(@TempDir Path tempDir) throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
