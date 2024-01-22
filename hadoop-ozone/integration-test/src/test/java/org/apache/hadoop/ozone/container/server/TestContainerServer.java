@@ -67,7 +67,6 @@ import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.util.function.CheckedBiConsumer;
 import org.apache.ratis.util.function.CheckedBiFunction;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -75,6 +74,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Test Containers.
@@ -170,7 +170,7 @@ public class TestContainerServer {
           ContainerTestHelper
               .getCreateContainerRequest(
                   ContainerTestHelper.getTestContainerID(), pipeline);
-      Assertions.assertNotNull(request.getTraceID());
+      assertNotNull(request.getTraceID());
 
       client.sendCommand(request);
     } finally {
