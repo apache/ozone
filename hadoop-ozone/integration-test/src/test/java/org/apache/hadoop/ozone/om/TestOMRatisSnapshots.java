@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
+import org.apache.hadoop.utils.FaultInjectorImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.server.protocol.TermIndex;
@@ -79,7 +80,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -402,7 +402,7 @@ public class TestOMRatisSnapshots {
     OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
 
     // Set fault injector to pause before install
-    FaultInjector faultInjector = new SnapshotPauseInjector();
+    FaultInjector faultInjector = new FaultInjectorImpl();
     followerOM.getOmSnapshotProvider().setInjector(faultInjector);
 
     // Do some transactions so that the log index increases
@@ -611,7 +611,7 @@ public class TestOMRatisSnapshots {
     OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
 
     // Set fault injector to pause before install
-    FaultInjector faultInjector = new SnapshotPauseInjector();
+    FaultInjector faultInjector = new FaultInjectorImpl();
     followerOM.getOmSnapshotProvider().setInjector(faultInjector);
 
     // Do some transactions so that the log index increases
@@ -1124,48 +1124,6 @@ public class TestOMRatisSnapshots {
     public void exitSystem(int status, String message, Throwable throwable,
         Logger log) {
       log.error("System Exit: " + message, throwable);
-    }
-  }
-
-  private static class SnapshotPauseInjector extends FaultInjector {
-    private CountDownLatch ready;
-    private CountDownLatch wait;
-
-    SnapshotPauseInjector() {
-      init();
-    }
-
-    @Override
-    public void init() {
-      this.ready = new CountDownLatch(1);
-      this.wait = new CountDownLatch(1);
-    }
-
-    @Override
-    public void pause() throws IOException {
-      ready.countDown();
-      try {
-        wait.await();
-      } catch (InterruptedException e) {
-        throw new IOException(e);
-      }
-    }
-
-    @Override
-    public void resume() throws IOException {
-      // Make sure injector pauses before resuming.
-      try {
-        ready.await();
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-        assertTrue(Fail.fail("resume interrupted"));
-      }
-      wait.countDown();
-    }
-
-    @Override
-    public void reset() throws IOException {
-      init();
     }
   }
 

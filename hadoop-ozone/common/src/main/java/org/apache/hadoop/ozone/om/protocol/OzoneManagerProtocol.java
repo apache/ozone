@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
+import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
@@ -421,6 +422,17 @@ public interface OzoneManagerProtocol
   List<ServiceInfo> getServiceList() throws IOException;
 
   ServiceInfoEx getServiceInfo() throws IOException;
+
+  /**
+   * List open files in OM.
+   * @param path One of: root "/", path to a bucket, key path, or key prefix
+   * @param maxKeys Limit the number of keys that can be returned in this batch.
+   * @param contToken Continuation token.
+   * @return ListOpenFilesResult
+   * @throws IOException
+   */
+  ListOpenFilesResult listOpenFiles(String path, int maxKeys, String contToken)
+      throws IOException;
 
   /**
    * Transfer the raft leadership.
@@ -1100,10 +1112,11 @@ public interface OzoneManagerProtocol
    * @param volumeName - The volume name.
    * @param bucketName - The bucket name.
    * @param keyName - The key user want to recover.
-   * @return OmKeyInfo KeyInfo is file under recovery
+   * @param force - force recover the file.
+   * @return OmKeyInfo KeyInfo of file under recovery
    * @throws IOException if an error occurs
    */
-  List<OmKeyInfo> recoverLease(String volumeName, String bucketName, String keyName) throws IOException;
+  OmKeyInfo recoverLease(String volumeName, String bucketName, String keyName, boolean force) throws IOException;
 
   /**
    * Update modification time and access time of a file.

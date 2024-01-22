@@ -53,6 +53,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunk
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.Checksum;
@@ -139,6 +140,7 @@ public class KeyValueHandler extends Handler {
   private final boolean validateChunkChecksumData;
   // A striped lock that is held during container creation.
   private final Striped<Lock> containerCreationLocks;
+  private static FaultInjector injector;
 
   public KeyValueHandler(ConfigurationSource config,
                          String datanodeId,
@@ -567,6 +569,10 @@ public class KeyValueHandler extends Handler {
 
   ContainerCommandResponseProto handleFinalizeBlock(
       ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
+    ContainerCommandResponseProto responseProto = checkFaultInjector(request);
+    if (responseProto != null) {
+      return responseProto;
+    }
 
     if (!request.hasFinalizeBlock()) {
       if (LOG.isDebugEnabled()) {
@@ -646,6 +652,12 @@ public class KeyValueHandler extends Handler {
    */
   ContainerCommandResponseProto handleGetCommittedBlockLength(
       ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
+
+    ContainerCommandResponseProto responseProto = checkFaultInjector(request);
+    if (responseProto != null) {
+      return responseProto;
+    }
+
     if (!request.hasGetCommittedBlockLength()) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Malformed Get Key request. trace ID: {}",
@@ -1444,8 +1456,34 @@ public class KeyValueHandler extends Handler {
     throw new StorageContainerException(msg, result);
   }
 
+  private ContainerCommandResponseProto checkFaultInjector(ContainerCommandRequestProto request) {
+    if (injector != null) {
+      Throwable ex = injector.getException();
+      if (ex != null) {
+        // reset injector
+        injector = null;
+        return ContainerUtils.logAndReturnError(LOG, (StorageContainerException) ex, request);
+      }
+      try {
+        injector.pause();
+      } catch (IOException e) {
+        // do nothing
+      }
+    }
+    return null;
+  }
+
   public static Logger getLogger() {
     return LOG;
   }
 
+  @VisibleForTesting
+  public static FaultInjector getInjector() {
+    return injector;
+  }
+
+  @VisibleForTesting
+  public static void setInjector(FaultInjector instance) {
+    injector = instance;
+  }
 }

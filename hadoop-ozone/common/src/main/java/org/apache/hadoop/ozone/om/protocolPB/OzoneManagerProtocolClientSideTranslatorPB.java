@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
+import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
@@ -134,6 +135,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKey
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysLightResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListMultipartUploadsRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListMultipartUploadsResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListOpenFilesRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListOpenFilesResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListStatusRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListStatusLightResponse;
@@ -1796,6 +1799,32 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
+  public ListOpenFilesResult listOpenFiles(String path,
+                                           int maxKeys,
+                                           String contToken)
+      throws IOException {
+    ListOpenFilesRequest req = ListOpenFilesRequest.newBuilder()
+        .setPath(path)
+        .setCount(maxKeys)
+        .setToken(contToken)
+        .build();
+
+    OMRequest omRequest = createOMRequest(Type.ListOpenFiles)
+        .setListOpenFilesRequest(req)
+        .build();
+
+    final ListOpenFilesResponse resp = handleError(submitRequest(omRequest))
+        .getListOpenFilesResponse();
+
+    return new ListOpenFilesResult(
+        resp.getTotalOpenKeyCount(),
+        resp.getHasMore(),
+        resp.hasContinuationToken() ? resp.getContinuationToken() : null,
+        resp.getClientIDList(),
+        resp.getKeyInfoList());
+  }
+
+  @Override
   public void transferLeadership(String newLeaderId)
       throws IOException {
     TransferLeadershipRequestProto.Builder builder =
@@ -2447,12 +2476,14 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public List<OmKeyInfo> recoverLease(String volumeName, String bucketName, String keyName) throws IOException {
+  public OmKeyInfo recoverLease(String volumeName, String bucketName, String keyName, boolean force)
+      throws IOException {
     RecoverLeaseRequest recoverLeaseRequest =
         RecoverLeaseRequest.newBuilder()
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setKeyName(keyName)
+            .setForce(force)
             .build();
 
     OMRequest omRequest = createOMRequest(Type.RecoverLease)
@@ -2460,10 +2491,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     RecoverLeaseResponse recoverLeaseResponse =
         handleError(submitRequest(omRequest)).getRecoverLeaseResponse();
-    ArrayList<OmKeyInfo> list = new ArrayList();
-    list.add(OmKeyInfo.getFromProtobuf(recoverLeaseResponse.getKeyInfo()));
-    list.add(OmKeyInfo.getFromProtobuf(recoverLeaseResponse.getOpenKeyInfo()));
-    return list;
+
+    return OmKeyInfo.getFromProtobuf(recoverLeaseResponse.getKeyInfo());
   }
 
   @Override
