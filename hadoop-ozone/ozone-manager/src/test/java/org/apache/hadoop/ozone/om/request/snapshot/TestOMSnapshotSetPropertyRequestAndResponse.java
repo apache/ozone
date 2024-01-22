@@ -36,7 +36,7 @@ import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotSetPropertyRespons
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotProperty;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -150,14 +150,14 @@ public class TestOMSnapshotSetPropertyRequestAndResponse {
              iterator = omMetadataManager.getSnapshotInfoTable().iterator()) {
       while (iterator.hasNext()) {
         String snapDbKey = iterator.next().getKey();
-        SnapshotSize snapshotSize = SnapshotSize.newBuilder()
+        SnapshotProperty snapshotSize = SnapshotProperty.newBuilder()
+            .setSnapshotKey(snapDbKey)
             .setExclusiveSize(exclusiveSize)
             .setExclusiveReplicatedSize(exclusiveSizeAfterRepl)
             .build();
         SetSnapshotPropertyRequest snapshotUpdateSizeRequest =
             SetSnapshotPropertyRequest.newBuilder()
-                .setSnapshotKey(snapDbKey)
-                .setSnapshotSize(snapshotSize)
+                .setSnapshotProperty(snapshotSize)
                 .build();
 
         OMRequest omRequest = OMRequest.newBuilder()
