@@ -446,7 +446,7 @@ class TestOpenKeyCleanupService {
     if (hsync) {
       writeClient.hsyncKey(keyArg, session.getId());
       if (recovery) {
-        writeClient.recoverLease(volumeName, bucketName, keyName);
+        writeClient.recoverLease(volumeName, bucketName, keyName, false);
       }
     }
   }
