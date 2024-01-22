@@ -41,7 +41,6 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -406,7 +405,7 @@ public class TestDatanodeAdminMonitor {
     replicas.add(unhealthy);
     nodeManager.setContainers(dn1, ImmutableSet.of(containerID));
 
-    Mockito.when(repManager.getContainerReplicaCount(Mockito.eq(containerID)))
+    when(repManager.getContainerReplicaCount(eq(containerID)))
         .thenReturn(new RatisContainerReplicaCount(container, replicas,
             Collections.emptyList(), 2, false));
     DatanodeAdminMonitorTestUtil.mockCheckContainerState(repManager, true);
@@ -430,7 +429,7 @@ public class TestDatanodeAdminMonitor {
         .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
         .build();
     replicas.add(copyOfUnhealthyOnNewNode);
-    Mockito.when(repManager.getContainerReplicaCount(Mockito.eq(containerID)))
+    when(repManager.getContainerReplicaCount(eq(containerID)))
         .thenReturn(new RatisContainerReplicaCount(container, replicas,
             Collections.emptyList(), 2, false));
     DatanodeAdminMonitorTestUtil.mockCheckContainerState(repManager, false);
