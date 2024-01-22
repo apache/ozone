@@ -197,7 +197,6 @@ public class TestSnapshotDeletingService {
   }
 
   @SuppressWarnings("checkstyle:MethodLength")
-  @Flaky("HDDS-9023")
   @Test
   public void testSnapshotWithFSO() throws Exception {
     Table<String, OmDirectoryInfo> dirTable =
