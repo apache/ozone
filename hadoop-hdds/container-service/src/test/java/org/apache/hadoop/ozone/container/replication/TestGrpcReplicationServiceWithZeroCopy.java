@@ -47,6 +47,7 @@ import java.util.concurrent.CompletableFuture;
 
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -155,6 +156,7 @@ class TestGrpcReplicationServiceWithZeroCopy {
 
     File[] files = downloadDir.toFile().listFiles();
 
+    assertNotNull(files);
     assertEquals(files.length, 1);
 
     assertTrue(files[0].getName().startsWith("container-" + containerId + "-"));
