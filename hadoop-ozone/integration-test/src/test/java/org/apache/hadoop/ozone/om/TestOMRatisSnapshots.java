@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -62,6 +63,8 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.event.Level;
 
@@ -326,7 +329,7 @@ public class TestOMRatisSnapshots {
   private void checkSnapshot(OzoneManager leaderOM, OzoneManager followerOM,
                              String snapshotName,
                              List<String> keys, SnapshotInfo snapshotInfo)
-      throws IOException {
+      throws IOException, RocksDBException {
     // Read back data from snapshot.
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -349,6 +352,13 @@ public class TestOMRatisSnapshots {
         Paths.get(getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo));
     // Get the list of hardlinks from the leader.  Then confirm those links
     //  are on the follower
+    RocksDB activeRocksDB = ((RDBStore)leaderOM.getMetadataManager().getStore()).getDb().getManagedRocksDb()
+        .get();
+    List<String> liveSstFiles = new ArrayList<>();
+    liveSstFiles.addAll(activeRocksDB.getLiveFiles().files.stream().map(s -> s.substring(1)).collect(
+        Collectors.toList()));
+
+
     int hardLinkCount = 0;
     try (Stream<Path>list = Files.list(leaderSnapshotDir)) {
       for (Path leaderSnapshotSST: list.collect(Collectors.toList())) {
@@ -358,7 +368,8 @@ public class TestOMRatisSnapshots {
           Path leaderActiveSST =
               Paths.get(leaderActiveDir.toString(), fileName);
           // Skip if not hard link on the leader
-          if (!leaderActiveSST.toFile().exists()) {
+          // First confirm it is live
+          if (!liveSstFiles.stream().anyMatch(s -> s.equals(fileName))) {
             continue;
           }
           // If it is a hard link on the leader, it should be a hard
