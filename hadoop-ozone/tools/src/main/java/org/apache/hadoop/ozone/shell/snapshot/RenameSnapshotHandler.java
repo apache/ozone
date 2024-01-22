@@ -38,11 +38,11 @@ public class RenameSnapshotHandler extends Handler {
 
   @CommandLine.Parameters(description = "Current snapshot name",
       index = "1", arity = "1")
-  private String fromSnapshotName;
+  private String snapshotOldName;
 
   @CommandLine.Parameters(description = "New snapshot name",
       index = "2", arity = "1")
-  private String toSnapshotName;
+  private String snapshotNewName;
 
   @Override
   protected OzoneAddress getAddress() {
@@ -53,12 +53,12 @@ public class RenameSnapshotHandler extends Handler {
   protected void execute(OzoneClient client, OzoneAddress address) throws IOException, OzoneClientException {
     String volumeName = snapshotPath.getValue().getVolumeName();
     String bucketName = snapshotPath.getValue().getBucketName();
-    OmUtils.validateSnapshotName(toSnapshotName);
+    OmUtils.validateSnapshotName(snapshotNewName);
     client.getObjectStore()
-        .renameSnapshot(volumeName, bucketName, fromSnapshotName, toSnapshotName);
+        .renameSnapshot(volumeName, bucketName, snapshotOldName, snapshotNewName);
     if (isVerbose()) {
       out().format("Renamed snapshot from'%s' to %s under '%s/%s'.%n",
-                   fromSnapshotName, toSnapshotName, volumeName, bucketName);
+          snapshotOldName, snapshotNewName, volumeName, bucketName);
     }
   }
 }

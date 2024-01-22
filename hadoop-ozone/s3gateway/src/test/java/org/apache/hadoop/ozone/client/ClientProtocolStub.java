@@ -644,7 +644,7 @@ public class ClientProtocolStub implements ClientProtocol {
 
   @Override
   public void renameSnapshot(String volumeName, String bucketName,
-      String fromSnapshotName, String toSnapshotName)
+      String snapshotOldName, String snapshotNewName)
       throws IOException {
 
   }

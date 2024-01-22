@@ -32,7 +32,6 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
@@ -187,7 +186,7 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
           new CacheKey<>(snapshotNewTableKey),
           CacheValue.get(termIndex.getIndex(), snapshotOldInfo));
 
-      updateSnapshotInChainManager(omMetadataManager, snapshotOldInfo);
+      omMetadataManager.getSnapshotChainManager().updateSnapshot(snapshotOldInfo);
 
       ozoneManager.getOmSnapshotManager().getSnapshotCache().invalidate(snapshotOldTableKey);
 
@@ -230,14 +229,4 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
                                             snapshotOldInfo.toAuditMap(), exception, userInfo));
     return omClientResponse;
   }
-
-  private void updateSnapshotInChainManager(OmMetadataManagerImpl omMetadataManager, SnapshotInfo snapshotInfo) {
-    synchronized (omMetadataManager.getSnapshotChainManager()) {
-      SnapshotChainManager snapshotChainManager =
-          omMetadataManager.getSnapshotChainManager();
-
-      snapshotChainManager.updateSnapshot(snapshotInfo);
-    }
-  }
-
 }
