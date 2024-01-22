@@ -96,7 +96,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
-import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -2000,7 +1999,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
   @Test
   void testRenameFile() throws Exception {
-    final String dir = "/dir" + new Random().nextInt(1000);
+    final String dir = "/dir" + RandomUtils.nextInt(0, 1000);
     Path dirPath = new Path(getBucketPath() + dir);
     Path file1Source = new Path(getBucketPath() + dir
         + "/file1_Copy");
@@ -2026,7 +2025,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
    */
   @Test
   void testRenameFileToDir() throws Exception {
-    final String dir = "/dir" + new Random().nextInt(1000);
+    final String dir = "/dir" + RandomUtils.nextInt(0, 1000);
     Path dirPath = new Path(getBucketPath() + dir);
     getFs().mkdirs(dirPath);
 

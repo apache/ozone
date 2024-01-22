@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.block;
 
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -70,7 +71,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
@@ -218,9 +218,8 @@ public class TestDeletedBlockLog {
   private Map<Long, List<Long>> generateData(int dataSize,
       HddsProtos.LifeCycleState state) throws IOException {
     Map<Long, List<Long>> blockMap = new HashMap<>();
-    Random random = new Random(1);
-    int continerIDBase = random.nextInt(100);
-    int localIDBase = random.nextInt(1000);
+    int continerIDBase = RandomUtils.nextInt(0, 100);
+    int localIDBase = RandomUtils.nextInt(0, 1000);
     for (int i = 0; i < dataSize; i++) {
       long containerID = continerIDBase + i;
       updateContainerMetadata(containerID, state);
@@ -692,13 +691,12 @@ public class TestDeletedBlockLog {
   @Test
   public void testRandomOperateTransactions() throws Exception {
     mockContainerHealthResult(true);
-    Random random = new Random();
     int added = 0, committed = 0;
     List<DeletedBlocksTransaction> blocks = new ArrayList<>();
     List<Long> txIDs;
     // Randomly add/get/commit/increase transactions.
     for (int i = 0; i < 100; i++) {
-      int state = random.nextInt(4);
+      int state = RandomUtils.nextInt(0, 4);
       if (state == 0) {
         addTransactions(generateData(10), true);
         added += 10;
@@ -803,8 +801,7 @@ public class TestDeletedBlockLog {
     // add two transactions for same container
     containerID = blocks.get(0).getContainerID();
     Map<Long, List<Long>> deletedBlocksMap = new HashMap<>();
-    Random random = new Random();
-    long localId = random.nextLong();
+    long localId = RandomUtils.nextLong();
     deletedBlocksMap.put(containerID, new LinkedList<>(
         Collections.singletonList(localId)));
     addTransactions(deletedBlocksMap, true);
