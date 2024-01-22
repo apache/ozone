@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.scm;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
@@ -62,7 +61,7 @@ import org.slf4j.LoggerFactory;
  * without reestablishing connection. But the connection will be closed if
  * not being used for a period of time.
  */
-public class XceiverClientManager implements Closeable, XceiverClientFactory {
+public class XceiverClientManager implements XceiverClientFactory {
   private static final Logger LOG =
       LoggerFactory.getLogger(XceiverClientManager.class);
   //TODO : change this to SCM configuration class

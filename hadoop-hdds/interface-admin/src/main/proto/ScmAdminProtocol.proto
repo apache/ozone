@@ -78,10 +78,11 @@ message ScmContainerLocationRequest {
   optional GetContainerReplicasRequestProto getContainerReplicasRequest = 39;
   optional ReplicationManagerReportRequestProto replicationManagerReportRequest = 40;
   optional ResetDeletedBlockRetryCountRequestProto resetDeletedBlockRetryCountRequest = 41;
-  optional TransferLeadershipRequestProto  transferScmLeadershipRequest = 42;
+  optional TransferLeadershipRequestProto transferScmLeadershipRequest = 42;
   optional GetFailedDeletedBlocksTxnRequestProto getFailedDeletedBlocksTxnRequest = 43;
   optional DecommissionScmRequestProto decommissionScmRequest = 44;
-  optional GetContainersOnDecomNodeRequestProto getContainersOnDecomNodeRequest = 45;
+  optional SingleNodeQueryRequestProto singleNodeQueryRequest = 45;
+  optional GetContainersOnDecomNodeRequestProto getContainersOnDecomNodeRequest = 46;
 }
 
 message ScmContainerLocationResponse {
@@ -131,10 +132,11 @@ message ScmContainerLocationResponse {
   optional GetContainerReplicasResponseProto getContainerReplicasResponse = 39;
   optional ReplicationManagerReportResponseProto getReplicationManagerReportResponse = 40;
   optional ResetDeletedBlockRetryCountResponseProto resetDeletedBlockRetryCountResponse = 41;
-  optional TransferLeadershipResponseProto  transferScmLeadershipResponse = 42;
+  optional TransferLeadershipResponseProto transferScmLeadershipResponse = 42;
   optional GetFailedDeletedBlocksTxnResponseProto getFailedDeletedBlocksTxnResponse = 43;
   optional DecommissionScmResponseProto decommissionScmResponse = 44;
-  optional GetContainersOnDecomNodeResponseProto getContainersOnDecomNodeResponse = 45;
+  optional SingleNodeQueryResponseProto singleNodeQueryResponse = 45;
+  optional GetContainersOnDecomNodeResponseProto getContainersOnDecomNodeResponse = 46;
 
   enum Status {
     OK = 1;
@@ -186,7 +188,8 @@ enum Type {
   TransferLeadership = 38;
   GetFailedDeletedBlocksTransaction = 39;
   DecommissionScm = 40;
-  GetContainersOnDecomNode = 41;
+  SingleNodeQuery = 41;
+  GetContainersOnDecomNode = 42;
 }
 
 /**
@@ -327,6 +330,14 @@ message NodeQueryRequestProto {
 
 message NodeQueryResponseProto {
   repeated Node datanodes = 1;
+}
+
+message SingleNodeQueryRequestProto {
+  required UUID uuid = 1;
+}
+
+message SingleNodeQueryResponseProto {
+  optional Node datanode = 1;
 }
 
 /*

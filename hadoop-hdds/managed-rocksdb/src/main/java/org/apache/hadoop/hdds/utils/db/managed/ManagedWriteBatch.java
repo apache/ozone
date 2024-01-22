@@ -38,7 +38,10 @@ public class ManagedWriteBatch extends WriteBatch {
 
   @Override
   public void close() {
-    super.close();
-    leakTracker.close();
+    try {
+      super.close();
+    } finally {
+      leakTracker.close();
+    }
   }
 }

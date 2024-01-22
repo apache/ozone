@@ -27,8 +27,6 @@ import java.nio.file.Paths;
 import java.util.UUID;
 import java.util.stream.Stream;
 
-import com.google.common.base.Strings;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -39,7 +37,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -56,6 +53,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Test client-side CRUD snapshot operations with Ozone Manager.
@@ -120,13 +119,13 @@ class TestOzoneFsSnapshot {
     // Create volume and bucket
     int res = ToolRunner.run(shell,
         new String[]{"-mkdir", "-p", BUCKET_PATH});
-    Assertions.assertEquals(0, res);
+    assertEquals(0, res);
     // Create key
     res = ToolRunner.run(shell, new String[]{"-touch", KEY_PATH});
-    Assertions.assertEquals(0, res);
+    assertEquals(0, res);
     // List the bucket to make sure that bucket exists.
     res = ToolRunner.run(shell, new String[]{"-ls", BUCKET_PATH});
-    Assertions.assertEquals(0, res);
+    assertEquals(0, res);
 
   }
 
@@ -137,12 +136,12 @@ class TestOzoneFsSnapshot {
     int res = ToolRunner.run(shell,
         new String[]{"-createSnapshot", BUCKET_PATH, snapshotName});
     // Asserts that create request succeeded
-    Assertions.assertEquals(0, res);
+    assertEquals(0, res);
 
     res = ToolRunner.run(shell,
         new String[]{"-createSnapshot", BUCKET_PATH, snapshotName});
     // Asserts that create request fails since snapshot name provided twice
-    Assertions.assertEquals(1, res);
+    assertEquals(1, res);
   }
 
   @Test
@@ -162,19 +161,19 @@ class TestOzoneFsSnapshot {
 
     int res = ToolRunner.run(shell, new String[] {
         "-mkdir", "-p", dirPath});
-    Assertions.assertEquals(0, res);
+    assertEquals(0, res);
 
     try (GenericTestUtils.SystemOutCapturer capture =
              new GenericTestUtils.SystemOutCapturer()) {
       res = ToolRunner.run(shell, new String[] {
           "-createSnapshot", dirPath, snapshotName});
       // Asserts that create request succeeded
-      Assertions.assertEquals(0, res);
+      assertEquals(0, res);
 
       String expectedSnapshotPath = Paths.get(
           BUCKET_PATH, OM_SNAPSHOT_INDICATOR, snapshotName).toString();
       String out = capture.getOutput().trim();
-      Assertions.assertTrue(out.endsWith(expectedSnapshotPath));
+      assertThat(out).endsWith(expectedSnapshotPath);
     }
   }
 
@@ -192,7 +191,7 @@ class TestOzoneFsSnapshot {
     int res = ToolRunner.run(shell,
         new String[]{"-createSnapshot", BUCKET_PATH, snapshotName});
     // Asserts that create request succeeded
-    Assertions.assertEquals(0, res);
+    assertEquals(0, res);
 
     SnapshotInfo snapshotInfo = ozoneManager
         .getMetadataManager()
@@ -202,7 +201,7 @@ class TestOzoneFsSnapshot {
     // Assert that snapshot exists in RocksDB.
     // We can't use list or valid if snapshot directory exists because DB
     // transaction might not be flushed by the time.
-    Assertions.assertNotNull(snapshotInfo);
+    assertNotNull(snapshotInfo);
   }
 
   private static Stream<Arguments> createSnapshotFailureScenarios() {
@@ -252,8 +251,7 @@ class TestOzoneFsSnapshot {
     String errorMessage = execShellCommandAndGetOutput(expectedResponse,
         new String[]{"-createSnapshot", paramBucketPath, snapshotName});
 
-    Assertions.assertTrue(errorMessage
-        .contains(expectedMessage));
+    assertThat(errorMessage).contains(expectedMessage);
   }
 
   /**
@@ -291,7 +289,7 @@ class TestOzoneFsSnapshot {
       int res = ToolRunner.run(shell,
           new String[]{"-deleteSnapshot", BUCKET_PATH, snapshotName1});
       // Asserts that delete request succeeded
-      Assertions.assertEquals(0, res);
+      assertEquals(0, res);
 
       // Wait for the snapshot to be marked deleted.
       GenericTestUtils.waitFor(() -> {
@@ -339,24 +337,22 @@ class TestOzoneFsSnapshot {
     String deleteKeyOut = execShellCommandAndGetOutput(0,
         new String[]{"-rm", "-r", "-skipTrash", KEY_PATH});
 
-    Assertions.assertTrue(deleteKeyOut
-        .contains("Deleted " + BUCKET_PATH));
+    assertThat(deleteKeyOut).contains("Deleted " + BUCKET_PATH);
 
     // Delete bucket should fail due to existing snapshot
     String deleteBucketOut = execShellCommandAndGetOutput(1,
         new String[]{"-rm", "-r", "-skipTrash", BUCKET_PATH});
-    Assertions.assertTrue(deleteBucketOut
-          .contains(BUCKET + " can't be deleted when it has snapshots"));
+    assertThat(deleteBucketOut).contains(BUCKET + " can't be deleted when it has snapshots");
 
     // Key shouldn't exist under bucket
     String listKeyOut = execShellCommandAndGetOutput(0,
         new String[]{"-ls", BUCKET_PATH});
-    Assertions.assertTrue(Strings.isNullOrEmpty(listKeyOut));
+    assertThat(listKeyOut).isNullOrEmpty();
 
     // Key should still exist under snapshot
     String listSnapKeyOut = execShellCommandAndGetOutput(0,
         new String[]{"-ls", snapshotPath});
-    Assertions.assertTrue(listSnapKeyOut.contains(snapshotKeyPath));
+    assertThat(listSnapKeyOut).contains(snapshotKeyPath);
   }
 
   @Test
@@ -366,7 +362,7 @@ class TestOzoneFsSnapshot {
     int res = ToolRunner.run(shell,
         new String[]{"-deleteSnapshot", BUCKET_PATH, snapshotName});
     // Asserts that delete request succeeded
-    Assertions.assertEquals(0, res);
+    assertEquals(0, res);
 
     // Wait for the snapshot to be marked deleted.
     GenericTestUtils.waitFor(() -> {
@@ -417,8 +413,7 @@ class TestOzoneFsSnapshot {
     String errorMessage = execShellCommandAndGetOutput(expectedResponse,
             new String[]{"-deleteSnapshot", paramBucketPath, snapshotName});
 
-    Assertions.assertTrue(errorMessage
-            .contains(expectedMessage), errorMessage);
+    assertThat(errorMessage).contains(expectedMessage);
   }
 
   /**
@@ -438,7 +433,7 @@ class TestOzoneFsSnapshot {
 
     // Execute command
     int res = ToolRunner.run(shell, args);
-    Assertions.assertEquals(response, res);
+    assertEquals(response, res);
 
     // Store command output to a string,
     // if command should succeed then
@@ -467,7 +462,7 @@ class TestOzoneFsSnapshot {
     int res = ToolRunner.run(shell,
         new String[]{"-createSnapshot", BUCKET_PATH, snapshotName});
     // Asserts that create request succeeded
-    Assertions.assertEquals(0, res);
+    assertEquals(0, res);
 
     OzoneConfiguration conf = ozoneManager.getConfiguration();
 

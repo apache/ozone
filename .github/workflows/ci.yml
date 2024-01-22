@@ -435,7 +435,6 @@ jobs:
           - hdds
           - om
           - ozone
-          - scm
           - shell
           - flaky
       fail-fast: false

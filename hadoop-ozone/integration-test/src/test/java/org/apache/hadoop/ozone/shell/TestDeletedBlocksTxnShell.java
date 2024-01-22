@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.shell;
 
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -52,7 +53,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -129,9 +129,8 @@ public class TestDeletedBlocksTxnShell {
   //<containerID,  List<blockID>>
   private Map<Long, List<Long>> generateData(int dataSize) throws Exception {
     Map<Long, List<Long>> blockMap = new HashMap<>();
-    Random random = new Random(1);
-    int continerIDBase = random.nextInt(100);
-    int localIDBase = random.nextInt(1000);
+    int continerIDBase = RandomUtils.nextInt(0, 100);
+    int localIDBase = RandomUtils.nextInt(0, 1000);
     for (int i = 0; i < dataSize; i++) {
       long containerID = continerIDBase + i;
       updateContainerMetadata(containerID);

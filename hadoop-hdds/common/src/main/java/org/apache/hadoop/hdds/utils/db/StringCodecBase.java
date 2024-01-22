@@ -177,8 +177,7 @@ abstract class StringCodecBase implements Codec<String> {
   }
 
   @Override
-  public String fromCodecBuffer(@Nonnull CodecBuffer buffer)
-      throws IOException {
+  public String fromCodecBuffer(@Nonnull CodecBuffer buffer) {
     return decode(buffer.asReadOnlyByteBuffer());
   }
 
