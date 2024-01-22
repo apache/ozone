@@ -316,6 +316,7 @@ public final class HAUtils {
     DBStoreBuilder dbStoreBuilder =
         DBStoreBuilder.newBuilder(configuration, rocksDBConfiguration)
             .setName(dbName)
+            .disableDefaultCFAutoCompaction(true)
             .setPath(Paths.get(metaDir.getPath()));
     // Add column family names and codecs.
     for (DBColumnFamilyDefinition columnFamily : definition
