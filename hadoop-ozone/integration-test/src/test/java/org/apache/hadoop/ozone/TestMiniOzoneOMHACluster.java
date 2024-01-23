@@ -29,12 +29,13 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.Assertions;
 
 /**
  * This class tests MiniOzoneHAClusterImpl.
@@ -52,7 +53,7 @@ public class TestMiniOzoneOMHACluster {
   /**
    * Create a MiniOzoneHAClusterImpl for testing.
    *
-   * @throws IOException
+   * @throws Exception
    */
   @BeforeEach
   public void init() throws Exception {
@@ -91,9 +92,8 @@ public class TestMiniOzoneOMHACluster {
       ozoneManager.set(om);
       return om != null;
     }, 100, 120000);
-    Assertions.assertNotNull(ozoneManager, "Timed out waiting OM leader election to finish: "
+    assertNotNull(ozoneManager, "Timed out waiting OM leader election to finish: "
             + "no leader or more than one leader.");
-    Assertions.assertTrue(ozoneManager.get().isLeaderReady(),
-            "Should have gotten the leader!");
+    assertTrue(ozoneManager.get().isLeaderReady(), "Should have gotten the leader!");
   }
 }

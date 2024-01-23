@@ -172,7 +172,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <jaeger.version>1.6.0</jaeger.version>
     <opentracing.version>0.33.0</opentracing.version>
 
-    <hk2.version>2.5.0</hk2.version>
+    <hk2.version>2.6.1</hk2.version>
 
     <!-- httpcomponents versions -->
     <httpclient.version>4.5.13</httpclient.version>
@@ -220,7 +220,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <mockito.version>4.11.0</mockito.version>
     <hamcrest.version>2.2</hamcrest.version>
     <jmockit.version>1.24</jmockit.version>
-    <junit4.version>4.13.1</junit4.version>
     <junit5.version>5.10.1</junit5.version>
     <zookeeper.version>3.7.2</zookeeper.version>
 
@@ -248,7 +247,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     -->
     <enforced.java.version>[${javac.version},)</enforced.java.version>
     <enforced.maven.version>[3.3.0,)</enforced.maven.version>
-    <allow.junit4>true</allow.junit4>
 
     <!-- Plugin versions and config -->
     <maven-surefire-plugin.argLine>-Xmx4096m -XX:+HeapDumpOnOutOfMemoryError</maven-surefire-plugin.argLine>
@@ -275,6 +273,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <maven-deploy-plugin.version>2.8.1</maven-deploy-plugin.version>
     <build-helper-maven-plugin.version>1.9</build-helper-maven-plugin.version>
     <maven-dependency-plugin.version>3.6.1</maven-dependency-plugin.version>
+    <plexus-archiver.version>4.2.2</plexus-archiver.version>
     <docker-maven-plugin.version>0.29.0</docker-maven-plugin.version>
     <exec-maven-plugin.version>1.3.1</exec-maven-plugin.version>
     <license-maven-plugin.version>2.3.0</license-maven-plugin.version>
@@ -1157,17 +1156,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <version>${aws-java-sdk.version}</version>
       </dependency>
       <dependency>
-        <groupId>junit</groupId>
-        <artifactId>junit</artifactId>
-        <version>${junit4.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>org.hamcrest</groupId>
-            <artifactId>hamcrest-core</artifactId>
-          </exclusion>
-        </exclusions>
-      </dependency>
-      <dependency>
         <groupId>org.hamcrest</groupId>
         <artifactId>hamcrest</artifactId>
         <version>${hamcrest.version}</version>
@@ -1744,6 +1732,13 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-dependency-plugin</artifactId>
           <version>${maven-dependency-plugin.version}</version>
+          <dependencies>
+            <dependency>
+              <groupId>org.codehaus.plexus</groupId>
+              <artifactId>plexus-archiver</artifactId>
+              <version>${plexus-archiver.version}</version>
+            </dependency>
+          </dependencies>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -1806,6 +1801,17 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                     </allowedImports>
                     <exclusion>org.apache.hadoop.hdds.utils.db.managed.*</exclusion>
                   </RestrictImports>
+                </rules>
+              </configuration>
+            </execution>
+            <execution>
+              <id>ban-imports</id>
+              <phase>process-sources</phase>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <configuration>
+                <rules>
                   <restrictImports>
                     <includeTestCode>true</includeTestCode>
                     <reason>Use directly from Guava</reason>
@@ -1818,22 +1824,35 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                     <includeTestCode>true</includeTestCode>
                     <reason>Disable with @Unhealthy or @Slow instead (see HDDS-9276)</reason>
                     <bannedImports>
-                      <bannedImport>org.junit.Ignore</bannedImport>
                       <bannedImport>org.junit.jupiter.api.Disabled</bannedImport>
                     </bannedImports>
                   </restrictImports>
-                </rules>
-              </configuration>
-            </execution>
-            <execution>
-              <id>ban-junit4-imports</id>
-              <phase>process-sources</phase>
-              <goals>
-                <goal>enforce</goal>
-              </goals>
-              <configuration>
-                <skip>${allow.junit4}</skip>
-                <rules>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Use Ozone's version of the same class</reason>
+                    <bannedImports>
+                      <bannedImport>org.apache.hadoop.test.GenericTestUtils</bannedImport>
+                      <bannedImport>org.apache.hadoop.test.LambdaTestUtils</bannedImport>
+                    </bannedImports>
+                    <exclusions>
+                      <exclusion>org.apache.hadoop.fs.contract.*</exclusion>
+                      <exclusion>org.apache.hadoop.tools.contract.*</exclusion>
+                    </exclusions>
+                  </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Use Ozone's version of the same class</reason>
+                    <bannedImports>
+                      <bannedImport>org.apache.hadoop.test.MetricsAssert</bannedImport>
+                    </bannedImports>
+                  </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Use Ozone's similar class</reason>
+                    <bannedImports>
+                      <bannedImport>org.apache.hadoop.hdfs.MiniDFSCluster</bannedImport>
+                    </bannedImports>
+                  </restrictImports>
                   <restrictImports>
                     <includeTestCode>true</includeTestCode>
                     <parseFullCompilationUnit>true</parseFullCompilationUnit>
@@ -1843,6 +1862,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                     </bannedImports>
                     <allowedImports>
                       <allowedImport>org.junit.jupiter.**</allowedImport>
+                      <allowedImport>org.junit.platform.**</allowedImport>
                     </allowedImports>
                   </restrictImports>
                 </rules>
@@ -2257,23 +2277,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
       </build>
     </profile>
     <profile>
-      <id>scm</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-surefire-plugin</artifactId>
-            <configuration>
-              <includes>
-                <include>org.apache.hadoop.ozone.scm.**</include>
-              </includes>
-              <excludedGroups>${unstable-test-groups}</excludedGroups>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
       <id>contract</id>
       <build>
         <plugins>
@@ -2343,7 +2346,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                 <exclude>org.apache.hadoop.ozone.debug.**</exclude>
                 <exclude>org.apache.hadoop.ozone.freon.**</exclude>
                 <exclude>org.apache.hadoop.ozone.om.**</exclude>
-                <exclude>org.apache.hadoop.ozone.scm.**</exclude>
                 <exclude>org.apache.hadoop.ozone.shell.**</exclude>
               </excludes>
               <excludedGroups>${unstable-test-groups}</excludedGroups>

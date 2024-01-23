@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * ContainerLocationProtocol is used by an HDFS node to find the set of nodes
@@ -231,6 +232,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
   List<HddsProtos.Node> queryNode(HddsProtos.NodeOperationalState opState,
       HddsProtos.NodeState state, HddsProtos.QueryScope queryScope,
       String poolName, int clientVersion) throws IOException;
+
+  HddsProtos.Node queryNode(UUID uuid) throws IOException;
 
   List<DatanodeAdminError> decommissionNodes(List<String> nodes)
       throws IOException;

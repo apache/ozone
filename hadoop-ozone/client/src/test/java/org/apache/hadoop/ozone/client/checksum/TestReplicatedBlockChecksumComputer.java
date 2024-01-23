@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.client.checksum;
 
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.util.DataChecksum;
@@ -27,7 +28,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.List;
-import java.util.Random;
 
 import static org.apache.hadoop.hdds.scm.OzoneClientConfig.ChecksumCombineMode.COMPOSITE_CRC;
 import static org.apache.hadoop.hdds.scm.OzoneClientConfig.ChecksumCombineMode.MD5MD5CRC;
@@ -40,9 +40,8 @@ public class TestReplicatedBlockChecksumComputer {
   @Test
   public void testComputeMd5Crc() throws IOException {
     final int lenOfBytes = 32;
-    byte[] randomChunkChecksum = new byte[lenOfBytes];
-    Random r = new Random();
-    r.nextBytes(randomChunkChecksum);
+    byte[] randomChunkChecksum = RandomUtils.nextBytes(lenOfBytes);
+
     MD5Hash emptyBlockMD5 = MD5Hash.digest(randomChunkChecksum);
     byte[] emptyBlockMD5Hash = emptyBlockMD5.getDigest();
     AbstractBlockChecksumComputer computer =
@@ -56,9 +55,7 @@ public class TestReplicatedBlockChecksumComputer {
   @Test
   public void testComputeCompositeCrc() throws IOException {
     final int lenOfBytes = 32;
-    byte[] randomChunkChecksum = new byte[lenOfBytes];
-    Random r = new Random();
-    r.nextBytes(randomChunkChecksum);
+    byte[] randomChunkChecksum = RandomUtils.nextBytes(lenOfBytes);
 
     CrcComposer crcComposer =
         CrcComposer.newCrcComposer(DataChecksum.Type.CRC32C, 4);

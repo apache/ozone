@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -43,6 +42,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test the behaviour of the datanode and scm when communicating
@@ -101,7 +101,7 @@ public class TestRefreshVolumeUsageHandler {
       //a new key is created, but the datanode default REFRESH_PERIOD is 1 hour,
       //still the cache is updated, so the scm will eventually get the new
       //used space from the datanode through node report.
-      Assertions.assertTrue(cluster.getStorageContainerManager()
+      assertTrue(cluster.getStorageContainerManager()
           .getScmNodeManager().getUsageInfo(datanodeDetails)
           .getScmNodeStat().getScmUsed().isEqual(currentScmUsed));
 
@@ -116,7 +116,7 @@ public class TestRefreshVolumeUsageHandler {
 
       //after waiting for several node report , this usage info
       //in SCM should be updated as we have updated the DN's cached usage info.
-      Assertions.assertTrue(cluster.getStorageContainerManager()
+      assertTrue(cluster.getStorageContainerManager()
           .getScmNodeManager().getUsageInfo(datanodeDetails)
           .getScmNodeStat().getScmUsed().isGreater(currentScmUsed));
 

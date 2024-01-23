@@ -804,9 +804,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     ScmConfig scmConfig = conf.getObject(ScmConfig.class);
     pipelineChoosePolicy = PipelineChoosePolicyFactory
-        .getPolicy(scmConfig, false);
+        .getPolicy(scmNodeManager, scmConfig, false);
     ecPipelineChoosePolicy = PipelineChoosePolicyFactory
-        .getPolicy(scmConfig, true);
+        .getPolicy(scmNodeManager, scmConfig, true);
     if (configurator.getWritableContainerFactory() != null) {
       writableContainerFactory = configurator.getWritableContainerFactory();
     } else {

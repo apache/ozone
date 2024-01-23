@@ -671,7 +671,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
         ancestorGen);
 
     if (availableNodes <= 0) {
-      LOG.warn("No available node in (scope=\"{}\" excludedScope=\"{}\" " +
+      LOG.info("No available node in (scope=\"{}\" excludedScope=\"{}\" " +
               "excludedNodes=\"{}\"  ancestorGen=\"{}\").",
           scopeNode.getNetworkFullPath(), excludedScopes, excludedNodes,
           ancestorGen);

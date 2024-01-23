@@ -32,6 +32,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
 
+import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
 import static javax.ws.rs.core.Response.Status.NOT_FOUND;
 
 /**
@@ -55,15 +56,26 @@ public class S3SecretManagementEndpoint extends S3SecretEndpointBase {
     return generateInternal(username);
   }
 
-  private Response generateInternal(@Nullable String username)
-      throws IOException {
-    S3SecretResponse s3SecretResponse = new S3SecretResponse();
-    S3SecretValue s3SecretValue = generateS3Secret(username);
-    s3SecretResponse.setAwsSecret(s3SecretValue.getAwsSecret());
-    s3SecretResponse.setAwsAccessKey(s3SecretValue.getAwsAccessKey());
-    AUDIT.logReadSuccess(buildAuditMessageForSuccess(
-        S3GAction.GENERATE_SECRET, getAuditParameters()));
-    return Response.ok(s3SecretResponse).build();
+  private Response generateInternal(@Nullable String username) throws IOException {
+    try {
+      S3SecretValue s3SecretValue = generateS3Secret(username);
+
+      S3SecretResponse s3SecretResponse = new S3SecretResponse();
+      s3SecretResponse.setAwsSecret(s3SecretValue.getAwsSecret());
+      s3SecretResponse.setAwsAccessKey(s3SecretValue.getAwsAccessKey());
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
+          S3GAction.GENERATE_SECRET, getAuditParameters()));
+      return Response.ok(s3SecretResponse).build();
+    } catch (OMException e) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(
+          S3GAction.GENERATE_SECRET, getAuditParameters(), e));
+      if (e.getResult() == OMException.ResultCodes.S3_SECRET_ALREADY_EXISTS) {
+        return Response.status(BAD_REQUEST.getStatusCode(), e.getResult().toString()).build();
+      } else {
+        LOG.error("Can't execute get secret request: ", e);
+        return Response.serverError().build();
+      }
+    }
   }
 
   private S3SecretValue generateS3Secret(@Nullable String username)

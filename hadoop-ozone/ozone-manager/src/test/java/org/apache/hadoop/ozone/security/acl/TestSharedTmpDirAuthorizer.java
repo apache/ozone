@@ -22,9 +22,11 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 
 import java.util.stream.Stream;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 /**
  * Tests for {@link SharedTmpDirAuthorizer}.
@@ -37,8 +39,8 @@ public class TestSharedTmpDirAuthorizer {
 
   @BeforeAll
   public static void setUp() {
-    nativeAuthorizer = Mockito.mock(OzoneNativeAuthorizer.class);
-    authorizer = Mockito.mock(TestOzoneAuthorizerFactory
+    nativeAuthorizer = mock(OzoneNativeAuthorizer.class);
+    authorizer = mock(TestOzoneAuthorizerFactory
                                   .MockThirdPartyAuthorizer.class);
 
     sharedTmpDirAuthorizer =
@@ -65,13 +67,13 @@ public class TestSharedTmpDirAuthorizer {
                                .setKeyName("key1")
                                .build();
 
-    RequestContext context = Mockito.mock(RequestContext.class);
+    RequestContext context = mock(RequestContext.class);
     sharedTmpDirAuthorizer.checkAccess(objInfo, context);
 
     if (isNative) {
-      Mockito.verify(nativeAuthorizer).checkAccess(objInfo, context);
+      verify(nativeAuthorizer).checkAccess(objInfo, context);
     } else {
-      Mockito.verify(authorizer).checkAccess(objInfo, context);
+      verify(authorizer).checkAccess(objInfo, context);
     }
   }
 }

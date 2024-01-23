@@ -123,7 +123,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   private long referencedReplicatedSize;
   private long exclusiveSize;
   private long exclusiveReplicatedSize;
-  private boolean deepCleanedDeletedDir;
 
   /**
    * Private constructor, constructed via builder.
@@ -163,8 +162,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
                        long referencedSize,
                        long referencedReplicatedSize,
                        long exclusiveSize,
-                       long exclusiveReplicatedSize,
-                       boolean deepCleanedDeletedDir) {
+                       long exclusiveReplicatedSize) {
     this.snapshotId = snapshotId;
     this.name = name;
     this.volumeName = volumeName;
@@ -183,7 +181,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     this.referencedReplicatedSize = referencedReplicatedSize;
     this.exclusiveSize = exclusiveSize;
     this.exclusiveReplicatedSize = exclusiveReplicatedSize;
-    this.deepCleanedDeletedDir = deepCleanedDeletedDir;
   }
 
   public void setName(String name) {
@@ -288,7 +285,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
   }
 
   public SnapshotInfo.Builder toBuilder() {
-    return new Builder()
+    return new SnapshotInfo.Builder()
         .setSnapshotId(snapshotId)
         .setName(name)
         .setVolumeName(volumeName)
@@ -305,8 +302,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         .setReferencedSize(referencedSize)
         .setReferencedReplicatedSize(referencedReplicatedSize)
         .setExclusiveSize(exclusiveSize)
-        .setExclusiveReplicatedSize(exclusiveReplicatedSize)
-        .setDeepCleanedDeletedDir(deepCleanedDeletedDir);
+        .setExclusiveReplicatedSize(exclusiveReplicatedSize);
   }
 
   /**
@@ -331,7 +327,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     private long referencedReplicatedSize;
     private long exclusiveSize;
     private long exclusiveReplicatedSize;
-    private boolean deepCleanedDeletedDir;
 
     public Builder() {
       // default values
@@ -428,11 +423,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
       return this;
     }
 
-    public Builder setDeepCleanedDeletedDir(boolean deepCleanedDeletedDir) {
-      this.deepCleanedDeletedDir = deepCleanedDeletedDir;
-      return this;
-    }
-
     public SnapshotInfo build() {
       Preconditions.checkNotNull(name);
       return new SnapshotInfo(
@@ -453,8 +443,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
           referencedSize,
           referencedReplicatedSize,
           exclusiveSize,
-          exclusiveReplicatedSize,
-          deepCleanedDeletedDir
+          exclusiveReplicatedSize
       );
     }
   }
@@ -476,8 +465,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
             .setReferencedSize(referencedSize)
             .setReferencedReplicatedSize(referencedReplicatedSize)
             .setExclusiveSize(exclusiveSize)
-            .setExclusiveReplicatedSize(exclusiveReplicatedSize)
-            .setDeepCleanedDeletedDir(deepCleanedDeletedDir);
+            .setExclusiveReplicatedSize(exclusiveReplicatedSize);
 
     if (pathPreviousSnapshotId != null) {
       sib.setPathPreviousSnapshotID(toProtobuf(pathPreviousSnapshotId));
@@ -548,11 +536,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     if (snapshotInfoProto.hasExclusiveReplicatedSize()) {
       osib.setExclusiveReplicatedSize(
           snapshotInfoProto.getExclusiveReplicatedSize());
-    }
-
-    if (snapshotInfoProto.hasDeepCleanedDeletedDir()) {
-      osib.setDeepCleanedDeletedDir(
-          snapshotInfoProto.getDeepCleanedDeletedDir());
     }
 
     osib.setSnapshotPath(snapshotInfoProto.getSnapshotPath())
@@ -639,14 +622,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
     return exclusiveReplicatedSize;
   }
 
-  public boolean getDeepCleanedDeletedDir() {
-    return deepCleanedDeletedDir;
-  }
-
-  public void setDeepCleanedDeletedDir(boolean deepCleanedDeletedDir) {
-    this.deepCleanedDeletedDir = deepCleanedDeletedDir;
-  }
-
   /**
    * Generate default name of snapshot, (used if user doesn't provide one).
    */
@@ -680,8 +655,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         .setSnapshotPath(volumeName + OM_KEY_PREFIX + bucketName)
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setDeepClean(false)
-        .setDeepCleanedDeletedDir(false);
+        .setDeepClean(true);
 
     if (snapshotId != null) {
       builder.setCheckpointDir(getCheckpointDirName(snapshotId));
@@ -714,8 +688,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         referencedSize == that.referencedSize &&
         referencedReplicatedSize == that.referencedReplicatedSize &&
         exclusiveSize == that.exclusiveSize &&
-        exclusiveReplicatedSize == that.exclusiveReplicatedSize &&
-        deepCleanedDeletedDir == that.deepCleanedDeletedDir;
+        exclusiveReplicatedSize == that.exclusiveReplicatedSize;
   }
 
   @Override
@@ -726,7 +699,7 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         globalPreviousSnapshotId, snapshotPath, checkpointDir,
         deepClean, sstFiltered,
         referencedSize, referencedReplicatedSize,
-        exclusiveSize, exclusiveReplicatedSize, deepCleanedDeletedDir);
+        exclusiveSize, exclusiveReplicatedSize);
   }
 
   /**
@@ -753,7 +726,6 @@ public final class SnapshotInfo implements Auditable, CopyObject<SnapshotInfo> {
         .setReferencedReplicatedSize(referencedReplicatedSize)
         .setExclusiveSize(exclusiveSize)
         .setExclusiveReplicatedSize(exclusiveReplicatedSize)
-        .setDeepCleanedDeletedDir(deepCleanedDeletedDir)
         .build();
   }
 }

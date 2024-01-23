@@ -107,9 +107,9 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
-    doubleBuffer = new OzoneManagerDoubleBuffer.Builder()
+    doubleBuffer = OzoneManagerDoubleBuffer.newBuilder()
         .setOmMetadataManager(omMetadataManager)
-        .setmaxUnFlushedTransactionCount(100000)
+        .setMaxUnFlushedTransactionCount(100000)
         .enableRatis(true)
         .build();
   }
@@ -173,9 +173,9 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     final int deleteCount = 5;
 
     // We are doing +1 for volume transaction.
-    GenericTestUtils.waitFor(() ->
-        doubleBuffer.getFlushedTransactionCount() ==
-            (bucketCount + deleteCount + 1), 100, 120000);
+    GenericTestUtils.waitFor(
+        () -> doubleBuffer.getFlushedTransactionCountForTesting() == bucketCount + deleteCount + 1,
+        100, 120000);
 
     assertEquals(1, omMetadataManager.countRowsInTable(
         omMetadataManager.getVolumeTable()));
@@ -251,8 +251,9 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     final int deleteCount = 10;
 
     // We are doing +1 for volume transaction.
-    GenericTestUtils.waitFor(() -> doubleBuffer.getFlushedTransactionCount()
-            == (bucketCount + deleteCount + 2), 100, 120000);
+    GenericTestUtils.waitFor(
+        () -> doubleBuffer.getFlushedTransactionCountForTesting() == bucketCount + deleteCount + 2,
+        100, 120000);
 
     assertEquals(2, omMetadataManager.countRowsInTable(
         omMetadataManager.getVolumeTable()));
@@ -398,8 +399,8 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     int expectedBuckets = bucketsPerVolume * volumeCount;
     long expectedTransactions = volumeCount + expectedBuckets;
 
-    GenericTestUtils.waitFor(() ->
-        expectedTransactions == doubleBuffer.getFlushedTransactionCount(),
+    GenericTestUtils.waitFor(
+        () -> expectedTransactions == doubleBuffer.getFlushedTransactionCountForTesting(),
         100, volumeCount * 500);
 
     GenericTestUtils.waitFor(() ->
@@ -411,7 +412,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
         assertRowCount(expectedBuckets, omMetadataManager.getBucketTable()),
         300, volumeCount * 300);
 
-    assertThat(doubleBuffer.getFlushIterations()).isGreaterThan(0);
+    assertThat(doubleBuffer.getFlushIterationsForTesting()).isGreaterThan(0);
   }
 
   private boolean assertRowCount(int expected, Table<String, ?> table) {

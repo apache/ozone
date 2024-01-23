@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,14 +49,14 @@ public final class PipelineChoosePolicyFactory {
   private PipelineChoosePolicyFactory() {
   }
 
-  public static PipelineChoosePolicy getPolicy(
+  public static PipelineChoosePolicy getPolicy(final NodeManager nodeManager,
       ScmConfig scmConfig, boolean forEC) throws SCMException {
     Class<? extends PipelineChoosePolicy> policyClass = null;
     String policyName = forEC ? scmConfig.getECPipelineChoosePolicyName() :
         scmConfig.getPipelineChoosePolicyName();
     try {
       policyClass = getClass(policyName, PipelineChoosePolicy.class);
-      return createPipelineChoosePolicyFromClass(policyClass);
+      return createPipelineChoosePolicyFromClass(nodeManager, policyClass);
     } catch (Exception e) {
       Class<? extends PipelineChoosePolicy> defaultPolicy = forEC ?
           OZONE_SCM_EC_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT :
@@ -64,13 +65,14 @@ public final class PipelineChoosePolicyFactory {
         LOG.error("Met an exception while create pipeline choose policy "
             + "for the given class {}. Fallback to the default pipeline "
             + " choose policy {}", policyName, defaultPolicy, e);
-        return createPipelineChoosePolicyFromClass(defaultPolicy);
+        return createPipelineChoosePolicyFromClass(nodeManager, defaultPolicy);
       }
       throw e;
     }
   }
 
   private static PipelineChoosePolicy createPipelineChoosePolicyFromClass(
+      final NodeManager nodeManager,
       Class<? extends PipelineChoosePolicy> policyClass) throws SCMException {
     Constructor<? extends PipelineChoosePolicy> constructor;
     try {
@@ -86,7 +88,7 @@ public final class PipelineChoosePolicyFactory {
     }
 
     try {
-      return constructor.newInstance();
+      return constructor.newInstance().init(nodeManager);
     } catch (Exception e) {
       throw new RuntimeException("Failed to instantiate class " +
           policyClass.getCanonicalName() + " for " + e.getMessage());

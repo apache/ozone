@@ -74,6 +74,10 @@ public class TestContainerStateCounts extends AbstractReconSqlDBTest {
   private static final int NUM_DELETED_CONTAINERS = 4;
   private static final int NUM_CLOSED_CONTAINERS = 3;
 
+  public TestContainerStateCounts() {
+    super();
+  }
+
 
   @BeforeEach
   public void setUp() throws Exception {

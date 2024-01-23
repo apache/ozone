@@ -21,7 +21,7 @@ package org.apache.hadoop.fs.contract;
 import org.apache.hadoop.fs.Path;
 
 import org.assertj.core.api.Assertions;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 

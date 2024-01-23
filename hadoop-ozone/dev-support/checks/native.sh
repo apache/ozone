@@ -19,6 +19,13 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 CHECK=native
 
+zlib_version=$(mvn -N help:evaluate -Dexpression=zlib.version -q -DforceStdout)
+if [[ -z "${zlib_version}" ]]; then
+  echo "ERROR zlib.version not defined in pom.xml"
+  exit 1
+fi
+
 source "${DIR}/junit.sh" -Pnative -Drocks_tools_native \
+  -Dzlib.url="https://github.com/madler/zlib/releases/download/v${zlib_version}/zlib-${zlib_version}.tar.gz" \
   -DexcludedGroups="unhealthy" \
   "$@"
