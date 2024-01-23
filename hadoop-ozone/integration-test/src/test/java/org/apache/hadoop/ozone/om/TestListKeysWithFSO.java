@@ -406,19 +406,7 @@ public class TestListKeysWithFSO {
     // case-1: StartKey LeafNode is lexographically ahead than prefixKey.
     // So, will return EmptyList
     // a1/b2 < a1/b2Invalid
-    List<String> expectedKeys = getExpectedKeyList("", "", legacyOzoneBucket2);
-    checkKeyList("", "", expectedKeys, fsoOzoneBucket2);
-
-    expectedKeys = getExpectedKeyList("", "a", legacyOzoneBucket2);
-    checkKeyList("", "a", expectedKeys, fsoOzoneBucket2);
-
-    expectedKeys = getExpectedKeyList("a", "a", legacyOzoneBucket2);
-    checkKeyList("a", "a", expectedKeys, fsoOzoneBucket2);
-
-    expectedKeys = getExpectedKeyList("a", "a1", legacyOzoneBucket2);
-    checkKeyList("a", "a1", expectedKeys, fsoOzoneBucket2);
-
-    expectedKeys =
+    List<String> expectedKeys =
         getExpectedKeyList("x/y/z/z1.tx", "", legacyOzoneBucket2);
     checkKeyList("x/y/z/z1.tx", "", expectedKeys, fsoOzoneBucket2);
   }

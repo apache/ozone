@@ -136,7 +136,7 @@ public class OzoneListStatusHelper {
         getStatusHelper.apply(args, clientAddress, allowPartialPrefixes);
 
     String dbPrefixKey;
-    if (fileStatus == null || allowPartialPrefixes) {
+    if (fileStatus == null) {
       // if the file status is null, prefix is a not a valid filesystem path
       // this should only work in list keys mode.
       // fetch the db key based on the prefix path.
@@ -155,17 +155,38 @@ public class OzoneListStatusHelper {
         throw ome;
       }
     } else {
-      // If the keyname is a file just return one entry
+      // If the keyName is a file just return one entry if partial prefixes are
+      // not allowed.
+      // If partial prefixes are allowed, the found file should also be
+      // considered as a prefix.
       if (fileStatus.isFile()) {
-        return Collections.singletonList(fileStatus);
+        if (!allowPartialPrefixes) {
+          return Collections.singletonList(fileStatus);
+        } else {
+          try {
+            dbPrefixKey = getDbKey(keyName, args, volumeInfo, omBucketInfo);
+            prefixKey = OzoneFSUtils.getParentDir(keyName);
+          } catch (OMException ome) {
+            if (ome.getResult() == FILE_NOT_FOUND) {
+              // the parent dir cannot be found return null list
+              if (LOG.isDebugEnabled()) {
+                LOG.debug("Parent directory of keyName:{} does not exist." +
+                    "Returns empty list", keyName);
+              }
+              return new ArrayList<>();
+            }
+            throw ome;
+          }
+        }
+      } else {
+        // fetch the db key based on parent prefix id.
+        long id = getId(fileStatus, omBucketInfo);
+        final long volumeId = volumeInfo.getObjectID();
+        final long bucketId = omBucketInfo.getObjectID();
+        dbPrefixKey =
+            metadataManager.getOzonePathKey(volumeId, bucketId, id, "");
       }
 
-      // fetch the db key based on parent prefix id.
-      long id = getId(fileStatus, omBucketInfo);
-      final long volumeId = volumeInfo.getObjectID();
-      final long bucketId = omBucketInfo.getObjectID();
-      dbPrefixKey = metadataManager.getOzonePathKey(volumeId, bucketId,
-              id, "");
     }
 
     // Determine startKeyPrefix for DB iteration
