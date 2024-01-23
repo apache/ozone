@@ -171,7 +171,7 @@ public class AuditLogger {
      * @param millis Latency in nanoseconds.
      */
     public void appendPreOpLatencyMs(long millis) {
-      append("preOpLatencyMs", TimeUnit.NANOSECONDS.toMillis(millis));
+      append("preOpLatencyMs", millis);
     }
 
     /**

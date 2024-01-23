@@ -895,7 +895,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
           BlockID.getFromProtobuf(msg.getWriteChunk().getBlockID())
               .toString());
       auditParams.put("blockDataSize",
-          String.valueOf(msg.getReadChunk().getChunkData().getLen()));
+          String.valueOf(msg.getWriteChunk().getChunkData().getLen()));
       return auditParams;
 
     case ListChunk:
@@ -913,7 +913,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
             BlockData.getFromProtoBuf(msg.getPutSmallFile()
                 .getBlock().getBlockData()).toString());
         auditParams.put("blockDataSize",
-            String.valueOf(msg.getReadChunk().getChunkData().getLen()));
+            String.valueOf(msg.getPutSmallFile().getChunkInfo().getLen()));
       } catch (IOException ex) {
         if (LOG.isTraceEnabled()) {
           LOG.trace("Encountered error parsing BlockData from protobuf: "
@@ -926,8 +926,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       auditParams.put("blockData",
           BlockID.getFromProtobuf(msg.getGetSmallFile().getBlock().getBlockID())
               .toString());
-      auditParams.put("blockDataSize",
-          String.valueOf(msg.getReadChunk().getChunkData().getLen()));
       return auditParams;
 
     case CloseContainer:
