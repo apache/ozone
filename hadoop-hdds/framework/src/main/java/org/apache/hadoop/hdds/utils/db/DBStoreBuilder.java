@@ -50,6 +50,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_DELTA_UPDATE_DATA
 import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
@@ -83,6 +84,9 @@ public final class DBStoreBuilder {
   // The column family options that will be used for any column families
   // added by name only (without specifying options).
   private ManagedColumnFamilyOptions defaultCfOptions;
+
+  private ManagedStatistics statistics;
+
   private String dbname;
   private Path dbPath;
   private String dbJmxBeanNameName;
@@ -222,6 +226,7 @@ public final class DBStoreBuilder {
           enableCompactionDag, maxDbUpdatesSizeThreshold, createCheckpointDirs,
           configuration, threadNamePrefix);
     } finally {
+      IOUtils.closeQuietly(statistics);
       tableConfigs.forEach(TableConfig::close);
     }
   }
@@ -415,10 +420,9 @@ public final class DBStoreBuilder {
 
     // Create statistics.
     if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
-      try (ManagedStatistics statistics = new ManagedStatistics()) {
-        statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
-        dbOptions.setStatistics(statistics);
-      }
+      statistics = new ManagedStatistics();
+      statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
+      dbOptions.setStatistics(statistics);
     }
 
     return dbOptions;
