@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.admin.scm.GetFailedDeletedBlocksTxnSubcommand;
 import org.apache.hadoop.ozone.admin.scm.ResetDeletedBlockRetryCountSubcommand;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -61,6 +60,8 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test for DeletedBlocksTxnSubcommand Cli.
@@ -193,7 +194,7 @@ public class TestDeletedBlocksTxnShell {
     flush();
     currentValidTxnNum = deletedBlockLog.getNumOfValidTransactions();
     LOG.info("Valid num of txns: {}", currentValidTxnNum);
-    Assertions.assertEquals(30, currentValidTxnNum);
+    assertEquals(30, currentValidTxnNum);
 
     // let the first 20 txns be failed
     List<Long> txIds = new ArrayList<>();
@@ -207,7 +208,7 @@ public class TestDeletedBlocksTxnShell {
     flush();
     currentValidTxnNum = deletedBlockLog.getNumOfValidTransactions();
     LOG.info("Valid num of txns: {}", currentValidTxnNum);
-    Assertions.assertEquals(10, currentValidTxnNum);
+    assertEquals(10, currentValidTxnNum);
 
     ContainerOperationClient scmClient = new ContainerOperationClient(conf);
     CommandLine cmd;
@@ -223,12 +224,12 @@ public class TestDeletedBlocksTxnShell {
     while (m.find()) {
       matchCount += 1;
     }
-    Assertions.assertEquals(20, matchCount);
+    assertEquals(20, matchCount);
 
     // print the first 10 failed txns info into file
     cmd.parseArgs("-o", txnFile.getAbsolutePath(), "-c", "10");
     getCommand.execute(scmClient);
-    Assertions.assertTrue(txnFile.exists());
+    assertThat(txnFile).exists();
 
     ResetDeletedBlockRetryCountSubcommand resetCommand =
         new ResetDeletedBlockRetryCountSubcommand();
@@ -240,7 +241,7 @@ public class TestDeletedBlocksTxnShell {
     flush();
     currentValidTxnNum = deletedBlockLog.getNumOfValidTransactions();
     LOG.info("Valid num of txns: {}", currentValidTxnNum);
-    Assertions.assertEquals(20, currentValidTxnNum);
+    assertEquals(20, currentValidTxnNum);
 
     // reset the given txIds list
     cmd.parseArgs("-l", "11,12,13,14,15");
@@ -248,7 +249,7 @@ public class TestDeletedBlocksTxnShell {
     flush();
     currentValidTxnNum = deletedBlockLog.getNumOfValidTransactions();
     LOG.info("Valid num of txns: {}", currentValidTxnNum);
-    Assertions.assertEquals(25, currentValidTxnNum);
+    assertEquals(25, currentValidTxnNum);
 
     // reset the non-existing txns and valid txns, should do nothing
     cmd.parseArgs("-l", "1,2,3,4,5,100,101,102,103,104,105");
@@ -256,7 +257,7 @@ public class TestDeletedBlocksTxnShell {
     flush();
     currentValidTxnNum = deletedBlockLog.getNumOfValidTransactions();
     LOG.info("Valid num of txns: {}", currentValidTxnNum);
-    Assertions.assertEquals(25, currentValidTxnNum);
+    assertEquals(25, currentValidTxnNum);
 
     // reset all the result expired txIds, all transactions should be available
     cmd.parseArgs("-a");
@@ -264,6 +265,6 @@ public class TestDeletedBlocksTxnShell {
     flush();
     currentValidTxnNum = deletedBlockLog.getNumOfValidTransactions();
     LOG.info("Valid num of txns: {}", currentValidTxnNum);
-    Assertions.assertEquals(30, currentValidTxnNum);
+    assertEquals(30, currentValidTxnNum);
   }
 }
