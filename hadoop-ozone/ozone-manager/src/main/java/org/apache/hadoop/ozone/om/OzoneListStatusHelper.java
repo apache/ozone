@@ -81,6 +81,7 @@ public class OzoneListStatusHelper {
     this.omDefaultReplication = omDefaultReplication;
   }
 
+  @SuppressWarnings("methodlength")
   public Collection<OzoneFileStatus> listStatusFSO(OmKeyArgs args,
       String startKey, long numEntries, String clientAddress,
       boolean allowPartialPrefixes) throws IOException {
