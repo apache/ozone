@@ -304,7 +304,9 @@ interface IOmdbInsightsState {
   nextClickable: boolean;
   includeFso: boolean;
   includeNonFso: boolean;
+  //prevClickable we are checkingor hiding Previous Button on PrevClickable flag
   prevClickable: boolean;
+  //pageDisplayCount is used when we are navigating between pages using Next and Previous Button
   pageDisplayCount: number;
 }
 
@@ -392,12 +394,10 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       pageDisplayCount: 1
     }, () => {
       if (e.key === 'OM') {
-        //mismatchPrevKeyList = [0];
         prevKeyListMap.clear();
         this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, 0, 'SCM');
       }
       else {
-        //mismatchPrevKeyList = [0];
         prevKeyListMap.clear();
         this.fetchMismatchContainers(this.state.DEFAULT_LIMIT, 0, 'OM');
       }
@@ -852,7 +852,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     } else if (this.state.activeTab === '4') {
       this.setState({
         prevKeyDeleted: prevKeyListMap.get(this.state.pageDisplayCount - 1),
-        pageDisplayCount : this.state.pageDisplayCount- 1
+        pageDisplayCount : this.state.pageDisplayCount - 1
       }, () => {
         this.fetchDeletedKeys(this.state.DEFAULT_LIMIT,this.state.prevKeyDeleted);
       })
@@ -860,7 +860,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       else {
         this.setState({
           prevKeyMismatch: prevKeyListMap.get(this.state.pageDisplayCount -1),
-          pageDisplayCount : this.state.pageDisplayCount- 1
+          pageDisplayCount : this.state.pageDisplayCount - 1
         }, () => {
           this.fetchMismatchContainers(this.state.DEFAULT_LIMIT,this.state.prevKeyMismatch, this.state.mismatchMissingState);
         })
@@ -895,7 +895,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       return <>{this.state.pageDisplayCount}</>
     }
     if (type === 'next') {
-      return <>{this.state.nextClickable ? <Link to="/Om" className='ant-pagination-item-link next' onClick={this.fetchNextRecords}> {'>'} </Link> : <div className='norecords'>No Records</div> }</>;
+      return <>{this.state.nextClickable && <Link to="/Om" className='ant-pagination-item-link next' onClick={this.fetchNextRecords}> {'>'} </Link>}</>;
     }
     return originalElement;
   };
