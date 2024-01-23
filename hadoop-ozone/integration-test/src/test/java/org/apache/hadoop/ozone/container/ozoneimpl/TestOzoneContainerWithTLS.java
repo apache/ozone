@@ -42,7 +42,6 @@ import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -352,20 +351,15 @@ public class TestOzoneContainerWithTLS {
   }
 
   private long createAndCloseContainer(
-      XceiverClientSpi client, boolean useToken) {
+      XceiverClientSpi client, boolean useToken) throws IOException {
     long id = getTestContainerID();
-    try {
-      Token<ContainerTokenIdentifier>
-          token = createContainer(client, useToken, id);
+    Token<ContainerTokenIdentifier> token = createContainer(client, useToken, id);
 
-      ContainerCommandRequestProto request =
-          getCloseContainer(client.getPipeline(), id, token);
-      ContainerCommandResponseProto response = client.sendCommand(request);
-      assertNotNull(response);
-      assertSame(response.getResult(), ContainerProtos.Result.SUCCESS);
-    } catch (Exception e) {
-      Assertions.fail(e);
-    }
+    ContainerCommandRequestProto request =
+        getCloseContainer(client.getPipeline(), id, token);
+    ContainerCommandResponseProto response = client.sendCommand(request);
+    assertNotNull(response);
+    assertSame(response.getResult(), ContainerProtos.Result.SUCCESS);
     return id;
   }
 

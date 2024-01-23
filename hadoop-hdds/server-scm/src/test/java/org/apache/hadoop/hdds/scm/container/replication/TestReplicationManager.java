@@ -56,7 +56,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -530,7 +529,7 @@ public class TestReplicationManager {
             ContainerReplicaProto.State.UNHEALTHY);
     replicas.add(unhealthy);
     storeContainerAndReplicas(container, replicas);
-    Mockito.when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
+    when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocation -> {
           DatanodeDetails dn = invocation.getArgument(0);
           if (dn.equals(unhealthy.getDatanodeDetails())) {
@@ -550,9 +549,9 @@ public class TestReplicationManager {
     assertEquals(0, repQueue.overReplicatedQueueSize());
 
     // next, this test sets up some mocks to test if RatisUnderReplicationHandler will handle this container correctly
-    Mockito.when(ratisPlacementPolicy.chooseDatanodes(anyList(), anyList(), eq(null), eq(1), anyLong(),
+    when(ratisPlacementPolicy.chooseDatanodes(anyList(), anyList(), eq(null), eq(1), anyLong(),
         anyLong())).thenAnswer(invocation -> ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()));
-    Mockito.when(nodeManager.getTotalDatanodeCommandCounts(any(DatanodeDetails.class), any(), any()))
+    when(nodeManager.getTotalDatanodeCommandCounts(any(DatanodeDetails.class), any(), any()))
         .thenAnswer(invocation -> {
           Map<SCMCommandProto.Type, Integer> map = new HashMap<>();
           map.put(SCMCommandProto.Type.replicateContainerCommand, 0);
