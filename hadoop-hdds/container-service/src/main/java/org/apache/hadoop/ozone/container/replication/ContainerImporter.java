@@ -121,6 +121,7 @@ public class ContainerImporter {
             .readContainer(containerDescriptorYaml);
       }
       containerData.setVolume(targetVolume);
+      ContainerUtils.verifyChecksum(containerData, conf);
 
       try (FileInputStream input = new FileInputStream(tarFilePath.toFile())) {
         Container container = controller.importContainer(

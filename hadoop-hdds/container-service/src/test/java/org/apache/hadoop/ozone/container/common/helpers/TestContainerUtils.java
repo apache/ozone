@@ -27,9 +27,11 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.yaml.snakeyaml.Yaml;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -44,8 +46,10 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Typ
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
 import static org.apache.hadoop.hdds.HddsUtils.processForDebug;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getDummyCommandRequestProto;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Test for {@link ContainerUtils}.
@@ -121,6 +125,25 @@ public class TestContainerUtils {
     id1.setInitialVersion(1);
     assertWriteRead(tempDir, id1);
   }
+
+  @Test
+  public void testVerifyInconsistentChecksumShouldFail() throws Exception {
+    ContainerData containerData = mock(ContainerData.class);
+    when(containerData.getContainerType()).thenReturn(
+        ContainerProtos.ContainerType.KeyValueContainer);
+    // mock to return different checksum
+    when(containerData.getChecksum()).thenReturn("checksum1", "checksum2");
+    Yaml yaml = mock(Yaml.class);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(HddsConfigKeys.HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED, true);
+    try {
+      ContainerUtils.verifyChecksum(containerData, conf);
+      fail("code should not reach here, exception should have been thrown.");
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("Container checksum error"));
+    }
+  }
+
 
   private void assertWriteRead(@TempDir File tempDir,
       DatanodeDetails details) throws IOException {
