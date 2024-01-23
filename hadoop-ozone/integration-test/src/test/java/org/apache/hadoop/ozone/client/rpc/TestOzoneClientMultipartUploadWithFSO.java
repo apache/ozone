@@ -58,7 +58,6 @@ import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -568,8 +567,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     bucket.abortMultipartUpload(keyName, uploadID);
 
     String multipartOpenKey =
-        getMultipartOpenKey(uploadID, volumeName, bucketName, keyName,
-            metadataMgr);
+            metadataMgr.getMultipartKeyFSO(volumeName, bucketName, keyName, uploadID);
     OmKeyInfo omKeyInfo =
         metadataMgr.getOpenKeyTable(bucketLayout).get(multipartOpenKey);
     OmMultipartKeyInfo omMultipartKeyInfo =
@@ -853,8 +851,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
         ozoneManager.getMetadataManager().getBucketTable().get(buckKey);
     BucketLayout bucketLayout = buckInfo.getBucketLayout();
     String multipartOpenKey =
-        getMultipartOpenKey(uploadID, volumeName, bucketName, keyName,
-            metadataMgr);
+        metadataMgr.getMultipartKeyFSO(volumeName, bucketName, keyName, uploadID);
 
     String multipartKey = metadataMgr.getMultipartKey(volumeName, bucketName,
         keyName, uploadID);
@@ -879,32 +876,6 @@ public class TestOzoneClientMultipartUploadWithFSO {
       assertEquals(partName, partKeyInfo.getPartName());
     }
     return multipartKey;
-  }
-
-  private String getMultipartOpenKey(String multipartUploadID,
-                                     String volName, String buckName, String kName,
-                                     OMMetadataManager omMetadataManager) throws IOException {
-
-    String fileName = OzoneFSUtils.getFileName(kName);
-    final long volumeId = omMetadataManager.getVolumeId(volName);
-    final long bucketId = omMetadataManager.getBucketId(volName,
-        buckName);
-    long parentID = getParentID(volName, buckName, kName,
-        omMetadataManager);
-
-    String multipartKey = omMetadataManager.getMultipartKey(volumeId, bucketId,
-        parentID, fileName, multipartUploadID);
-
-    return multipartKey;
-  }
-
-  private long getParentID(String volName, String buckName,
-                           String kName, OMMetadataManager omMetadataManager) throws IOException {
-    final long volumeId = omMetadataManager.getVolumeId(volName);
-    final long bucketId = omMetadataManager.getBucketId(volName,
-        buckName);
-    return OMFileRequest.getParentID(volumeId, bucketId,
-        kName, omMetadataManager);
   }
 
   private String initiateMultipartUpload(OzoneBucket oBucket, String kName,
