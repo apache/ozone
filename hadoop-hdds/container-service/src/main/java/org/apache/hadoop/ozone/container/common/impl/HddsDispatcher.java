@@ -409,7 +409,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
             new Exception(responseProto.getMessage()));
       }
       perf.appendOpLatencyMs(oPLatencyMS);
-      performanceAudit(action, params, perf);
+      performanceAudit(action, params, perf, oPLatencyMS);
 
       return responseProto;
     } else {
@@ -698,14 +698,16 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   }
 
   private void performanceAudit(AuditAction action, Map<String, String> params,
-      PerformanceStringBuilder performance) {
-    AuditMessage msg =
-        buildAuditMessageForPerformance(action, params, performance.build());
-    AUDIT.logPerformance(msg);
+      PerformanceStringBuilder performance, long opLatencyMs) {
+    if (isExceedThreshold(opLatencyMs)) {
+      AuditMessage msg =
+          buildAuditMessageForPerformance(action, params, performance);
+      AUDIT.logPerformance(msg);
+    }
   }
 
   public AuditMessage buildAuditMessageForPerformance(AuditAction op,
-      Map<String, String> auditMap, String performance) {
+      Map<String, String> auditMap, PerformanceStringBuilder performance) {
     return new AuditMessage.Builder()
         .setUser(null)
         .atIp(null)
