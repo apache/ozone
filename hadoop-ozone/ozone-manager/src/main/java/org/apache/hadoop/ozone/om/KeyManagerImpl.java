@@ -806,8 +806,8 @@ public class KeyManagerImpl implements KeyManager {
           //if there are no parts, use the replicationType from the open key.
           if (isBucketFSOptimized(volumeName, bucketName)) {
             multipartKey =
-                getMultipartOpenKeyFSO(volumeName, bucketName, keyName,
-                    uploadID);
+                    OMMultipartUploadUtils.getMultipartOpenKey(volumeName, bucketName, keyName, uploadID,
+                            metadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
           }
           OmKeyInfo omKeyInfo =
               metadataManager.getOpenKeyTable(bucketLayout)
@@ -875,13 +875,6 @@ public class KeyManagerImpl implements KeyManager {
       return fullKeyPartName.toString();
     }
     return partName;
-  }
-
-  private String getMultipartOpenKeyFSO(String volumeName, String bucketName,
-      String keyName, String uploadID) throws IOException {
-    OMMetadataManager metaMgr = metadataManager;
-    return OMMultipartUploadUtils.getMultipartOpenKeyFSO(
-        volumeName, bucketName, keyName, uploadID, metaMgr);
   }
 
   /**
