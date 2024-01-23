@@ -458,15 +458,6 @@ MIT
    org.slf4j:slf4j-reload4j
 
 
-CDDL + GPLv2 with classpath exception
-=====================
-
-   javax.annotation:javax.annotation-api
-   javax.el:javax.el-api
-   javax.interceptor:javax.interceptor-api
-   javax.servlet:javax.servlet-api
-
-
 Public Domain
 =====================
 
