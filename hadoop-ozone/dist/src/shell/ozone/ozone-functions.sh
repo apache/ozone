@@ -1433,7 +1433,9 @@ function ozone_set_module_access_args
     OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --add-exports java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED"
   fi
   if [[ "${JAVA_MAJOR_VERSION}" -ge 9 ]]; then
-    OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --add-opens='java.base/java.nio=ALL-UNNAMED' --add-opens='java.base/java.lang=ALL-UNNAMED' --add-opens='java.base/java.lang.reflect=ALL-UNNAMED' --add-opens='java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED' --add-exports='java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED' --add-exports='java.base/sun.net.dns=ALL-UNNAMED' "
+    OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --add-opens java.base/java.nio=ALL-UNNAMED"
+    OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --add-opens java.base/java.lang=ALL-UNNAMED"
+    OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --add-opens java.base/java.lang.reflect=ALL-UNNAMED"
   fi
 }
 

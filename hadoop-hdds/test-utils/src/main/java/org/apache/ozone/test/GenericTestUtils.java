@@ -503,10 +503,7 @@ public abstract class GenericTestUtils {
           if (modifiersField == null) {
             throw e;
           }
-        } catch (NoSuchMethodException ex) {
-          e.addSuppressed(ex);
-          throw e;
-        } catch (InvocationTargetException ex) {
+        } catch (InvocationTargetException | NoSuchMethodException ex) {
           e.addSuppressed(ex);
           throw e;
         }
