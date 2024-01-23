@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -64,6 +65,8 @@ public class ContainerImporter {
   private final Set<Long> importContainerProgress
       = Collections.synchronizedSet(new HashSet<>());
 
+  private final ConfigurationSource conf;
+
   public ContainerImporter(@NotNull ConfigurationSource conf,
                            @NotNull ContainerSet containerSet,
                            @NotNull ContainerController controller,
@@ -79,6 +82,7 @@ public class ContainerImporter {
     containerSize = (long) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+    this.conf = conf;
   }
 
   public boolean isAllowedContainerImport(long containerID) {
