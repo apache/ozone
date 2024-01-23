@@ -1048,7 +1048,6 @@ public class TestContainerBalancerTask {
     stopBalancer();
   }
 
-  @Unhealthy("HDDS-8941")
   @Test
   public void testDelayedStart() throws InterruptedException, TimeoutException {
     conf.setTimeDuration("hdds.scm.wait.time.after.safemode.exit", 10,
@@ -1066,7 +1065,7 @@ public class TestContainerBalancerTask {
      This is the delay before it starts balancing.
      */
     GenericTestUtils.waitFor(
-        () -> balancingThread.getState() == Thread.State.TIMED_WAITING, 1, 40);
+        () -> balancingThread.getState() == Thread.State.TIMED_WAITING, 1, 20);
     assertEquals(Thread.State.TIMED_WAITING,
         balancingThread.getState());
 
@@ -1074,7 +1073,7 @@ public class TestContainerBalancerTask {
     // STOPPED
     balancingThread.interrupt();
     GenericTestUtils.waitFor(() -> containerBalancerTask.getBalancerStatus() ==
-        ContainerBalancerTask.Status.STOPPED, 1, 40);
+        ContainerBalancerTask.Status.STOPPED, 1, 20);
     assertEquals(ContainerBalancerTask.Status.STOPPED, containerBalancerTask.getBalancerStatus());
 
     // ensure the thread dies
