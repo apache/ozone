@@ -286,7 +286,9 @@ public class TestBlockManagerImpl {
   }
 
   @ContainerTestVersionInfo.ContainerTest
-  public void testFlush1() throws Exception {
+  public void testFlush1(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    initTest(versionInfo);
     Assumptions.assumeFalse(
         isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V1));
     // simulates writing 1024 bytes, hsync,
@@ -330,7 +332,9 @@ public class TestBlockManagerImpl {
   }
 
   @ContainerTestVersionInfo.ContainerTest
-  public void testFlush2() throws Exception {
+  public void testFlush2(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    initTest(versionInfo);
     Assumptions.assumeFalse(
         isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V1));
     // simulates writing a full chunk + 1024 bytes, hsync,
@@ -368,7 +372,9 @@ public class TestBlockManagerImpl {
   }
 
   @ContainerTestVersionInfo.ContainerTest
-  public void testFlush3() throws Exception {
+  public void testFlush3(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    initTest(versionInfo);
     Assumptions.assumeFalse(
         isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V1));
     // simulates writing 1024 bytes, hsync,
