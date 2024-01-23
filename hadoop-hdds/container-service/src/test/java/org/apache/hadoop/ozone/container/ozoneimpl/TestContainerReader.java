@@ -570,7 +570,7 @@ public class TestContainerReader {
     }
     // verify container data and perform cleanup
     ContainerReader containerReader = new ContainerReader(volumeSet,
-        hddsVolume, containerSet, conf, false);
+        hddsVolume, containerSet, conf, true);
 
     containerReader.run();
 
