@@ -222,6 +222,14 @@ EPL 2.0
    jakarta.ws.rs:jakarta.ws.rs-api
    org.aspectj:aspectjrt
    org.aspectj:aspectjweaver
+   org.glassfish.hk2.external:aopalliance-repackaged
+   org.glassfish.hk2.external:jakarta.inject
+   org.glassfish.hk2.external:javax.inject
+   org.glassfish.hk2:guice-bridge
+   org.glassfish.hk2:hk2-api
+   org.glassfish.hk2:hk2-locator
+   org.glassfish.hk2:hk2-utils
+   org.glassfish.hk2:osgi-resource-locator
    org.glassfish.jersey.containers:jersey-container-servlet
    org.glassfish.jersey.containers:jersey-container-servlet-core
    org.glassfish.jersey.core:jersey-client
@@ -251,14 +259,6 @@ CDDL 1.1 + GPLv2 with classpath exception
    javax.servlet:javax.servlet-api
    javax.servlet.jsp:jsp-api
    javax.ws.rs:jsr311-api
-   org.glassfish.hk2.external:aopalliance-repackaged
-   org.glassfish.hk2.external:jakarta.inject
-   org.glassfish.hk2.external:javax.inject
-   org.glassfish.hk2:guice-bridge
-   org.glassfish.hk2:hk2-api
-   org.glassfish.hk2:hk2-locator
-   org.glassfish.hk2:hk2-utils
-   org.glassfish.hk2:osgi-resource-locator
    org.glassfish.jaxb:jaxb-runtime
    org.glassfish.jaxb:txw2
 
