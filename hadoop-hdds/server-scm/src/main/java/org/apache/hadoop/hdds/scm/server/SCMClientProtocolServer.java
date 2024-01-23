@@ -62,7 +62,6 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
-import org.apache.hadoop.hdds.scm.node.DatanodeAdminMonitorImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -592,8 +591,7 @@ public class SCMClientProtocolServer implements
   @Override
   public Map<String, List<ContainerID>> getContainersOnDecomNode(DatanodeDetails dn) throws IOException {
     try {
-      return scm.getScmDecommissionManager().getContainersReplicatedOnNode(
-          new DatanodeAdminMonitorImpl.TrackedNode(dn, 0L));
+      return scm.getScmDecommissionManager().getContainersReplicatedOnNode(dn);
     } catch (NodeNotFoundException e) {
       throw new IOException("Failed to get containers list. Unable to find required node", e);
     }

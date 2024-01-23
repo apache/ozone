@@ -494,11 +494,11 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     return underReplicated == 0 && unclosed == 0;
   }
 
-  public Map<String, List<ContainerID>> getContainersReplicatedOnNode(TrackedNode dn) {
+  public Map<String, List<ContainerID>> getContainersReplicatedOnNode(DatanodeDetails dn) {
     Iterator<TrackedNode> iterator = trackedNodes.iterator();
     while (iterator.hasNext()) {
       TrackedNode trackedNode = iterator.next();
-      if (trackedNode.equals(dn)) {
+      if (trackedNode.equals(new TrackedNode(dn, 0L))) {
         return trackedNode.getContainersReplicatedOnNode();
       }
     }
