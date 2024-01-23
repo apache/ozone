@@ -93,16 +93,8 @@ public final class OMMultipartUploadUtils {
     if (bucketLayout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
       return omMetadataManager.getMultipartKeyFSO(volumeName, bucketName, keyName, multipartUploadId);
     } else {
-      return getMultipartOpenKey(volumeName, bucketName,
-          keyName, multipartUploadId, omMetadataManager);
+      return omMetadataManager.getMultipartKey(volumeName, bucketName, keyName, multipartUploadId);
     }
-  }
-
-  public static String getMultipartOpenKey(String volumeName,
-       String bucketName, String keyName, String multipartUploadId,
-       OMMetadataManager omMetadataManager) {
-    return omMetadataManager.getMultipartKey(
-        volumeName, bucketName, keyName, multipartUploadId);
   }
 
 
