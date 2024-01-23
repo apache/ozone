@@ -28,16 +28,16 @@ import java.io.IOException;
 /**
  * Command-line tool to set the encryption key of a bucket.
  *
- * There is a known bug, HDDS-7449, which could potentially result in the loss
- * of bucket encryption properties when either quota or bucket replication
- * properties are (re)set on an existing bucket, posing a critical issue.
- * This issue may affect consumers using previous versions of Ozone.
+ * There are known bugs, HDDS-7449 and HDDS-7526, which could potentially result
+ * in the loss of bucket encryption properties when either quota or bucket
+ * replication properties are (re)set on an existing bucket, posing a critical
+ * issue. This may affect consumers using previous versions of Ozone.
  *
  * To address this bug, this CLI tool provides the ability to (re)set the
- * Bucket Encryption Key (BEK) for HDDS-7449 affected buckets using the Ozone
- * shell.
+ * Bucket Encryption Key (BEK) for HDDS-7449/HDDS-7526 affected buckets using
+ * the Ozone shell.
  *
- * Users can execute the following command:
+ * Users can execute the following command for setting BEK for a given bucket:
  * "ozone sh bucket set-encryption-key -k <enckey> <vol>/<buck>"
  *
  * Please note that this operation only resets the BEK and does not modify any
@@ -51,13 +51,16 @@ import java.io.IOException;
  * to reset bucket encryption post-bucket creation under normal circumstances
  * and may be removed in the future. Users are advised to exercise caution and
  * consider alternative approaches for managing bucket encryption unless
- * HDDS-7449 is encountered. As a result, the setter methods and this CLI
- * functionality have been marked as deprecated, and the command has been
- * hidden.
+ * HDDS-7449 or HDDS-7526 is encountered. As a result, the setter methods and
+ * this CLI functionality have been marked as deprecated, and the command has
+ * been hidden.
  */
 @Deprecated
 @CommandLine.Command(name = "set-encryption-key",
-    description = "Set encryption key on bucket",
+    description = "Set Bucket Encryption Key (BEK) for a given bucket. Users " +
+        "are advised to exercise caution and consider alternative approaches " +
+        "for managing bucket encryption unless HDDS-7449 or HDDS-7526 is " +
+        "encountered.",
     hidden = true)
 public class SetEncryptionKey extends BucketHandler {
 
