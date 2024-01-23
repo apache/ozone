@@ -78,18 +78,18 @@ public class ContainerReader implements Runnable {
   private final ConfigurationSource config;
   private final File hddsVolumeDir;
   private final MutableVolumeSet volumeSet;
-  private final boolean shouldDeleteRecovering;
+  private final boolean shouldDelete;
 
   public ContainerReader(
       MutableVolumeSet volSet, HddsVolume volume, ContainerSet cset,
-      ConfigurationSource conf, boolean shouldDeleteRecovering) {
+      ConfigurationSource conf, boolean shouldDelete) {
     Preconditions.checkNotNull(volume);
     this.hddsVolume = volume;
     this.hddsVolumeDir = hddsVolume.getHddsRootDir();
     this.containerSet = cset;
     this.config = conf;
     this.volumeSet = volSet;
-    this.shouldDeleteRecovering = shouldDeleteRecovering;
+    this.shouldDelete = shouldDelete;
   }
 
   @Override
@@ -149,15 +149,17 @@ public class ContainerReader implements Runnable {
       File currentDir = new File(idDir, Storage.STORAGE_DIR_CURRENT);
       File[] containerTopDirs = currentDir.listFiles();
       if (containerTopDirs != null && containerTopDirs.length > 0) {
-        try {
-          // idDir is working directory having data
-          // and volume is initialized with temp path
-          hddsVolume.createTmpDirs(idDir.getName());
-        } catch (IOException e) {
-          LOG.error("Volume {} dir path {} can not be accessed to create " +
-              "temp dirs.", hddsVolumeRootDir, idDir.getName(), e);
-          volumeSet.failVolume(hddsVolumeRootDir.getPath());
-          return;
+        if (shouldDelete) {
+          try {
+            // idDir is working directory having data
+            // and volume is initialized with temp path
+            hddsVolume.createTmpDirs(idDir.getName());
+          } catch (IOException e) {
+            LOG.error("Tmp directory can not be created inside {}" +
+                " for Volume {}.", idDir.getName(), hddsVolumeRootDir, e);
+            volumeSet.failVolume(hddsVolumeRootDir.getPath());
+            return;
+          }
         }
 
         for (File containerTopDir : containerTopDirs) {
@@ -225,7 +227,7 @@ public class ContainerReader implements Runnable {
         KeyValueContainer kvContainer = new KeyValueContainer(kvContainerData,
             config);
         if (kvContainer.getContainerState() == RECOVERING) {
-          if (shouldDeleteRecovering) {
+          if (shouldDelete) {
             kvContainer.markContainerUnhealthy();
             LOG.info("Stale recovering container {} marked UNHEALTHY",
                 kvContainerData.getContainerID());
@@ -234,7 +236,9 @@ public class ContainerReader implements Runnable {
           return;
         }
         if (kvContainer.getContainerState() == DELETED) {
-          cleanupContainer(hddsVolume, kvContainer);
+          if (shouldDelete) {
+            cleanupContainer(hddsVolume, kvContainer);
+          }
           return;
         }
         try {
@@ -243,8 +247,10 @@ public class ContainerReader implements Runnable {
           if (e.getResult() != ContainerProtos.Result.CONTAINER_EXISTS) {
             throw e;
           }
-          resolveDuplicate((KeyValueContainer) containerSet.getContainer(
-              kvContainer.getContainerData().getContainerID()), kvContainer);
+          if (shouldDelete) {
+            resolveDuplicate((KeyValueContainer) containerSet.getContainer(
+                kvContainer.getContainerData().getContainerID()), kvContainer);
+          }
         }
       } else {
         throw new StorageContainerException("Container File is corrupted. " +
