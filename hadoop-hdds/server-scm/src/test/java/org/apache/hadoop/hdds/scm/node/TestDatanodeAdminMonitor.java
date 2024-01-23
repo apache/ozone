@@ -840,7 +840,7 @@ public class TestDatanodeAdminMonitor {
   @Test
   public void testContainersReplicatedOnDecomDnAPI()
       throws NodeNotFoundException, ContainerNotFoundException {
-    conf.setBoolean("hdds.scm.replication.enable.legacy", true);
+    conf.setBoolean("hdds.scm.replication.enable.legacy", false);
 
     DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
     nodeManager.register(dn1,

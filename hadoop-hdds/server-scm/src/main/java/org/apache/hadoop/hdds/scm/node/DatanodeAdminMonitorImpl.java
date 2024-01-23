@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -98,7 +97,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
     private DatanodeDetails datanodeDetails;
     private long startTime = 0L;
-    private Map<String, List<ContainerID>> containersReplicatedOnNode = new HashMap<>();
+    private Map<String, List<ContainerID>> containersReplicatedOnNode = new ConcurrentHashMap<>();
 
     public TrackedNode(DatanodeDetails datanodeDetails, long startTime) {
       this.datanodeDetails = datanodeDetails;
@@ -129,8 +128,8 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     }
 
     public void setContainersReplicatedOnNode(List<ContainerID> underReplicated, List<ContainerID> unClosed) {
-      this.containersReplicatedOnNode.put("UnderReplicated", ImmutableList.copyOf(underReplicated));
-      this.containersReplicatedOnNode.put("UnClosed", ImmutableList.copyOf(unClosed));
+      this.containersReplicatedOnNode.put("UnderReplicated", Collections.unmodifiableList(underReplicated));
+      this.containersReplicatedOnNode.put("UnClosed", Collections.unmodifiableList(unClosed));
     }
   }
 
