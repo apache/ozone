@@ -1243,12 +1243,14 @@
               {
                 "id": 3,
                 "name": "data",
-                "type": "bytes"
+                "type": "bytes",
+                "oneof_parent": "responseData"
               },
               {
                 "id": 4,
                 "name": "dataBuffers",
-                "type": "DataBuffers"
+                "type": "DataBuffers",
+                "oneof_parent": "responseData"
               }
             ]
           },
