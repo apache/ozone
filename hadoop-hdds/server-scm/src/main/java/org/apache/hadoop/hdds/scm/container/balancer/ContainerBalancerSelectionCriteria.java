@@ -84,19 +84,13 @@ public class ContainerBalancerSelectionCriteria {
   }
 
   /**
-   * Gets containers that are suitable for moving based on the following
-   * required criteria:
-   * 1. Container must not be undergoing replication.
-   * 2. Container must not already be selected for balancing.
-   * 3. Container size should be closer to 5GB.
-   * 4. Container must not be in the configured exclude containers list.
-   * 5. Container should be closed.
-   * 6. If the {@link LegacyReplicationManager} is enabled, then the container should not be an EC container.
-   * @param node DatanodeDetails for which to find candidate containers.
-   * @return Set of candidate containers that satisfy the criteria.
+   * Get ContainerID Set for the Datanode, it will be returned as NavigableSet
+   * Since sorting will be time-consuming, the Set will be cached.
+   *
+   * @param node source datanode
+   * @return cached Navigable ContainerID Set
    */
-  public Set<ContainerID> getCandidateContainers(
-      DatanodeDetails node, long sizeMovedAlready) {
+  public Set<ContainerID> getContainerIDSet(DatanodeDetails node) {
     try {
       // Initialize containerSet for node
       if (!setMap.containsKey(node)) {
@@ -111,17 +105,7 @@ public class ContainerBalancerSelectionCriteria {
       return Collections.emptySet();
     }
 
-    NavigableSet<ContainerID> containerIDSet = setMap.get(node);
-    if (excludeContainers != null) {
-      containerIDSet.removeAll(excludeContainers);
-    }
-    if (selectedContainers != null) {
-      containerIDSet.removeAll(selectedContainers);
-    }
-
-    containerIDSet.removeIf(
-        containerID -> shouldBeExcluded(containerID, node, sizeMovedAlready));
-    return containerIDSet;
+    return setMap.get(node);
   }
 
   /**
@@ -176,7 +160,21 @@ public class ContainerBalancerSelectionCriteria {
         && replicationManager.getConfig().isLegacyEnabled();
   }
 
-  private boolean shouldBeExcluded(ContainerID containerID,
+  /**
+   * Gets containers that are suitable for moving based on the following
+   * required criteria:
+   * 1. Container must not be in ExcludedContainers.
+   * 2. Container must not be in SelectedContainers.
+   * 3. Container must not be undergoing replication.
+   * 4. Container must not already be selected for balancing.
+   * 5. Container size should be closer to 5GB.
+   * 6. Container must not be in the configured exclude containers list.
+   * 7. Container should be closed.
+   * 8. If the {@link LegacyReplicationManager} is enabled, then the container should not be an EC container.
+   * @param node DatanodeDetails for which to find candidate containers.
+   * @return Set of candidate containers that satisfy the criteria.
+   */
+  public boolean shouldBeExcluded(ContainerID containerID,
       DatanodeDetails node, long sizeMovedAlready) {
     ContainerInfo container;
     try {
@@ -186,7 +184,8 @@ public class ContainerBalancerSelectionCriteria {
           "candidate container. Excluding it.", containerID);
       return true;
     }
-    return !isContainerClosed(container, node) || isECContainerAndLegacyRMEnabled(container) ||
+    return excludeContainers.contains(containerID) || selectedContainers.contains(containerID) ||
+        !isContainerClosed(container, node) || isECContainerAndLegacyRMEnabled(container) ||
         isContainerReplicatingOrDeleting(containerID) ||
         !findSourceStrategy.canSizeLeaveSource(node, container.getUsedBytes())
         || breaksMaxSizeToMoveLimit(container.containerID(),
