@@ -136,13 +136,12 @@ public final class ContainerTestUtils {
 
   public static StateContext getMockContext(DatanodeDetails datanodeDetails,
       OzoneConfiguration conf) {
-    DatanodeStateMachine stateMachine = Mockito.mock(
-        DatanodeStateMachine.class);
+    DatanodeStateMachine stateMachine = mock(DatanodeStateMachine.class);
     Mockito.lenient().when(stateMachine.getReconfigurationHandler())
         .thenReturn(new ReconfigurationHandler("DN", conf, op -> { }));
-    StateContext context = Mockito.mock(StateContext.class);
-    Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
-    Mockito.when(context.getParent()).thenReturn(stateMachine);
+    StateContext context = mock(StateContext.class);
+    when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
+    when(context.getParent()).thenReturn(stateMachine);
     return context;
   }
 
@@ -235,6 +234,15 @@ public final class ContainerTestUtils {
     return ScanResult.unhealthy(ScanResult.FailureType.CORRUPT_CHUNK,
         new File(""),
         new IOException("Fake corruption failure for testing"));
+  }
+
+  /**
+   * Construct an unhealthy scan result with DELETED_CONTAINER failure type.
+   */
+  public static ScanResult getDeletedContainerResult() {
+    return ScanResult.unhealthy(ScanResult.FailureType.DELETED_CONTAINER,
+        new File(""),
+        new IOException("Fake deleted container exception"));
   }
 
   public static KeyValueContainer addContainerToDeletedDir(

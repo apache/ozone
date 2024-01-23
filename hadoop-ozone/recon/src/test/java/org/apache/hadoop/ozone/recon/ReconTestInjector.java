@@ -45,7 +45,6 @@ import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.ratis.util.Preconditions;
-import org.junit.rules.TemporaryFolder;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
@@ -73,10 +72,6 @@ public class ReconTestInjector {
   private Map<Class, Class> extraInheritedBindings = new HashMap<>();
   private Map<Class, Object> extraInstanceBindings = new HashMap<>();
   private Set<Class> extraClassBindings = new HashSet<>();
-
-  public ReconTestInjector(TemporaryFolder temporaryFolder) throws IOException {
-    this.tmpDir = temporaryFolder.newFolder();
-  }
 
   public ReconTestInjector(File tmpDir) {
     this.tmpDir = tmpDir;
@@ -208,7 +203,7 @@ public class ReconTestInjector {
     }
 
     if (withReconSqlDb) {
-      reconSqlDB = new AbstractReconSqlDBTest();
+      reconSqlDB = new AbstractReconSqlDBTest(tmpDir.toPath());
       modules.addAll(reconSqlDB.getReconSqlDBModules());
     }
 
@@ -237,10 +232,6 @@ public class ReconTestInjector {
    */
   public static class Builder {
     private ReconTestInjector reconTestInjector;
-
-    public Builder(TemporaryFolder temporaryFolder) throws IOException {
-      reconTestInjector = new ReconTestInjector(temporaryFolder);
-    }
 
     public Builder(File tmpDir) {
       reconTestInjector = new ReconTestInjector(tmpDir);

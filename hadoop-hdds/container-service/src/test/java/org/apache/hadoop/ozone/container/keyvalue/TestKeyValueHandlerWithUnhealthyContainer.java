@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,7 +49,11 @@ import static org.apache.hadoop.ozone.container.ContainerTestHelper.getPutBlockR
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getTestBlockID;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getWriteChunkRequest;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -65,7 +68,7 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
 
   @BeforeEach
   public void init() {
-    mockIcrSender = Mockito.mock(IncrementalReportSender.class);
+    mockIcrSender = mock(IncrementalReportSender.class);
   }
 
   @Test
@@ -154,23 +157,23 @@ public class TestKeyValueHandlerWithUnhealthyContainer {
     KeyValueHandler handler = getDummyHandler();
     KeyValueContainerData mockContainerData = mock(KeyValueContainerData.class);
     HddsVolume mockVolume = mock(HddsVolume.class);
-    Mockito.when(mockContainerData.getVolume()).thenReturn(mockVolume);
+    when(mockContainerData.getVolume()).thenReturn(mockVolume);
     KeyValueContainer container = new KeyValueContainer(
         mockContainerData, new OzoneConfiguration());
 
     // When volume is failed, the call to mark the container unhealthy should
     // be ignored.
-    Mockito.when(mockVolume.isFailed()).thenReturn(true);
+    when(mockVolume.isFailed()).thenReturn(true);
     handler.markContainerUnhealthy(container,
         ContainerTestUtils.getUnhealthyScanResult());
-    Mockito.verify(mockIcrSender, Mockito.never()).send(Mockito.any());
+    verify(mockIcrSender, never()).send(any());
 
     // When volume is healthy, ICR should be sent when container is marked
     // unhealthy.
-    Mockito.when(mockVolume.isFailed()).thenReturn(false);
+    when(mockVolume.isFailed()).thenReturn(false);
     handler.markContainerUnhealthy(container,
         ContainerTestUtils.getUnhealthyScanResult());
-    Mockito.verify(mockIcrSender, Mockito.atMostOnce()).send(Mockito.any());
+    verify(mockIcrSender, atMostOnce()).send(any());
   }
 
   // -- Helper methods below.

@@ -68,7 +68,10 @@
                                 return {
                                     hostname: key,
                                     opstate: value && value.find((element) => element.key === "OPSTATE").value,
+                                    usedspacepercent: value && value.find((element) => element.key === "USEDSPACEPERCENT").value,
+                                    capacity: value && value.find((element) => element.key === "CAPACITY").value,
                                     comstate: value && value.find((element) => element.key === "COMSTATE").value,
+                                    lastheartbeat: value && value.find((element) => element.key === "LASTHEARTBEAT").value,
                                     port: portSpec.port,
                                     protocol: portSpec.proto
                                 }

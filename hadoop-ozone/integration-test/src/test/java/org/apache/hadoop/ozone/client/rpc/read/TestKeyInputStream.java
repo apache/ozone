@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.om.TestBucket;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -63,10 +64,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * Tests {@link KeyInputStream}.
  */
 class TestKeyInputStream extends TestInputStreamBase {
-
-  private static List<ContainerLayoutVersion> layouts() {
-    return ContainerLayoutVersion.getAllVersions();
-  }
 
   /**
    * This method does random seeks and reads and validates the reads are
@@ -124,8 +121,7 @@ class TestKeyInputStream extends TestInputStreamBase {
    * This test runs the others as a single test, so to avoid creating a new
    * mini-cluster for each test.
    */
-  @ParameterizedTest
-  @MethodSource("layouts")
+  @ContainerLayoutTestInfo.ContainerTest
   void testNonReplicationReads(ContainerLayoutVersion layout) throws Exception {
     try (MiniOzoneCluster cluster = newCluster(layout)) {
       cluster.waitForClusterToBeReady();

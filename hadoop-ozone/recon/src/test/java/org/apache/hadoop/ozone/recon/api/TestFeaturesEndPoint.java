@@ -29,7 +29,6 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.io.TempDir;
 
 import javax.ws.rs.core.Response;
@@ -41,6 +40,9 @@ import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_E
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_PROVIDER_KEY;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -97,9 +99,9 @@ public class TestFeaturesEndPoint {
     Response disabledFeatures = featuresEndPoint.getDisabledFeatures();
     List<FeatureProvider.Feature> allDisabledFeatures =
         (List<FeatureProvider.Feature>) disabledFeatures.getEntity();
-    Assertions.assertNotNull(allDisabledFeatures);
-    Assertions.assertTrue(allDisabledFeatures.size() > 0);
-    Assertions.assertEquals(FeatureProvider.Feature.HEATMAP.getFeatureName(),
+    assertNotNull(allDisabledFeatures);
+    assertThat(allDisabledFeatures.size()).isGreaterThan(0);
+    assertEquals(FeatureProvider.Feature.HEATMAP.getFeatureName(),
         allDisabledFeatures.get(0).getFeatureName());
   }
 
@@ -112,8 +114,8 @@ public class TestFeaturesEndPoint {
     Response disabledFeatures = featuresEndPoint.getDisabledFeatures();
     List<FeatureProvider.Feature> allDisabledFeatures =
         (List<FeatureProvider.Feature>) disabledFeatures.getEntity();
-    Assertions.assertNotNull(allDisabledFeatures);
-    Assertions.assertTrue(allDisabledFeatures.size() == 0);
+    assertNotNull(allDisabledFeatures);
+    assertEquals(0, allDisabledFeatures.size());
   }
 
   @Test
@@ -125,9 +127,9 @@ public class TestFeaturesEndPoint {
     Response disabledFeatures = featuresEndPoint.getDisabledFeatures();
     List<FeatureProvider.Feature> allDisabledFeatures =
         (List<FeatureProvider.Feature>) disabledFeatures.getEntity();
-    Assertions.assertNotNull(allDisabledFeatures);
-    Assertions.assertTrue(allDisabledFeatures.size() > 0);
-    Assertions.assertEquals(FeatureProvider.Feature.HEATMAP.getFeatureName(),
+    assertNotNull(allDisabledFeatures);
+    assertThat(allDisabledFeatures.size()).isGreaterThan(0);
+    assertEquals(FeatureProvider.Feature.HEATMAP.getFeatureName(),
         allDisabledFeatures.get(0).getFeatureName());
   }
 
@@ -140,7 +142,7 @@ public class TestFeaturesEndPoint {
     Response disabledFeatures = featuresEndPoint.getDisabledFeatures();
     List<FeatureProvider.Feature> allDisabledFeatures =
         (List<FeatureProvider.Feature>) disabledFeatures.getEntity();
-    Assertions.assertNotNull(allDisabledFeatures);
-    Assertions.assertTrue(allDisabledFeatures.size() == 0);
+    assertNotNull(allDisabledFeatures);
+    assertEquals(0, allDisabledFeatures.size());
   }
 }

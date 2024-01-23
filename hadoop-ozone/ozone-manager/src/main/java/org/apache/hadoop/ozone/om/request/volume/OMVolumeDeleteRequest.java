@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 
 import com.google.common.base.Preconditions;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
 import org.slf4j.Logger;
@@ -65,9 +65,8 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long transactionLogIndex = termIndex.getIndex();
 
     DeleteVolumeRequest deleteVolumeRequest =
         getOmRequest().getDeleteVolumeRequest();
@@ -148,8 +147,6 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
       omClientResponse = new OMVolumeDeleteResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
       if (acquiredUserLock) {
         mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(USER_LOCK, owner));

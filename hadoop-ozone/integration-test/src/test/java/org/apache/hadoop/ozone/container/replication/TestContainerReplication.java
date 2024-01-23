@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -88,13 +89,8 @@ class TestContainerReplication {
   }
 
   @AfterAll
-  static void tearDown() throws IOException {
-    if (clientFactory != null) {
-      clientFactory.close();
-    }
-    if (cluster != null) {
-      cluster.shutdown();
-    }
+  static void tearDown() {
+    IOUtils.closeQuietly(clientFactory, cluster);
   }
 
   @ParameterizedTest

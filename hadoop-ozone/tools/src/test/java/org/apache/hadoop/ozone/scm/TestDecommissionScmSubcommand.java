@@ -25,14 +25,14 @@ import org.apache.ozone.test.GenericTestUtils;
 
 import java.io.IOException;
 import java.util.UUID;
-
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import org.mockito.Mockito;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import picocli.CommandLine;
 
 /**
@@ -66,7 +66,7 @@ public class TestDecommissionScmSubcommand {
             .setSuccess(true)
             .build();
 
-    Mockito.when(client.decommissionScm(any()))
+    when(client.decommissionScm(any()))
         .thenAnswer(invocation -> (
             response));
 
@@ -94,7 +94,7 @@ public class TestDecommissionScmSubcommand {
             .setErrorMsg("Cannot remove current leader.")
             .build();
 
-    Mockito.when(client.decommissionScm(any()))
+    when(client.decommissionScm(any()))
         .thenAnswer(invocation -> (
             response));
 

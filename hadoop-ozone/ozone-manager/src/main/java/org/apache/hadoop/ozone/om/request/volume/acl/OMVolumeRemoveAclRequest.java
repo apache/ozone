@@ -19,12 +19,12 @@ package org.apache.hadoop.ozone.om.request.volume.acl;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeAclOpResponse;
@@ -140,10 +140,8 @@ public class OMVolumeRemoveAclRequest extends OMVolumeAclRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
     ozoneManager.getMetrics().incNumRemoveAcl();
-    return super.validateAndUpdateCache(ozoneManager, trxnLogIndex,
-        omDoubleBufferHelper);
+    return super.validateAndUpdateCache(ozoneManager, termIndex);
   }
 }

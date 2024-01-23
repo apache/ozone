@@ -53,14 +53,19 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
-import static org.mockito.ArgumentMatchers.anyObject;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import org.apache.ozone.test.tag.Flaky;
 import org.bouncycastle.cert.X509CertificateHolder;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -170,46 +175,45 @@ public class TestHddsSecureDatanodeInit {
 
     // Case 0: When keypair as well as certificate is missing. Initial keypair
     // boot-up. Get certificate will fail as no SCM is not running.
-    Assertions.assertThrows(Exception.class,
+    assertThrows(Exception.class,
         () -> service.initializeCertificateClient(client));
 
-    Assertions.assertNotNull(client.getPrivateKey());
-    Assertions.assertNotNull(client.getPublicKey());
-    Assertions.assertNull(client.getCertificate());
-    Assertions.assertTrue(dnLogs.getOutput()
-        .contains("Init response: GETCERT"));
+    assertNotNull(client.getPrivateKey());
+    assertNotNull(client.getPublicKey());
+    assertNull(client.getCertificate());
+    assertThat(dnLogs.getOutput()).contains("Init response: GETCERT");
   }
 
   @Test
   public void testSecureDnStartupCase1() throws Exception {
     // Case 1: When only certificate is present.
     certCodec.writeCertificate(certHolder);
-    RuntimeException rteException = Assertions.assertThrows(
+    RuntimeException rteException = assertThrows(
         RuntimeException.class,
         () -> service.initializeCertificateClient(client));
-    Assertions.assertTrue(rteException.getMessage()
-        .contains("DN security initialization failed"));
-    Assertions.assertNull(client.getPrivateKey());
-    Assertions.assertNull(client.getPublicKey());
-    Assertions.assertNotNull(client.getCertificate());
-    Assertions.assertTrue(dnLogs.getOutput()
-        .contains("Init response: FAILURE"));
+    assertThat(rteException.getMessage())
+        .contains("DN security initialization failed");
+    assertNull(client.getPrivateKey());
+    assertNull(client.getPublicKey());
+    assertNotNull(client.getCertificate());
+    assertThat(dnLogs.getOutput())
+        .contains("Init response: FAILURE");
   }
 
   @Test
   public void testSecureDnStartupCase2() throws Exception {
     // Case 2: When private key and certificate is missing.
     keyCodec.writePublicKey(publicKey);
-    RuntimeException rteException = Assertions.assertThrows(
+    RuntimeException rteException = assertThrows(
         RuntimeException.class,
         () -> service.initializeCertificateClient(client));
-    Assertions.assertTrue(rteException.getMessage()
-        .contains("DN security initialization failed"));
-    Assertions.assertNull(client.getPrivateKey());
-    Assertions.assertNotNull(client.getPublicKey());
-    Assertions.assertNull(client.getCertificate());
-    Assertions.assertTrue(dnLogs.getOutput()
-        .contains("Init response: FAILURE"));
+    assertThat(rteException.getMessage())
+        .contains("DN security initialization failed");
+    assertNull(client.getPrivateKey());
+    assertNotNull(client.getPublicKey());
+    assertNull(client.getCertificate());
+    assertThat(dnLogs.getOutput())
+        .contains("Init response: FAILURE");
   }
 
   @Test
@@ -217,16 +221,16 @@ public class TestHddsSecureDatanodeInit {
     // Case 3: When only public key and certificate is present.
     keyCodec.writePublicKey(publicKey);
     certCodec.writeCertificate(certHolder);
-    RuntimeException rteException = Assertions.assertThrows(
+    RuntimeException rteException = assertThrows(
         RuntimeException.class,
         () -> service.initializeCertificateClient(client));
-    Assertions.assertTrue(rteException.getMessage()
-        .contains("DN security initialization failed"));
-    Assertions.assertNull(client.getPrivateKey());
-    Assertions.assertNotNull(client.getPublicKey());
-    Assertions.assertNotNull(client.getCertificate());
-    Assertions.assertTrue(dnLogs.getOutput()
-        .contains("Init response: FAILURE"));
+    assertThat(rteException.getMessage())
+        .contains("DN security initialization failed");
+    assertNull(client.getPrivateKey());
+    assertNotNull(client.getPublicKey());
+    assertNotNull(client.getCertificate());
+    assertThat(dnLogs.getOutput())
+        .contains("Init response: FAILURE");
   }
 
   @Test
@@ -246,17 +250,17 @@ public class TestHddsSecureDatanodeInit {
             .setX509Certificate(pemCert)
             .setX509CACertificate(pemCert)
             .build();
-    when(scmClient.getDataNodeCertificateChain(anyObject(), anyString()))
+    when(scmClient.getDataNodeCertificateChain(any(), anyString()))
         .thenReturn(responseProto);
     service.initializeCertificateClient(client);
-    Assertions.assertNotNull(client.getPrivateKey());
-    Assertions.assertNotNull(client.getPublicKey());
-    Assertions.assertNotNull(client.getCertificate());
-    Assertions.assertTrue(dnLogs.getOutput()
-        .contains("Init response: GETCERT"));
+    assertNotNull(client.getPrivateKey());
+    assertNotNull(client.getPublicKey());
+    assertNotNull(client.getCertificate());
+    assertThat(dnLogs.getOutput())
+        .contains("Init response: GETCERT");
     dnLogs.clearOutput();
     // reset scmClient behavior
-    when(scmClient.getDataNodeCertificateChain(anyObject(), anyString()))
+    when(scmClient.getDataNodeCertificateChain(any(), anyString()))
         .thenReturn(null);
   }
 
@@ -266,11 +270,11 @@ public class TestHddsSecureDatanodeInit {
     certCodec.writeCertificate(certHolder);
     keyCodec.writePrivateKey(privateKey);
     service.initializeCertificateClient(client);
-    Assertions.assertNotNull(client.getPrivateKey());
-    Assertions.assertNotNull(client.getPublicKey());
-    Assertions.assertNotNull(client.getCertificate());
-    Assertions.assertTrue(dnLogs.getOutput()
-        .contains("Init response: SUCCESS"));
+    assertNotNull(client.getPrivateKey());
+    assertNotNull(client.getPublicKey());
+    assertNotNull(client.getCertificate());
+    assertThat(dnLogs.getOutput())
+        .contains("Init response: SUCCESS");
   }
 
   @Test
@@ -278,13 +282,13 @@ public class TestHddsSecureDatanodeInit {
     // Case 6: If key pair already exist than response should be GETCERT.
     keyCodec.writePublicKey(publicKey);
     keyCodec.writePrivateKey(privateKey);
-    Assertions.assertThrows(Exception.class,
+    assertThrows(Exception.class,
         () -> service.initializeCertificateClient(client));
-    Assertions.assertNotNull(client.getPrivateKey());
-    Assertions.assertNotNull(client.getPublicKey());
-    Assertions.assertNull(client.getCertificate());
-    Assertions.assertTrue(dnLogs.getOutput()
-        .contains("Init response: GETCERT"));
+    assertNotNull(client.getPrivateKey());
+    assertNotNull(client.getPublicKey());
+    assertNull(client.getCertificate());
+    assertThat(dnLogs.getOutput())
+        .contains("Init response: GETCERT");
   }
 
   @Test
@@ -295,11 +299,11 @@ public class TestHddsSecureDatanodeInit {
     certCodec.writeCertificate(certHolder);
 
     service.initializeCertificateClient(client);
-    Assertions.assertNotNull(client.getPrivateKey());
-    Assertions.assertNotNull(client.getPublicKey());
-    Assertions.assertNotNull(client.getCertificate());
-    Assertions.assertTrue(dnLogs.getOutput()
-        .contains("Init response: SUCCESS"));
+    assertNotNull(client.getPrivateKey());
+    assertNotNull(client.getPublicKey());
+    assertNotNull(client.getCertificate());
+    assertThat(dnLogs.getOutput())
+        .contains("Init response: SUCCESS");
   }
 
   /**
@@ -334,7 +338,7 @@ public class TestHddsSecureDatanodeInit {
             .setX509CACertificate(pemCert)
             .setX509RootCACertificate(pemCert)
             .build();
-    when(scmClient.getDataNodeCertificateChain(anyObject(), anyString()))
+    when(scmClient.getDataNodeCertificateChain(any(), anyString()))
         .thenReturn(responseProto);
 
     List<String> rootCaList = new ArrayList<>();
@@ -342,8 +346,7 @@ public class TestHddsSecureDatanodeInit {
     when(scmClient.getAllRootCaCertificates()).thenReturn(rootCaList);
     // check that new cert ID should not equal to current cert ID
     String certId = newCertHolder.getSerialNumber().toString();
-    Assertions.assertFalse(certId.equals(
-        client.getCertificate().getSerialNumber().toString()));
+    assertNotEquals(certId, client.getCertificate().getSerialNumber().toString());
 
     // start monitor task to renew key and cert
     client.startCertificateRenewerService();
@@ -371,7 +374,7 @@ public class TestHddsSecureDatanodeInit {
         .setX509CACertificate(pemCert)
         .setX509RootCACertificate(pemCert)
         .build();
-    when(scmClient.getDataNodeCertificateChain(anyObject(), anyString()))
+    when(scmClient.getDataNodeCertificateChain(any(), anyString()))
         .thenReturn(responseProto);
     rootCaList.add(pemCert);
     when(scmClient.getAllRootCaCertificates()).thenReturn(rootCaList);
@@ -382,12 +385,10 @@ public class TestHddsSecureDatanodeInit {
       String newCertId = client.getCertificate().getSerialNumber().toString();
       return newCertId.equals(certId2);
     }, 1000, CERT_LIFETIME * 1000);
-    Assertions.assertFalse(client.getPrivateKey().equals(privateKey1));
-    Assertions.assertFalse(client.getPublicKey().equals(publicKey1));
-    Assertions.assertFalse(client.getCACertificate().getSerialNumber()
-        .toString().equals(caCertId1));
-    Assertions.assertFalse(client.getRootCACertificate().getSerialNumber()
-        .toString().equals(rootCaCertId1));
+    assertNotEquals(privateKey1, client.getPrivateKey());
+    assertNotEquals(publicKey1, client.getPublicKey());
+    assertNotEquals(caCertId1, client.getCACertificate().getSerialNumber().toString());
+    assertNotEquals(rootCaCertId1, client.getRootCACertificate().getSerialNumber().toString());
   }
 
   /**
@@ -412,25 +413,23 @@ public class TestHddsSecureDatanodeInit {
                 .SCMGetCertResponseProto.ResponseCode.success)
             .setX509Certificate(pemCert)
             .build();
-    when(scmClient.getDataNodeCertificateChain(anyObject(), anyString()))
+    when(scmClient.getDataNodeCertificateChain(any(), anyString()))
         .thenReturn(responseProto);
 
     // check that new cert ID should not equal to current cert ID
     String certId = newCertHolder.getSerialNumber().toString();
-    Assertions.assertFalse(certId.equals(
-        client.getCertificate().getSerialNumber().toString()));
+    assertNotEquals(certId, client.getCertificate().getSerialNumber().toString());
 
     // start monitor task to renew key and cert
     client.startCertificateRenewerService();
 
     // certificate failed to renew, client still hold the old expired cert.
     Thread.sleep(CERT_LIFETIME * 1000);
-    Assertions.assertFalse(certId.equals(
-        client.getCertificate().getSerialNumber().toString()));
+    assertNotEquals(certId, client.getCertificate().getSerialNumber().toString());
     try {
       client.getCertificate().checkValidity();
     } catch (Exception e) {
-      Assertions.assertTrue(e instanceof CertificateExpiredException);
+      assertInstanceOf(CertificateExpiredException.class, e);
     }
 
     // provide a new valid SCMGetCertResponseProto
@@ -443,7 +442,7 @@ public class TestHddsSecureDatanodeInit {
         .setX509Certificate(pemCert)
         .setX509CACertificate(pemCert)
         .build();
-    when(scmClient.getDataNodeCertificateChain(anyObject(), anyString()))
+    when(scmClient.getDataNodeCertificateChain(any(), anyString()))
         .thenReturn(responseProto);
     String certId2 = newCertHolder.getSerialNumber().toString();
 

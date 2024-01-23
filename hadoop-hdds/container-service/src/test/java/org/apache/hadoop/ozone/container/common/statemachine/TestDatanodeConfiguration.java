@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.util.TimeDuration;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.TimeUnit;
@@ -183,13 +182,13 @@ public class TestDatanodeConfiguration {
 
     final DatanodeRatisServerConfig ratisConf = conf.getObject(
         DatanodeRatisServerConfig.class);
-    Assertions.assertEquals(1, ratisConf.getLogAppenderWaitTimeMin(),
+    assertEquals(0, ratisConf.getLogAppenderWaitTimeMin(),
         "getLogAppenderWaitTimeMin");
 
-    assertWaitTimeMin(TimeDuration.ONE_MILLISECOND, conf);
-    ratisConf.setLogAppenderWaitTimeMin(0);
-    conf.setFromObject(ratisConf);
     assertWaitTimeMin(TimeDuration.ZERO, conf);
+    ratisConf.setLogAppenderWaitTimeMin(1);
+    conf.setFromObject(ratisConf);
+    assertWaitTimeMin(TimeDuration.ONE_MILLISECOND, conf);
   }
 
   static void assertWaitTimeMin(TimeDuration expected,
@@ -198,7 +197,7 @@ public class TestDatanodeConfiguration {
     final RaftProperties p = ContainerTestUtils.newXceiverServerRatis(dn, conf)
         .newRaftProperties();
     final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);
-    Assertions.assertEquals(expected, t,
+    assertEquals(expected, t,
         RaftServerConfigKeys.Log.Appender.WAIT_TIME_MIN_KEY);
   }
 }

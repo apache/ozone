@@ -135,6 +135,7 @@ public final class SCMNodeMetrics implements MetricsSource {
   public void getMetrics(MetricsCollector collector, boolean all) {
     Map<String, Map<String, Integer>> nodeCount = managerMXBean.getNodeCount();
     Map<String, Long> nodeInfo = managerMXBean.getNodeInfo();
+    int totalNodeCount = 0;
     /**
      * Loop over the Node map and create a metric for the cross product of all
      * Operational and health states, ie:
@@ -152,8 +153,11 @@ public final class SCMNodeMetrics implements MetricsSource {
                 StringUtils.camelize(e.getKey() + "_" + h.getKey() + "_nodes"),
                 "Number of " + e.getKey() + " " + h.getKey() + " datanodes"),
             h.getValue());
+        totalNodeCount += h.getValue();
       }
     }
+    metrics.addGauge(
+        Interns.info("AllNodes", "Number of datanodes"), totalNodeCount);
 
     for (Map.Entry<String, Long> e : nodeInfo.entrySet()) {
       metrics.addGauge(

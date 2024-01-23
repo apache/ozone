@@ -30,7 +30,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 
 import java.io.IOException;
@@ -39,9 +38,12 @@ import java.util.List;
 
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.times;
 
@@ -96,7 +98,7 @@ public class TestOmUpdateEventValidator {
         mock(SnapshotInfo.class), "key1", PUT));
 
     // Verify that no log message is printed
-    verify(logger, Mockito.never()).warn(Mockito.anyString());
+    verify(logger, never()).warn(anyString());
   }
 
   @Test
@@ -138,7 +140,7 @@ public class TestOmUpdateEventValidator {
     // Assert that the captured log messages are not empty
     List<String> logMessages = captor.getAllValues();
     for (String logMessage : logMessages) {
-      assertFalse(logMessage.isEmpty(), "Warning message is empty");
+      assertThat(logMessage).isNotEmpty();
     }
   }
 

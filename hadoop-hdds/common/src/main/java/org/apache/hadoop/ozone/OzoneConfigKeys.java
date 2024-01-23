@@ -188,6 +188,10 @@ public final class OzoneConfigKeys {
       "ozone.client.ec.grpc.write.timeout";
   public static final String OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT_DEFAULT = "30s";
 
+  public static final String OZONE_EC_GRPC_ZERO_COPY_ENABLED =
+      "ozone.ec.grpc.zerocopy.enabled";
+  public static final boolean OZONE_EC_GRPC_ZERO_COPY_ENABLED_DEFAULT = true;
+
   /**
    * Ozone administrator users delimited by comma.
    * If not set, only the user who launches an ozone service will be the
@@ -352,10 +356,6 @@ public final class OzoneConfigKeys {
       = ScmConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY;
   public static final String DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT
       = ScmConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_SEGMENT_BUFFER_SIZE_KEY
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_BUFFER_SIZE_KEY;
-  public static final String DFS_CONTAINER_RATIS_SEGMENT_BUFFER_SIZE_DEFAULT
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_BUFFER_SIZE_DEFAULT;
   public static final String DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY
       = ScmConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY;
   public static final String
@@ -381,9 +381,6 @@ public final class OzoneConfigKeys {
   public static final String
       DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES =
       ScmConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES;
-  public static final int
-      DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES_DEFAULT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES_DEFAULT;
   public static final String DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS =
       ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS;
   public static final int DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS_DEFAULT =
@@ -670,6 +667,14 @@ public final class OzoneConfigKeys {
       TimeDuration.valueOf(150, TimeUnit.SECONDS);
   public static final String OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION =
       "ozone.scm.close.container.wait.duration";
+
+  public static final String HDDS_SCM_CLIENT_RPC_TIME_OUT =
+      "hdds.scmclient.rpc.timeout";
+  public static final String HDDS_SCM_CLIENT_MAX_RETRY_TIMEOUT =
+      "hdds.scmclient.max.retry.timeout";
+  public static final String HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY =
+      "hdds.scmclient.failover.max.retry";
+
 
   /**
    * There is no need to instantiate this class.

@@ -35,6 +35,8 @@ import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -53,11 +55,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT;
@@ -113,11 +115,10 @@ public class ContainerOperationClient implements ScmClient {
       throws IOException {
     XceiverClientManager manager;
     if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-      List<X509Certificate> caCertificates =
-          HAUtils.buildCAX509List(null, conf);
+      CACertificateProvider caCerts = () -> HAUtils.buildCAX509List(null, conf);
       manager = new XceiverClientManager(conf,
           conf.getObject(XceiverClientManager.ScmClientConfig.class),
-          caCertificates);
+          new ClientTrustManager(caCerts, null));
     } else {
       manager = new XceiverClientManager(conf);
     }
@@ -223,6 +224,11 @@ public class ContainerOperationClient implements ScmClient {
       throws IOException {
     return storageContainerLocationClient.queryNode(opState, nodeState,
         queryScope, poolName, ClientVersion.CURRENT_VERSION);
+  }
+
+  @Override
+  public HddsProtos.Node queryNode(UUID uuid) throws IOException {
+    return storageContainerLocationClient.queryNode(uuid);
   }
 
   @Override

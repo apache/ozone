@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.s3.security;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -26,7 +27,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -100,9 +100,7 @@ public class OMSetSecretRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-         long transactionLogIndex,
-         OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
@@ -125,7 +123,7 @@ public class OMSetSecretRequest extends OMClientRequest {
               // Update S3SecretTable cache entry in this case
               newS3SecretValue = new S3SecretValue(accessId, secretKey);
               // Set the transactionLogIndex to be used for updating.
-              newS3SecretValue.setTransactionLogIndex(transactionLogIndex);
+              newS3SecretValue.setTransactionLogIndex(termIndex.getIndex());
               s3SecretManager
                   .updateCache(accessId, newS3SecretValue);
             } else {
@@ -149,9 +147,6 @@ public class OMSetSecretRequest extends OMClientRequest {
       exception = ex;
       omClientResponse = new OMSetSecretResponse(
           createErrorOMResponse(omResponse, ex));
-    } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
     }
 
     final Map<String, String> auditMap = new HashMap<>();

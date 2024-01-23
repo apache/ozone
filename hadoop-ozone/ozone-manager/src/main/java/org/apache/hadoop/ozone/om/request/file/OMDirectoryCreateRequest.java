@@ -31,12 +31,13 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
@@ -44,8 +45,7 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -114,14 +114,19 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     CreateDirectoryRequest createDirectoryRequest =
-        getOmRequest().getCreateDirectoryRequest();
+        super.preExecute(ozoneManager).getCreateDirectoryRequest();
     Preconditions.checkNotNull(createDirectoryRequest);
+
+    OmUtils.verifyKeyNameWithSnapshotReservedWord(
+        createDirectoryRequest.getKeyArgs().getKeyName());
 
     KeyArgs.Builder newKeyArgs = createDirectoryRequest.getKeyArgs()
         .toBuilder().setModificationTime(Time.now());
 
+    KeyArgs resolvedKeyArgs = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
+        ozoneManager, ACLType.CREATE);
     CreateDirectoryRequest.Builder newCreateDirectoryRequest =
-        createDirectoryRequest.toBuilder().setKeyArgs(newKeyArgs);
+        createDirectoryRequest.toBuilder().setKeyArgs(resolvedKeyArgs);
 
     return getOmRequest().toBuilder().setCreateDirectoryRequest(
         newCreateDirectoryRequest).setUserInfo(getUserInfo()).build();
@@ -129,8 +134,8 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long trxnLogIndex = termIndex.getIndex();
 
     CreateDirectoryRequest createDirectoryRequest = getOmRequest()
         .getCreateDirectoryRequest();
@@ -159,14 +164,6 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     int numMissingParents = 0;
 
     try {
-      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
-      volumeName = keyArgs.getVolumeName();
-      bucketName = keyArgs.getBucketName();
-
-      // check Acl
-      checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
-          IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
-
       // Check if this is the root of the filesystem.
       if (keyName.length() == 0) {
         throw new OMException("Directory create failed. Cannot create " +
@@ -234,8 +231,6 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       omClientResponse = new OMDirectoryCreateResponse(
           createErrorOMResponse(omResponse, exception), result);
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
       if (acquiredLock) {
         mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));

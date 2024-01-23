@@ -37,7 +37,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.SelectorOutputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -55,6 +54,9 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOU
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 /**
  * Ozone file system tests with Streaming.
@@ -152,7 +154,7 @@ public class TestOzoneFileSystemWithStreaming {
 
     final OutputStream wrapped = out.getWrappedStream();
     LOG.info("wrapped: {}", wrapped.getClass());
-    Assertions.assertEquals(SelectorOutputStream.class, wrapped.getClass());
+    assertEquals(SelectorOutputStream.class, wrapped.getClass());
     final SelectorOutputStream<?> selector = (SelectorOutputStream<?>) wrapped;
     final boolean belowThreshold = data.length <= AUTO_THRESHOLD;
     LOG.info("data.length={}, threshold={}, belowThreshold? {}",
@@ -161,13 +163,12 @@ public class TestOzoneFileSystemWithStreaming {
 
     out.close();
     final OutputStream underlying = selector.getUnderlying();
-    Assertions.assertNotNull(underlying);
+    assertNotNull(underlying);
     LOG.info("underlying after close: {}", underlying.getClass());
     if (belowThreshold) {
-      Assertions.assertTrue(underlying instanceof OzoneFSOutputStream);
+      assertInstanceOf(OzoneFSOutputStream.class, underlying);
     } else {
-      Assertions.assertEquals(OzoneFSDataStreamOutput.class,
-          underlying.getClass());
+      assertEquals(OzoneFSDataStreamOutput.class, underlying.getClass());
     }
   }
 
@@ -177,10 +178,10 @@ public class TestOzoneFileSystemWithStreaming {
     LOG.info("underlying before close: {}", underlying != null ?
         underlying.getClass() : null);
     if (belowThreshold) {
-      Assertions.assertNull(underlying);
+      assertNull(underlying);
     } else {
-      Assertions.assertNotNull(underlying);
-      Assertions.assertEquals(OzoneFSDataStreamOutput.class,
+      assertNotNull(underlying);
+      assertEquals(OzoneFSDataStreamOutput.class,
           underlying.getClass());
     }
   }

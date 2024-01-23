@@ -30,14 +30,14 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
-
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests Freon with Pipeline destroy.
@@ -54,7 +54,7 @@ public class TestFreonWithPipelineDestroy {
    * Ozone is made active by setting OZONE_ENABLED = true
    *
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT,
@@ -85,7 +85,7 @@ public class TestFreonWithPipelineDestroy {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -114,11 +114,10 @@ public class TestFreonWithPipelineDestroy {
         "--validate-writes"
     );
 
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
-    Assert.assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
-    Assert.assertEquals(0,
-        randomKeyGenerator.getUnsuccessfulValidationCount());
+    assertEquals(1, randomKeyGenerator.getNumberOfVolumesCreated());
+    assertEquals(1, randomKeyGenerator.getNumberOfBucketsCreated());
+    assertEquals(1, randomKeyGenerator.getNumberOfKeysAdded());
+    assertEquals(0, randomKeyGenerator.getUnsuccessfulValidationCount());
   }
 
   private void destroyPipeline() throws Exception {

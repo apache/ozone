@@ -81,6 +81,7 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -297,7 +298,7 @@ public class TestECUnderReplicationHandler {
       List<DatanodeDetails> usedNodes) {
     assertEquals(replicas.size(), usedNodes.size());
     for (ContainerReplica r : replicas) {
-      assertTrue(usedNodes.contains(r.getDatanodeDetails()));
+      assertThat(usedNodes).contains(r.getDatanodeDetails());
     }
   }
 

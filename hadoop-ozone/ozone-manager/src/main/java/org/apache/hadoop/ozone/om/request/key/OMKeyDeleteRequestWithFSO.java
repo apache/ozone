@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -31,7 +32,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -68,8 +68,8 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long trxnLogIndex = termIndex.getIndex();
     DeleteKeyRequest deleteKeyRequest = getOmRequest().getDeleteKeyRequest();
 
     OzoneManagerProtocolProtos.KeyArgs keyArgs =
@@ -96,13 +96,6 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
     Result result = null;
     OmBucketInfo omBucketInfo = null;
     try {
-      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
-      volumeName = keyArgs.getVolumeName();
-      bucketName = keyArgs.getBucketName();
-
-      checkACLsWithFSO(ozoneManager, volumeName, bucketName, keyName,
-          IAccessAuthorizer.ACLType.DELETE);
-
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
       acquiredLock = getOmLockDetails().isLockAcquired();
@@ -178,8 +171,6 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       omClientResponse = new OMKeyDeleteResponseWithFSO(
           createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-            omDoubleBufferHelper);
       if (acquiredLock) {
         mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
@@ -211,5 +202,14 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
     }
 
     return omClientResponse;
+  }
+
+  @Override
+  protected OzoneManagerProtocolProtos.KeyArgs resolveBucketAndCheckAcls(
+      OzoneManager ozoneManager,
+      OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs)
+      throws IOException {
+    return resolveBucketAndCheckKeyAclsWithFSO(newKeyArgs.build(),
+        ozoneManager, IAccessAuthorizer.ACLType.DELETE);
   }
 }

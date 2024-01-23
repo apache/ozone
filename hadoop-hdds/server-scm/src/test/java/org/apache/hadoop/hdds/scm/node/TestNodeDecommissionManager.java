@@ -42,6 +42,7 @@ import java.util.ArrayList;
 
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -63,7 +64,7 @@ public class TestNodeDecommissionManager {
     conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.getAbsolutePath());
     nodeManager = createNodeManager(conf);
-    decom = new NodeDecommissionManager(conf, nodeManager, null,
+    decom = new NodeDecommissionManager(conf, nodeManager,
         SCMContext.emptyContext(), new EventQueue(), null);
   }
 
@@ -101,31 +102,30 @@ public class TestNodeDecommissionManager {
         decom.decommissionNodes(
             singletonList(dns.get(1).getIpAddress() + ":10"));
     assertEquals(1, error.size());
-    assertTrue(error.get(0).getHostname().contains(dns.get(1).getIpAddress()));
+    assertThat(error.get(0).getHostname()).contains(dns.get(1).getIpAddress());
 
     // Try to decommission a host that does not exist
     error = decom.decommissionNodes(singletonList("123.123.123.123"));
     assertEquals(1, error.size());
-    assertTrue(error.get(0).getHostname().contains("123.123.123.123"));
+    assertThat(error.get(0).getHostname()).contains("123.123.123.123");
 
     // Try to decommission a host that does exist and a host that does not
     error  = decom.decommissionNodes(Arrays.asList(dns.get(1).getIpAddress(),
         "123,123,123,123"));
     assertEquals(1, error.size());
-    assertTrue(error.get(0).getHostname().contains("123,123,123,123"));
+    assertThat(error.get(0).getHostname()).contains("123,123,123,123");
 
     // Try to decommission a host with many DNs on the address with no port
     error = decom.decommissionNodes(singletonList(dns.get(0).getIpAddress()));
     assertEquals(1, error.size());
-    assertTrue(error.get(0).getHostname().contains(dns.get(0).getIpAddress()));
+    assertThat(error.get(0).getHostname()).contains(dns.get(0).getIpAddress());
 
     // Try to decommission a host with many DNs on the address with a port
     // that does not exist
     error = decom.decommissionNodes(singletonList(dns.get(0).getIpAddress()
         + ":10"));
     assertEquals(1, error.size());
-    assertTrue(error.get(0).getHostname().contains(dns.get(0).getIpAddress()
-        + ":10"));
+    assertThat(error.get(0).getHostname()).contains(dns.get(0).getIpAddress() + ":10");
 
     // Try to decommission 2 hosts with address that does not exist
     // Both should return error
@@ -220,7 +220,7 @@ public class TestNodeDecommissionManager {
     List<DatanodeAdminError> error =
         decom.decommissionNodes(singletonList(extraDN.getIpAddress()));
     assertEquals(1, error.size());
-    assertTrue(error.get(0).getHostname().contains(extraDN.getIpAddress()));
+    assertThat(error.get(0).getHostname()).contains(extraDN.getIpAddress());
 
     // Now try the one with the unique port
     decom.decommissionNodes(

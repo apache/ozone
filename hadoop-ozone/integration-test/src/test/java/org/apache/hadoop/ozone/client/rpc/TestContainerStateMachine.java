@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -53,28 +54,22 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import org.apache.ratis.statemachine.impl.StatemachineImplTestUtil;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests the containerStateMachine failure handling.
  */
+@Timeout(300)
 public class TestContainerStateMachine {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
@@ -89,7 +84,7 @@ public class TestContainerStateMachine {
    *
    * @throws IOException
    */
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     path = GenericTestUtils
         .getTempPath(TestContainerStateMachine.class.getSimpleName());
@@ -137,7 +132,7 @@ public class TestContainerStateMachine {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -149,8 +144,9 @@ public class TestContainerStateMachine {
   public void testContainerStateMachineFailures() throws Exception {
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
-            .createKey("ratis", 1024, ReplicationType.RATIS,
-                ReplicationFactor.ONE, new HashMap<>());
+            .createKey("ratis", 1024,
+                ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+                    ReplicationFactor.ONE), new HashMap<>());
     // First write and flush creates a container in the datanode
     key.write("ratis".getBytes(UTF_8));
     key.flush();
@@ -162,7 +158,7 @@ public class TestContainerStateMachine {
 
     List<OmKeyLocationInfo> locationInfoList =
         groupOutputStream.getLocationInfoList();
-    Assert.assertEquals(1, locationInfoList.size());
+    assertEquals(1, locationInfoList.size());
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
 
     // delete the container dir
@@ -174,7 +170,7 @@ public class TestContainerStateMachine {
 
     key.close();
     // Make sure the container is marked unhealthy
-    Assert.assertEquals(
+    assertEquals(
         ContainerProtos.ContainerDataProto.State.UNHEALTHY,
         cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
             .getContainer().getContainerSet()
@@ -189,14 +185,15 @@ public class TestContainerStateMachine {
         (ContainerStateMachine) TestHelper.getStateMachine(cluster);
     SimpleStateMachineStorage storage =
         (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
-    Assert.assertNull(StatemachineImplTestUtil.findLatestSnapshot(storage));
+    assertNull(StatemachineImplTestUtil.findLatestSnapshot(storage));
 
     // Write 10 keys. Num snapshots should be equal to config value.
     for (int i = 1; i <= 10; i++) {
       OzoneOutputStream key =
           objectStore.getVolume(volumeName).getBucket(bucketName)
-              .createKey(("ratis" + i), 1024, ReplicationType.RATIS,
-                  ReplicationFactor.ONE, new HashMap<>());
+              .createKey(("ratis" + i), 1024,
+                  ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+                      ReplicationFactor.ONE), new HashMap<>());
       // First write and flush creates a container in the datanode
       key.write(("ratis" + i).getBytes(UTF_8));
       key.flush();
@@ -212,15 +209,16 @@ public class TestContainerStateMachine {
     storage = (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
     Path parentPath = getSnapshotPath(storage);
     int numSnapshots = parentPath.getParent().toFile().listFiles().length;
-    Assert.assertTrue(Math.abs(ratisServerConfiguration
-        .getNumSnapshotsRetained() - numSnapshots) <= 1);
+    assertThat(Math.abs(ratisServerConfiguration.getNumSnapshotsRetained() - numSnapshots))
+        .isLessThanOrEqualTo(1);
 
     // Write 10 more keys. Num Snapshots should remain the same.
     for (int i = 11; i <= 20; i++) {
       OzoneOutputStream key =
           objectStore.getVolume(volumeName).getBucket(bucketName)
-              .createKey(("ratis" + i), 1024, ReplicationType.RATIS,
-                  ReplicationFactor.ONE, new HashMap<>());
+              .createKey(("ratis" + i), 1024,
+                  ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+                      ReplicationFactor.ONE), new HashMap<>());
       // First write and flush creates a container in the datanode
       key.write(("ratis" + i).getBytes(UTF_8));
       key.flush();
@@ -232,8 +230,8 @@ public class TestContainerStateMachine {
     storage = (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
     parentPath = getSnapshotPath(storage);
     numSnapshots = parentPath.getParent().toFile().listFiles().length;
-    Assert.assertTrue(Math.abs(ratisServerConfiguration
-        .getNumSnapshotsRetained() - numSnapshots) <= 1);
+    assertThat(Math.abs(ratisServerConfiguration.getNumSnapshotsRetained() - numSnapshots))
+        .isLessThanOrEqualTo(1);
   }
 
   static Path getSnapshotPath(SimpleStateMachineStorage storage)

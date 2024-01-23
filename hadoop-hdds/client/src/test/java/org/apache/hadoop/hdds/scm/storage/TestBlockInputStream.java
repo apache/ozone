@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.primitives.Bytes;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -35,13 +36,11 @@ import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.StatusException;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 import org.mockito.stubbing.OngoingStubbing;
 
 import java.io.EOFException;
@@ -52,7 +51,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -92,7 +90,7 @@ public class TestBlockInputStream {
   @BeforeEach
   @SuppressWarnings("unchecked")
   public void setup() throws Exception {
-    refreshFunction = Mockito.mock(Function.class);
+    refreshFunction = mock(Function.class);
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     checksum = new Checksum(ChecksumType.NONE, CHUNK_SIZE);
     createChunkList(5);
@@ -188,9 +186,8 @@ public class TestBlockInputStream {
     assertThrows(EOFException.class, () -> seekAndVerify(finalPos));
 
     // Seek to random positions between 0 and the block size.
-    Random random = new Random();
     for (int i = 0; i < 10; i++) {
-      pos = random.nextInt(blockSize);
+      pos = RandomUtils.nextInt(0, blockSize);
       seekAndVerify(pos);
     }
   }
@@ -376,7 +373,7 @@ public class TestBlockInputStream {
       subject.initialize();
 
       // WHEN
-      Assertions.assertThrows(ex.getClass(),
+      assertThrows(ex.getClass(),
           () -> subject.read(new byte[len], 0, len));
 
       // THEN
