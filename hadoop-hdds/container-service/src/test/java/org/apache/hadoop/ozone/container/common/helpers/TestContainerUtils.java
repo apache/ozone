@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.yaml.snakeyaml.Yaml;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -135,8 +134,6 @@ public class TestContainerUtils {
         ContainerProtos.ContainerType.KeyValueContainer);
     // mock to return different checksum
     when(containerData.getChecksum()).thenReturn("checksum1", "checksum2");
-    Yaml yaml = mock(Yaml.class);
-    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(HddsConfigKeys.HDDS_CONTAINER_CHECKSUM_VERIFICATION_ENABLED, true);
     try {
       ContainerUtils.verifyChecksum(containerData, conf);
