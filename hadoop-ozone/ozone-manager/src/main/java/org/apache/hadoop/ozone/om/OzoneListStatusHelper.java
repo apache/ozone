@@ -136,7 +136,7 @@ public class OzoneListStatusHelper {
         getStatusHelper.apply(args, clientAddress, allowPartialPrefixes);
 
     String dbPrefixKey;
-    if (fileStatus == null) {
+    if (fileStatus == null || allowPartialPrefixes) {
       // if the file status is null, prefix is a not a valid filesystem path
       // this should only work in list keys mode.
       // fetch the db key based on the prefix path.
