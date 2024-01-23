@@ -708,11 +708,11 @@ public class ContainerBalancerTask implements Runnable {
     }
 
     ContainerMoveSelection moveSelection = null;
-    Set<ContainerID> toRemoveContainers = new HashSet<>();
+    Set<ContainerID> toRemoveContainerIds = new HashSet<>();
     for (ContainerID containerId: sourceContainerIDSet) {
       if (selectionCriteria.shouldBeExcluded(containerId, source,
           sizeScheduledForMoveInLatestIteration)) {
-        toRemoveContainers.add(containerId);
+        toRemoveContainerIds.add(containerId);
         continue;
       }
       moveSelection = findTargetStrategy.findTargetForContainerMove(source,
@@ -721,7 +721,7 @@ public class ContainerBalancerTask implements Runnable {
         break;
       }
     }
-    sourceContainerIDSet.removeAll(toRemoveContainers);
+    sourceContainerIDSet.removeAll(toRemoveContainerIds);
 
     if (moveSelection == null) {
       if (LOG.isDebugEnabled()) {
