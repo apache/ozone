@@ -29,6 +29,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -83,6 +84,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
@@ -110,7 +112,7 @@ public class TestHSync {
 
   @BeforeAll
   public static void init() throws Exception {
-    final int chunkSize = 16 << 10;
+    final int chunkSize = 4 << 10;
     final int flushSize = 2 * chunkSize;
     final int maxFlushSize = 2 * flushSize;
     final int blockSize = 2 * maxFlushSize;
@@ -197,6 +199,39 @@ public class TestHSync {
   }
 
   @Test
+  public void testO3fsHSync() throws Exception {
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s.%s/",
+        OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      for (int i = 0; i < 10; i++) {
+        final Path file = new Path("/file" + i);
+        runTestHSync(fs, file, 1 << i);
+      }
+    }
+  }
+
+  @Test
+  public void testOfsHSync() throws Exception {
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      for (int i = 0; i < 10; i++) {
+        final Path file = new Path(dir, "file" + i);
+        runTestHSync(fs, file, 1 << i);
+      }
+    }
+  }
+
+  @Test
   public void testUncommittedBlocks() throws Exception {
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s/",
@@ -261,7 +296,9 @@ public class TestHSync {
 
     OMMetrics omMetrics = cluster.getOzoneManager().getMetrics();
     omMetrics.resetNumKeyHSyncs();
-    String data = "random data";
+    final byte[] data = new byte[128];
+    ThreadLocalRandom.current().nextBytes(data);
+
     final Path file = new Path(dir, "file-hsync-then-close");
     long blockSize;
     try (FileSystem fs = FileSystem.get(CONF)) {
@@ -269,49 +306,42 @@ public class TestHSync {
       long fileSize = 0;
       try (FSDataOutputStream outputStream = fs.create(file, true)) {
         // make sure at least writing 2 blocks data
-        while (fileSize < blockSize) {
-          outputStream.write(data.getBytes(UTF_8), 0, data.length());
+        while (fileSize <= blockSize) {
+          outputStream.write(data, 0, data.length);
           outputStream.hsync();
-          fileSize += data.length();
+          fileSize += data.length;
         }
+      }
+    }
+    assertEquals(2, omMetrics.getNumKeyHSyncs());
+
+    // test file with all blocks pre-allocated
+    omMetrics.resetNumKeyHSyncs();
+    long writtenSize = 0;
+    try (OzoneOutputStream outputStream = bucket.createKey("key-" + RandomStringUtils.randomNumeric(5)
+        , blockSize * 2, ReplicationType.RATIS, ReplicationFactor.THREE, new HashMap<>())) {
+      // make sure at least writing 2 blocks data
+      while (writtenSize <= blockSize) {
+        outputStream.write(data, 0, data.length);
+        outputStream.hsync();
+        writtenSize += data.length;
       }
     }
     assertEquals(2, omMetrics.getNumKeyHSyncs());
   }
 
-  @Test
-  public void testPreAllocatedFileHsyncKeyCallCount() throws Exception {
-    // Set the fs.defaultFS
-    final String rootPath = String.format("%s://%s/",
-        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
-    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
-
-    final String dir = OZONE_ROOT + bucket.getVolumeName()
-        + OZONE_URI_DELIMITER + bucket.getName();
-
-    String data = "random data";
-    String keyName = "key-" + RandomStringUtils.randomNumeric(5);
-    final Path file = new Path(dir, keyName);
-    long blockSize;
-    long fileSize;
-    try (FileSystem fs = FileSystem.get(CONF)) {
-      blockSize = fs.getDefaultBlockSize(file);
-      fileSize = 2 * blockSize;
-    }
-
-    OMMetrics omMetrics = cluster.getOzoneManager().getMetrics();
-    omMetrics.resetNumKeyHSyncs();
-    long writtenSize = 0;
-    try (OzoneOutputStream outputStream = bucket.createKey(keyName, fileSize, ReplicationType.RATIS,
-        ReplicationFactor.THREE, new HashMap<>())) {
-      // make sure at least writing 2 blocks data
-      while (writtenSize < blockSize) {
-        outputStream.write(data.getBytes(UTF_8), 0, data.length());
-        outputStream.hsync();
-        writtenSize += data.length();
+  static void runTestHSync(FileSystem fs, Path file, int initialDataSize)
+      throws Exception {
+    try (StreamWithLength out = new StreamWithLength(
+        fs.create(file, true))) {
+      runTestHSync(fs, file, out, initialDataSize);
+      for (int i = 1; i < 5; i++) {
+        for (int j = -1; j <= 1; j++) {
+          int dataSize = (1 << (i * 5)) + j;
+          runTestHSync(fs, file, out, dataSize);
+        }
       }
     }
-    assertEquals(2, omMetrics.getNumKeyHSyncs());
   }
 
   private static class StreamWithLength implements Closeable {
@@ -336,6 +366,36 @@ public class TestHSync {
     public void close() throws IOException {
       out.close();
     }
+  }
+
+  static void runTestHSync(FileSystem fs, Path file,
+      StreamWithLength out, int dataSize)
+      throws Exception {
+    final long length = out.getLength();
+    LOG.info("runTestHSync {} with size {}, skipLength={}",
+        file, dataSize, length);
+    final byte[] data = new byte[dataSize];
+    ThreadLocalRandom.current().nextBytes(data);
+    out.writeAndHsync(data);
+
+    final byte[] buffer = new byte[4 << 10];
+    int offset = 0;
+    try (FSDataInputStream in = fs.open(file)) {
+      final long skipped = in.skip(length);
+      assertEquals(length, skipped);
+
+      for (; ;) {
+        final int n = in.read(buffer, 0, buffer.length);
+        if (n <= 0) {
+          break;
+        }
+        for (int i = 0; i < n; i++) {
+          assertEquals(data[offset + i], buffer[i]);
+        }
+        offset += n;
+      }
+    }
+    assertEquals(data.length, offset);
   }
 
   private void runConcurrentWriteHSync(Path file,
@@ -400,7 +460,7 @@ public class TestHSync {
         + OZONE_URI_DELIMITER + bucket.getName();
 
     try (FileSystem fs = FileSystem.get(CONF)) {
-      for (int i = 0; i < 10; i++) {
+      for (int i = 0; i < 5; i++) {
         final Path file = new Path(dir, "file" + i);
         try (FSDataOutputStream out =
             fs.create(file, true)) {

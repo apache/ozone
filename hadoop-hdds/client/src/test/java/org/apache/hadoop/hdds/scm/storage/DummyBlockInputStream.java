@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.function.Function;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -49,11 +50,19 @@ class DummyBlockInputStream extends BlockInputStream {
       Function<BlockID, BlockLocationInfo> refreshFunction,
       List<ChunkInfo> chunkList,
       Map<String, byte[]> chunks) {
-    super(blockId, blockLen, pipeline, token, verifyChecksum,
+    super(new BlockLocationInfo(new BlockLocationInfo.Builder().setBlockID(blockId).setLength(blockLen)),
+        pipeline, token, verifyChecksum,
         xceiverClientManager, refreshFunction);
     this.chunkDataMap = chunks;
     this.chunks = chunkList;
 
+  }
+
+  @Override
+  protected ContainerProtos.BlockData getBlockData() throws IOException {
+    BlockID blockID = getBlockID();
+    ContainerProtos.DatanodeBlockID datanodeBlockID = blockID.getDatanodeBlockIDProtobuf();
+    return ContainerProtos.BlockData.newBuilder().addAllChunks(chunks).setBlockID(datanodeBlockID).build();
   }
 
   @Override
