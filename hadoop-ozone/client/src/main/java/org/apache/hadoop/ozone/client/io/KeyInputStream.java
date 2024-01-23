@@ -64,7 +64,7 @@ public class KeyInputStream extends MultipartInputStream {
       BlockInputStreamFactory blockStreamFactory) {
     boolean isHsyncFile = keyInfo.getMetadata().containsKey(OzoneConsts.HSYNC_CLIENT_ID);
     List<BlockExtendedInputStream> partStreams = new ArrayList<>();
-    for (int i = 0; i < blockInfos.size(); i ++) {
+    for (int i = 0; i < blockInfos.size(); i++) {
       OmKeyLocationInfo omKeyLocationInfo = blockInfos.get(i);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Adding stream for accessing {}. The stream will be " +
@@ -89,7 +89,7 @@ public class KeyInputStream extends MultipartInputStream {
       }
 
       if (i == (blockInfos.size() - 1) && isHsyncFile) {
-        // fetch last block length from DN
+        // block is under construction
         omKeyLocationInfo.setUnderConstruction(true);
       }
 

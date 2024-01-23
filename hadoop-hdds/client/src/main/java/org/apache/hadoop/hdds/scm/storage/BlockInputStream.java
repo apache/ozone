@@ -156,6 +156,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
         blockData = getBlockData();
         chunks = blockData.getChunksList();
         if (blockInfo != null && blockInfo.isUnderConstruction()) {
+          // use the block length from DN if block is under construction.
           length = blockData.getSize();
         }
         break;
@@ -232,15 +233,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
     } else {
       throw cause;
     }
-  }
-
-  /**
-   * Send RPC call to get the block info from the container.
-   * @return List of chunks in this block.
-   */
-  @VisibleForTesting
-  protected List<ChunkInfo> getChunkInfoList() throws IOException {
-    return getBlockData().getChunksList();
   }
 
   /**

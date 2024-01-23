@@ -318,8 +318,8 @@ public class TestHSync {
     // test file with all blocks pre-allocated
     omMetrics.resetNumKeyHSyncs();
     long writtenSize = 0;
-    try (OzoneOutputStream outputStream = bucket.createKey("key-" + RandomStringUtils.randomNumeric(5)
-        , blockSize * 2, ReplicationType.RATIS, ReplicationFactor.THREE, new HashMap<>())) {
+    try (OzoneOutputStream outputStream = bucket.createKey("key-" + RandomStringUtils.randomNumeric(5),
+        blockSize * 2, ReplicationType.RATIS, ReplicationFactor.THREE, new HashMap<>())) {
       // make sure at least writing 2 blocks data
       while (writtenSize <= blockSize) {
         outputStream.write(data, 0, data.length);

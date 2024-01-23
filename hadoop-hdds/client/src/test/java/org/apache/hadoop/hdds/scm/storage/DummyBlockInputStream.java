@@ -66,11 +66,6 @@ class DummyBlockInputStream extends BlockInputStream {
   }
 
   @Override
-  protected List<ChunkInfo> getChunkInfoList() throws IOException {
-    return chunks;
-  }
-
-  @Override
   protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
     return new DummyChunkInputStream(
         chunkInfo, null, null, false,
