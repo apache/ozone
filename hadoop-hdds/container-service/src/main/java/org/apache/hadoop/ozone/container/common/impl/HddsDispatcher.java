@@ -699,7 +699,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
   private void performanceAudit(AuditAction action, Map<String, String> params,
       PerformanceStringBuilder performance, long opLatencyMs) {
-    if (isExceedThreshold(opLatencyMs)) {
+    if (isOperationSlow(opLatencyMs)) {
       AuditMessage msg =
           buildAuditMessageForPerformance(action, params, performance);
       AUDIT.logPerformance(msg);
@@ -947,7 +947,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
   }
 
-  private boolean isExceedThreshold(long opLatencyMs) {
+  private boolean isOperationSlow(long opLatencyMs) {
     return opLatencyMs >= slowOpThresholdMs;
   }
 }
