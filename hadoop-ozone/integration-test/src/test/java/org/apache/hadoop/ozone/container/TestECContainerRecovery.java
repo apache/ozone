@@ -52,7 +52,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,6 +71,8 @@ import java.util.stream.Collectors;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
 
 /**
  * Tests the EC recovery and over replication processing.
@@ -308,7 +309,7 @@ public class TestECContainerRecovery {
               .mockFieldReflection(handler,
                       "coordinator");
 
-      Mockito.doAnswer(invocation -> {
+      doAnswer(invocation -> {
         GenericTestUtils.waitFor(() ->
             dn.getDatanodeStateMachine()
                 .getContainer()
@@ -320,8 +321,8 @@ public class TestECContainerRecovery {
         reconstructedDN.set(dn);
         invocation.callRealMethod();
         return null;
-      }).when(coordinator).reconstructECBlockGroup(Mockito.any(), Mockito.any(),
-              Mockito.any(), Mockito.any());
+      }).when(coordinator).reconstructECBlockGroup(any(), any(),
+              any(), any());
     }
 
     // Shutting down DN triggers close pipeline and close container.
