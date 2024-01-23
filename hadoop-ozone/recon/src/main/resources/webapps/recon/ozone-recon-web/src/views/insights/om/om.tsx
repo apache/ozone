@@ -30,8 +30,6 @@ import { AxiosGetHelper, cancelRequests } from 'utils/axiosRequestHelper';
 
 const size = filesize.partial({ standard: 'iec' });
 const { TabPane } = Tabs;
-//Previous Key Need to store respective Lastkey of each API
-
 let keysPendingExpanded: any = [];
 const prevKeyListMap = new Map();
 
@@ -517,7 +515,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
             prevClickable: false
           })
         }
-        //Need to avoid rewrite in Map so avoiding duplication and wrong value for
+        //Need to avoid rewrite in Map so avoiding duplication when we change Page size
         if (!prevKeyListMap.has(this.state.pageDisplayCount)) {
           prevKeyListMap.set(this.state.pageDisplayCount, prevKeyMismatch);
         }
