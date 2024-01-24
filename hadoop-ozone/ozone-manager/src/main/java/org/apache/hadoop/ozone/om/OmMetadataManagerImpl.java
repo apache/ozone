@@ -1836,7 +1836,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         String dbOpenKeyName = openKeyValue.getKey();
 
         final int lastPrefix = dbOpenKeyName.lastIndexOf(OM_KEY_PREFIX);
-        final String dbKeyName = dbOpenKeyName.substring(0, lastPrefix);
         OmKeyInfo openKeyInfo = openKeyValue.getValue();
 
         if (isOpenMultipartKey(openKeyInfo, dbOpenKeyName)) {
