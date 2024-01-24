@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdfs.server.datanode.checker.Checkable;
 import org.apache.hadoop.util.Timer;
 
-import org.checkerframework.checker.nullness.qual.Nullable;
+import jakarta.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
