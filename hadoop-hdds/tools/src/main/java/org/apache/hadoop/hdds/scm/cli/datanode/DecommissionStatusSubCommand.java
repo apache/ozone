@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import picocli.CommandLine;
@@ -123,6 +124,8 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
           node.getNodeID());
       printDetails(datanode);
       printCounts(datanode, counts, numDecomNodes);
+      Map<String, List<ContainerID>> containers = scmClient.getContainersOnDecomNode(datanode);
+      System.out.println(containers);
     }
   }
   private void printDetails(DatanodeDetails datanode) {

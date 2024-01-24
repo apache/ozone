@@ -836,6 +836,50 @@ public class TestDatanodeAdminMonitor {
         nodeManager.getNodeStatus(dn1).getOperationalState());
   }
 
+  @Test
+  public void testContainersReplicatedOnDecomDnAPI()
+      throws NodeNotFoundException, ContainerNotFoundException {
+    conf.setBoolean("hdds.scm.replication.enable.legacy", false);
+
+    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+    nodeManager.register(dn1,
+        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+            HddsProtos.NodeState.HEALTHY));
+
+    Set<ContainerID> containers = new HashSet<>();
+    containers.add(ContainerID.valueOf(1));
+    containers.add(ContainerID.valueOf(2));
+    nodeManager.setContainers(dn1, containers);
+    DatanodeAdminMonitorTestUtil
+        .mockGetContainerReplicaCount(repManager,
+            true,
+            HddsProtos.LifeCycleState.CLOSED,
+            DECOMMISSIONING,
+            IN_SERVICE,
+            IN_SERVICE);
+
+    monitor.startMonitoring(dn1);
+    monitor.run();
+    assertEquals(1, monitor.getTrackedNodeCount());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dn1).getOperationalState());
+    assertEquals(monitor.getContainersReplicatedOnNode(dn1).get("UnderReplicated").size(), 2);
+    assertEquals(monitor.getContainersReplicatedOnNode(dn1).get("UnClosed").size(), 0);
+
+    DatanodeAdminMonitorTestUtil
+        .mockGetContainerReplicaCount(repManager,
+            true,
+            HddsProtos.LifeCycleState.OPEN,
+            IN_SERVICE);
+
+    monitor.run();
+    assertEquals(1, monitor.getTrackedNodeCount());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dn1).getOperationalState());
+    assertEquals(monitor.getContainersReplicatedOnNode(dn1).get("UnderReplicated").size(), 0);
+    assertEquals(monitor.getContainersReplicatedOnNode(dn1).get("UnClosed").size(), 2);
+  }
+
   /**
    * Generate a set of ContainerID, starting from an ID of zero up to the given
    * count minus 1.
