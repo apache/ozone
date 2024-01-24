@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 import picocli.CommandLine.Model.CommandSpec;
@@ -64,8 +65,8 @@ public class DatanodeCommands implements Callable<Void>, SubcommandWithParent {
   }
 
   @VisibleForTesting
-  public void setParent() {
-    parent = new OzoneAdmin();
+  public void setParent(OzoneConfiguration conf) {
+    parent = new OzoneAdmin(conf);
   }
   @Override
   public Class<?> getParentType() {

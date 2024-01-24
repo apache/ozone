@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -57,9 +58,9 @@ public class StatusSubCommand implements Callable<Void>, SubcommandWithParent {
   }
 
   @VisibleForTesting
-  public void setParent() {
+  public void setParent(OzoneConfiguration conf) {
     parent = new DatanodeCommands();
-    parent.setParent();
+    parent.setParent(conf);
   }
 
   @Override

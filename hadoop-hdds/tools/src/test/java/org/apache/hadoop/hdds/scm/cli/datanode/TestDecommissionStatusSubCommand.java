@@ -17,8 +17,17 @@
  */
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpServer;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.http.HttpConfig;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,6 +36,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,6 +45,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import picocli.CommandLine;
+import sun.net.www.protocol.http.HttpURLConnection;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -55,15 +66,46 @@ public class TestDecommissionStatusSubCommand {
   private final PrintStream originalErr = System.err;
   private DecommissionStatusSubCommand cmd;
   private List<HddsProtos.Node> nodes = getNodeDetails(2);
+  private static HttpServer httpServer;
+  private static OzoneConfiguration conf;
+
+  @BeforeAll
+  public static void setupScmHttp() throws Exception {
+    httpServer = HttpServer.create(new InetSocketAddress(15000), 0);
+    httpServer.createContext("/jmx", new HttpHandler() {
+      public void handle(HttpExchange exchange) throws IOException {
+        byte[] response = ("{  \"beans\" : [ {    " +
+            "\"name\" : \"Hadoop:service=StorageContainerManager,name=NodeDecommissionMetrics\",    " +
+            "\"modelerType\" : \"NodeDecommissionMetrics\",    \"DecommissioningMaintenanceNodesTotal\" : 0,    " +
+            "\"RecommissionNodesTotal\" : 0,    \"PipelinesWaitingToCloseTotal\" : 0,    " +
+            "\"ContainersUnderReplicatedTotal\" : 0,    \"ContainersUnClosedTotal\" : 0,    " +
+            "\"ContainersSufficientlyReplicatedTotal\" : 0  } ]}").getBytes();
+        exchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, response.length);
+        exchange.getResponseBody().write(response);
+        exchange.close();
+      }
+    });
+    httpServer.start();
+  }
+  @AfterAll
+  public static void shutdownScmHttp() {
+    if (httpServer != null) {
+      httpServer.stop(0);
+    }
+  }
 
   @BeforeEach
   public void setup() throws UnsupportedEncodingException {
     cmd = new DecommissionStatusSubCommand();
-    cmd.setParent();
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
+    conf = new OzoneConfiguration();
+    HttpConfig.Policy policy = HttpConfig.Policy.HTTP_ONLY;
+    conf.set(OzoneConfigKeys.OZONE_HTTP_POLICY_KEY, policy.name());
+    conf.set(ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY, "localhost:15000");
+    conf.set(ScmConfigKeys.OZONE_SCM_HTTP_BIND_HOST_KEY, "localhost");
+    cmd.setParent(conf);
   }
-
   @AfterEach
   public void tearDown() {
     System.setOut(originalOut);
@@ -200,7 +242,6 @@ public class TestDecommissionStatusSubCommand {
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertFalse(m.find());
   }
-
 
   private List<HddsProtos.Node> getNodeDetails(int n) {
     List<HddsProtos.Node> nodesList = new ArrayList<>();

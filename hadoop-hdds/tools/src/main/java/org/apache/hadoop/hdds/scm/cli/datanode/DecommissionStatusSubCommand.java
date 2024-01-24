@@ -217,9 +217,9 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
   }
 
   @VisibleForTesting
-  public void setParent() {
+  public void setParent(OzoneConfiguration conf) {
     parent = new StatusSubCommand();
-    parent.setParent();
+    parent.setParent(conf);
   }
 
 }
