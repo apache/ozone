@@ -58,6 +58,7 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -222,6 +223,40 @@ public class TestHSync {
       for (int i = 0; i < 10; i++) {
         final Path file = new Path(dir, "file" + i);
         runTestHSync(fs, file, 1 << i);
+      }
+    }
+  }
+
+  @Test
+  public void testHSyncDeletedKey() throws Exception {
+    // Verify that a key can't be successfully hsync'ed again after it's deleted,
+    // and that key won't reappear after a failed hsync.
+
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+    final Path key1 = new Path(dir, "key-hsync-del");
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      // Create key1
+      try (FSDataOutputStream os = fs.create(key1, true)) {
+        os.write(1);
+        os.hsync();
+        fs.delete(key1, false);
+
+        // getFileStatus should throw FNFE because the key is deleted
+        assertThrows(FileNotFoundException.class,
+            () -> fs.getFileStatus(key1));
+        // hsync should throw because the open key is gone
+        assertThrows(OMException.class,
+            () -> os.hsync());
+        // key1 should not reappear because of hsync
+        assertThrows(FileNotFoundException.class,
+            () -> fs.getFileStatus(key1));
       }
     }
   }
