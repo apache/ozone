@@ -1821,6 +1821,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       int count, BucketLayout bucketLayout) throws IOException {
     final ExpiredOpenKeys expiredKeys = new ExpiredOpenKeys();
 
+    final Table<String, OmKeyInfo> kt = getKeyTable(bucketLayout);
     // Only check for expired keys in the open key table, not its cache.
     // If a key expires while it is in the cache, it will be cleaned
     // up after the cache is flushed.
@@ -1836,6 +1837,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         String dbOpenKeyName = openKeyValue.getKey();
 
         final int lastPrefix = dbOpenKeyName.lastIndexOf(OM_KEY_PREFIX);
+        final String dbKeyName = dbOpenKeyName.substring(0, lastPrefix);
         OmKeyInfo openKeyInfo = openKeyValue.getValue();
 
         if (isOpenMultipartKey(openKeyInfo, dbOpenKeyName)) {
@@ -1856,13 +1858,14 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
             // add non-hsync'ed keys
             expiredKeys.addOpenKey(openKeyInfo, dbOpenKeyName);
           } else {
+            final OmKeyInfo info = kt.get(dbKeyName);
             // add hsync'ed keys
             final KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
-                .setVolumeName(openKeyInfo.getVolumeName())
-                .setBucketName(openKeyInfo.getBucketName())
-                .setKeyName(openKeyInfo.getKeyName())
-                .setDataSize(openKeyInfo.getDataSize());
-            java.util.Optional.ofNullable(openKeyInfo.getLatestVersionLocations())
+                .setVolumeName(info.getVolumeName())
+                .setBucketName(info.getBucketName())
+                .setKeyName(info.getKeyName())
+                .setDataSize(info.getDataSize());
+            java.util.Optional.ofNullable(info.getLatestVersionLocations())
                 .map(OmKeyLocationInfoGroup::getLocationList)
                 .map(Collection::stream)
                 .orElseGet(Stream::empty)
@@ -1870,7 +1873,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                 .forEach(keyArgs::addKeyLocations);
 
             OzoneManagerProtocolClientSideTranslatorPB.setReplicationConfig(
-                openKeyInfo.getReplicationConfig(), keyArgs);
+                info.getReplicationConfig(), keyArgs);
 
             expiredKeys.addHsyncKey(keyArgs, Long.parseLong(clientIdString));
           }
