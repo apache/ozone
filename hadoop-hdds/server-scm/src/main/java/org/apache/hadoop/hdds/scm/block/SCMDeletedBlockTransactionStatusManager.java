@@ -302,7 +302,8 @@ public class SCMDeletedBlockTransactionStatusManager {
         }
         break;
       default:
-        LOG.error("Unable to update from unknown DN report status: {}", newStatus);
+        LOG.error("Unexpected status from Datanode: {}. SCM Command ID: {} with status: {}.",
+            dnId, scmCmdId, newStatus);
         break;
       }
       if (!changed) {
@@ -322,8 +323,8 @@ public class SCMDeletedBlockTransactionStatusManager {
         if (updateTime != null &&
             Duration.between(updateTime, now).toMillis() > timeoutMs) {
           CmdStatusData state = removeScmCommand(dnId, scmCmdId);
-          LOG.warn("Remove Timeout SCM BlockDeletionCommand {} for DN {} " +
-              "after without update {}ms}", state, dnId, timeoutMs);
+          LOG.warn("SCM BlockDeletionCommand {} for DN {} was removed after {}ms without update",
+              state, dnId, timeoutMs);
         }
       }
     }
