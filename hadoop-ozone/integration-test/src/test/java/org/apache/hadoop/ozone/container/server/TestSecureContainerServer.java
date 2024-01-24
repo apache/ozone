@@ -95,23 +95,21 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.ratis.rpc.RpcType;
-
-import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
-
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.CheckedBiConsumer;
 import org.apache.ratis.util.function.CheckedBiFunction;
-import org.junit.jupiter.api.AfterEach;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
+import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
 
 /**
  * Test Container servers when security is enabled.
@@ -320,7 +318,7 @@ public class TestSecureContainerServer {
       String msg = response.getMessage();
       assertTrue(msg.contains(BLOCK_TOKEN_VERIFICATION_FAILED.name()), msg);
     } else {
-      final Throwable t = Assertions.assertThrows(Throwable.class,
+      final Throwable t = assertThrows(Throwable.class,
           () -> client.sendCommand(request));
       assertRootCauseMessage(BLOCK_TOKEN_VERIFICATION_FAILED.name(), t);
     }
