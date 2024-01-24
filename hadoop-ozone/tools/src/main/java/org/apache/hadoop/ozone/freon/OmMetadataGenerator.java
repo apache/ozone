@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs.Builder;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
 import com.codahale.metrics.Timer;
@@ -79,6 +80,7 @@ public class OmMetadataGenerator extends BaseFreonGenerator
     LOOKUP_FILE,
     READ_FILE,
     LIST_STATUS,
+    LIST_STATUS_LIGHT,
     CREATE_KEY,
     CREATE_STREAM_KEY,
     LOOKUP_KEY,
@@ -377,8 +379,8 @@ public class OmMetadataGenerator extends BaseFreonGenerator
         List<OmKeyInfo> keyInfoList =
             ozoneManagerClient.listKeys(volumeName, bucketName, startKeyName, "", batchSize).getKeys();
         if (keyInfoList.size() + 1 < batchSize) {
-          throw new NoSuchFileException("There are not enough files for testing you should use "
-                  + "CREATE_FILE to create at least batch-size * threads = " + batchSize * getThreadNo());
+          throw new NoSuchFileException("There are not enough keys for testing you should use "
+                  + "CREATE_KEY to create at least batch-size * threads = " + batchSize * getThreadNo());
         }
         return null;
       });
@@ -389,8 +391,8 @@ public class OmMetadataGenerator extends BaseFreonGenerator
         List<BasicOmKeyInfo> keyInfoList =
             ozoneManagerClient.listKeysLight(volumeName, bucketName, startKeyName, "", batchSize).getKeys();
         if (keyInfoList.size() + 1 < batchSize) {
-          throw new NoSuchFileException("There are not enough files for testing you should use "
-                  + "CREATE_FILE to create at least batch-size * threads = " + batchSize * getThreadNo());
+          throw new NoSuchFileException("There are not enough keys for testing you should use "
+                  + "CREATE_KEY to create at least batch-size * threads = " + batchSize * getThreadNo());
         }
         return null;
       });
@@ -404,6 +406,19 @@ public class OmMetadataGenerator extends BaseFreonGenerator
         if (fileStatusList.size() + 1 < batchSize) {
           throw new NoSuchFileException("There are not enough files for testing you should use "
                   + "CREATE_FILE to create at least batch-size * threads = " + batchSize * getThreadNo());
+        }
+        return null;
+      });
+      break;
+    case LIST_STATUS_LIGHT:
+      startKeyName = getPath(threadSeqId * batchSize);
+      keyArgs = omKeyArgsBuilder.get().setKeyName("").build();
+      getMetrics().timer(operation.name()).time(() -> {
+        List<OzoneFileStatusLight> fileStatusList = ozoneManagerClient.listStatusLight(
+            keyArgs, false, startKeyName, batchSize, false);
+        if (fileStatusList.size() + 1 < batchSize) {
+          throw new NoSuchFileException("There are not enough files for testing you should use "
+              + "CREATE_FILE to create at least batch-size * threads = " + batchSize * getThreadNo());
         }
         return null;
       });
