@@ -86,6 +86,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -123,6 +124,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.eq;
 
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.slf4j.Logger;
@@ -1570,6 +1573,49 @@ public class TestSCMNodeManager {
       assertEquals(1, nodeManager.minHealthyVolumeNum(dnList));
       dnList.clear();
     }
+  }
+
+  private List<StorageReportProto> generateStorageReportProto(
+      int volumeCount, UUID dnId, long capacity, long used, long remaining) {
+    List<StorageReportProto> reports = new ArrayList<>(volumeCount);
+    boolean failed = true;
+    for (int x = 0; x < volumeCount; x++) {
+      String storagePath = testDir.getAbsolutePath() + "/" + dnId;
+      reports.add(HddsTestUtils
+          .createStorageReport(dnId, storagePath, capacity,
+              used, remaining, null, failed));
+      failed = !failed;
+    }
+    return reports;
+  }
+
+  private static Stream<Arguments> calculateStoragePercentageScenarios() {
+    return Stream.of(
+        Arguments.of(600, 65, 500, 1, "600.0B", "10.83", "5.83"),
+        Arguments.of(10000, 1000, 8800, 12, "117.2KB", "10.00", "2.00"),
+        Arguments.of(100000000, 1000, 899999, 12, "1.1GB", "0.00", "99.10"),
+        Arguments.of(10000, 1000, 0, 0, "0.0B", "N/A", "N/A"),
+        Arguments.of(0, 0, 0, 0, "0.0B", "N/A", "N/A"),
+        Arguments.of(1010, 547, 400, 5, "4.9KB", "54.16", "6.24")
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("calculateStoragePercentageScenarios")
+  public void testCalculateStoragePercentage(long perCapacity,
+      long used, long remaining, int volumeCount, String totalCapacity,
+          String scmUsedPerc, String nonScmUsedPerc) {
+    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    UUID dnId = dn.getUuid();
+    List<StorageReportProto> reports = volumeCount > 0 ?
+        generateStorageReportProto(volumeCount, dnId, perCapacity,
+            used, remaining) : null;
+    String capacityResult = SCMNodeManager.calculateStorageCapacity(reports);
+    assertEquals(totalCapacity, capacityResult);
+    String[] storagePercentage = SCMNodeManager.calculateStoragePercentage(
+        reports);
+    assertEquals(scmUsedPerc, storagePercentage[0]);
+    assertEquals(nonScmUsedPerc, storagePercentage[1]);
   }
 
   /**

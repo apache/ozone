@@ -130,22 +130,7 @@ public class S3MultipartUploadCompleteRequestWithFSO
   protected String getDBMultipartOpenKey(String volumeName, String bucketName,
       String keyName, String uploadID, OMMetadataManager omMetadataManager)
       throws IOException {
-
-    long parentId =
-        getParentId(omMetadataManager, volumeName, bucketName, keyName);
-
-    String fileName = keyName;
-    Path filePath = Paths.get(keyName).getFileName();
-    if (filePath != null) {
-      fileName = filePath.toString();
-    }
-
-    final long volumeId = omMetadataManager.getVolumeId(volumeName);
-    final long bucketId = omMetadataManager.getBucketId(volumeName,
-            bucketName);
-
-    return omMetadataManager.getMultipartKey(volumeId, bucketId,
-            parentId, fileName, uploadID);
+    return omMetadataManager.getMultipartKeyFSO(volumeName, bucketName, keyName, uploadID);
   }
 
   @Override

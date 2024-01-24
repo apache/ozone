@@ -41,7 +41,6 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -406,7 +405,7 @@ public class TestDatanodeAdminMonitor {
     replicas.add(unhealthy);
     nodeManager.setContainers(dn1, ImmutableSet.of(containerID));
 
-    Mockito.when(repManager.getContainerReplicaCount(Mockito.eq(containerID)))
+    when(repManager.getContainerReplicaCount(eq(containerID)))
         .thenReturn(new RatisContainerReplicaCount(container, replicas,
             Collections.emptyList(), 2, false));
     DatanodeAdminMonitorTestUtil.mockCheckContainerState(repManager, true);
@@ -430,7 +429,7 @@ public class TestDatanodeAdminMonitor {
         .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
         .build();
     replicas.add(copyOfUnhealthyOnNewNode);
-    Mockito.when(repManager.getContainerReplicaCount(Mockito.eq(containerID)))
+    when(repManager.getContainerReplicaCount(eq(containerID)))
         .thenReturn(new RatisContainerReplicaCount(container, replicas,
             Collections.emptyList(), 2, false));
     DatanodeAdminMonitorTestUtil.mockCheckContainerState(repManager, false);
@@ -835,6 +834,50 @@ public class TestDatanodeAdminMonitor {
     assertEquals(0, monitor.getTrackedNodeCount());
     assertEquals(IN_SERVICE,
         nodeManager.getNodeStatus(dn1).getOperationalState());
+  }
+
+  @Test
+  public void testContainersReplicatedOnDecomDnAPI()
+      throws NodeNotFoundException, ContainerNotFoundException {
+    conf.setBoolean("hdds.scm.replication.enable.legacy", false);
+
+    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+    nodeManager.register(dn1,
+        new NodeStatus(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+            HddsProtos.NodeState.HEALTHY));
+
+    Set<ContainerID> containers = new HashSet<>();
+    containers.add(ContainerID.valueOf(1));
+    containers.add(ContainerID.valueOf(2));
+    nodeManager.setContainers(dn1, containers);
+    DatanodeAdminMonitorTestUtil
+        .mockGetContainerReplicaCount(repManager,
+            true,
+            HddsProtos.LifeCycleState.CLOSED,
+            DECOMMISSIONING,
+            IN_SERVICE,
+            IN_SERVICE);
+
+    monitor.startMonitoring(dn1);
+    monitor.run();
+    assertEquals(1, monitor.getTrackedNodeCount());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dn1).getOperationalState());
+    assertEquals(monitor.getContainersReplicatedOnNode(dn1).get("UnderReplicated").size(), 2);
+    assertEquals(monitor.getContainersReplicatedOnNode(dn1).get("UnClosed").size(), 0);
+
+    DatanodeAdminMonitorTestUtil
+        .mockGetContainerReplicaCount(repManager,
+            true,
+            HddsProtos.LifeCycleState.OPEN,
+            IN_SERVICE);
+
+    monitor.run();
+    assertEquals(1, monitor.getTrackedNodeCount());
+    assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
+        nodeManager.getNodeStatus(dn1).getOperationalState());
+    assertEquals(monitor.getContainersReplicatedOnNode(dn1).get("UnderReplicated").size(), 0);
+    assertEquals(monitor.getContainersReplicatedOnNode(dn1).get("UnClosed").size(), 2);
   }
 
   /**

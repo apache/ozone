@@ -92,8 +92,41 @@ jobs:
           printf -v x "%s," "${splits[@]}"
           split_matrix="[${x%,}]"
           echo "matrix=$split_matrix" >> $GITHUB_OUTPUT
+  build:
+    needs:
+      - prepare-job
+    runs-on: ubuntu-20.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v3
+      - name: Cache for maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.m2/repository
+            !~/.m2/repository/org/apache/ozone
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-repo-
+      - name: Setup java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: 8
+      - name: Build (most) of Ozone
+        run: hadoop-ozone/dev-support/checks/build.sh -Dskip.npx -Dskip.installnpx -DskipShade
+      - name: Store Maven repo for tests
+        uses: actions/upload-artifact@v3
+        with:
+          name: ozone-repo
+          path: |
+            ~/.m2/repository/org/apache/ozone
+          retention-days: 1
   run-test:
-    needs: prepare-job
+    needs:
+      - prepare-job
+      - build
     name: Run-Split
     runs-on: ubuntu-20.04
     strategy:
@@ -105,14 +138,22 @@ jobs:
         with:
           ref: ${{ github.event.inputs.ref }}
       - name: Cache for maven dependencies
-        uses: actions/cache@v3
+        uses: actions/cache/restore@v3
         with:
-          path: ~/.m2/repository
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}-8-single
+          path: |
+            ~/.m2/repository
+            !~/.m2/repository/org/apache/ozone
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
           restore-keys: |
-            maven-repo-${{ hashFiles('**/pom.xml') }}-8
-            maven-repo-${{ hashFiles('**/pom.xml') }}
             maven-repo-
+      - name: Download Ozone repo
+        id: download-ozone-repo
+        uses: actions/download-artifact@v3
+        with:
+          name: ozone-repo
+          path: |
+            ~/.m2/repository/org/apache/ozone
+        continue-on-error: true
       - name: Setup java
         uses: actions/setup-java@v3
         with:
@@ -120,6 +161,10 @@ jobs:
           java-version: 8
       - name: Execute tests
         run: |
+          if [[ -e "${{ steps.download-ozone-repo.outputs.download-path }}" ]]; then
+            export OZONE_REPO_CACHED=true
+          fi
+
           test_type=${{ needs.prepare-job.outputs.test_type }}
           args="-DexcludedGroups=unhealthy"
           if [ "$test_type" = "integration" ]; then
@@ -145,12 +190,6 @@ jobs:
         with:
           name: result-${{ env.TEST_CLASS }}-split-${{ matrix.split }}
           path: target/${{ needs.prepare-job.outputs.test_type }}
-      - name: Delete temporary build artifacts before caching
-        run: |
-          #Never cache local artifacts
-          rm -rf ~/.m2/repository/org/apache/ozone/hdds*
-          rm -rf ~/.m2/repository/org/apache/ozone/ozone*
-        if: always()
   count-failures:
     if: ${{ always() }}
     needs: run-test

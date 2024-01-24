@@ -44,7 +44,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
@@ -69,6 +68,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCE
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test Ozone Debug shell.
@@ -127,12 +128,12 @@ public class TestOzoneDebugShell {
     writeKey(volumeName, bucketName, keyName);
 
     int exitCode = runChunkInfoCommand(volumeName, bucketName, keyName);
-    Assertions.assertEquals(0, exitCode);
+    assertEquals(0, exitCode);
 
     closeContainerForKey(volumeName, bucketName, keyName);
 
     exitCode = runChunkInfoCommand(volumeName, bucketName, keyName);
-    Assertions.assertEquals(0, exitCode);
+    assertEquals(0, exitCode);
   }
 
   @Test
@@ -142,7 +143,7 @@ public class TestOzoneDebugShell {
     final String keyName = UUID.randomUUID().toString();
     writeKey(volumeName, bucketName, keyName);
     int exitCode = runChunkInfoAndVerifyPaths(volumeName, bucketName, keyName);
-    Assertions.assertEquals(0, exitCode);
+    assertEquals(0, exitCode);
   }
 
   @Test
@@ -163,7 +164,7 @@ public class TestOzoneDebugShell {
     OzoneSnapshot snapshot =
         client.getObjectStore().listSnapshot(volumeName, bucketName, null, null)
             .next();
-    Assertions.assertEquals(snapshotName, snapshot.getName());
+    assertEquals(snapshotName, snapshot.getName());
     String dbPath = getSnapshotDBPath(snapshot.getCheckpointDir());
     String snapshotCurrent = dbPath + OM_KEY_PREFIX + "CURRENT";
     GenericTestUtils
@@ -171,9 +172,9 @@ public class TestOzoneDebugShell {
     String[] args =
         new String[] {"--db=" + dbPath, "scan", "--cf", "keyTable"};
     int exitCode = cmd.execute(args);
-    Assertions.assertEquals(0, exitCode);
+    assertEquals(0, exitCode);
     String cmdOut = stdout.toString();
-    Assertions.assertTrue(cmdOut.contains(keyName));
+    assertThat(cmdOut).contains(keyName);
   }
 
   private static String getSnapshotDBPath(String checkPointDir) {
@@ -233,7 +234,7 @@ public class TestOzoneDebugShell {
       // DN storage directories are set differently for each DN
       // in MiniOzoneCluster as datanode-0,datanode-1,datanode-2 which is why
       // we expect 3 paths here in the set.
-      Assertions.assertEquals(3, blockFilePaths.size());
+      assertEquals(3, blockFilePaths.size());
     }
     return exitCode;
   }

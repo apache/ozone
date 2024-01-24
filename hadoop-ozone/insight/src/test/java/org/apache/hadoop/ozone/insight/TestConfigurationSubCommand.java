@@ -27,10 +27,11 @@ import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Test insight report which prints out configs.
@@ -60,12 +61,12 @@ public class TestConfigurationSubCommand {
     subCommand.printConfig(CustomConfig.class, conf);
 
     final String output = out.toString(StandardCharsets.UTF_8.name());
-    Assertions.assertTrue(output.contains(">>> ozone.scm.client.address"));
-    Assertions.assertTrue(output.contains("default: localhost"));
-    Assertions.assertTrue(output.contains("current: omclient"));
-    Assertions.assertTrue(output.contains(">>> ozone.scm.client.secure"));
-    Assertions.assertTrue(output.contains("default: true"));
-    Assertions.assertTrue(output.contains("current: true"));
+    assertThat(output).contains(">>> ozone.scm.client.address");
+    assertThat(output).contains("default: localhost");
+    assertThat(output).contains("current: omclient");
+    assertThat(output).contains(">>> ozone.scm.client.secure");
+    assertThat(output).contains("default: true");
+    assertThat(output).contains("current: true");
   }
 
   /**
