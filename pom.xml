@@ -1865,6 +1865,18 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
                       <allowedImport>org.junit.platform.**</allowedImport>
                     </allowedImports>
                   </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Use jakarta.annotation</reason>
+                    <bannedImports>
+                      <bannedImport>javax.annotation.Nonnull</bannedImport>
+                      <bannedImport>javax.annotation.Nullable</bannedImport>
+                      <bannedImport>org.checkerframework.checker.nullness.qual.NonNull</bannedImport>
+                      <bannedImport>org.checkerframework.checker.nullness.qual.Nullable</bannedImport>
+                      <bannedImport>org.jetbrains.annotations.NotNull</bannedImport>
+                      <bannedImport>org.jetbrains.annotations.Nullable</bannedImport>
+                    </bannedImports>
+                  </restrictImports>
                 </rules>
               </configuration>
             </execution>
