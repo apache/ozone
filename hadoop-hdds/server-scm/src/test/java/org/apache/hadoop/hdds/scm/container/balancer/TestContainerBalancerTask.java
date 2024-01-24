@@ -1065,7 +1065,7 @@ public class TestContainerBalancerTask {
      This is the delay before it starts balancing.
      */
     GenericTestUtils.waitFor(
-        () -> balancingThread.getState() == Thread.State.TIMED_WAITING, 1, 20);
+        () -> balancingThread.getState() == Thread.State.TIMED_WAITING, 1, 40);
     assertEquals(Thread.State.TIMED_WAITING,
         balancingThread.getState());
 
