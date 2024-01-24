@@ -1,4 +1,3 @@
-package org.apache.hadoop.hdds.scm.cli.datanode;
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,6 +15,7 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.cli.GenericCli;
