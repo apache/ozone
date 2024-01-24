@@ -176,12 +176,14 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
           commitKeyArgs.getMetadataList()));
 
       final String clientIdString = String.valueOf(writerClientId);
-      // flag to indicate whether it is necessary to update the value (ozone key) in OpenKeyTable
-      boolean updateOpenKeyTable = false;
+      // non-null indicates it is necessary to update the open key
+      OmKeyInfo newOpenKeyInfo = null;
 
       if (isHSync) {
-        updateOpenKeyTable = !OmKeyHSyncUtil.isHSyncedPreviously(omKeyInfo, clientIdString, dbOpenFileKey);
-        omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID, clientIdString);
+        if (!OmKeyHSyncUtil.isHSyncedPreviously(omKeyInfo, clientIdString, dbOpenFileKey)) {
+          omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID, clientIdString);
+          newOpenKeyInfo = omKeyInfo.copyObject();
+        }
       } else if (isRecovery) {
         omKeyInfo.getMetadata().remove(OzoneConsts.HSYNC_CLIENT_ID);
         omKeyInfo.getMetadata().remove(OzoneConsts.LEASE_RECOVERY);
@@ -203,8 +205,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       boolean isPreviousCommitHsync = false;
       Map<String, RepeatedOmKeyInfo> oldKeyVersionsToDeleteMap = null;
       if (null != keyToDelete) {
-        // TODO: Replace Optional with a helper method call
-        isPreviousCommitHsync = java.util.Optional.ofNullable(keyToDelete)
+        isPreviousCommitHsync = java.util.Optional.of(keyToDelete)
             .map(WithMetadata::getMetadata)
             .map(meta -> meta.get(OzoneConsts.HSYNC_CLIENT_ID))
             .filter(id -> id.equals(clientIdString))
@@ -277,10 +278,10 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
         // Prevent hsync metadata from getting committed to the final key
         omKeyInfo.getMetadata().remove(OzoneConsts.HSYNC_CLIENT_ID);
-      } else if (updateOpenKeyTable) {
-        // Both isHSync and updateOpenKeyTable are true, update OpenKeyTable
+      } else if (newOpenKeyInfo != null) {
+        // isHSync is true and newOpenKeyInfo is set, update OpenKeyTable
         OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-            dbOpenFileKey, omKeyInfo, fileName, trxnLogIndex);
+            dbOpenFileKey, newOpenKeyInfo, fileName, trxnLogIndex);
       }
 
       OMFileRequest.addFileTableCacheEntry(omMetadataManager, dbFileKey,
@@ -290,7 +291,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
 
       omClientResponse = new OMKeyCommitResponseWithFSO(omResponse.build(),
           omKeyInfo, dbFileKey, dbOpenFileKey, omBucketInfo.copyObject(),
-          oldKeyVersionsToDeleteMap, volumeId, isHSync, updateOpenKeyTable);
+          oldKeyVersionsToDeleteMap, volumeId, isHSync, newOpenKeyInfo);
 
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {

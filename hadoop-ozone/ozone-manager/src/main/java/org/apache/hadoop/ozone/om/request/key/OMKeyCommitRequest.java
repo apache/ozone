@@ -237,8 +237,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       final String clientIdString = String.valueOf(writerClientId);
       if (null != keyToDelete) {
-        // TODO: Replace Optional with a helper method call
-        isPreviousCommitHsync = java.util.Optional.ofNullable(keyToDelete)
+        isPreviousCommitHsync = java.util.Optional.of(keyToDelete)
             .map(WithMetadata::getMetadata)
             .map(meta -> meta.get(OzoneConsts.HSYNC_CLIENT_ID))
             .filter(id -> id.equals(clientIdString))
@@ -264,18 +263,16 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       omKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
           commitKeyArgs.getMetadataList()));
 
-      // flag to indicate whether it is necessary to update the value (ozone key) in OpenKeyTable
-      boolean updateOpenKeyTable = false;
+      // non-null indicates it is necessary to update the open key
+      OmKeyInfo newOpenKeyInfo = null;
 
       if (isHSync) {
-        updateOpenKeyTable = !OmKeyHSyncUtil.isHSyncedPreviously(omKeyInfo, clientIdString, dbOpenKey);
-        omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID, clientIdString);
+        if (!OmKeyHSyncUtil.isHSyncedPreviously(omKeyInfo, clientIdString, dbOpenKey)) {
+          omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID, clientIdString);
+          newOpenKeyInfo = omKeyInfo.copyObject();
+        }
       } else if (isRecovery) {
-        // Q for Sammi/Wei-Chiu: The following line won't do anything (before this PR) because HSYNC_CLIENT_ID was never
-        // added to OpenKeyTable right? Have I missed something?
         omKeyInfo.getMetadata().remove(OzoneConsts.HSYNC_CLIENT_ID);
-        // In HDDS-9638, I see LEASE_RECOVERY being added to OpenKeyTable in OMRecoverLeaseRequest. But
-        // not HSYNC_CLIENT_ID there.
         omKeyInfo.getMetadata().remove(OzoneConsts.LEASE_RECOVERY);
       }
       omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
@@ -349,10 +346,10 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
         // Prevent hsync metadata from getting committed to the final key
         omKeyInfo.getMetadata().remove(OzoneConsts.HSYNC_CLIENT_ID);
-      } else if (updateOpenKeyTable) {
-        // Both isHSync and updateOpenKeyTable are true, update OpenKeyTable
+      } else if (newOpenKeyInfo != null) {
+        // isHSync is true and newOpenKeyInfo is set, update OpenKeyTable
         omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
-            dbOpenKey, omKeyInfo, trxnLogIndex);
+            dbOpenKey, newOpenKeyInfo, trxnLogIndex);
       }
 
       omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
@@ -362,7 +359,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       omClientResponse = new OMKeyCommitResponse(omResponse.build(),
           omKeyInfo, dbOzoneKey, dbOpenKey, omBucketInfo.copyObject(),
-          oldKeyVersionsToDeleteMap, isHSync, updateOpenKeyTable);
+          oldKeyVersionsToDeleteMap, isHSync, newOpenKeyInfo);
 
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {

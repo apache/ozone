@@ -55,9 +55,9 @@ public class OMKeyCommitResponseWithFSO extends OMKeyCommitResponse {
       @Nonnull OmBucketInfo omBucketInfo,
       Map<String, RepeatedOmKeyInfo> deleteKeyMap, long volumeId,
       boolean isHSync,
-      boolean updateOpenKeyTable) {
+      OmKeyInfo newOpenKeyInfo) {
     super(omResponse, omKeyInfo, ozoneKeyName, openKeyName,
-            omBucketInfo, deleteKeyMap, isHSync, updateOpenKeyTable);
+            omBucketInfo, deleteKeyMap, isHSync, newOpenKeyInfo);
     this.volumeId = volumeId;
   }
 
@@ -79,9 +79,9 @@ public class OMKeyCommitResponseWithFSO extends OMKeyCommitResponse {
     if (!this.isHSync()) {
       omMetadataManager.getOpenKeyTable(getBucketLayout())
           .deleteWithBatch(batchOperation, getOpenKeyName());
-    } else if (needToUpdateOpenKeyTable()) {
+    } else if (getNewOpenKeyInfo() != null) {
       omMetadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(
-          batchOperation, getOpenKeyName(), getOmKeyInfo());
+          batchOperation, getOpenKeyName(), getNewOpenKeyInfo());
     }
 
     OMFileRequest.addToFileTable(omMetadataManager, batchOperation,
