@@ -998,6 +998,24 @@ public interface ClientProtocol {
       ReplicationConfig replicationConfig) throws IOException;
 
   /**
+   * Set Bucket Encryption Key (BEK).
+   *
+   * @param volumeName
+   * @param bucketName
+   * @param bekName
+   * @throws IOException
+   * @deprecated This functionality is deprecated as it is not intended for
+   * users to reset bucket encryption under normal circumstances and may be
+   * removed in the future. Users are advised to exercise caution and consider
+   * alternative approaches for managing bucket encryption unless HDDS-7449 or
+   * HDDS-7526 is encountered. As a result, the setter methods for this
+   * functionality have been marked as deprecated.
+   */
+  @Deprecated
+  void setEncryptionKey(String volumeName, String bucketName,
+                        String bekName) throws IOException;
+
+  /**
    * Returns OzoneKey that contains the application generated/visible
    * metadata for an Ozone Object.
    *
