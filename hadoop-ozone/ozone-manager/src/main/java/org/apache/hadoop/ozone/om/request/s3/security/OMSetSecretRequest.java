@@ -122,9 +122,6 @@ public class OMSetSecretRequest extends OMClientRequest {
                   OMException.ResultCodes.ACCESS_ID_NOT_FOUND);
             }
 
-            // accessId found in S3SecretTable. Update S3SecretTable
-            LOG.debug("Updating S3SecretTable cache entry");
-
             // Update S3SecretTable cache entry in this case
             // Set the transactionLogIndex to be used for updating.
             final S3SecretValue newS3SecretValue = S3SecretValue.of(accessId, secretKey, termIndex.getIndex());
