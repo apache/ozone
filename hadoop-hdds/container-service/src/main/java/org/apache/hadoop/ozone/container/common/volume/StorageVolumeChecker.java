@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
