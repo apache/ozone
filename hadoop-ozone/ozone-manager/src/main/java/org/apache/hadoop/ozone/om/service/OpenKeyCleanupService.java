@@ -104,6 +104,8 @@ public class OpenKeyCleanupService extends BackgroundService {
         OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT_DEFAULT, TimeUnit.MILLISECONDS);
 
     if (leaseHardMillis < leaseSoftMillis) {
+      LOG.warn("Hard lease limit is lesser than Soft lease limit, using Soft lease limit value for Hard lease limit,"
+          + "LeaseHardLimit: {}, LeaseSoftLimit: {}", leaseHardMillis, leaseSoftMillis);
       this.leaseThreshold = Duration.ofMillis(leaseSoftMillis);
     } else {
       this.leaseThreshold = Duration.ofMillis(leaseHardMillis);

@@ -269,9 +269,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     // refresh last block pipeline
     ContainerWithPipeline containerWithPipeline =
         ozoneManager.getScmClient().getContainerClient().getContainerWithPipeline(finalBlock.getContainerID());
-    if (containerWithPipeline != null) {
-      finalBlock.setPipeline(containerWithPipeline.getPipeline());
-    }
+    finalBlock.setPipeline(containerWithPipeline.getPipeline());
 
     RecoverLeaseResponse.Builder rb = RecoverLeaseResponse.newBuilder();
     rb.setKeyInfo(returnKeyInfo ? keyInfo.getNetworkProtobuf(getOmRequest().getVersion(), true) :
