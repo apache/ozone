@@ -721,6 +721,7 @@ public class ContainerBalancerTask implements Runnable {
         break;
       }
     }
+    // Update cached containerIDSet in setMap
     sourceContainerIDSet.removeAll(toRemoveContainerIds);
 
     if (moveSelection == null) {
