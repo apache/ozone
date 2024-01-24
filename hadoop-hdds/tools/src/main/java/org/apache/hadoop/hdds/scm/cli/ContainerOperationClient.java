@@ -217,6 +217,11 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
+  public Map<String, List<ContainerID>> getContainersOnDecomNode(DatanodeDetails dn) throws IOException {
+    return storageContainerLocationClient.getContainersOnDecomNode(dn);
+  }
+
+  @Override
   public List<HddsProtos.Node> queryNode(
       HddsProtos.NodeOperationalState opState,
       HddsProtos.NodeState nodeState,
