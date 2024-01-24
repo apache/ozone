@@ -17,6 +17,10 @@
  */
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpServer;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -25,6 +29,10 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.http.HttpConfig;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.http.HttpConfig;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -92,6 +100,7 @@ public class TestDecommissionStatusSubCommand {
     });
     httpServer.start();
   }
+
   @AfterAll
   public static void shutdownScmHttp() {
     if (httpServer != null) {
