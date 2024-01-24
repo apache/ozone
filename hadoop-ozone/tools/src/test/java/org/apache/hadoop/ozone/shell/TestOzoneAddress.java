@@ -26,6 +26,7 @@ import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -133,6 +134,6 @@ public class TestOzoneAddress {
 
     OzoneClientException exception = assertThrows(OzoneClientException.class,
             () -> address.ensureSnapshotAddress());
-    assertTrue(exception.getMessage().contains(message));
+    assertThat(exception.getMessage()).contains(message);
   }
 }
