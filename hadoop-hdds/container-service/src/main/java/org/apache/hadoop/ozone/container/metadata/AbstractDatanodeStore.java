@@ -22,7 +22,6 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
@@ -33,14 +32,12 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
 import org.rocksdb.InfoLogLevel;
-import org.rocksdb.StatsLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,9 +47,6 @@ import java.util.NoSuchElementException;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF;
 
 /**
  * Implementation of the {@link DatanodeStore} interface that contains
@@ -114,71 +108,56 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
         options.setMaxTotalWalSize(maxWalSize);
       }
 
-      String rocksDbStat = config.getTrimmed(
-          OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
-          OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT);
+      DatanodeConfiguration dc =
+          config.getObject(DatanodeConfiguration.class);
+      // Config user log files
+      InfoLogLevel level = InfoLogLevel.valueOf(
+          dc.getRocksdbLogLevel() + "_LEVEL");
+      options.setInfoLogLevel(level);
+      options.setMaxLogFileSize(dc.getRocksdbLogMaxFileSize());
+      options.setKeepLogFileNum(dc.getRocksdbLogMaxFileNum());
+      
+      if (this.dbDef instanceof DatanodeSchemaThreeDBDefinition) {
+        options.setDeleteObsoleteFilesPeriodMicros(
+            dc.getRocksdbDeleteObsoleteFilesPeriod());
 
-      ManagedStatistics statistics = null;
-      try {
-        if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
-          statistics = new ManagedStatistics();
-          statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
-          options.setStatistics(statistics);
-        }
-
-        DatanodeConfiguration dc =
-            config.getObject(DatanodeConfiguration.class);
-        // Config user log files
-        InfoLogLevel level = InfoLogLevel.valueOf(
-            dc.getRocksdbLogLevel() + "_LEVEL");
-        options.setInfoLogLevel(level);
-        options.setMaxLogFileSize(dc.getRocksdbLogMaxFileSize());
-        options.setKeepLogFileNum(dc.getRocksdbLogMaxFileNum());
-
-        if (this.dbDef instanceof DatanodeSchemaThreeDBDefinition) {
-          options.setDeleteObsoleteFilesPeriodMicros(
-              dc.getRocksdbDeleteObsoleteFilesPeriod());
-
-          // For V3, all Rocksdb dir has the same "container.db" name. So use
-          // parentDirName(storage UUID)-dbDirName as db metrics name
-          this.store = DBStoreBuilder.newBuilder(config, dbDef)
-              .setDBOptions(options)
-              .setDefaultCFOptions(cfOptions)
-              .setOpenReadOnly(openReadOnly)
-              .setDBJmxBeanNameName(dbDef.getDBLocation(config).getName() + "-" +
-                  dbDef.getName())
-              .build();
-        } else {
-          this.store = DBStoreBuilder.newBuilder(config, dbDef)
-              .setDBOptions(options)
-              .setDefaultCFOptions(cfOptions)
-              .setOpenReadOnly(openReadOnly)
-              .build();
-        }
-
-        // Use the DatanodeTable wrapper to disable the table iterator on
-        // existing Table implementations retrieved from the DBDefinition.
-        // See the DatanodeTable's Javadoc for an explanation of why this is
-        // necessary.
-        metadataTable = new DatanodeTable<>(
-                dbDef.getMetadataColumnFamily().getTable(this.store));
-        checkTableStatus(metadataTable, metadataTable.getName());
-
-        // The block iterator this class returns will need to use the table
-        // iterator internally, so construct a block data table instance
-        // that does not have the iterator disabled by DatanodeTable.
-        blockDataTableWithIterator =
-                dbDef.getBlockDataColumnFamily().getTable(this.store);
-
-        blockDataTable = new DatanodeTable<>(blockDataTableWithIterator);
-        checkTableStatus(blockDataTable, blockDataTable.getName());
-
-        deletedBlocksTable = new DatanodeTable<>(
-                dbDef.getDeletedBlocksColumnFamily().getTable(this.store));
-        checkTableStatus(deletedBlocksTable, deletedBlocksTable.getName());
-      } finally {
-        IOUtils.closeQuietly(statistics);
+        // For V3, all Rocksdb dir has the same "container.db" name. So use
+        // parentDirName(storage UUID)-dbDirName as db metrics name
+        this.store = DBStoreBuilder.newBuilder(config, dbDef)
+            .setDBOptions(options)
+            .setDefaultCFOptions(cfOptions)
+            .setOpenReadOnly(openReadOnly)
+            .setDBJmxBeanNameName(dbDef.getDBLocation(config).getName() + "-" +
+                dbDef.getName())
+            .build();
+      } else {
+        this.store = DBStoreBuilder.newBuilder(config, dbDef)
+            .setDBOptions(options)
+            .setDefaultCFOptions(cfOptions)
+            .setOpenReadOnly(openReadOnly)
+            .build();
       }
+
+      // Use the DatanodeTable wrapper to disable the table iterator on
+      // existing Table implementations retrieved from the DBDefinition.
+      // See the DatanodeTable's Javadoc for an explanation of why this is
+      // necessary.
+      metadataTable = new DatanodeTable<>(
+              dbDef.getMetadataColumnFamily().getTable(this.store));
+      checkTableStatus(metadataTable, metadataTable.getName());
+
+      // The block iterator this class returns will need to use the table
+      // iterator internally, so construct a block data table instance
+      // that does not have the iterator disabled by DatanodeTable.
+      blockDataTableWithIterator =
+              dbDef.getBlockDataColumnFamily().getTable(this.store);
+
+      blockDataTable = new DatanodeTable<>(blockDataTableWithIterator);
+      checkTableStatus(blockDataTable, blockDataTable.getName());
+
+      deletedBlocksTable = new DatanodeTable<>(
+              dbDef.getDeletedBlocksColumnFamily().getTable(this.store));
+      checkTableStatus(deletedBlocksTable, deletedBlocksTable.getName());
     }
   }
 

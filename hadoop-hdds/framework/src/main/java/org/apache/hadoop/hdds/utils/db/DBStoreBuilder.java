@@ -50,7 +50,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_DELTA_UPDATE_DATA
 import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 
 import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
@@ -84,7 +83,7 @@ public final class DBStoreBuilder {
   // The column family options that will be used for any column families
   // added by name only (without specifying options).
   private ManagedColumnFamilyOptions defaultCfOptions;
-
+  // Initialize the Statistics instance if ROCKSDB_STATISTICS enabled
   private ManagedStatistics statistics;
 
   private String dbname;
@@ -192,6 +191,11 @@ public final class DBStoreBuilder {
     if (maxNumberOfOpenFiles != null) {
       dbOptions.setMaxOpenFiles(maxNumberOfOpenFiles);
     }
+    if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
+      statistics = new ManagedStatistics();
+      statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
+      dbOptions.setStatistics(statistics);
+    }
   }
 
   /**
@@ -221,12 +225,11 @@ public final class DBStoreBuilder {
         throw new IOException("The DB destination directory should exist.");
       }
 
-      return new RDBStore(dbFile, rocksDBOption, writeOptions, tableConfigs,
+      return new RDBStore(dbFile, rocksDBOption, statistics, writeOptions, tableConfigs,
           registry.build(), openReadOnly, maxFSSnapshots, dbJmxBeanNameName,
           enableCompactionDag, maxDbUpdatesSizeThreshold, createCheckpointDirs,
           configuration, threadNamePrefix);
     } finally {
-      IOUtils.closeQuietly(statistics);
       tableConfigs.forEach(TableConfig::close);
     }
   }
@@ -417,13 +420,6 @@ public final class DBStoreBuilder {
     // Apply WAL settings.
     dbOptions.setWalTtlSeconds(rocksDBConfiguration.getWalTTL());
     dbOptions.setWalSizeLimitMB(rocksDBConfiguration.getWalSizeLimit());
-
-    // Create statistics.
-    if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
-      statistics = new ManagedStatistics();
-      statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
-      dbOptions.setStatistics(statistics);
-    }
 
     return dbOptions;
   }
