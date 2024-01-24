@@ -17,10 +17,12 @@
  */
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 import picocli.CommandLine.Model.CommandSpec;
@@ -46,6 +48,9 @@ import java.util.concurrent.Callable;
 @MetaInfServices(SubcommandWithParent.class)
 public class DatanodeCommands implements Callable<Void>, SubcommandWithParent {
 
+  @CommandLine.ParentCommand
+  private OzoneAdmin parent;
+
   @Spec
   private CommandSpec spec;
 
@@ -53,6 +58,15 @@ public class DatanodeCommands implements Callable<Void>, SubcommandWithParent {
   public Void call() throws Exception {
     GenericCli.missingSubcommand(spec);
     return null;
+  }
+
+  public OzoneAdmin getParent() {
+    return parent;
+  }
+
+  @VisibleForTesting
+  public void setParent(OzoneConfiguration conf) {
+    parent = new OzoneAdmin(conf);
   }
 
   @Override

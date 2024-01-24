@@ -17,6 +17,8 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
  * limitations under the License.
  */
 
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.cli.SubcommandWithParent;
@@ -40,6 +42,9 @@ import java.util.concurrent.Callable;
 @MetaInfServices(SubcommandWithParent.class)
 public class StatusSubCommand implements Callable<Void>, SubcommandWithParent {
 
+  @CommandLine.ParentCommand
+  private DatanodeCommands parent;
+
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
 
@@ -47,6 +52,16 @@ public class StatusSubCommand implements Callable<Void>, SubcommandWithParent {
   public Void call() throws Exception {
     GenericCli.missingSubcommand(spec);
     return null;
+  }
+
+  public DatanodeCommands getParent() {
+    return parent;
+  }
+
+  @VisibleForTesting
+  public void setParent(OzoneConfiguration conf) {
+    parent = new DatanodeCommands();
+    parent.setParent(conf);
   }
 
   @Override
