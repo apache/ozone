@@ -38,7 +38,5 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-    commit-message:
-      prefix: "[Java] Dependabot Package Upgrade: "
     pull-request-branch-name:
       separator: "-"
