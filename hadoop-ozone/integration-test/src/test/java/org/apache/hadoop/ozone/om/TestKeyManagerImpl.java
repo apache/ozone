@@ -115,7 +115,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 
 import org.apache.ratis.util.ExitUtils;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -854,7 +854,7 @@ public class TestKeyManagerImpl {
             .getLocationList().get(0).getPipeline().getNodesInOrder());
   }
 
-  @NotNull
+  @Nonnull
   private ResolvedBucket resolvedBucket() {
     ResolvedBucket bucket = new ResolvedBucket(VOLUME_NAME, BUCKET_NAME,
         VOLUME_NAME, BUCKET_NAME, "", BucketLayout.DEFAULT);

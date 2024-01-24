@@ -145,7 +145,7 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.protocol.ClientId;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -364,7 +364,7 @@ public class RpcClient implements ClientProtocol {
     return found;
   }
 
-  @NotNull
+  @Nonnull
   @VisibleForTesting
   protected XceiverClientFactory createXceiverClientFactory(
       ServiceInfoEx serviceInfo) throws IOException {
@@ -1656,7 +1656,7 @@ public class RpcClient implements ClientProtocol {
     return getOzoneKeyDetails(keyInfo);
   }
 
-  @NotNull
+  @Nonnull
   private OzoneKeyDetails getOzoneKeyDetails(OmKeyInfo keyInfo) {
     List<OzoneKeyLocation> ozoneKeyLocations = new ArrayList<>();
     long lastKeyOffset = 0L;
@@ -1700,7 +1700,7 @@ public class RpcClient implements ClientProtocol {
     return getOzoneKeyDetails(keyInfo);
   }
 
-  @NotNull
+  @Nonnull
   private OmKeyInfo getS3KeyInfo(
       String bucketName, String keyName, boolean isHeadOp) throws IOException {
     verifyBucketName(bucketName);

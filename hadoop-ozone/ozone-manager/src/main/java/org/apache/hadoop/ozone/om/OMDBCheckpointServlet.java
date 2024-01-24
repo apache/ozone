@@ -37,7 +37,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
 import com.google.common.base.Preconditions;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -616,7 +616,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
   }
 
-  @NotNull
+  @Nonnull
   private static Path getMetaDirPath(Path checkpointLocation) {
     // This check is done to take care of findbugs else below getParent()
     // should not be null.

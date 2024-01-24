@@ -46,7 +46,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateDirectoryRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -736,7 +736,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
     }
   }
 
-  @NotNull
+  @Nonnull
   private String createDirKey(List<String> dirs, int depth) {
     String keyName = RandomStringUtils.randomAlphabetic(5);
     dirs.add(keyName);
