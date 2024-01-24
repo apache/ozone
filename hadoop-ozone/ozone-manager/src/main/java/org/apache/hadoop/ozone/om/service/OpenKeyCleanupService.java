@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.ExpiredOpenKeys;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -97,9 +98,16 @@ public class OpenKeyCleanupService extends BackgroundService {
         TimeUnit.MILLISECONDS);
     this.expireThreshold = Duration.ofMillis(expireMillis);
 
-    long leaseMillis = conf.getTimeDuration(OMConfigKeys.OZONE_OM_LEASE_HARD_LIMIT,
+    long leaseHardMillis = conf.getTimeDuration(OMConfigKeys.OZONE_OM_LEASE_HARD_LIMIT,
         OMConfigKeys.OZONE_OM_LEASE_HARD_LIMIT_DEFAULT, TimeUnit.MILLISECONDS);
-    this.leaseThreshold = Duration.ofMillis(leaseMillis);
+    long leaseSoftMillis = conf.getTimeDuration(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT,
+        OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT_DEFAULT, TimeUnit.MILLISECONDS);
+
+    if (leaseHardMillis < leaseSoftMillis) {
+      this.leaseThreshold = Duration.ofMillis(leaseSoftMillis);
+    } else {
+      this.leaseThreshold = Duration.ofMillis(leaseHardMillis);
+    }
 
     this.cleanupLimitPerTask = conf.getInt(
         OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_LIMIT_PER_TASK,
