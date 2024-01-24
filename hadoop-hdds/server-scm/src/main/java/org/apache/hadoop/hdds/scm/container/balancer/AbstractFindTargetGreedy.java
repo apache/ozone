@@ -228,6 +228,9 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
       if (totalEnteringSize < config.getMaxSizeEnteringTarget()) {
         //reorder
         potentialTargets.add(nodeManager.getUsageInfo(target));
+      } else {
+        logger.debug("Datanode {} removed from the list of potential targets. The total size of data entering it in " +
+            "this iteration is {}.", target, totalEnteringSize);
       }
       return;
     }
