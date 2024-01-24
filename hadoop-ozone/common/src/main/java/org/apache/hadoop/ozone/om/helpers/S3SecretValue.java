@@ -38,16 +38,33 @@ public class S3SecretValue {
   }
 
   // TODO: This field should be renamed to accessId for generalization.
-  private String kerberosID;
-  private String awsSecret;
-  private boolean isDeleted;
-  private long transactionLogIndex;
+  private final String kerberosID;
+  private final String awsSecret;
+  private final boolean isDeleted;
+  private final long transactionLogIndex;
+
+  public static S3SecretValue of(String kerberosID, String awsSecret) {
+    return of(kerberosID, awsSecret, 0);
+  }
+
+  public static S3SecretValue of(String kerberosID, String awsSecret, long transactionLogIndex) {
+    return new S3SecretValue(
+        Objects.requireNonNull(kerberosID),
+        Objects.requireNonNull(awsSecret),
+        false,
+        transactionLogIndex
+    );
+  }
 
   public S3SecretValue(String kerberosID, String awsSecret) {
     this(kerberosID, awsSecret, false, 0L);
   }
 
-  public S3SecretValue(String kerberosID, String awsSecret, boolean isDeleted,
+  public S3SecretValue deleted() {
+    return new S3SecretValue(kerberosID, awsSecret, true, transactionLogIndex);
+  }
+
+  private S3SecretValue(String kerberosID, String awsSecret, boolean isDeleted,
                        long transactionLogIndex) {
     this.kerberosID = kerberosID;
     this.awsSecret = awsSecret;
@@ -59,24 +76,12 @@ public class S3SecretValue {
     return kerberosID;
   }
 
-  public void setKerberosID(String kerberosID) {
-    this.kerberosID = kerberosID;
-  }
-
   public String getAwsSecret() {
     return awsSecret;
   }
 
-  public void setAwsSecret(String awsSecret) {
-    this.awsSecret = awsSecret;
-  }
-
   public boolean isDeleted() {
     return isDeleted;
-  }
-
-  public void setDeleted(boolean status) {
-    this.isDeleted = status;
   }
 
   public String getAwsAccessKey() {
@@ -87,12 +92,8 @@ public class S3SecretValue {
     return transactionLogIndex;
   }
 
-  public void setTransactionLogIndex(long transactionLogIndex) {
-    this.transactionLogIndex = transactionLogIndex;
-  }
-
   public static S3SecretValue fromProtobuf(S3Secret s3Secret) {
-    return new S3SecretValue(s3Secret.getKerberosID(), s3Secret.getAwsSecret());
+    return S3SecretValue.of(s3Secret.getKerberosID(), s3Secret.getAwsSecret());
   }
 
   public S3Secret getProtobuf() {
