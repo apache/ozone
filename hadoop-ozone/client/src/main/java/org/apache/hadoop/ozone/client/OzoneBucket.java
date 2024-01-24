@@ -413,6 +413,12 @@ public class OzoneBucket extends WithMetadata {
     this.listCacheSize = listCacheSize;
   }
 
+  @Deprecated
+  public void setEncryptionKey(String bekName) throws IOException {
+    proxy.setEncryptionKey(volumeName, name, bekName);
+    encryptionKeyName = bekName;
+  }
+
   /**
    * Creates a new key in the bucket, with default replication type RATIS and
    * with replication factor THREE.

@@ -573,6 +573,14 @@ public class ClientProtocolStub implements ClientProtocol {
 
   }
 
+  @Deprecated
+  @Override
+  public void setEncryptionKey(String volumeName, String bucketName,
+                               String bekName)
+      throws IOException {
+
+  }
+
   @Override
   public OzoneKey headObject(String volumeName, String bucketName,
                              String keyName) throws IOException {
