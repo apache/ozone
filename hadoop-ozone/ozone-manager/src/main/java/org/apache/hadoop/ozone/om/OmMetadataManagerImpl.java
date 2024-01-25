@@ -1844,7 +1844,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   @Override
   public ExpiredOpenKeys getExpiredOpenKeys(Duration expireThreshold,
-      int count, BucketLayout bucketLayout) throws IOException {
+      int count, BucketLayout bucketLayout, Duration leaseThreshold) throws IOException {
     final ExpiredOpenKeys expiredKeys = new ExpiredOpenKeys();
 
     final Table<String, OmKeyInfo> kt = getKeyTable(bucketLayout);
@@ -1857,6 +1857,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       final long expiredCreationTimestamp =
           expireThreshold.negated().plusMillis(Time.now()).toMillis();
 
+      final long expiredLeaseTimestamp =
+          leaseThreshold.negated().plusMillis(Time.now()).toMillis();
 
       int num = 0;
       while (num < count && keyValueTableIterator.hasNext()) {
@@ -1871,7 +1873,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           continue;
         }
 
-        if (openKeyInfo.getCreationTime() <= expiredCreationTimestamp) {
+        if (openKeyInfo.getCreationTime() <= expiredCreationTimestamp ||
+            openKeyInfo.getModificationTime() <= expiredLeaseTimestamp) {
           final String clientIdString
               = dbOpenKeyName.substring(lastPrefix + 1);
 
@@ -1882,10 +1885,12 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
               .filter(id -> id.equals(clientIdString))
               .isPresent();
 
-          if (!isHsync) {
+          if (!isHsync && openKeyInfo.getCreationTime() <= expiredCreationTimestamp) {
             // add non-hsync'ed keys
             expiredKeys.addOpenKey(openKeyInfo, dbOpenKeyName);
-          } else {
+            num++;
+          } else if (isHsync && openKeyInfo.getModificationTime() <= expiredLeaseTimestamp &&
+              !openKeyInfo.getMetadata().containsKey(OzoneConsts.LEASE_RECOVERY)) {
             // add hsync'ed keys
             final KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
                 .setVolumeName(info.getVolumeName())
@@ -1903,8 +1908,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                 info.getReplicationConfig(), keyArgs);
 
             expiredKeys.addHsyncKey(keyArgs, Long.parseLong(clientIdString));
+            num++;
           }
-          num++;
         }
       }
     }
