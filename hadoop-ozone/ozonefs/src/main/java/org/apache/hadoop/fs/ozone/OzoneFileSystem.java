@@ -155,15 +155,17 @@ public class OzoneFileSystem extends BasicOzoneFileSystem
 
     // finalize the final block and get block length
     List<OmKeyLocationInfo> locationInfoList = keyInfo.getLatestVersionLocations().getLocationList();
-    OmKeyLocationInfo block = locationInfoList.get(locationInfoList.size() - 1);
-    try {
-      block.setLength(getAdapter().finalizeBlock(block));
-    } catch (Throwable e) {
-      if (!forceRecovery) {
-        throw e;
+    if (locationInfoList.size() > 0) {
+      OmKeyLocationInfo block = locationInfoList.get(locationInfoList.size() - 1);
+      try {
+        block.setLength(getAdapter().finalizeBlock(block));
+      } catch (Throwable e) {
+        if (!forceRecovery) {
+          throw e;
+        }
+        LOG.warn("Failed to finalize block. Continue to recover the file since {} is enabled.",
+            FORCE_LEASE_RECOVERY_ENV, e);
       }
-      LOG.warn("Failed to finalize block. Continue to recover the file since {} is enabled.",
-          FORCE_LEASE_RECOVERY_ENV, e);
     }
 
     // recover and commit file

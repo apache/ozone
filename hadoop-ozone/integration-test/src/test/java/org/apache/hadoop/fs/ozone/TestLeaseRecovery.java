@@ -433,6 +433,27 @@ public class TestLeaseRecovery {
     }
   }
 
+  @Test
+  public void testRecoveryWithoutBlocks() throws Exception {
+    RootedOzoneFileSystem fs = (RootedOzoneFileSystem)FileSystem.get(conf);
+
+    final FSDataOutputStream stream = fs.create(file, true);
+    try {
+      stream.hsync();
+      assertFalse(fs.isFileClosed(file));
+
+      int count = 0;
+      while (count++ < 15 && !fs.recoverLease(file)) {
+        Thread.sleep(1000);
+      }
+      // The lease should have been recovered.
+      assertTrue(fs.isFileClosed(file), "File should be closed");
+
+    } finally {
+      closeIgnoringKeyNotFound(stream);
+    }
+  }
+
   private void verifyData(byte[] data, int dataSize, Path filePath, RootedOzoneFileSystem fs) throws IOException {
     try (FSDataInputStream fdis = fs.open(filePath)) {
       int bufferSize = dataSize > data.length ? dataSize / 2 : dataSize;
