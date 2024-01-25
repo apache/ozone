@@ -26,8 +26,8 @@ import java.util.Deque;
 import java.util.LinkedList;
 import java.util.concurrent.ThreadLocalRandom;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -79,8 +79,8 @@ class TestBufferPool {
       assertEmpty(allocated, size);
       fill(allocated); // make buffer contents unique, for equals check
 
-      assertFalse(buffers.contains(allocated),
-          () -> "buffer " + n + ": " + allocated + " already in: " + buffers);
+      assertThat(buffers).withFailMessage("buffer " + n + ": " + allocated + " already in: " + buffers)
+          .doesNotContain(allocated);
       buffers.addLast(allocated);
     }
 
