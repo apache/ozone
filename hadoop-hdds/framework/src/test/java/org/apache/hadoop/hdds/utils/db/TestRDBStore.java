@@ -65,7 +65,7 @@ public class TestRDBStore {
       Set<TableConfig> families,
       long maxDbUpdatesSizeThreshold)
       throws IOException {
-    return new RDBStore(dbFile, options, new ManagedWriteOptions(), families,
+    return new RDBStore(dbFile, options, null, new ManagedWriteOptions(), families,
         CodecRegistry.newBuilder().build(), false, 1000, null, false,
         maxDbUpdatesSizeThreshold, true, null, "");
   }

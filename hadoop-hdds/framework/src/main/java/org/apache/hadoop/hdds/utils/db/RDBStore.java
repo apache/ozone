@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
@@ -77,10 +78,11 @@ public class RDBStore implements DBStore {
   // number in request to avoid increase in heap memory.
   private final long maxDbUpdatesSizeThreshold;
   private final ManagedDBOptions dbOptions;
+  private final ManagedStatistics statistics;
   private final String threadNamePrefix;
 
   @SuppressWarnings("parameternumber")
-  public RDBStore(File dbFile, ManagedDBOptions dbOptions,
+  public RDBStore(File dbFile, ManagedDBOptions dbOptions, ManagedStatistics statistics,
                   ManagedWriteOptions writeOptions, Set<TableConfig> families,
                   CodecRegistry registry, boolean readOnly, int maxFSSnapshots,
                   String dbJmxBeanName, boolean enableCompactionDag,
@@ -97,6 +99,7 @@ public class RDBStore implements DBStore {
     codecRegistry = registry;
     dbLocation = dbFile;
     this.dbOptions = dbOptions;
+    this.statistics = statistics;
 
     try {
       if (enableCompactionDag) {
@@ -119,8 +122,8 @@ public class RDBStore implements DBStore {
       if (dbJmxBeanName == null) {
         dbJmxBeanName = dbFile.getName();
       }
-      metrics = RocksDBStoreMetrics.create(dbOptions.statistics(), db,
-          dbJmxBeanName);
+      // Use statistics instead of dbOptions.statistics() to avoid repeated init.
+      metrics = RocksDBStoreMetrics.create(statistics, db, dbJmxBeanName);
       if (metrics == null) {
         LOG.warn("Metrics registration failed during RocksDB init, " +
             "db path :{}", dbJmxBeanName);
@@ -230,6 +233,9 @@ public class RDBStore implements DBStore {
     if (rocksDBCheckpointDiffer != null) {
       RocksDBCheckpointDifferHolder
           .invalidateCacheEntry(rocksDBCheckpointDiffer.getMetadataDir());
+    }
+    if (statistics != null) {
+      IOUtils.close(LOG, statistics);
     }
     IOUtils.close(LOG, db);
   }
