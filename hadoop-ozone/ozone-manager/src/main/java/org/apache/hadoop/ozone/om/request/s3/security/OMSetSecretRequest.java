@@ -113,25 +113,19 @@ public class OMSetSecretRequest extends OMClientRequest {
     try {
       omClientResponse = ozoneManager.getS3SecretManager()
           .doUnderLock(accessId, s3SecretManager -> {
-            // Intentionally set to final so they can only be set once.
-            final S3SecretValue newS3SecretValue;
 
             // Update legacy S3SecretTable, if the accessId entry exists
-            if (s3SecretManager.hasS3Secret(accessId)) {
-              // accessId found in S3SecretTable. Update S3SecretTable
-              LOG.debug("Updating S3SecretTable cache entry");
-              // Update S3SecretTable cache entry in this case
-              newS3SecretValue = new S3SecretValue(accessId, secretKey);
-              // Set the transactionLogIndex to be used for updating.
-              newS3SecretValue.setTransactionLogIndex(transactionLogIndex);
-              s3SecretManager
-                  .updateCache(accessId, newS3SecretValue);
-            } else {
+            if (!s3SecretManager.hasS3Secret(accessId)) {
               // If S3SecretTable is not updated,
               // throw ACCESS_ID_NOT_FOUND exception.
               throw new OMException("accessId '" + accessId + "' not found.",
                   OMException.ResultCodes.ACCESS_ID_NOT_FOUND);
             }
+
+            // Update S3SecretTable cache entry in this case
+            // Set the transactionLogIndex to be used for updating.
+            final S3SecretValue newS3SecretValue = S3SecretValue.of(accessId, secretKey, transactionLogIndex);
+            s3SecretManager.updateCache(accessId, newS3SecretValue);
 
             // Compose response
             final SetS3SecretResponse.Builder setSecretResponse =

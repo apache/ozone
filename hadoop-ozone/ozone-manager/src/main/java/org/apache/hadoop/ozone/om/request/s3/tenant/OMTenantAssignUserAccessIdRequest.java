@@ -271,10 +271,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
         }
       }
 
-      final S3SecretValue s3SecretValue =
-          new S3SecretValue(accessId, awsSecret);
-      // Set the transactionLogIndex to be used for updating.
-      s3SecretValue.setTransactionLogIndex(transactionLogIndex);
+      final S3SecretValue s3SecretValue = S3SecretValue.of(accessId, awsSecret, transactionLogIndex);
 
       // Add to tenantAccessIdTable
       final OmDBAccessIdInfo omDBAccessIdInfo = new OmDBAccessIdInfo.Builder()
