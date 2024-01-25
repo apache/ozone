@@ -379,7 +379,7 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   @Nonnull
   public S3SecretValue getS3Secret(String kerberosID) throws IOException {
-    return new S3SecretValue(STUB_KERBEROS_ID, STUB_SECRET);
+    return S3SecretValue.of(STUB_KERBEROS_ID, STUB_SECRET);
   }
 
   @Override
