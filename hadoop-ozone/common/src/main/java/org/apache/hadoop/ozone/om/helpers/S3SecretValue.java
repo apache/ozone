@@ -56,10 +56,6 @@ public class S3SecretValue {
     );
   }
 
-  public S3SecretValue(String kerberosID, String awsSecret) {
-    this(kerberosID, awsSecret, false, 0L);
-  }
-
   public S3SecretValue deleted() {
     return new S3SecretValue(kerberosID, awsSecret, true, transactionLogIndex);
   }
