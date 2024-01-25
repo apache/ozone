@@ -38,6 +38,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -49,7 +50,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import picocli.CommandLine;
-import sun.net.www.protocol.http.HttpURLConnection;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -72,7 +72,7 @@ public class TestDecommissionStatusSubCommand {
   private List<HddsProtos.Node> nodes = getNodeDetails(2);
   private Map<String, List<ContainerID>> containerOnDecom = getContainersOnDecomNodes();
   private static HttpServer httpServer;
-  private static OzoneConfiguration conf;
+  private OzoneConfiguration conf = new OzoneConfiguration();
 
   @BeforeAll
   public static void setupScmHttp() throws Exception {
@@ -104,7 +104,6 @@ public class TestDecommissionStatusSubCommand {
     cmd = new DecommissionStatusSubCommand();
     System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
-    conf = new OzoneConfiguration();
     HttpConfig.Policy policy = HttpConfig.Policy.HTTP_ONLY;
     conf.set(OzoneConfigKeys.OZONE_HTTP_POLICY_KEY, policy.name());
     conf.set(ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY, "localhost:15000");
