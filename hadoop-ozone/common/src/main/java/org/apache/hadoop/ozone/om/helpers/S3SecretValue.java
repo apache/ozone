@@ -57,7 +57,7 @@ public final class S3SecretValue {
   }
 
   public S3SecretValue deleted() {
-    return new S3SecretValue(kerberosID, awsSecret, true, transactionLogIndex);
+    return new S3SecretValue(kerberosID, "", true, transactionLogIndex);
   }
 
   private S3SecretValue(String kerberosID, String awsSecret, boolean isDeleted,
