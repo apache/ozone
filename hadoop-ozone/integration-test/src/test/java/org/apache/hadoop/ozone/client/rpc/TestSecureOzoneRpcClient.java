@@ -264,7 +264,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
 
     // Add secret to S3Secret table.
     s3SecretManager.storeSecret(accessKey,
-        new S3SecretValue(accessKey, secret));
+        S3SecretValue.of(accessKey, secret));
 
     OMRequest writeRequest = OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
@@ -313,7 +313,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
 
     // Override secret to S3Secret store with some dummy value
     s3SecretManager
-        .storeSecret(accessKey, new S3SecretValue(accessKey, "dummy"));
+        .storeSecret(accessKey, S3SecretValue.of(accessKey, "dummy"));
 
     // Write request with invalid credentials.
     omResponse = cluster.getOzoneManager().getOmServerProtocol()
