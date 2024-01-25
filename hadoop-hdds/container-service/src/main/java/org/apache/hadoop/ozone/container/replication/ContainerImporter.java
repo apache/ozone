@@ -124,8 +124,8 @@ public class ContainerImporter {
         containerData = (KeyValueContainerData) ContainerDataYaml
             .readContainer(containerDescriptorYaml);
       }
-      containerData.setVolume(targetVolume);
       ContainerUtils.verifyChecksum(containerData, conf);
+      containerData.setVolume(targetVolume);
 
       try (FileInputStream input = new FileInputStream(tarFilePath.toFile())) {
         Container container = controller.importContainer(
@@ -159,4 +159,19 @@ public class ContainerImporter {
     return Paths.get(hddsVolume.getVolumeRootDir())
         .resolve(CONTAINER_COPY_TMP_DIR).resolve(CONTAINER_COPY_DIR);
   }
+
+  protected KeyValueContainerData getKeyValueContainerData(
+      byte[] containerDescriptorYaml) throws IOException {
+    return  (KeyValueContainerData) ContainerDataYaml
+        .readContainer(containerDescriptorYaml);
+  }
+
+  public Set<Long> getImportContainerProgress() {
+    return this.importContainerProgress;
+  }
+
+  public TarContainerPacker getPacker(CopyContainerCompression compression) {
+    return new TarContainerPacker(compression);
+  }
+
 }
