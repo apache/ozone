@@ -265,6 +265,14 @@ public class TestListKeysWithFSO {
     expectedKeys =
             getExpectedKeyDeepList("a1/b3/e3/e31.tx", "", legacyOzoneBucket);
     checkKeyDeepList("a1/b3/e3/e31.tx", "", expectedKeys, fsoOzoneBucket);
+
+    expectedKeys =
+            getExpectedKeyDeepList("a1/b2", "", legacyOzoneBucket);
+    checkKeyDeepList("a1/b2", "", expectedKeys, fsoOzoneBucket);
+
+    expectedKeys =
+            getExpectedKeyDeepList("a1/b2", "a1/b2/d2/d21.tx", legacyOzoneBucket);
+    checkKeyDeepList("a1/b2", "a1/b2/d2/d21.tx", expectedKeys, fsoOzoneBucket);
   }
 
   @Test
@@ -478,6 +486,27 @@ public class TestListKeysWithFSO {
     // startKey reaches last key
     keyPrefix = "a1/b1/c12";
     startKey = "a1/b1/c12/c3.tx";
+    // a1/b1/c1222.tx
+    expectedKeys =
+            getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    keyPrefix = "a1/b1/";
+    startKey = "";
+    // a1/b1/c1222.tx
+    expectedKeys =
+            getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    keyPrefix = "a1/b1/";
+    startKey = "a1";
+    // a1/b1/c1222.tx
+    expectedKeys =
+            getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    keyPrefix = "a1/b1/";
+    startKey = "a1/b1";
     // a1/b1/c1222.tx
     expectedKeys =
             getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
