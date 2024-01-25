@@ -48,6 +48,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -691,8 +692,8 @@ public class TestDatanodeAdminMonitor {
     assertEquals(1, monitor.getTrackedNodeCount());
     long monitoredTime = monitor.getSingleTrackedNode(dn1.getIpAddress())
         .getStartTime();
-    assertTrue(monitoredTime >= beforeTime);
-    assertTrue(monitoredTime <= afterTime);
+    assertThat(monitoredTime).isGreaterThanOrEqualTo(beforeTime);
+    assertThat(monitoredTime).isLessThanOrEqualTo(afterTime);
   }
 
   @Test

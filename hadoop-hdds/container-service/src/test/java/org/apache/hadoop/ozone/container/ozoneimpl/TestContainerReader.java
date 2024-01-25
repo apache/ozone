@@ -358,7 +358,7 @@ public class TestContainerReader {
         hddsVolume1, containerSet1, conf, true);
     containerReader.readVolume(hddsVolume1.getHddsRootDir());
     assertEquals(0, containerSet1.containerCount());
-    assertTrue(dnLogs.getOutput().contains("Container DB file is missing"));
+    assertThat(dnLogs.getOutput()).contains("Container DB file is missing");
   }
 
   @ContainerTestVersionInfo.ContainerTest
