@@ -48,32 +48,29 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 /**
  * Verify BlockOutputStream with incremental PutBlock feature.
- * (incremental.chunk.list = true)
+ * (ozone.client.incremental.chunk.list = true)
  */
 public class TestBlockOutputStreamIncrementalPutBlock {
   private OzoneClient client;
-  private ObjectStore store;
-  private RpcClient rpcClient;
-
-  private String keyName = UUID.randomUUID().toString();
-  private String volumeName = UUID.randomUUID().toString();
-  private String bucketName = UUID.randomUUID().toString();
-  private ConfigurationSource config = new InMemoryConfiguration();
-  private boolean enableIncrementalChunkList;
+  private final String keyName = UUID.randomUUID().toString();
+  private final String volumeName = UUID.randomUUID().toString();
+  private final String bucketName = UUID.randomUUID().toString();
+  private OzoneBucket bucket;
+  private final ConfigurationSource config = new InMemoryConfiguration();
 
   public static Iterable<Boolean> parameters() {
     return Arrays.asList(true, false);
   }
 
-  public void init() throws IOException {
+  public void init(boolean incrementalChunkList) throws IOException {
     OzoneClientConfig clientConfig = config.getObject(OzoneClientConfig.class);
 
-    clientConfig.setIncrementalChunkList(enableIncrementalChunkList);
+    clientConfig.setIncrementalChunkList(incrementalChunkList);
     clientConfig.setChecksumType(ContainerProtos.ChecksumType.CRC32C);
 
     ((InMemoryConfiguration)config).setFromObject(clientConfig);
 
-    rpcClient = new RpcClient(config, null) {
+    RpcClient rpcClient = new RpcClient(config, null) {
 
       @Override
       protected OmTransport createOmTransport(
@@ -91,7 +88,12 @@ public class TestBlockOutputStreamIncrementalPutBlock {
     };
 
     client = new OzoneClient(config, rpcClient);
-    store = client.getObjectStore();
+    ObjectStore store = client.getObjectStore();
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    bucket = volume.getBucket(bucketName);
   }
 
   @AfterEach
@@ -103,17 +105,11 @@ public class TestBlockOutputStreamIncrementalPutBlock {
   @MethodSource("parameters")
   public void writeSmallKey(boolean incrementalChunkList)
       throws IOException {
-    this.enableIncrementalChunkList = incrementalChunkList;
-    init();
+    init(incrementalChunkList);
 
-    store.createVolume(volumeName);
-    OzoneVolume volume = store.getVolume(volumeName);
     int size = 1024;
     String s = RandomStringUtils.randomAlphabetic(1024);
     ByteBuffer byteBuffer = ByteBuffer.wrap(s.getBytes(StandardCharsets.UTF_8));
-
-    volume.createBucket(bucketName);
-    OzoneBucket bucket = volume.getBucket(bucketName);
 
     try (OzoneOutputStream out = bucket.createKey(keyName, size,
         ReplicationConfig.getDefault(config), new HashMap<>())) {
@@ -136,16 +132,10 @@ public class TestBlockOutputStreamIncrementalPutBlock {
   @MethodSource("parameters")
   public void writeLargeKey(boolean incrementalChunkList)
       throws IOException {
-    this.enableIncrementalChunkList = incrementalChunkList;
-    init();
+    init(incrementalChunkList);
 
-    store.createVolume(volumeName);
-    OzoneVolume volume = store.getVolume(volumeName);
     int size = 1024 * 1024 + 1;
     ByteBuffer byteBuffer = ByteBuffer.allocate(size);
-
-    volume.createBucket(bucketName);
-    OzoneBucket bucket = volume.getBucket(bucketName);
 
     try (OzoneOutputStream out = bucket.createKey(keyName, size,
         ReplicationConfig.getDefault(config), new HashMap<>())) {
