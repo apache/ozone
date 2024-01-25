@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Timeout;

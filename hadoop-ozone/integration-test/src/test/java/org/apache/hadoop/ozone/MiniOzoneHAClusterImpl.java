@@ -172,13 +172,13 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   public OzoneManager waitForLeaderOM()
       throws TimeoutException, InterruptedException {
-      final OzoneManager[] om = new OzoneManager[1];
-      GenericTestUtils.waitFor(() -> {
-        om[0] = getOMLeader();
-        return om[0] != null;
-      }, 200, waitForClusterToBeReadyTimeout);
-      return om[0];
-    }
+    final OzoneManager[] om = new OzoneManager[1];
+    GenericTestUtils.waitFor(() -> {
+      om[0] = getOMLeader();
+      return om[0] != null;
+    }, 200, waitForClusterToBeReadyTimeout);
+    return om[0];
+  }
 
   /**
    * Get OzoneManager leader object.
