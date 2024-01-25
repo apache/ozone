@@ -166,11 +166,11 @@ public class ContainerImporter {
         .readContainer(containerDescriptorYaml);
   }
 
-  public Set<Long> getImportContainerProgress() {
+  protected Set<Long> getImportContainerProgress() {
     return this.importContainerProgress;
   }
 
-  public TarContainerPacker getPacker(CopyContainerCompression compression) {
+  protected TarContainerPacker getPacker(CopyContainerCompression compression) {
     return new TarContainerPacker(compression);
   }
 
