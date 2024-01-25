@@ -317,6 +317,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private final Map<String, TableCacheMetrics> tableCacheMetricsMap =
       new HashMap<>();
   private SnapshotChainManager snapshotChainManager;
+  private final S3Batcher s3Batcher = new S3SecretBatcher();
 
   /**
    * OmMetadataManagerImpl constructor.
@@ -1940,25 +1941,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   @Override
   public S3Batcher batcher() {
-    return new S3Batcher() {
-      @Override
-      public void addWithBatch(AutoCloseable batchOperator,
-                               String id, S3SecretValue s3SecretValue)
-          throws IOException {
-        if (batchOperator instanceof BatchOperation) {
-          s3SecretTable.putWithBatch((BatchOperation) batchOperator,
-              id, s3SecretValue);
-        }
-      }
-
-      @Override
-      public void deleteWithBatch(AutoCloseable batchOperator, String id)
-          throws IOException {
-        if (batchOperator instanceof BatchOperation) {
-          s3SecretTable.deleteWithBatch((BatchOperation) batchOperator, id);
-        }
-      }
-    };
+    return s3Batcher;
   }
 
   @Override
@@ -2169,5 +2152,24 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
 
     return false;
+  }
+
+  private final class S3SecretBatcher implements S3Batcher {
+    @Override
+    public void addWithBatch(AutoCloseable batchOperator, String id, S3SecretValue s3SecretValue)
+        throws IOException {
+      if (batchOperator instanceof BatchOperation) {
+        s3SecretTable.putWithBatch((BatchOperation) batchOperator,
+            id, s3SecretValue);
+      }
+    }
+
+    @Override
+    public void deleteWithBatch(AutoCloseable batchOperator, String id)
+        throws IOException {
+      if (batchOperator instanceof BatchOperation) {
+        s3SecretTable.deleteWithBatch((BatchOperation) batchOperator, id);
+      }
+    }
   }
 }
