@@ -216,7 +216,7 @@ public class TestPipelineManagerImpl {
     PipelineManagerImpl pipelineManager2 =
         createPipelineManager(true, buffer2);
     // Should be able to load previous pipelines.
-    assertFalse(pipelineManager2.getPipelines().isEmpty());
+    assertThat(pipelineManager2.getPipelines()).isNotEmpty();
     assertEquals(3, pipelineManager.getPipelines().size());
     Pipeline pipeline3 = pipelineManager2.createPipeline(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
@@ -261,10 +261,10 @@ public class TestPipelineManagerImpl {
     assertEquals(Pipeline.PipelineState.DORMANT, pipelineManager.getPipeline(pipelineID).getPipelineState());
     buffer.flush();
     assertEquals(Pipeline.PipelineState.DORMANT, pipelineStore.get(pipeline.getId()).getPipelineState());
-    assertFalse(pipelineManager
+    assertThat(pipelineManager
         .getPipelines(RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE),
-            Pipeline.PipelineState.OPEN).contains(pipeline));
+            Pipeline.PipelineState.OPEN)).doesNotContain(pipeline);
     assertEquals(1, pipelineManager.getPipelineCount(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
             Pipeline.PipelineState.DORMANT));
@@ -573,16 +573,16 @@ public class TestPipelineManagerImpl {
     pipelineManager.scrubPipelines();
 
     // The allocatedPipeline should now be scrubbed as the interval has passed
-    assertFalse(pipelineManager
+    assertThat(pipelineManager
         .getPipelines(RatisReplicationConfig
                 .getInstance(ReplicationFactor.THREE),
-            Pipeline.PipelineState.ALLOCATED).contains(allocatedPipeline));
+            Pipeline.PipelineState.ALLOCATED)).doesNotContain(allocatedPipeline);
 
     // The closedPipeline should now be scrubbed as the interval has passed
-    assertFalse(pipelineManager
+    assertThat(pipelineManager
         .getPipelines(RatisReplicationConfig
                 .getInstance(ReplicationFactor.THREE),
-            Pipeline.PipelineState.CLOSED).contains(closedPipeline));
+            Pipeline.PipelineState.CLOSED)).doesNotContain(closedPipeline);
 
     pipelineManager.close();
   }

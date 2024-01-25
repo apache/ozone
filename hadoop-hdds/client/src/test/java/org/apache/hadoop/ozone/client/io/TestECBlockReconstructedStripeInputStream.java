@@ -52,6 +52,7 @@ import static java.util.Collections.emptySet;
 import static java.util.Collections.singleton;
 import static java.util.stream.Collectors.toSet;
 import static org.apache.hadoop.ozone.client.io.ECStreamTestUtil.generateParity;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -800,7 +801,7 @@ public class TestECBlockReconstructedStripeInputStream {
       // created in the stream factory, indicating we did not read them.
       List<TestBlockInputStream> streams = streamFactory.getBlockStreams();
       for (TestBlockInputStream stream : streams) {
-        assertTrue(stream.getEcReplicaIndex() > 2);
+        assertThat(stream.getEcReplicaIndex()).isGreaterThan(2);
       }
     }
   }

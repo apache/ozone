@@ -544,7 +544,7 @@ public class TestContainerPersistence {
       long actualContainerID = report.getContainerID();
       assertTrue(containerIDs.remove(actualContainerID));
     }
-    assertTrue(containerIDs.isEmpty());
+    assertThat(containerIDs).isEmpty();
   }
 
   /**
@@ -585,7 +585,7 @@ public class TestContainerPersistence {
     }
     // Assert that we listed all the keys that we had put into
     // container.
-    assertTrue(testMap.isEmpty());
+    assertThat(testMap).isEmpty();
   }
 
   private ChunkInfo writeChunkHelper(BlockID blockID) throws IOException {

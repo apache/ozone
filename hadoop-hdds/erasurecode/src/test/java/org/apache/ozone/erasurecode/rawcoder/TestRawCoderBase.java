@@ -24,9 +24,9 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -132,13 +132,13 @@ public abstract class TestRawCoderBase extends TestCoderBase {
     final ECChunk[] parity = prepareParityChunksForEncoding();
     IOException ioException = assertThrows(IOException.class,
         () -> encoder.encode(data, parity));
-    assertTrue(ioException.getMessage().contains("closed"));
+    assertThat(ioException.getMessage()).contains("closed");
     decoder.release();
     final ECChunk[] in = prepareInputChunksForDecoding(data, parity);
     final ECChunk[] out = prepareOutputChunksForDecoding();
     ioException = assertThrows(IOException.class,
         () -> decoder.decode(in, getErasedIndexesForDecoding(), out));
-    assertTrue(ioException.getMessage().contains("closed"));
+    assertThat(ioException.getMessage()).contains("closed");
   }
 
   @Test

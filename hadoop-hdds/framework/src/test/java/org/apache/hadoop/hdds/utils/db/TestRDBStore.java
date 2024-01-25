@@ -248,7 +248,7 @@ public class TestRDBStore {
     int count = families.size();
     // Assert that we have all the tables in the list and no more.
     for (String name : families) {
-      assertTrue(hashTable.containsKey(name));
+      assertThat(hashTable).containsKey(name);
       count--;
     }
     assertEquals(0, count);
