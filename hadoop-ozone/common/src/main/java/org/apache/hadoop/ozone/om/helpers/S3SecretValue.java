@@ -27,7 +27,7 @@ import java.util.Objects;
 /**
  * S3Secret to be saved in database.
  */
-public class S3SecretValue {
+public final class S3SecretValue {
   private static final Codec<S3SecretValue> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(S3Secret.getDefaultInstance()),
       S3SecretValue::fromProtobuf,
