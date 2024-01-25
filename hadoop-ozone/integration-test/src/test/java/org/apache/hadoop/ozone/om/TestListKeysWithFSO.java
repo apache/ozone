@@ -484,6 +484,74 @@ public class TestListKeysWithFSO {
     checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
   }
 
+  @Test
+  public void testDeepListKeysWithTrailingSlash() throws Exception {
+    List<String> expectedKeys;
+
+    // Case-1: StartKey is less than prefixKey, return emptyList.
+    String keyPrefix = "a1/b2/";
+    String startKey = "a1";
+    expectedKeys =
+            getExpectedKeyDeepList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyDeepList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    // Case-2: StartKey is empty, return all node.
+    keyPrefix = "a1/b2/";
+    startKey = "";
+    expectedKeys =
+            getExpectedKeyDeepList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyDeepList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    // Case-3: StartKey is same as prefixKey, return all nodes.
+    keyPrefix = "a1/b2/";
+    startKey = "a1/b2";
+    expectedKeys =
+            getExpectedKeyDeepList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyDeepList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    // Case-4: StartKey is greater than prefixKey
+    keyPrefix = "a1/b2/";
+    startKey = "a1/b2/d2/d21.tx";
+    expectedKeys =
+            getExpectedKeyDeepList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyDeepList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    // Case-5: StartKey reaches last element, return emptyList
+    keyPrefix = "a1/b2/";
+    startKey = "a1/b2/d3/d31.tx";
+    expectedKeys =
+            getExpectedKeyDeepList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyDeepList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+//    // Case-6: StartKey is invalid (less than last element)
+//    keyPrefix = "a1/b1/c1";
+//    startKey = "a1/b1/c1/c0invalid";
+//    expectedKeys =
+//            getExpectedKeyDeepList(keyPrefix, startKey, legacyOzoneBucket);
+//    checkKeyDeepList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+//
+//    // Case-7: StartKey reaches last element
+//    keyPrefix = "a1/b1/c1";
+//    startKey = "a1/b1/c1/c2.tx";
+//    expectedKeys =
+//            getExpectedKeyDeepList(keyPrefix, startKey, legacyOzoneBucket);
+//    checkKeyDeepList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+//
+//    // Case-8: StartKey is invalid (greater than last element)
+//    keyPrefix = "a1/b1/c1";
+//    startKey = "a1/b1/c1/c2invalid";
+//    expectedKeys =
+//            getExpectedKeyDeepList(keyPrefix, startKey, legacyOzoneBucket);
+//    checkKeyDeepList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+
+    // Case-9:
+    keyPrefix = "a1/b1/c12";
+    startKey = "a1/b1/c1222.tx";
+    expectedKeys =
+            getExpectedKeyDeepList(keyPrefix, startKey, legacyOzoneBucket);
+    checkKeyDeepList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+  }
+
   /**
    * Verify listKeys at different levels.
    *
