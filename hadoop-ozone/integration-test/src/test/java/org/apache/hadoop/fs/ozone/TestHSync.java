@@ -23,11 +23,16 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
+import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.crypto.CipherSuite;
@@ -35,7 +40,6 @@ import org.apache.hadoop.crypto.CryptoCodec;
 import org.apache.hadoop.crypto.CryptoOutputStream;
 import org.apache.hadoop.crypto.Encryptor;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -57,6 +61,7 @@ import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
@@ -107,7 +112,7 @@ public class TestHSync {
 
   @BeforeAll
   public static void init() throws Exception {
-    final int chunkSize = 16 << 10;
+    final int chunkSize = 4 << 10;
     final int flushSize = 2 * chunkSize;
     final int maxFlushSize = 2 * flushSize;
     final int blockSize = 2 * maxFlushSize;
@@ -279,6 +284,52 @@ public class TestHSync {
     }
   }
 
+  @Test
+  public void testHsyncKeyCallCount() throws Exception {
+    // Set the fs.defaultFS
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+
+    OMMetrics omMetrics = cluster.getOzoneManager().getMetrics();
+    omMetrics.resetNumKeyHSyncs();
+    final byte[] data = new byte[128];
+    ThreadLocalRandom.current().nextBytes(data);
+
+    final Path file = new Path(dir, "file-hsync-then-close");
+    long blockSize;
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      blockSize = fs.getDefaultBlockSize(file);
+      long fileSize = 0;
+      try (FSDataOutputStream outputStream = fs.create(file, true)) {
+        // make sure at least writing 2 blocks data
+        while (fileSize <= blockSize) {
+          outputStream.write(data, 0, data.length);
+          outputStream.hsync();
+          fileSize += data.length;
+        }
+      }
+    }
+    assertEquals(2, omMetrics.getNumKeyHSyncs());
+
+    // test file with all blocks pre-allocated
+    omMetrics.resetNumKeyHSyncs();
+    long writtenSize = 0;
+    try (OzoneOutputStream outputStream = bucket.createKey("key-" + RandomStringUtils.randomNumeric(5),
+        blockSize * 2, ReplicationType.RATIS, ReplicationFactor.THREE, new HashMap<>())) {
+      // make sure at least writing 2 blocks data
+      while (writtenSize <= blockSize) {
+        outputStream.write(data, 0, data.length);
+        outputStream.hsync();
+        writtenSize += data.length;
+      }
+    }
+    assertEquals(2, omMetrics.getNumKeyHSyncs());
+  }
+
   static void runTestHSync(FileSystem fs, Path file, int initialDataSize)
       throws Exception {
     try (StreamWithLength out = new StreamWithLength(
@@ -409,7 +460,7 @@ public class TestHSync {
         + OZONE_URI_DELIMITER + bucket.getName();
 
     try (FileSystem fs = FileSystem.get(CONF)) {
-      for (int i = 0; i < 10; i++) {
+      for (int i = 0; i < 5; i++) {
         final Path file = new Path(dir, "file" + i);
         try (FSDataOutputStream out =
             fs.create(file, true)) {

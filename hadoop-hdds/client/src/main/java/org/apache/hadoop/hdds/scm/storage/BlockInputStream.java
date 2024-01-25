@@ -32,6 +32,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
@@ -66,7 +67,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
       LoggerFactory.getLogger(BlockInputStream.class);
 
   private final BlockID blockID;
-  private final long length;
+  private long length;
+  private final BlockLocationInfo blockInfo;
   private final AtomicReference<Pipeline> pipelineRef =
       new AtomicReference<>();
   private final AtomicReference<Token<OzoneBlockTokenIdentifier>> tokenRef =
@@ -111,12 +113,13 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   private final Function<BlockID, BlockLocationInfo> refreshFunction;
 
-  public BlockInputStream(BlockID blockId, long blockLen, Pipeline pipeline,
+  public BlockInputStream(BlockLocationInfo blockInfo, Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
       XceiverClientFactory xceiverClientFactory,
       Function<BlockID, BlockLocationInfo> refreshFunction) {
-    this.blockID = blockId;
-    this.length = blockLen;
+    this.blockInfo = blockInfo;
+    this.blockID = blockInfo.getBlockID();
+    this.length = blockInfo.getLength();
     setPipeline(pipeline);
     tokenRef.set(token);
     this.verifyChecksum = verifyChecksum;
@@ -124,14 +127,16 @@ public class BlockInputStream extends BlockExtendedInputStream {
     this.refreshFunction = refreshFunction;
   }
 
+  // only for unit tests
   public BlockInputStream(BlockID blockId, long blockLen, Pipeline pipeline,
                           Token<OzoneBlockTokenIdentifier> token,
                           boolean verifyChecksum,
-                          XceiverClientFactory xceiverClientFactory
-  ) {
-    this(blockId, blockLen, pipeline, token, verifyChecksum,
+                          XceiverClientFactory xceiverClientFactory) {
+    this(new BlockLocationInfo(new BlockLocationInfo.Builder().setBlockID(blockId).setLength(blockLen)),
+        pipeline, token, verifyChecksum,
         xceiverClientFactory, null);
   }
+
   /**
    * Initialize the BlockInputStream. Get the BlockData (list of chunks) from
    * the Container and create the ChunkInputStreams for each Chunk in the Block.
@@ -143,11 +148,17 @@ public class BlockInputStream extends BlockExtendedInputStream {
       return;
     }
 
+    BlockData blockData = null;
     List<ChunkInfo> chunks = null;
     IOException catchEx = null;
     do {
       try {
-        chunks = getChunkInfoList();
+        blockData = getBlockData();
+        chunks = blockData.getChunksList();
+        if (blockInfo != null && blockInfo.isUnderConstruction()) {
+          // use the block length from DN if block is under construction.
+          length = blockData.getSize();
+        }
         break;
         // If we get a StorageContainerException or an IOException due to
         // datanodes are not reachable, refresh to get the latest pipeline
@@ -226,19 +237,22 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
   /**
    * Send RPC call to get the block info from the container.
-   * @return List of chunks in this block.
+   * @return BlockData.
    */
-  protected List<ChunkInfo> getChunkInfoList() throws IOException {
+  protected BlockData getBlockData() throws IOException {
     acquireClient();
     try {
-      return getChunkInfoListUsingClient();
+      return getBlockDataUsingClient();
     } finally {
       releaseClient();
     }
   }
 
-  @VisibleForTesting
-  protected List<ChunkInfo> getChunkInfoListUsingClient() throws IOException {
+  /**
+   * Send RPC call to get the block info from the container.
+   * @return BlockData.
+   */
+  protected BlockData getBlockDataUsingClient() throws IOException {
     final Pipeline pipeline = xceiverClient.getPipeline();
 
     if (LOG.isDebugEnabled()) {
@@ -258,8 +272,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
 
     GetBlockResponseProto response = ContainerProtocolCalls.getBlock(
         xceiverClient, VALIDATORS, blkIDBuilder.build(), tokenRef.get());
-
-    return response.getBlockData().getChunksList();
+    return response.getBlockData();
   }
 
   private void setPipeline(Pipeline pipeline) {
