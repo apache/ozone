@@ -72,7 +72,7 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.hadoop.util.Time;
-import org.apache.ozone.test.NamedTestsBase;
+import org.apache.ozone.test.OzoneTestBase;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -102,7 +102,7 @@ import static org.mockito.Mockito.when;
  * Unit test key manager.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class TestKeyManagerUnit extends NamedTestsBase {
+class TestKeyManagerUnit extends OzoneTestBase {
 
   private static final AtomicLong CONTAINER_ID = new AtomicLong();
 

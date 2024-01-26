@@ -23,9 +23,10 @@ import org.junit.jupiter.api.TestInfo;
 import java.lang.reflect.Method;
 
 /**
- * Base class for JUnit tests.  Provides test method name, which can be used to create unique items.
+ * Base class for Ozone JUnit tests.
+ * Provides test method name, which can be used to create unique items.
  */
-public abstract class NamedTestsBase {
+public abstract class OzoneTestBase {
 
   private TestInfo info;
 
@@ -35,8 +36,9 @@ public abstract class NamedTestsBase {
   }
 
   protected String getTestName() {
-    // FIXME parameterized tests?
-    return info.getTestMethod().map(Method::getName).orElse("unknown");
+    return info.getTestMethod()
+        .map(Method::getName)
+        .orElse("unknown");
   }
 
 }
