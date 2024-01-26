@@ -91,16 +91,25 @@ public class ContainerBalancerSelectionCriteria {
    * @return cached Navigable ContainerID Set
    */
   public Set<ContainerID> getContainerIDSet(DatanodeDetails node) {
+    // Check if the node is registered at the beginning
+    if (!nodeManager.isNodeRegistered(node)) {
+      return Collections.emptySet();
+    }
+
     try {
       // Initialize containerSet for node
-      if (!setMap.containsKey(node)) {
-        addNodeToSetMap(node);
-      }
-      // In case the node is removed
-      nodeManager.getContainers(node);
-    } catch (NodeNotFoundException e) {
-      LOG.warn("Could not find Datanode {} while selecting candidate " +
-          "containers for Container Balancer.", node.toString(), e);
+      setMap.computeIfAbsent(node, n -> {
+        try {
+          addNodeToSetMap(n);
+          return setMap.get(n);
+        } catch (NodeNotFoundException e) {
+          LOG.warn("Could not find Datanode {} while selecting candidate " +
+              "containers for Container Balancer.", n.toString(), e);
+          return null;
+        }
+      });
+    } catch (Exception e) {
+      LOG.error("An unexpected error occurred while processing the node.", e);
       setMap.remove(node);
       return Collections.emptySet();
     }
