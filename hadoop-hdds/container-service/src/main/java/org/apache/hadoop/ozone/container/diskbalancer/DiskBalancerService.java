@@ -450,11 +450,13 @@ public class DiskBalancerService extends BackgroundService {
         metrics.incrSuccessCount(1);
         metrics.incrSuccessBytes(containerSize);
       } catch (IOException e) {
-        try {
-          Files.deleteIfExists(diskBalancerTmpDir);
-        } catch (IOException ex) {
-          LOG.warn("Failed to delete tmp directory {}", diskBalancerTmpDir,
-              ex);
+        if (diskBalancerTmpDir != null) {
+          try {
+            Files.deleteIfExists(diskBalancerTmpDir);
+          } catch (IOException ex) {
+            LOG.warn("Failed to delete tmp directory {}", diskBalancerTmpDir,
+                ex);
+          }
         }
         if (diskBalancerDestDir != null) {
           try {
