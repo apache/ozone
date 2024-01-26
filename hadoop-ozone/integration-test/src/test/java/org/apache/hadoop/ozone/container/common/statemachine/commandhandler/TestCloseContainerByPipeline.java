@@ -58,6 +58,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -159,8 +160,7 @@ public class TestCloseContainerByPipeline {
         .waitFor(() -> isContainerClosed(cluster, containerID, datanodeDetails),
             500, 5 * 1000);
     // Make sure the closeContainerCommandHandler is Invoked
-    assertTrue(
-        closeContainerHandler.getInvocationCount() > lastInvocationCount);
+    assertThat(closeContainerHandler.getInvocationCount()).isGreaterThan(lastInvocationCount);
   }
 
   @Test

@@ -105,11 +105,11 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.ratis.rpc.SupportedRpcType.GRPC;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test Container servers when security is enabled.
@@ -316,7 +316,7 @@ public class TestSecureContainerServer {
       ContainerCommandResponseProto response = client.sendCommand(request);
       assertNotEquals(response.getResult(), ContainerProtos.Result.SUCCESS);
       String msg = response.getMessage();
-      assertTrue(msg.contains(BLOCK_TOKEN_VERIFICATION_FAILED.name()), msg);
+      assertThat(msg).contains(BLOCK_TOKEN_VERIFICATION_FAILED.name());
     } else {
       final Throwable t = assertThrows(Throwable.class,
           () -> client.sendCommand(request));
@@ -329,7 +329,7 @@ public class TestSecureContainerServer {
     Throwable rootCause = ExceptionUtils.getRootCause(t);
     assertNotNull(rootCause);
     String msg = rootCause.getMessage();
-    assertTrue(msg.contains(contained), msg);
+    assertThat(msg).contains(contained);
   }
 
   private static String getToken(ContainerID containerID) throws IOException {
