@@ -251,7 +251,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       if (omKeyInfo == null) {
         String action = isRecovery ? "recovery" : isHSync ? "hsync" : "commit";
         throw new OMException("Failed to " + action + " key, as " + dbOpenKey +
-            "entry is not found in the OpenKey table", KEY_NOT_FOUND);
+            " entry is not found in the OpenKey table", KEY_NOT_FOUND);
       }
       if (omKeyInfo.getMetadata().containsKey(OzoneConsts.LEASE_RECOVERY) &&
           omKeyInfo.getMetadata().containsKey(OzoneConsts.HSYNC_CLIENT_ID)) {

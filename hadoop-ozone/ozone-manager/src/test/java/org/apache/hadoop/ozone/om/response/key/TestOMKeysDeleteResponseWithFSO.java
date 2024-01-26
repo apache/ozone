@@ -38,6 +38,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
@@ -110,7 +111,7 @@ public class TestOMKeysDeleteResponseWithFSO
       OmBucketInfo omBucketInfo) {
     return new OMKeysDeleteResponseWithFSO(
         omResponse, getOmKeyInfoList(), dirDeleteList, true, omBucketInfo,
-        volId);
+        volId, Collections.emptyList());
   }
 
   @Test

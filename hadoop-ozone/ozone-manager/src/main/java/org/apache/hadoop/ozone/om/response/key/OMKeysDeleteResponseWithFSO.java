@@ -36,11 +36,12 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 
 /**
  * Response for DeleteKeys request.
  */
-@CleanupTableInfo(cleanupTables = { FILE_TABLE, DIRECTORY_TABLE,
+@CleanupTableInfo(cleanupTables = { FILE_TABLE, OPEN_FILE_TABLE, DIRECTORY_TABLE,
     DELETED_DIR_TABLE, DELETED_TABLE, BUCKET_TABLE })
 public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
 
@@ -51,8 +52,9 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
       @NotNull OzoneManagerProtocolProtos.OMResponse omResponse,
       @NotNull List<OmKeyInfo> keyDeleteList,
       @NotNull List<OmKeyInfo> dirDeleteList, boolean isRatisEnabled,
-      @NotNull OmBucketInfo omBucketInfo, @Nonnull long volId) {
-    super(omResponse, keyDeleteList, isRatisEnabled, omBucketInfo);
+      @NotNull OmBucketInfo omBucketInfo, @Nonnull long volId,
+      @Nonnull List<String> dbOpenKeys) {
+    super(omResponse, keyDeleteList, isRatisEnabled, omBucketInfo, dbOpenKeys);
     this.dirsList = dirDeleteList;
     this.volumeId = volId;
   }
@@ -93,6 +95,11 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
         omMetadataManager.getBucketKey(getOmBucketInfo().getVolumeName(),
             getOmBucketInfo().getBucketName()), getOmBucketInfo());
+
+    for (String dbOpenKey : getDbOpenKeys()) {
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).deleteWithBatch(
+          batchOperation, dbOpenKey);
+    }
   }
 
   @Override
