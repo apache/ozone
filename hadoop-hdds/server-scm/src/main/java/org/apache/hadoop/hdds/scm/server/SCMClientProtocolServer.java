@@ -589,6 +589,15 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
+  public Map<String, List<ContainerID>> getContainersOnDecomNode(DatanodeDetails dn) throws IOException {
+    try {
+      return scm.getScmDecommissionManager().getContainersReplicatedOnNode(dn);
+    } catch (NodeNotFoundException e) {
+      throw new IOException("Failed to get containers list. Unable to find required node", e);
+    }
+  }
+
+  @Override
   public List<HddsProtos.Node> queryNode(
       HddsProtos.NodeOperationalState opState, HddsProtos.NodeState state,
       HddsProtos.QueryScope queryScope, String poolName, int clientVersion)

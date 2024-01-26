@@ -397,7 +397,7 @@ public class TestSCMSafeModeManager {
       if (entry.getKey().equals(safeModeRule)) {
         Pair<Boolean, String> value = entry.getValue();
         assertEquals(false, value.getLeft());
-        assertTrue(value.getRight().contains(stringToMatch));
+        assertThat(value.getRight()).contains(stringToMatch);
       }
     }
   }

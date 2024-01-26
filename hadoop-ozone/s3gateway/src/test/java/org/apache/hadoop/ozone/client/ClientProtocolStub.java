@@ -379,7 +379,7 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   @Nonnull
   public S3SecretValue getS3Secret(String kerberosID) throws IOException {
-    return new S3SecretValue(STUB_KERBEROS_ID, STUB_SECRET);
+    return S3SecretValue.of(STUB_KERBEROS_ID, STUB_SECRET);
   }
 
   @Override
@@ -569,6 +569,14 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public void setReplicationConfig(String volumeName, String bucketName,
                                    ReplicationConfig replicationConfig)
+      throws IOException {
+
+  }
+
+  @Deprecated
+  @Override
+  public void setEncryptionKey(String volumeName, String bucketName,
+                               String bekName)
       throws IOException {
 
   }
