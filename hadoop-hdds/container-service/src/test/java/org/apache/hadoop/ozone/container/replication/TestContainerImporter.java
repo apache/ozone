@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.HashSet;
 import java.util.concurrent.CompletableFuture;
@@ -162,13 +163,14 @@ class TestContainerImporter {
         containerSet, controllerMock, volumeSet));
 
     TarContainerPacker packer = mock(TarContainerPacker.class);
-    when(packer.unpackContainerDescriptor(any())).thenReturn(new byte[0]);
+    when(packer.unpackContainerDescriptor(any())).thenReturn("test".getBytes(
+        StandardCharsets.UTF_8));
     when(containerImporter.getPacker(any())).thenReturn(packer);
 
     doReturn(containerData).when(containerImporter).getKeyValueContainerData(any(byte[].class));
     when(containerImporter.getImportContainerProgress()).thenReturn(new HashSet<>());
 
-    File tarFile  = File.createTempFile("temp_" + System
+    File tarFile = File.createTempFile("temp_" + System
         .currentTimeMillis(), ".tar");
 
     StorageContainerException scException =

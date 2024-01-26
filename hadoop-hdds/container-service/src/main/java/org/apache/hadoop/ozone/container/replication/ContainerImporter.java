@@ -116,13 +116,12 @@ public class ContainerImporter {
       }
 
       KeyValueContainerData containerData;
-      TarContainerPacker packer = new TarContainerPacker(compression);
+      TarContainerPacker packer = getPacker(compression);
 
       try (FileInputStream input = new FileInputStream(tarFilePath.toFile())) {
         byte[] containerDescriptorYaml =
             packer.unpackContainerDescriptor(input);
-        containerData = (KeyValueContainerData) ContainerDataYaml
-            .readContainer(containerDescriptorYaml);
+        containerData = getKeyValueContainerData(containerDescriptorYaml);
       }
       ContainerUtils.verifyChecksum(containerData, conf);
       containerData.setVolume(targetVolume);
