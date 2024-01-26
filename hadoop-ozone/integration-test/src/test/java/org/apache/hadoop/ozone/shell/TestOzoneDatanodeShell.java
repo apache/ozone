@@ -35,7 +35,7 @@ import picocli.CommandLine.ParameterException;
 import picocli.CommandLine.ParseResult;
 import picocli.CommandLine.RunLast;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -99,9 +99,7 @@ public class TestOzoneDatanodeShell {
           if (exceptionToCheck.getCause() != null) {
             exceptionToCheck = exceptionToCheck.getCause();
           }
-          assertTrue(exceptionToCheck.getMessage().contains(expectedError),
-              String.format("Error of shell code doesn't contain the " + "exception [%s] in [%s]", expectedError,
-                  exceptionToCheck.getMessage()));
+          assertThat(exceptionToCheck.getMessage()).contains(expectedError);
         }
       }
     }

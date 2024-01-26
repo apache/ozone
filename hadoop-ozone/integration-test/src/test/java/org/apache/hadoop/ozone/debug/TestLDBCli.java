@@ -61,8 +61,8 @@ import java.util.TreeMap;
 import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class tests `ozone debug ldb` CLI that reads from a RocksDB directory.
@@ -236,7 +236,7 @@ public class TestLDBCli {
 
     // Check stderr
     final String stderrShouldContain = expectedExitCodeStderrPair.getRight();
-    assertTrue(stderr.toString().contains(stderrShouldContain));
+    assertThat(stderr.toString()).contains(stderrShouldContain);
   }
 
   @Test
