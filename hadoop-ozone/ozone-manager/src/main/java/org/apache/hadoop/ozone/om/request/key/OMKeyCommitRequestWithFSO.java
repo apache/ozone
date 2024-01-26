@@ -172,9 +172,6 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         }
       }
 
-      omKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
-          commitKeyArgs.getMetadataList()));
-
       final String clientIdString = String.valueOf(writerClientId);
       // non-null indicates it is necessary to update the open key
       OmKeyInfo newOpenKeyInfo = null;
@@ -189,6 +186,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         omKeyInfo.getMetadata().remove(OzoneConsts.LEASE_RECOVERY);
       }
 
+      omKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
+          commitKeyArgs.getMetadataList()));
       omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
 

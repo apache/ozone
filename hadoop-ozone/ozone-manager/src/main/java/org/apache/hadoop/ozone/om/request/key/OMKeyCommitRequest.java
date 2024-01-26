@@ -260,8 +260,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
               " metadata while recovery flag is not set in request", KEY_UNDER_LEASE_RECOVERY);
         }
       }
-      omKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
-          commitKeyArgs.getMetadataList()));
 
       // non-null indicates it is necessary to update the open key
       OmKeyInfo newOpenKeyInfo = null;
@@ -275,6 +273,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         omKeyInfo.getMetadata().remove(OzoneConsts.HSYNC_CLIENT_ID);
         omKeyInfo.getMetadata().remove(OzoneConsts.LEASE_RECOVERY);
       }
+
+      omKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
+          commitKeyArgs.getMetadataList()));
       omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
       omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
       // Update the block length for each block, return the allocated but
