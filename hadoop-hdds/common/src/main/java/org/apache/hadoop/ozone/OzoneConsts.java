@@ -367,10 +367,6 @@ public final class OzoneConsts {
   // Tenant admin role. All tenant admins are assigned this role
   public static final String DEFAULT_TENANT_ROLE_ADMIN_SUFFIX = "-AdminRole";
 
-  // For OM metrics saving to a file
-  public static final String OM_METRICS_FILE = "omMetrics";
-  public static final String OM_METRICS_TEMP_FILE = OM_METRICS_FILE + ".tmp";
-
   // For Multipart upload
   public static final int OM_MULTIPART_MIN_SIZE = 5 * 1024 * 1024;
 

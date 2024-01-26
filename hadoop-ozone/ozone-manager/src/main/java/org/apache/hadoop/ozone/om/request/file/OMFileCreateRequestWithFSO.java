@@ -100,7 +100,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
     OmBucketInfo omBucketInfo = null;
     final List<OmKeyLocationInfo> locations = new ArrayList<>();
     List<OmDirectoryInfo> missingParentInfos;
-    int numKeysCreated = 0;
+    int numMissingParents = 0;
 
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
@@ -158,7 +158,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
               ozoneManager, keyArgs, bucketInfo, pathInfoFSO, trxnLogIndex);
 
       // total number of keys created.
-      numKeysCreated = missingParentInfos.size();
+      numMissingParents = missingParentInfos.size();
 
       final ReplicationConfig repConfig = OzoneConfigUtil
           .resolveReplicationConfigPreference(keyArgs.getType(),
@@ -193,8 +193,8 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
               .getRequiredNodes();
       checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
           preAllocatedSpace);
-      checkBucketQuotaInNamespace(omBucketInfo, numKeysCreated + 1L);
-      omBucketInfo.incrUsedNamespace(numKeysCreated);
+      checkBucketQuotaInNamespace(omBucketInfo, numMissingParents + 1L);
+      omBucketInfo.incrUsedNamespace(numMissingParents);
 
       // Add to cache entry can be done outside of lock for this openKey.
       // Even if bucket gets deleted, when commitKey we shall identify if
@@ -246,7 +246,9 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
 
     switch (result) {
     case SUCCESS:
-      omMetrics.incNumKeys(numKeysCreated);
+      // Parent directories were created as part of this request. The final file will not count towards the metric
+      // until it is committed.
+      omMetrics.incNumDirs(numMissingParents);
       LOG.debug("File created. Volume:{}, Bucket:{}, Key:{}", volumeName,
           bucketName, keyName);
       break;

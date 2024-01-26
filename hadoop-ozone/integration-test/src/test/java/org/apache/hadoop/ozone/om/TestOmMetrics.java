@@ -113,8 +113,6 @@ public class TestOmMetrics {
   @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
-    conf.setTimeDuration(OMConfigKeys.OZONE_OM_METRICS_SAVE_INTERVAL,
-        1000, TimeUnit.MILLISECONDS);
     clusterBuilder = MiniOzoneCluster.newBuilder(conf).withoutDatanodes();
   }
 

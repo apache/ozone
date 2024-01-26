@@ -283,10 +283,39 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
     if (!isHSync) {
       auditLog(auditLogger, buildAuditMessage(OMAction.COMMIT_KEY, auditMap,
               exception, getOmRequest().getUserInfo()));
-      processResult(commitKeyRequest, volumeName, bucketName, keyName,
-          omMetrics, exception, omKeyInfo, result);
+      updateMetrics(commitKeyRequest, omMetrics, omKeyInfo, result);
+      logResult(commitKeyRequest, volumeName, bucketName, keyName, exception, result);
     }
 
     return omClientResponse;
+  }
+
+  private void updateMetrics(CommitKeyRequest commitKeyRequest, OMMetrics omMetrics, OmKeyInfo omKeyInfo,
+                             Result result) {
+    switch (result) {
+    case SUCCESS:
+      // As when we commit the key, then it is visible in ozone, so we should
+      // increment here.
+      // As key also can have multiple versions, we need to increment keys
+      // only if version is 0. Currently we have not complete support of
+      // versioning of keys. So, this can be revisited later.
+      if (omKeyInfo.getKeyLocationVersions().size() == 1) {
+        omMetrics.incNumFiles();
+      }
+      if (commitKeyRequest.getKeyArgs().hasEcReplicationConfig()) {
+        omMetrics.incEcKeysTotal();
+      }
+      omMetrics.incDataCommittedBytes(omKeyInfo.getDataSize());
+      break;
+    case FAILURE:
+      if (commitKeyRequest.getKeyArgs().hasEcReplicationConfig()) {
+        omMetrics.incEcKeyCreateFailsTotal();
+      }
+      omMetrics.incNumKeyCommitFails();
+      break;
+    default:
+      LOG.error("Unrecognized Result for OMKeyCommitRequestWithFSO: {}",
+          commitKeyRequest);
+    }
   }
 }

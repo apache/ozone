@@ -88,7 +88,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
     String keyName = keyArgs.getKeyName();
-    int numKeysCreated = 0;
+    int numDirsCreated = 0;
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
@@ -154,9 +154,9 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
                 .getBucketId(volumeName, bucketName);
 
         // total number of keys created.
-        numKeysCreated = missingParentInfos.size() + 1;
-        checkBucketQuotaInNamespace(omBucketInfo, numKeysCreated);
-        omBucketInfo.incrUsedNamespace(numKeysCreated);
+        numDirsCreated = missingParentInfos.size() + 1;
+        checkBucketQuotaInNamespace(omBucketInfo, numDirsCreated);
+        omBucketInfo.incrUsedNamespace(numDirsCreated);
 
         // prepare leafNode dir
         OmDirectoryInfo dirInfo = createDirectoryInfoWithACL(
@@ -196,14 +196,14 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
     auditLog(auditLogger, buildAuditMessage(OMAction.CREATE_DIRECTORY,
         auditMap, exception, userInfo));
 
-    logResult(createDirectoryRequest, keyArgs, omMetrics, numKeysCreated,
+    logResult(createDirectoryRequest, keyArgs, omMetrics, numDirsCreated,
             result, exception);
 
     return omClientResponse;
   }
 
   private void logResult(CreateDirectoryRequest createDirectoryRequest,
-                         KeyArgs keyArgs, OMMetrics omMetrics, int numKeys,
+                         KeyArgs keyArgs, OMMetrics omMetrics, int numDirs,
                          Result result,
                          Exception exception) {
 
@@ -213,7 +213,7 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
 
     switch (result) {
     case SUCCESS:
-      omMetrics.incNumKeys(numKeys);
+      omMetrics.incNumDirs(numDirs);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Directory created. Volume:{}, Bucket:{}, Key:{}",
             volumeName, bucketName, keyName);

@@ -95,6 +95,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
     OMClientResponse omClientResponse = null;
     Result result = null;
     OmBucketInfo omBucketInfo = null;
+    boolean isDirectory = false;
     try {
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
@@ -117,6 +118,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       // keyName field stores only the leaf node name, which is 'file1'.
       String fileName = OzoneFSUtils.getFileName(keyName);
       omKeyInfo.setKeyName(fileName);
+      isDirectory = keyStatus.isDirectory();
 
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
@@ -128,7 +130,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
               bucketId, omKeyInfo.getParentObjectID(),
               omKeyInfo.getFileName());
 
-      if (keyStatus.isDirectory()) {
+      if (isDirectory) {
         // Check if there are any sub path exists under the user requested path
         if (!recursive &&
             OMFileRequest.hasChildren(omKeyInfo, omMetadataManager)) {
@@ -187,7 +189,11 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
 
     switch (result) {
     case SUCCESS:
-      omMetrics.decNumKeys();
+      if (isDirectory) {
+        omMetrics.decNumDirs();
+      } else {
+        omMetrics.decNumFiles();
+      }
       LOG.debug("Key deleted. Volume:{}, Bucket:{}, Key:{}", volumeName,
           bucketName, keyName);
       break;
