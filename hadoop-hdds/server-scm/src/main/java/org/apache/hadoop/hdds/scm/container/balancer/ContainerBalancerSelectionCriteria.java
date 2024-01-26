@@ -95,26 +95,9 @@ public class ContainerBalancerSelectionCriteria {
     if (!nodeManager.isNodeRegistered(node)) {
       return Collections.emptySet();
     }
-
-    try {
-      // Initialize containerSet for node
-      setMap.computeIfAbsent(node, n -> {
-        try {
-          addNodeToSetMap(n);
-          return setMap.get(n);
-        } catch (NodeNotFoundException e) {
-          LOG.warn("Could not find Datanode {} while selecting candidate " +
-              "containers for Container Balancer.", n.toString(), e);
-          return null;
-        }
-      });
-    } catch (Exception e) {
-      LOG.error("An unexpected error occurred while processing the node.", e);
-      setMap.remove(node);
-      return Collections.emptySet();
-    }
-
-    return setMap.get(node);
+    Set<ContainerID> containers = setMap.computeIfAbsent(node,
+        this::getCandidateContainers);
+    return containers != null ? containers : Collections.emptySet();
   }
 
   /**
@@ -262,18 +245,23 @@ public class ContainerBalancerSelectionCriteria {
   }
 
 
-  private void addNodeToSetMap(DatanodeDetails node)
-      throws NodeNotFoundException {
+  private NavigableSet<ContainerID> getCandidateContainers(DatanodeDetails node) {
     NavigableSet<ContainerID> newSet =
         new TreeSet<>(orderContainersByUsedBytes().reversed());
-    Set<ContainerID> idSet = nodeManager.getContainers(node);
-    if (excludeContainers != null) {
-      idSet.removeAll(excludeContainers);
+    try {
+      Set<ContainerID> idSet = nodeManager.getContainers(node);
+      if (excludeContainers != null) {
+        idSet.removeAll(excludeContainers);
+      }
+      if (selectedContainers != null) {
+        idSet.removeAll(selectedContainers);
+      }
+      newSet.addAll(idSet);
+      return newSet;
+    } catch (NodeNotFoundException e) {
+      LOG.warn("Could not find Datanode {} while selecting candidate " +
+              "containers for Container Balancer.", node, e);
+      return null;
     }
-    if (selectedContainers != null) {
-      idSet.removeAll(selectedContainers);
-    }
-    newSet.addAll(idSet);
-    setMap.put(node, newSet);
   }
 }
