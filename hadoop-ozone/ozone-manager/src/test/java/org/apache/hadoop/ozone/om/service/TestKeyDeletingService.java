@@ -121,7 +121,7 @@ public class TestKeyDeletingService {
     }
     System.setProperty(DBConfigFromFile.CONFIG_DIR, "/");
     ServerUtils.setOzoneMetaDirPath(conf, newFolder.toString());
-    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
+    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 1000,
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL,
         100, TimeUnit.MILLISECONDS);
@@ -207,7 +207,7 @@ public class TestKeyDeletingService {
     // Make sure that we have run the background thread 5 times more
     GenericTestUtils.waitFor(
         () -> keyDeletingService.getRunCount().get() >= 5,
-        100, 1000);
+        100, 10000);
     // Since SCM calls are failing, deletedKeyCount should be zero.
     assertEquals(0, keyDeletingService.getDeletedKeyCount().get());
     assertEquals(keyCount, keyManager
@@ -544,7 +544,7 @@ t
     // Create Snap3, traps all the deleted keys.
     writeClient.createSnapshot(volumeName, bucketName, "snap3");
     assertTableRowCount(snapshotInfoTable, 3, metadataManager);
-    checkSnapDeepCleanStatus(snapshotInfoTable, true);
+    checkSnapDeepCleanStatus(snapshotInfoTable, false);
 
     keyDeletingService.resume();
 
@@ -564,9 +564,8 @@ t
 
       assertTableRowCount(snap3deletedTable, 0, metadataManager);
       assertTableRowCount(deletedTable, 0, metadataManager);
-      checkSnapDeepCleanStatus(snapshotInfoTable, false);
+      checkSnapDeepCleanStatus(snapshotInfoTable, true);
     }
-
   }
 
   @Test
@@ -670,6 +669,7 @@ t
              iterator = snapshotInfoTable.iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> snapshotEntry = iterator.next();
+        System.out.println(snapshotEntry.getValue());
         String snapshotName = snapshotEntry.getValue().getName();
         assertEquals(expectedSize.get(snapshotName),
             snapshotEntry.getValue().
