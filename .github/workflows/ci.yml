@@ -135,7 +135,7 @@ jobs:
       - build-info
       - build
       - basic
-    timeout-minutes: 30
+    timeout-minutes: 45
     if: needs.build-info.outputs.needs-compile == 'true'
     strategy:
       matrix:
