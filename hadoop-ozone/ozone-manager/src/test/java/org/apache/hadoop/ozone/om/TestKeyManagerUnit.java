@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
@@ -71,11 +72,13 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.hadoop.util.Time;
+import org.apache.ozone.test.NamedTestsBase;
 import org.apache.ratis.util.ExitUtils;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -90,6 +93,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.anySet;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -97,7 +101,10 @@ import static org.mockito.Mockito.when;
 /**
  * Unit test key manager.
  */
-public class TestKeyManagerUnit {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class TestKeyManagerUnit extends NamedTestsBase {
+
+  private static final AtomicLong CONTAINER_ID = new AtomicLong();
 
   private OzoneConfiguration configuration;
   private OMMetadataManager metadataManager;
@@ -112,12 +119,9 @@ public class TestKeyManagerUnit {
   private OzoneManager om;
 
   @BeforeAll
-  public static void setup() {
+  void setup() throws Exception {
     ExitUtils.disableSystemExit();
-  }
-  
-  @BeforeEach
-  public void init() throws Exception {
+
     configuration = new OzoneConfiguration();
     testDir = GenericTestUtils.getRandomizedTestDir();
     configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS,
@@ -131,10 +135,15 @@ public class TestKeyManagerUnit {
     metadataManager = omTestManagers.getMetadataManager();
     keyManager = (KeyManagerImpl)omTestManagers.getKeyManager();
     writeClient = omTestManagers.getWriteClient();
+  }
+
+  @BeforeEach
+  void init() {
+    reset(blockClient, containerClient);
     startDate = Instant.ofEpochMilli(Time.now());
   }
 
-  @AfterEach
+  @AfterAll
   public void cleanup() throws Exception {
     om.stop();
     FileUtils.deleteDirectory(testDir);
@@ -143,34 +152,40 @@ public class TestKeyManagerUnit {
   @Test
   public void listMultipartUploadPartsWithZeroUpload() throws IOException {
     //GIVEN
-    createBucket(metadataManager, "vol1", "bucket1");
+    final String volume = volumeName();
+    createBucket(metadataManager, volume, "bucket1");
 
     OmMultipartInfo omMultipartInfo =
-        initMultipartUpload(writeClient, "vol1", "bucket1", "dir/key1");
+        initMultipartUpload(writeClient, volume, "bucket1", "dir/key1");
 
     //WHEN
     OmMultipartUploadListParts omMultipartUploadListParts = keyManager
-        .listParts("vol1", "bucket1", "dir/key1", omMultipartInfo.getUploadID(),
+        .listParts(volume, "bucket1", "dir/key1", omMultipartInfo.getUploadID(),
             0, 10);
 
     assertEquals(0,
         omMultipartUploadListParts.getPartInfoList().size());
   }
 
+  private String volumeName() {
+    return getTestName();
+  }
+
   @Test
   public void listMultipartUploads() throws IOException {
 
     //GIVEN
-    createBucket(metadataManager, "vol1", "bucket1");
-    createBucket(metadataManager, "vol1", "bucket2");
+    final String volume = volumeName();
+    createBucket(metadataManager, volume, "bucket1");
+    createBucket(metadataManager, volume, "bucket2");
 
-    initMultipartUpload(writeClient, "vol1", "bucket1", "dir/key1");
-    initMultipartUpload(writeClient, "vol1", "bucket1", "dir/key2");
-    initMultipartUpload(writeClient, "vol1", "bucket2", "dir/key1");
+    initMultipartUpload(writeClient, volume, "bucket1", "dir/key1");
+    initMultipartUpload(writeClient, volume, "bucket1", "dir/key2");
+    initMultipartUpload(writeClient, volume, "bucket2", "dir/key1");
 
     //WHEN
     OmMultipartUploadList omMultipartUploadList =
-        keyManager.listMultipartUploads("vol1", "bucket1", "");
+        keyManager.listMultipartUploads(volume, "bucket1", "");
 
     //THEN
     List<OmMultipartUpload> uploads = omMultipartUploadList.getUploads();
@@ -188,8 +203,8 @@ public class TestKeyManagerUnit {
 
   @Test
   public void listMultipartUploadsWithFewEntriesInCache() throws IOException {
-    String volume = UUID.randomUUID().toString();
-    String bucket = UUID.randomUUID().toString();
+    String volume = volumeName();
+    String bucket = "bucket";
 
     //GIVEN
     createBucket(metadataManager, volume, bucket);
@@ -276,20 +291,21 @@ public class TestKeyManagerUnit {
   public void listMultipartUploadsWithPrefix() throws IOException {
 
     //GIVEN
-    createBucket(metadataManager, "vol1", "bucket1");
-    createBucket(metadataManager, "vol1", "bucket2");
+    final String volumeName = volumeName();
+    createBucket(metadataManager, volumeName, "bucket1");
+    createBucket(metadataManager, volumeName, "bucket2");
 
-    initMultipartUpload(writeClient, "vol1", "bucket1", "dip/key1");
+    initMultipartUpload(writeClient, volumeName, "bucket1", "dip/key1");
 
-    initMultipartUpload(writeClient, "vol1", "bucket1", "dir/key1");
-    initMultipartUpload(writeClient, "vol1", "bucket1", "dir/key2");
-    initMultipartUpload(writeClient, "vol1", "bucket1", "key3");
+    initMultipartUpload(writeClient, volumeName, "bucket1", "dir/key1");
+    initMultipartUpload(writeClient, volumeName, "bucket1", "dir/key2");
+    initMultipartUpload(writeClient, volumeName, "bucket1", "key3");
 
-    initMultipartUpload(writeClient, "vol1", "bucket2", "dir/key1");
+    initMultipartUpload(writeClient, volumeName, "bucket2", "dir/key1");
 
     //WHEN
     OmMultipartUploadList omMultipartUploadList =
-        keyManager.listMultipartUploads("vol1", "bucket1", "dir");
+        keyManager.listMultipartUploads(volumeName, "bucket1", "dir");
 
     //THEN
     List<OmMultipartUpload> uploads = omMultipartUploadList.getUploads();
@@ -357,7 +373,7 @@ public class TestKeyManagerUnit {
     final DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
     final DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
     final DatanodeDetails dn4 = MockDatanodeDetails.randomDatanodeDetails();
-    final long containerID = 1L;
+    final long containerID = CONTAINER_ID.incrementAndGet();
     Set<Long> containerIDs = newHashSet(containerID);
 
     final Pipeline pipeline1 = Pipeline.newBuilder()
@@ -388,18 +404,19 @@ public class TestKeyManagerUnit {
             singletonList(new ContainerWithPipeline(ci, pipeline1)),
             singletonList(new ContainerWithPipeline(ci, pipeline2)));
 
-    insertVolume("volumeOne");
+    final String volume = volumeName();
+    insertVolume(volume);
 
-    insertBucket("volumeOne", "bucketOne");
+    insertBucket(volume, "bucketOne");
 
     BlockID blockID1 = new BlockID(containerID, 1L);
-    insertKey(null, "volumeOne", "bucketOne", "keyOne", blockID1);
+    insertKey(null, volume, "bucketOne", "keyOne", blockID1);
     BlockID blockID2 = new BlockID(containerID, 2L);
-    insertKey(null, "volumeOne", "bucketOne", "keyTwo", blockID2);
+    insertKey(null, volume, "bucketOne", "keyTwo", blockID2);
 
     // 1st call to get key1.
     OmKeyArgs keyArgs = new Builder()
-        .setVolumeName("volumeOne")
+        .setVolumeName(volume)
         .setBucketName("bucketOne")
         .setKeyName("keyOne")
         .build();
@@ -415,7 +432,7 @@ public class TestKeyManagerUnit {
 
     // subsequent call to key2 in same container sound result no scm calls.
     keyArgs = new Builder()
-        .setVolumeName("volumeOne")
+        .setVolumeName(volume)
         .setBucketName("bucketOne")
         .setKeyName("keyTwo")
         .build();
@@ -431,7 +448,7 @@ public class TestKeyManagerUnit {
 
     // Yet, another call with forceCacheUpdate should trigger a call to SCM.
     keyArgs = new Builder()
-        .setVolumeName("volumeOne")
+        .setVolumeName(volume)
         .setBucketName("bucketOne")
         .setKeyName("keyTwo")
         .setForceUpdateContainerCacheFromSCM(true)
@@ -492,15 +509,16 @@ public class TestKeyManagerUnit {
     when(containerClient.getContainerWithPipelineBatch(containerIDs))
         .thenReturn(cps);
 
-    insertVolume("volumeOne");
+    final String volume = volumeName();
+    insertVolume(volume);
 
-    insertBucket("volumeOne", "bucketOne");
+    insertBucket(volume, "bucketOne");
 
-    insertKey(pipelineOne, "volumeOne", "bucketOne", "keyOne",
+    insertKey(pipelineOne, volume, "bucketOne", "keyOne",
         new BlockID(1L, 1L));
 
     final OmKeyArgs.Builder keyArgs = new OmKeyArgs.Builder()
-        .setVolumeName("volumeOne")
+        .setVolumeName(volume)
         .setBucketName("bucketOne")
         .setKeyName("keyOne");
 
@@ -566,7 +584,7 @@ public class TestKeyManagerUnit {
 
   @Test
   public void listStatus() throws Exception {
-    String volume = "vol";
+    String volume = volumeName();
     String bucket = "bucket";
     String keyPrefix = "key";
     String client = "client.host";
@@ -584,19 +602,20 @@ public class TestKeyManagerUnit {
     Set<Long> containerIDs = new HashSet<>();
     List<ContainerWithPipeline> containersWithPipeline = new ArrayList<>();
     for (long i = 1; i <= 10; i++) {
+      final long containerID = CONTAINER_ID.incrementAndGet();
       final OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
-          .setBlockID(new BlockID(i, 1L))
+          .setBlockID(new BlockID(containerID, 1L))
           .setPipeline(pipeline)
           .setOffset(0)
           .setLength(256000)
           .build();
 
       ContainerInfo containerInfo = new ContainerInfo.Builder()
-          .setContainerID(i)
+          .setContainerID(containerID)
           .build();
       containersWithPipeline.add(
           new ContainerWithPipeline(containerInfo, pipeline));
-      containerIDs.add(i);
+      containerIDs.add(containerID);
 
       OmKeyInfo keyInfo = new OmKeyInfo.Builder()
           .setVolumeName(volume)
