@@ -90,7 +90,7 @@ public class TestChunkStreams {
   }
 
   private BlockInputStream createStream(byte[] buf, int offset) {
-    return new BlockInputStream(null, 100, null, null, true, null) {
+    return new BlockInputStream(null, 100L, null, null, true, null) {
       private long pos;
       private final ByteArrayInputStream in =
           new ByteArrayInputStream(buf, offset, 100);

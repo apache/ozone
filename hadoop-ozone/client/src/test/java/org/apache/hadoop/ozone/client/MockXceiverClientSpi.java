@@ -110,8 +110,7 @@ public class MockXceiverClientSpi extends XceiverClientSpi {
 
   private ReadChunkResponseProto readChunk(ReadChunkRequestProto readChunk) {
     return ReadChunkResponseProto.newBuilder()
-        .setChunkData(datanodeStorage
-            .readChunkInfo(readChunk.getBlockID(), readChunk.getChunkData()))
+        .setChunkData(readChunk.getChunkData())
         .setData(datanodeStorage
             .readChunkData(readChunk.getBlockID(), readChunk.getChunkData()))
         .setBlockID(readChunk.getBlockID())

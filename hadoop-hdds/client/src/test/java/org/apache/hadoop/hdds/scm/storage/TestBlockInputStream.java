@@ -22,6 +22,7 @@ import com.google.common.primitives.Bytes;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -409,16 +410,19 @@ public class TestBlockInputStream {
         .thenReturn(blockLocationInfo);
     when(blockLocationInfo.getPipeline()).thenReturn(newPipeline);
 
-    BlockInputStream subject = new BlockInputStream(blockID, blockSize,
+    BlockInputStream subject = new BlockInputStream(
+        new BlockLocationInfo(new BlockLocationInfo.Builder().setBlockID(blockID).setLength(blockSize)),
         pipeline, null, false, clientFactory, refreshFunction) {
-      @Override
-      protected List<ChunkInfo> getChunkInfoListUsingClient() {
-        return chunks;
-      }
-
       @Override
       protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
         return stream;
+      }
+
+      @Override
+      protected ContainerProtos.BlockData getBlockDataUsingClient() throws IOException {
+        BlockID blockID = getBlockID();
+        ContainerProtos.DatanodeBlockID datanodeBlockID = blockID.getDatanodeBlockIDProtobuf();
+        return ContainerProtos.BlockData.newBuilder().addAllChunks(chunks).setBlockID(datanodeBlockID).build();
       }
     };
 

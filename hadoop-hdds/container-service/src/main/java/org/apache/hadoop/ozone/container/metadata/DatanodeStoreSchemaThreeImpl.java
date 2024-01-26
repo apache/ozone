@@ -53,7 +53,7 @@ import static org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDe
  * - All keys have containerID as prefix.
  * - The table 3 has String as key instead of Long since we want to use prefix.
  */
-public class DatanodeStoreSchemaThreeImpl extends AbstractDatanodeStore
+public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalChunkList
     implements DeleteTransactionStore<String> {
 
   public static final String DUMP_FILE_SUFFIX = ".data";

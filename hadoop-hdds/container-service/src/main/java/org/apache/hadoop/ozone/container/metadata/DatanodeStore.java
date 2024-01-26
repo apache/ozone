@@ -130,8 +130,7 @@ public interface DatanodeStore extends Closeable {
   }
 
   default BlockData getBlockByID(BlockID blockID,
-      KeyValueContainerData containerData) throws IOException {
-    String blockKey = containerData.getBlockKey(blockID.getLocalID());
+      String blockKey) throws IOException {
 
     // check block data table
     BlockData blockData = getBlockDataTable().get(blockKey);

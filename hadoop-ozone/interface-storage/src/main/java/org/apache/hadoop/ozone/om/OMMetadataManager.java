@@ -335,7 +335,7 @@ public interface OMMetadataManager extends DBStoreHAManager {
    * @throws IOException
    */
   ExpiredOpenKeys getExpiredOpenKeys(Duration expireThreshold, int count,
-      BucketLayout bucketLayout) throws IOException;
+      BucketLayout bucketLayout, Duration leaseThreshold) throws IOException;
 
   /**
    * Returns the names of up to {@code count} MPU key whose age is greater

@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
 import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
 import org.apache.hadoop.hdds.scm.storage.PartInputStream;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 
@@ -61,8 +62,10 @@ public class KeyInputStream extends MultipartInputStream {
       boolean verifyChecksum,
       Function<OmKeyInfo, OmKeyInfo> retryFunction,
       BlockInputStreamFactory blockStreamFactory) {
+    boolean isHsyncFile = keyInfo.getMetadata().containsKey(OzoneConsts.HSYNC_CLIENT_ID);
     List<BlockExtendedInputStream> partStreams = new ArrayList<>();
-    for (OmKeyLocationInfo omKeyLocationInfo : blockInfos) {
+    for (int i = 0; i < blockInfos.size(); i++) {
+      OmKeyLocationInfo omKeyLocationInfo = blockInfos.get(i);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Adding stream for accessing {}. The stream will be " +
             "initialized later.", omKeyLocationInfo);
@@ -83,6 +86,11 @@ public class KeyInputStream extends MultipartInputStream {
         };
       } else {
         retry = null;
+      }
+
+      if (i == (blockInfos.size() - 1) && isHsyncFile) {
+        // block is under construction
+        omKeyLocationInfo.setUnderConstruction(true);
       }
 
       BlockExtendedInputStream stream =

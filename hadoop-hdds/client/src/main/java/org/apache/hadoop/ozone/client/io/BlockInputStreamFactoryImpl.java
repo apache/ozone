@@ -84,8 +84,8 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
           blockInfo, verifyChecksum, xceiverFactory, refreshFunction,
           ecBlockStreamFactory);
     } else {
-      return new BlockInputStream(blockInfo.getBlockID(), blockInfo.getLength(),
-          pipeline, token, verifyChecksum, xceiverFactory, refreshFunction);
+      return new BlockInputStream(blockInfo, pipeline, token, verifyChecksum, xceiverFactory,
+          refreshFunction);
     }
   }
 
