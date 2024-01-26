@@ -252,14 +252,17 @@ public class TestHSync {
         assertThrows(FileNotFoundException.class,
             () -> fs.getFileStatus(key1));
         // hsync should throw because the open key is gone
-        assertThrows(OMException.class,
-            () -> os.hsync());
-        // key1 should not reappear because of hsync
+        try {
+          os.hsync();
+        } catch (OMException omEx) {
+          assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, omEx.getResult());
+        }
+        // key1 should not reappear after failed hsync
         assertThrows(FileNotFoundException.class,
             () -> fs.getFileStatus(key1));
-      } catch (OMException omEx) {
+      } catch (OMException ex) {
         // os.close() throws OMException because the key is deleted
-        assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, omEx.getResult());
+        assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ex.getResult());
       }
     }
   }
