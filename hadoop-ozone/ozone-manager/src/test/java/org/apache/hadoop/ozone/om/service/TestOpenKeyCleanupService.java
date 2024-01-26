@@ -275,9 +275,7 @@ class TestOpenKeyCleanupService {
     LOG.info("oldMpuKeyCount={}, oldMpuRunCount={}", oldkeyCount, oldrunCount);
 
     final OMMetrics metrics = om.getMetrics();
-    long numKeyHSyncs = metrics.getNumKeyHSyncs();
     long numOpenKeysCleaned = metrics.getNumOpenKeysCleaned();
-    long numOpenKeysHSyncCleaned = metrics.getNumOpenKeysHSyncCleaned();
     final int keyCount = numDEFKeys + numFSOKeys;
     final int partCount = NUM_MPU_PARTS * keyCount;
     createIncompleteMPUKeys(numDEFKeys, BucketLayout.DEFAULT, NUM_MPU_PARTS,
