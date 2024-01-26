@@ -152,7 +152,7 @@ public class RootedOzoneFileSystem extends BasicRootedOzoneFileSystem
 
     // finalize the final block and get block length
     List<OmKeyLocationInfo> keyLocationInfoList = keyInfo.getLatestVersionLocations().getLocationList();
-    if (keyLocationInfoList.size() > 0) {
+    if (!keyLocationInfoList.isEmpty()) {
       OmKeyLocationInfo block = keyLocationInfoList.get(keyLocationInfoList.size() - 1);
       try {
         block.setLength(getAdapter().finalizeBlock(block));
