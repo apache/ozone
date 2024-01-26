@@ -248,28 +248,30 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     List<OmKeyLocationInfo> keyLocationInfoList = keyLatestVersionLocations.getLocationList();
     OmKeyLocationInfoGroup openKeyLatestVersionLocations = openKeyInfo.getLatestVersionLocations();
     List<OmKeyLocationInfo> openKeyLocationInfoList = openKeyLatestVersionLocations.getLocationList();
-    OmKeyLocationInfo finalBlock;
+
+    OmKeyLocationInfo finalBlock = null;
     boolean returnKeyInfo = true;
     if (openKeyLocationInfoList.size() > keyLocationInfoList.size() &&
-        openKeyModificationTime > keyInfo.getModificationTime()) {
+        openKeyModificationTime > keyInfo.getModificationTime() &&
+        openKeyLocationInfoList.size() > 0) {
       finalBlock = openKeyLocationInfoList.get(openKeyLocationInfoList.size() - 1);
       returnKeyInfo = false;
-    } else {
+    } else if (keyLocationInfoList.size() > 0) {
       finalBlock = keyLocationInfoList.get(keyLocationInfoList.size() - 1);
     }
-
-    // set token to last block if enabled
-    if (ozoneManager.isGrpcBlockTokenEnabled()) {
-      String remoteUser = getRemoteUser().getShortUserName();
-      OzoneBlockTokenSecretManager secretManager = ozoneManager.getBlockTokenSecretManager();
-      finalBlock.setToken(secretManager.generateToken(remoteUser, finalBlock.getBlockID(),
-          EnumSet.of(READ, WRITE), finalBlock.getLength()));
+    if (finalBlock != null) {
+      // set token to last block if enabled
+      if (ozoneManager.isGrpcBlockTokenEnabled()) {
+        String remoteUser = getRemoteUser().getShortUserName();
+        OzoneBlockTokenSecretManager secretManager = ozoneManager.getBlockTokenSecretManager();
+        finalBlock.setToken(secretManager.generateToken(remoteUser, finalBlock.getBlockID(),
+            EnumSet.of(READ, WRITE), finalBlock.getLength()));
+      }
+      // refresh last block pipeline
+      ContainerWithPipeline containerWithPipeline =
+          ozoneManager.getScmClient().getContainerClient().getContainerWithPipeline(finalBlock.getContainerID());
+      finalBlock.setPipeline(containerWithPipeline.getPipeline());
     }
-
-    // refresh last block pipeline
-    ContainerWithPipeline containerWithPipeline =
-        ozoneManager.getScmClient().getContainerClient().getContainerWithPipeline(finalBlock.getContainerID());
-    finalBlock.setPipeline(containerWithPipeline.getPipeline());
 
     RecoverLeaseResponse.Builder rb = RecoverLeaseResponse.newBuilder();
     rb.setKeyInfo(returnKeyInfo ? keyInfo.getNetworkProtobuf(getOmRequest().getVersion(), true) :
