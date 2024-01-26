@@ -257,6 +257,9 @@ public class TestHSync {
         // key1 should not reappear because of hsync
         assertThrows(FileNotFoundException.class,
             () -> fs.getFileStatus(key1));
+      } catch (OMException omEx) {
+        // os.close() throws OMException because the key is deleted
+        assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, omEx.getResult());
       }
     }
   }
