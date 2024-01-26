@@ -92,10 +92,14 @@ public class TestLeaseRecovery {
    * is no longer open in OM.  This is currently expected (see HDDS-9358).
    */
   public static void closeIgnoringKeyNotFound(OutputStream stream) {
+    closeIgnoringOMException(stream, OMException.ResultCodes.KEY_NOT_FOUND);
+  }
+
+  public static void closeIgnoringOMException(OutputStream stream, OMException.ResultCodes expectedResultCode) {
     try {
       stream.close();
     } catch (IOException e) {
-      assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ((OMException)e).getResult());
+      assertEquals(expectedResultCode, ((OMException)e).getResult());
     }
   }
 
@@ -327,7 +331,11 @@ public class TestLeaseRecovery {
       // Since all DNs are out, then the length in OM keyInfo will be used as the final file length
       assertEquals(dataSize, fileStatus.getLen());
     } finally {
-      closeIgnoringKeyNotFound(stream);
+      if (!forceRecovery) {
+        closeIgnoringOMException(stream, OMException.ResultCodes.KEY_UNDER_LEASE_RECOVERY);
+      } else {
+        closeIgnoringKeyNotFound(stream);
+      }
       KeyValueHandler.setInjector(null);
     }
 
