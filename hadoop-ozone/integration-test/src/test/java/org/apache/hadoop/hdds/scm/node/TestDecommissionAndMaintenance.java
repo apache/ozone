@@ -64,6 +64,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -420,7 +421,7 @@ public class TestDecommissionAndMaintenance {
     // There should now be 5-6 replicas of the container we are tracking
     Set<ContainerReplica> newReplicas =
         cm.getContainerReplicas(container.containerID());
-    assertTrue(newReplicas.size() >= 5);
+    assertThat(newReplicas.size()).isGreaterThanOrEqualTo(5);
 
     scmClient.recommissionNodes(forMaintenance.stream()
         .map(d -> getDNHostAndPort(d))
@@ -448,7 +449,7 @@ public class TestDecommissionAndMaintenance {
     for (DatanodeDetails dn : ecMaintenance) {
       waitForDnToReachPersistedOpState(dn, IN_MAINTENANCE);
     }
-    assertTrue(cm.getContainerReplicas(ecContainer.containerID()).size() >= 6);
+    assertThat(cm.getContainerReplicas(ecContainer.containerID()).size()).isGreaterThanOrEqualTo(6);
     scmClient.recommissionNodes(ecMaintenance.stream()
         .map(this::getDNHostAndPort)
         .collect(Collectors.toList()));
@@ -500,7 +501,7 @@ public class TestDecommissionAndMaintenance {
     // There should now be 5-6 replicas of the container we are tracking
     Set<ContainerReplica> newReplicas =
         cm.getContainerReplicas(container.containerID());
-    assertTrue(newReplicas.size() >= 5);
+    assertThat(newReplicas.size()).isGreaterThanOrEqualTo(5);
   }
 
   @Test

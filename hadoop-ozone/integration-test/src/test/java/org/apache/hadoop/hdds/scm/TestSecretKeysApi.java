@@ -74,11 +74,11 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration test to verify symmetric SecretKeys APIs in a secure cluster.
@@ -309,9 +309,9 @@ public final class TestSecretKeysApi {
         assertThrows(RemoteException.class,
             secretKeyProtocol::getCurrentSecretKey);
     assertEquals(AuthorizationException.class.getName(), ex.getClassName());
-    assertTrue(ex.getMessage().contains(
+    assertThat(ex.getMessage()).contains(
         "User test@EXAMPLE.COM (auth:KERBEROS) is not authorized " +
-            "for protocol"));
+            "for protocol");
   }
 
   @Test

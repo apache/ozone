@@ -47,9 +47,10 @@ import java.util.concurrent.TimeoutException;
 import javax.management.openmbean.CompositeData;
 import javax.management.openmbean.TabularData;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  *
@@ -183,16 +184,15 @@ public class TestSCMMXBean {
     assertNotNull(expectedData);
     for (Object obj : actualData.values()) {
       // Each TabularData is a set of CompositeData
-      assertTrue(obj instanceof CompositeData);
-      CompositeData cds = (CompositeData) obj;
+      CompositeData cds = assertInstanceOf(CompositeData.class, obj);
       assertEquals(2, cds.values().size());
       Iterator<?> it = cds.values().iterator();
       String key = it.next().toString();
       String value = it.next().toString();
       int num = Integer.parseInt(value);
-      assertTrue(expectedData.containsKey(key));
+      assertThat(expectedData).containsKey(key);
       assertEquals(expectedData.remove(key).intValue(), num);
     }
-    assertTrue(expectedData.isEmpty());
+    assertThat(expectedData).isEmpty();
   }
 }
