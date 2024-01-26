@@ -852,18 +852,21 @@ public class StateContext {
   }
 
   /**
-   * Updates status of a pending status command.
+   * Updates the command status of a pending command.
    * @param cmdId       command id
    * @param cmdStatusUpdater Consumer to update command status.
-   * @return true if command status updated successfully else false.
+   * @return true if command status updated successfully else if the command
+   * associated with the command id does not exist in the context.
    */
   public boolean updateCommandStatus(Long cmdId,
       Consumer<CommandStatus> cmdStatusUpdater) {
-    if (cmdStatusMap.containsKey(cmdId)) {
-      cmdStatusUpdater.accept(cmdStatusMap.get(cmdId));
-      return true;
-    }
-    return false;
+    CommandStatus updatedCommandStatus = cmdStatusMap.computeIfPresent(cmdId,
+        (key, value) -> {
+          cmdStatusUpdater.accept(value);
+          return value;
+        }
+    );
+    return updatedCommandStatus != null;
   }
 
   public void configureHeartbeatFrequency() {
