@@ -74,7 +74,8 @@ public class MultipartUploadCleanupService extends BackgroundService {
   public MultipartUploadCleanupService(long interval, TimeUnit unit,
         long timeout, OzoneManager ozoneManager, ConfigurationSource conf) {
     super("MultipartUploadCleanupService", interval, unit,
-        MPU_INFO_DELETING_CORE_POOL_SIZE, timeout);
+        MPU_INFO_DELETING_CORE_POOL_SIZE, timeout,
+        ozoneManager.getThreadNamePrefix());
     this.ozoneManager = ozoneManager;
     this.keyManager = ozoneManager.getKeyManager();
 

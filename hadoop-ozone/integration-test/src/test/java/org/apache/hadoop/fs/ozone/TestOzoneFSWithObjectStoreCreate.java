@@ -39,16 +39,12 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -64,15 +60,19 @@ import java.util.Map;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
-import static org.junit.Assert.fail;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Class tests create with object store and getFileStatus.
  */
+@Timeout(300)
 public class TestOzoneFSWithObjectStoreCreate {
-
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
 
   private String rootPath;
 
@@ -85,7 +85,7 @@ public class TestOzoneFSWithObjectStoreCreate {
 
   private String bucketName;
 
-  @BeforeClass
+  @BeforeAll
   public static void initClass() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
 
@@ -99,7 +99,7 @@ public class TestOzoneFSWithObjectStoreCreate {
     client = cluster.newClient();
   }
 
-  @AfterClass
+  @AfterAll
   public static void teardownClass() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -107,7 +107,7 @@ public class TestOzoneFSWithObjectStoreCreate {
     }
   }
 
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     volumeName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
     bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
@@ -122,7 +122,7 @@ public class TestOzoneFSWithObjectStoreCreate {
     o3fs = (OzoneFileSystem) FileSystem.get(new URI(rootPath), conf);
   }
 
-  @After
+  @AfterEach
   public void teardown() {
     IOUtils.closeQuietly(o3fs);
   }
@@ -152,7 +152,7 @@ public class TestOzoneFSWithObjectStoreCreate {
     // workingDir will be added.
     key1 = "///dir1/dir2/file1";
     Path p = new Path(key1);
-    Assert.assertTrue(o3fs.getFileStatus(p).isFile());
+    assertTrue(o3fs.getFileStatus(p).isFile());
 
     p = p.getParent();
     checkAncestors(p);
@@ -160,7 +160,7 @@ public class TestOzoneFSWithObjectStoreCreate {
 
     key2 = "///dir1/dir2/file2";
     p = new Path(key2);
-    Assert.assertTrue(o3fs.getFileStatus(p).isFile());
+    assertTrue(o3fs.getFileStatus(p).isFile());
     checkAncestors(p);
 
   }
@@ -199,7 +199,7 @@ public class TestOzoneFSWithObjectStoreCreate {
     for (int i = 1; i <= 3; i++) {
       String fileName = parentDir.concat("/file" + i + "/");
       Path p = new Path(fileName);
-      Assert.assertTrue(o3fs.getFileStatus(p).isFile());
+      assertTrue(o3fs.getFileStatus(p).isFile());
       checkAncestors(p);
     }
 
@@ -212,7 +212,7 @@ public class TestOzoneFSWithObjectStoreCreate {
 
     // Delete parent dir via o3fs.
     boolean result = o3fs.delete(new Path("/dir1"), true);
-    Assert.assertTrue(result);
+    assertTrue(result);
 
     // No Key should exist.
     for (String key : keys) {
@@ -243,7 +243,7 @@ public class TestOzoneFSWithObjectStoreCreate {
     for (int i = 1; i <= 3; i++) {
       String fileName = "/dest/".concat(parentDir.concat("/file" + i + "/"));
       Path p = new Path(fileName);
-      Assert.assertTrue(o3fs.getFileStatus(p).isFile());
+      assertTrue(o3fs.getFileStatus(p).isFile());
       checkAncestors(p);
     }
 
@@ -271,9 +271,8 @@ public class TestOzoneFSWithObjectStoreCreate {
       ozoneOutputStream.close();
       fail("testKeyCreationFailDuetoDirectoryCreationBeforeCommit");
     } catch (IOException ex) {
-      Assert.assertTrue(ex instanceof OMException);
-      Assert.assertEquals(NOT_A_FILE,
-          ((OMException) ex).getResult());
+      OMException e = assertInstanceOf(OMException.class, ex);
+      assertEquals(NOT_A_FILE, e.getResult());
     }
 
   }
@@ -290,7 +289,7 @@ public class TestOzoneFSWithObjectStoreCreate {
     String keyName = "/dir1/dir2/mpukey";
     OmMultipartInfo omMultipartInfo =
         ozoneBucket.initiateMultipartUpload(keyName);
-    Assert.assertNotNull(omMultipartInfo);
+    assertNotNull(omMultipartInfo);
 
     OzoneOutputStream ozoneOutputStream =
         ozoneBucket.createMultipartKey(keyName, 10, 1,
@@ -315,8 +314,8 @@ public class TestOzoneFSWithObjectStoreCreate {
           omMultipartInfo.getUploadID(), partsMap);
       fail("testMPUFailDuetoDirectoryCreationBeforeComplete failed");
     } catch (OMException ex) {
-      Assert.assertTrue(ex instanceof OMException);
-      Assert.assertEquals(NOT_A_FILE, ex.getResult());
+      assertInstanceOf(OMException.class, ex);
+      assertEquals(NOT_A_FILE, ex.getResult());
     }
 
     // Delete directory
@@ -331,7 +330,7 @@ public class TestOzoneFSWithObjectStoreCreate {
       // This read will not change the offset inside the file
       int readBytes = ozoneInputStream.read(0, buffer, 0, 10);
       String readData = new String(buffer, 0, readBytes, UTF_8);
-      Assert.assertEquals(new String(b, 0, b.length, UTF_8), readData);
+      assertEquals(new String(b, 0, b.length, UTF_8), readData);
     }
 
   }
@@ -345,7 +344,7 @@ public class TestOzoneFSWithObjectStoreCreate {
       o3fs.create(new Path("/t1/t2"));
       fail("testCreateDirectoryFirstThenFileWithSameName failed");
     } catch (FileAlreadyExistsException ex) {
-      Assert.assertTrue(ex.getMessage().contains(NOT_A_FILE.name()));
+      assertThat(ex.getMessage()).contains(NOT_A_FILE.name());
     }
 
     OzoneVolume ozoneVolume =
@@ -356,8 +355,8 @@ public class TestOzoneFSWithObjectStoreCreate {
       ozoneBucket.createKey("t1/t2", 0);
       fail("testCreateDirectoryFirstThenFileWithSameName failed");
     } catch (OMException ex) {
-      Assert.assertTrue(ex instanceof OMException);
-      Assert.assertEquals(NOT_A_FILE, ex.getResult());
+      assertInstanceOf(OMException.class, ex);
+      assertEquals(NOT_A_FILE, ex.getResult());
     }
   }
 
@@ -429,7 +428,7 @@ public class TestOzoneFSWithObjectStoreCreate {
       outputKeys.add(ozoneKey.getName());
     }
 
-    Assert.assertEquals(keys, outputKeys);
+    assertEquals(keys, outputKeys);
   }
 
   private void createKey(OzoneBucket ozoneBucket, String key, int length,
@@ -450,7 +449,7 @@ public class TestOzoneFSWithObjectStoreCreate {
     ozoneInputStream.close();
 
     String inputString = new String(input, UTF_8);
-    Assert.assertEquals(inputString, new String(read, UTF_8));
+    assertEquals(inputString, new String(read, UTF_8));
 
     // Read using filesystem.
     FSDataInputStream fsDataInputStream = o3fs.open(new Path(key));
@@ -458,24 +457,21 @@ public class TestOzoneFSWithObjectStoreCreate {
     fsDataInputStream.read(read, 0, length);
     fsDataInputStream.close();
 
-    Assert.assertEquals(inputString, new String(read, UTF_8));
+    assertEquals(inputString, new String(read, UTF_8));
   }
 
   private void checkPath(Path path) {
-    try {
-      o3fs.getFileStatus(path);
-      fail("testObjectStoreCreateWithO3fs failed for Path" + path);
-    } catch (IOException ex) {
-      Assert.assertTrue(ex instanceof FileNotFoundException);
-      Assert.assertTrue(ex.getMessage().contains("No such file or directory"));
-    }
+    FileNotFoundException ex = assertThrows(FileNotFoundException.class, () ->
+        o3fs.getFileStatus(path),
+        "testObjectStoreCreateWithO3fs failed for Path" + path);
+    assertThat(ex.getMessage()).contains("No such file or directory");
   }
 
   private void checkAncestors(Path p) throws Exception {
     p = p.getParent();
     while (p.getParent() != null) {
       FileStatus fileStatus = o3fs.getFileStatus(p);
-      Assert.assertTrue(fileStatus.isDirectory());
+      assertTrue(fileStatus.isDirectory());
       p = p.getParent();
     }
   }

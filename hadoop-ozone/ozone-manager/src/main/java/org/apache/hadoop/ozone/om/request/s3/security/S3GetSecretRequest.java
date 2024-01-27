@@ -19,11 +19,13 @@
 package org.apache.hadoop.ozone.om.request.s3.security;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.slf4j.Logger;
@@ -35,7 +37,6 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.security.S3GetSecretResponse;
@@ -126,13 +127,11 @@ public class S3GetSecretRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-    IOException exception = null;
+    Exception exception = null;
 
     final GetS3SecretRequest getS3SecretRequest =
             getOmRequest().getGetS3SecretRequest();
@@ -151,19 +150,16 @@ public class S3GetSecretRequest extends OMClientRequest {
     try {
       omClientResponse = ozoneManager.getS3SecretManager()
           .doUnderLock(accessId, s3SecretManager -> {
-            S3SecretValue assignS3SecretValue;
-            S3SecretValue s3SecretValue =
-                s3SecretManager.getSecret(accessId);
+            final S3SecretValue assignS3SecretValue;
+            S3SecretValue s3SecretValue = s3SecretManager.getSecret(accessId);
 
             if (s3SecretValue == null) {
               // Not found in S3SecretTable.
               if (createIfNotExist) {
                 // Add new entry in this case
-                assignS3SecretValue =
-                    new S3SecretValue(accessId, awsSecret.get());
+                assignS3SecretValue = S3SecretValue.of(accessId, awsSecret.get(), termIndex.getIndex());
                 // Add cache entry first.
-                s3SecretManager.updateCache(accessId,
-                    assignS3SecretValue);
+                s3SecretManager.updateCache(accessId, assignS3SecretValue);
               } else {
                 assignS3SecretValue = null;
               }
@@ -207,14 +203,11 @@ public class S3GetSecretRequest extends OMClientRequest {
           });
 
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new S3GetSecretResponse(null,
           ozoneManager.getS3SecretManager(),
-          createErrorOMResponse(omResponse, ex));
-    } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
+          createErrorOMResponse(omResponse, exception));
     }
 
     Map<String, String> auditMap = new HashMap<>();

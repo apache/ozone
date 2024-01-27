@@ -46,27 +46,24 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Test OzoneManager list volume operation under combinations of configs.
  */
+@Timeout(120)
 public class TestOzoneManagerListVolumes {
 
   private static MiniOzoneCluster cluster;
-
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(120));
 
   private static UserGroupInformation adminUser =
       UserGroupInformation.createUserForTesting("om", new String[]{"ozone"});
@@ -80,7 +77,7 @@ public class TestOzoneManagerListVolumes {
       UserGroupInformation.createUserForTesting("user3@example.com",
           new String[]{"test"});
 
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     // loginUser is the user running this test.
     // Implication: loginUser is automatically added to the OM admin list.
@@ -91,7 +88,7 @@ public class TestOzoneManagerListVolumes {
    * Create a MiniDFSCluster for testing.
    */
 
-  @BeforeClass
+  @BeforeAll
   public static void setupClass()
       throws InterruptedException, TimeoutException, IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -131,7 +128,7 @@ public class TestOzoneManagerListVolumes {
     om.join();
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdownClass() {
     if (cluster != null) {
       cluster.shutdown();
@@ -148,7 +145,7 @@ public class TestOzoneManagerListVolumes {
     cluster.getOzoneManager().restart();
   }
 
-  @After
+  @AfterEach
   public void stopOM() {
     OzoneManager om = cluster.getOzoneManager();
     if (om != null) {
@@ -179,7 +176,7 @@ public class TestOzoneManagerListVolumes {
                                    String aclString) throws IOException {
     OzoneObj obj = OzoneObjInfo.Builder.newBuilder().setVolumeName(volumeName)
         .setResType(OzoneObj.ResourceType.VOLUME).setStoreType(OZONE).build();
-    Assert.assertTrue(objectStore.setAcl(obj, OzoneAcl.parseAcls(aclString)));
+    assertTrue(objectStore.setAcl(obj, OzoneAcl.parseAcls(aclString)));
   }
 
   /**
@@ -212,7 +209,7 @@ public class TestOzoneManagerListVolumes {
         String volumeName = vol.getName();
         accessibleVolumes.add(volumeName);
       }
-      Assert.assertEquals(new HashSet<>(expectVol), accessibleVolumes);
+      assertEquals(new HashSet<>(expectVol), accessibleVolumes);
     } catch (RuntimeException ex) {
       if (expectListByUserSuccess) {
         throw ex;
@@ -238,11 +235,11 @@ public class TestOzoneManagerListVolumes {
         it.next();
         count++;
       }
-      Assert.assertEquals(5, count);
+      assertEquals(5, count);
     } else {
       try {
         objectStore.listVolumes("volume");
-        Assert.fail("listAllVolumes should fail for " + user.getUserName());
+        fail("listAllVolumes should fail for " + user.getUserName());
       } catch (RuntimeException ex) {
         // Current listAllVolumes throws RuntimeException
         if (ex.getCause() instanceof OMException) {

@@ -487,6 +487,7 @@ function get_count_misc_files() {
         "^.github"
         "^hadoop-hdds/dev-support/checkstyle"
         "^hadoop-ozone/dev-support/checks"
+        "^hadoop-ozone/dev-support/intellij"
         "^hadoop-ozone/dist/src/main/license"
         "\.bats$"
         "\.txt$"
@@ -588,8 +589,8 @@ fi
 
 
 get_changed_files
-run_all_tests_if_environment_files_changed
 check_if_tests_are_needed_at_all
+run_all_tests_if_environment_files_changed
 
 get_count_all_files
 get_count_compose_files

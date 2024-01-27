@@ -73,7 +73,7 @@ import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -84,6 +84,20 @@ public final class ContainerTestUtils {
 
   private ContainerTestUtils() {
   }
+
+  public static final DispatcherContext WRITE_STAGE = DispatcherContext
+      .newBuilder(DispatcherContext.Op.WRITE_STATE_MACHINE_DATA)
+      .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA)
+      .build();
+
+  public static final DispatcherContext COMMIT_STAGE = DispatcherContext
+      .newBuilder(DispatcherContext.Op.APPLY_TRANSACTION)
+      .setStage(DispatcherContext.WriteChunkStage.COMMIT_DATA)
+      .setContainer2BCSIDMap(Collections.emptyMap())
+      .build();
+
+  public static final DispatcherContext COMBINED_STAGE
+      = DispatcherContext.getHandleWriteChunk();
 
   /**
    * Creates an Endpoint class for testing purpose.
@@ -110,20 +124,25 @@ public final class ContainerTestUtils {
     StorageContainerDatanodeProtocolClientSideTranslatorPB rpcClient =
         new StorageContainerDatanodeProtocolClientSideTranslatorPB(rpcProxy);
     return new EndpointStateMachine(address, rpcClient,
-        new LegacyHadoopConfigurationSource(conf));
+        new LegacyHadoopConfigurationSource(conf), "");
   }
 
   public static OzoneContainer getOzoneContainer(
       DatanodeDetails datanodeDetails, OzoneConfiguration conf)
       throws IOException {
-    DatanodeStateMachine stateMachine =
-        Mockito.mock(DatanodeStateMachine.class);
-    Mockito.when(stateMachine.getReconfigurationHandler())
-        .thenReturn(new ReconfigurationHandler("DN", conf, op -> { }));
-    StateContext context = Mockito.mock(StateContext.class);
-    Mockito.when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
-    Mockito.when(context.getParent()).thenReturn(stateMachine);
+    StateContext context = getMockContext(datanodeDetails, conf);
     return new OzoneContainer(datanodeDetails, conf, context);
+  }
+
+  public static StateContext getMockContext(DatanodeDetails datanodeDetails,
+      OzoneConfiguration conf) {
+    DatanodeStateMachine stateMachine = mock(DatanodeStateMachine.class);
+    Mockito.lenient().when(stateMachine.getReconfigurationHandler())
+        .thenReturn(new ReconfigurationHandler("DN", conf, op -> { }));
+    StateContext context = mock(StateContext.class);
+    when(stateMachine.getDatanodeDetails()).thenReturn(datanodeDetails);
+    when(context.getParent()).thenReturn(stateMachine);
+    return context;
   }
 
   public static DatanodeDetails createDatanodeDetails() {
@@ -215,6 +234,15 @@ public final class ContainerTestUtils {
     return ScanResult.unhealthy(ScanResult.FailureType.CORRUPT_CHUNK,
         new File(""),
         new IOException("Fake corruption failure for testing"));
+  }
+
+  /**
+   * Construct an unhealthy scan result with DELETED_CONTAINER failure type.
+   */
+  public static ScanResult getDeletedContainerResult() {
+    return ScanResult.unhealthy(ScanResult.FailureType.DELETED_CONTAINER,
+        new File(""),
+        new IOException("Fake deleted container exception"));
   }
 
   public static KeyValueContainer addContainerToDeletedDir(

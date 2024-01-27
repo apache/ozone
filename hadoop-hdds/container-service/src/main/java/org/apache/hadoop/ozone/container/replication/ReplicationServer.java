@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.replication;
 
 import java.io.IOException;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -69,7 +70,8 @@ public class ReplicationServer {
 
   public ReplicationServer(ContainerController controller,
       ReplicationConfig replicationConfig, SecurityConfig secConf,
-      CertificateClient caClient, ContainerImporter importer) {
+      CertificateClient caClient, ContainerImporter importer,
+      String threadNamePrefix) {
     this.secConf = secConf;
     this.caClient = caClient;
     this.controller = controller;
@@ -81,17 +83,20 @@ public class ReplicationServer {
     int replicationQueueLimit =
         replicationConfig.getReplicationQueueLimit();
     LOG.info("Initializing replication server with thread count = {}"
-        + " queue length = {}",
+            + " queue length = {}",
         replicationConfig.getReplicationMaxStreams(),
         replicationConfig.getReplicationQueueLimit());
-    this.executor =
-        new ThreadPoolExecutor(replicationServerWorkers,
-            replicationServerWorkers,
-            60, TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>(replicationQueueLimit),
-            new ThreadFactoryBuilder().setDaemon(true)
-                .setNameFormat("ReplicationContainerReader-%d")
-                .build());
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setDaemon(true)
+        .setNameFormat(threadNamePrefix + "ReplicationContainerReader-%d")
+        .build();
+    this.executor = new ThreadPoolExecutor(
+        replicationServerWorkers,
+        replicationServerWorkers,
+        60,
+        TimeUnit.SECONDS,
+        new LinkedBlockingQueue<>(replicationQueueLimit),
+        threadFactory);
 
     init();
   }

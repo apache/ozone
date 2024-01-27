@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Assertions;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -56,11 +55,11 @@ public class TestFindTargetStrategy {
 
     //create three datanodes with different usageinfo
     DatanodeUsageInfo dui1 = new DatanodeUsageInfo(MockDatanodeDetails
-        .randomDatanodeDetails(), new SCMNodeStat(100, 0, 40));
+        .randomDatanodeDetails(), new SCMNodeStat(100, 0, 40, 0, 30));
     DatanodeUsageInfo dui2 = new DatanodeUsageInfo(MockDatanodeDetails
-        .randomDatanodeDetails(), new SCMNodeStat(100, 0, 60));
+        .randomDatanodeDetails(), new SCMNodeStat(100, 0, 60, 0, 30));
     DatanodeUsageInfo dui3 = new DatanodeUsageInfo(MockDatanodeDetails
-        .randomDatanodeDetails(), new SCMNodeStat(100, 0, 80));
+        .randomDatanodeDetails(), new SCMNodeStat(100, 0, 80, 0, 30));
 
     //insert in ascending order
     overUtilizedDatanodes.add(dui1);
@@ -78,16 +77,13 @@ public class TestFindTargetStrategy {
 
     Object[] sortedPotentialTargetArray = potentialTargets.toArray();
 
-    Assertions.assertEquals(sortedPotentialTargetArray.length, 3);
+    assertEquals(3, sortedPotentialTargetArray.length);
 
     //make sure after sorting target for source, the potentialTargets is
     //sorted in descending order of usage
-    Assertions.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[0])
-        .getDatanodeDetails(), dui3.getDatanodeDetails());
-    Assertions.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[1])
-        .getDatanodeDetails(), dui2.getDatanodeDetails());
-    Assertions.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[2])
-        .getDatanodeDetails(), dui1.getDatanodeDetails());
+    assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[0]).getDatanodeDetails(), dui3.getDatanodeDetails());
+    assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[1]).getDatanodeDetails(), dui2.getDatanodeDetails());
+    assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[2]).getDatanodeDetails(), dui1.getDatanodeDetails());
 
   }
 
@@ -98,11 +94,11 @@ public class TestFindTargetStrategy {
   public void testResetPotentialTargets() {
     // create three datanodes with different usage infos
     DatanodeUsageInfo dui1 = new DatanodeUsageInfo(MockDatanodeDetails
-        .randomDatanodeDetails(), new SCMNodeStat(100, 30, 70));
+        .randomDatanodeDetails(), new SCMNodeStat(100, 30, 70, 0, 50));
     DatanodeUsageInfo dui2 = new DatanodeUsageInfo(MockDatanodeDetails
-        .randomDatanodeDetails(), new SCMNodeStat(100, 20, 80));
+        .randomDatanodeDetails(), new SCMNodeStat(100, 20, 80, 0, 60));
     DatanodeUsageInfo dui3 = new DatanodeUsageInfo(MockDatanodeDetails
-        .randomDatanodeDetails(), new SCMNodeStat(100, 10, 90));
+        .randomDatanodeDetails(), new SCMNodeStat(100, 10, 90, 0, 70));
 
     List<DatanodeUsageInfo> potentialTargets = new ArrayList<>();
     potentialTargets.add(dui1);
@@ -118,10 +114,8 @@ public class TestFindTargetStrategy {
     List<DatanodeDetails> newPotentialTargets = new ArrayList<>(1);
     newPotentialTargets.add(dui1.getDatanodeDetails());
     findTargetGreedyByUsageInfo.resetPotentialTargets(newPotentialTargets);
-    Assertions.assertEquals(1,
-        findTargetGreedyByUsageInfo.getPotentialTargets().size());
-    Assertions.assertEquals(dui1,
-        findTargetGreedyByUsageInfo.getPotentialTargets().iterator().next());
+    assertEquals(1, findTargetGreedyByUsageInfo.getPotentialTargets().size());
+    assertEquals(dui1, findTargetGreedyByUsageInfo.getPotentialTargets().iterator().next());
   }
 
   /**
@@ -179,18 +173,18 @@ public class TestFindTargetStrategy {
     List<DatanodeUsageInfo> overUtilizedDatanodes = new ArrayList<>();
     //set the farthest target with the lowest usage info
     overUtilizedDatanodes.add(
-        new DatanodeUsageInfo(target5, new SCMNodeStat(100, 0, 90)));
+        new DatanodeUsageInfo(target5, new SCMNodeStat(100, 0, 90, 0, 80)));
     //set the tree targets, which have the same network topology distance
     //to source , with different usage info
     overUtilizedDatanodes.add(
-        new DatanodeUsageInfo(target2, new SCMNodeStat(100, 0, 20)));
+        new DatanodeUsageInfo(target2, new SCMNodeStat(100, 0, 20, 0, 10)));
     overUtilizedDatanodes.add(
-        new DatanodeUsageInfo(target3, new SCMNodeStat(100, 0, 40)));
+        new DatanodeUsageInfo(target3, new SCMNodeStat(100, 0, 40, 0, 30)));
     overUtilizedDatanodes.add(
-        new DatanodeUsageInfo(target4, new SCMNodeStat(100, 0, 60)));
+        new DatanodeUsageInfo(target4, new SCMNodeStat(100, 0, 60, 0, 50)));
     //set the nearest target with the highest usage info
     overUtilizedDatanodes.add(
-        new DatanodeUsageInfo(target1, new SCMNodeStat(100, 0, 10)));
+        new DatanodeUsageInfo(target1, new SCMNodeStat(100, 0, 10, 0, 5)));
 
 
     FindTargetGreedyByNetworkTopology findTargetGreedyByNetworkTopology =
@@ -206,26 +200,21 @@ public class TestFindTargetStrategy {
         findTargetGreedyByNetworkTopology.getPotentialTargets();
 
     Object[] sortedPotentialTargetArray = potentialTargets.toArray();
-    Assertions.assertEquals(sortedPotentialTargetArray.length, 5);
+    assertEquals(5, sortedPotentialTargetArray.length);
 
     // although target1 has the highest usage, it has the nearest network
     // topology distance to source, so it should be at the head of the
     // sorted PotentialTargetArray
-    Assertions.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[0])
-        .getDatanodeDetails(), target1);
+    assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[0]).getDatanodeDetails(), target1);
 
     // these targets have same network topology distance to source,
     // so they should be sorted by usage
-    Assertions.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[1])
-        .getDatanodeDetails(), target4);
-    Assertions.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[2])
-        .getDatanodeDetails(), target3);
-    Assertions.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[3])
-        .getDatanodeDetails(), target2);
+    assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[1]).getDatanodeDetails(), target4);
+    assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[2]).getDatanodeDetails(), target3);
+    assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[3]).getDatanodeDetails(), target2);
 
     //target5 has the lowest usage , but it has the farthest distance to source
     //so it should be at the tail of the sorted PotentialTargetArray
-    Assertions.assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[4])
-        .getDatanodeDetails(), target5);
+    assertEquals(((DatanodeUsageInfo)sortedPotentialTargetArray[4]).getDatanodeDetails(), target5);
   }
 }

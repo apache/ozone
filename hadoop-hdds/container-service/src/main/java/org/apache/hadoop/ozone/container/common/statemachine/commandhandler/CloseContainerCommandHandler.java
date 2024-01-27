@@ -65,13 +65,14 @@ public class CloseContainerCommandHandler implements CommandHandler {
    * Constructs a ContainerReport handler.
    */
   public CloseContainerCommandHandler(
-      int threadPoolSize, int queueSize) {
+      int threadPoolSize, int queueSize, String threadNamePrefix) {
     executor = new ThreadPoolExecutor(
-            threadPoolSize, threadPoolSize,
-            0L, TimeUnit.MILLISECONDS,
-            new LinkedBlockingQueue<>(queueSize),
-            new ThreadFactoryBuilder()
-                .setNameFormat("CloseContainerThread-%d").build());
+        threadPoolSize, threadPoolSize,
+        0L, TimeUnit.MILLISECONDS,
+        new LinkedBlockingQueue<>(queueSize),
+        new ThreadFactoryBuilder()
+            .setNameFormat(threadNamePrefix + "CloseContainerThread-%d")
+            .build());
   }
 
   /**
@@ -101,7 +102,8 @@ public class CloseContainerCommandHandler implements CommandHandler {
         final Container container = controller.getContainer(containerId);
 
         if (container == null) {
-          LOG.error("Container #{} does not exist in datanode. "
+          LOG.info("Container #{} does not exist in datanode. "
+              + "Its pipeline may have closed before it was created. "
               + "Container close failed.", containerId);
           return;
         }
@@ -149,7 +151,7 @@ public class CloseContainerCommandHandler implements CommandHandler {
           break;
         }
       } catch (NotLeaderException e) {
-        LOG.debug("Follower cannot close container #{}.", containerId);
+        LOG.info("Follower cannot close container #{}.", containerId);
       } catch (IOException e) {
         LOG.error("Can't close container #{}", containerId, e);
       } finally {

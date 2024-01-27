@@ -31,16 +31,15 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
-
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests OFS behavior when filesystem paths are enabled and parent directory is
@@ -54,7 +53,7 @@ public class TestOzoneFileSystemMissingParent {
   private static FileSystem fs;
   private static OzoneClient client;
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
@@ -81,12 +80,12 @@ public class TestOzoneFileSystemMissingParent {
     fs = FileSystem.get(conf);
   }
 
-  @After
+  @AfterEach
   public void cleanUp() throws Exception {
     fs.delete(bucketPath, true);
   }
 
-  @AfterClass
+  @AfterAll
   public static void tearDown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -112,8 +111,8 @@ public class TestOzoneFileSystemMissingParent {
 
     // Close should throw exception, Since parent doesn't exist.
     OMException omException = assertThrows(OMException.class, stream::close);
-    assertTrue(omException.getMessage().contains("Cannot create file : " +
-        "parent/file as parent directory doesn't exist"));
+    assertThat(omException.getMessage())
+        .contains("Cannot create file : " + "parent/file as parent directory doesn't exist");
   }
 
   /**
@@ -133,8 +132,8 @@ public class TestOzoneFileSystemMissingParent {
 
     // Close should throw exception, Since parent has been moved.
     OMException omException = assertThrows(OMException.class, stream::close);
-    assertTrue(omException.getMessage().contains("Cannot create file : " +
-        "parent/file as parent directory doesn't exist"));
+    assertThat(omException.getMessage())
+        .contains("Cannot create file : " + "parent/file as parent directory doesn't exist");
 
     fs.delete(renamedPath, true);
   }

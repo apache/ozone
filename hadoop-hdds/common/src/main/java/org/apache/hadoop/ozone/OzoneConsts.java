@@ -19,16 +19,12 @@
 package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ratis.thirdparty.io.grpc.Context;
-import org.apache.ratis.thirdparty.io.grpc.Metadata;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.regex.Pattern;
-
-import static org.apache.ratis.thirdparty.io.grpc.Metadata.ASCII_STRING_MARSHALLER;
 
 /**
  * Set of constants used in Ozone implementation.
@@ -101,6 +97,7 @@ public final class OzoneConsts {
   public static final String OZONE_HTTP_SCHEME = "http";
   public static final String OZONE_URI_DELIMITER = "/";
   public static final String OZONE_ROOT = OZONE_URI_DELIMITER;
+  public static final Path ROOT_PATH = Paths.get(OZONE_ROOT);
 
 
   public static final String CONTAINER_EXTENSION = ".container";
@@ -381,16 +378,6 @@ public final class OzoneConsts {
   // https://docs.aws.amazon.com/AmazonS3/latest/userguide/qfacts.html
   public static final int MAXIMUM_NUMBER_OF_PARTS_PER_UPLOAD = 10000;
 
-  // GRPC block token metadata header and context key
-  public static final String OZONE_BLOCK_TOKEN = "blocktoken";
-  public static final Context.Key<UserGroupInformation> UGI_CTX_KEY =
-      Context.key("UGI");
-
-  public static final Metadata.Key<String> OBT_METADATA_KEY =
-      Metadata.Key.of(OZONE_BLOCK_TOKEN, ASCII_STRING_MARSHALLER);
-  public static final Metadata.Key<String> USER_METADATA_KEY =
-      Metadata.Key.of(OZONE_USER, ASCII_STRING_MARSHALLER);
-
   public static final String RPC_PORT = "RPC";
 
   // Default OMServiceID for OM Ratis servers to use as RaftGroupId
@@ -486,9 +473,9 @@ public final class OzoneConsts {
 
   // %s to distinguish different certificates
   public static final String SCM_SUB_CA = "scm-sub";
-  public static final String SCM_SUB_CA_PREFIX = SCM_SUB_CA + "-%s@";
+  public static final String SCM_SUB_CA_PREFIX = SCM_SUB_CA + "@";
   public static final String SCM_ROOT_CA = "scm";
-  public static final String SCM_ROOT_CA_PREFIX = SCM_ROOT_CA + "-%s@";
+  public static final String SCM_ROOT_CA_PREFIX = SCM_ROOT_CA + "@";
 
   // Layout Version written into Meta Table ONLY during finalization.
   public static final String LAYOUT_VERSION_KEY = "#LAYOUTVERSION";

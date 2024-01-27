@@ -35,7 +35,7 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.scm.TestStorageContainerManagerHelper;
+import org.apache.hadoop.hdds.scm.TestStorageContainerManagerHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -43,17 +43,11 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.JUnit5AwareTimeout;
-import org.apache.ozone.test.UnhealthyTest;
 import org.apache.ozone.test.tag.Unhealthy;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.experimental.categories.Category;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,16 +60,18 @@ import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test Ozone Manager operation in distributed handler scenario.
  */
-@Category(UnhealthyTest.class) @Unhealthy("HDDS-3260")
+@Timeout(300)
+@Unhealthy("HDDS-3260")
 public class TestScmSafeMode {
 
   private static final Logger LOG = LoggerFactory
@@ -88,10 +84,6 @@ public class TestScmSafeMode {
   private StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
-
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
-
   /**
    * Create a MiniDFSCluster for testing.
    * <p>
@@ -100,7 +92,7 @@ public class TestScmSafeMode {
    *
    * @throws IOException
    */
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_STALENODE_INTERVAL, "10s");
@@ -121,7 +113,7 @@ public class TestScmSafeMode {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -166,7 +158,7 @@ public class TestScmSafeMode {
     StorageContainerManager scm;
 
     scm = cluster.getStorageContainerManager();
-    Assert.assertTrue(scm.isInSafeMode());
+    assertTrue(scm.isInSafeMode());
 
     om = cluster.getOzoneManager();
 
@@ -179,8 +171,8 @@ public class TestScmSafeMode {
     IOException ioException = assertThrows(IOException.class,
         () -> bucket1.createKey(keyName, 1000, RATIS, ONE,
             new HashMap<>()));
-    assertTrue(ioException.getMessage()
-        .contains("SafeModePrecheck failed for allocateBlock"));
+    assertThat(ioException.getMessage())
+        .contains("SafeModePrecheck failed for allocateBlock");
   }
 
   /**
@@ -189,20 +181,20 @@ public class TestScmSafeMode {
   @Test
   public void testIsScmInSafeModeAndForceExit() throws Exception {
     // Test 1: SCM should be out of safe mode.
-    Assert.assertFalse(storageContainerLocationClient.inSafeMode());
+    assertFalse(storageContainerLocationClient.inSafeMode());
     cluster.stop();
     // Restart the cluster with same metadata dir.
 
     try {
       cluster = builder.build();
     } catch (IOException e) {
-      Assert.fail("Cluster startup failed.");
+      fail("Cluster startup failed.");
     }
 
     // Test 2: Scm should be in safe mode as datanodes are not started yet.
     storageContainerLocationClient = cluster
         .getStorageContainerLocationClient();
-    Assert.assertTrue(storageContainerLocationClient.inSafeMode());
+    assertTrue(storageContainerLocationClient.inSafeMode());
     // Force scm out of safe mode.
     cluster.getStorageContainerManager().getClientProtocolServer()
         .forceExitSafeMode();
@@ -212,7 +204,7 @@ public class TestScmSafeMode {
         return !cluster.getStorageContainerManager().getClientProtocolServer()
             .inSafeMode();
       } catch (IOException e) {
-        Assert.fail("Cluster");
+        fail("Cluster");
         return false;
       }
     }, 10, 1000 * 5);
@@ -227,7 +219,7 @@ public class TestScmSafeMode {
     try {
       cluster = builder.build();
     } catch (IOException e) {
-      Assert.fail("Cluster startup failed.");
+      fail("Cluster startup failed.");
     }
     assertTrue(cluster.getStorageContainerManager().isInSafeMode());
     cluster.startHddsDatanodes();
@@ -278,7 +270,7 @@ public class TestScmSafeMode {
     scm = cluster.getStorageContainerManager();
     assertTrue(scm.isInSafeMode());
     assertFalse(logCapturer.getOutput().contains("SCM exiting safe mode."));
-    assertTrue(scm.getCurrentContainerThreshold() == 0);
+    assertEquals(0, scm.getCurrentContainerThreshold());
     for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
       dn.start();
     }
@@ -292,8 +284,8 @@ public class TestScmSafeMode {
     double safeModeCutoff = conf
         .getDouble(HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT,
             HddsConfigKeys.HDDS_SCM_SAFEMODE_THRESHOLD_PCT_DEFAULT);
-    assertTrue(scm.getCurrentContainerThreshold() >= safeModeCutoff);
-    assertTrue(logCapturer.getOutput().contains("SCM exiting safe mode."));
+    assertThat(scm.getCurrentContainerThreshold()).isGreaterThanOrEqualTo(safeModeCutoff);
+    assertThat(logCapturer.getOutput()).contains("SCM exiting safe mode.");
     assertFalse(scm.isInSafeMode());
   }
 
@@ -308,8 +300,8 @@ public class TestScmSafeMode {
         () -> scm.getClientProtocolServer()
             .allocateContainer(ReplicationType.STAND_ALONE,
                 ReplicationFactor.ONE, ""));
-    assertTrue(scmException.getMessage()
-        .contains("SafeModePrecheck failed for allocateContainer"));
+    assertThat(scmException.getMessage())
+        .contains("SafeModePrecheck failed for allocateContainer");
     cluster.startHddsDatanodes();
     cluster.waitForClusterToBeReady();
     cluster.waitTobeOutOfSafeMode();

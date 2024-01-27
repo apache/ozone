@@ -34,6 +34,7 @@ Execute AWSS3APICli
     ${output} =       Execute                    aws s3api --endpoint-url ${ENDPOINT_URL} ${command}
     [return]          ${output}
 
+# For possible AWS CLI return codes see: https://docs.aws.amazon.com/cli/latest/topic/return-codes.html
 Execute AWSS3APICli and checkrc
     [Arguments]       ${command}                 ${expected_error_code}
     ${output} =       Execute and checkrc        aws s3api --endpoint-url ${ENDPOINT_URL} ${command}  ${expected_error_code}
@@ -47,6 +48,11 @@ Execute AWSS3APICli and ignore error
 Execute AWSS3Cli
     [Arguments]       ${command}
     ${output} =       Execute                     aws s3 --endpoint-url ${ENDPOINT_URL} ${command}
+    [return]          ${output}
+
+Execute AWSS3CliDebug
+    [Arguments]       ${command}
+    ${output} =       Execute                     aws --debug s3 --endpoint ${ENDPOINT_URL} ${command}
     [return]          ${output}
 
 Install aws cli
@@ -74,8 +80,12 @@ Setup v4 headers
 
 Setup secure v4 headers
     ${result} =         Execute and Ignore error             ozone s3 getsecret ${OM_HA_PARAM}
-    ${output} =         Run Keyword And Return Status    Should Contain    ${result}    S3_SECRET_ALREADY_EXISTS
-    Return From Keyword if      ${output}
+    ${exists} =         Run Keyword And Return Status    Should Contain    ${result}    S3_SECRET_ALREADY_EXISTS
+    IF                  ${exists}
+                        Execute    ozone s3 revokesecret -y ${OM_HA_PARAM}
+        ${result} =     Execute    ozone s3 getsecret ${OM_HA_PARAM}
+    END
+
     ${accessKey} =      Get Regexp Matches         ${result}     (?<=awsAccessKey=).*
     # Use a valid user that are created in the Docket image Ex: testuser if it is not a secure cluster
     ${accessKey} =      Get Variable Value         ${accessKey}  testuser
@@ -197,3 +207,9 @@ Verify Multipart Upload
     ${tmp} =    Catenate    @{files}
     Execute    cat ${tmp} > /tmp/original${random}
     Compare files    /tmp/original${random}    /tmp/verify${random}
+
+Revoke S3 secrets
+    Execute and Ignore Error             ozone s3 revokesecret -y
+    Execute and Ignore Error             ozone s3 revokesecret -y -u testuser
+    Execute and Ignore Error             ozone s3 revokesecret -y -u testuser2
+

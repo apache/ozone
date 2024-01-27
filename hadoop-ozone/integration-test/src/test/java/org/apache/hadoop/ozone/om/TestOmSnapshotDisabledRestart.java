@@ -27,12 +27,15 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Integration test to verify that if snapshot feature is disabled, OM start up
@@ -100,16 +103,16 @@ public class TestOmSnapshotDisabledRestart {
         om.getConfiguration().setBoolean(
             OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, false);
         // Restart OM, expect OM start up failure
-        RuntimeException rte = Assertions.assertThrows(RuntimeException.class,
+        RuntimeException rte = assertThrows(RuntimeException.class,
             () -> cluster.restartOzoneManager(om, true));
-        Assertions.assertTrue(rte.getMessage().contains("snapshots remaining"));
+        assertThat(rte.getMessage()).contains("snapshots remaining");
         // Enable snapshot feature again
         om.getConfiguration().setBoolean(
             OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
         // Should pass this time
         cluster.restartOzoneManager(om, true);
       } catch (Exception e) {
-        Assertions.fail("Failed to restart OM", e);
+        fail("Failed to restart OM", e);
       }
     });
   }

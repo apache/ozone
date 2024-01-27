@@ -22,18 +22,14 @@ import com.google.common.primitives.Bytes;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
-import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.TestUtils;
 import org.apache.ozone.test.tag.Native;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.Disabled;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.Named;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Matchers;
-import org.mockito.Mockito;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -41,6 +37,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -56,16 +54,25 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Test for ManagedSSTDumpIterator.
  */
 class TestManagedSSTDumpIterator {
 
+  @TempDir
+  private Path tempDir;
+
   private File createSSTFileWithKeys(
       TreeMap<Pair<String, Integer>, String> keys) throws Exception {
-    File file = File.createTempFile("tmp_sst_file", ".sst");
-    file.deleteOnExit();
+    File file = Files.createFile(tempDir.resolve("tmp_sst_file.sst")).toFile();
     try (ManagedEnvOptions envOptions = new ManagedEnvOptions();
          ManagedOptions managedOptions = new ManagedOptions();
          ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(
@@ -177,12 +184,11 @@ class TestManagedSSTDumpIterator {
   @Native(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)
   @ParameterizedTest
   @MethodSource("keyValueFormatArgs")
-  @Disabled("HDDS-9274")
+  @Unhealthy("HDDS-9274")
   public void testSSTDumpIteratorWithKeyFormat(String keyFormat,
                                                String valueFormat)
       throws Exception {
-    Assumptions.assumeTrue(NativeLibraryLoader.getInstance()
-        .loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME));
+    assumeTrue(NativeLibraryLoader.getInstance().loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME));
 
     TreeMap<Pair<String, Integer>, String> keys =
         IntStream.range(0, 100).boxed().collect(
@@ -228,13 +234,13 @@ class TestManagedSSTDumpIterator {
             ManagedSSTDumpIterator.KeyValue r = iterator.next();
             String key = new String(r.getKey(), StandardCharsets.UTF_8);
             Pair<String, Integer> recordKey = Pair.of(key, r.getType());
-            Assertions.assertTrue(expectedKeys.containsKey(recordKey));
-            Assertions.assertEquals(Optional.ofNullable(expectedKeys
+            assertThat(expectedKeys).containsKey(recordKey);
+            assertEquals(Optional.ofNullable(expectedKeys
                     .get(recordKey)).orElse(""),
                 new String(r.getValue(), StandardCharsets.UTF_8));
             expectedKeys.remove(recordKey);
           }
-          Assertions.assertEquals(0, expectedKeys.size());
+          assertEquals(0, expectedKeys.size());
         } finally {
           lowerBound.ifPresent(ManagedSlice::close);
           upperBound.ifPresent(ManagedSlice::close);
@@ -248,21 +254,21 @@ class TestManagedSSTDumpIterator {
   @ParameterizedTest
   @MethodSource("invalidPipeInputStreamBytes")
   public void testInvalidSSTDumpIteratorWithKeyFormat(byte[] inputBytes)
-      throws NativeLibraryNotLoadedException, ExecutionException,
+      throws ExecutionException,
       InterruptedException, IOException {
     ByteArrayInputStream byteArrayInputStream =
         new ByteArrayInputStream(inputBytes);
-    ManagedSSTDumpTool tool = Mockito.mock(ManagedSSTDumpTool.class);
-    File file = File.createTempFile("tmp", ".sst");
-    Future future = Mockito.mock(Future.class);
-    Mockito.when(future.isDone()).thenReturn(false);
-    Mockito.when(future.get()).thenReturn(0);
-    Mockito.when(tool.run(Matchers.any(Map.class),
-            Matchers.any(ManagedOptions.class)))
+    ManagedSSTDumpTool tool = mock(ManagedSSTDumpTool.class);
+    File file = Files.createFile(tempDir.resolve("tmp_file.sst")).toFile();
+    Future future = mock(Future.class);
+    when(future.isDone()).thenReturn(false);
+    when(future.get()).thenReturn(0);
+    when(tool.run(any(Map.class),
+            any(ManagedOptions.class)))
         .thenReturn(new ManagedSSTDumpTool.SSTDumpToolTask(future,
             byteArrayInputStream));
     try (ManagedOptions options = new ManagedOptions()) {
-      Assertions.assertThrows(IllegalStateException.class,
+      assertThrows(IllegalStateException.class,
           () -> new ManagedSSTDumpIterator<ManagedSSTDumpIterator.KeyValue>(
               tool, file.getAbsolutePath(), options) {
             @Override

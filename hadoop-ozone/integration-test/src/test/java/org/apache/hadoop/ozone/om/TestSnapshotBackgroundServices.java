@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.om;
 
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -40,6 +39,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
@@ -50,7 +50,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -66,6 +65,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -78,16 +78,18 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
-import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithData.createKey;
+import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithStoppedNodes.createKey;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests snapshot background services.
  */
 @Timeout(5000)
 public class TestSnapshotBackgroundServices {
-
-  private MiniOzoneHAClusterImpl cluster = null;
+  private MiniOzoneHAClusterImpl cluster;
   private ObjectStore objectStore;
   private OzoneBucket ozoneBucket;
   private String volumeName;
@@ -95,12 +97,12 @@ public class TestSnapshotBackgroundServices {
 
   private static final long SNAPSHOT_THRESHOLD = 50;
   private static final int LOG_PURGE_GAP = 50;
-  // This test depends on direct RocksDB checks that are easier done with OBS
-  // buckets.
-  private static final BucketLayout TEST_BUCKET_LAYOUT =
-      BucketLayout.OBJECT_STORE;
-  private static final String SNAPSHOT_NAME_PREFIX = "snapshot";
+  // This test depends on direct RocksDB checks that are easier done with OBS buckets.
+  private static final BucketLayout TEST_BUCKET_LAYOUT = BucketLayout.OBJECT_STORE;
+  private static final String SNAPSHOT_NAME_PREFIX = "snapshot-";
+  private static final String KEY_NAME_PREFIX = "key-";
   private OzoneClient client;
+  private final AtomicInteger counter = new AtomicInteger();
 
   /**
    * Create a MiniOzoneCluster for testing. The cluster initially has one
@@ -113,11 +115,12 @@ public class TestSnapshotBackgroundServices {
     String clusterId = UUID.randomUUID().toString();
     String scmId = UUID.randomUUID().toString();
     String omServiceId = "om-service-test1";
+    OzoneManagerRatisServerConfig omRatisConf = conf.getObject(OzoneManagerRatisServerConfig.class);
+    omRatisConf.setLogAppenderWaitTimeMin(10);
+    conf.setFromObject(omRatisConf);
     conf.setInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, LOG_PURGE_GAP);
-    conf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_SEGMENT_SIZE_KEY, 16,
-        StorageUnit.KB);
-    conf.setStorageSize(OMConfigKeys.
-        OZONE_OM_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY, 16, StorageUnit.KB);
+    conf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_SEGMENT_SIZE_KEY, 16, StorageUnit.KB);
+    conf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY, 16, StorageUnit.KB);
     if ("testSSTFilteringBackgroundService".equals(testInfo.getDisplayName())) {
       conf.setTimeDuration(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, 1,
           TimeUnit.SECONDS);
@@ -172,12 +175,12 @@ public class TestSnapshotBackgroundServices {
     client = OzoneClientFactory.getRpcClient(omServiceId, conf);
     objectStore = client.getObjectStore();
 
-    volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    volumeName = "volume" + counter.incrementAndGet();
+    bucketName = "bucket" + counter.incrementAndGet();
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
-        .setOwner("user" + RandomStringUtils.randomNumeric(5))
-        .setAdmin("admin" + RandomStringUtils.randomNumeric(5))
+        .setOwner("user" + counter.incrementAndGet())
+        .setAdmin("admin" + counter.incrementAndGet())
         .build();
 
     objectStore.createVolume(volumeName, createVolumeArgs);
@@ -220,10 +223,9 @@ public class TestSnapshotBackgroundServices {
         getNewLeader(leaderOM, followerOM.getOMNodeId(), followerOM);
     OzoneManager newFollowerOM =
         cluster.getOzoneManager(leaderOM.getOMNodeId());
-    Assertions.assertEquals(leaderOM, newFollowerOM);
+    assertEquals(leaderOM, newFollowerOM);
 
-    SnapshotInfo newSnapshot = createOzoneSnapshot(newLeaderOM,
-        SNAPSHOT_NAME_PREFIX + RandomStringUtils.randomNumeric(5));
+    SnapshotInfo newSnapshot = createOzoneSnapshot(newLeaderOM, SNAPSHOT_NAME_PREFIX + counter.incrementAndGet());
 
     /*
       Check whether newly created key data is reclaimed
@@ -245,12 +247,11 @@ public class TestSnapshotBackgroundServices {
         .getMetadataManager()
         .getKeyTable(ozoneBucket.getBucketLayout());
     OmKeyInfo keyInfoA = omKeyInfoTable.get(keyA);
-    Assertions.assertNotNull(keyInfoA);
+    assertNotNull(keyInfoA);
 
     // create snapshot b
-    SnapshotInfo snapshotInfoB = createOzoneSnapshot(newLeaderOM,
-        SNAPSHOT_NAME_PREFIX + RandomStringUtils.randomNumeric(5));
-    Assertions.assertNotNull(snapshotInfoB);
+    SnapshotInfo snapshotInfoB = createOzoneSnapshot(newLeaderOM, SNAPSHOT_NAME_PREFIX + counter.incrementAndGet());
+    assertNotNull(snapshotInfoB);
 
     // delete key a
     ozoneBucket.deleteKey(keyNameA);
@@ -259,8 +260,7 @@ public class TestSnapshotBackgroundServices {
         () -> !isKeyInTable(keyA, omKeyInfoTable));
 
     // create snapshot c
-    SnapshotInfo snapshotInfoC = createOzoneSnapshot(newLeaderOM,
-        SNAPSHOT_NAME_PREFIX + RandomStringUtils.randomNumeric(5));
+    SnapshotInfo snapshotInfoC = createOzoneSnapshot(newLeaderOM, SNAPSHOT_NAME_PREFIX + counter.incrementAndGet());
 
     // get snapshot c
     OmSnapshot snapC;
@@ -268,7 +268,7 @@ public class TestSnapshotBackgroundServices {
         .getOmSnapshotManager()
         .checkForSnapshot(volumeName, bucketName,
             getSnapshotPrefix(snapshotInfoC.getName()), true)) {
-      Assertions.assertNotNull(rcC);
+      assertNotNull(rcC);
       snapC = (OmSnapshot) rcC.get();
     }
 
@@ -277,8 +277,7 @@ public class TestSnapshotBackgroundServices {
         () -> isKeyInTable(keyA, snapC.getMetadataManager().getDeletedTable()));
 
     // create snapshot d
-    SnapshotInfo snapshotInfoD = createOzoneSnapshot(newLeaderOM,
-        SNAPSHOT_NAME_PREFIX + RandomStringUtils.randomNumeric(5));
+    SnapshotInfo snapshotInfoD = createOzoneSnapshot(newLeaderOM, SNAPSHOT_NAME_PREFIX + counter.incrementAndGet());
 
     // delete snapshot c
     client.getObjectStore()
@@ -294,7 +293,7 @@ public class TestSnapshotBackgroundServices {
         .getOmSnapshotManager()
         .checkForSnapshot(volumeName, bucketName,
             getSnapshotPrefix(snapshotInfoD.getName()), true)) {
-      Assertions.assertNotNull(rcD);
+      assertNotNull(rcD);
       snapD = (OmSnapshot) rcD.get();
     }
 
@@ -401,23 +400,23 @@ public class TestSnapshotBackgroundServices {
         getNewLeader(leaderOM, followerOM.getOMNodeId(), followerOM);
     OzoneManager newFollowerOM =
         cluster.getOzoneManager(leaderOM.getOMNodeId());
-    Assertions.assertEquals(leaderOM, newFollowerOM);
+    assertEquals(leaderOM, newFollowerOM);
 
     List<CompactionLogEntry> compactionLogEntriesOnPreviousLeader =
         getCompactionLogEntries(leaderOM);
 
     List<CompactionLogEntry> compactionLogEntriesOnNewLeader =
         getCompactionLogEntries(newLeaderOM);
-    Assertions.assertEquals(compactionLogEntriesOnPreviousLeader,
+    assertEquals(compactionLogEntriesOnPreviousLeader,
         compactionLogEntriesOnNewLeader);
 
-    Assertions.assertEquals(leaderOM.getMetadataManager().getStore()
+    assertEquals(leaderOM.getMetadataManager().getStore()
             .getRocksDBCheckpointDiffer().getForwardCompactionDAG().nodes()
             .stream().map(CompactionNode::getFileName).collect(toSet()),
         newLeaderOM.getMetadataManager().getStore()
             .getRocksDBCheckpointDiffer().getForwardCompactionDAG().nodes()
             .stream().map(CompactionNode::getFileName).collect(toSet()));
-    Assertions.assertEquals(leaderOM.getMetadataManager().getStore()
+    assertEquals(leaderOM.getMetadataManager().getStore()
             .getRocksDBCheckpointDiffer().getForwardCompactionDAG().edges()
             .stream().map(edge ->
                 edge.source().getFileName() + "-" + edge.target().getFileName())
@@ -465,13 +464,13 @@ public class TestSnapshotBackgroundServices {
         getNewLeader(leaderOM, followerOM.getOMNodeId(), followerOM);
     OzoneManager newFollowerOM =
         cluster.getOzoneManager(leaderOM.getOMNodeId());
-    Assertions.assertEquals(leaderOM, newFollowerOM);
+    assertEquals(leaderOM, newFollowerOM);
 
     createSnapshotsEachWithNewKeys(newLeaderOM);
 
     File sstBackupDir = getSstBackupDir(newLeaderOM);
     File[] files = sstBackupDir.listFiles();
-    Assertions.assertNotNull(files);
+    assertNotNull(files);
     int numberOfSstFiles = files.length;
 
     resumeBackupCompactionFilesPruning(newLeaderOM);
@@ -520,7 +519,7 @@ public class TestSnapshotBackgroundServices {
         getNewLeader(leaderOM, followerOM.getOMNodeId(), followerOM);
     OzoneManager newFollowerOM =
         cluster.getOzoneManager(leaderOM.getOMNodeId());
-    Assertions.assertEquals(leaderOM, newFollowerOM);
+    assertEquals(leaderOM, newFollowerOM);
 
     checkIfSnapshotGetsProcessedBySFS(newLeaderOM);
 
@@ -531,18 +530,14 @@ public class TestSnapshotBackgroundServices {
   private void confirmSnapDiffForTwoSnapshotsDifferingBySingleKey(
       OzoneManager ozoneManager)
       throws IOException, InterruptedException, TimeoutException {
-    String firstSnapshot = createOzoneSnapshot(ozoneManager,
-        TestSnapshotBackgroundServices.SNAPSHOT_NAME_PREFIX +
-            RandomStringUtils.randomNumeric(10)).getName();
+    String firstSnapshot = createOzoneSnapshot(ozoneManager, SNAPSHOT_NAME_PREFIX + counter.incrementAndGet())
+        .getName();
     String diffKey = writeKeys(1).get(0);
-    String secondSnapshot = createOzoneSnapshot(ozoneManager,
-        TestSnapshotBackgroundServices.SNAPSHOT_NAME_PREFIX +
-            RandomStringUtils.randomNumeric(10)).getName();
-    SnapshotDiffReportOzone diff = getSnapDiffReport(volumeName, bucketName,
-        firstSnapshot, secondSnapshot);
-    Assertions.assertEquals(Collections.singletonList(
-            SnapshotDiffReportOzone.getDiffReportEntry(
-                SnapshotDiffReport.DiffType.CREATE, diffKey, null)),
+    String secondSnapshot = createOzoneSnapshot(ozoneManager, SNAPSHOT_NAME_PREFIX + counter.incrementAndGet())
+        .getName();
+    SnapshotDiffReportOzone diff = getSnapDiffReport(volumeName, bucketName, firstSnapshot, secondSnapshot);
+    assertEquals(Collections.singletonList(
+            SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.CREATE, diffKey, null)),
         diff.getDiffList());
   }
 
@@ -563,19 +558,17 @@ public class TestSnapshotBackgroundServices {
         .getStore()
         .getRocksDBCheckpointDiffer()
         .getSSTBackupDir();
-    Assertions.assertNotNull(sstBackupDirPath);
+    assertNotNull(sstBackupDirPath);
     File sstBackupDir = new File(sstBackupDirPath);
-    Assertions.assertNotNull(sstBackupDir);
+    assertNotNull(sstBackupDir);
     return sstBackupDir;
   }
 
   private void checkIfSnapshotGetsProcessedBySFS(OzoneManager ozoneManager)
       throws IOException, TimeoutException, InterruptedException {
     writeKeys(1);
-    SnapshotInfo newSnapshot = createOzoneSnapshot(ozoneManager,
-        TestSnapshotBackgroundServices.SNAPSHOT_NAME_PREFIX +
-            RandomStringUtils.randomNumeric(5));
-    Assertions.assertNotNull(newSnapshot);
+    SnapshotInfo newSnapshot = createOzoneSnapshot(ozoneManager, SNAPSHOT_NAME_PREFIX + counter.incrementAndGet());
+    assertNotNull(newSnapshot);
     Table<String, SnapshotInfo> snapshotInfoTable =
         ozoneManager.getMetadataManager().getSnapshotInfoTable();
     GenericTestUtils.waitFor(() -> {
@@ -583,7 +576,7 @@ public class TestSnapshotBackgroundServices {
       try {
         snapshotInfo = snapshotInfoTable.get(newSnapshot.getTableKey());
       } catch (IOException e) {
-        Assertions.fail();
+        fail();
       }
       return snapshotInfo.isSstFiltered();
     }, 1000, 10000);
@@ -595,7 +588,7 @@ public class TestSnapshotBackgroundServices {
       throws IOException, TimeoutException, InterruptedException {
     verifyLeadershipTransfer(leaderOM, followerNodeId, followerOM);
     OzoneManager newLeaderOM = cluster.getOMLeader();
-    Assertions.assertEquals(followerOM, newLeaderOM);
+    assertEquals(followerOM, newLeaderOM);
     return newLeaderOM;
   }
 
@@ -638,22 +631,17 @@ public class TestSnapshotBackgroundServices {
     return response.get().getSnapshotDiffReport();
   }
 
-  private SnapshotInfo createOzoneSnapshot(OzoneManager leaderOM, String name)
-      throws IOException {
+  private SnapshotInfo createOzoneSnapshot(OzoneManager leaderOM, String name) throws IOException {
     objectStore.createSnapshot(volumeName, bucketName, name);
 
-    String tableKey = SnapshotInfo.getTableKey(volumeName,
-        bucketName,
-        name);
+    String tableKey = SnapshotInfo.getTableKey(volumeName, bucketName, name);
     SnapshotInfo snapshotInfo = leaderOM.getMetadataManager()
         .getSnapshotInfoTable()
         .get(tableKey);
     // Allow the snapshot to be written to disk
-    String fileName =
-        getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo);
+    String fileName = getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo);
     File snapshotDir = new File(fileName);
-    if (!RDBCheckpointUtils
-        .waitForCheckpointDirectoryExist(snapshotDir)) {
+    if (!RDBCheckpointUtils.waitForCheckpointDirectoryExist(snapshotDir)) {
       throw new IOException("snapshot directory doesn't exist");
     }
     return snapshotInfo;
@@ -663,7 +651,9 @@ public class TestSnapshotBackgroundServices {
     List<String> keys = new ArrayList<>();
     long index = 0;
     while (index < keyCount) {
-      keys.add(createKey(ozoneBucket));
+      String key = KEY_NAME_PREFIX + counter.incrementAndGet();
+      createKey(ozoneBucket, key);
+      keys.add(key);
       index++;
     }
     return keys;
@@ -677,5 +667,4 @@ public class TestSnapshotBackgroundServices {
       inputStream.close();
     }
   }
-
 }

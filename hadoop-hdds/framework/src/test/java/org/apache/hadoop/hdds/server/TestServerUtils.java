@@ -30,19 +30,17 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.test.PathUtils;
 
 import org.apache.commons.io.FileUtils;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
 /**
@@ -50,8 +48,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  */
 public class TestServerUtils {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   /**
    * Test case for {@link ServerUtils#getPermissions}.
@@ -84,7 +82,7 @@ public class TestServerUtils {
   public void testGetDirectoryFromConfigWithOctalPermissions()
       throws IOException {
     // Create a temporary directory
-    String filePath = folder.getRoot().getAbsolutePath();
+    String filePath = folder.toAbsolutePath().toString();
 
     // Create an OzoneConfiguration object
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -127,7 +125,7 @@ public class TestServerUtils {
   public void testGetDirectoryFromConfigWithSymbolicPermissions()
       throws IOException {
     // Create a temporary directory
-    String filePath = folder.getRoot().getAbsolutePath();
+    String filePath = folder.toAbsolutePath().toString();
 
     OzoneConfiguration conf = new OzoneConfiguration();
     String key = OzoneConfigKeys.OZONE_METADATA_DIRS;
@@ -162,8 +160,8 @@ public class TestServerUtils {
   public void testGetDirectoryFromConfigWithMultipleDirectories()
       throws IOException {
     // Create temporary directories
-    File dir1 = folder.newFolder("dir1");
-    File dir2 = folder.newFolder("dir2");
+    File dir1 = new File(folder.toFile(), "dir1");
+    File dir2 = new File(folder.toFile(), "dir2");
 
     // Create an OzoneConfiguration object
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -198,9 +196,8 @@ public class TestServerUtils {
    */
   @Test
   public void testGetScmDbDir() {
-    final File testDir = PathUtils.getTestDir(TestServerUtils.class);
-    final File dbDir = new File(testDir, "scmDbDir");
-    final File metaDir = new File(testDir, "metaDir");
+    final File dbDir = new File(folder.toFile(), "scmDbDir");
+    final File metaDir = new File(folder.toFile(), "metaDir");
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS, dbDir.getPath());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
@@ -222,8 +219,7 @@ public class TestServerUtils {
    */
   @Test
   public void testGetScmDbDirWithFallback() {
-    final File testDir = PathUtils.getTestDir(TestServerUtils.class);
-    final File metaDir = new File(testDir, "metaDir");
+    final File metaDir = new File(folder.toFile(), "metaDir");
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
     try {
@@ -249,8 +245,7 @@ public class TestServerUtils {
 
   @Test
   public void ozoneMetadataDirAcceptsSingleItem() {
-    final File testDir = PathUtils.getTestDir(TestServerUtils.class);
-    final File metaDir = new File(testDir, "metaDir");
+    final File metaDir = new File(folder.toFile(), "metaDir");
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.getPath());
 

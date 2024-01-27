@@ -69,6 +69,10 @@ public final class DeletedContainerBlocksSummary {
     return new DeletedContainerBlocksSummary(blocks);
   }
 
+  public int getNumOfTxs() {
+    return txSummary.size();
+  }
+
   public int getNumOfBlocks() {
     return numOfBlocks;
   }

@@ -37,6 +37,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Singleton;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
@@ -80,7 +81,6 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
@@ -99,11 +99,21 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import com.google.inject.Inject;
+
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.RECON_SCM_CONFIG_PREFIX;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_EVENT_REPORT_QUEUE_WAIT_THRESHOLD_DEFAULT;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.buildRpcServerStartMessage;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_SCM_CLIENT_MAX_RETRY_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_SCM_CLIENT_RPC_TIME_OUT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_KEY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_MAX_RETRY_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_MAX_RETRY_TIMEOUT_KEY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_DEFAULT;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT;
@@ -159,6 +169,7 @@ public class ReconStorageContainerManagerFacade
   private ScheduledExecutorService scheduler;
 
   private AtomicBoolean isSyncDataFromSCMRunning;
+  private final String threadNamePrefix;
 
   // To Do :- Refactor the constructor in a separate JIRA
   @Inject
@@ -172,14 +183,32 @@ public class ReconStorageContainerManagerFacade
       ReconContainerMetadataManager reconContainerMetadataManager,
       ReconUtils reconUtils,
       ReconSafeModeManager safeModeManager) throws IOException {
-    reconNodeDetails = getReconNodeDetails(conf);
-    this.eventQueue = new EventQueue();
+    reconNodeDetails = reconUtils.getReconNodeDetails(conf);
+    this.threadNamePrefix = reconNodeDetails.threadNamePrefix();
+    this.eventQueue = new EventQueue(threadNamePrefix);
     eventQueue.setSilent(true);
     this.scmContext = new SCMContext.Builder()
         .setIsPreCheckComplete(true)
         .setSCM(this)
         .build();
     this.ozoneConfiguration = getReconScmConfiguration(conf);
+    long scmClientRPCTimeOut = conf.getTimeDuration(
+        OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_KEY,
+        OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    long scmClientMaxRetryTimeOut = conf.getTimeDuration(
+        OZONE_RECON_SCM_CLIENT_MAX_RETRY_TIMEOUT_KEY,
+        OZONE_RECON_SCM_CLIENT_MAX_RETRY_TIMEOUT_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    int scmClientFailOverMaxRetryCount = conf.getInt(
+        OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_KEY,
+        OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_DEFAULT);
+
+    conf.setLong(HDDS_SCM_CLIENT_RPC_TIME_OUT, scmClientRPCTimeOut);
+    conf.setLong(HDDS_SCM_CLIENT_MAX_RETRY_TIMEOUT, scmClientMaxRetryTimeOut);
+    conf.setLong(HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY,
+        scmClientFailOverMaxRetryCount);
+
     this.scmStorageConfig = new ReconStorageConfig(conf, reconUtils);
     this.clusterMap = new NetworkTopologyImpl(conf);
     this.dbStore = DBStoreBuilder
@@ -237,9 +266,9 @@ public class ReconStorageContainerManagerFacade
         reconTaskStatusDao,
         reconTaskConfig);
     ContainerHealthTask containerHealthTask = new ContainerHealthTask(
-        containerManager, scmServiceProvider,
-        reconTaskStatusDao, containerHealthSchemaManager,
-        containerPlacementPolicy, reconTaskConfig);
+        containerManager, scmServiceProvider, reconTaskStatusDao,
+        containerHealthSchemaManager, containerPlacementPolicy, reconTaskConfig,
+        reconContainerMetadataManager, conf);
 
     this.containerSizeCountTask = new ContainerSizeCountTask(
         containerManager,
@@ -281,9 +310,10 @@ public class ReconStorageContainerManagerFacade
         ScmUtils.getContainerReportConfPrefix() + ".execute.wait.threshold",
         OZONE_SCM_EVENT_REPORT_EXEC_WAIT_THRESHOLD_DEFAULT);
     List<BlockingQueue<ContainerReport>> queues
-        = ScmUtils.initContainerReportQueue(ozoneConfiguration);
+        = ReconUtils.initContainerReportQueue(ozoneConfiguration);
     List<ThreadPoolExecutor> executors
-        = FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(queues);
+        = FixedThreadPoolWithAffinityExecutor.initializeExecutorPool(
+        threadNamePrefix, queues);
     Map<String, FixedThreadPoolWithAffinityExecutor> reportExecutorMap
         = new ConcurrentHashMap<>();
     FixedThreadPoolWithAffinityExecutor<ContainerReportFromDatanode,
@@ -349,13 +379,6 @@ public class ReconStorageContainerManagerFacade
     return reconScmConfiguration;
   }
 
-  private SCMNodeDetails getReconNodeDetails(OzoneConfiguration conf) {
-    SCMNodeDetails.Builder builder = new SCMNodeDetails.Builder();
-    builder.setDatanodeProtocolServerAddress(
-        HddsServerUtil.getReconDataNodeBindAddress(conf));
-    return builder.build();
-  }
-
   /**
    * Start the Recon SCM subsystems.
    */
@@ -366,7 +389,10 @@ public class ReconStorageContainerManagerFacade
           "Recon ScmDatanodeProtocol RPC server",
           getDatanodeProtocolServer().getDatanodeRpcAddress()));
     }
-    scheduler = Executors.newScheduledThreadPool(1);
+    scheduler = Executors.newScheduledThreadPool(1,
+        new ThreadFactoryBuilder().setNameFormat(threadNamePrefix +
+                "SyncSCMContainerInfo-%d")
+            .build());
     boolean isSCMSnapshotEnabled = ozoneConfiguration.getBoolean(
         ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED,
         ReconServerConfigKeys.OZONE_RECON_SCM_SNAPSHOT_ENABLED_DEFAULT);

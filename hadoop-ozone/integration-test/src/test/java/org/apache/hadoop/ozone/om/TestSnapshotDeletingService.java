@@ -194,11 +194,9 @@ public class TestSnapshotDeletingService {
     // /vol1/bucket2/bucket2snap1 has been cleaned up from cache map
     SnapshotCache snapshotCache = om.getOmSnapshotManager().getSnapshotCache();
     assertEquals(2, snapshotCache.size());
-    assertEquals(2, snapshotCache.getPendingEvictionListSize());
   }
 
   @SuppressWarnings("checkstyle:MethodLength")
-  @Flaky("HDDS-9023")
   @Test
   public void testSnapshotWithFSO() throws Exception {
     Table<String, OmDirectoryInfo> dirTable =
@@ -407,7 +405,7 @@ public class TestSnapshotDeletingService {
           RepeatedOmKeyInfo activeDBDeleted = next.getValue();
           OMMetadataManager metadataManager =
               cluster.getOzoneManager().getMetadataManager();
-          assertEquals(activeDBDeleted.getOmKeyInfoList().size(), 1);
+          assertEquals(1, activeDBDeleted.getOmKeyInfoList().size());
           OmKeyInfo activeDbDeletedKeyInfo =
               activeDBDeleted.getOmKeyInfoList().get(0);
           long volumeId = metadataManager

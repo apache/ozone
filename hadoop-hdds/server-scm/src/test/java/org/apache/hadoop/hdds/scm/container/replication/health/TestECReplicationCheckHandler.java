@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -59,8 +58,11 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyList;
 
 /**
  * Tests for the ECContainerHealthCheck class.
@@ -77,9 +79,8 @@ public class TestECReplicationCheckHandler {
 
   @BeforeEach
   public void setup() {
-    placementPolicy = Mockito.mock(PlacementPolicy.class);
-    Mockito.when(placementPolicy.validateContainerPlacement(
-        anyList(), anyInt()))
+    placementPolicy = mock(PlacementPolicy.class);
+    when(placementPolicy.validateContainerPlacement(anyList(), anyInt()))
         .thenReturn(new ContainerPlacementStatusDefault(2, 2, 3));
     healthCheck = new ECReplicationCheckHandler();
     repConfig = new ECReplicationConfig(3, 2);
@@ -341,12 +342,13 @@ public class TestECReplicationCheckHandler {
     assertFalse(result.underReplicatedDueToOutOfService());
     assertTrue(result.isUnrecoverable());
     assertTrue(result.hasUnreplicatedOfflineIndexes());
+    assertFalse(result.offlineIndexesOkAfterPending());
 
     assertTrue(healthCheck.handle(request));
     // Unrecoverable so not added to the queue
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
-    assertEquals(0, report.getStat(
+    assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     assertEquals(1, report.getStat(
         ReplicationManagerReport.HealthState.MISSING));
@@ -354,12 +356,12 @@ public class TestECReplicationCheckHandler {
 
   @Test
   public void testUnderReplicatedAndUnrecoverableWithDecommissionPending() {
-    testUnderReplicatedAndUnrecoverableWithOffline(DECOMMISSIONING);
+    testUnderReplicatedAndUnrecoverableWithOfflinePending(DECOMMISSIONING);
   }
 
   @Test
   public void testUnderReplicatedAndUnrecoverableWithMaintenancePending() {
-    testUnderReplicatedAndUnrecoverableWithOffline(ENTERING_MAINTENANCE);
+    testUnderReplicatedAndUnrecoverableWithOfflinePending(ENTERING_MAINTENANCE);
   }
 
   private void testUnderReplicatedAndUnrecoverableWithOfflinePending(
@@ -383,10 +385,13 @@ public class TestECReplicationCheckHandler {
     assertFalse(result.isReplicatedOkAfterPending());
     assertFalse(result.underReplicatedDueToOutOfService());
     assertTrue(result.isUnrecoverable());
-    assertFalse(result.hasUnreplicatedOfflineIndexes());
+    // The pending has not completed yet, so the container is still under-replicated.
+    assertTrue(result.hasUnreplicatedOfflineIndexes());
+    assertTrue(result.offlineIndexesOkAfterPending());
 
     assertTrue(healthCheck.handle(request));
-    // Unrecoverable so not added to the queue
+    // Unrecoverable, but there are offline indexes which need replicated. As there is a pending
+    // add on the offline index, it is not added to the queue.
     assertEquals(0, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
     assertEquals(1, report.getStat(
@@ -583,9 +588,7 @@ public class TestECReplicationCheckHandler {
     ContainerInfo container = createContainerInfo(repConfig);
 
     // Placement policy is always violated
-    Mockito.when(placementPolicy.validateContainerPlacement(
-        Mockito.any(),
-        Mockito.anyInt()
+    when(placementPolicy.validateContainerPlacement(any(), anyInt()
     )).thenAnswer(invocation ->
         new ContainerPlacementStatusDefault(4, 5, 9));
 
@@ -618,9 +621,9 @@ public class TestECReplicationCheckHandler {
     ContainerInfo container = createContainerInfo(repConfig);
 
     // Placement policy is always violated
-    Mockito.when(placementPolicy.validateContainerPlacement(
-        Mockito.any(),
-        Mockito.anyInt()
+    when(placementPolicy.validateContainerPlacement(
+        any(),
+        anyInt()
     )).thenAnswer(invocation ->
         new ContainerPlacementStatusDefault(4, 5, 9));
 

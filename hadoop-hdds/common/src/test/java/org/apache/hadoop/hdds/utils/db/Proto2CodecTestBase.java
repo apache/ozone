@@ -18,44 +18,36 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import com.google.protobuf.InvalidProtocolBufferException;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
+import org.junit.jupiter.api.Test;
 
-import java.nio.charset.StandardCharsets;
-
-import static org.junit.Assert.fail;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test {@link Proto2Codec} related classes.
  */
 public abstract class Proto2CodecTestBase<T> {
-  @Rule
-  public ExpectedException thrown = ExpectedException.none();
-
   public abstract Codec<T> getCodec();
 
   @Test
   public void testInvalidProtocolBuffer() throws Exception {
-    try {
-      getCodec().fromPersistedFormat("random".getBytes(StandardCharsets.UTF_8));
-      fail("testInvalidProtocolBuffer failed");
-    } catch (InvalidProtocolBufferException e) {
-      GenericTestUtils.assertExceptionContains(
-          "the input ended unexpectedly", e);
-    }
+    InvalidProtocolBufferException exception =
+        assertThrows(InvalidProtocolBufferException.class,
+            () -> getCodec().fromPersistedFormat("random".getBytes(UTF_8)));
+    assertThat(exception.getMessage())
+        .contains("the input ended unexpectedly");
   }
 
   @Test
-  public void testFromPersistedFormat() throws Exception {
-    thrown.expect(NullPointerException.class);
-    getCodec().fromPersistedFormat(null);
+  public void testFromPersistedFormat() {
+    assertThrows(NullPointerException.class,
+        () -> getCodec().fromPersistedFormat(null));
   }
 
   @Test
   public void testToPersistedFormat() throws Exception {
-    thrown.expect(NullPointerException.class);
-    getCodec().toPersistedFormat(null);
+    assertThrows(NullPointerException.class,
+        () -> getCodec().toPersistedFormat(null));
   }
 }

@@ -73,8 +73,17 @@ public class ScmConfig extends ReconfigurableConfig {
           + "org.apache.hadoop.hdds.scm.PipelineChoosePolicy. "
           + "The class decides which pipeline will be used to find or "
           + "allocate Ratis containers. If not set, "
-          + "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms. "
-          + "RandomPipelineChoosePolicy will be used as default value."
+          + "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms."
+          + "RandomPipelineChoosePolicy will be used as default value. "
+          + "The following values can be used, "
+          + "(1) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms."
+          + "RandomPipelineChoosePolicy : random choose one pipeline. "
+          + "(2) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms."
+          + "HealthyPipelineChoosePolicy : random choose one healthy pipeline. "
+          + "(3) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms."
+          + "CapacityPipelineChoosePolicy : choose the pipeline with lower "
+          + "utilization from the two pipelines. Note that random choose "
+          + "method will be executed twice in this policy."
   )
   private String pipelineChoosePolicyName;
 
@@ -85,11 +94,20 @@ public class ScmConfig extends ReconfigurableConfig {
       tags = { ConfigTag.SCM, ConfigTag.PIPELINE },
       description =
           "The full name of class which implements "
-              + "org.apache.hadoop.hdds.scm.PipelineChoosePolicy. "
-              + "The class decides which pipeline will be used when "
-              + "selecting an EC Pipeline. If not set, "
-              + "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms. "
-              + "RandomPipelineChoosePolicy will be used as default value."
+          + "org.apache.hadoop.hdds.scm.PipelineChoosePolicy. "
+          + "The class decides which pipeline will be used when "
+          + "selecting an EC Pipeline. If not set, "
+          + "org.apache.hadoop.hdds.scm.pipeline.choose.algorithms."
+          + "RandomPipelineChoosePolicy will be used as default value. "
+          + "The following values can be used, "
+          + "(1) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms."
+          + "RandomPipelineChoosePolicy : random choose one pipeline. "
+          + "(2) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms."
+          + "HealthyPipelineChoosePolicy : random choose one healthy pipeline. "
+          + "(3) org.apache.hadoop.hdds.scm.pipeline.choose.algorithms."
+          + "CapacityPipelineChoosePolicy : choose the pipeline with lower "
+          + "utilization from the two pipelines. Note that random choose "
+          + "method will be executed twice in this policy."
   )
   private String ecPipelineChoosePolicyName;
 
@@ -117,7 +135,7 @@ public class ScmConfig extends ReconfigurableConfig {
               + "queued for deletion. Unit could be defined with "
               + "postfix (ns,ms,s,m,h,d). "
   )
-  private long blockDeletionInterval = Duration.ofSeconds(60).toMillis();
+  private Duration blockDeletionInterval = Duration.ofSeconds(60);
 
   @Config(key = "init.default.layout.version",
       defaultValue = "-1",
@@ -131,11 +149,11 @@ public class ScmConfig extends ReconfigurableConfig {
   private int defaultLayoutVersionOnInit = -1;
 
   public Duration getBlockDeletionInterval() {
-    return Duration.ofMillis(blockDeletionInterval);
+    return blockDeletionInterval;
   }
 
   public void setBlockDeletionInterval(Duration duration) {
-    this.blockDeletionInterval = duration.toMillis();
+    blockDeletionInterval = duration;
   }
 
   public void setKerberosPrincipal(String kerberosPrincipal) {

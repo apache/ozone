@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.conf;
 
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -58,6 +59,14 @@ public class SimpleConfiguration extends SimpleConfigurationParent {
       description = "Wait time (To test TIME config type)",
       tags = ConfigTag.MANAGEMENT)
   private long waitTime;
+
+  @Config(key = "duration",
+      type = ConfigType.TIME,
+      timeUnit = TimeUnit.MINUTES,
+      defaultValue = "1h",
+      description = "N/A",
+      tags = ConfigTag.MANAGEMENT)
+  private Duration duration;
 
   @Config(key = "class",
       type = ConfigType.CLASS,
@@ -138,5 +147,13 @@ public class SimpleConfiguration extends SimpleConfigurationParent {
 
   public void setThreshold(double threshold) {
     this.threshold = threshold;
+  }
+
+  public Duration getDuration() {
+    return duration;
+  }
+
+  public void setDuration(Duration duration) {
+    this.duration = duration;
   }
 }

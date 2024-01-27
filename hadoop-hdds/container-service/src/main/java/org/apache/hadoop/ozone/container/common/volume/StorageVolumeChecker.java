@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -33,6 +33,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -49,7 +50,7 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.checkerframework.checker.nullness.qual.Nullable;
+import jakarta.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -107,7 +108,8 @@ public class StorageVolumeChecker {
    * @param conf  Configuration object.
    * @param timer {@link Timer} object used for throttling checks.
    */
-  public StorageVolumeChecker(ConfigurationSource conf, Timer timer) {
+  public StorageVolumeChecker(ConfigurationSource conf, Timer timer,
+      String threadNamePrefix) {
 
     this.timer = timer;
 
@@ -125,22 +127,25 @@ public class StorageVolumeChecker {
         timer, minDiskCheckGapMs, maxAllowedTimeForCheckMs,
         Executors.newCachedThreadPool(
             new ThreadFactoryBuilder()
-                .setNameFormat("DataNode DiskChecker thread %d")
+                .setNameFormat(threadNamePrefix + "DataNodeDiskChecker" +
+                    "Thread-%d")
                 .setDaemon(true)
                 .build()));
 
     checkVolumeResultHandlerExecutorService = Executors.newCachedThreadPool(
         new ThreadFactoryBuilder()
-            .setNameFormat("VolumeCheck ResultHandler thread %d")
+            .setNameFormat(threadNamePrefix + "VolumeCheckResultHandler" +
+                "Thread-%d")
             .setDaemon(true)
             .build());
 
-    this.diskCheckerservice = Executors.newScheduledThreadPool(
-        1, r -> {
-          Thread t = new Thread(r, "Periodic HDDS volume checker");
-          t.setDaemon(true);
-          return t;
-        });
+    ThreadFactory threadFactory = r -> {
+      Thread t = new Thread(r, threadNamePrefix + "PeriodicHDDSVolumeChecker");
+      t.setDaemon(true);
+      return t;
+    };
+    this.diskCheckerservice = Executors.newSingleThreadScheduledExecutor(
+        threadFactory);
 
     started = new AtomicBoolean(false);
   }

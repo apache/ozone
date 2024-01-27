@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -27,12 +28,8 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
-import org.junit.Assert;
 
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Iterator;
 import java.util.UUID;
 
 /**
@@ -67,7 +64,7 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
       String keyName, long clientID) throws Exception {
     // need to initialize parentID
     String parentDir = OzoneFSUtils.getParentDir(keyName);
-    Assert.assertNotEquals("Parent doesn't exists!", parentDir, keyName);
+    assertNotEquals("Parent doesn't exists!", parentDir, keyName);
 
     // add parentDir to dirTable
     long parentID = getParentID(volumeName, bucketName, keyName);
@@ -90,13 +87,11 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
 
   private long getParentID(String volumeName, String bucketName,
                            String keyName) throws IOException {
-    Path keyPath = Paths.get(keyName);
-    Iterator<Path> elements = keyPath.iterator();
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omMetadataManager.getBucketId(volumeName,
             bucketName);
     return OMFileRequest.getParentID(volumeId, bucketId,
-            elements, keyName, omMetadataManager);
+            keyName, omMetadataManager);
   }
 
   @Override

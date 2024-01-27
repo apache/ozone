@@ -64,7 +64,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -77,11 +76,11 @@ import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -168,7 +167,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
       BucketLayout bucketLayout) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    Instant testStartTime = Instant.now();
+    Instant testStartTime = getTestStartTime();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     String value = "sample value";
@@ -241,46 +240,6 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
                         .getToken())));
   }
 
-  /**
-   * Tests failure in following operations when grpc block token is
-   * not present.
-   * 1. getKey
-   * 2. writeChunk
-   * */
-  @Test
-  @Unhealthy("Needs to be moved out of this class as  client setup is static")
-  public void testKeyOpFailureWithoutBlockToken() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    String value = "sample value";
-    store.createVolume(volumeName);
-    OzoneVolume volume = store.getVolume(volumeName);
-    volume.createBucket(bucketName);
-    OzoneBucket bucket = volume.getBucket(bucketName);
-
-    for (int i = 0; i < 10; i++) {
-      String keyName = UUID.randomUUID().toString();
-
-      try (OzoneOutputStream out = bucket.createKey(keyName,
-          value.getBytes(UTF_8).length, ReplicationType.RATIS,
-          ReplicationFactor.ONE, new HashMap<>())) {
-        IOException ioException = assertThrows(IOException.class,
-            () -> out.write(value.getBytes(UTF_8)));
-        assertTrue(ioException.getMessage()
-            .contains("UNAUTHENTICATED: Fail to find any token "));
-      }
-
-      OzoneKey key = bucket.getKey(keyName);
-      assertEquals(keyName, key.getName());
-      IOException ioException = assertThrows(IOException.class,
-          () -> bucket.readKey(keyName));
-      assertTrue(ioException.getMessage()
-          .contains("Failed to authenticate with GRPC XceiverServer with " +
-              "Ozone block token."));
-    }
-  }
-
-
   @Test
   public void testS3Auth() throws Exception {
 
@@ -305,7 +264,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
 
     // Add secret to S3Secret table.
     s3SecretManager.storeSecret(accessKey,
-        new S3SecretValue(accessKey, secret));
+        S3SecretValue.of(accessKey, secret));
 
     OMRequest writeRequest = OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
@@ -354,7 +313,7 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
 
     // Override secret to S3Secret store with some dummy value
     s3SecretManager
-        .storeSecret(accessKey, new S3SecretValue(accessKey, "dummy"));
+        .storeSecret(accessKey, S3SecretValue.of(accessKey, "dummy"));
 
     // Write request with invalid credentials.
     omResponse = cluster.getOzoneManager().getOmServerProtocol()

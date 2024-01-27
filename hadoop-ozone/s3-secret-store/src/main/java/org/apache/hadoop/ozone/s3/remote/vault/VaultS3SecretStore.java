@@ -21,7 +21,7 @@ import com.bettercloud.vault.SslConfig;
 import com.bettercloud.vault.Vault;
 import com.bettercloud.vault.VaultConfig;
 import com.bettercloud.vault.VaultException;
-import com.bettercloud.vault.response.LookupResponse;
+import com.bettercloud.vault.response.LogicalResponse;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ozone.om.S3Batcher;
 import org.apache.hadoop.ozone.om.S3SecretStore;
@@ -32,10 +32,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.Map;
-import java.util.Objects;
 
+import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.ozone.s3.remote.S3SecretRemoteStoreConfigurationKeys.ADDRESS;
 import static org.apache.hadoop.ozone.s3.remote.S3SecretRemoteStoreConfigurationKeys.ENGINE_VER;
 import static org.apache.hadoop.ozone.s3.remote.S3SecretRemoteStoreConfigurationKeys.KEY_STORE_PASSWORD;
@@ -92,9 +91,8 @@ public class VaultS3SecretStore implements S3SecretStore {
   public void storeSecret(String kerberosId, S3SecretValue secret)
       throws IOException {
     try {
-      checkAuth();
-      vault.logical().write(secretPath + '/' + kerberosId,
-              Collections.singletonMap(kerberosId, secret.getAwsSecret()));
+      callWithReAuth(() -> vault.logical().write(secretPath + '/' + kerberosId,
+          singletonMap(kerberosId, secret.getAwsSecret())));
     } catch (VaultException e) {
       LOG.error("Failed to store secret", e);
       throw new IOException("Failed to store secret", e);
@@ -104,10 +102,9 @@ public class VaultS3SecretStore implements S3SecretStore {
   @Override
   public S3SecretValue getSecret(String kerberosID) throws IOException {
     try {
-      checkAuth();
-
-      Map<String, String> data = vault.logical()
-              .read(secretPath + '/' + kerberosID).getData();
+      Map<String, String> data = callWithReAuth(() -> vault.logical()
+          .read(secretPath + '/' + kerberosID))
+          .getData();
 
       if (data == null) {
         return null;
@@ -118,7 +115,7 @@ public class VaultS3SecretStore implements S3SecretStore {
         return null;
       }
 
-      return new S3SecretValue(kerberosID, s3Secret);
+      return S3SecretValue.of(kerberosID, s3Secret);
     } catch (VaultException e) {
       LOG.error("Failed to read secret", e);
       throw new IOException("Failed to read secret", e);
@@ -128,49 +125,34 @@ public class VaultS3SecretStore implements S3SecretStore {
   @Override
   public void revokeSecret(String kerberosId) throws IOException {
     try {
-      checkAuth();
-      vault.logical().delete(secretPath + '/' + kerberosId);
+      callWithReAuth(() -> vault.logical()
+          .delete(secretPath + '/' + kerberosId));
     } catch (VaultException e) {
       LOG.error("Failed to delete secret", e);
       throw new IOException("Failed to revoke secret", e);
     }
   }
 
-  private void checkAuth() throws VaultException {
-    try {
-      doCheck();
-    } catch (VaultException e) {
-      processEx(e, this::auth);
-      try {
-        doCheck();
-      } catch (VaultException ex) {
-        processEx(ex, () -> {
-          throw new VaultException("Failed to re-authenticate",
-              ex.getHttpStatusCode());
-        });
+  private LogicalResponse callWithReAuth(RestCall action)
+      throws VaultException {
+    LogicalResponse response = action.call();
+    int status = response.getRestResponse().getStatus();
+    if (isAuthFailed(status)) {
+      auth();
+
+      response = action.call();
+      status = response.getRestResponse().getStatus();
+
+      if (isAuthFailed(status)) {
+        throw new VaultException("Failed to re-authenticate", status);
       }
     }
+
+    return response;
   }
 
-  private void doCheck() throws VaultException {
-    LookupResponse lookupResponse = vault.auth().lookupSelf();
-
-    if (!Objects.equals(lookupResponse.getId(), config.getToken())) {
-      LOG.error("Lookup token is not the same as Vault client configuration.");
-      throw new VaultException("Failed to re-authenticate", 401);
-    }
-  }
-
-  private void processEx(VaultException e, Call callback)
-      throws VaultException {
-    int status = e.getHttpStatusCode();
-    if (status == 403 || status == 401) {
-      callback.run();
-    }
-  }
-
-  private interface Call {
-    void run() throws VaultException;
+  private static boolean isAuthFailed(int status) {
+    return status == 403 || status == 401 || status == 400;
   }
 
   @Override
@@ -206,5 +188,9 @@ public class VaultS3SecretStore implements S3SecretStore {
 
   public static VaultS3SecretStoreBuilder builder() {
     return new VaultS3SecretStoreBuilder();
+  }
+
+  private interface RestCall {
+    LogicalResponse call() throws VaultException;
   }
 }

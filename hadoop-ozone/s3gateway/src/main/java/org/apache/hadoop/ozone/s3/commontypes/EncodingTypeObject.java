@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.s3.commontypes;
 
 import org.apache.commons.lang3.StringUtils;
 
-import javax.annotation.Nullable;
+import jakarta.annotation.Nullable;
 
 /**
  * A converter to encode string if needed.

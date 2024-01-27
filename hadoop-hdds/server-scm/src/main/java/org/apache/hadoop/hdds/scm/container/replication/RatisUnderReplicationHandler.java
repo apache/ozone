@@ -18,9 +18,11 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -97,6 +99,14 @@ public class RatisUnderReplicationHandler
         new RatisContainerReplicaCount(containerInfo, replicas, pendingOps,
             minHealthyForMaintenance, false);
 
+    if (result instanceof ContainerHealthResult.UnderReplicatedHealthResult) {
+      ContainerHealthResult.UnderReplicatedHealthResult
+          underReplicatedResult = (ContainerHealthResult.UnderReplicatedHealthResult) result;
+      if (underReplicatedResult.hasVulnerableUnhealthy()) {
+        return handleVulnerableUnhealthyReplicas(withUnhealthy, pendingOps);
+      }
+    }
+
     // verify that this container is still under replicated and we don't have
     // sufficient replication after considering pending adds
     RatisContainerReplicaCount replicaCount =
@@ -150,9 +160,110 @@ public class RatisUnderReplicationHandler
     return commandsSent;
   }
 
+  /**
+   * Sends a replicate command for each replica specified in
+   * vulnerableUnhealthy.
+   * @param replicaCount RatisContainerReplicaCount for this container
+   * @param pendingOps List of pending ops
+   * @return number of replicate commands sent
+   */
+  private int handleVulnerableUnhealthyReplicas(RatisContainerReplicaCount replicaCount,
+      List<ContainerReplicaOp> pendingOps) throws NotLeaderException, CommandTargetOverloadedException, SCMException {
+    ContainerInfo container = replicaCount.getContainer();
+    List<ContainerReplica> vulnerableUnhealthy = replicaCount.getVulnerableUnhealthyReplicas(dn -> {
+      try {
+        return replicationManager.getNodeStatus(dn);
+      } catch (NodeNotFoundException e) {
+        LOG.warn("Exception for datanode {} while handling vulnerable replicas for container {}, with all replicas" +
+            " {}.", dn, container, replicaCount.getReplicas(), e);
+        return null;
+      }
+    });
+    LOG.info("Handling vulnerable UNHEALTHY replicas {} for container {}.", vulnerableUnhealthy, container);
+
+    int pendingAdds = 0;
+    for (ContainerReplicaOp op : pendingOps) {
+      if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
+        pendingAdds++;
+      }
+    }
+    if (pendingAdds >= vulnerableUnhealthy.size()) {
+      LOG.debug("There are {} pending adds for container {}, while the number of UNHEALTHY replicas is {}.",
+          pendingAdds, container.containerID(), vulnerableUnhealthy.size());
+      return 0;
+    }
+
+    /*
+    Since we're replicating UNHEALTHY replicas, it's possible that replication keeps on failing. Shuffling gives
+    other replicas a chance to be replicated since there's a limit on in-flight adds.
+    */
+    Collections.shuffle(vulnerableUnhealthy);
+    return replicateEachSource(replicaCount, vulnerableUnhealthy, pendingOps);
+  }
+
+  /**
+   * Replicates each of the ContainerReplica specified in sources to new
+   * Datanodes. Will not consider Datanodes hosting existing replicas and
+   * Datanodes pending adds as targets. Note that this method simply skips
+   * a replica if its datanode is overloaded with commands, throwing an
+   * exception once all sources have been looked at.
+   * @param replicaCount RatisContainerReplicaCount for this container
+   * @param sources List containing replicas, each will be replicated
+   */
+  private int replicateEachSource(RatisContainerReplicaCount replicaCount, List<ContainerReplica> sources,
+      List<ContainerReplicaOp> pendingOps) throws NotLeaderException, SCMException, CommandTargetOverloadedException {
+    List<ContainerReplica> allReplicas = replicaCount.getReplicas();
+    ContainerInfo container = replicaCount.getContainer();
+
+    /*
+    We use the placement policy to get a target Datanode to which a vulnerable replica will be replicated. In
+    placement policy terms, a 'used node' is a Datanode which has a legit replica of this container. An 'excluded
+    node' is a Datanode that should not be considered to host a replica of this container, but other Datanodes in this
+    Datanode's rack are available. So, Datanodes of any vulnerable replicas should be excluded nodes while Datanodes
+    of other replicas, including UNHEALTHY replicas that are not pending delete (because they have unique origin),
+    should be used nodes.
+    */
+    ReplicationManagerUtil.ExcludedAndUsedNodes excludedAndUsedNodes =
+        ReplicationManagerUtil.getExcludedAndUsedNodes(container, allReplicas, Collections.emptySet(), pendingOps,
+            replicationManager);
+
+    CommandTargetOverloadedException firstException = null;
+    int numCommandsSent = 0;
+    for (ContainerReplica replica : sources) {
+      // find a target for each source and send replicate command
+      final List<DatanodeDetails> target =
+          ReplicationManagerUtil.getTargetDatanodes(placementPolicy, 1, excludedAndUsedNodes.getUsedNodes(),
+              excludedAndUsedNodes.getExcludedNodes(), currentContainerSize, container);
+      int count = 0;
+      try {
+        count = sendReplicationCommands(container, ImmutableList.of(replica.getDatanodeDetails()), target);
+      } catch (CommandTargetOverloadedException e) {
+        LOG.info("Exception while replicating {} to target {} for container {}.", replica, target, container, e);
+        if (firstException == null) {
+          firstException = e;
+        }
+      }
+
+      if (count == 1) {
+        // a command was sent to target, so it needs to be in the used nodes list because it's pending an add
+        excludedAndUsedNodes.getUsedNodes().add(target.get(0));
+      }
+      numCommandsSent += count;
+    }
+
+    if (firstException != null) {
+      throw firstException;
+    }
+
+    return numCommandsSent;
+  }
+
   private void removeUnhealthyReplicaIfPossible(ContainerInfo containerInfo,
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps)
       throws NotLeaderException {
+    LOG.info("Finding an unhealthy replica to delete for container {} with " +
+        "replicas {} to unblock under replication handling.", containerInfo,
+        replicas);
     int pendingDeletes = 0;
     for (ContainerReplicaOp op : pendingOps) {
       if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
@@ -166,6 +277,9 @@ public class RatisUnderReplicationHandler
               try {
                 return replicationManager.getNodeStatus(dnd);
               } catch (NodeNotFoundException e) {
+                LOG.warn("Exception while finding an unhealthy replica to " +
+                    "delete for container {} with replicas {}.", containerInfo,
+                    replicas, e);
                 return null;
               }
             });
@@ -244,8 +358,8 @@ public class RatisUnderReplicationHandler
    * @param pendingOps List of pending ContainerReplicaOp
    * @return List of healthy datanodes that have closed/quasi-closed replicas
    * (or UNHEALTHY replicas if they're the only ones available) and are not
-   * pending replica deletion. Sorted in descending order of
-   * sequence id.
+   * pending replica deletion. If there is a maximum sequence ID, then only
+   * replicas with that sequence ID are returned.
    */
   private List<DatanodeDetails> getSources(
       RatisContainerReplicaCount replicaCount,
@@ -259,8 +373,24 @@ public class RatisUnderReplicationHandler
     }
 
     Predicate<ContainerReplica> predicate =
-        replica -> replica.getState() == State.CLOSED ||
-        replica.getState() == State.QUASI_CLOSED;
+        replica -> replica.getState() == State.CLOSED;
+
+    /*
+    If no CLOSED replicas are available, or if the container itself is
+    QUASI_CLOSED, then QUASI_CLOSED replicas are allowed to be sources.
+    */
+    boolean hasClosedReplica = false;
+    for (ContainerReplica replica : replicaCount.getReplicas()) {
+      if (replica.getState() == State.CLOSED) {
+        hasClosedReplica = true;
+        break;
+      }
+    }
+    if (!hasClosedReplica ||
+        replicaCount.getContainer().getState() == LifeCycleState.QUASI_CLOSED) {
+      predicate =
+          predicate.or(replica -> replica.getState() == State.QUASI_CLOSED);
+    }
 
     if (replicaCount.getHealthyReplicaCount() == 0) {
       predicate = predicate.or(
@@ -314,7 +444,7 @@ public class RatisUnderReplicationHandler
         replicaCount.getContainer().containerID(), replicaCount.getReplicas());
 
     ReplicationManagerUtil.ExcludedAndUsedNodes excludedAndUsedNodes =
-        ReplicationManagerUtil.getExcludedAndUsedNodes(
+        ReplicationManagerUtil.getExcludedAndUsedNodes(replicaCount.getContainer(),
             replicaCount.getReplicas(), Collections.emptySet(), pendingOps,
             replicationManager);
 

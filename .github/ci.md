@@ -9,13 +9,11 @@ This is the most important [workflow](./workflows/ci.yml).  It runs the tests th
 
 It is triggered each time a pull request is created or synchronized (i.e. when the remote branch is pushed to).  These trigger events are defined in the [build-branch workflow](./workflows/post-commit.yml).
 
-It is also "scheduled" on the `master` branch twice a day (00:30 and 12:30), as defined in the [scheduled-ci workflow](./workflows/scheduled_ci.yml).  (Those are the runs [here](https://github.com/apache/ozone/actions/workflows/post-commit.yml?query=event%3Aschedule++) which are marked "scheduled", and have no branch label.)
-
 The full-ci workflow is divided into a number of different jobs, most of which run in parallel.  Each job is described below.
 
 Some of the jobs are defined using GA's "build matrix" feature.  This allows you define similar jobs with a single job definition. Any differences are specified by a list of values for a specific key.  For example, the "compile" job uses the matrix feature to generate the images with different versions of java.  There, the matrix is specified by the "java" key which has a list of values describing which version of java to use, (8 or 11.)
 
-The jobs currently using the "build matrix" feature are: "compile", "basic", "acceptance" and "integration".  These jobs also use GA's fail-fast flag to cancel the other jobs in the same matrix, if one fails. For example, in the "compile" job, if the java 8 build fails, the java 11 build will be cancelled due to this flag, but the other jobs outside the "compile" matrix are unaffected. 
+The jobs currently using the "build matrix" feature are: "compile", "basic", "unit", "acceptance" and "integration".  These jobs also use GA's fail-fast flag to cancel the other jobs in the same matrix, if one fails. For example, in the "compile" job, if the java 8 build fails, the java 11 build will be cancelled due to this flag, but the other jobs outside the "compile" matrix are unaffected. 
 
 While the fail-fast flag only works within a matrix job, the "Cancelling" workflow, (described below,) works across jobs.
 
@@ -47,7 +45,12 @@ Runs a subset of the following subjobs depending on what was selected by build-i
 - docs: [Builds](../hadoop-ozone/dev-support/checks/docs.sh) website with [Hugo](https://gohugo.io/)
 - findbugs: [Runs](../hadoop-ozone/dev-support/checks/findbugs.sh) spotbugs static analysis on bytecode
 - rat (release audit tool): [Confirms](../hadoop-ozone/dev-support/checks/rat.sh) source files include licenses
+
+
+#### unit job
+Performs unit tests (if necessary) in two parts:
 - unit: [Runs](../hadoop-ozone/dev-support/checks/unit.sh) 'mvn test' for all non integration tests
+- native: [Runs](../hadoop-ozone/dev-support/checks/native.sh) 'mvn test' for all tests that require RocksDB native library to be built (few tests but longer build process)
 
 #### dependency job
 [Confirms](../hadoop-ozone/dev-support/checks/dependency.sh) that the list of jars included in the current build matches the expected ones defined [here](../hadoop-ozone/dist/src/main/license/jar-report.txt)
@@ -68,11 +71,6 @@ If they don't match, it describes how to make the updates to include the changes
 - acceptance
 - basic
 - integration
-
-### Cancelling Workflow
-[This](./workflows/cancel-ci.yaml) workflow is triggered each time a [full-ci](ci.md#full-ci-workflow) workflow is triggered.  It reduces GA usage, by cancelling PR workflows that have a job failure.  Specifically, it checks all PR workflows running at the time it is invoked. It cancels any of those which have a failed job, (at that time). Any PR workflows with jobs that fail after that will be caught by a subsequent run of the "Cancelling" workflow.
-
-Note that it checks the status of all PR workflows running at that time, not just the one that triggered it.
 
 ### close-prs Workflow
 [This](./workflows/close-pending.yaml) workflow is scheduled each night at midnight; it closes PR's that have not been updated in the last 21 days, while letting the author know they are free to reopen.

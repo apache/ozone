@@ -30,11 +30,9 @@ import org.apache.hadoop.ozone.failure.Failures;
 import org.apache.hadoop.ozone.freon.FreonReplicationOptions;
 import org.apache.hadoop.ozone.loadgenerators.LoadGenerator;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.ozone.test.UnhealthyTest;
-import org.junit.BeforeClass;
-import org.junit.AfterClass;
-import org.junit.Test;
-import org.junit.experimental.categories.Category;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -46,7 +44,6 @@ import java.util.concurrent.TimeUnit;
 /**
  * Test Read Write with Mini Ozone Chaos Cluster.
  */
-@Category(UnhealthyTest.class)
 @Command(description = "Starts IO with MiniOzoneChaosCluster",
     name = "chaos", mixinStandardHelpOptions = true)
 public class TestMiniChaosOzoneCluster extends GenericCli {
@@ -120,7 +117,7 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
   private static final String OM_SERVICE_ID = "ozoneChaosTest";
   private static final String SCM_SERVICE_ID = "scmChaosTest";
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration configuration = new OzoneConfiguration();
 
@@ -194,7 +191,7 @@ public class TestMiniChaosOzoneCluster extends GenericCli {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     if (loadGenerator != null) {
       loadGenerator.shutdownLoadGenerator();

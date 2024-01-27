@@ -40,7 +40,7 @@ public class BucketObjectDBInfo extends ObjectDBInfo {
   private boolean isVersioningEnabled;
 
   @JsonProperty("usedBytes")
-  private String usedBytes;
+  private long usedBytes;
 
   @JsonProperty("encryptionInfo")
   private BucketEncryptionKeyInfo bekInfo;
@@ -72,7 +72,7 @@ public class BucketObjectDBInfo extends ObjectDBInfo {
     super.setUsedNamespace(omBucketInfo.getUsedNamespace());
     super.setCreationTime(omBucketInfo.getCreationTime());
     super.setModificationTime(omBucketInfo.getModificationTime());
-    super.setAcls(omBucketInfo.getAcls());
+    super.setAcls(AclMetadata.fromOzoneAcls(omBucketInfo.getAcls()));
     this.volumeName = omBucketInfo.getVolumeName();
     this.sourceBucket = omBucketInfo.getSourceBucket();
     this.sourceVolume = omBucketInfo.getSourceVolume();
@@ -82,6 +82,7 @@ public class BucketObjectDBInfo extends ObjectDBInfo {
     this.bucketLayout = omBucketInfo.getBucketLayout();
     this.owner = omBucketInfo.getOwner();
     this.bekInfo = omBucketInfo.getEncryptionKeyInfo();
+    this.usedBytes = omBucketInfo.getUsedBytes();
   }
 
   public String getVolumeName() {
@@ -100,11 +101,11 @@ public class BucketObjectDBInfo extends ObjectDBInfo {
     this.storageType = storageType;
   }
 
-  public String getUsedBytes() {
+  public long getUsedBytes() {
     return usedBytes;
   }
 
-  public void setUsedBytes(String usedBytes) {
+  public void setUsedBytes(long usedBytes) {
     this.usedBytes = usedBytes;
   }
 

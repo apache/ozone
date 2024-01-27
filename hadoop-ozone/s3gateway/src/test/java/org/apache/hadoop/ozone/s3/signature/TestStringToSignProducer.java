@@ -35,16 +35,17 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor.LowerCaseKeyStringMap;
 import org.apache.kerby.util.Hex;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Test string2sign creation.
@@ -110,13 +111,11 @@ public class TestStringToSignProducer {
     MessageDigest md = MessageDigest.getInstance("SHA-256");
     md.update(canonicalRequest.getBytes(StandardCharsets.UTF_8));
 
-    Assert.assertEquals(
-        "String to sign is invalid",
-        "AWS4-HMAC-SHA256\n"
+    assertEquals("AWS4-HMAC-SHA256\n"
             + DATETIME + "\n"
             + "20181009/us-east-1/s3/aws4_request\n"
             + Hex.encode(md.digest()).toLowerCase(),
-        signatureBase);
+        signatureBase, "String to sign is invalid");
   }
 
   private ContainerRequestContext setupContext(
@@ -125,15 +124,15 @@ public class TestStringToSignProducer {
       MultivaluedMap<String, String> headerMap,
       MultivaluedMap<String, String> queryMap) {
     ContainerRequestContext context =
-        Mockito.mock(ContainerRequestContext.class);
-    UriInfo uriInfo = Mockito.mock(UriInfo.class);
+        mock(ContainerRequestContext.class);
+    UriInfo uriInfo = mock(UriInfo.class);
 
-    Mockito.when(uriInfo.getRequestUri()).thenReturn(uri);
-    Mockito.when(uriInfo.getQueryParameters()).thenReturn(queryMap);
+    when(uriInfo.getRequestUri()).thenReturn(uri);
+    when(uriInfo.getQueryParameters()).thenReturn(queryMap);
 
-    Mockito.when(context.getUriInfo()).thenReturn(uriInfo);
-    Mockito.when(context.getMethod()).thenReturn(method);
-    Mockito.when(context.getHeaders()).thenReturn(headerMap);
+    when(context.getUriInfo()).thenReturn(uriInfo);
+    when(context.getMethod()).thenReturn(method);
+    when(context.getHeaders()).thenReturn(headerMap);
 
     return context;
   }
@@ -210,7 +209,7 @@ public class TestStringToSignProducer {
       actualResult = e.getCode();
     }
 
-    Assert.assertEquals(expectedResult, actualResult);
+    assertEquals(expectedResult, actualResult);
   }
 
   private static Stream<Arguments> testValidateCanonicalHeadersInput() {
@@ -269,6 +268,6 @@ public class TestStringToSignProducer {
       actualResult = e.getCode();
     }
 
-    Assert.assertEquals(expectedResult, actualResult);
+    assertEquals(expectedResult, actualResult);
   }
 }

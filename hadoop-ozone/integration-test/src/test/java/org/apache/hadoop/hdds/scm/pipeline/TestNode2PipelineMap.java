@@ -17,6 +17,8 @@
  */
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -30,7 +32,6 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -93,18 +94,16 @@ public class TestNode2PipelineMap {
         .getContainersInPipeline(ratisContainer.getPipeline().getId());
 
     ContainerID cId = ratisContainer.getContainerInfo().containerID();
-    Assertions.assertEquals(1, set.size());
-    set.forEach(containerID ->
-        Assertions.assertEquals(containerID, cId));
+    assertEquals(1, set.size());
+    set.forEach(containerID -> assertEquals(containerID, cId));
 
     List<DatanodeDetails> dns = ratisContainer.getPipeline().getNodes();
-    Assertions.assertEquals(3, dns.size());
+    assertEquals(3, dns.size());
 
     // get pipeline details by dnid
     Set<PipelineID> pipelines = scm.getScmNodeManager()
         .getPipelines(dns.get(0));
-    Assertions.assertTrue(
-        pipelines.contains(ratisContainer.getPipeline().getId()));
+    assertThat(pipelines).contains(ratisContainer.getPipeline().getId());
 
     // Now close the container and it should not show up while fetching
     // containers by pipeline
@@ -114,13 +113,12 @@ public class TestNode2PipelineMap {
         .updateContainerState(cId, HddsProtos.LifeCycleEvent.CLOSE);
     Set<ContainerID> set2 = pipelineManager.getContainersInPipeline(
         ratisContainer.getPipeline().getId());
-    Assertions.assertEquals(0, set2.size());
+    assertEquals(0, set2.size());
 
-    pipelineManager
-        .closePipeline(ratisContainer.getPipeline(), false);
+    pipelineManager.closePipeline(ratisContainer.getPipeline().getId());
+    pipelineManager.deletePipeline(ratisContainer.getPipeline().getId());
     pipelines = scm.getScmNodeManager()
         .getPipelines(dns.get(0));
-    Assertions.assertFalse(
-        pipelines.contains(ratisContainer.getPipeline().getId()));
+    assertThat(pipelines).doesNotContain(ratisContainer.getPipeline().getId());
   }
 }

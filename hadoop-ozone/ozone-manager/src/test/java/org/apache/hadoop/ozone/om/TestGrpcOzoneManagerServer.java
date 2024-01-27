@@ -18,21 +18,19 @@
 
 package org.apache.hadoop.ozone.om;
 
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import static org.mockito.Mockito.mock;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.mockito.Mockito;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 
 /**
  * Tests for GrpcOzoneManagerServer.
  */
+@Timeout(30)
 public class TestGrpcOzoneManagerServer {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestGrpcOzoneManagerServer.class);
@@ -40,19 +38,17 @@ public class TestGrpcOzoneManagerServer {
   private OzoneManagerProtocolServerSideTranslatorPB omServerProtocol;
   private GrpcOzoneManagerServer server;
 
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(30));
-
   @Test
   public void testStartStop() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    ozoneManager = Mockito.mock(OzoneManager.class);
+    ozoneManager = mock(OzoneManager.class);
     omServerProtocol = ozoneManager.getOmServerProtocol();
 
     server = new GrpcOzoneManagerServer(conf,
         omServerProtocol,
         ozoneManager.getDelegationTokenMgr(),
-        ozoneManager.getCertificateClient());
+        ozoneManager.getCertificateClient(),
+        "");
 
     try {
       server.start();
