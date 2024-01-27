@@ -67,9 +67,8 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Optional;
 import java.util.UUID;
-
-import com.google.common.base.Optional;
 
 import static org.apache.hadoop.security.authentication.util.KerberosName.DEFAULT_MECHANISM;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -172,9 +171,9 @@ public class TestS3GetSecretRequest {
     when(omMultiTenantManager.getCacheOp()).thenReturn(cacheOp);
 
     when(omMultiTenantManager.getTenantForAccessID(USER_CAROL))
-        .thenReturn(Optional.absent());
+        .thenReturn(Optional.empty());
     when(omMultiTenantManager.getTenantForAccessID(USER_ALICE))
-        .thenReturn(Optional.absent());
+        .thenReturn(Optional.empty());
     when(omMultiTenantManager.getTenantForAccessID(ACCESS_ID_BOB))
         .thenReturn(Optional.of(ACCESS_ID_BOB));
   }
