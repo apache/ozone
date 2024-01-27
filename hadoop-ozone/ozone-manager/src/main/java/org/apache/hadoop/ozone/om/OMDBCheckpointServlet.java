@@ -242,9 +242,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     long startTime = System.currentTimeMillis();
     long pauseCounter = PAUSE_COUNTER.incrementAndGet();
 
-    // Pause compactions, Copy/link files and get checkpoint.
     try {
       LOG.info("Compaction pausing {} started.", pauseCounter);
+      // Pause compactions, Copy/link files and get checkpoint.
       differ.incrementTarballRequestCount();
       FileUtils.copyDirectory(compactionLogDir.getOriginalDir(),
           compactionLogDir.getTmpDir());
@@ -253,13 +253,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       checkpoint = getDbStore().getCheckpoint(flush);
     } finally {
       // Unpause the compaction threads.
-      synchronized (getDbStore().getRocksDBCheckpointDiffer()) {
-        differ.decrementTarballRequestCount();
-        differ.notifyAll();
-        long elapsedTime = System.currentTimeMillis() - startTime;
-        LOG.info("Compaction pausing {} ended. Elapsed ms: {}",
-            pauseCounter, elapsedTime);
-      }
+      differ.decrementTarballRequestCountAndNotify();
+      long elapsedTime = System.currentTimeMillis() - startTime;
+      LOG.info("Compaction pausing {} ended. Elapsed ms: {}", pauseCounter, elapsedTime);
     }
     return checkpoint;
   }
