@@ -522,7 +522,7 @@ enum Status {
     UNAUTHORIZED = 91;
 
     S3_SECRET_ALREADY_EXISTS = 92;
-    
+
     INVALID_PATH = 93;
 
     TOO_MANY_BUCKETS = 94;
@@ -851,6 +851,7 @@ message SnapshotInfo {
   // snapshot exclusive size after replication
   optional uint64 exclusiveReplicatedSize = 18;
   // note: shared sizes can be calculated from: referenced - exclusive
+  optional bool deepCleanedDeletedDir = 19;
 }
 
 message SnapshotDiffJobProto {
@@ -1894,17 +1895,27 @@ message SnapshotMoveKeyInfos {
 
 message SnapshotPurgeRequest {
   repeated string snapshotDBKeys = 1;
-  repeated string updatedSnapshotDBKey = 2;
+  repeated string updatedSnapshotDBKey = 2 [deprecated = true];
 }
 
 message SetSnapshotPropertyRequest {
-  optional SnapshotProperty snapshotProperty = 1;
+  optional SnapshotProperty snapshotProperty = 1 [deprecated = true];
+  optional string snapshotKey = 2;
+  optional SnapshotSize snapshotSize = 3;
+  optional bool deepCleanedDeletedDir = 4;
+  optional bool deepCleanedDeletedKey = 5;
 }
 
+// SnapshotProperty in entirely deprecated, Keeping it here for proto.lock compatibility
 message SnapshotProperty {
-  optional string snapshotKey = 1;
-  optional uint64 exclusiveSize = 2;
-  optional uint64 exclusiveReplicatedSize = 3;
+  optional string snapshotKey = 1 [deprecated = true];
+  optional uint64 exclusiveSize = 2 [deprecated = true];
+  optional uint64 exclusiveReplicatedSize = 3 [deprecated = true];
+}
+
+message SnapshotSize {
+  optional uint64 exclusiveSize = 1;
+  optional uint64 exclusiveReplicatedSize = 2;
 }
 
 message DeleteTenantRequest {
