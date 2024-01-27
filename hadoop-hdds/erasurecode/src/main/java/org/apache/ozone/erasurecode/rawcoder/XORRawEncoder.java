@@ -17,7 +17,7 @@
  */
 package org.apache.ozone.erasurecode.rawcoder;
 
-import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 
 import java.nio.ByteBuffer;

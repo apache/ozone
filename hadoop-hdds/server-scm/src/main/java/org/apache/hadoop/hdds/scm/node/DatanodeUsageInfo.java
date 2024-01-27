@@ -31,6 +31,7 @@ public class DatanodeUsageInfo {
 
   private DatanodeDetails datanodeDetails;
   private SCMNodeStat scmNodeStat;
+  private int containerCount;
 
   /**
    * Constructs a DatanodeUsageInfo with DatanodeDetails and SCMNodeStat.
@@ -43,6 +44,7 @@ public class DatanodeUsageInfo {
       SCMNodeStat scmNodeStat) {
     this.datanodeDetails = datanodeDetails;
     this.scmNodeStat = scmNodeStat;
+    this.containerCount = -1;
   }
 
   /**
@@ -135,6 +137,14 @@ public class DatanodeUsageInfo {
     return scmNodeStat;
   }
 
+  public int getContainerCount() {
+    return containerCount;
+  }
+
+  public void setContainerCount(int containerCount) {
+    this.containerCount = containerCount;
+  }
+
   /**
    * Gets Comparator that compares two DatanodeUsageInfo on the basis of
    * their utilization values. Utilization is (capacity - remaining) divided
@@ -195,7 +205,11 @@ public class DatanodeUsageInfo {
       builder.setCapacity(scmNodeStat.getCapacity().get());
       builder.setUsed(scmNodeStat.getScmUsed().get());
       builder.setRemaining(scmNodeStat.getRemaining().get());
+      builder.setCommitted(scmNodeStat.getCommitted().get());
+      builder.setFreeSpaceToSpare(scmNodeStat.getFreeSpaceToSpare().get());
     }
+
+    builder.setContainerCount(containerCount);
     return builder;
   }
 }

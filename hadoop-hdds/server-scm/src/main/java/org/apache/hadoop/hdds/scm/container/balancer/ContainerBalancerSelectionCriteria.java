@@ -18,10 +18,13 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.replication.LegacyReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -83,11 +86,7 @@ public class ContainerBalancerSelectionCriteria {
    * 3. Container size should be closer to 5GB.
    * 4. Container must not be in the configured exclude containers list.
    * 5. Container should be closed.
-   * 6. Container should not be an EC container
-   * //TODO Temporarily not considering EC containers as candidates
-   * @see
-   * <a href="https://issues.apache.org/jira/browse/HDDS-6940">HDDS-6940</a>
-   *
+   * 6. If the {@link LegacyReplicationManager} is enabled, then the container should not be an EC container.
    * @param node DatanodeDetails for which to find candidate containers.
    * @return NavigableSet of candidate containers that satisfy the criteria.
    */
@@ -120,7 +119,8 @@ public class ContainerBalancerSelectionCriteria {
    * @param second second container to compare
    * @return An integer greater than 0 if first is more used, 0 if they're
    * the same containers or a container is not found, and a value less than 0
-   * if first is not more used than second.
+   * if first is less used than second. If both containers have equal used
+   * space, they're compared using {@link ContainerID#compareTo(ContainerID)}.
    */
   private int isContainerMoreUsed(ContainerID first,
                                   ContainerID second) {
@@ -132,8 +132,10 @@ public class ContainerBalancerSelectionCriteria {
       ContainerInfo secondInfo = containerManager.getContainer(second);
       if (firstInfo.getUsedBytes() > secondInfo.getUsedBytes()) {
         return 1;
-      } else {
+      } else if (firstInfo.getUsedBytes() < secondInfo.getUsedBytes()) {
         return -1;
+      } else {
+        return first.compareTo(second);
       }
     } catch (ContainerNotFoundException e) {
       LOG.warn("Could not retrieve ContainerInfo from container manager for " +
@@ -153,12 +155,14 @@ public class ContainerBalancerSelectionCriteria {
 
   /**
    * Checks whether a Container has the ReplicationType
-   * {@link HddsProtos.ReplicationType#EC}.
+   * {@link HddsProtos.ReplicationType#EC} and the Legacy Replication Manger is enabled.
    * @param container container to check
-   * @return true if the ReplicationType is EC, else false
+   * @return true if the ReplicationType is EC and "hdds.scm.replication
+   * .enable.legacy" is true, else false
    */
-  private boolean isECContainer(ContainerInfo container) {
-    return container.getReplicationType().equals(HddsProtos.ReplicationType.EC);
+  private boolean isECContainerAndLegacyRMEnabled(ContainerInfo container) {
+    return container.getReplicationType().equals(HddsProtos.ReplicationType.EC)
+        && replicationManager.getConfig().isLegacyEnabled();
   }
 
   private boolean shouldBeExcluded(ContainerID containerID,
@@ -171,29 +175,58 @@ public class ContainerBalancerSelectionCriteria {
           "candidate container. Excluding it.", containerID);
       return true;
     }
-    return !isContainerClosed(container) || isECContainer(container) ||
+    return !isContainerClosed(container, node) || isECContainerAndLegacyRMEnabled(container) ||
         isContainerReplicatingOrDeleting(containerID) ||
         !findSourceStrategy.canSizeLeaveSource(node, container.getUsedBytes())
-        || breaksMaxSizeToMoveLimit(container, sizeMovedAlready);
+        || breaksMaxSizeToMoveLimit(container.containerID(),
+        container.getUsedBytes(), sizeMovedAlready);
   }
 
   /**
-   * Checks whether specified container is closed.
+   * Checks whether specified container is closed. Also checks if the replica
+   * on the specified datanode is CLOSED. Assumes that there will only be one
+   * replica of a container on a particular Datanode.
    * @param container container to check
+   * @param datanodeDetails datanode on which a replica of the container is
+   * present
    * @return true if container LifeCycleState is
-   * {@link HddsProtos.LifeCycleState#CLOSED}, else false
+   * {@link HddsProtos.LifeCycleState#CLOSED} and its replica on the
+   * specified datanode is CLOSED, else false
    */
-  private boolean isContainerClosed(ContainerInfo container) {
-    return container.getState().equals(HddsProtos.LifeCycleState.CLOSED);
+  private boolean isContainerClosed(ContainerInfo container,
+                                    DatanodeDetails datanodeDetails) {
+    if (!container.getState().equals(HddsProtos.LifeCycleState.CLOSED)) {
+      return false;
+    }
+
+    // also check that the replica on the specified DN is closed
+    Set<ContainerReplica> replicas;
+    try {
+      replicas = containerManager.getContainerReplicas(container.containerID());
+    } catch (ContainerNotFoundException e) {
+      LOG.warn("Container {} does not exist in ContainerManager. Skipping " +
+          "this container.", container.getContainerID(), e);
+      return false;
+    }
+    for (ContainerReplica replica : replicas) {
+      if (replica.getDatanodeDetails().equals(datanodeDetails)) {
+        // don't consider replica if it's not closed
+        // assumption: there's only one replica of this container on this DN
+        return replica.getState().equals(ContainerReplicaProto.State.CLOSED);
+      }
+    }
+
+    return false;
   }
 
-  private boolean breaksMaxSizeToMoveLimit(ContainerInfo container,
-      long sizeMovedAlready) {
+  private boolean breaksMaxSizeToMoveLimit(ContainerID containerID,
+                                           long usedBytes,
+                                           long sizeMovedAlready) {
     // check max size to move per iteration limit
-    if (sizeMovedAlready + container.getUsedBytes() >
+    if (sizeMovedAlready + usedBytes >
         balancerConfiguration.getMaxSizeToMovePerIteration()) {
       LOG.debug("Removing container {} because it fails max size " +
-            "to move per iteration check.", container.containerID());
+          "to move per iteration check.", containerID);
       return true;
     }
     return false;

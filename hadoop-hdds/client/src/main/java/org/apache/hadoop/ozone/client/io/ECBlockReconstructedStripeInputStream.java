@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
@@ -44,6 +43,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.Set;
@@ -138,7 +138,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   // but needed for reconstructing missing data)
   private final SortedSet<Integer> internalBuffers = new TreeSet<>();
   // Data Indexes we have tried to read from, and failed for some reason
-  private final Set<Integer> failedDataIndexes = new HashSet<>();
+  private final Set<Integer> failedDataIndexes = new TreeSet<>();
   private final ByteBufferPool byteBufferPool;
 
   private RawErasureDecoder decoder;
@@ -153,8 +153,9 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   @SuppressWarnings("checkstyle:ParameterNumber")
   public ECBlockReconstructedStripeInputStream(ECReplicationConfig repConfig,
       BlockLocationInfo blockInfo, boolean verifyChecksum,
-      XceiverClientFactory xceiverClientFactory, Function<BlockID,
-      Pipeline> refreshFunction, BlockInputStreamFactory streamFactory,
+      XceiverClientFactory xceiverClientFactory,
+      Function<BlockID, BlockLocationInfo> refreshFunction,
+      BlockInputStreamFactory streamFactory,
       ByteBufferPool byteBufferPool,
       ExecutorService ecReconstructExecutor) {
     super(repConfig, blockInfo, verifyChecksum, xceiverClientFactory,
@@ -183,7 +184,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
    */
   public synchronized void addFailedDatanodes(Collection<DatanodeDetails> dns) {
     if (initialized) {
-      throw new RuntimeException("Cannot add failed datanodes after the " +
+      throw new IllegalStateException("Cannot add failed datanodes after the " +
           "reader has been initialized");
     }
     DatanodeDetails[] locations = getDataLocations();
@@ -195,6 +196,17 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         }
       }
     }
+    LOG.debug("{}: set failed indexes {}", this, failedDataIndexes);
+  }
+
+  /**
+   * Returns the set of failed indexes. This will be empty if no errors were
+   * encountered reading any of the block indexes, and no failed nodes were
+   * added via {@link #addFailedDatanodes(Collection)}.
+   * The returned set is a copy of the internal set, so it can be modified.
+   */
+  public synchronized Set<Integer> getFailedIndexes() {
+    return new HashSet<>(failedDataIndexes);
   }
 
   /**
@@ -209,6 +221,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     Preconditions.assertNotNull(indexes, "recovery indexes");
     recoveryIndexes.clear();
     recoveryIndexes.addAll(indexes);
+    LOG.debug("{}: set recovery indexes {}", this, recoveryIndexes);
   }
 
   private void init() throws InsufficientLocationsException {
@@ -218,7 +231,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     }
     if (!hasSufficientLocations()) {
       String msg = "There are insufficient datanodes to read the EC block";
-      LOG.debug(msg);
+      LOG.debug("{}: {}", this, msg);
       throw new InsufficientLocationsException(msg);
     }
     allocateInternalBuffers();
@@ -265,7 +278,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     DatanodeDetails[] locations = getDataLocations();
     for (int i = 0; i < locations.length; i++) {
       if (locations[i] == null && failedDataIndexes.add(i)) {
-        LOG.debug("Marked index={} as failed", i);
+        LOG.debug("{}: marked [{}] as failed", this, i);
       }
     }
   }
@@ -275,7 +288,8 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   }
 
   private void assignBuffers(ByteBuffer[] bufs) {
-    Preconditions.assertTrue(bufs.length == getExpectedBufferCount());
+    Preconditions.assertSame(getExpectedBufferCount(), bufs.length,
+        "buffer count");
 
     if (isOfflineRecovery()) {
       decoderOutputBuffers = bufs;
@@ -407,10 +421,11 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   }
 
   private void validateBuffers(ByteBuffer[] bufs) {
-    Preconditions.assertTrue(bufs.length == getExpectedBufferCount());
+    Preconditions.assertSame(getExpectedBufferCount(), bufs.length,
+        "buffer count");
     int chunkSize = getRepConfig().getEcChunkSize();
     for (ByteBuffer b : bufs) {
-      Preconditions.assertTrue(b.remaining() == chunkSize);
+      Preconditions.assertSame(chunkSize, b.remaining(), "buf.remaining");
     }
   }
 
@@ -440,7 +455,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     for (int i = dataNum; i < dataNum + parityNum; i++) {
       ByteBuffer b = decoderInputBuffers[i];
       if (b != null) {
-        Preconditions.assertTrue(b.position() == paritySize);
+        Preconditions.assertSame(paritySize, b.position(), "buf.position");
       }
     }
     // The output buffers need their limit set to the parity size
@@ -507,8 +522,6 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   @SuppressWarnings("java:S2245") // no need for secure random
   private SortedSet<Integer> selectInternalInputs(
       SortedSet<Integer> available, long count) {
-
-    LOG.debug("Selecting {} internal inputs from {}", count, available);
 
     if (count <= 0) {
       return emptySortedSet();
@@ -581,23 +594,22 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         // an IOException.
         pair.getValue().get();
       } catch (ExecutionException ee) {
-        String message = "Failed to read from block {} EC index {}. Excluding" +
-                " the block";
-        if (LOG.isDebugEnabled()) {
-          LOG.debug(message, getBlockID(), index + 1, ee.getCause());
+        boolean added = failedDataIndexes.add(index);
+        Throwable t = ee.getCause() != null ? ee.getCause() : ee;
+        String msg = "{}: error reading [{}]";
+        if (added) {
+          msg += ", marked as failed";
         } else {
-          Throwable t = ee.getCause() != null ? ee.getCause() : ee;
-          LOG.warn(message + " Exception: {} Exception Message: {}",
-                  getBlockID(), index + 1, t.getClass().getName(),
-                  t.getMessage());
+          msg += ", already had failed"; // should not really happen
         }
+        LOG.info(msg, this, index, t);
 
-        failedDataIndexes.add(index);
         exceptionOccurred = true;
       } catch (InterruptedException ie) {
         // Catch each InterruptedException to ensure all the futures have been
         // handled, and then throw the exception later
-        LOG.debug("Interrupted while waiting for reads to complete", ie);
+        LOG.debug("{}: interrupted while waiting for reads to complete",
+            this, ie);
         Thread.currentThread().interrupt();
       }
     }
@@ -606,11 +618,37 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
           "Interrupted while waiting for reads to complete");
     }
     if (exceptionOccurred) {
-      throw new IOException("One or more errors occurred reading blocks");
+      throw new IOException("One or more errors occurred reading block "
+          + getBlockID());
     }
   }
 
   private void readIntoBuffer(int ind, ByteBuffer buf) throws IOException {
+    List<DatanodeDetails> failedLocations = new LinkedList<>();
+    while (true) {
+      int currentBufferPosition = buf.position();
+      try {
+        readFromCurrentLocation(ind, buf);
+        break;
+      } catch (IOException e) {
+        DatanodeDetails failedLocation = getDataLocations()[ind];
+        failedLocations.add(failedLocation);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("{}: read [{}] failed from {} due to {}", this,
+              ind, failedLocation, e.getMessage());
+        }
+        closeStream(ind);
+        if (shouldRetryFailedRead(ind)) {
+          buf.position(currentBufferPosition);
+        } else {
+          throw new BadDataLocationException(ind, e, failedLocations);
+        }
+      }
+    }
+  }
+
+  private void readFromCurrentLocation(int ind, ByteBuffer buf)
+      throws IOException {
     BlockExtendedInputStream stream = getOrOpenStream(ind);
     seekStreamIfNecessary(stream, 0);
     while (buf.hasRemaining()) {
@@ -622,12 +660,16 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
         // stored in OM. Therefore if there is any remaining space in the
         // buffer, we should throw an exception.
         if (buf.hasRemaining()) {
+          LOG.trace("{}: unexpected EOF with {} bytes remaining [{}]",
+              this, buf.remaining(), ind);
           throw new IOException("Expected to read " + buf.remaining() +
               " bytes from block " + getBlockID() + " EC index " + (ind + 1) +
               " but reached EOF");
         }
+        LOG.debug("{}: EOF for [{}]", this, ind);
         break;
       }
+      LOG.trace("{}: read {} bytes for [{}]", this, read, ind);
     }
   }
 
@@ -704,7 +746,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   }
 
   private void freeAllResourcesWithoutClosing() throws IOException {
-    LOG.debug("Freeing all resources while leaving the block open");
+    LOG.debug("{}: Freeing all resources while leaving the block open", this);
     freeBuffers();
     closeStreams();
   }
@@ -735,8 +777,10 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
 
     if (isOfflineRecovery()) {
       if (!paddingIndexes.isEmpty()) {
-        paddingIndexes.forEach(i ->
-            Preconditions.assertTrue(!recoveryIndexes.contains(i)));
+        paddingIndexes.forEach(i -> Preconditions.assertTrue(
+            !recoveryIndexes.contains(i),
+            () -> "Padding index " + i + " should not be selected for recovery")
+        );
       }
 
       missingIndexes.addAll(recoveryIndexes);
@@ -769,6 +813,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     }
 
     SortedSet<Integer> internal = selectInternalInputs(candidates, required);
+    LOG.debug("{}: selected {}, {} as inputs", this, selectedIndexes, internal);
     selectedIndexes.addAll(internal);
   }
 

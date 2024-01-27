@@ -27,7 +27,6 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
@@ -38,6 +37,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBl
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
@@ -46,9 +46,11 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.security.token.Token;
 
 import com.google.common.base.Preconditions;
-import org.junit.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Helpers for container tests.
@@ -445,8 +447,8 @@ public final class ContainerTestHelper {
    */
   public static void verifyGetBlock(ContainerCommandRequestProto request,
       ContainerCommandResponseProto response, int expectedChunksCount) {
-    Assert.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
-    Assert.assertEquals(expectedChunksCount,
+    assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+    assertEquals(expectedChunksCount,
         response.getGetBlock().getBlockData().getChunksCount());
   }
 
@@ -542,18 +544,27 @@ public final class ContainerTestHelper {
   }
 
   public static BlockID getTestBlockID(long containerID) {
-    // Add 2ms delay so that localID based on UtcTime
-    // won't collide.
-    sleep(2);
-    return new BlockID(containerID, HddsUtils.getTime());
+    return new BlockID(containerID, UniqueId.next());
   }
 
   public static long getTestContainerID() {
-    return HddsUtils.getTime();
+    return UniqueId.next();
   }
 
   public static String getFixedLengthString(String string, int length) {
     return String.format("%1$" + length + "s", string);
+  }
+
+  public static byte[] generateData(int length, boolean random) {
+    final byte[] data = new byte[length];
+    if (random) {
+      ThreadLocalRandom.current().nextBytes(data);
+    } else {
+      for (int i = 0; i < length; i++) {
+        data[i] = (byte) i;
+      }
+    }
+    return data;
   }
 
   /**
@@ -617,7 +628,7 @@ public final class ContainerTestHelper {
       break;
 
     default:
-      Assert.fail("Unhandled request type " + cmdType + " in unit test");
+      fail("Unhandled request type " + cmdType + " in unit test");
     }
 
     return builder.build();

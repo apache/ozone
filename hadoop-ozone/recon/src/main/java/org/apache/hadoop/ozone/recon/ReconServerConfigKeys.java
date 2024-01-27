@@ -149,6 +149,42 @@ public final class  ReconServerConfigKeys {
 
   public static final long
       OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT = 150 * 1000L;
+
+  public static final String
+      OZONE_RECON_CONTAINER_KEY_FLUSH_TO_DB_MAX_THRESHOLD =
+      "ozone.recon.containerkey.flush.db.max.threshold";
+
+  public static final long
+      OZONE_RECON_CONTAINER_KEY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT = 150 * 1000L;
+
+  public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY =
+      "ozone.recon.scm.snapshot.task.interval.delay";
+
+  public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DEFAULT
+      = "24h";
+
+  public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY =
+      "ozone.recon.scm.snapshot.task.initial.delay";
+
+  public static final String
+      OZONE_RECON_SCM_SNAPSHOT_TASK_INITIAL_DELAY_DEFAULT = "1m";
+
+  public static final String OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_KEY =
+      "ozone.recon.scmclient.rpc.timeout";
+
+  public static final String OZONE_RECON_SCM_CLIENT_RPC_TIME_OUT_DEFAULT = "1m";
+
+  public static final String OZONE_RECON_SCM_CLIENT_MAX_RETRY_TIMEOUT_KEY =
+      "ozone.recon.scmclient.max.retry.timeout";
+
+  public static final String OZONE_RECON_SCM_CLIENT_MAX_RETRY_TIMEOUT_DEFAULT =
+      "6s";
+
+  public static final String OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_KEY =
+      "ozone.recon.scmclient.failover.max.retry";
+
+  public static final int
+      OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_DEFAULT = 3;
   /**
    * Private constructor for utility class.
    */

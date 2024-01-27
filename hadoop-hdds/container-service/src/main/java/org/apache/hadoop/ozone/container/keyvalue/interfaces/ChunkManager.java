@@ -25,9 +25,11 @@ import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.ratis.statemachine.StateMachine;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -104,8 +106,19 @@ public interface ChunkManager {
     // no-op
   }
 
-  static long getBufferCapacityForChunkRead(ChunkInfo chunkInfo,
-      long defaultReadBufferCapacity) {
+  default String streamInit(Container container, BlockID blockID)
+      throws StorageContainerException {
+    return null;
+  }
+
+  default StateMachine.DataChannel getStreamDataChannel(
+          Container container, BlockID blockID, ContainerMetrics metrics)
+          throws StorageContainerException {
+    return null;
+  }
+
+  static int getBufferCapacityForChunkRead(ChunkInfo chunkInfo,
+      int defaultReadBufferCapacity) {
     long bufferCapacity = 0;
     if (chunkInfo.isReadDataIntoSingleBuffer()) {
       // Older client - read all chunk data into one single buffer.
@@ -130,6 +143,13 @@ public interface ChunkManager {
       bufferCapacity = chunkInfo.getLen();
     }
 
-    return bufferCapacity;
+    if (bufferCapacity > Integer.MAX_VALUE) {
+      throw new IllegalStateException("Integer overflow:"
+          + " bufferCapacity = " + bufferCapacity
+          + " > Integer.MAX_VALUE = " + Integer.MAX_VALUE
+          + ", defaultReadBufferCapacity=" + defaultReadBufferCapacity
+          + ", chunkInfo=" + chunkInfo);
+    }
+    return Math.toIntExact(bufferCapacity);
   }
 }

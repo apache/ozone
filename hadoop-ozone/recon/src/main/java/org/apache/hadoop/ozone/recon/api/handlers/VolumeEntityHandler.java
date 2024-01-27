@@ -21,11 +21,14 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconConstants;
+import org.apache.hadoop.ozone.recon.api.types.CountStats;
 import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
+import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
+import org.apache.hadoop.ozone.recon.api.types.VolumeObjectDBInfo;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 
@@ -48,11 +51,10 @@ public class VolumeEntityHandler extends EntityHandler {
   @Override
   public NamespaceSummaryResponse getSummaryResponse()
           throws IOException {
-    NamespaceSummaryResponse namespaceSummaryResponse =
-            new NamespaceSummaryResponse(EntityType.VOLUME);
+
     String[] names = getNames();
-    List<OmBucketInfo> buckets = listBucketsUnderVolume(names[0]);
-    namespaceSummaryResponse.setNumBucket(buckets.size());
+    List<OmBucketInfo> buckets = getOmMetadataManager().
+        listBucketsUnderVolume(names[0]);
     int totalDir = 0;
     long totalKey = 0L;
 
@@ -63,10 +65,29 @@ public class VolumeEntityHandler extends EntityHandler {
       totalKey += getTotalKeyCount(bucketObjectId);
     }
 
-    namespaceSummaryResponse.setNumTotalDir(totalDir);
-    namespaceSummaryResponse.setNumTotalKey(totalKey);
+    CountStats countStats = new CountStats(
+        -1, buckets.size(), totalDir, totalKey);
 
-    return namespaceSummaryResponse;
+    return NamespaceSummaryResponse.newBuilder()
+        .setEntityType(EntityType.VOLUME)
+        .setCountStats(countStats)
+        .setObjectDBInfo(getVolumeObjDbInfo(names))
+        .setStatus(ResponseStatus.OK)
+        .build();
+  }
+
+  private VolumeObjectDBInfo getVolumeObjDbInfo(String[] names)
+      throws IOException {
+    String dbVolumeKey = getOmMetadataManager().getVolumeKey(names[0]);
+    if (null == dbVolumeKey) {
+      return new VolumeObjectDBInfo();
+    }
+    OmVolumeArgs volumeArgs =
+        getOmMetadataManager().getVolumeTable().getSkipCache(dbVolumeKey);
+    if (null == volumeArgs) {
+      return new VolumeObjectDBInfo();
+    }
+    return new VolumeObjectDBInfo(volumeArgs);
   }
 
   @Override
@@ -77,7 +98,8 @@ public class VolumeEntityHandler extends EntityHandler {
     duResponse.setPath(getNormalizedPath());
     String[] names = getNames();
     String volName = names[0];
-    List<OmBucketInfo> buckets = listBucketsUnderVolume(volName);
+    List<OmBucketInfo> buckets = getOmMetadataManager().
+        listBucketsUnderVolume(volName);
     duResponse.setCount(buckets.size());
 
     // List of DiskUsage data for all buckets
@@ -118,7 +140,8 @@ public class VolumeEntityHandler extends EntityHandler {
           throws IOException {
     QuotaUsageResponse quotaUsageResponse = new QuotaUsageResponse();
     String[] names = getNames();
-    List<OmBucketInfo> buckets = listBucketsUnderVolume(names[0]);
+    List<OmBucketInfo> buckets = getOmMetadataManager().
+        listBucketsUnderVolume(names[0]);
     String volKey = getOmMetadataManager().getVolumeKey(names[0]);
     OmVolumeArgs volumeArgs =
             getOmMetadataManager().getVolumeTable().getSkipCache(volKey);
@@ -141,15 +164,16 @@ public class VolumeEntityHandler extends EntityHandler {
     FileSizeDistributionResponse distResponse =
             new FileSizeDistributionResponse();
     String[] names = getNames();
-    List<OmBucketInfo> buckets = listBucketsUnderVolume(names[0]);
-    int[] volumeFileSizeDist = new int[ReconConstants.NUM_OF_BINS];
+    List<OmBucketInfo> buckets = getOmMetadataManager()
+        .listBucketsUnderVolume(names[0]);
+    int[] volumeFileSizeDist = new int[ReconConstants.NUM_OF_FILE_SIZE_BINS];
 
     // accumulate file size distribution arrays from all buckets under volume
     for (OmBucketInfo bucket : buckets) {
       long bucketObjectId = bucket.getObjectID();
       int[] bucketFileSizeDist = getTotalFileSizeDist(bucketObjectId);
       // add on each bin
-      for (int i = 0; i < ReconConstants.NUM_OF_BINS; ++i) {
+      for (int i = 0; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
         volumeFileSizeDist[i] += bucketFileSizeDist[i];
       }
     }

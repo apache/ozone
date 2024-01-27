@@ -20,18 +20,13 @@ package org.apache.hadoop.ozone.protocolPB;
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.CryptoProtocolVersion;
-import org.apache.hadoop.fs.CompositeCrcFileChecksum;
+import org.apache.hadoop.ozone.client.checksum.CompositeCrcFileChecksum;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.fs.MD5MD5CRC32CastagnoliFileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
 import org.apache.hadoop.fs.Options;
-import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.MD5Hash;
@@ -49,10 +44,10 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FileEnc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MD5MD5Crc32FileChecksumProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.proto.SecurityProtos.TokenProto;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.util.CrcUtil;
+import org.apache.hadoop.security.token.TokenIdentifier;
+import org.apache.hadoop.ozone.client.checksum.CrcUtil;
 import org.apache.hadoop.util.DataChecksum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,6 +55,9 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+
+import static org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper.getByteString;
+import static org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper.getFixedByteString;
 
 /**
  * Utilities for converting protobuf classes.
@@ -70,40 +68,37 @@ public final class OMPBHelper {
       ByteString.copyFromUtf8("<redacted>");
 
   private OMPBHelper() {
-    /** Hidden constructor */
+    // no instances
   }
 
   /**
-   * Converts Ozone delegation token to @{@link TokenProto}.
-   * @return tokenProto
+   * Convert {@link TokenProto} (used for delegation tokens and block tokens)
+   * to {@link Token}.
    */
-  public static TokenProto convertToTokenProto(Token<?> tok) {
-    if (tok == null) {
+  public static <T extends TokenIdentifier> Token<T> tokenFromProto(
+      TokenProto tokenProto) {
+    return new Token<>(
+        tokenProto.getIdentifier().toByteArray(),
+        tokenProto.getPassword().toByteArray(),
+        new Text(tokenProto.getKind()),
+        new Text(tokenProto.getService()));
+  }
+
+  /**
+   * Convert {@link Token} to {@link TokenProto} (used for delegation tokens
+   * and block tokens).
+   */
+  public static TokenProto protoFromToken(Token<?> token) {
+    if (token == null) {
       throw new IllegalArgumentException("Invalid argument: token is null");
     }
 
-    return TokenProto.newBuilder().
-        setIdentifier(getByteString(tok.getIdentifier())).
-        setPassword(getByteString(tok.getPassword())).
-        setKind(tok.getKind().toString()).
-        setService(tok.getService().toString()).build();
-  }
-
-  public static ByteString getByteString(byte[] bytes) {
-    // return singleton to reduce object allocation
-    return (bytes.length == 0) ? ByteString.EMPTY : ByteString.copyFrom(bytes);
-  }
-
-  /**
-   * Converts @{@link TokenProto} to Ozone delegation token.
-   *
-   * @return Ozone
-   */
-  public static Token<OzoneTokenIdentifier> convertToDelegationToken(
-      TokenProto tokenProto) {
-    return new Token<>(tokenProto.getIdentifier()
-        .toByteArray(), tokenProto.getPassword().toByteArray(), new Text(
-        tokenProto.getKind()), new Text(tokenProto.getService()));
+    return TokenProto.newBuilder()
+        .setIdentifier(getByteString(token.getIdentifier()))
+        .setPassword(getByteString(token.getPassword()))
+        .setKindBytes(getFixedByteString(token.getKind()))
+        .setServiceBytes(getByteString(token.getService().getBytes()))
+        .build();
   }
 
   public static BucketEncryptionKeyInfo convert(
@@ -167,55 +162,6 @@ public final class OMPBHelper {
     String keyName = proto.getKeyName();
     return new FileEncryptionInfo(suite, version, key, iv, keyName,
         ezKeyVersionName);
-  }
-
-  public static DefaultReplicationConfig convert(
-      HddsProtos.DefaultReplicationConfig defaultReplicationConfig) {
-    if (defaultReplicationConfig == null) {
-      throw new IllegalArgumentException(
-          "Invalid argument: default replication config" + " is null");
-    }
-
-    final ReplicationType type =
-        ReplicationType.fromProto(defaultReplicationConfig.getType());
-    DefaultReplicationConfig defaultReplicationConfigObj = null;
-    switch (type) {
-    case EC:
-      defaultReplicationConfigObj = new DefaultReplicationConfig(type,
-          new ECReplicationConfig(
-              defaultReplicationConfig.getEcReplicationConfig()));
-      break;
-    default:
-      final ReplicationFactor factor =
-          ReplicationFactor.fromProto(defaultReplicationConfig.getFactor());
-      defaultReplicationConfigObj = new DefaultReplicationConfig(type, factor);
-    }
-    return defaultReplicationConfigObj;
-  }
-
-  public static HddsProtos.DefaultReplicationConfig convert(
-      DefaultReplicationConfig defaultReplicationConfig) {
-    if (defaultReplicationConfig == null) {
-      throw new IllegalArgumentException(
-          "Invalid argument: default replication config" + " is null");
-    }
-
-    final HddsProtos.DefaultReplicationConfig.Builder builder =
-        HddsProtos.DefaultReplicationConfig.newBuilder();
-    builder.setType(ReplicationType.toProto(
-        defaultReplicationConfig.getType()));
-
-    if (defaultReplicationConfig.getFactor() != null) {
-      builder.setFactor(ReplicationFactor.toProto(
-          defaultReplicationConfig.getFactor()));
-    }
-
-    if (defaultReplicationConfig.getEcReplicationConfig() != null) {
-      builder.setEcReplicationConfig(
-          defaultReplicationConfig.getEcReplicationConfig().toProto());
-    }
-
-    return builder.build();
   }
 
   public static FileChecksum convert(FileChecksumProto proto)

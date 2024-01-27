@@ -18,15 +18,19 @@
 package org.apache.hadoop.ozone.om.request.s3.security;
 
 import com.google.common.base.Optional;
+import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.logging.log4j.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+
+import static org.apache.hadoop.security.SaslRpcServer.AuthMethod.KERBEROS;
 
 /**
  * Common helper function for S3 secret requests.
@@ -37,6 +41,22 @@ public final class S3SecretRequestHelper {
       LoggerFactory.getLogger(S3SecretRequestHelper.class);
 
   private S3SecretRequestHelper() {
+  }
+
+  /**
+   * Retrieves thread-local UGI for request or construct new one
+   * based on provided accessId.
+   *
+   * @param accessId user identifier from request.
+   * @return {@link UserGroupInformation} instance.
+   */
+  public static UserGroupInformation getOrCreateUgi(String accessId) {
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
+    if (ugi == null && Strings.isNotEmpty(accessId)) {
+      return UserGroupInformation.createRemoteUser(accessId, KERBEROS);
+    } else {
+      return ugi;
+    }
   }
 
   /**

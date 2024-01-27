@@ -16,11 +16,14 @@
  */
 package org.apache.hadoop.hdds.server.events;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.hadoop.hdds.HddsIdFactory;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -79,7 +82,7 @@ public class TestEventWatcher {
     queue.fireEvent(WATCH_UNDER_REPLICATED,
         new UnderreplicatedEvent(id2, "C2"));
 
-    Assertions.assertEquals(0,
+    assertEquals(0,
         underReplicatedEvents.getReceivedEvents().size());
 
     Thread.sleep(1000);
@@ -87,16 +90,16 @@ public class TestEventWatcher {
     queue.fireEvent(REPLICATION_COMPLETED,
         new ReplicationCompletedEvent(id1, "C2", "D1"));
 
-    Assertions.assertEquals(0,
+    assertEquals(0,
         underReplicatedEvents.getReceivedEvents().size());
 
     Thread.sleep(1500);
 
     queue.processAll(1000L);
 
-    Assertions.assertEquals(1,
+    assertEquals(1,
         underReplicatedEvents.getReceivedEvents().size());
-    Assertions.assertEquals(id2,
+    assertEquals(id2,
         underReplicatedEvents.getReceivedEvents().get(0).id);
 
   }
@@ -132,15 +135,14 @@ public class TestEventWatcher {
     List<UnderreplicatedEvent> c1todo = replicationWatcher
         .getTimeoutEvents(e -> e.containerId.equalsIgnoreCase("C1"));
 
-    Assertions.assertEquals(2, c1todo.size());
-    Assertions.assertTrue(replicationWatcher.contains(event1));
+    assertEquals(2, c1todo.size());
+    assertTrue(replicationWatcher.contains(event1));
     Thread.sleep(1500L);
 
     c1todo = replicationWatcher
         .getTimeoutEvents(e -> e.containerId.equalsIgnoreCase("C1"));
-    Assertions.assertEquals(0, c1todo.size());
-    Assertions.assertFalse(replicationWatcher.contains(event1));
-
+    assertEquals(0, c1todo.size());
+    assertFalse(replicationWatcher.contains(event1));
   }
 
   @Test
@@ -195,18 +197,19 @@ public class TestEventWatcher {
     EventWatcherMetrics metrics = replicationWatcher.getMetrics();
 
     //3 events are received
-    Assertions.assertEquals(3, metrics.getTrackedEvents().value());
+    assertEquals(3, metrics.getTrackedEvents().value());
 
     //completed + timed out = all messages
-    Assertions.assertEquals(metrics.getTrackedEvents().value(),
+    assertEquals(metrics.getTrackedEvents().value(),
         metrics.getCompletedEvents().value() +
             metrics.getTimedOutEvents().value(),
         "number of timed out and completed messages should be the same as the"
             + " all messages");
 
     //_at least_ two are timed out.
-    Assertions.assertTrue(metrics.getTimedOutEvents().value() >= 2,
-        "At least two events should be timed out.");
+    assertThat(metrics.getTimedOutEvents().value())
+        .withFailMessage("At least two events should be timed out.")
+        .isGreaterThanOrEqualTo(2);
 
     DefaultMetricsSystem.shutdown();
   }

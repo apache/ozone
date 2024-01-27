@@ -30,11 +30,16 @@ import java.util.concurrent.TimeUnit;
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
 public final class ScmConfigKeys {
+  public static final String OZONE_SCM_HA_PREFIX = "ozone.scm.ha";
 
   // Location of SCM DB files. For now we just support a single
   // metadata dir but in future we may support multiple for redundancy or
   // performance.
   public static final String OZONE_SCM_DB_DIRS = "ozone.scm.db.dirs";
+
+  // SCM DB directory permission
+  public static final String OZONE_SCM_DB_DIRS_PERMISSIONS =
+      "ozone.scm.db.dirs.permissions";
 
   public static final String DFS_CONTAINER_RATIS_ENABLED_KEY
       = "dfs.container.ratis.enabled";
@@ -61,11 +66,11 @@ public final class ScmConfigKeys {
   public static final String DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY =
       "dfs.container.ratis.segment.size";
   public static final String DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT =
-      "1MB";
+      "64MB";
   public static final String DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY =
       "dfs.container.ratis.segment.preallocated.size";
   public static final String
-      DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT = "16KB";
+      DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT = "4MB";
   public static final String
       DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT =
       "dfs.container.ratis.statemachinedata.sync.timeout";
@@ -75,8 +80,6 @@ public final class ScmConfigKeys {
   public static final String
       DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES =
       "dfs.container.ratis.statemachinedata.sync.retries";
-  public static final int
-      DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES_DEFAULT = -1;
   public static final String
       DFS_CONTAINER_RATIS_STATEMACHINE_MAX_PENDING_APPLY_TXNS =
       "dfs.container.ratis.statemachine.max.pending.apply-transactions";
@@ -136,7 +139,11 @@ public final class ScmConfigKeys {
   public static final String OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_KEY =
       "ozone.chunk.read.buffer.default.size";
   public static final String OZONE_CHUNK_READ_BUFFER_DEFAULT_SIZE_DEFAULT =
-      "64KB";
+      "1MB";
+  public static final String OZONE_CHUNK_READ_MAPPED_BUFFER_THRESHOLD_KEY =
+      "ozone.chunk.read.mapped.buffer.threshold";
+  public static final String OZONE_CHUNK_READ_MAPPED_BUFFER_THRESHOLD_DEFAULT =
+      "32KB";
 
   public static final String OZONE_SCM_CONTAINER_LAYOUT_KEY =
       "ozone.scm.container.layout";
@@ -229,6 +236,12 @@ public final class ScmConfigKeys {
 
   public static final String OZONE_SCM_HANDLER_COUNT_KEY =
       "ozone.scm.handler.count.key";
+  public static final String OZONE_SCM_CLIENT_HANDLER_COUNT_KEY =
+      "ozone.scm.client.handler.count.key";
+  public static final String OZONE_SCM_BLOCK_HANDLER_COUNT_KEY =
+      "ozone.scm.block.handler.count.key";
+  public static final String OZONE_SCM_DATANODE_HANDLER_COUNT_KEY =
+      "ozone.scm.datanode.handler.count.key";
   public static final int OZONE_SCM_HANDLER_COUNT_DEFAULT = 100;
 
   public static final String OZONE_SCM_SECURITY_HANDLER_COUNT_KEY =
@@ -342,6 +355,10 @@ public final class ScmConfigKeys {
       "ozone.scm.container.size";
   public static final String OZONE_SCM_CONTAINER_SIZE_DEFAULT = "5GB";
 
+  public static final String OZONE_SCM_CONTAINER_LOCK_STRIPE_SIZE =
+      "ozone.scm.container.lock.stripes";
+  public static final int OZONE_SCM_CONTAINER_LOCK_STRIPE_SIZE_DEFAULT = 512;
+
   public static final String OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY =
       "ozone.scm.container.placement.impl";
   public static final String OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY =
@@ -370,10 +387,6 @@ public final class ScmConfigKeys {
   public static final String
       OZONE_SCM_EXPIRED_CONTAINER_REPLICA_OP_SCRUB_INTERVAL_DEFAULT =
       "5m";
-  public static final String OZONE_SCM_CONTAINER_REPLICA_OP_TIME_OUT =
-      "ozone.scm.expired.container.replica.op.time.out";
-  public static final String
-      OZONE_SCM_CONTAINER_REPLICA_OP_TIME_OUT_DEFAULT = "30m";
 
   // Upper limit for how many pipelines can be created
   // across the cluster nodes managed by SCM.
@@ -411,8 +424,12 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_PIPELINE_DESTROY_TIMEOUT =
       "ozone.scm.pipeline.destroy.timeout";
 
+  // We wait for 150s before closing containers
+  // OzoneConfigKeys#OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION.
+  // So, we are waiting for another 150s before deleting the pipeline
+  // (150 + 150) = 300s
   public static final String OZONE_SCM_PIPELINE_DESTROY_TIMEOUT_DEFAULT =
-      "66s";
+      "300s";
 
   public static final String OZONE_SCM_PIPELINE_CREATION_INTERVAL =
       "ozone.scm.pipeline.creation.interval";
@@ -422,7 +439,7 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_PIPELINE_SCRUB_INTERVAL =
       "ozone.scm.pipeline.scrub.interval";
   public static final String OZONE_SCM_PIPELINE_SCRUB_INTERVAL_DEFAULT =
-      "5m";
+      "150s";
 
 
   // Allow SCM to auto create factor ONE ratis pipeline.
@@ -470,6 +487,10 @@ public final class ScmConfigKeys {
       "ozone.scm.datanode.admin.monitor.interval";
   public static final String OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL_DEFAULT =
       "30s";
+  public static final String OZONE_SCM_DATANODE_ADMIN_MONITOR_LOGGING_LIMIT =
+      "ozone.scm.datanode.admin.monitor.logging.limit";
+  public static final int
+      OZONE_SCM_DATANODE_ADMIN_MONITOR_LOGGING_LIMIT_DEFAULT = 1000;
 
   public static final String OZONE_SCM_INFO_WAIT_DURATION =
       "ozone.scm.info.wait.duration";
@@ -560,11 +581,24 @@ public final class ScmConfigKeys {
           "ozone.scm.ha.ratis.log.purge.gap";
   public static final int OZONE_SCM_HA_RAFT_LOG_PURGE_GAP_DEFAULT = 1000000;
 
+  /**
+   * the config will transfer value to ratis config
+   * raft.server.snapshot.auto.trigger.threshold.
+   */
   public static final String OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD =
           "ozone.scm.ha.ratis.snapshot.threshold";
   public static final long OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD_DEFAULT =
           1000L;
 
+  /**
+   * the config will transfer value to ratis config
+   * raft.server.snapshot.creation.gap, used by ratis to take snapshot
+   * when manual trigger using api.
+   */
+  public static final String OZONE_SCM_HA_RATIS_SNAPSHOT_GAP
+      = "ozone.scm.ha.ratis.server.snapshot.creation.gap";
+  public static final long OZONE_SCM_HA_RATIS_SNAPSHOT_GAP_DEFAULT =
+      1024L;
   public static final String OZONE_SCM_HA_RATIS_SNAPSHOT_DIR =
           "ozone.scm.ha.ratis.snapshot.dir";
 
@@ -581,10 +615,15 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_HA_RATIS_SERVER_ELECTION_PRE_VOTE =
       "ozone.scm.ha.ratis.server.leaderelection.pre-vote";
   public static final boolean
-      OZONE_SCM_HA_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT = false;
+      OZONE_SCM_HA_RATIS_SERVER_ELECTION_PRE_VOTE_DEFAULT = true;
 
   public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_SCMAUDIT =
       "ozone.audit.log.debug.cmd.list.scmaudit";
+
+  public static final String OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL =
+      "ozone.scm.ha.dbtransactionbuffer.flush.interval";
+  public static final long
+      OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT = 600 * 1000L;
   /**
    * Never constructed.
    */

@@ -20,6 +20,11 @@
 
 package org.apache.hadoop.ozone.client;
 
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.StreamBufferArgs;
+import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
@@ -41,7 +46,7 @@ public class OzoneOutputStreamStub extends OzoneOutputStream {
    * @param name - partName
    */
   public OzoneOutputStreamStub(OutputStream outputStream, String name) {
-    super(outputStream);
+    super(outputStream, null);
     this.partName = name;
   }
 
@@ -67,6 +72,23 @@ public class OzoneOutputStreamStub extends OzoneOutputStream {
       getOutputStream().close();
       closed = true;
     }
+  }
+
+  @Override
+  public KeyOutputStream getKeyOutputStream() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    ReplicationConfig replicationConfig =
+        ReplicationConfig.getDefault(conf);
+    OzoneClientConfig ozoneClientConfig = conf.getObject(OzoneClientConfig.class);
+    StreamBufferArgs streamBufferArgs =
+        StreamBufferArgs.getDefaultStreamBufferArgs(replicationConfig, ozoneClientConfig);
+    return new KeyOutputStream(replicationConfig, null, ozoneClientConfig, streamBufferArgs) {
+      @Override
+      public synchronized OmMultipartCommitUploadPartInfo
+          getCommitUploadPartInfo() {
+        return OzoneOutputStreamStub.this.getCommitUploadPartInfo();
+      }
+    };
   }
 
   @Override

@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.file;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -26,19 +27,17 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
@@ -46,8 +45,7 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,8 +72,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .Status;
 import org.apache.hadoop.util.Time;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
@@ -118,14 +114,19 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     CreateDirectoryRequest createDirectoryRequest =
-        getOmRequest().getCreateDirectoryRequest();
+        super.preExecute(ozoneManager).getCreateDirectoryRequest();
     Preconditions.checkNotNull(createDirectoryRequest);
+
+    OmUtils.verifyKeyNameWithSnapshotReservedWord(
+        createDirectoryRequest.getKeyArgs().getKeyName());
 
     KeyArgs.Builder newKeyArgs = createDirectoryRequest.getKeyArgs()
         .toBuilder().setModificationTime(Time.now());
 
+    KeyArgs resolvedKeyArgs = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
+        ozoneManager, ACLType.CREATE);
     CreateDirectoryRequest.Builder newCreateDirectoryRequest =
-        createDirectoryRequest.toBuilder().setKeyArgs(newKeyArgs);
+        createDirectoryRequest.toBuilder().setKeyArgs(resolvedKeyArgs);
 
     return getOmRequest().toBuilder().setCreateDirectoryRequest(
         newCreateDirectoryRequest).setUserInfo(getUserInfo()).build();
@@ -133,8 +134,8 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long trxnLogIndex = termIndex.getIndex();
 
     CreateDirectoryRequest createDirectoryRequest = getOmRequest()
         .getCreateDirectoryRequest();
@@ -156,21 +157,13 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean acquiredLock = false;
-    IOException exception = null;
+    Exception exception = null;
     OMClientResponse omClientResponse = null;
     Result result = Result.FAILURE;
     List<OmKeyInfo> missingParentInfos;
     int numMissingParents = 0;
 
     try {
-      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
-      volumeName = keyArgs.getVolumeName();
-      bucketName = keyArgs.getBucketName();
-
-      // check Acl
-      checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
-          IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
-
       // Check if this is the root of the filesystem.
       if (keyName.length() == 0) {
         throw new OMException("Directory create failed. Cannot create " +
@@ -178,8 +171,9 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
             OMException.ResultCodes.CANNOT_CREATE_DIRECTORY_AT_ROOT);
       }
       // acquire lock
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          volumeName, bucketName);
+      mergeOmLockDetails(omMetadataManager.getLock()
+          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      acquiredLock = getOmLockDetails().isLockAcquired();
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
@@ -203,22 +197,24 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
           omDirectoryResult == NONE) {
         List<String> missingParents = omPathInfo.getMissingParents();
         long baseObjId = ozoneManager.getObjectIdFromTxId(trxnLogIndex);
-        List<OzoneAcl> inheritAcls = omPathInfo.getAcls();
+        OmBucketInfo omBucketInfo =
+            getBucketInfo(omMetadataManager, volumeName, bucketName);
 
         dirKeyInfo = createDirectoryKeyInfoWithACL(keyName, keyArgs, baseObjId,
-            OzoneAclUtil.fromProtobuf(keyArgs.getAclsList()), trxnLogIndex,
+            omBucketInfo, omPathInfo, trxnLogIndex,
             ozoneManager.getDefaultReplicationConfig());
 
         missingParentInfos = getAllParentInfo(ozoneManager, keyArgs,
-            missingParents, inheritAcls, trxnLogIndex);
+            missingParents, omBucketInfo, omPathInfo, trxnLogIndex);
 
         numMissingParents = missingParentInfos.size();
-        OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
-            bucketName, Optional.of(dirKeyInfo),
-            Optional.of(missingParentInfos), trxnLogIndex);
-        OmBucketInfo omBucketInfo =
-            getBucketInfo(omMetadataManager, volumeName, bucketName);
+        checkBucketQuotaInNamespace(omBucketInfo, numMissingParents + 1L);
         omBucketInfo.incrUsedNamespace(numMissingParents + 1L);
+
+        OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
+            bucketName, omBucketInfo.getBucketLayout(),
+            dirKeyInfo, missingParentInfos, trxnLogIndex);
+        
         result = Result.SUCCESS;
         omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
             dirKeyInfo, missingParentInfos, result, getBucketLayout(),
@@ -230,16 +226,17 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
         omClientResponse = new OMDirectoryCreateResponse(omResponse.build(),
             result);
       }
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new OMDirectoryCreateResponse(
           createErrorOMResponse(omResponse, exception), result);
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 
@@ -257,14 +254,16 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
    * @param ozoneManager
    * @param keyArgs
    * @param missingParents list of parent directories to be created
-   * @param inheritAcls ACLs to be assigned to each new parent dir
+   * @param bucketInfo
+   * @param omPathInfo
    * @param trxnLogIndex
    * @return
    * @throws IOException
    */
   public static List<OmKeyInfo> getAllParentInfo(OzoneManager ozoneManager,
-      KeyArgs keyArgs, List<String> missingParents, List<OzoneAcl> inheritAcls,
-      long trxnLogIndex) throws IOException {
+      KeyArgs keyArgs, List<String> missingParents, OmBucketInfo bucketInfo,
+      OMFileRequest.OMPathInfo omPathInfo, long trxnLogIndex)
+      throws IOException {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     List<OmKeyInfo> missingParentInfos = new ArrayList<>();
 
@@ -290,19 +289,18 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       }
 
       LOG.debug("missing parent {} getting added to KeyTable", missingKey);
-      // what about keyArgs for parent directories? TODO
+
       OmKeyInfo parentKeyInfo =
           createDirectoryKeyInfoWithACL(missingKey, keyArgs, nextObjId,
-              inheritAcls, trxnLogIndex,
+              bucketInfo, omPathInfo, trxnLogIndex,
               ozoneManager.getDefaultReplicationConfig());
       objectCount++;
 
       missingParentInfos.add(parentKeyInfo);
       omMetadataManager.getKeyTable(BucketLayout.DEFAULT).addCacheEntry(
-          new CacheKey<>(omMetadataManager.getOzoneKey(volumeName,
-              bucketName, parentKeyInfo.getKeyName())),
-          new CacheValue<>(Optional.of(parentKeyInfo),
-              trxnLogIndex));
+          omMetadataManager.getOzoneKey(
+              volumeName, bucketName, parentKeyInfo.getKeyName()),
+          parentKeyInfo, trxnLogIndex);
     }
 
     return missingParentInfos;
@@ -310,7 +308,7 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
 
   private void logResult(CreateDirectoryRequest createDirectoryRequest,
       KeyArgs keyArgs, OMMetrics omMetrics, Result result,
-      IOException exception, int numMissingParents) {
+      Exception exception, int numMissingParents) {
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
@@ -350,15 +348,19 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
    * @param keyName
    * @param keyArgs
    * @param objectId
+   * @param bucketInfo
+   * @param omPathInfo
    * @param transactionIndex
    * @param serverDefaultReplConfig
    * @return the OmKeyInfo structure
    */
   public static OmKeyInfo createDirectoryKeyInfoWithACL(String keyName,
-      KeyArgs keyArgs, long objectId, List<OzoneAcl> inheritAcls,
-      long transactionIndex, ReplicationConfig serverDefaultReplConfig) {
+      KeyArgs keyArgs, long objectId, OmBucketInfo bucketInfo,
+      OMFileRequest.OMPathInfo omPathInfo, long transactionIndex,
+      ReplicationConfig serverDefaultReplConfig) {
     return dirKeyInfoBuilderNoACL(keyName, keyArgs, objectId,
-        serverDefaultReplConfig).setAcls(inheritAcls)
+        serverDefaultReplConfig)
+        .setAcls(getAclsForDir(keyArgs, bucketInfo, omPathInfo))
         .setUpdateID(transactionIndex).build();
   }
 

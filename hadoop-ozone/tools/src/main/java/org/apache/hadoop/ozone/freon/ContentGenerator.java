@@ -18,10 +18,15 @@ package org.apache.hadoop.ozone.freon;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.fs.StreamCapabilities;
+import org.apache.hadoop.fs.Syncable;
+import org.apache.hadoop.fs.impl.StoreImplementationUtils;
+import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 
 /**
  * Utility class to write random keys from a limited buffer.
@@ -49,6 +54,14 @@ public class ContentGenerator {
 
   private final byte[] buffer;
 
+  private SyncOptions flushOrSync;
+
+  enum SyncOptions {
+    NONE,
+    HFLUSH,
+    HSYNC
+  }
+
   ContentGenerator(long keySize, int bufferSize) {
     this(keySize, bufferSize, bufferSize);
   }
@@ -59,6 +72,13 @@ public class ContentGenerator {
     this.copyBufferSize = copyBufferSize;
     buffer = RandomStringUtils.randomAscii(bufferSize)
         .getBytes(StandardCharsets.UTF_8);
+    this.flushOrSync = SyncOptions.NONE;
+  }
+
+  ContentGenerator(long keySize, int bufferSize, int copyBufferSize,
+      SyncOptions flushOrSync) {
+    this(keySize, bufferSize, copyBufferSize);
+    this.flushOrSync = flushOrSync;
   }
 
   /**
@@ -71,14 +91,55 @@ public class ContentGenerator {
       if (copyBufferSize == 1) {
         for (int i = 0; i < curSize; i++) {
           outputStream.write(buffer[i]);
+          doFlushOrSync(outputStream);
         }
       } else {
         for (int i = 0; i < curSize; i += copyBufferSize) {
           outputStream.write(buffer, i,
               Math.min(copyBufferSize, curSize - i));
+          doFlushOrSync(outputStream);
         }
       }
     }
+  }
+
+  private void doFlushOrSync(OutputStream outputStream) throws IOException {
+    switch (flushOrSync) {
+    case NONE:
+      // noop
+      break;
+    case HFLUSH:
+      if (StoreImplementationUtils.hasCapability(
+          outputStream, StreamCapabilities.HSYNC)) {
+        ((Syncable)outputStream).hflush();
+      }
+      break;
+    case HSYNC:
+      if (StoreImplementationUtils.hasCapability(
+          outputStream, StreamCapabilities.HSYNC)) {
+        ((Syncable)outputStream).hsync();
+      }
+      break;
+    default:
+      throw new IllegalArgumentException("Unsupported sync option"
+          + flushOrSync);
+    }
+  }
+
+  /**
+   * Write the required bytes to the streaming output stream.
+   */
+  public void write(OzoneDataStreamOutput out) throws IOException {
+    for (long nrRemaining = keySize;
+         nrRemaining > 0; nrRemaining -= bufferSize) {
+      int curSize = (int) Math.min(bufferSize, nrRemaining);
+      for (int i = 0; i < curSize; i += copyBufferSize) {
+        ByteBuffer bb =
+            ByteBuffer.wrap(buffer, i, Math.min(copyBufferSize, curSize - i));
+        out.write(bb);
+      }
+    }
+    out.close();
   }
 
   @VisibleForTesting

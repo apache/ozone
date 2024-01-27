@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+import com.google.common.base.Objects;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocationList;
 
@@ -77,6 +78,13 @@ public class OmKeyLocationInfoGroup {
 
   public boolean isMultipartKey() {
     return isMultipartKey;
+  }
+
+  /**
+   * @return Raw internal locationVersionMap.
+   */
+  public Map<Long, List<OmKeyLocationInfo>> getLocationVersionMap() {
+    return locationVersionMap;
   }
 
   /**
@@ -178,12 +186,35 @@ public class OmKeyLocationInfoGroup {
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("version:").append(version).append(" ");
-    sb.append("isMultipartKey:").append(isMultipartKey);
+    sb.append("isMultipartKey:").append(isMultipartKey).append(" ");
     for (List<OmKeyLocationInfo> kliList : locationVersionMap.values()) {
       for (OmKeyLocationInfo kli: kliList) {
-        sb.append(kli.getLocalID()).append(" || ");
+        sb.append("conID ").append(kli.getContainerID());
+        sb.append(" ");
+        sb.append("locID ").append(kli.getLocalID());
+        sb.append(" ");
+        sb.append("bcsID ").append(kli.getBlockCommitSequenceId());
+        sb.append(" || ");
       }
     }
     return sb.toString();
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    OmKeyLocationInfoGroup that = (OmKeyLocationInfoGroup) o;
+    return version == that.version && isMultipartKey == that.isMultipartKey
+        && Objects.equal(locationVersionMap, that.locationVersionMap);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hashCode(version, locationVersionMap, isMultipartKey);
   }
 }

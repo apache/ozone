@@ -173,7 +173,7 @@ public class OzoneManagerStarter extends GenericCli {
     String[] originalArgs = getCmd().getParseResult().originalArgs()
         .toArray(new String[0]);
     StringUtils.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
-        OzoneManager.class, originalArgs, LOG);
+        OzoneManager.class, originalArgs, LOG, conf);
   }
 
   /**
@@ -190,8 +190,9 @@ public class OzoneManagerStarter extends GenericCli {
       om.start();
       ShutdownHookManager.get().addShutdownHook(() -> {
         try {
-          om.stop();
-          om.join();
+          if (om.stop()) {
+            om.join();
+          }
         } catch (Exception e) {
           LOG.error("Error during stop OzoneManager.", e);
         }

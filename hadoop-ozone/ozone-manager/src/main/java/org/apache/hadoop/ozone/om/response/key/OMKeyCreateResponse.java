@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import java.io.IOException;
 import java.util.List;
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -91,6 +91,13 @@ public class OMKeyCreateResponse extends OmKeyResponse {
         omMetadataManager.getKeyTable(getBucketLayout())
             .putWithBatch(batchOperation, parentKey, parentKeyInfo);
       }
+      
+      // namespace quota changes for parent directory
+      String bucketKey = omMetadataManager.getBucketKey(
+          getOmBucketInfo().getVolumeName(),
+          getOmBucketInfo().getBucketName());
+      omMetadataManager.getBucketTable().putWithBatch(batchOperation,
+          bucketKey, getOmBucketInfo());
     }
 
     String openKey = omMetadataManager.getOpenKey(omKeyInfo.getVolumeName(),

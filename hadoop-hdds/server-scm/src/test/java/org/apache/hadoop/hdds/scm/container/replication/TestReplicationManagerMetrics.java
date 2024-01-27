@@ -17,23 +17,26 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
-import static org.apache.hadoop.test.MetricsAsserts.getLongGauge;
-import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.any;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.apache.ozone.test.MetricsAsserts.getLongGauge;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 
 /**
  * Tests for the ReplicationManagerMetrics class.
  */
 public class TestReplicationManagerMetrics {
 
-  private ReplicationManager replicationManager;
   private ReplicationManagerMetrics metrics;
 
   @BeforeEach
@@ -54,16 +57,20 @@ public class TestReplicationManagerMetrics {
         report.increment(s);
       }
     }
-    final LegacyReplicationManager lrm = Mockito.mock(
+    final LegacyReplicationManager lrm = mock(
         LegacyReplicationManager.class);
-    Mockito.when(lrm.getInflightCount(Mockito.any(InflightType.class)))
+    when(lrm.getInflightCount(any(InflightType.class)))
         .thenReturn(0);
-    replicationManager = Mockito.mock(ReplicationManager.class);
-    Mockito.when(replicationManager.getLegacyReplicationManager())
-        .thenReturn(lrm);
-    Mockito.when(replicationManager.getContainerReport()).thenReturn(report);
-    Mockito.when(replicationManager.getContainerReplicaPendingOps())
-        .thenReturn(Mockito.mock(ContainerReplicaPendingOps.class));
+    ConfigurationSource conf = new OzoneConfiguration();
+    ReplicationManager.ReplicationManagerConfiguration rmConf = conf
+        .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
+    ReplicationManager replicationManager = mock(ReplicationManager.class);
+    when(replicationManager.getConfig()).thenReturn(rmConf);
+    when(replicationManager.getLegacyReplicationManager()).thenReturn(lrm);
+    when(replicationManager.getContainerReport()).thenReturn(report);
+    when(replicationManager.getContainerReplicaPendingOps())
+        .thenReturn(mock(ContainerReplicaPendingOps.class));
+    when(replicationManager.getQueue()).thenReturn(new ReplicationQueue());
     metrics = ReplicationManagerMetrics.create(replicationManager);
   }
 
@@ -74,25 +81,19 @@ public class TestReplicationManagerMetrics {
 
   @Test
   public void testLifeCycleStateMetricsPresent() {
-    Assertions.assertEquals(HddsProtos.LifeCycleState.OPEN.getNumber(),
-        getGauge("NumOpenContainers"));
-    Assertions.assertEquals(HddsProtos.LifeCycleState.CLOSING.getNumber(),
-        getGauge("NumClosingContainers"));
-    Assertions.assertEquals(HddsProtos.LifeCycleState.QUASI_CLOSED.getNumber(),
-        getGauge("NumQuasiClosedContainers"));
-    Assertions.assertEquals(HddsProtos.LifeCycleState.CLOSED.getNumber(),
-        getGauge("NumClosedContainers"));
-    Assertions.assertEquals(HddsProtos.LifeCycleState.DELETING.getNumber(),
-        getGauge("NumDeletingContainers"));
-    Assertions.assertEquals(HddsProtos.LifeCycleState.DELETED.getNumber(),
-        getGauge("NumDeletedContainers"));
+    assertEquals(HddsProtos.LifeCycleState.OPEN.getNumber(), getGauge("OpenContainers"));
+    assertEquals(HddsProtos.LifeCycleState.CLOSING.getNumber(), getGauge("ClosingContainers"));
+    assertEquals(HddsProtos.LifeCycleState.QUASI_CLOSED.getNumber(), getGauge("QuasiClosedContainers"));
+    assertEquals(HddsProtos.LifeCycleState.CLOSED.getNumber(), getGauge("ClosedContainers"));
+    assertEquals(HddsProtos.LifeCycleState.DELETING.getNumber(), getGauge("DeletingContainers"));
+    assertEquals(HddsProtos.LifeCycleState.DELETED.getNumber(), getGauge("DeletedContainers"));
   }
 
   @Test
   public void testHealthStateMetricsPresent() {
     for (ReplicationManagerReport.HealthState s :
         ReplicationManagerReport.HealthState.values()) {
-      Assertions.assertEquals(s.ordinal(), getGauge(s.getMetricName()));
+      assertEquals(s.ordinal(), getGauge(s.getMetricName()));
     }
   }
 

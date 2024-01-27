@@ -21,13 +21,14 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
-import org.apache.hadoop.ozone.common.MonotonicClock;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 
+import java.time.Clock;
 import java.time.ZoneOffset;
 
 /**
@@ -56,17 +57,17 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
       boolean unsafeByteBufferConversion,
       XceiverClientFactory xceiverClientFactory,
       long openID,
-      ContainerClientMetrics clientMetrics) {
+      ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs) {
     super(config, omClient, requestId, replicationConfig, uploadID, partNumber,
         isMultipart, info, unsafeByteBufferConversion, xceiverClientFactory,
-        openID, clientMetrics);
+        openID, clientMetrics, streamBufferArgs);
     assert replicationConfig instanceof ECReplicationConfig;
   }
 
   @Override
   ExcludeList createExcludeList() {
     return new ExcludeList(getConfig().getExcludeNodesExpiryTime(),
-        new MonotonicClock(ZoneOffset.UTC));
+        Clock.system(ZoneOffset.UTC));
   }
 
   @Override
@@ -82,6 +83,7 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
             .setBufferPool(getBufferPool())
             .setToken(subKeyInfo.getToken())
             .setClientMetrics(getClientMetrics())
+            .setStreamBufferArgs(getStreamBufferArgs())
             .build();
   }
 

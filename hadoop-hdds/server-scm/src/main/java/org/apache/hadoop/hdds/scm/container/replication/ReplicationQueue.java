@@ -22,6 +22,8 @@ import java.util.LinkedList;
 import java.util.PriorityQueue;
 import java.util.Queue;
 
+import com.google.common.collect.Queues;
+
 /**
  * Object to encapsulate the under and over replication queues used by
  * replicationManager.
@@ -32,21 +34,32 @@ public class ReplicationQueue {
       underRepQueue;
   private final Queue<ContainerHealthResult.OverReplicatedHealthResult>
       overRepQueue;
-  private final Queue<ContainerHealthResult.MisReplicatedHealthResult>
-      misRepQueue;
 
   public ReplicationQueue() {
-    underRepQueue = new PriorityQueue<>(
+    underRepQueue = Queues.synchronizedQueue(new PriorityQueue<>(
         Comparator.comparing(ContainerHealthResult
             .UnderReplicatedHealthResult::getWeightedRedundancy)
         .thenComparing(ContainerHealthResult
-            .UnderReplicatedHealthResult::getRequeueCount));
-    overRepQueue = new LinkedList<>();
-    misRepQueue = new LinkedList<>();
+            .UnderReplicatedHealthResult::getRequeueCount)));
+    overRepQueue = Queues.synchronizedQueue(new LinkedList<>());
   }
 
+  /**
+   * Add an under replicated container back to the queue if it was unable to
+   * be processed. Its retry count will be incremented before it is re-queued,
+   * reducing its priority.
+   * Note that the queue could have been rebuilt and replaced after this
+   * message was removed but before it is added back. This will result in a
+   * duplicate entry on the queue. However, when it is processed again, the
+   * result of the processing will end up with pending replicas scheduled. If
+   * instance 1 is processed and creates the pending replicas, when instance 2
+   * is processed, it will find the pending containers and know it has no work
+   * to do, and be discarded. Additionally, the queue will be refreshed
+   * periodically removing any duplicates.
+   */
   public void enqueue(ContainerHealthResult.UnderReplicatedHealthResult
       underReplicatedHealthResult) {
+    underReplicatedHealthResult.incrementRequeueCount();
     underRepQueue.add(underReplicatedHealthResult);
   }
 
@@ -55,24 +68,26 @@ public class ReplicationQueue {
     overRepQueue.add(overReplicatedHealthResult);
   }
 
-  public void enqueue(ContainerHealthResult.MisReplicatedHealthResult
-      misReplicatedHealthResult) {
-    misRepQueue.add(misReplicatedHealthResult);
-  }
-
+  /**
+   * Retrieve the new highest priority container to be replicated from the
+   * under-replicated queue.
+   * @return The new underReplicated container to be processed, or null if the
+   *         queue is empty.
+   */
   public ContainerHealthResult.UnderReplicatedHealthResult
       dequeueUnderReplicatedContainer() {
     return underRepQueue.poll();
   }
 
+  /**
+   * Retrieve the new highest priority container to be replicated from the
+   * over-replicated queue.
+   * @return The next over-replicated container to be processed, or null if the
+   *         queue is empty.
+   */
   public ContainerHealthResult.OverReplicatedHealthResult
       dequeueOverReplicatedContainer() {
     return overRepQueue.poll();
-  }
-
-  public ContainerHealthResult.MisReplicatedHealthResult
-      dequeueMisReplicatedContainer() {
-    return misRepQueue.poll();
   }
 
   public int underReplicatedQueueSize() {
@@ -81,10 +96,6 @@ public class ReplicationQueue {
 
   public int overReplicatedQueueSize() {
     return overRepQueue.size();
-  }
-
-  public int misReplicatedQueueSize() {
-    return misRepQueue.size();
   }
 
 }

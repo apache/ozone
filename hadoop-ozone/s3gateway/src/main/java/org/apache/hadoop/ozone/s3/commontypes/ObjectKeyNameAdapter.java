@@ -27,16 +27,20 @@ import java.io.UnsupportedEncodingException;
  * A converter to convert raw-String to S3 compliant object key name.
  * ref: https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-keys.html
  */
-public class ObjectKeyNameAdapter extends XmlAdapter<String, String> {
+public class ObjectKeyNameAdapter extends
+    XmlAdapter<String, EncodingTypeObject> {
   @Override
-  public String unmarshal(String s) {
+  public EncodingTypeObject unmarshal(String s) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public String marshal(String s)
+  public String marshal(EncodingTypeObject s)
       throws UnsupportedEncodingException {
-    return S3Utils.urlEncode(s)
-        .replaceAll("%2F", "/");
+    if (s.getEncodingType() != null && s.getEncodingType().equals("url")) {
+      return S3Utils.urlEncode(s.getName())
+          .replaceAll("%2F", "/");
+    }
+    return s.getName();
   }
 }

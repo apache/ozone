@@ -105,4 +105,14 @@ public class DeleteContainerCommand extends
   public int getReplicaIndex() {
     return replicaIndex;
   }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append(getType())
+        .append(": containerID: ").append(getContainerID())
+        .append(", replicaIndex: ").append(getReplicaIndex())
+        .append(", force: ").append(force);
+    return sb.toString();
+  }
 }

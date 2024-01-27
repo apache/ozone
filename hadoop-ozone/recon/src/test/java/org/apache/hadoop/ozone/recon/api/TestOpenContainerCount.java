@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -48,28 +49,30 @@ import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
+import org.apache.hadoop.ozone.recon.common.CommonUtils;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -78,6 +81,8 @@ import javax.ws.rs.core.Response;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
@@ -87,8 +92,8 @@ import java.util.concurrent.Callable;
  * Test for Open Container count per Datanode.
  */
 public class TestOpenContainerCount {
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
+  @TempDir
+  private Path temporaryFolder;
 
   private NodeEndpoint nodeEndpoint;
   private ReconOMMetadataManager reconOMMetadataManager;
@@ -113,11 +118,15 @@ public class TestOpenContainerCount {
   private List<Long> containerIDs;
 
   private List<ContainerWithPipeline> cpw;
+  private CommonUtils commonUtils;
+  private PipelineManager pipelineManager;
+  private ReconPipelineManager reconPipelineManager;
 
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
-            initializeNewOmMetadataManager(temporaryFolder.newFolder()),
-            temporaryFolder.newFolder());
+            initializeNewOmMetadataManager(Files.createDirectory(
+                temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+        Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
     datanodeDetails = randomDatanodeDetails();
     datanodeDetails.setHostName(HOST1);
     datanodeDetails.setIpAddress(IP1);
@@ -155,6 +164,7 @@ public class TestOpenContainerCount {
               .thenReturn(containerWithPipeline);
       containerIDs.add(i);
       cpw.add(containerWithPipeline);
+      commonUtils = new CommonUtils();
     }
 
     // Open 5 containers on pipeline 2
@@ -180,6 +190,7 @@ public class TestOpenContainerCount {
             .thenReturn(cpw);
 
     reconUtilsMock = mock(ReconUtils.class);
+
     HttpURLConnection urlConnectionMock = mock(HttpURLConnection.class);
     when(urlConnectionMock.getResponseCode())
             .thenReturn(HttpServletResponse.SC_OK);
@@ -187,9 +198,12 @@ public class TestOpenContainerCount {
             anyString(), anyBoolean())).thenReturn(urlConnectionMock);
     when(reconUtilsMock.getReconDbDir(any(OzoneConfiguration.class),
         anyString())).thenReturn(GenericTestUtils.getRandomizedTestDir());
+    when(reconUtilsMock.getReconNodeDetails(
+        any(OzoneConfiguration.class))).thenReturn(
+        commonUtils.getReconNodeDetails());
 
     ReconTestInjector reconTestInjector =
-            new ReconTestInjector.Builder(temporaryFolder)
+            new ReconTestInjector.Builder(temporaryFolder.toFile())
                     .withReconSqlDb()
                     .withReconOm(reconOMMetadataManager)
                     .withOmServiceProvider(
@@ -210,9 +224,13 @@ public class TestOpenContainerCount {
     nodeEndpoint = reconTestInjector.getInstance(NodeEndpoint.class);
     reconScm = (ReconStorageContainerManagerFacade)
             reconTestInjector.getInstance(OzoneStorageContainerManager.class);
+    pipelineManager = reconScm.getPipelineManager();
+    reconPipelineManager = (ReconPipelineManager) pipelineManager;
+    reconPipelineManager.addPipeline(pipeline);
+    reconPipelineManager.addPipeline(pipeline2);
   }
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     // The following setup runs only once
     if (!isSetupDone) {
@@ -320,7 +338,7 @@ public class TestOpenContainerCount {
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
     } catch (Exception ex) {
-      Assert.fail(ex.getMessage());
+      fail(ex.getMessage());
     }
   }
 
@@ -343,7 +361,7 @@ public class TestOpenContainerCount {
       --expectedCnt;
       closeContainer(id);
       DatanodeMetadata metadata = getDatanodeMetadata();
-      Assert.assertEquals(expectedCnt, metadata.getOpenContainers());
+      assertEquals(expectedCnt, metadata.getOpenContainers());
     }
   }
 
@@ -412,7 +430,7 @@ public class TestOpenContainerCount {
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
     } catch (Exception ex) {
-      Assert.fail(ex.getMessage());
+      fail(ex.getMessage());
     }
   }
 

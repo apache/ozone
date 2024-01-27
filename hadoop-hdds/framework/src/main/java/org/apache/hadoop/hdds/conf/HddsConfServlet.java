@@ -28,13 +28,13 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
+import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.http.HttpServer2;
+import org.apache.hadoop.hdds.server.http.HttpServer2;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.gson.Gson;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TAGS_SYSTEM_KEY;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -98,15 +98,9 @@ public class HddsConfServlet extends HttpServlet {
       throws IOException {
     try {
       if (cmd == null) {
-        if (FORMAT_XML.equals(format)) {
-          response.setContentType("text/xml; charset=utf-8");
-        } else if (FORMAT_JSON.equals(format)) {
-          response.setContentType("application/json; charset=utf-8");
-        }
-
         writeResponse(getConfFromContext(), out, format, name);
       } else {
-        processConfigTagRequest(request, out);
+        processConfigTagRequest(request, cmd, out);
       }
     } catch (BadFormatException bfe) {
       response.sendError(HttpServletResponse.SC_BAD_REQUEST, bfe.getMessage());
@@ -149,19 +143,21 @@ public class HddsConfServlet extends HttpServlet {
     }
   }
 
-  private void processConfigTagRequest(HttpServletRequest request,
+  private void processConfigTagRequest(HttpServletRequest request, String cmd,
       Writer out) throws IOException {
-    String cmd = request.getParameter(COMMAND);
     Gson gson = new Gson();
     OzoneConfiguration config = getOzoneConfig();
 
     switch (cmd) {
     case "getOzoneTags":
-      out.write(gson.toJson(config.get(OZONE_TAGS_SYSTEM_KEY)
-          .split(",")));
+      out.write(gson.toJson(OzoneConfiguration.TAGS));
       break;
     case "getPropertyByTag":
       String tags = request.getParameter("tags");
+      if (Strings.isNullOrEmpty(tags)) {
+        throw new IllegalArgumentException("The tags parameter should be set" +
+                " when using the getPropertyByTag command.");
+      }
       Map<String, Properties> propMap = new HashMap<>();
 
       for (String tag : tags.split(",")) {

@@ -28,12 +28,16 @@ import javax.xml.bind.annotation.XmlRootElement;
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.SortedSet;
+import java.util.TreeSet;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.conf.Configuration;
@@ -45,7 +49,10 @@ import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import com.google.common.base.Preconditions;
 import org.apache.ratis.server.RaftServerConfigKeys;
 
+import static java.util.Collections.unmodifiableSortedSet;
+import static java.util.stream.Collectors.toCollection;
 import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR;
 
 /**
  * Configuration for ozone.
@@ -53,6 +60,12 @@ import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFI
 @InterfaceAudience.Private
 public class OzoneConfiguration extends Configuration
     implements MutableConfigurationSource {
+
+  public static final SortedSet<String> TAGS = unmodifiableSortedSet(
+      Arrays.stream(ConfigTag.values())
+          .map(Enum::name)
+          .collect(toCollection(TreeSet::new)));
+
   static {
     addDeprecatedKeys();
 
@@ -274,6 +287,11 @@ public class OzoneConfiguration extends Configuration
     return props;
   }
 
+  public Map<String, String> getOzoneProperties() {
+    String ozoneRegex = ".*(ozone|hdds|ratis|container|scm|recon)\\..*";
+    return getValByRegex(ozoneRegex);
+  }
+
   @Override
   public Collection<String> getConfigKeys() {
     return getProps().keySet()
@@ -297,6 +315,11 @@ public class OzoneConfiguration extends Configuration
     return configMap;
   }
 
+  @Override
+  public boolean isPropertyTag(String tagStr) {
+    return TAGS.contains(tagStr) || super.isPropertyTag(tagStr);
+  }
+
   private static void addDeprecatedKeys() {
     Configuration.addDeprecations(new DeprecationDelta[]{
         new DeprecationDelta("ozone.datanode.pipeline.limit",
@@ -308,7 +331,32 @@ public class OzoneConfiguration extends Configuration
         new DeprecationDelta("dfs.datanode.keytab.file",
             DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY),
         new DeprecationDelta("ozone.scm.chunk.layout",
-            ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY)
+            ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY),
+        new DeprecationDelta("hdds.datanode.replication.work.dir",
+            OZONE_CONTAINER_COPY_WORKDIR)
     });
+  }
+
+  /**
+   * Gets backwards-compatible configuration property values.
+   * @param name Primary configuration attribute key name.
+   * @param fallbackName The key name of the configuration property that needs
+   *                     to be backward compatible.
+   * @param defaultValue The default value to be returned.
+   */
+  public int getInt(String name, String fallbackName, int defaultValue,
+      Consumer<String> log) {
+    String value = this.getTrimmed(name);
+    if (value == null) {
+      value = this.getTrimmed(fallbackName);
+      if (log != null) {
+        log.accept(name + " is not set.  Fallback to " + fallbackName +
+            ", which is set to " + value);
+      }
+    }
+    if (value == null) {
+      return defaultValue;
+    }
+    return Integer.parseInt(value);
   }
 }

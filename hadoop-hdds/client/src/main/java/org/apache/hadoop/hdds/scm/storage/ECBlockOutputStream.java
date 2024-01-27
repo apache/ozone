@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -66,6 +67,7 @@ public class ECBlockOutputStream extends BlockOutputStream {
    * @param pipeline             pipeline where block will be written
    * @param bufferPool           pool of buffers
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public ECBlockOutputStream(
       BlockID blockID,
       XceiverClientFactory xceiverClientManager,
@@ -73,10 +75,10 @@ public class ECBlockOutputStream extends BlockOutputStream {
       BufferPool bufferPool,
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
-      ContainerClientMetrics clientMetrics
+      ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs
   ) throws IOException {
     super(blockID, xceiverClientManager,
-        pipeline, bufferPool, config, token, clientMetrics);
+        pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs);
     // In EC stream, there will be only one node in pipeline.
     this.datanodeDetails = pipeline.getClosestNode();
   }
@@ -117,7 +119,8 @@ public class ECBlockOutputStream extends BlockOutputStream {
         continue;
       }
       List<ChunkInfo> chunks = bd.getChunks();
-      if (chunks != null && chunks.get(0).hasStripeChecksum()) {
+      if (chunks != null && chunks.size() > 0 && chunks.get(0)
+          .hasStripeChecksum()) {
         checksumBlockData = bd;
         break;
       }
@@ -128,7 +131,11 @@ public class ECBlockOutputStream extends BlockOutputStream {
       List<ChunkInfo> checksumBlockDataChunks = checksumBlockData.getChunks();
 
       Preconditions.checkArgument(
-          currentChunks.size() == checksumBlockDataChunks.size());
+          currentChunks.size() == checksumBlockDataChunks.size(),
+          "The chunk list has " + currentChunks.size()
+              + " entries, but the checksum chunks has "
+              + checksumBlockDataChunks.size()
+              + " entries. They should be equal in size.");
       List<ChunkInfo> newChunkList = new ArrayList<>();
 
       for (int i = 0; i < currentChunks.size(); i++) {
@@ -221,7 +228,7 @@ public class ECBlockOutputStream extends BlockOutputStream {
     try {
       ContainerProtos.BlockData blockData = getContainerBlockData().build();
       XceiverClientReply asyncReply =
-          putBlockAsync(getXceiverClient(), blockData, close, getToken());
+          putBlockAsync(getXceiverClient(), blockData, close, getTokenString());
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
           asyncReply.getResponse();
       flushFuture = future.thenApplyAsync(e -> {
@@ -255,12 +262,6 @@ public class ECBlockOutputStream extends BlockOutputStream {
     }
     this.putBlkRspFuture = flushFuture;
     return flushFuture;
-  }
-
-  @Override
-  public void close() throws IOException {
-    super.close();
-    cleanup(false);
   }
 
   /**

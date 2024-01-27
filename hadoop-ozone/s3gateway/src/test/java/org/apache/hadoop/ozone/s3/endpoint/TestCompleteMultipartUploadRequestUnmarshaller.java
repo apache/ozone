@@ -18,15 +18,14 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import org.junit.Assert;
-import org.junit.Test;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.Test;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Class tests Unmarshall logic of {@link CompleteMultipartUploadRequest}.
@@ -76,13 +75,13 @@ public class TestCompleteMultipartUploadRequestUnmarshaller {
   }
 
   private void checkContent(CompleteMultipartUploadRequest request) {
-    Assert.assertEquals(2, request.getPartList().size());
+    assertEquals(2, request.getPartList().size());
 
     List<CompleteMultipartUploadRequest.Part> parts =
         request.getPartList();
 
-    Assert.assertEquals(part1, parts.get(0).geteTag());
-    Assert.assertEquals(part2, parts.get(1).geteTag());
+    assertEquals(part1, parts.get(0).geteTag());
+    assertEquals(part2, parts.get(1).geteTag());
   }
 
   private CompleteMultipartUploadRequest unmarshall(

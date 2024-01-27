@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -43,16 +44,19 @@ import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
-
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -137,11 +141,11 @@ public class TestContainerPlacementFactory {
         new ArrayList<>(Arrays.asList(storage4)));
 
     // create mock node manager
-    nodeManager = Mockito.mock(NodeManager.class);
+    nodeManager = mock(NodeManager.class);
     when(nodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
     for (DatanodeInfo dn: dnInfos) {
-      when(nodeManager.getNodeByUuid(dn.getUuidString()))
+      when(nodeManager.getNodeByUuid(dn.getUuid()))
           .thenReturn(dn);
     }
 
@@ -152,27 +156,30 @@ public class TestContainerPlacementFactory {
     int nodeNum = 3;
     List<DatanodeDetails> datanodeDetails =
         policy.chooseDatanodes(null, null, nodeNum, 15, 15);
-    Assertions.assertEquals(nodeNum, datanodeDetails.size());
-    Assertions.assertTrue(cluster.isSameParent(datanodeDetails.get(0),
+    assertEquals(nodeNum, datanodeDetails.size());
+    assertTrue(cluster.isSameParent(datanodeDetails.get(0),
         datanodeDetails.get(1)));
-    Assertions.assertFalse(cluster.isSameParent(datanodeDetails.get(0),
+    assertFalse(cluster.isSameParent(datanodeDetails.get(0),
         datanodeDetails.get(2)));
-    Assertions.assertFalse(cluster.isSameParent(datanodeDetails.get(1),
+    assertFalse(cluster.isSameParent(datanodeDetails.get(1),
         datanodeDetails.get(2)));
   }
 
   @Test
-  public void testDefaultPolicy() throws IOException {
+  public void testRackAwareContainerPolicy() throws IOException {
+    conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
+            SCMContainerPlacementRackAware.class.getName());
     PlacementPolicy policy = ContainerPlacementPolicyFactory
         .getPolicy(conf, null, null, true, null);
-    Assertions.assertSame(SCMContainerPlacementRandom.class, policy.getClass());
+    assertSame(SCMContainerPlacementRackAware.class,
+            policy.getClass());
   }
 
   @Test
   public void testECPolicy() throws IOException {
     PlacementPolicy policy = ContainerPlacementPolicyFactory
         .getECPolicy(conf, null, null, true, null);
-    Assertions.assertSame(SCMContainerPlacementRackScatter.class,
+    assertSame(SCMContainerPlacementRackScatter.class,
         policy.getClass());
   }
 
@@ -180,7 +187,7 @@ public class TestContainerPlacementFactory {
    * A dummy container placement implementation for test.
    */
   public static class DummyImpl implements
-          PlacementPolicy<ContainerReplica> {
+          PlacementPolicy {
     @Override
     public List<DatanodeDetails> chooseDatanodes(
         List<DatanodeDetails> usedNodes,
@@ -198,9 +205,16 @@ public class TestContainerPlacementFactory {
 
     @Override
     public Set<ContainerReplica> replicasToCopyToFixMisreplication(
-            Set<ContainerReplica> replicas) {
+            Map<ContainerReplica, Boolean> replicas) {
       return Collections.emptySet();
     }
+
+    @Override
+    public Set<ContainerReplica> replicasToRemoveToFixOverreplication(
+            Set<ContainerReplica> replicas, int expectedCountPerUniqueReplica) {
+      return null;
+    }
+
   }
 
   @Test
@@ -209,7 +223,7 @@ public class TestContainerPlacementFactory {
     conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         DummyImpl.class.getName());
 
-    Assertions.assertThrows(SCMException.class, () ->
+    assertThrows(SCMException.class, () ->
         ContainerPlacementPolicyFactory.getPolicy(conf, null, null, true, null)
     );
   }
@@ -219,7 +233,7 @@ public class TestContainerPlacementFactory {
     // set a placement class not implemented
     conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         "org.apache.hadoop.hdds.scm.container.placement.algorithm.HelloWorld");
-    Assertions.assertThrows(RuntimeException.class, () ->
+    assertThrows(RuntimeException.class, () ->
         ContainerPlacementPolicyFactory.getPolicy(conf, null, null, true, null)
     );
   }

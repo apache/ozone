@@ -19,10 +19,14 @@
 
 package org.apache.hadoop.hdds.utils;
 
+import java.util.Optional;
+import org.apache.hadoop.metrics2.MetricsTag;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test class for DecayRpcSchedulerUtil.
@@ -41,7 +45,7 @@ public class TestDecayRpcSchedulerUtil {
   private static final String RANDOM_METRIC_NAME = "ThreadsNew";
 
   @Test
-  public void testSplitMetricNameIfNeeded() {
+  void testSplitMetricNameIfNeeded() {
     // Split the metric name and return only the
     // name of the metric type.
     String splitName = DecayRpcSchedulerUtil
@@ -57,7 +61,7 @@ public class TestDecayRpcSchedulerUtil {
   }
 
   @Test
-  public void testCheckMetricNameForUsername() {
+  void testCheckMetricNameForUsername() {
     // Get the username from the metric name.
     String decayRpcSchedulerUsername = DecayRpcSchedulerUtil
         .checkMetricNameForUsername(RECORD_NAME, METRIC_NAME);
@@ -71,5 +75,35 @@ public class TestDecayRpcSchedulerUtil {
         .checkMetricNameForUsername(RANDOM_RECORD_NAME, RANDOM_METRIC_NAME);
 
     assertNull(nullUsername);
+  }
+
+  @Test
+  void testCreateUsernameTagWithNullUsername() {
+    // GIVEN
+    final String username = null;
+
+    // WHEN
+    Optional<MetricsTag> optionalMetricsTag =
+        DecayRpcSchedulerUtil.createUsernameTag(username);
+
+    // THEN
+    assertFalse(optionalMetricsTag.isPresent());
+  }
+
+  @Test
+  void testCreateUsernameTagWithNotNullUsername() {
+    // GIVEN
+    final String username = "username";
+
+    // WHEN
+    Optional<MetricsTag> optionalMetricsTag =
+        DecayRpcSchedulerUtil.createUsernameTag(username);
+
+    // THEN
+    assertTrue(optionalMetricsTag.isPresent());
+    assertEquals(username, optionalMetricsTag.get().value());
+    assertEquals(username, optionalMetricsTag.get().name());
+    assertEquals("caller username",
+        optionalMetricsTag.get().description());
   }
 }

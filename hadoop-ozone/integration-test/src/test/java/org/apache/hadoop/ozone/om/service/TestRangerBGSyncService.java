@@ -16,37 +16,9 @@
  */
 package org.apache.hadoop.ozone.om.service;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
-import static org.apache.hadoop.ozone.om.OMMultiTenantManager.OZONE_TENANT_RANGER_ROLE_DESCRIPTION;
-import static org.apache.hadoop.security.authentication.util.KerberosName.DEFAULT_MECHANISM;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.framework;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.when;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
@@ -70,39 +42,59 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeerId;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Ignore;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.rules.Timeout;
-import org.mockito.Mockito;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.slf4j.event.Level;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
+import static org.apache.hadoop.ozone.om.OMMultiTenantManager.OZONE_TENANT_RANGER_ROLE_DESCRIPTION;
+import static org.apache.hadoop.security.authentication.util.KerberosName.DEFAULT_MECHANISM;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.framework;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests Ozone Manager Multi-Tenancy feature Background Sync with Apache Ranger.
  * Marking it as Ignore because it needs Ranger access point.
  */
-@Ignore("TODO: Requires a Ranger endpoint")
+@Unhealthy("Requires a Ranger endpoint")
+@Timeout(180)
 public class TestRangerBGSyncService {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestRangerBGSyncService.class);
-
-  /**
-   * Timeout for each test.
-   */
-  @Rule
-  public Timeout timeout = new Timeout(180, TimeUnit.SECONDS);
 
   private static final long TEST_SYNC_INTERVAL_SEC = 1L;
   private static final long TEST_SYNC_TIMEOUT_SEC = 3L;
@@ -110,7 +102,8 @@ public class TestRangerBGSyncService {
   private static final int CHECK_SYNC_MILLIS = 1000;
   private static final int WAIT_SYNC_TIMEOUT_MILLIS = 60000;
 
-  private TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   private MultiTenantAccessController accessController;
   private OMRangerBGSyncService bgSync;
@@ -119,7 +112,7 @@ public class TestRangerBGSyncService {
   private final List<String> policiesCreated = new ArrayList<>();
   // List of role names created in Ranger for the test
   private final List<String> rolesCreated = new ArrayList<>();
-  // List of user names created in Ranger for the test
+  // List of usernames created in Ranger for the test
   private final List<String> usersCreated = new ArrayList<>();
 
   private static OzoneConfiguration conf;
@@ -155,7 +148,7 @@ public class TestRangerBGSyncService {
         System.getProperty(OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD));
   }
 
-  @BeforeClass
+  @BeforeAll
   public static void init() {
     conf = new OzoneConfiguration();
     simulateOzoneSiteXmlConfig();
@@ -166,11 +159,11 @@ public class TestRangerBGSyncService {
         Level.INFO);
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
   }
 
-  @Before
+  @BeforeEach
   public void setUp() throws IOException {
 
     KerberosName.setRuleMechanism(DEFAULT_MECHANISM);
@@ -179,15 +172,12 @@ public class TestRangerBGSyncService {
             "RULE:[1:$1@$0](.*@EXAMPLE.COM)s/@.*//\n" +
             "DEFAULT");
     ugiAlice = UserGroupInformation.createRemoteUser(USER_ALICE);
-    Assert.assertEquals(USER_ALICE_SHORT, ugiAlice.getShortUserName());
+    assertEquals(USER_ALICE_SHORT, ugiAlice.getShortUserName());
 
     ozoneManager = mock(OzoneManager.class);
 
-    Server.Call call = spy(new Server.Call(1, 1, null, null,
-        RPC.RpcKind.RPC_BUILTIN, new byte[] {1, 2, 3}));
     // Run as alice, so that Server.getRemoteUser() won't return null.
-    when(call.getRemoteUser()).thenReturn(ugiAlice);
-    Server.getCurCall().set(call);
+    mockRemoteUser(ugiAlice);
 
     String omID = UUID.randomUUID().toString();
     final String path = GenericTestUtils.getTempPath(omID);
@@ -195,13 +185,11 @@ public class TestRangerBGSyncService {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
 
     omMetrics = OMMetrics.create();
-    folder = new TemporaryFolder(new File("/tmp"));
-    folder.create();
     conf.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        folder.newFolder().getAbsolutePath());
+        folder.resolve("om").toAbsolutePath().toString());
     // No need to conf.set(OzoneConfigKeys.OZONE_ADMINISTRATORS, ...) here
     //  as we did the trick earlier with mockito.
-    omMetadataManager = new OmMetadataManagerImpl(conf);
+    omMetadataManager = new OmMetadataManagerImpl(conf, ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.isRatisEnabled()).thenReturn(true);
@@ -244,7 +232,7 @@ public class TestRangerBGSyncService {
         ozoneManager.getMetadataManager().getMetaTable().put(
             OzoneConsts.RANGER_OZONE_SERVICE_VERSION_KEY, String.valueOf(v));
         return null;
-      }).when(omRatisServer).submitRequest(Mockito.any(), Mockito.any());
+      }).when(omRatisServer).submitRequest(any(), any());
     } catch (ServiceException e) {
       throw new RuntimeException(e);
     }
@@ -266,7 +254,7 @@ public class TestRangerBGSyncService {
     accessController = new RangerClientMultiTenantAccessController(conf);
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     bgSync.shutdown();
     cleanupPoliciesRolesUsers();
@@ -284,7 +272,7 @@ public class TestRangerBGSyncService {
   private void createRoleHelper(Role role) throws IOException {
     Role roleCreated = accessController.createRole(role);
     // Confirm role creation
-    Assert.assertEquals(role.getName(), roleCreated.getName());
+    assertEquals(role.getName(), roleCreated.getName());
     // Add to created roles list
     rolesCreated.add(0, role.getName());
   }
@@ -338,7 +326,7 @@ public class TestRangerBGSyncService {
                 .setIsDelegatedAdmin(false)
                 .build());
       } catch (IOException e) {
-        Assert.fail(e.getMessage());
+        fail(e.getMessage());
       }
     }
 
@@ -347,7 +335,7 @@ public class TestRangerBGSyncService {
       rangerUserRequest.createUser(USER_ALICE_SHORT, "Password12");
       usersCreated.add(USER_ALICE_SHORT);
     } catch (IOException e) {
-      Assert.fail(e.getMessage());
+      fail(e.getMessage());
     }
 
     try {
@@ -355,7 +343,7 @@ public class TestRangerBGSyncService {
       rangerUserRequest.createUser(USER_BOB_SHORT, "Password12");
       usersCreated.add(USER_BOB_SHORT);
     } catch (IOException e) {
-      Assert.fail(e.getMessage());
+      fail(e.getMessage());
     }
 
     try {
@@ -367,7 +355,7 @@ public class TestRangerBGSyncService {
           .build();
       createRoleHelper(adminRole);
     } catch (IOException e) {
-      Assert.fail(e.getMessage());
+      fail(e.getMessage());
     }
 
     try {
@@ -381,7 +369,7 @@ public class TestRangerBGSyncService {
           .build();
       createRoleHelper(userRole);
     } catch (IOException e) {
-      Assert.fail(e.getMessage());
+      fail(e.getMessage());
     }
 
     try {
@@ -393,7 +381,7 @@ public class TestRangerBGSyncService {
       accessController.createPolicy(tenant1VolumeAccessPolicy);
       policiesCreated.add(tenant1VolumeAccessPolicy.getName());
     } catch (IOException e) {
-      Assert.fail(e.getMessage());
+      fail(e.getMessage());
     }
 
     try {
@@ -405,7 +393,7 @@ public class TestRangerBGSyncService {
       accessController.createPolicy(tenant1BucketCreatePolicy);
       policiesCreated.add(tenant1BucketCreatePolicy.getName());
     } catch (IOException e) {
-      Assert.fail(e.getMessage());
+      fail(e.getMessage());
     }
   }
 
@@ -478,7 +466,7 @@ public class TestRangerBGSyncService {
 
     final long rangerSvcVersionBefore =
         bgSync.getRangerOzoneServicePolicyVersion();
-    Assert.assertTrue(rangerSvcVersionBefore >= startingRangerVersion);
+    assertThat(rangerSvcVersionBefore).isGreaterThanOrEqualTo(startingRangerVersion);
 
     // Note: DB Service Version will be -1 if the test starts with an empty DB
     final long dbSvcVersionBefore = bgSync.getOMDBRangerServiceVersion();
@@ -491,9 +479,9 @@ public class TestRangerBGSyncService {
     final long dbSvcVersionAfter = bgSync.getOMDBRangerServiceVersion();
     final long rangerSvcVersionAfter =
         bgSync.getRangerOzoneServicePolicyVersion();
-    Assert.assertEquals(rangerSvcVersionAfter, dbSvcVersionAfter);
-    Assert.assertTrue(dbSvcVersionAfter > dbSvcVersionBefore);
-    Assert.assertTrue(rangerSvcVersionAfter > rangerSvcVersionBefore);
+    assertEquals(rangerSvcVersionAfter, dbSvcVersionAfter);
+    assertThat(dbSvcVersionAfter).isGreaterThan(dbSvcVersionBefore);
+    assertThat(rangerSvcVersionAfter).isGreaterThan(rangerSvcVersionBefore);
 
     // Verify that the Ranger policies and roles not backed up
     // by OzoneManager Multi-Tenancy tables are cleaned up by sync thread
@@ -501,28 +489,28 @@ public class TestRangerBGSyncService {
     for (String policy : policiesCreated) {
       try {
         final Policy policyRead = accessController.getPolicy(policy);
-        Assert.fail("The policy should have been deleted: " + policyRead);
+        fail("The policy should have been deleted: " + policyRead);
       } catch (IOException ex) {
         if (!(ex.getCause() instanceof RangerServiceException)) {
-          Assert.fail("Expected RangerServiceException, got " +
+          fail("Expected RangerServiceException, got " +
               ex.getCause().getClass().getSimpleName());
         }
         RangerServiceException rse = (RangerServiceException) ex.getCause();
-        Assert.assertEquals(404, rse.getStatus().getStatusCode());
+        assertEquals(404, rse.getStatus().getStatusCode());
       }
     }
 
     for (String roleName : rolesCreated) {
       try {
         final Role role = accessController.getRole(roleName);
-        Assert.fail("This role should have been deleted from Ranger: " + role);
+        fail("This role should have been deleted from Ranger: " + role);
       } catch (IOException ex) {
         if (!(ex.getCause() instanceof RangerServiceException)) {
-          Assert.fail("Expected RangerServiceException, got " +
+          fail("Expected RangerServiceException, got " +
               ex.getCause().getClass().getSimpleName());
         }
         RangerServiceException rse = (RangerServiceException) ex.getCause();
-        Assert.assertEquals(400, rse.getStatus().getStatusCode());
+        assertEquals(400, rse.getStatus().getStatusCode());
       }
     }
   }
@@ -541,7 +529,7 @@ public class TestRangerBGSyncService {
     createRolesAndPoliciesInRanger(true);
 
     long rangerSvcVersionBefore = bgSync.getRangerOzoneServicePolicyVersion();
-    Assert.assertTrue(rangerSvcVersionBefore >= startingRangerVersion);
+    assertThat(rangerSvcVersionBefore).isGreaterThanOrEqualTo(startingRangerVersion);
 
     // Note: DB Service Version will be -1 if the test starts with an empty DB
     final long dbSvcVersionBefore = bgSync.getOMDBRangerServiceVersion();
@@ -554,29 +542,29 @@ public class TestRangerBGSyncService {
     final long dbSvcVersionAfter = bgSync.getOMDBRangerServiceVersion();
     final long rangerSvcVersionAfter =
         bgSync.getRangerOzoneServicePolicyVersion();
-    Assert.assertEquals(rangerSvcVersionAfter, dbSvcVersionAfter);
-    Assert.assertEquals(rangerSvcVersionAfter, rangerSvcVersionBefore);
+    assertEquals(rangerSvcVersionAfter, dbSvcVersionAfter);
+    assertEquals(rangerSvcVersionAfter, rangerSvcVersionBefore);
     if (dbSvcVersionBefore != -1L) {
-      Assert.assertEquals(dbSvcVersionBefore, dbSvcVersionAfter);
+      assertEquals(dbSvcVersionBefore, dbSvcVersionAfter);
     }
 
     for (String policyName : policiesCreated) {
       try {
         final Policy policyRead = accessController.getPolicy(policyName);
-        Assert.assertEquals(policyName, policyRead.getName());
+        assertEquals(policyName, policyRead.getName());
       } catch (Exception e) {
         e.printStackTrace();
-        Assert.fail(e.getMessage());
+        fail(e.getMessage());
       }
     }
 
     for (String roleName : rolesCreated) {
       try {
         final Role roleResponse = accessController.getRole(roleName);
-        Assert.assertEquals(roleName, roleResponse.getName());
+        assertEquals(roleName, roleResponse.getName());
       } catch (Exception e) {
         e.printStackTrace();
-        Assert.fail(e.getMessage());
+        fail(e.getMessage());
       }
     }
   }
@@ -594,11 +582,11 @@ public class TestRangerBGSyncService {
 
     long rangerVersionAfterCreation =
         bgSync.getRangerOzoneServicePolicyVersion();
-    Assert.assertTrue(rangerVersionAfterCreation >= startingRangerVersion);
+    assertThat(rangerVersionAfterCreation).isGreaterThanOrEqualTo(startingRangerVersion);
 
     // Delete user bob from user role, expect Ranger sync thread to update it
     String userRoleName = rolesCreated.get(0);
-    Assert.assertEquals(
+    assertEquals(
         OMMultiTenantManager.getDefaultUserRoleName(TENANT_ID), userRoleName);
 
     Role userRole = accessController.getRole(userRoleName);
@@ -627,15 +615,14 @@ public class TestRangerBGSyncService {
     final long dbSvcVersionAfter = bgSync.getOMDBRangerServiceVersion();
     final long rangerSvcVersionAfter =
         bgSync.getRangerOzoneServicePolicyVersion();
-    Assert.assertEquals(rangerSvcVersionAfter, dbSvcVersionAfter);
-    Assert.assertTrue(dbSvcVersionAfter > dbSvcVersionBefore);
-    Assert.assertTrue(rangerSvcVersionAfter > rangerSvcVersionBefore);
+    assertEquals(rangerSvcVersionAfter, dbSvcVersionAfter);
+    assertThat(dbSvcVersionAfter).isGreaterThan(dbSvcVersionBefore);
+    assertThat(rangerSvcVersionAfter).isGreaterThan(rangerSvcVersionBefore);
 
     for (String policyName : policiesCreated) {
       final Policy policy = accessController.getPolicy(policyName);
-      Assert.assertNotNull("Policy should exist in Ranger: " + policyName,
-          policy);
-      Assert.assertEquals(policyName, policy.getName());
+      assertNotNull(policy, "Policy should exist in Ranger: " + policyName);
+      assertEquals(policyName, policy.getName());
     }
 
     for (String roleName : rolesCreated) {
@@ -644,7 +631,7 @@ public class TestRangerBGSyncService {
       }
       final Role roleRead = accessController.getRole(roleName);
       final Set<String> usersGot = roleRead.getUsersMap().keySet();
-      Assert.assertEquals(userSet, usersGot);
+      assertEquals(userSet, usersGot);
       break;
     }
   }
@@ -663,7 +650,7 @@ public class TestRangerBGSyncService {
 
     long rangerVersionAfterCreation =
         bgSync.getRangerOzoneServicePolicyVersion();
-    Assert.assertTrue(rangerVersionAfterCreation >= startingRangerVersion);
+    assertThat(rangerVersionAfterCreation).isGreaterThanOrEqualTo(startingRangerVersion);
 
     // Delete both policies, expect Ranger sync thread to recover both
     accessController.deletePolicy(
@@ -684,27 +671,27 @@ public class TestRangerBGSyncService {
     long dbSvcVersionAfter = bgSync.getOMDBRangerServiceVersion();
     final long rangerSvcVersionAfter =
         bgSync.getRangerOzoneServicePolicyVersion();
-    Assert.assertEquals(rangerSvcVersionAfter, dbSvcVersionAfter);
-    Assert.assertTrue(dbSvcVersionAfter > dbSvcVersionBefore);
-    Assert.assertTrue(rangerSvcVersionAfter > rangerSvcVersionBefore);
+    assertEquals(rangerSvcVersionAfter, dbSvcVersionAfter);
+    assertThat(dbSvcVersionAfter).isGreaterThan(dbSvcVersionBefore);
+    assertThat(rangerSvcVersionAfter).isGreaterThan(rangerSvcVersionBefore);
 
     for (String policyName : policiesCreated) {
       try {
         final Policy policyRead = accessController.getPolicy(policyName);
-        Assert.assertEquals(policyName, policyRead.getName());
+        assertEquals(policyName, policyRead.getName());
       } catch (Exception e) {
         e.printStackTrace();
-        Assert.fail(e.getMessage());
+        fail(e.getMessage());
       }
     }
 
     for (String roleName : rolesCreated) {
       try {
         final Role roleRead = accessController.getRole(roleName);
-        Assert.assertEquals(roleName, roleRead.getName());
+        assertEquals(roleName, roleRead.getName());
       } catch (Exception e) {
         e.printStackTrace();
-        Assert.fail(e.getMessage());
+        fail(e.getMessage());
       }
     }
   }

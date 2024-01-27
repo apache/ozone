@@ -156,7 +156,7 @@ public class StorageContainerManagerStarter extends GenericCli {
     String[] originalArgs = getCmd().getParseResult().originalArgs()
         .toArray(new String[0]);
     StringUtils.startupShutdownMessage(HddsVersionInfo.HDDS_VERSION_INFO,
-        StorageContainerManager.class, originalArgs, LOG);
+        StorageContainerManager.class, originalArgs, LOG, conf);
   }
 
   /**

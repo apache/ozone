@@ -20,14 +20,14 @@ package org.apache.hadoop.ozone.om.upgrade;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.OM_REQUEST_CLASS_PACKAGE;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.OM_UPGRADE_CLASS_PACKAGE;
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.getRequestClasses;
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.VALIDATE_IN_PREFINALIZE;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -35,20 +35,15 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Optional;
-import java.util.Set;
 
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType;
-import org.junit.Assert;
-import org.junit.Ignore;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 /**
  * Test OM layout version management.
@@ -62,8 +57,8 @@ public class TestOMVersionManager {
 
     // Initial Version is always allowed.
     assertTrue(omVersionManager.isAllowed(INITIAL_VERSION));
-    assertTrue(INITIAL_VERSION.layoutVersion() <=
-        omVersionManager.getMetadataLayoutVersion());
+    assertThat(INITIAL_VERSION.layoutVersion())
+        .isLessThanOrEqualTo(omVersionManager.getMetadataLayoutVersion());
   }
 
   @Test
@@ -73,7 +68,7 @@ public class TestOMVersionManager {
 
     try {
       new OMLayoutVersionManager(lV);
-      Assert.fail();
+      fail();
     } catch (OMException ex) {
       assertEquals(NOT_SUPPORTED_OPERATION, ex.getResult());
     }
@@ -83,10 +78,10 @@ public class TestOMVersionManager {
   public void testOMLayoutFeaturesHaveIncreasingLayoutVersion()
       throws Exception {
     OMLayoutFeature[] values = OMLayoutFeature.values();
-    int currVersion = Integer.MIN_VALUE;
+    int currVersion = -1;
     OMLayoutFeature lastFeature = null;
     for (OMLayoutFeature lf : values) {
-      assertTrue(currVersion < lf.layoutVersion());
+      assertEquals(currVersion + 1, lf.layoutVersion());
       currVersion = lf.layoutVersion();
       lastFeature = lf;
     }
@@ -103,41 +98,8 @@ public class TestOMVersionManager {
     verify(omMock, times(UpgradeActionType.values().length)).getVersion();
   }
 
-  @Ignore("Since there is no longer a need to enforce the getRequestType " +
-      "method in OM request classes, disabling the " +
-      "test. Potentially revisit later.")
   @Test
-  public void testAllOMRequestClassesHaveRequestType()
-      throws InvocationTargetException, IllegalAccessException {
 
-    Set<Class<? extends OMClientRequest>> requestClasses =
-        getRequestClasses(OM_REQUEST_CLASS_PACKAGE);
-    Set<String> requestTypes = new HashSet<>();
-
-    for (Class<? extends OMClientRequest> requestClass : requestClasses) {
-      try {
-        Method getRequestTypeMethod = requestClass.getMethod(
-            "getRequestType");
-        String type = (String) getRequestTypeMethod.invoke(null);
-
-        int lVersion = INITIAL_VERSION.layoutVersion();
-        BelongsToLayoutVersion annotation =
-            requestClass.getAnnotation(BelongsToLayoutVersion.class);
-        if (annotation != null) {
-          lVersion = annotation.value().layoutVersion();
-        }
-        if (requestTypes.contains(type + "-" + lVersion)) {
-          Assert.fail("Duplicate request/version type found : " + type);
-        }
-        requestTypes.add(type + "-" + lVersion);
-      } catch (NoSuchMethodException nsmEx) {
-        Assert.fail("getRequestType method not defined in a class." +
-            nsmEx.getMessage());
-      }
-    }
-  }
-
-  @Test
   /*
    * The OMLayoutFeatureAspect relies on the fact that the OM client
    * request handler class has a preExecute method with first argument as
@@ -152,7 +114,7 @@ public class TestOMVersionManager {
             .findFirst();
 
     assertTrue(preExecuteMethod.isPresent());
-    assertTrue(preExecuteMethod.get().getParameterCount() >= 1);
+    assertThat(preExecuteMethod.get().getParameterCount()).isGreaterThanOrEqualTo(1);
     assertEquals(OzoneManager.class,
         preExecuteMethod.get().getParameterTypes()[0]);
   }
@@ -173,8 +135,8 @@ public class TestOMVersionManager {
     lvm.registerUpgradeActions(OM_UPGRADE_CLASS_PACKAGE);
 
     action = INITIAL_VERSION.action(VALIDATE_IN_PREFINALIZE);
-    Assert.assertTrue(action.isPresent());
-    Assert.assertEquals(MockOmUpgradeAction.class, action.get().getClass());
+    assertTrue(action.isPresent());
+    assertEquals(MockOmUpgradeAction.class, action.get().getClass());
     OzoneManager omMock = mock(OzoneManager.class);
     action.get().execute(omMock);
     verify(omMock, times(1)).getVersion();

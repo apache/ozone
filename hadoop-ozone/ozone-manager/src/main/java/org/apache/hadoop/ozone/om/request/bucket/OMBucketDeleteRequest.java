@@ -19,13 +19,18 @@
 package org.apache.hadoop.ozone.om.request.bucket;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
+import java.util.Iterator;
 import java.util.Map;
 
-import com.google.common.base.Optional;
+import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
@@ -60,6 +65,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.CONTAINS_SNAPSHOT;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
@@ -75,9 +81,8 @@ public class OMBucketDeleteRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long transactionLogIndex = termIndex.getIndex();
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumBucketDeletes();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
@@ -97,7 +102,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
     auditMap.put(OzoneConsts.BUCKET, bucketName);
 
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
-    IOException exception = null;
+    Exception exception = null;
 
     boolean acquiredBucketLock = false, acquiredVolumeLock = false;
     boolean success = true;
@@ -111,11 +116,13 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       }
 
       // acquire lock
-      acquiredVolumeLock =
-          omMetadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName);
-      acquiredBucketLock =
-          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          volumeName, bucketName);
+      mergeOmLockDetails(
+          omMetadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName));
+      acquiredVolumeLock = getOmLockDetails().isLockAcquired();
+      mergeOmLockDetails(
+          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
+              bucketName));
+      acquiredBucketLock = getOmLockDetails().isLockAcquired();
 
       // No need to check volume exists here, as bucket cannot be created
       // with out volume creation. Check if bucket exists
@@ -135,6 +142,29 @@ public class OMBucketDeleteRequest extends OMClientRequest {
         throw new OMException("Bucket is not empty",
             OMException.ResultCodes.BUCKET_NOT_EMPTY);
       }
+
+      // Check if bucket does not contain incomplete MPUs
+      if (omMetadataManager.containsIncompleteMPUs(volumeName, bucketName)) {
+        LOG.debug("Volume '{}', Bucket '{}' can't be deleted when it has " +
+                "incomplete multipart uploads", volumeName, bucketName);
+        throw new OMException(
+            String.format("Volume %s, Bucket %s can't be deleted when it " +
+                "has incomplete multipart uploads", volumeName, bucketName),
+            ResultCodes.BUCKET_NOT_EMPTY);
+      }
+
+      // appending '/' to end to eliminate cases where 2 buckets start with same
+      // characters.
+      String snapshotBucketKey = bucketKey + OzoneConsts.OM_KEY_PREFIX;
+
+      if (bucketContainsSnapshot(omMetadataManager, snapshotBucketKey)) {
+        LOG.debug("Bucket '{}' can't be deleted when it has snapshots",
+            bucketName);
+        throw new OMException(
+            "Bucket " + bucketName + " can't be deleted when it has snapshots",
+            CONTAINS_SNAPSHOT);
+      }
+
       if (omBucketInfo.getBucketLayout().isFileSystemOptimized()) {
         omMetrics.incNumFSOBucketDeletes();
       }
@@ -143,7 +173,7 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       // Update table cache.
       omMetadataManager.getBucketTable().addCacheEntry(
           new CacheKey<>(bucketKey),
-          new CacheValue<>(Optional.absent(), transactionLogIndex));
+          CacheValue.get(transactionLogIndex));
 
       omResponse.setDeleteBucketResponse(
           DeleteBucketResponse.newBuilder().build());
@@ -160,25 +190,27 @@ public class OMBucketDeleteRequest extends OMClientRequest {
       // Update table cache.
       omMetadataManager.getVolumeTable().addCacheEntry(
           new CacheKey<>(volumeKey),
-          new CacheValue<>(Optional.of(omVolumeArgs), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, omVolumeArgs));
 
       // Add to double buffer.
       omClientResponse = new OMBucketDeleteResponse(omResponse.build(),
           volumeName, bucketName, omVolumeArgs.copyObject());
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       success = false;
       exception = ex;
       omClientResponse = new OMBucketDeleteResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
       }
       if (acquiredVolumeLock) {
-        omMetadataManager.getLock().releaseReadLock(VOLUME_LOCK, volumeName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseReadLock(VOLUME_LOCK, volumeName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 
@@ -196,6 +228,44 @@ public class OMBucketDeleteRequest extends OMClientRequest {
           volumeName, exception);
       return omClientResponse;
     }
+  }
+
+  private boolean bucketContainsSnapshot(OMMetadataManager omMetadataManager,
+      String snapshotBucketKey) throws IOException {
+    return bucketContainsSnapshotInCache(omMetadataManager, snapshotBucketKey)
+        || bucketContainsSnapshotInTable(omMetadataManager, snapshotBucketKey);
+  }
+
+  private boolean bucketContainsSnapshotInTable(
+      OMMetadataManager omMetadataManager, String snapshotBucketKey)
+      throws IOException {
+    try (
+        TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+            snapshotIterator = omMetadataManager
+            .getSnapshotInfoTable().iterator()) {
+      snapshotIterator.seek(snapshotBucketKey);
+      if (snapshotIterator.hasNext()) {
+        return snapshotIterator.next().getKey().startsWith(snapshotBucketKey);
+      }
+    }
+    return false;
+  }
+
+  private boolean bucketContainsSnapshotInCache(
+      OMMetadataManager omMetadataManager, String snapshotBucketKey) {
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>>> cacheIter =
+        omMetadataManager.getSnapshotInfoTable().cacheIterator();
+    while (cacheIter.hasNext()) {
+      Map.Entry<CacheKey<String>, CacheValue<SnapshotInfo>> cacheKeyValue =
+          cacheIter.next();
+      String key = cacheKeyValue.getKey().getCacheKey();
+      // TODO: [SNAPSHOT] Revisit when delete snapshot gets implemented as entry
+      //  in cache/table could be null.
+      if (key.startsWith(snapshotBucketKey)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

@@ -68,7 +68,7 @@ public class AuthorizerLockImpl implements AuthorizerLock {
   }
 
   @Override
-  public long tryReadLockThrowOnTimeout() throws IOException {
+  public long tryOptimisticReadThrowOnTimeout() throws IOException {
 
     long stamp;
     try {
@@ -80,11 +80,27 @@ public class AuthorizerLockImpl implements AuthorizerLock {
       throw new OMException("Timed out acquiring authorizer read lock."
           + " Another multi-tenancy request is in-progress. Try again later",
           ResultCodes.TIMEOUT);
-    } else if (LOG.isDebugEnabled()) {
-      LOG.debug("Acquired authorizer read lock from thread {} with stamp {}",
-          Thread.currentThread().getId(), stamp);
     }
-    return stamp;
+
+    long optimisticStamp = authorizerStampedLock.tryConvertToOptimisticRead(
+        stamp);
+    if (optimisticStamp == 0L) {
+      // This should never happen. If we reached this point we are holding a
+      // read lock and providing its stamp so the lock should be in read mode
+      // already. This would return a valid stamp, not 0.
+      unlockRead(stamp);
+      throw new OMException("Failed to convert read lock to optimistic read.",
+              INTERNAL_ERROR);
+    } else if (LOG.isDebugEnabled()) {
+      LOG.debug("Acquired authorizer optimistic read from thread {} with" +
+          " stamp {}", Thread.currentThread().getId(), optimisticStamp);
+    }
+    return optimisticStamp;
+  }
+
+  @Override
+  public boolean validateOptimisticRead(long stamp) {
+    return authorizerStampedLock.validate(stamp);
   }
 
   @Override

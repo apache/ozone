@@ -26,7 +26,6 @@ import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
@@ -74,6 +73,17 @@ public class KeyInputStream extends MultipartInputStream {
       // BlockInputStream is only created here and not initialized. The
       // BlockInputStream is initialized when a read operation is performed on
       // the block for the first time.
+      Function<BlockID, BlockLocationInfo> retry;
+      if (retryFunction != null) {
+        retry = keyBlockID -> {
+          OmKeyInfo newKeyInfo = retryFunction.apply(keyInfo);
+          return getBlockLocationInfo(newKeyInfo,
+              omKeyLocationInfo.getBlockID());
+        };
+      } else {
+        retry = null;
+      }
+
       BlockExtendedInputStream stream =
           blockStreamFactory.create(
               keyInfo.getReplicationConfig(),
@@ -82,16 +92,14 @@ public class KeyInputStream extends MultipartInputStream {
               omKeyLocationInfo.getToken(),
               verifyChecksum,
               xceiverClientFactory,
-              keyBlockID -> {
-                OmKeyInfo newKeyInfo = retryFunction.apply(keyInfo);
-                return getPipeline(newKeyInfo, omKeyLocationInfo.getBlockID());
-              });
+              retry);
       partStreams.add(stream);
     }
     return partStreams;
   }
 
-  private static Pipeline getPipeline(OmKeyInfo newKeyInfo, BlockID blockID) {
+  private static BlockLocationInfo getBlockLocationInfo(OmKeyInfo newKeyInfo,
+      BlockID blockID) {
     List<OmKeyLocationInfo> collect =
         newKeyInfo.getLatestVersionLocations()
             .getLocationList()
@@ -99,7 +107,7 @@ public class KeyInputStream extends MultipartInputStream {
             .filter(l -> l.getBlockID().equals(blockID))
             .collect(Collectors.toList());
     if (CollectionUtils.isNotEmpty(collect)) {
-      return collect.get(0).getPipeline();
+      return collect.get(0);
     } else {
       return null;
     }

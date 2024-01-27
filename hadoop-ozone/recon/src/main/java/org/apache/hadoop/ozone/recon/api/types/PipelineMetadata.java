@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.api.types;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 
 import javax.xml.bind.annotation.XmlAccessType;
@@ -44,7 +45,7 @@ public final class PipelineMetadata {
   private String leaderNode;
 
   @XmlElement(name = "datanodes")
-  private List<String> datanodes;
+  private List<DatanodeDetails> datanodes;
 
   @XmlElement(name = "lastLeaderElection")
   private long lastLeaderElection;
@@ -78,7 +79,7 @@ public final class PipelineMetadata {
     return leaderNode;
   }
 
-  public List<String> getDatanodes() {
+  public List<DatanodeDetails> getDatanodes() {
     return datanodes;
   }
 
@@ -137,7 +138,7 @@ public final class PipelineMetadata {
     private UUID pipelineId;
     private PipelineState status;
     private String leaderNode;
-    private List<String> datanodes;
+    private List<DatanodeDetails> datanodes;
     private long lastLeaderElection;
     private long duration;
     private long leaderElections;
@@ -183,7 +184,7 @@ public final class PipelineMetadata {
       return this;
     }
 
-    public Builder setDatanodes(List<String> datanodes) {
+    public Builder setDatanodes(List<DatanodeDetails> datanodes) {
       this.datanodes = datanodes;
       return this;
     }

@@ -29,19 +29,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Command Queue is queue of commands for the datanode.
  * <p>
  * Node manager, container Manager and Ozone managers can queue commands for
- * datanodes into this queue. These commands will be send in the order in which
- * there where queued.
+ * datanodes into this queue. These commands will be sent in the order in which
+ * they were queued.
+ *
+ * Note this class is not thread safe, and accesses must be protected by a lock.
  */
 public class CommandQueue {
   private final Map<UUID, Commands> commandMap;
-  private final Lock lock;
   private long commandsInQueue;
 
   /**
@@ -59,7 +58,6 @@ public class CommandQueue {
    */
   public CommandQueue() {
     commandMap = new HashMap<>();
-    lock = new ReentrantLock();
     commandsInQueue = 0;
   }
 
@@ -68,13 +66,8 @@ public class CommandQueue {
    */
   @VisibleForTesting
   public void clear() {
-    lock.lock();
-    try {
-      commandMap.clear();
-      commandsInQueue = 0;
-    } finally {
-      lock.unlock();
-    }
+    commandMap.clear();
+    commandsInQueue = 0;
   }
 
   /**
@@ -87,41 +80,53 @@ public class CommandQueue {
    */
   @SuppressWarnings("unchecked")
   List<SCMCommand> getCommand(final UUID datanodeUuid) {
-    lock.lock();
-    try {
-      Commands cmds = commandMap.remove(datanodeUuid);
-      List<SCMCommand> cmdList = null;
-      if (cmds != null) {
-        cmdList = cmds.getCommands();
-        commandsInQueue -= cmdList.size() > 0 ? cmdList.size() : 0;
-        // A post condition really.
-        Preconditions.checkState(commandsInQueue >= 0);
-      }
-      return cmds == null ? Collections.emptyList() : cmdList;
-    } finally {
-      lock.unlock();
+    Commands cmds = commandMap.remove(datanodeUuid);
+    List<SCMCommand> cmdList = null;
+    if (cmds != null) {
+      cmdList = cmds.getCommands();
+      commandsInQueue -= cmdList.size() > 0 ? cmdList.size() : 0;
+      // A post condition really.
+      Preconditions.checkState(commandsInQueue >= 0);
     }
+    return cmds == null ? Collections.emptyList() : cmdList;
   }
 
   /**
    * Returns the count of commands of the give type currently queued for the
-   * given datanode.
+   * given datanode. Note that any commands which return false for their
+   * Command.contributesToQueueSize() method will not be included in the count.
+   * At the current time, only low priority ReplicateContainerCommands meet this
+   * condition.
    * @param datanodeUuid Datanode UUID.
    * @param commandType The type of command for which to get the count.
    * @return The currently queued command count, or zero if none are queued.
    */
   public int getDatanodeCommandCount(
       final UUID datanodeUuid, SCMCommandProto.Type commandType) {
-    lock.lock();
-    try {
-      Commands commands = commandMap.get(datanodeUuid);
-      if (commands == null) {
-        return 0;
-      }
-      return commands.getCommandSummary(commandType);
-    } finally {
-      lock.unlock();
+    Commands commands = commandMap.get(datanodeUuid);
+    if (commands == null) {
+      return 0;
     }
+    return commands.getCommandSummary(commandType);
+  }
+
+  /**
+   * Return a summary of all commands currently queued for the given Datanode.
+   * Note that any commands which return false for their
+   * Command.contributesToQueueSize() method will not be included in the count.
+   * At the current time, only low priority ReplicateContainerCommands meet this
+   * condition.
+   * @param datanodeUuid Datanode UUID
+   * @return A map containing the command summary. Note the returned map is a
+   *         copy of the internal map and can be modified safely by the caller.
+   */
+  public Map<SCMCommandProto.Type, Integer> getDatanodeCommandSummary(
+      final UUID datanodeUuid) {
+    Commands commands = commandMap.get(datanodeUuid);
+    if (commands == null) {
+      return Collections.emptyMap();
+    }
+    return commands.getAllCommandsSummary();
   }
 
   /**
@@ -132,14 +137,8 @@ public class CommandQueue {
    */
   public void addCommand(final UUID datanodeUuid, final SCMCommand
       command) {
-    lock.lock();
-    try {
-      commandMap.computeIfAbsent(datanodeUuid, s -> new Commands())
-          .add(command);
-      commandsInQueue++;
-    } finally {
-      lock.unlock();
-    }
+    commandMap.computeIfAbsent(datanodeUuid, s -> new Commands()).add(command);
+    commandsInQueue++;
   }
 
   /**
@@ -174,13 +173,19 @@ public class CommandQueue {
      */
     public void add(SCMCommand command) {
       this.commands.add(command);
-      summary.put(command.getType(),
-          summary.getOrDefault(command.getType(), 0) + 1);
+      if (command.contributesToQueueSize()) {
+        summary.put(command.getType(),
+            summary.getOrDefault(command.getType(), 0) + 1);
+      }
       updateTime = Time.monotonicNow();
     }
 
     public int getCommandSummary(SCMCommandProto.Type commandType) {
       return summary.getOrDefault(commandType, 0);
+    }
+
+    public Map<SCMCommandProto.Type, Integer> getAllCommandsSummary() {
+      return new HashMap<>(summary);
     }
 
     /**

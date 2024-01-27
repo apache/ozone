@@ -27,13 +27,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
+import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
-import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,18 +46,18 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
       LoggerFactory.getLogger(OMDBUpdatesHandler.class);
 
   private Map<Integer, String> tablesNames;
-  private CodecRegistry codecRegistry;
   private OMMetadataManager omMetadataManager;
   private List<OMDBUpdateEvent> omdbUpdateEvents = new ArrayList<>();
-  private Map<String, OMDBUpdateEvent> omdbLatestUpdateEvents
+  private Map<Object, OMDBUpdateEvent> omdbLatestUpdateEvents
       = new HashMap<>();
   private OMDBDefinition omdbDefinition;
+  private OmUpdateEventValidator omUpdateEventValidator;
 
   public OMDBUpdatesHandler(OMMetadataManager metadataManager) {
     omMetadataManager = metadataManager;
     tablesNames = metadataManager.getStore().getTableNames();
-    codecRegistry = metadataManager.getStore().getCodecRegistry();
     omdbDefinition = new OMDBDefinition();
+    omUpdateEventValidator = new OmUpdateEventValidator(omdbDefinition);
   }
 
   @Override
@@ -82,31 +81,43 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
   }
 
   /**
+   * Processes an OM DB update event based on the provided parameters.
    *
-   * @param cfIndex
-   * @param keyBytes
-   * @param valueBytes
-   * @param action
-   * @throws IOException
+   * @param cfIndex     Index of the column family.
+   * @param keyBytes    Serialized key bytes.
+   * @param valueBytes  Serialized value bytes.
+   * @param action      Type of the database action (e.g., PUT, DELETE).
+   * @throws IOException If an I/O error occurs.
    */
   private void processEvent(int cfIndex, byte[] keyBytes, byte[]
       valueBytes, OMDBUpdateEvent.OMDBUpdateAction action)
       throws IOException {
     String tableName = tablesNames.get(cfIndex);
-    Optional<Class> keyType = omdbDefinition.getKeyType(tableName);
-    Optional<Class> valueType = omdbDefinition.getValueType(tableName);
-    if (keyType.isPresent() && valueType.isPresent()) {
+    // DTOKEN_TABLE is using OzoneTokenIdentifier as key instead of String
+    // and assuming to typecast as String while de-serializing will throw error.
+    // omdbLatestUpdateEvents defines map key as String type to store in its map
+    // and to change to Object as key will have larger impact considering all
+    // ReconOmTasks. Currently, this table is not needed to sync in Recon OM DB
+    // snapshot as this table data not being used currently in Recon.
+    // When this table data will be needed, all events for this table will be
+    // saved using Object as key and new task will also retrieve using Object
+    // as key.
+    final DBColumnFamilyDefinition<?, ?> cf
+        = omdbDefinition.getColumnFamily(tableName);
+    if (cf != null) {
       OMDBUpdateEvent.OMUpdateEventBuilder builder =
           new OMDBUpdateEvent.OMUpdateEventBuilder<>();
       builder.setTable(tableName);
       builder.setAction(action);
-      String key = (String) codecRegistry.asObject(keyBytes, keyType.get());
+      final Object key = cf.getKeyCodec().fromPersistedFormat(keyBytes);
       builder.setKey(key);
 
-      // Put new
-      // Put existing --> Update
-      // Delete existing
-      // Delete non-existing
+      // Handle the event based on its type:
+      // - PUT with a new key: Insert the new value.
+      // - PUT with an existing key: Update the existing value.
+      // - DELETE with an existing key: Remove the value.
+      // - DELETE with a non-existing key: No action, log a warning if
+      // necessary.
       Table table = omMetadataManager.getTable(tableName);
 
       OMDBUpdateEvent latestEvent = omdbLatestUpdateEvents.get(key);
@@ -114,23 +125,54 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
       if (latestEvent != null) {
         oldValue = latestEvent.getValue();
       } else {
-        // Recon does not add entries to cache and it is safer to always use
+        // Recon does not add entries to cache, and it is safer to always use
         // getSkipCache in Recon.
         oldValue = table.getSkipCache(key);
       }
 
-      if (action == PUT) {
-        Object value = codecRegistry.asObject(valueBytes, valueType.get());
+      if (action.equals(PUT)) {
+        final Object value = cf.getValueCodec().fromPersistedFormat(valueBytes);
+
+        // If the updated value is not valid for this event, we skip it.
+        if (!omUpdateEventValidator.isValidEvent(tableName, value, key,
+            action)) {
+          return;
+        }
+
         builder.setValue(value);
-        // If a PUT operation happens on an existing Key, it is tagged
-        // as an "UPDATE" event.
+        // Tag PUT operations on existing keys as "UPDATE" events.
         if (oldValue != null) {
+
+          // If the oldValue is not valid for this event, we skip it.
+          if (!omUpdateEventValidator.isValidEvent(tableName, oldValue, key,
+              action)) {
+            return;
+          }
+
           builder.setOldValue(oldValue);
           if (latestEvent == null || latestEvent.getAction() != DELETE) {
             builder.setAction(UPDATE);
           }
         }
       } else if (action.equals(DELETE)) {
+        if (null == oldValue) {
+          String keyStr = (key instanceof String) ? key.toString() : "";
+          if (keyStr.isEmpty()) {
+            LOG.warn(
+                "Only DTOKEN_TABLE table uses OzoneTokenIdentifier as key " +
+                    "instead of String. Event on any other table in this " +
+                    "condition may need to be investigated. This DELETE " +
+                    "event is on {} table which is not useful for Recon to " +
+                    "capture.", tableName);
+          }
+          LOG.warn("Old Value of Key: {} in table: {} should not be null " +
+              "for DELETE event ", keyStr, tableName);
+          return;
+        }
+        if (!omUpdateEventValidator.isValidEvent(tableName, oldValue, key,
+            action)) {
+          return;
+        }
         // When you delete a Key, we add the old value to the event so that
         // a downstream task can use it.
         builder.setValue(oldValue);
@@ -144,8 +186,7 @@ public class OMDBUpdatesHandler extends ManagedWriteBatch.Handler {
       omdbUpdateEvents.add(event);
       omdbLatestUpdateEvents.put(key, event);
     } else {
-      // key type or value type cannot be determined for this table.
-      // log a warn message and ignore the update.
+      // Log and ignore events if key or value types are undetermined.
       if (LOG.isWarnEnabled()) {
         LOG.warn(String.format("KeyType or ValueType could not be determined" +
             " for table %s. Ignoring the event.", tableName));

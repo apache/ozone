@@ -28,11 +28,14 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -58,15 +61,21 @@ public class ListPipelinesSubcommand extends ScmSubcommand {
   private String replication;
 
   @CommandLine.Option(
-      names = {"-ffc", "--filterByFactor"},
+      names = {"-ffc", "--filterByFactor", "--filter-by-factor"},
       description = "[deprecated] Filter pipelines by factor (e.g. ONE, THREE) "
           + " (implies RATIS replication type)")
   private ReplicationFactor factor;
 
-  @CommandLine.Option(names = {"-s", "--state", "-fst", "--filterByState"},
+  @CommandLine.Option(
+      names = {"-s", "--state", "-fst", "--filterByState", "--filter-by-state"},
       description = "Filter listed pipelines by State, eg OPEN, CLOSED",
       defaultValue = "")
   private String state;
+
+  @CommandLine.Option(names = { "--json" },
+            defaultValue = "false",
+            description = "Format output as JSON")
+    private boolean json;
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
@@ -81,7 +90,14 @@ public class ListPipelinesSubcommand extends ScmSubcommand {
       stream = stream.filter(p -> p.getPipelineState().toString()
           .compareToIgnoreCase(state) == 0);
     }
-    stream.forEach(System.out::println);
+
+    if (json) {
+      List<Pipeline> pipelineList = stream.collect(Collectors.toList());
+      System.out.print(
+              JsonUtils.toJsonStringWithDefaultPrettyPrinter(pipelineList));
+    } else {
+      stream.forEach(System.out::println);
+    }
   }
 
   private Optional<Predicate<? super Pipeline>> getReplicationFilter() {

@@ -28,12 +28,14 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.safemode.Precheck;
 
+import org.apache.hadoop.hdds.scm.security.RootCARotationManager;
 import org.apache.hadoop.hdds.scm.server.ContainerReportQueue;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReport;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.util.StringUtils;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -202,7 +204,7 @@ public final class ScmUtils {
             ScmConfigKeys.OZONE_SCM_DATANODE_DISALLOW_SAME_PEERS_DEFAULT));
   }
 
-  @NotNull
+  @Nonnull
   public static List<BlockingQueue<ContainerReport>> initContainerReportQueue(
       OzoneConfiguration configuration) {
     int threadPoolSize = configuration.getInt(getContainerReportConfPrefix()
@@ -225,4 +227,25 @@ public final class ScmUtils {
             + SCMEvents.INCREMENTAL_CONTAINER_REPORT.getName());
   }
 
+  public static void checkIfCertSignRequestAllowed(
+      RootCARotationManager rotationManager, boolean isScmCertRenew,
+      OzoneConfiguration config, String operation) throws SCMException {
+    if (rotationManager != null) {
+      if (rotationManager.isRotationInProgress() && !isScmCertRenew) {
+        throw new SCMException("Root CA and Sub CA rotation is in-progress." +
+            " Please try the operation later again.",
+            SCMException.ResultCodes.CA_ROTATION_IN_PROGRESS);
+      }
+      if (rotationManager.isPostRotationInProgress()) {
+        SecurityConfig securityConfig = new SecurityConfig(config);
+        throw new SCMException("The operation " + operation +
+            " is prohibited due to root CA " +
+            "and sub CA rotation have just finished. " +
+            "The prohibition state will last at most " +
+            securityConfig.getRootCaCertificatePollingInterval() + ". " +
+            "Please try the operation later again.",
+            SCMException.ResultCodes.CA_ROTATION_IN_POST_PROGRESS);
+      }
+    }
+  }
 }

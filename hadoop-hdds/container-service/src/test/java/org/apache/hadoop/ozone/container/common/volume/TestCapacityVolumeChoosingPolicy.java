@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageSource;
@@ -26,18 +27,21 @@ import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.File;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
 import static org.apache.ozone.test.GenericTestUtils.getTestDir;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests {@link CapacityVolumeChoosingPolicy}.
@@ -90,6 +94,9 @@ public class TestCapacityVolumeChoosingPolicy {
   @AfterEach
   public void cleanUp() {
     volumes.forEach(HddsVolume::shutdown);
+    FileUtil.fullyDelete(new File(VOLUME_1));
+    FileUtil.fullyDelete(new File(VOLUME_2));
+    FileUtil.fullyDelete(new File(VOLUME_3));
   }
 
   @Test
@@ -98,9 +105,9 @@ public class TestCapacityVolumeChoosingPolicy {
     HddsVolume hddsVolume2 = volumes.get(1);
     HddsVolume hddsVolume3 = volumes.get(2);
 
-    Assertions.assertEquals(100L, hddsVolume1.getAvailable());
-    Assertions.assertEquals(200L, hddsVolume2.getAvailable());
-    Assertions.assertEquals(300L, hddsVolume3.getAvailable());
+    assertEquals(100L, hddsVolume1.getAvailable());
+    assertEquals(200L, hddsVolume2.getAvailable());
+    assertEquals(300L, hddsVolume3.getAvailable());
 
     Map<HddsVolume, Integer> chooseCount = new HashMap<>();
     chooseCount.put(hddsVolume1, 0);
@@ -113,22 +120,36 @@ public class TestCapacityVolumeChoosingPolicy {
       chooseCount.put(volume, chooseCount.get(volume) + 1);
     }
 
-    Assertions.assertTrue(chooseCount.get(hddsVolume3) >
-        chooseCount.get(hddsVolume1));
-    Assertions.assertTrue(chooseCount.get(hddsVolume3) >
-        chooseCount.get(hddsVolume2));
+    assertThat(chooseCount.get(hddsVolume3)).isGreaterThan(chooseCount.get(hddsVolume1));
+    assertThat(chooseCount.get(hddsVolume3)).isGreaterThan(chooseCount.get(hddsVolume2));
   }
 
   @Test
   public void throwsDiskOutOfSpaceIfRequestMoreThanAvailable() {
-    Exception e = Assertions.assertThrows(DiskOutOfSpaceException.class,
+    Exception e = assertThrows(DiskOutOfSpaceException.class,
         () -> policy.chooseVolume(volumes, 500));
 
     String msg = e.getMessage();
-    assertTrue(
-        msg.contains("No volumes have enough space for a new container.  " +
-            "Most available space: 250 bytes"),
-        msg);
+    assertThat(msg)
+        .contains("No volumes have enough space for a new container.  " +
+            "Most available space: 250 bytes");
+  }
+
+  @Test
+  public void testVolumeChoosingPolicyFactory()
+      throws InstantiationException, IllegalAccessException {
+    // unset HDDS_DATANODE_VOLUME_CHOOSING_POLICY
+    // should assert the default policy.
+    assertEquals(CapacityVolumeChoosingPolicy.class,
+        VolumeChoosingPolicyFactory.getPolicy(CONF).getClass());
+    CONF.set(HDDS_DATANODE_VOLUME_CHOOSING_POLICY,
+        CapacityVolumeChoosingPolicy.class.getName());
+    assertEquals(CapacityVolumeChoosingPolicy.class,
+        VolumeChoosingPolicyFactory.getPolicy(CONF).getClass());
+    CONF.set(HDDS_DATANODE_VOLUME_CHOOSING_POLICY,
+        RoundRobinVolumeChoosingPolicy.class.getName());
+    assertEquals(RoundRobinVolumeChoosingPolicy.class,
+        VolumeChoosingPolicyFactory.getPolicy(CONF).getClass());
   }
 
 }

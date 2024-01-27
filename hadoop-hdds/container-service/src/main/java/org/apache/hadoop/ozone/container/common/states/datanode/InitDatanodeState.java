@@ -101,12 +101,13 @@ public class InitDatanodeState implements DatanodeState,
         }
       }
       for (InetSocketAddress addr : addresses) {
-        connectionManager.addSCMServer(addr);
+        connectionManager.addSCMServer(addr, context.getThreadNamePrefix());
         this.context.addEndpoint(addr);
       }
       InetSocketAddress reconAddress = getReconAddresses(conf);
       if (reconAddress != null) {
-        connectionManager.addReconServer(reconAddress);
+        connectionManager.addReconServer(reconAddress,
+            context.getThreadNamePrefix());
         this.context.addEndpoint(reconAddress);
       }
     }
@@ -127,7 +128,7 @@ public class InitDatanodeState implements DatanodeState,
         .getDatanodeDetails();
     if (datanodeDetails != null) {
       try {
-        ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, idPath);
+        ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, idPath, conf);
       } catch (IOException ex) {
         // As writing DatanodeDetails in to datanodeid file failed, which is
         // a critical thing, so shutting down the state machine.

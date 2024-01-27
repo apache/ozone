@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.audit.Auditable;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketArgs;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 
 /**
  * A class that encapsulates Bucket Arguments.
@@ -50,6 +51,10 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
    */
   private StorageType storageType;
 
+  /**
+   * Bucket encryption key info if encryption is enabled.
+   */
+  private BucketEncryptionKeyInfo bekInfo;
   private long quotaInBytes = OzoneConsts.QUOTA_RESET;
   private long quotaInNamespace = OzoneConsts.QUOTA_RESET;
   private boolean quotaInBytesSet = false;
@@ -150,6 +155,10 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     return defaultReplicationConfig;
   }
 
+  public BucketEncryptionKeyInfo getBucketEncryptionKeyInfo() {
+    return bekInfo;
+  }
+
   /**
    * Sets the Bucket default replication config.
    */
@@ -166,6 +175,12 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
   private void setQuotaInNamespace(long quotaInNamespace) {
     this.quotaInNamespaceSet = true;
     this.quotaInNamespace = quotaInNamespace;
+  }
+
+  @Deprecated
+  private void setBucketEncryptionKey(
+      BucketEncryptionKeyInfo bucketEncryptionKey) {
+    this.bekInfo = bucketEncryptionKey;
   }
 
   /**
@@ -216,6 +231,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     private long quotaInBytes;
     private boolean quotaInNamespaceSet = false;
     private long quotaInNamespace;
+    private BucketEncryptionKeyInfo bekInfo;
     private DefaultReplicationConfig defaultReplicationConfig;
     private String ownerName;
     /**
@@ -238,6 +254,12 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
 
     public Builder setIsVersionEnabled(Boolean versionFlag) {
       this.isVersionEnabled = versionFlag;
+      return this;
+    }
+
+    @Deprecated
+    public Builder setBucketEncryptionKey(BucketEncryptionKeyInfo info) {
+      this.bekInfo = info;
       return this;
     }
 
@@ -291,6 +313,9 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
       if (quotaInNamespaceSet) {
         omBucketArgs.setQuotaInNamespace(quotaInNamespace);
       }
+      if (bekInfo != null && bekInfo.getKeyName() != null) {
+        omBucketArgs.setBucketEncryptionKey(bekInfo);
+      }
       return omBucketArgs;
     }
   }
@@ -322,6 +347,11 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     if (ownerName != null) {
       builder.setOwnerName(ownerName);
     }
+
+    if (bekInfo != null && bekInfo.getKeyName() != null) {
+      builder.setBekInfo(OMPBHelper.convert(bekInfo));
+    }
+
     return builder.build();
   }
 
@@ -344,14 +374,21 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     // OmBucketArgs ctor already has more arguments, so setting the default
     // replication config separately.
     if (bucketArgs.hasDefaultReplicationConfig()) {
-      omBucketArgs.setDefaultReplicationConfig(new DefaultReplicationConfig(
+      omBucketArgs.setDefaultReplicationConfig(
+          DefaultReplicationConfig.fromProto(
               bucketArgs.getDefaultReplicationConfig()));
     }
+
     if (bucketArgs.hasQuotaInBytes()) {
       omBucketArgs.setQuotaInBytes(bucketArgs.getQuotaInBytes());
     }
     if (bucketArgs.hasQuotaInNamespace()) {
       omBucketArgs.setQuotaInNamespace(bucketArgs.getQuotaInNamespace());
+    }
+
+    if (bucketArgs.hasBekInfo()) {
+      omBucketArgs.setBucketEncryptionKey(
+          OMPBHelper.convert(bucketArgs.getBekInfo()));
     }
     return omBucketArgs;
   }

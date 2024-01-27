@@ -20,11 +20,16 @@ Resource            ../lib/os.robot
 
 *** Keywords ***
 Execute read-replicas CLI tool
-    Execute                         ozone debug read-replicas o3://om/${VOLUME}/${BUCKET}/${TESTFILE}
+    Execute                         ozone debug -Dozone.network.topology.aware.read=true read-replicas o3://om/${VOLUME}/${BUCKET}/${TESTFILE}
     ${directory} =                  Execute     ls -d /opt/hadoop/${VOLUME}_${BUCKET}_${TESTFILE}_*/ | tail -n 1
     Directory Should Exist          ${directory}
     File Should Exist               ${directory}/${TESTFILE}_manifest
     [Return]                        ${directory}
+
+Execute Lease recovery cli
+    [Arguments]                     ${KEY_PATH}
+    ${result} =                     Execute And Ignore Error      ozone debug recover --path=${KEY_PATH}
+    [Return]                        ${result}
 
 Read Replicas Manifest
     ${manifest} =        Get File        ${DIR}/${TESTFILE}_manifest

@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.security.x509.certificate.utils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -41,15 +42,13 @@ import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.cert.CRLException;
 import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
 import java.security.cert.X509CRL;
 import java.time.LocalDateTime;
 import java.util.Date;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificates.utils.SelfSignedCertificate;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.crl.CRLCodec;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.bouncycastle.asn1.x500.X500Name;
@@ -58,6 +57,7 @@ import org.bouncycastle.cert.X509CRLEntryHolder;
 import org.bouncycastle.cert.X509CRLHolder;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v2CRLBuilder;
+import org.bouncycastle.jcajce.provider.asymmetric.x509.CertificateFactory;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.junit.jupiter.api.BeforeEach;
@@ -69,7 +69,6 @@ import org.junit.jupiter.api.io.TempDir;
  */
 public class TestCRLCodec {
 
-  private static OzoneConfiguration conf = new OzoneConfiguration();
   private static final String COMPONENT = "test";
   private SecurityConfig securityConfig;
   private X509CertificateHolder x509CertificateHolder;
@@ -94,7 +93,7 @@ public class TestCRLCodec {
   public void init(@TempDir Path tempDir) throws NoSuchProviderException,
       NoSuchAlgorithmException, IOException,
       CertificateException, OperatorCreationException {
-
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_METADATA_DIRS, tempDir.toString());
     securityConfig = new SecurityConfig(conf);
     writeTempCert();
@@ -160,8 +159,8 @@ public class TestCRLCodec {
 
     byte[] crlBytes = TMP_CRL_ENTRY.getBytes(UTF_8);
     try (InputStream inStream = new ByteArrayInputStream(crlBytes)) {
-      CertificateFactory cf = CertificateFactory.getInstance("X.509");
-      X509CRL crl = (X509CRL)cf.generateCRL(inStream);
+      CertificateFactory cf = CertificateCodec.getCertFactory();
+      X509CRL crl = (X509CRL) cf.engineGenerateCRL(inStream);
 
       CRLCodec crlCodec = new CRLCodec(securityConfig);
       crlCodec.writeCRL(crl);
@@ -169,7 +168,7 @@ public class TestCRLCodec {
       // verify file generated or not
       File crlFile =
           Paths.get(crlCodec.getLocation().toString(),
-                    this.securityConfig.getCrlName()).toFile();
+              this.securityConfig.getCrlName()).toFile();
 
       assertTrue(crlFile.exists());
     }
@@ -206,8 +205,8 @@ public class TestCRLCodec {
     // Verify header and footer of PEM encoded String
     String header = "-----BEGIN X509 CRL-----";
     String footer = "-----END X509 CRL-----";
-    assertTrue(pemEncodedString.contains(header));
-    assertTrue(pemEncodedString.contains(footer));
+    assertThat(pemEncodedString).contains(header);
+    assertThat(pemEncodedString).contains(footer);
   }
 
   @Test
@@ -243,8 +242,7 @@ public class TestCRLCodec {
    */
   private void writeTempCert() throws NoSuchProviderException,
       NoSuchAlgorithmException, IOException {
-    HDDSKeyGenerator keyGenerator =
-        new HDDSKeyGenerator(conf);
+    HDDSKeyGenerator keyGenerator = new HDDSKeyGenerator(securityConfig);
     keyPair = keyGenerator.generateKey();
     LocalDateTime startDate = LocalDateTime.now();
     LocalDateTime endDate = startDate.plusDays(1);
@@ -255,8 +253,7 @@ public class TestCRLCodec {
             .setScmID(RandomStringUtils.randomAlphabetic(4))
             .setBeginDate(startDate)
             .setEndDate(endDate)
-            .setConfiguration(keyGenerator.getSecurityConfig()
-                                  .getConfiguration())
+            .setConfiguration(securityConfig)
             .setKey(keyPair)
             .makeCA()
             .build();
@@ -272,7 +269,7 @@ public class TestCRLCodec {
       assertTrue(basePath.mkdirs());
     }
     codec.writeCertificate(basePath.toPath(), TMP_CERT_FILE_NAME,
-                           pemString, false);
+        pemString);
   }
 
   private X509CertificateHolder readTempCert()
@@ -282,7 +279,7 @@ public class TestCRLCodec {
         new CertificateCodec(securityConfig, COMPONENT);
 
     X509CertificateHolder x509CertHolder =
-        codec.readCertificate(basePath.toPath(), TMP_CERT_FILE_NAME);
+        codec.getTargetCertHolder(basePath.toPath(), TMP_CERT_FILE_NAME);
 
     assertNotNull(x509CertHolder);
 

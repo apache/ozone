@@ -363,7 +363,7 @@ public class FollowerAppendLogEntryGenerator extends BaseAppendLogGenerator
     }
     long lastCommit = reply.getFollowerCommit();
     if (lastCommit % 1000 == 0) {
-      long currentIndex = getAttemptCounter().get();
+      long currentIndex = getAttemptCount();
       if (currentIndex - lastCommit > batching * 3) {
         LOG.warn(
             "Last committed index ({}) is behind the current index ({}) on "

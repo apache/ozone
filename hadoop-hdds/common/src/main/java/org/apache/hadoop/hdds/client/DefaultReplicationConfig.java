@@ -26,88 +26,53 @@ import java.util.Objects;
  */
 public class DefaultReplicationConfig {
 
-  private ReplicationType type;
-  private ReplicationFactor factor;
-  private ECReplicationConfig ecReplicationConfig;
-
-  public DefaultReplicationConfig(ReplicationType type,
-      ReplicationFactor factor) {
-    this.type = type;
-    this.factor = factor;
-    this.ecReplicationConfig = null;
-  }
+  private final ECReplicationConfig ecReplicationConfig;
+  private final ReplicationConfig replicationConfig;
 
   public DefaultReplicationConfig(ReplicationConfig replicationConfig) {
-    this.type =
-        ReplicationType.fromProto(replicationConfig.getReplicationType());
+    this.replicationConfig = replicationConfig;
     if (replicationConfig instanceof ECReplicationConfig) {
-      this.ecReplicationConfig = (ECReplicationConfig) replicationConfig;
+      ecReplicationConfig = (ECReplicationConfig) replicationConfig;
     } else {
-      this.factor =
-          ReplicationFactor.valueOf(replicationConfig.getRequiredNodes());
+      ecReplicationConfig = null;
     }
   }
 
-  public DefaultReplicationConfig(ReplicationType type,
-      ECReplicationConfig ecReplicationConfig) {
-    this.type = type;
-    this.factor = null;
-    this.ecReplicationConfig = ecReplicationConfig;
-  }
-
-  public DefaultReplicationConfig(ReplicationType type,
-      ReplicationFactor factor, ECReplicationConfig ecReplicationConfig) {
-    this.type = type;
-    this.factor = factor;
-    this.ecReplicationConfig = ecReplicationConfig;
-  }
-
-  public DefaultReplicationConfig(
-      org.apache.hadoop.hdds.protocol.proto.HddsProtos.DefaultReplicationConfig
-          defaultReplicationConfig) {
-    this.type = ReplicationType.fromProto(defaultReplicationConfig.getType());
-    if (defaultReplicationConfig.hasEcReplicationConfig()) {
-      this.ecReplicationConfig = new ECReplicationConfig(
-          defaultReplicationConfig.getEcReplicationConfig());
-    } else {
-      this.factor =
-          ReplicationFactor.fromProto(defaultReplicationConfig.getFactor());
+  public static DefaultReplicationConfig fromProto(
+      HddsProtos.DefaultReplicationConfig proto) {
+    if (proto == null) {
+      throw new IllegalArgumentException(
+          "Invalid argument: default replication config is null");
     }
+    ReplicationConfig config = proto.hasEcReplicationConfig()
+        ? new ECReplicationConfig(proto.getEcReplicationConfig())
+        : ReplicationConfig.fromProtoTypeAndFactor(
+            proto.getType(), proto.getFactor());
+    return new DefaultReplicationConfig(config);
   }
 
   public ReplicationType getType() {
-    return this.type;
-  }
-
-  public ReplicationFactor getFactor() {
-    return this.factor;
+    return ReplicationType.fromProto(replicationConfig.getReplicationType());
   }
 
   public DefaultReplicationConfig copy() {
-    return new DefaultReplicationConfig(this.type, this.factor,
-        this.ecReplicationConfig);
+    return new DefaultReplicationConfig(replicationConfig);
   }
 
-  public ECReplicationConfig getEcReplicationConfig() {
-    return this.ecReplicationConfig;
-  }
-
-  public int getRequiredNodes() {
-    if (this.type == ReplicationType.EC) {
-      return ecReplicationConfig.getRequiredNodes();
-    }
-    return this.factor.getValue();
+  public ReplicationConfig getReplicationConfig() {
+    return replicationConfig;
   }
 
   public HddsProtos.DefaultReplicationConfig toProto() {
     final HddsProtos.DefaultReplicationConfig.Builder builder =
         HddsProtos.DefaultReplicationConfig.newBuilder()
-            .setType(ReplicationType.toProto(this.type));
-    if (this.factor != null) {
-      builder.setFactor(ReplicationFactor.toProto(this.factor));
-    }
+            .setType(replicationConfig.getReplicationType());
     if (this.ecReplicationConfig != null) {
       builder.setEcReplicationConfig(this.ecReplicationConfig.toProto());
+    } else {
+      ReplicationFactor factor =
+          ReplicationFactor.valueOf(replicationConfig.getRequiredNodes());
+      builder.setFactor(factor.toProto());
     }
     return builder.build();
   }
@@ -121,14 +86,17 @@ public class DefaultReplicationConfig {
       return false;
     }
     DefaultReplicationConfig that = (DefaultReplicationConfig) o;
-    return Objects.equals(type, that.type) && Objects
-        .equals(factor, that.factor) && Objects
-        .equals(ecReplicationConfig, that.ecReplicationConfig);
+    return Objects.equals(replicationConfig, that.replicationConfig);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(type, factor, ecReplicationConfig);
+    return Objects.hash(replicationConfig);
+  }
+
+  @Override
+  public String toString() {
+    return replicationConfig.toString();
   }
 }
 

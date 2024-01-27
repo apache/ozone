@@ -1,4 +1,4 @@
-/**
+ /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -29,37 +29,35 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.Rule;
-import org.junit.rules.Timeout;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.REPLICATION;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * This class tests container operations (TODO currently only supports create)
  * from cblock clients.
  */
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
 public class TestContainerOperations {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
-
   private static ScmClient storageClient;
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration ozoneConf;
 
-  @BeforeClass
+  @BeforeAll
   public static void setup() throws Exception {
     ozoneConf = new OzoneConfiguration();
     ozoneConf.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
@@ -69,7 +67,7 @@ public class TestContainerOperations {
     cluster.waitForClusterToBeReady();
   }
 
-  @AfterClass
+  @AfterAll
   public static void cleanup() throws Exception {
     if (cluster != null) {
       cluster.shutdown();
@@ -98,13 +96,12 @@ public class TestContainerOperations {
   public void testGetPipeline() throws Exception {
     try {
       storageClient.getPipeline(PipelineID.randomId().getProtobuf());
-      Assert.fail("Get Pipeline should fail");
+      fail("Get Pipeline should fail");
     } catch (Exception e) {
-      assertTrue(
-          SCMHAUtils.unwrapException(e) instanceof PipelineNotFoundException);
+      assertInstanceOf(PipelineNotFoundException.class, SCMHAUtils.unwrapException(e));
     }
 
-    Assert.assertFalse(storageClient.listPipelines().isEmpty());
+    assertThat(storageClient.listPipelines()).isNotEmpty();
   }
 
   @Test
@@ -131,5 +128,38 @@ public class TestContainerOperations {
       assertTrue(info.getNode().getPortsList().stream()
           .anyMatch(port -> REPLICATION.name().equals(port.getName())));
     }
+  }
+
+  @Test
+  public void testDatanodeUsageInfoContainerCount() throws IOException {
+    List<DatanodeDetails> dnList = cluster.getStorageContainerManager()
+            .getScmNodeManager()
+            .getAllNodes();
+
+    for (DatanodeDetails dn : dnList) {
+      List<HddsProtos.DatanodeUsageInfoProto> usageInfoList =
+              storageClient.getDatanodeUsageInfo(
+                      dn.getIpAddress(), dn.getUuidString());
+
+      assertEquals(1, usageInfoList.size());
+      assertEquals(0, usageInfoList.get(0).getContainerCount());
+    }
+
+    storageClient.createContainer(HddsProtos
+            .ReplicationType.STAND_ALONE, HddsProtos.ReplicationFactor
+            .ONE, OzoneConsts.OZONE);
+
+    int[] totalContainerCount = new int[2];
+    for (DatanodeDetails dn : dnList) {
+      List<HddsProtos.DatanodeUsageInfoProto> usageInfoList =
+              storageClient.getDatanodeUsageInfo(
+                      dn.getIpAddress(), dn.getUuidString());
+
+      assertEquals(1, usageInfoList.size());
+      assertThat(usageInfoList.get(0).getContainerCount()).isGreaterThanOrEqualTo(0).isLessThanOrEqualTo(1);
+      totalContainerCount[(int)usageInfoList.get(0).getContainerCount()]++;
+    }
+    assertEquals(2, totalContainerCount[0]);
+    assertEquals(1, totalContainerCount[1]);
   }
 }

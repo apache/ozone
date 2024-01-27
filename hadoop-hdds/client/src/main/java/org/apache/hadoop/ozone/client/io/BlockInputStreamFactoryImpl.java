@@ -78,7 +78,7 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
       BlockLocationInfo blockInfo, Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token, boolean verifyChecksum,
       XceiverClientFactory xceiverFactory,
-      Function<BlockID, Pipeline> refreshFunction) {
+      Function<BlockID, BlockLocationInfo> refreshFunction) {
     if (repConfig.getReplicationType().equals(HddsProtos.ReplicationType.EC)) {
       return new ECBlockInputStreamProxy((ECReplicationConfig)repConfig,
           blockInfo, verifyChecksum, xceiverFactory, refreshFunction,

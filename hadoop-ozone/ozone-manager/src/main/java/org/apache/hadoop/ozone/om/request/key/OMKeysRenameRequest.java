@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import com.google.common.base.Optional;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmRenameKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
@@ -55,6 +54,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -81,8 +81,8 @@ public class OMKeysRenameRequest extends OMKeyRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long trxnLogIndex = termIndex.getIndex();
 
     RenameKeysRequest renameKeysRequest = getOmRequest().getRenameKeysRequest();
     RenameKeysArgs renameKeysArgs = renameKeysRequest.getRenameKeysArgs();
@@ -105,7 +105,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
         getOmRequest());
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    IOException exception = null;
+    Exception exception = null;
     OmKeyInfo fromKeyValue = null;
     Result result = null;
     Map<String, String> auditMap = new LinkedHashMap<>();
@@ -120,9 +120,10 @@ public class OMKeysRenameRequest extends OMKeyRequest {
       bucket.audit(auditMap);
       volumeName = bucket.realVolume();
       bucketName = bucket.realBucket();
-      acquiredLock =
-          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-              volumeName, bucketName);
+      mergeOmLockDetails(
+          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
+              bucketName));
+      acquiredLock = getOmLockDetails().isLockAcquired();
 
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
@@ -206,9 +207,9 @@ public class OMKeysRenameRequest extends OMKeyRequest {
         Table<String, OmKeyInfo> keyTable =
             omMetadataManager.getKeyTable(getBucketLayout());
         keyTable.addCacheEntry(new CacheKey<>(fromKey),
-            new CacheValue<>(Optional.absent(), trxnLogIndex));
+            CacheValue.get(trxnLogIndex));
         keyTable.addCacheEntry(new CacheKey<>(toKey),
-            new CacheValue<>(Optional.of(fromKeyValue), trxnLogIndex));
+            CacheValue.get(trxnLogIndex, fromKeyValue));
         renamedKeys.put(fromKeyName, toKeyName);
         fromKeyAndToKeyInfo.put(fromKeyName, fromKeyValue);
       }
@@ -224,21 +225,22 @@ public class OMKeysRenameRequest extends OMKeyRequest {
           newOmRenameKeys);
 
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
-      createErrorOMResponse(omResponse, ex);
+      createErrorOMResponse(omResponse, exception);
 
       omResponse.setRenameKeysResponse(RenameKeysResponse.newBuilder()
           .setStatus(renameStatus).addAllUnRenamedKeys(unRenamedKeys).build());
       omClientResponse = new OMKeysRenameResponse(omResponse.build());
 
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

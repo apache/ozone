@@ -28,7 +28,7 @@ import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -87,6 +87,12 @@ public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
         omMetadataMgr.getDirectoryTable().putWithBatch(batchOp, parentKey,
                 parentDirInfo);
       }
+
+      String bucketKey = omMetadataMgr.getBucketKey(
+          getOmBucketInfo().getVolumeName(),
+          getOmBucketInfo().getBucketName());
+      omMetadataMgr.getBucketTable().putWithBatch(batchOp,
+          bucketKey, getOmBucketInfo());
     }
 
     OMFileRequest.addToOpenFileTable(omMetadataMgr, batchOp, getOmKeyInfo(),

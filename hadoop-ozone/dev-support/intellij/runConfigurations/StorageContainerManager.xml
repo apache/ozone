@@ -15,7 +15,7 @@
    limitations under the License.
 -->
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="StorageContainerManager" type="Application" factoryName="Application" nameIsGenerated="falsee">
+  <configuration default="false" name="StorageContainerManager" type="Application" factoryName="Application" nameIsGenerated="false">
     <option name="MAIN_CLASS_NAME" value="org.apache.hadoop.hdds.scm.server.StorageContainerManagerStarter" />
     <module name="hdds-server-scm" />
     <option name="PROGRAM_PARAMETERS" value="-conf=hadoop-ozone/dev-support/intellij/ozone-site.xml" />

@@ -26,8 +26,10 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.util.Time;
 
@@ -43,6 +45,10 @@ public class ObjectStoreStub extends ObjectStore {
 
   public ObjectStoreStub() {
     super();
+  }
+
+  public ObjectStoreStub(ConfigurationSource conf, ClientProtocol proxy) {
+    super(conf, proxy);
   }
 
   private Map<String, OzoneVolumeStub> volumes = new HashMap<>();
@@ -61,14 +67,15 @@ public class ObjectStoreStub extends ObjectStore {
 
   @Override
   public void createVolume(String volumeName, VolumeArgs volumeArgs) {
-    OzoneVolumeStub volume =
-        new OzoneVolumeStub(volumeName,
-            volumeArgs.getAdmin(),
-            volumeArgs.getOwner(),
-            volumeArgs.getQuotaInBytes(),
-            volumeArgs.getQuotaInNamespace(),
-            Time.now(),
-            volumeArgs.getAcls());
+    OzoneVolumeStub volume = OzoneVolumeStub.newBuilder()
+        .setName(volumeName)
+        .setAdmin(volumeArgs.getAdmin())
+        .setOwner(volumeArgs.getOwner())
+        .setQuotaInBytes(volumeArgs.getQuotaInBytes())
+        .setQuotaInNamespace(volumeArgs.getQuotaInNamespace())
+        .setCreationTime(Time.now())
+        .setAcls(volumeArgs.getAcls())
+        .build();
     volumes.put(volumeName, volume);
   }
 

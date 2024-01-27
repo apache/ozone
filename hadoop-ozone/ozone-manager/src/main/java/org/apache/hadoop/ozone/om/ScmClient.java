@@ -19,17 +19,19 @@ package org.apache.hadoop.ozone.om;
 
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
+import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import com.google.common.cache.LoadingCache;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.hdds.scm.update.client.SCMUpdateServiceGrpcClient;
 import org.apache.hadoop.util.CacheMetrics;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -49,7 +51,6 @@ public class ScmClient {
   private final StorageContainerLocationProtocol containerClient;
   private final LoadingCache<Long, Pipeline> containerLocationCache;
   private final CacheMetrics containerCacheMetrics;
-  private SCMUpdateServiceGrpcClient updateServiceGrpcClient;
 
   ScmClient(ScmBlockLocationProtocol blockClient,
             StorageContainerLocationProtocol containerClient,
@@ -76,16 +77,16 @@ public class ScmClient {
         .expireAfterWrite(ttl, unit)
         .recordStats()
         .build(new CacheLoader<Long, Pipeline>() {
-          @NotNull
+          @Nonnull
           @Override
-          public Pipeline load(@NotNull Long key) throws Exception {
+          public Pipeline load(@Nonnull Long key) throws Exception {
             return containerClient.getContainerWithPipeline(key).getPipeline();
           }
 
-          @NotNull
+          @Nonnull
           @Override
           public Map<Long, Pipeline> loadAll(
-              @NotNull Iterable<? extends Long> keys) throws Exception {
+              @Nonnull Iterable<? extends Long> keys) throws Exception {
             return containerClient.getContainerWithPipelineBatch(keys)
                 .stream()
                 .collect(Collectors.toMap(
@@ -104,15 +105,6 @@ public class ScmClient {
     return this.containerClient;
   }
 
-  public void setUpdateServiceGrpcClient(
-      SCMUpdateServiceGrpcClient updateClient) {
-    this.updateServiceGrpcClient = updateClient;
-  }
-
-  public SCMUpdateServiceGrpcClient getUpdateServiceGrpcClient() {
-    return updateServiceGrpcClient;
-  }
-
   public Map<Long, Pipeline> getContainerLocations(Iterable<Long> containerIds,
                                                   boolean forceRefresh)
       throws IOException {
@@ -120,9 +112,28 @@ public class ScmClient {
       containerLocationCache.invalidateAll(containerIds);
     }
     try {
-      return containerLocationCache.getAll(containerIds);
+      Map<Long, Pipeline> result = containerLocationCache.getAll(containerIds);
+      // Don't keep empty pipelines in the cache.
+      List<Long> emptyPipelines = result.entrySet().stream()
+          .filter(e -> e.getValue().isEmpty())
+          .map(Map.Entry::getKey)
+          .collect(Collectors.toList());
+      containerLocationCache.invalidateAll(emptyPipelines);
+      return result;
     } catch (ExecutionException e) {
       return handleCacheExecutionException(e);
+    } catch (InvalidCacheLoadException e) {
+      // this is thrown when a container is not found from SCM.
+      // In this case, return  available, instead of propagating the
+      // exception to client code.
+      Map<Long, Pipeline> result = new HashMap<>();
+      for (Long containerId : containerIds) {
+        Pipeline p = containerLocationCache.getIfPresent(containerId);
+        if (p != null) {
+          result.put(containerId, p);
+        }
+      }
+      return result;
     }
   }
 

@@ -20,14 +20,24 @@ package org.apache.hadoop.ozone.recon.scm;
 
 import org.apache.hadoop.hdds.scm.safemode.SafeModeManager;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 /**
  * Recon's stub implementation of SCM's SafeMode manager.
  */
 
 public class ReconSafeModeManager implements SafeModeManager {
+  private AtomicBoolean inSafeMode = new AtomicBoolean(true);
 
   @Override
   public boolean getInSafeMode() {
-    return false;
+    return this.inSafeMode.get();
+  }
+
+  /**
+   * Set safe mode status.
+   */
+  public void setInSafeMode(boolean inSafeMode) {
+    this.inSafeMode.set(inSafeMode);
   }
 }

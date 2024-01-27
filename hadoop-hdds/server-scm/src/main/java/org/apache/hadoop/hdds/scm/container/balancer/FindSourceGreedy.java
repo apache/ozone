@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,7 +72,7 @@ public class FindSourceGreedy implements FindSourceStrategy {
    * {@inheritDoc}
    */
   public void resetPotentialSources(
-      @NotNull Collection<DatanodeDetails> sources) {
+      @Nonnull Collection<DatanodeDetails> sources) {
     List<DatanodeUsageInfo> usageInfos = new ArrayList<>(sources.size());
     sources.forEach(source -> usageInfos.add(nodeManager.getUsageInfo(source)));
     resetSources(usageInfos);
@@ -157,10 +157,24 @@ public class FindSourceGreedy implements FindSourceStrategy {
       // MaxSizeLeavingTarget
       //2 after subtracting sizeLeavingAfterMove, the usage is bigger
       // than or equal to lowerLimit
-      return sizeLeavingAfterMove <= config.getMaxSizeLeavingSource() &&
-          Double.compare(nodeManager.getUsageInfo(source)
-              .calculateUtilization(-sizeLeavingAfterMove), lowerLimit) >= 0;
+      if (sizeLeavingAfterMove > config.getMaxSizeLeavingSource()) {
+        LOG.debug("{} bytes cannot leave datanode {} because 'size.leaving" +
+                ".source.max' limit is {} and {} bytes have already left.",
+            size, source.getUuidString(), config.getMaxSizeLeavingSource(),
+            sizeLeavingNode.get(source));
+        return false;
+      }
+      if (Double.compare(nodeManager.getUsageInfo(source)
+          .calculateUtilization(-sizeLeavingAfterMove), lowerLimit) < 0) {
+        LOG.debug("{} bytes cannot leave datanode {} because its utilization " +
+                "will drop below the lower limit of {}.", size,
+            source.getUuidString(), lowerLimit);
+        return false;
+      }
+      return true;
     }
+
+    LOG.warn("No record of how much size has left datanode {}", source);
     return false;
   }
 

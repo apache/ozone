@@ -19,6 +19,8 @@
 package org.apache.hadoop.ozone.container.common.statemachine;
 
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction.Action.CLOSE;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
@@ -37,6 +39,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
@@ -49,6 +52,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.Descriptors.Descriptor;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
@@ -62,8 +66,8 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import com.google.protobuf.Message;
@@ -83,7 +87,7 @@ public class TestStateContext {
         mock(DatanodeStateMachine.class);
 
     StateContext ctx = new StateContext(conf, DatanodeStates.getInitState(),
-        datanodeStateMachineMock);
+        datanodeStateMachineMock, "");
     InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
     ctx.addEndpoint(scm1);
     InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
@@ -137,19 +141,7 @@ public class TestStateContext {
 
   @Test
   public void testReportQueueWithAddReports() throws IOException {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    DatanodeStateMachine datanodeStateMachineMock =
-        mock(DatanodeStateMachine.class);
-    OzoneContainer o = mock(OzoneContainer.class);
-    ContainerSet s = mock(ContainerSet.class);
-    when(datanodeStateMachineMock.getContainer()).thenReturn(o);
-    when(o.getContainerSet()).thenReturn(s);
-    when(s.getContainerReport())
-        .thenReturn(
-            StorageContainerDatanodeProtocolProtos
-                .ContainerReportsProto.getDefaultInstance());
-    StateContext ctx = new StateContext(conf, DatanodeStates.getInitState(),
-        datanodeStateMachineMock);
+    StateContext ctx = createSubject();
     InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
     ctx.addEndpoint(scm1);
     InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
@@ -310,7 +302,7 @@ public class TestStateContext {
   private StateContext newStateContext(OzoneConfiguration conf,
       DatanodeStateMachine datanodeStateMachineMock) {
     StateContext stateContext = new StateContext(conf,
-        DatanodeStates.getInitState(), datanodeStateMachineMock);
+        DatanodeStates.getInitState(), datanodeStateMachineMock, "");
     InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
     stateContext.addEndpoint(scm1);
     InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
@@ -338,7 +330,7 @@ public class TestStateContext {
     DatanodeStateMachine datanodeStateMachineMock =
         mock(DatanodeStateMachine.class);
     StateContext stateContext = new StateContext(conf,
-        DatanodeStates.getInitState(), datanodeStateMachineMock);
+        DatanodeStates.getInitState(), datanodeStateMachineMock, "");
 
     InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
     InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
@@ -370,12 +362,95 @@ public class TestStateContext {
   }
 
   @Test
+  public void testClosePipelineActions() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStateMachine datanodeStateMachineMock =
+        mock(DatanodeStateMachine.class);
+    OzoneContainer container = mock(OzoneContainer.class);
+    HddsProtos.PipelineID pipelineIDProto = PipelineID.randomId().getProtobuf();
+
+    // Mock DN PipelineReport
+    // Report pipelineId the first two time.
+    // Return empty pipeline report the third time to mock the pipeline being
+    // closed and removed from the DN.
+    PipelineReportsProto.Builder
+        pipelineReportsProtoBuilder = PipelineReportsProto.newBuilder();
+    pipelineReportsProtoBuilder.addAllPipelineReport(Collections.singletonList(
+        PipelineReport.newBuilder()
+            .setPipelineID(pipelineIDProto)
+            .setIsLeader(false)
+            .build()));
+    PipelineReportsProto pipelineReportsProto =
+        pipelineReportsProtoBuilder.build();
+
+    StorageContainerDatanodeProtocolProtos.PipelineReportsProto.Builder
+        emptyPipelineReportsBuilder = PipelineReportsProto.newBuilder();
+    emptyPipelineReportsBuilder.addAllPipelineReport(Collections.emptyList());
+
+    when(container.getPipelineReport()).thenReturn(pipelineReportsProto,
+        pipelineReportsProto, emptyPipelineReportsBuilder.build());
+    when(datanodeStateMachineMock.getContainer()).thenReturn(container);
+
+    StateContext stateContext = new StateContext(conf,
+        DatanodeStates.getInitState(), datanodeStateMachineMock, "");
+
+    InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
+
+    // Add SCM endpoint.
+    stateContext.addEndpoint(scm1);
+
+    final ClosePipelineInfo closePipelineInfo = ClosePipelineInfo.newBuilder()
+        .setPipelineID(pipelineIDProto)
+        .setReason(ClosePipelineInfo.Reason.PIPELINE_FAILED)
+        .setDetailedReason("Test").build();
+    final PipelineAction pipelineAction = PipelineAction.newBuilder()
+        .setClosePipeline(closePipelineInfo)
+        .setAction(PipelineAction.Action.CLOSE)
+        .build();
+
+    // Add PipelineAction. Should be added to all endpoints.
+    stateContext.addPipelineActionIfAbsent(pipelineAction);
+
+    // Get pipeline actions for scm1.
+    List<PipelineAction> pipelineActions =
+        stateContext.getPendingPipelineAction(scm1, 10);
+    assertEquals(1, pipelineActions.size());
+
+    // Ensure that the close pipeline action is not dequeued from scm1 since
+    // DN reports the pipelineID.
+    pipelineActions = stateContext.getPendingPipelineAction(scm1, 10);
+    assertEquals(1, pipelineActions.size());
+
+    // Ensure that the pipeline action is dequeued from scm1 when
+    // the DN closes and removes the pipeline
+    pipelineActions = stateContext.getPendingPipelineAction(scm1, 10);
+    assertEquals(0, pipelineActions.size());
+  }
+
+  @Test
   public void testActionAPIs() {
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeStateMachine datanodeStateMachineMock =
         mock(DatanodeStateMachine.class);
+    OzoneContainer container = mock(OzoneContainer.class);
+    HddsProtos.PipelineID pipelineIDProto = PipelineID.randomId().getProtobuf();
+
+    // Mock DN PipelineReport
+    PipelineReportsProto.Builder
+        pipelineReportsProtoBuilder = PipelineReportsProto.newBuilder();
+    pipelineReportsProtoBuilder.addAllPipelineReport(Collections.singletonList(
+        PipelineReport.newBuilder()
+            .setPipelineID(pipelineIDProto)
+            .setIsLeader(false)
+            .build()));
+    PipelineReportsProto pipelineReportsProto =
+        pipelineReportsProtoBuilder.build();
+
+    when(container.getPipelineReport()).thenReturn(pipelineReportsProto);
+    when(datanodeStateMachineMock.getContainer()).thenReturn(container);
+
     StateContext stateContext = new StateContext(conf,
-        DatanodeStates.getInitState(), datanodeStateMachineMock);
+        DatanodeStates.getInitState(), datanodeStateMachineMock, "");
 
     InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
     InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
@@ -395,7 +470,7 @@ public class TestStateContext {
     stateContext.addEndpoint(scm2);
 
     final ClosePipelineInfo closePipelineInfo = ClosePipelineInfo.newBuilder()
-        .setPipelineID(PipelineID.randomId().getProtobuf())
+        .setPipelineID(pipelineIDProto)
         .setReason(ClosePipelineInfo.Reason.PIPELINE_FAILED)
         .setDetailedReason("Test").build();
     final PipelineAction pipelineAction = PipelineAction.newBuilder()
@@ -408,7 +483,8 @@ public class TestStateContext {
 
     pipelineActions = stateContext.getPendingPipelineAction(scm2, 10);
     assertEquals(1, pipelineActions.size());
-    // The pipeline action is dequeued from scm2 now, but still in scm1
+    // The pipeline action will not be dequeued from scm2
+    // until it is removed from the DN.
 
     // The same pipeline action will not be added if it already exists
     stateContext.addPipelineActionIfAbsent(pipelineAction);
@@ -439,7 +515,7 @@ public class TestStateContext {
     final AtomicBoolean taskExecuted = new AtomicBoolean();
 
     StateContext subject = new StateContext(new OzoneConfiguration(),
-        DatanodeStates.getInitState(), mock(DatanodeStateMachine.class)) {
+        DatanodeStates.getInitState(), mock(DatanodeStateMachine.class), "") {
       @Override
       public DatanodeState<DatanodeStates> getTask() {
         // this task waits until {@code subject} is shutdown
@@ -487,7 +563,8 @@ public class TestStateContext {
 
   @Test
   public void testIsThreadPoolAvailable() throws Exception {
-    StateContext stateContext = new StateContext(null, null, null);
+    StateContext stateContext = new StateContext(
+        new OzoneConfiguration(), null, null, "");
 
     int threadPoolSize = 2;
     ExecutorService executorService = Executors.newFixedThreadPool(
@@ -502,7 +579,7 @@ public class TestStateContext {
     }
     executorService.submit((Callable<String>) futureTwo::get);
 
-    Assertions.assertFalse(stateContext.isThreadPoolAvailable(executorService));
+    assertFalse(stateContext.isThreadPoolAvailable(executorService));
 
     futureOne.complete("futureOne");
     LambdaTestUtils.await(1000, 100, () ->
@@ -523,7 +600,7 @@ public class TestStateContext {
     executorService.submit((Callable<String>) future::get);
 
     StateContext subject = new StateContext(new OzoneConfiguration(),
-        DatanodeStates.INIT, mock(DatanodeStateMachine.class)) {
+        DatanodeStates.INIT, mock(DatanodeStateMachine.class), "") {
       @Override
       public DatanodeState<DatanodeStates> getTask() {
         // this task counts the number of execute() and await() calls
@@ -573,7 +650,7 @@ public class TestStateContext {
         mock(DatanodeStateMachine.class);
 
     StateContext ctx = new StateContext(conf, DatanodeStates.getInitState(),
-        datanodeStateMachineMock);
+        datanodeStateMachineMock, "");
     InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
     ctx.addEndpoint(scm1);
     InetSocketAddress scm2 = new InetSocketAddress("scm2", 9001);
@@ -623,6 +700,58 @@ public class TestStateContext {
 
   @Test
   public void testCommandQueueSummary() throws IOException {
+    StateContext ctx = createSubject();
+    ctx.addCommand(ReplicateContainerCommand.forTest(1));
+    ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
+    ctx.addCommand(ReplicateContainerCommand.forTest(2));
+    ctx.addCommand(ReplicateContainerCommand.forTest(3));
+    ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
+    ctx.addCommand(new CloseContainerCommand(1, PipelineID.randomId()));
+
+    Map<SCMCommandProto.Type, Integer> summary = ctx.getCommandQueueSummary();
+    assertEquals(3,
+        summary.get(SCMCommandProto.Type.replicateContainerCommand).intValue());
+    assertEquals(2,
+        summary.get(SCMCommandProto.Type.closePipelineCommand).intValue());
+    assertEquals(1,
+        summary.get(SCMCommandProto.Type.closeContainerCommand).intValue());
+  }
+
+  @Test
+  void updatesTermForCommandWithNewerTerm() throws IOException {
+    final long originalTerm = 1;
+    final long commandTerm = 2;
+    StateContext subject = createSubject();
+    SCMCommand<?> commandWithNewTerm = someCommand();
+    subject.setTermOfLeaderSCM(originalTerm);
+    commandWithNewTerm.setTerm(commandTerm);
+
+    subject.addCommand(commandWithNewTerm);
+
+    OptionalLong termOfLeaderSCM = subject.getTermOfLeaderSCM();
+    assertTrue(termOfLeaderSCM.isPresent());
+    assertEquals(commandTerm, termOfLeaderSCM.getAsLong());
+    assertEquals(commandWithNewTerm, subject.getNextCommand());
+  }
+
+  @Test
+  void keepsExistingTermForCommandWithOlderTerm() throws IOException {
+    final long originalTerm = 2;
+    final long commandTerm = 1;
+    StateContext subject = createSubject();
+    SCMCommand<?> commandWithNewTerm = someCommand();
+    subject.setTermOfLeaderSCM(originalTerm);
+    commandWithNewTerm.setTerm(commandTerm);
+
+    subject.addCommand(commandWithNewTerm);
+
+    OptionalLong termOfLeaderSCM = subject.getTermOfLeaderSCM();
+    assertTrue(termOfLeaderSCM.isPresent());
+    assertEquals(originalTerm, termOfLeaderSCM.getAsLong());
+    assertNull(subject.getNextCommand());
+  }
+
+  private static StateContext createSubject() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeStateMachine datanodeStateMachineMock =
         mock(DatanodeStateMachine.class);
@@ -634,22 +763,12 @@ public class TestStateContext {
         .thenReturn(
             StorageContainerDatanodeProtocolProtos
                 .ContainerReportsProto.getDefaultInstance());
-    StateContext ctx = new StateContext(conf, DatanodeStates.getInitState(),
-        datanodeStateMachineMock);
-    ctx.addCommand(new ReplicateContainerCommand(1, null));
-    ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
-    ctx.addCommand(new ReplicateContainerCommand(2, null));
-    ctx.addCommand(new ReplicateContainerCommand(3, null));
-    ctx.addCommand(new ClosePipelineCommand(PipelineID.randomId()));
-    ctx.addCommand(new CloseContainerCommand(1, PipelineID.randomId()));
+    return new StateContext(conf, DatanodeStates.getInitState(),
+        datanodeStateMachineMock, "");
+  }
 
-    Map<SCMCommandProto.Type, Integer> summary = ctx.getCommandQueueSummary();
-    Assertions.assertEquals(3,
-        summary.get(SCMCommandProto.Type.replicateContainerCommand).intValue());
-    Assertions.assertEquals(2,
-        summary.get(SCMCommandProto.Type.closePipelineCommand).intValue());
-    Assertions.assertEquals(1,
-        summary.get(SCMCommandProto.Type.closeContainerCommand).intValue());
+  private static SCMCommand<?> someCommand() {
+    return ReplicateContainerCommand.forTest(1);
   }
 
 }

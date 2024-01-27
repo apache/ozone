@@ -39,7 +39,7 @@ import java.util.concurrent.Callable;
 )
 public class DropTable implements Callable<Void>, SubcommandWithParent {
 
-  @CommandLine.Option(names = {"--column_family"},
+  @CommandLine.Option(names = {"--column-family", "--column_family"},
       description = "Table name")
   private String tableName;
 

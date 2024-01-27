@@ -149,6 +149,15 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   void deleteWithBatch(BatchOperation batch, KEY key) throws IOException;
 
   /**
+   * Deletes a range of keys from the metadata store.
+   *
+   * @param beginKey start metadata key
+   * @param endKey end metadata key
+   * @throws IOException on Failure
+   */
+  void deleteRange(KEY beginKey, KEY endKey) throws IOException;
+
+  /**
    * Returns the iterator for this metadata store.
    *
    * @return MetaStoreIterator
@@ -189,6 +198,17 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
   default void addCacheEntry(CacheKey<KEY> cacheKey,
       CacheValue<VALUE> cacheValue) {
     throw new NotImplementedException("addCacheEntry is not implemented");
+  }
+
+  /** Add entry to the table cache with a non-null key and a null value. */
+  default void addCacheEntry(KEY cacheKey, long epoch) {
+    addCacheEntry(new CacheKey<>(cacheKey), CacheValue.get(epoch));
+  }
+
+  /** Add entry to the table cache with a non-null key and a non-null value. */
+  default void addCacheEntry(KEY cacheKey, VALUE value, long epoch) {
+    addCacheEntry(new CacheKey<>(cacheKey),
+        CacheValue.get(epoch, value));
   }
 
   /**
@@ -316,5 +336,29 @@ public interface Table<KEY, VALUE> extends AutoCloseable {
     KEY getKey() throws IOException;
 
     VALUE getValue() throws IOException;
+  }
+
+  static <K, V> KeyValue<K, V> newKeyValue(K key, V value) {
+    return new KeyValue<K, V>() {
+      @Override
+      public K getKey() {
+        return key;
+      }
+
+      @Override
+      public V getValue() {
+        return value;
+      }
+
+      @Override
+      public String toString() {
+        return "(key=" + key + ", value=" + value + ")";
+      }
+    };
+  }
+
+  /** A {@link TableIterator} to iterate {@link KeyValue}s. */
+  interface KeyValueIterator<KEY, VALUE>
+      extends TableIterator<KEY, KeyValue<KEY, VALUE>> {
   }
 }

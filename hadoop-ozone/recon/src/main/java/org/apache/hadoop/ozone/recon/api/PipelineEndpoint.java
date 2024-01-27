@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory;
@@ -75,9 +76,9 @@ public class PipelineEndpoint {
 
     pipelines.forEach(pipeline -> {
       UUID pipelineId = pipeline.getId().getId();
-      List<String> datanodes = new ArrayList<>();
+      List<DatanodeDetails> datanodes = new ArrayList<>();
       PipelineMetadata.Builder builder = PipelineMetadata.newBuilder();
-      pipeline.getNodes().forEach(node -> datanodes.add(node.getHostName()));
+      pipeline.getNodes().forEach(node -> datanodes.add(node));
       long duration =
           Instant.now().toEpochMilli() -
               pipeline.getCreationTimestamp().toEpochMilli();

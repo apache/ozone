@@ -24,12 +24,14 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMDirectoriesPurgeResponseWithFSO;
@@ -51,18 +53,28 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest purgeDirsRequest =
         getOmRequest().getPurgeDirectoriesRequest();
+    String fromSnapshot = purgeDirsRequest.hasSnapshotTableKey() ?
+        purgeDirsRequest.getSnapshotTableKey() : null;
 
     List<OzoneManagerProtocolProtos.PurgePathRequest> purgeRequests =
             purgeDirsRequest.getDeletedPathList();
 
+    SnapshotInfo fromSnapshotInfo = null;
     Set<Pair<String, String>> lockSet = new HashSet<>();
     Map<Pair<String, String>, OmBucketInfo> volBucketInfoMap = new HashMap<>();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+
+    OMMetrics omMetrics = ozoneManager.getMetrics();
     try {
+      if (fromSnapshot != null) {
+        fromSnapshotInfo = ozoneManager.getMetadataManager()
+            .getSnapshotInfoTable()
+            .get(fromSnapshot);
+      }
+
       for (OzoneManagerProtocolProtos.PurgePathRequest path : purgeRequests) {
         for (OzoneManagerProtocolProtos.KeyInfo key :
             path.getMarkDeletedSubDirsList()) {
@@ -75,10 +87,13 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
                 volumeName, bucketName);
             lockSet.add(volBucketPair);
           }
+          omMetrics.decNumKeys();
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
               volumeName, bucketName);
           // bucketInfo can be null in case of delete volume or bucket
-          if (null != omBucketInfo) {
+          // or key does not belong to bucket as bucket is recreated
+          if (null != omBucketInfo
+              && omBucketInfo.getObjectID() == path.getBucketId()) {
             omBucketInfo.incrUsedNamespace(-1L);
             volBucketInfoMap.putIfAbsent(volBucketPair, omBucketInfo);
           }
@@ -95,10 +110,13 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
                 volumeName, bucketName);
             lockSet.add(volBucketPair);
           }
+          omMetrics.decNumKeys();
           OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager,
               volumeName, bucketName);
           // bucketInfo can be null in case of delete volume or bucket
-          if (null != omBucketInfo) {
+          // or key does not belong to bucket as bucket is recreated
+          if (null != omBucketInfo
+              && omBucketInfo.getObjectID() == path.getBucketId()) {
             omBucketInfo.incrUsedBytes(-sumBlockLengths(keyInfo));
             omBucketInfo.incrUsedNamespace(-1L);
             volBucketInfoMap.putIfAbsent(volBucketPair, omBucketInfo);
@@ -106,7 +124,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         }
       }
     } catch (IOException ex) {
-      // Case of IOException for fromProtobuf will not hanppen
+      // Case of IOException for fromProtobuf will not happen
       // as this is created and send within OM
       // only case of upgrade where compatibility is broken can have
       throw new IllegalStateException(ex);
@@ -124,9 +142,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
         getOmRequest());
     OMClientResponse omClientResponse = new OMDirectoriesPurgeResponseWithFSO(
         omResponse.build(), purgeRequests, ozoneManager.isRatisEnabled(),
-            getBucketLayout(), volBucketInfoMap);
-    addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-        omDoubleBufferHelper);
+            getBucketLayout(), volBucketInfoMap, fromSnapshotInfo);
 
     return omClientResponse;
   }

@@ -76,123 +76,18 @@ public class VolumeManagerImpl implements VolumeManager {
   @Override
   public List<OmVolumeArgs> listVolumes(String userName,
       String prefix, String startKey, int maxKeys) throws IOException {
-    metadataManager.getLock().acquireReadLock(USER_LOCK, userName);
+    boolean acquired = false;
+    if (userName != null) {
+      acquired = metadataManager.getLock().acquireReadLock(USER_LOCK, userName)
+          .isLockAcquired();
+    }
     try {
       return metadataManager.listVolumes(userName, prefix, startKey, maxKeys);
     } finally {
-      metadataManager.getLock().releaseReadLock(USER_LOCK, userName);
+      if (acquired) {
+        metadataManager.getLock().releaseReadLock(USER_LOCK, userName);
+      }
     }
-  }
-
-  @Override
-  public boolean addAcl(OzoneObj obj, OzoneAcl acl) throws IOException {
-    Objects.requireNonNull(obj);
-    Objects.requireNonNull(acl);
-    if (!obj.getResourceType().equals(OzoneObj.ResourceType.VOLUME)) {
-      throw new IllegalArgumentException("Unexpected argument passed to " +
-          "VolumeManager. OzoneObj type:" + obj.getResourceType());
-    }
-    String volume = obj.getVolumeName();
-    metadataManager.getLock().acquireWriteLock(VOLUME_LOCK, volume);
-    try {
-      String dbVolumeKey = metadataManager.getVolumeKey(volume);
-      OmVolumeArgs volumeArgs =
-          metadataManager.getVolumeTable().get(dbVolumeKey);
-      if (volumeArgs == null) {
-        LOG.debug("volume:{} does not exist", volume);
-        throw new OMException("Volume " + volume + " is not found",
-            ResultCodes.VOLUME_NOT_FOUND);
-      }
-      if (volumeArgs.addAcl(acl)) {
-        metadataManager.getVolumeTable().put(dbVolumeKey, volumeArgs);
-        return true;
-      }
-    } catch (IOException ex) {
-      if (!(ex instanceof OMException)) {
-        LOG.error("Add acl operation failed for volume:{} acl:{}",
-            volume, acl, ex);
-      }
-      throw ex;
-    } finally {
-      metadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volume);
-    }
-
-    return false;
-  }
-
-  @Override
-  public boolean removeAcl(OzoneObj obj, OzoneAcl acl) throws IOException {
-    Objects.requireNonNull(obj);
-    Objects.requireNonNull(acl);
-    if (!obj.getResourceType().equals(OzoneObj.ResourceType.VOLUME)) {
-      throw new IllegalArgumentException("Unexpected argument passed to " +
-          "VolumeManager. OzoneObj type:" + obj.getResourceType());
-    }
-    String volume = obj.getVolumeName();
-    metadataManager.getLock().acquireWriteLock(VOLUME_LOCK, volume);
-    try {
-      String dbVolumeKey = metadataManager.getVolumeKey(volume);
-      OmVolumeArgs volumeArgs =
-          metadataManager.getVolumeTable().get(dbVolumeKey);
-      if (volumeArgs == null) {
-        LOG.debug("volume:{} does not exist", volume);
-        throw new OMException("Volume " + volume + " is not found",
-            ResultCodes.VOLUME_NOT_FOUND);
-      }
-      if (volumeArgs.removeAcl(acl)) {
-        metadataManager.getVolumeTable().put(dbVolumeKey, volumeArgs);
-        return true;
-      }
-
-      Preconditions.checkState(volume.equals(volumeArgs.getVolume()));
-    } catch (IOException ex) {
-      if (!(ex instanceof OMException)) {
-        LOG.error("Remove acl operation failed for volume:{} acl:{}",
-            volume, acl, ex);
-      }
-      throw ex;
-    } finally {
-      metadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volume);
-    }
-
-    return false;
-  }
-
-  @Override
-  public boolean setAcl(OzoneObj obj, List<OzoneAcl> acls) throws IOException {
-    Objects.requireNonNull(obj);
-    Objects.requireNonNull(acls);
-
-    if (!obj.getResourceType().equals(OzoneObj.ResourceType.VOLUME)) {
-      throw new IllegalArgumentException("Unexpected argument passed to " +
-          "VolumeManager. OzoneObj type:" + obj.getResourceType());
-    }
-    String volume = obj.getVolumeName();
-    metadataManager.getLock().acquireWriteLock(VOLUME_LOCK, volume);
-    try {
-      String dbVolumeKey = metadataManager.getVolumeKey(volume);
-      OmVolumeArgs volumeArgs =
-          metadataManager.getVolumeTable().get(dbVolumeKey);
-      if (volumeArgs == null) {
-        LOG.debug("volume:{} does not exist", volume);
-        throw new OMException("Volume " + volume + " is not found",
-            ResultCodes.VOLUME_NOT_FOUND);
-      }
-      volumeArgs.setAcls(acls);
-      metadataManager.getVolumeTable().put(dbVolumeKey, volumeArgs);
-
-      Preconditions.checkState(volume.equals(volumeArgs.getVolume()));
-    } catch (IOException ex) {
-      if (!(ex instanceof OMException)) {
-        LOG.error("Set acl operation failed for volume:{} acls:{}",
-            volume, acls, ex);
-      }
-      throw ex;
-    } finally {
-      metadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volume);
-    }
-
-    return true;
   }
 
   @Override

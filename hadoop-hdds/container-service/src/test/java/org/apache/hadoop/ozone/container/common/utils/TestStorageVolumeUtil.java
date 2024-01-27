@@ -23,28 +23,35 @@ import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.volume.DbVolume;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.UUID;
 
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.powermock.api.mockito.PowerMockito.when;
+import static org.mockito.Mockito.when;
 
 /**
  * Test for {@link StorageVolumeUtil}.
  */
 public class TestStorageVolumeUtil {
-  @Rule
-  public final TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path volumeDir;
+  @TempDir
+  private Path dbVolumeDir;
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(TestStorageVolumeUtil.class);
 
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
   private static final String CLUSTER_ID = UUID.randomUUID().toString();
@@ -53,13 +60,13 @@ public class TestStorageVolumeUtil {
   private HddsVolume.Builder hddsVolumeBuilder;
   private DbVolume.Builder dbVolumeBuilder;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
-    hddsVolumeBuilder = new HddsVolume.Builder(folder.newFolder().getPath())
+    hddsVolumeBuilder = new HddsVolume.Builder(volumeDir.toString())
         .datanodeUuid(DATANODE_UUID)
         .conf(CONF)
         .usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
-    dbVolumeBuilder = new DbVolume.Builder(folder.newFolder().getPath())
+    dbVolumeBuilder = new DbVolume.Builder(dbVolumeDir.toString())
         .datanodeUuid(DATANODE_UUID)
         .conf(CONF)
         .usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
@@ -90,7 +97,7 @@ public class TestStorageVolumeUtil {
 
     // checkVolume for the 2nd time: rootFiles.length == 2
     res = StorageVolumeUtil.checkVolume(spyHddsVolume, CLUSTER_ID,
-        CLUSTER_ID, CONF, null, dbVolumeSet);
+        CLUSTER_ID, CONF, LOG, dbVolumeSet);
     assertTrue(res);
 
     // should only call createDbStore once, so no dup db instance

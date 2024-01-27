@@ -24,6 +24,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.ha.ConfUtils;
@@ -48,7 +49,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 
 /**
  * The Grpc s3gateway om transport failover proxy provider implementation
- * extending the ozone client OM failover proxy provider.  This implmentation
+ * extending the ozone client OM failover proxy provider.  This implementation
  * allows the Grpc OMTransport reuse OM failover retry policies and
  * getRetryAction methods.  In case of OM failover, client can try
  * connecting to another OM node from the list of proxies.
@@ -71,6 +72,7 @@ public class GrpcOMFailoverProxyProvider<T> extends
     Collection<String> omNodeIds = OmUtils.getActiveOMNodeIds(config, omSvcId);
     Map<String, ProxyInfo<T>> omProxies = new HashMap<>();
     List<String> omNodeIDList = new ArrayList<>();
+    Map<String, InetSocketAddress> omNodeAddressMap = new HashMap<>();
 
     for (String nodeId : OmUtils.emptyAsSingletonNull(omNodeIds)) {
       String rpcAddrKey = ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
@@ -85,14 +87,16 @@ public class GrpcOMFailoverProxyProvider<T> extends
         nodeId = OzoneConsts.OM_DEFAULT_NODE_ID;
       }
       if (hostaddr.isPresent()) {
+        int port = hostport.orElse(config
+            .getObject(GrpcOmTransport
+                .GrpcOmTransportConfig.class)
+            .getPort());
         ProxyInfo<T> proxyInfo =
             new ProxyInfo<>(createOMProxy(),
-                hostaddr.get() + ":"
-                    + hostport.orElse(config
-                    .getObject(GrpcOmTransport
-                        .GrpcOmTransportConfig.class)
-                    .getPort()));
+                hostaddr.get() + ":" + port);
         omProxies.put(nodeId, proxyInfo);
+        omNodeAddressMap.put(nodeId,
+            NetUtils.createSocketAddr(proxyInfo.proxyInfo));
       } else {
         LOG.error("expected host address not defined for: {}", rpcAddrKey);
         throw new ConfigurationException(rpcAddrKey + "is not defined");
@@ -107,6 +111,7 @@ public class GrpcOMFailoverProxyProvider<T> extends
     }
     setOmProxies(omProxies);
     setOmNodeIDList(omNodeIDList);
+    setOmNodeAddressMap(omNodeAddressMap);
   }
 
   private T createOMProxy() throws IOException {
@@ -118,7 +123,7 @@ public class GrpcOMFailoverProxyProvider<T> extends
 
   /**
    * Get the proxy object which should be used until the next failover event
-   * occurs. RPC proxy object is intialized lazily.
+   * occurs. RPC proxy object is initialized lazily.
    * @return the OM proxy object to invoke methods upon
    */
   @Override

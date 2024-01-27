@@ -18,9 +18,9 @@
  */
 package org.apache.hadoop.ozone.om.request.s3.tenant;
 
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -51,13 +50,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeSet;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_MAXIMUM_ACCESS_ID_LENGTH;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.S3_SECRET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 
@@ -193,10 +192,8 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
 
   @Override
   @SuppressWarnings("checkstyle:methodlength")
-  public OMClientResponse validateAndUpdateCache(
-      OzoneManager ozoneManager, long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
-
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long transactionLogIndex = termIndex.getIndex();
     final OMMultiTenantManager multiTenantManager =
         ozoneManager.getMultiTenantManager();
 
@@ -213,7 +210,6 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
     final String awsSecret = updateGetS3SecretRequest.getAwsSecret();
 
     boolean acquiredVolumeLock = false;
-    boolean acquiredS3SecretLock = false;
     final Map<String, String> auditMap = new HashMap<>();
     final OMMetadataManager omMetadataManager =
         ozoneManager.getMetadataManager();
@@ -224,7 +220,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
     final String userPrincipal = request.getUserPrincipal();
 
     Preconditions.checkState(accessId.equals(request.getAccessId()));
-    IOException exception = null;
+    Exception exception = null;
 
     String volumeName = null;
 
@@ -232,8 +228,9 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
       volumeName = ozoneManager.getMultiTenantManager()
           .getTenantVolumeName(tenantId);
 
-      acquiredVolumeLock = omMetadataManager.getLock().acquireWriteLock(
-          VOLUME_LOCK, volumeName);
+      mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
+          VOLUME_LOCK, volumeName));
+      acquiredVolumeLock = getOmLockDetails().isLockAcquired();
 
       // Expect tenant existence in tenantStateTable
       if (!omMetadataManager.getTenantStateTable().isExist(tenantId)) {
@@ -274,8 +271,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
         }
       }
 
-      final S3SecretValue s3SecretValue =
-          new S3SecretValue(accessId, awsSecret);
+      final S3SecretValue s3SecretValue = S3SecretValue.of(accessId, awsSecret, transactionLogIndex);
 
       // Add to tenantAccessIdTable
       final OmDBAccessIdInfo omDBAccessIdInfo = new OmDBAccessIdInfo.Builder()
@@ -286,7 +282,7 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
           .build();
       omMetadataManager.getTenantAccessIdTable().addCacheEntry(
           new CacheKey<>(accessId),
-          new CacheValue<>(Optional.of(omDBAccessIdInfo), transactionLogIndex));
+          CacheValue.get(transactionLogIndex, omDBAccessIdInfo));
 
       // Add to principalToAccessIdsTable
       if (principalInfo == null) {
@@ -298,27 +294,23 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
       }
       omMetadataManager.getPrincipalToAccessIdsTable().addCacheEntry(
           new CacheKey<>(userPrincipal),
-          new CacheValue<>(Optional.of(principalInfo),
-              transactionLogIndex));
-
-      // Add S3SecretTable cache entry
-      acquiredS3SecretLock = omMetadataManager.getLock()
-          .acquireWriteLock(S3_SECRET_LOCK, accessId);
+          CacheValue.get(transactionLogIndex, principalInfo));
 
       // Expect accessId absence from S3SecretTable
-      if (omMetadataManager.getS3SecretTable().isExist(accessId)) {
-        LOG.error("accessId '{}' already exists in S3SecretTable", accessId);
-        throw new OMException("accessId '" + accessId +
-            "' already exists in S3SecretTable",
-            ResultCodes.TENANT_USER_ACCESS_ID_ALREADY_EXISTS);
-      }
+      ozoneManager.getS3SecretManager()
+          .doUnderLock(accessId, s3SecretManager -> {
+            if (s3SecretManager.hasS3Secret(accessId)) {
+              LOG.error("accessId '{}' already exists in S3SecretTable",
+                  accessId);
+              throw new OMException("accessId '" + accessId +
+                  "' already exists in S3SecretTable",
+                  ResultCodes.TENANT_USER_ACCESS_ID_ALREADY_EXISTS);
+            }
 
-      omMetadataManager.getS3SecretTable().addCacheEntry(
-          new CacheKey<>(accessId),
-          new CacheValue<>(Optional.of(s3SecretValue), transactionLogIndex));
-
-      omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK, accessId);
-      acquiredS3SecretLock = false;
+            s3SecretManager
+                .updateCache(accessId, s3SecretValue);
+            return null;
+          });
 
       // Update tenant cache
       multiTenantManager.getCacheOp()
@@ -332,25 +324,26 @@ public class OMTenantAssignUserAccessIdRequest extends OMClientRequest {
               .build());
       omClientResponse = new OMTenantAssignUserAccessIdResponse(
           omResponse.build(), s3SecretValue, userPrincipal,
-          accessId, omDBAccessIdInfo, principalInfo);
-    } catch (IOException ex) {
+          accessId, omDBAccessIdInfo, principalInfo,
+          ozoneManager.getS3SecretManager());
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omResponse.setTenantAssignUserAccessIdResponse(
           TenantAssignUserAccessIdResponse.newBuilder().build());
       omClientResponse = new OMTenantAssignUserAccessIdResponse(
-          createErrorOMResponse(omResponse, ex));
+          createErrorOMResponse(omResponse, exception));
     } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
-      if (acquiredS3SecretLock) {
-        omMetadataManager.getLock().releaseWriteLock(S3_SECRET_LOCK, accessId);
-      }
       if (acquiredVolumeLock) {
         Preconditions.checkNotNull(volumeName);
-        omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK, volumeName);
+        mergeOmLockDetails(
+            omMetadataManager.getLock().releaseWriteLock(VOLUME_LOCK,
+                volumeName));
       }
       // Release authorizer write lock
       multiTenantManager.getAuthorizerLock().unlockWriteInOMRequest();
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
+      }
     }
 
     // Audit

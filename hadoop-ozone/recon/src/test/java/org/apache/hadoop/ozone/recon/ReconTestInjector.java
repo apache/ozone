@@ -44,8 +44,7 @@ import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
-import org.junit.Assert;
-import org.junit.rules.TemporaryFolder;
+import org.apache.ratis.util.Preconditions;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
@@ -69,13 +68,13 @@ public class ReconTestInjector {
   private boolean withContainerDB = false;
   private List<Module> additionalModules = new ArrayList<>();
   private boolean withReconSqlDb = false;
-  private TemporaryFolder temporaryFolder;
+  private File tmpDir;
   private Map<Class, Class> extraInheritedBindings = new HashMap<>();
   private Map<Class, Object> extraInstanceBindings = new HashMap<>();
   private Set<Class> extraClassBindings = new HashSet<>();
 
-  public ReconTestInjector(TemporaryFolder temporaryFolder) {
-    this.temporaryFolder = temporaryFolder;
+  public ReconTestInjector(File tmpDir) {
+    this.tmpDir = tmpDir;
   }
 
   public void setWithReconSqlDb(boolean withReconSqlDb) {
@@ -148,55 +147,53 @@ public class ReconTestInjector {
     return injector;
   }
 
-  void setupInjector() throws IOException {
+  void setupInjector() {
+    Preconditions.assertNotNull(tmpDir, "no temp dir");
+
     List<Module> modules = new ArrayList<>();
 
     modules.add(new AbstractModule() {
       @Override
       protected void configure() {
-        try {
-          bind(OzoneConfiguration.class).toInstance(
-              getTestOzoneConfiguration(temporaryFolder.newFolder()));
+        bind(OzoneConfiguration.class).toInstance(
+            getTestOzoneConfiguration(tmpDir));
 
-          if (reconOMMetadataManager != null) {
-            bind(ReconOMMetadataManager.class)
-                .toInstance(reconOMMetadataManager);
-          }
+        if (reconOMMetadataManager != null) {
+          bind(ReconOMMetadataManager.class)
+              .toInstance(reconOMMetadataManager);
+        }
 
-          if (ozoneManagerServiceProvider != null) {
-            bind(OzoneManagerServiceProvider.class)
-                .toInstance(ozoneManagerServiceProvider);
-          }
+        if (ozoneManagerServiceProvider != null) {
+          bind(OzoneManagerServiceProvider.class)
+              .toInstance(ozoneManagerServiceProvider);
+        }
 
-          if (reconScm != null) {
-            bind(OzoneStorageContainerManager.class).toInstance(reconScm);
-          }
+        if (reconScm != null) {
+          bind(OzoneStorageContainerManager.class).toInstance(reconScm);
+        }
 
-          if (withContainerDB) {
-            bind(ReconContainerMetadataManager.class)
-                .to(ReconContainerMetadataManagerImpl.class)
-                    .in(Singleton.class);
-            bind(ReconNamespaceSummaryManager.class)
-                    .to(ReconNamespaceSummaryManagerImpl.class)
-                    .in(Singleton.class);
-            bind(ReconDBProvider.class).in(Singleton.class);
-          }
+        if (withContainerDB) {
+          bind(ReconContainerMetadataManager.class)
+              .to(ReconContainerMetadataManagerImpl.class)
+                  .in(Singleton.class);
+          bind(ReconNamespaceSummaryManager.class)
+                  .to(ReconNamespaceSummaryManagerImpl.class)
+                  .in(Singleton.class);
+          bind(ReconDBProvider.class).in(Singleton.class);
+        }
 
-          for (Map.Entry<Class, Object> entry :
-              extraInstanceBindings.entrySet()) {
-            bind(entry.getKey()).toInstance(entry.getValue());
-          }
+        for (Map.Entry<Class, Object> entry :
+            extraInstanceBindings.entrySet()) {
+          bind(entry.getKey()).toInstance(entry.getValue());
+        }
 
-          for (Map.Entry<Class, Class> entry :
-              extraInheritedBindings.entrySet()) {
-            bind(entry.getKey()).to(entry.getValue()).in(Singleton.class);
-          }
+        for (Map.Entry<Class, Class> entry :
+            extraInheritedBindings.entrySet()) {
+          bind(entry.getKey()).to(entry.getValue()).in(Singleton.class);
+        }
 
-          for (Class type : extraClassBindings) {
-            bind(type).in(Singleton.class);
-          }
-        } catch (IOException e) {
-          Assert.fail();
+        for (Class type : extraClassBindings) {
+          bind(type).in(Singleton.class);
         }
       }
     });
@@ -206,7 +203,7 @@ public class ReconTestInjector {
     }
 
     if (withReconSqlDb) {
-      reconSqlDB = new AbstractReconSqlDBTest();
+      reconSqlDB = new AbstractReconSqlDBTest(tmpDir.toPath());
       modules.addAll(reconSqlDB.getReconSqlDBModules());
     }
 
@@ -236,8 +233,8 @@ public class ReconTestInjector {
   public static class Builder {
     private ReconTestInjector reconTestInjector;
 
-    public Builder(TemporaryFolder temporaryFolder) {
-      reconTestInjector = new ReconTestInjector(temporaryFolder);
+    public Builder(File tmpDir) {
+      reconTestInjector = new ReconTestInjector(tmpDir);
     }
 
     /**

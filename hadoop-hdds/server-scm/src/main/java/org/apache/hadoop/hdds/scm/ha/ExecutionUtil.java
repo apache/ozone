@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,23 +32,23 @@ public final class ExecutionUtil<E extends Throwable> {
   private static final Logger LOG = LoggerFactory.getLogger(
       ExecutionUtil.class);
 
-  private final CheckedFunction<E> fn;
+  private final CheckedRunnable<E> fn;
 
-  private CheckedFunction<E>  onException;
+  private CheckedRunnable<E> onException;
 
   private volatile boolean completed;
 
-  private ExecutionUtil(final CheckedFunction<E> fn) {
+  private ExecutionUtil(final CheckedRunnable<E> fn) {
     this.fn = fn;
     this.completed = false;
   }
 
-  public static<E extends Exception> ExecutionUtil<E> create(
-      CheckedFunction<E> tryBlock) {
+  public static <E extends Exception> ExecutionUtil<E> create(
+      CheckedRunnable<E> tryBlock) {
     return new ExecutionUtil<>(tryBlock);
   }
 
-  public ExecutionUtil<E> onException(CheckedFunction<E>  catchBlock) {
+  public ExecutionUtil<E> onException(CheckedRunnable<E>  catchBlock) {
     onException = catchBlock;
     return this;
   }
@@ -56,14 +57,14 @@ public final class ExecutionUtil<E extends Throwable> {
     if (!completed) {
       completed = true;
       try {
-        fn.execute();
+        fn.run();
       } catch (Exception ex) {
         try {
-          onException.execute();
+          onException.run();
         } catch (Exception error) {
           LOG.warn("Got error while doing clean-up.", error);
         }
-        throw (E) ex;
+        throw ex;
       }
     }
   }

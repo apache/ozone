@@ -20,6 +20,9 @@ package org.apache.hadoop.hdds.utils;
 
 import org.slf4j.Logger;
 
+import java.util.Arrays;
+import java.util.Collection;
+
 /**
  * Static helper utilities for IO / Closable classes.
  */
@@ -36,9 +39,11 @@ public final class IOUtils {
    *                   null.
    * @param closeables the objects to close
    */
-  public static void cleanupWithLogger(Logger logger,
-      java.io.Closeable... closeables) {
-    for (java.io.Closeable c : closeables) {
+  public static void cleanupWithLogger(Logger logger, AutoCloseable... closeables) {
+    if (closeables == null) {
+      return;
+    }
+    for (AutoCloseable c : closeables) {
       if (c != null) {
         try {
           c.close();
@@ -51,4 +56,45 @@ public final class IOUtils {
     }
   }
 
+  /**
+   * Close each argument, catching exceptions and logging them as error.
+   */
+  public static void close(Logger logger, AutoCloseable... closeables) {
+    close(logger, Arrays.asList(closeables));
+  }
+
+  /**
+   * Close each argument, catching exceptions and logging them as error.
+   */
+  public static void close(Logger logger,
+      Collection<AutoCloseable> closeables) {
+    if (closeables == null) {
+      return;
+    }
+    for (AutoCloseable c : closeables) {
+      if (c != null) {
+        try {
+          c.close();
+        } catch (Exception e) {
+          if (logger != null) {
+            logger.error("Exception in closing {}", c, e);
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Close each argument, swallowing exceptions.
+   */
+  public static void closeQuietly(AutoCloseable... closeables) {
+    close(null, closeables);
+  }
+
+  /**
+   * Close each argument, swallowing exceptions.
+   */
+  public static void closeQuietly(Collection<AutoCloseable> closeables) {
+    close(null, closeables);
+  }
 }

@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.recon.api.handlers;
 
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -90,6 +92,9 @@ public abstract class BucketHandler {
   public abstract BucketLayout getBucketLayout();
 
   public abstract OmKeyInfo getKeyInfo(String[] names)
+      throws IOException;
+
+  public abstract OmDirectoryInfo getDirInfo(String[] names)
       throws IOException;
 
   /**
@@ -171,6 +176,12 @@ public abstract class BucketHandler {
           .equals(BucketLayout.LEGACY)) {
         return new LegacyBucketHandler(reconNamespaceSummaryManager,
             omMetadataManager, reconSCM, bucketInfo);
+      } else if (bucketInfo.getBucketLayout()
+          .equals(BucketLayout.OBJECT_STORE)) {
+        // TODO: HDDS-7810 Write a handler for object store bucket
+        // We can use LegacyBucketHandler for OBS bucket for now.
+        return new LegacyBucketHandler(reconNamespaceSummaryManager,
+            omMetadataManager, reconSCM, bucketInfo);
       } else {
         LOG.error("Unsupported bucket layout: " +
             bucketInfo.getBucketLayout());
@@ -186,8 +197,12 @@ public abstract class BucketHandler {
       String volumeName, String bucketName) throws IOException {
 
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
-    OmBucketInfo bucketInfo = omMetadataManager
-        .getBucketTable().getSkipCache(bucketKey);
+    Table<String, OmBucketInfo> bucketTable =
+        omMetadataManager.getBucketTable();
+    OmBucketInfo bucketInfo = null;
+    if (null != bucketTable) {
+      bucketInfo = bucketTable.getSkipCache(bucketKey);
+    }
 
     return getBucketHandler(reconNamespaceSummaryManager,
         omMetadataManager, reconSCM, bucketInfo);

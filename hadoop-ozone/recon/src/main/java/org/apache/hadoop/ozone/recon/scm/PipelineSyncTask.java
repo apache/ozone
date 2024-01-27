@@ -22,6 +22,9 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -49,6 +52,8 @@ public class PipelineSyncTask extends ReconScmTask {
   private StorageContainerServiceProvider scmClient;
   private ReconPipelineManager reconPipelineManager;
   private ReconNodeManager nodeManager;
+
+  private ReadWriteLock lock = new ReentrantReadWriteLock(true);
   private final long interval;
 
   public PipelineSyncTask(ReconPipelineManager pipelineManager,
@@ -64,23 +69,33 @@ public class PipelineSyncTask extends ReconScmTask {
   }
 
   @Override
-  protected synchronized void run() {
+  public void run() {
     try {
       while (canRun()) {
-        long start = Time.monotonicNow();
-        List<Pipeline> pipelinesFromScm = scmClient.getPipelines();
-        reconPipelineManager.initializePipelines(pipelinesFromScm);
-        syncOperationalStateOnDeadNodes();
-        LOG.info("Pipeline sync Thread took {} milliseconds.",
-            Time.monotonicNow() - start);
-        recordSingleRunCompletion();
-        wait(interval);
+        triggerPipelineSyncTask();
+        Thread.sleep(interval);
       }
     } catch (Throwable t) {
       LOG.error("Exception in Pipeline sync Thread.", t);
       if (t instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
+    }
+  }
+
+  public void triggerPipelineSyncTask()
+      throws IOException, TimeoutException, NodeNotFoundException {
+    lock.writeLock().lock();
+    try {
+      long start = Time.monotonicNow();
+      List<Pipeline> pipelinesFromScm = scmClient.getPipelines();
+      reconPipelineManager.initializePipelines(pipelinesFromScm);
+      syncOperationalStateOnDeadNodes();
+      LOG.info("Pipeline sync Thread took {} milliseconds.",
+          Time.monotonicNow() - start);
+      recordSingleRunCompletion();
+    } finally {
+      lock.writeLock().unlock();
     }
   }
 

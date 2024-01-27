@@ -18,33 +18,40 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 /**
- * Codec to convert a prefixed String to/from byte array.
- * The prefix has to be of fixed-length.
+ * A {@link Codec} to serialize/deserialize {@link String}
+ * using {@link StandardCharsets#ISO_8859_1},
+ * a fixed-length one-byte-per-character encoding,
+ * i.e. the serialized size equals to {@link String#length()}.
  */
-public class FixedLengthStringCodec implements Codec<String> {
-  @Override
-  public byte[] toPersistedFormat(String object) throws IOException {
-    if (object != null) {
-      return FixedLengthStringUtils.string2Bytes(object);
-    } else {
-      return null;
-    }
+public final class FixedLengthStringCodec extends StringCodecBase {
+
+  private static final FixedLengthStringCodec INSTANCE
+      = new FixedLengthStringCodec();
+
+  public static FixedLengthStringCodec get() {
+    return INSTANCE;
   }
 
-  @Override
-  public String fromPersistedFormat(byte[] rawData) throws IOException {
-    if (rawData != null) {
-      return FixedLengthStringUtils.bytes2String(rawData);
-    } else {
-      return null;
-    }
+  private FixedLengthStringCodec() {
+    // singleton
+    super(StandardCharsets.ISO_8859_1);
   }
 
-  @Override
-  public String copyObject(String object) {
-    return object;
+  /**
+   * Encode the given {@link String} to a byte array.
+   * @throws IllegalStateException in case an encoding error occurs.
+   */
+  public static byte[] string2Bytes(String string) {
+    return get().string2Bytes(string, IllegalStateException::new);
+  }
+
+  /**
+   * Decode the given byte array to a {@link String}.
+   */
+  public static String bytes2String(byte[] bytes) {
+    return get().fromPersistedFormat(bytes);
   }
 }

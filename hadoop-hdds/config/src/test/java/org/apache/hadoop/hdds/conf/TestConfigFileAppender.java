@@ -17,10 +17,11 @@
  */
 package org.apache.hadoop.hdds.conf;
 
+import org.junit.jupiter.api.Test;
+
 import java.io.StringWriter;
 
-import org.junit.Assert;
-import org.junit.Test;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Test the utility which loads/writes the config file fragments.
@@ -39,10 +40,8 @@ public class TestConfigFileAppender {
     StringWriter builder = new StringWriter();
     appender.write(builder);
 
-    Assert.assertTrue("Generated config should contain property key entry",
-        builder.toString().contains("<name>hadoop.scm.enabled</name>"));
-
-    Assert.assertTrue("Generated config should contain tags",
-        builder.toString().contains("<tag>OZONE, SECURITY</tag>"));
+    assertThat(builder.toString())
+        .contains("<name>hadoop.scm.enabled</name>")
+        .contains("<tag>OZONE, SECURITY</tag>");
   }
 }

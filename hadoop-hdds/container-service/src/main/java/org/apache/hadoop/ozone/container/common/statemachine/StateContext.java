@@ -24,7 +24,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -142,7 +142,7 @@ public class StateContext {
    *
    * For non-HA mode, term of SCMCommand will be 0.
    */
-  private Optional<Long> termOfLeaderSCM = Optional.empty();
+  private OptionalLong termOfLeaderSCM = OptionalLong.empty();
 
   /**
    * Starting with a 2 sec heartbeat frequency which will be updated to the
@@ -152,6 +152,11 @@ public class StateContext {
   private final AtomicLong heartbeatFrequency = new AtomicLong(2000);
 
   private final AtomicLong reconHeartbeatFrequency = new AtomicLong(2000);
+
+  private final int maxCommandQueueLimit;
+
+  private final String threadNamePrefix;
+
   /**
    * Constructs a StateContext.
    *
@@ -161,8 +166,11 @@ public class StateContext {
    */
   public StateContext(ConfigurationSource conf,
       DatanodeStateMachine.DatanodeStates
-          state, DatanodeStateMachine parent) {
+          state, DatanodeStateMachine parent, String threadNamePrefix) {
     this.conf = conf;
+    DatanodeConfiguration dnConf =
+        conf.getObject(DatanodeConfiguration.class);
+    maxCommandQueueLimit = dnConf.getCommandQueueLimit();
     this.state = state;
     this.parentDatanodeStateMachine = parent;
     commandQueue = new LinkedList<>();
@@ -182,6 +190,7 @@ public class StateContext {
     isFullReportReadyToBeSent = new HashMap<>();
     fullReportTypeList = new ArrayList<>();
     type2Reports = new HashMap<>();
+    this.threadNamePrefix = threadNamePrefix;
     initReportTypeCollection();
   }
 
@@ -506,8 +515,6 @@ public class StateContext {
         int size = actions.size();
         int limit = size > maxLimit ? maxLimit : size;
         for (int count = 0; count < limit; count++) {
-          // we need to remove the action from the containerAction queue
-          // as well
           ContainerAction action = actions.poll();
           Preconditions.checkNotNull(action);
           containerActionList.add(action);
@@ -571,6 +578,7 @@ public class StateContext {
       InetSocketAddress endpoint,
       int maxLimit) {
     List<PipelineAction> pipelineActionList = new ArrayList<>();
+    List<PipelineAction> persistPipelineAction = new ArrayList<>();
     synchronized (pipelineActions) {
       if (!pipelineActions.isEmpty() &&
           CollectionUtils.isNotEmpty(pipelineActions.get(endpoint))) {
@@ -579,8 +587,21 @@ public class StateContext {
         int size = actionsForEndpoint.size();
         int limit = size > maxLimit ? maxLimit : size;
         for (int count = 0; count < limit; count++) {
-          pipelineActionList.add(actionsForEndpoint.poll());
+          // Add closePipeline back to the pipelineAction queue until
+          // pipeline is closed and removed from the DN.
+          PipelineAction action = actionsForEndpoint.poll();
+          if (action.hasClosePipeline()) {
+            if (parentDatanodeStateMachine.getContainer().getPipelineReport()
+                .getPipelineReportList().stream().noneMatch(
+                    report -> action.getClosePipeline().getPipelineID()
+                        .equals(report.getPipelineID()))) {
+              continue;
+            }
+            persistPipelineAction.add(action);
+          }
+          pipelineActionList.add(action);
         }
+        actionsForEndpoint.addAll(persistPipelineAction);
       }
       return pipelineActionList;
     }
@@ -720,10 +741,9 @@ public class StateContext {
 
     // if commandQueue is not empty, init termOfLeaderSCM
     // with the largest term found in commandQueue
-    commandQueue.stream()
+    termOfLeaderSCM = commandQueue.stream()
         .mapToLong(SCMCommand::getTerm)
-        .max()
-        .ifPresent(term -> termOfLeaderSCM = Optional.of(term));
+        .max();
   }
 
   /**
@@ -731,12 +751,27 @@ public class StateContext {
    * Always record the latest term that has seen.
    */
   private void updateTermOfLeaderSCM(SCMCommand<?> command) {
+    updateTermOfLeaderSCM(command.getTerm());
+  }
+
+  public void updateTermOfLeaderSCM(final long newTerm) {
     if (!termOfLeaderSCM.isPresent()) {
-      LOG.error("should init termOfLeaderSCM before update it.");
       return;
     }
-    termOfLeaderSCM = Optional.of(
-        Long.max(termOfLeaderSCM.get(), command.getTerm()));
+
+    final long currentTerm = termOfLeaderSCM.getAsLong();
+    if (currentTerm < newTerm) {
+      setTermOfLeaderSCM(newTerm);
+    }
+  }
+
+  @VisibleForTesting
+  public void setTermOfLeaderSCM(long term) {
+    termOfLeaderSCM = OptionalLong.of(term);
+  }
+
+  public OptionalLong getTermOfLeaderSCM() {
+    return termOfLeaderSCM;
   }
 
   /**
@@ -759,13 +794,14 @@ public class StateContext {
         }
 
         updateTermOfLeaderSCM(command);
-        if (command.getTerm() == termOfLeaderSCM.get()) {
+        final long currentTerm = termOfLeaderSCM.getAsLong();
+        if (command.getTerm() == currentTerm) {
           return command;
         }
 
         LOG.warn("Detect and drop a SCMCommand {} from stale leader SCM," +
             " stale term {}, latest term {}.",
-            command, command.getTerm(), termOfLeaderSCM.get());
+            command, command.getTerm(), currentTerm);
       }
     } finally {
       lock.unlock();
@@ -780,6 +816,12 @@ public class StateContext {
   public void addCommand(SCMCommand command) {
     lock.lock();
     try {
+      if (commandQueue.size() >= maxCommandQueueLimit) {
+        LOG.warn("Ignore command as command queue crosses max limit {}.",
+            maxCommandQueueLimit);
+        return;
+      }
+      updateTermOfLeaderSCM(command);
       commandQueue.add(command);
     } finally {
       lock.unlock();
@@ -851,18 +893,21 @@ public class StateContext {
   }
 
   /**
-   * Updates status of a pending status command.
+   * Updates the command status of a pending command.
    * @param cmdId       command id
    * @param cmdStatusUpdater Consumer to update command status.
-   * @return true if command status updated successfully else false.
+   * @return true if command status updated successfully else if the command
+   * associated with the command id does not exist in the context.
    */
   public boolean updateCommandStatus(Long cmdId,
       Consumer<CommandStatus> cmdStatusUpdater) {
-    if (cmdStatusMap.containsKey(cmdId)) {
-      cmdStatusUpdater.accept(cmdStatusMap.get(cmdId));
-      return true;
-    }
-    return false;
+    CommandStatus updatedCommandStatus = cmdStatusMap.computeIfPresent(cmdId,
+        (key, value) -> {
+          cmdStatusUpdater.accept(value);
+          return value;
+        }
+    );
+    return updatedCommandStatus != null;
   }
 
   public void configureHeartbeatFrequency() {
@@ -941,5 +986,9 @@ public class StateContext {
 
   public DatanodeQueueMetrics getQueueMetrics() {
     return parentDatanodeStateMachine.getQueueMetrics();
+  }
+
+  public String getThreadNamePrefix() {
+    return threadNamePrefix;
   }
 }

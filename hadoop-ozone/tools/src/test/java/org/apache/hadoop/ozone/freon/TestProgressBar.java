@@ -16,11 +16,10 @@
  */
 package org.apache.hadoop.ozone.freon;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.mockito.junit.MockitoJUnitRunner;
-
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoExtension;
 import java.io.PrintStream;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
@@ -35,14 +34,14 @@ import static org.mockito.Mockito.verify;
 /**
  * Tests for the Progressbar class for Freon.
  */
-@RunWith(MockitoJUnitRunner.class)
+@ExtendWith(MockitoExtension.class)
 public class TestProgressBar {
 
   private PrintStream stream;
   private AtomicLong numberOfKeysAdded;
   private LongSupplier currentValue;
 
-  @Before
+  @BeforeEach
   public void setupMock() {
     numberOfKeysAdded = new AtomicLong(0L);
     currentValue = numberOfKeysAdded::get;
@@ -55,7 +54,7 @@ public class TestProgressBar {
     long maxValue = 10L;
 
     ProgressBar progressbar =
-        new ProgressBar(stream, maxValue, currentValue, true);
+        new ProgressBar(stream, maxValue, currentValue, true, () -> "");
 
     Runnable task = () -> LongStream.range(0, maxValue)
         .forEach(counter -> numberOfKeysAdded.getAndIncrement());

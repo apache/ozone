@@ -45,9 +45,9 @@ public class ContainerPlacementStatusDefault
     this.rackReplicaCnts = rackReplicaCnts;
   }
 
-  public ContainerPlacementStatusDefault(int requiredRacks, int currentRacks,
+  public ContainerPlacementStatusDefault(int currentRacks, int requiredRacks,
       int totalRacks) {
-    this(requiredRacks, currentRacks, totalRacks, 1,
+    this(currentRacks, requiredRacks, totalRacks, 1,
          currentRacks == 0 ? Collections.emptyList()
                  : Collections.nCopies(currentRacks, 1));
   }
@@ -65,9 +65,9 @@ public class ContainerPlacementStatusDefault
     if (isPolicySatisfied()) {
       return null;
     }
-    if (currentRacks < Math.min(requiredRacks, totalRacks)) {
+    if (currentRacks < expectedPlacementCount()) {
       return "The container is mis-replicated as it is on " + currentRacks +
-              " racks but should be on " + requiredRacks + " racks.";
+              " racks but should be on " + expectedPlacementCount() + " racks.";
     }
     return "The container is mis-replicated as max number of replicas per rack "
             + "is " + maxReplicasPerRack + " but number of replicas per rack" +
@@ -79,9 +79,9 @@ public class ContainerPlacementStatusDefault
     if (isPolicySatisfied()) {
       return 0;
     }
-    return Math.max(requiredRacks - currentRacks,
+    return Math.max(expectedPlacementCount() - currentRacks,
             rackReplicaCnts.stream().mapToInt(
-                    cnt -> Math.max(maxReplicasPerRack - cnt, 0)).sum());
+                    cnt -> Math.max(cnt - maxReplicasPerRack, 0)).sum());
   }
 
   @Override

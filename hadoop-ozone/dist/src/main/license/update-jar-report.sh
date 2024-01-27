@@ -18,7 +18,7 @@
 set -euo pipefail
 
 SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-REPORT_NAME=${1:-jar-report.txt}
+REPORT_NAME=${1:-current.txt}
 
 cd "$SCRIPTDIR/../../.." || exit 1
 

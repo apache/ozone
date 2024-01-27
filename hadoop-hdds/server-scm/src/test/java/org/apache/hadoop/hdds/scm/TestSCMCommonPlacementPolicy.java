@@ -19,34 +19,49 @@
 package org.apache.hadoop.hdds.scm;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.Node;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ratis.thirdparty.com.google.common.collect.ImmutableMap;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto.DISK;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.util.function.Function;
+import java.util.stream.Stream;
 
 /**
  * Test functions of SCMCommonPlacementPolicy.
@@ -69,32 +84,44 @@ public class TestSCMCommonPlacementPolicy {
     List<DatanodeDetails> list = nodeManager.getAllNodes();
     List<DatanodeDetails> result = dummyPlacementPolicy.getResultSet(3, list);
     Set<DatanodeDetails> resultSet = new HashSet<>(result);
-    Assertions.assertNotEquals(1, resultSet.size());
+    assertNotEquals(1, resultSet.size());
   }
 
-  private void testReplicasToFixMisreplication(
+  private Set<ContainerReplica> testReplicasToFixMisreplication(
           List<ContainerReplica> replicas,
           DummyPlacementPolicy placementPolicy,
           int expectedNumberOfReplicasToCopy,
           Map<Node, Integer> expectedNumberOfCopyOperationFromRack) {
+    return testReplicasToFixMisreplication(replicas.stream().distinct().collect(
+            Collectors.toMap(Function.identity(), r -> true)), placementPolicy,
+            expectedNumberOfReplicasToCopy,
+            expectedNumberOfCopyOperationFromRack);
+  }
+
+  private Set<ContainerReplica> testReplicasToFixMisreplication(
+          Map<ContainerReplica, Boolean> replicas,
+          DummyPlacementPolicy placementPolicy,
+          int expectedNumberOfReplicasToCopy,
+          Map<Node, Integer> expectedNumberOfCopyOperationFromRack) {
     Set<ContainerReplica> replicasToCopy = placementPolicy
-            .replicasToCopyToFixMisreplication(Sets.newHashSet(replicas));
-    Assertions.assertEquals(expectedNumberOfReplicasToCopy,
+            .replicasToCopyToFixMisreplication(replicas);
+    assertEquals(expectedNumberOfReplicasToCopy,
             replicasToCopy.size());
     Map<Node, Long> rackCopyMap =
             replicasToCopy.stream().collect(Collectors.groupingBy(
                     replica -> placementPolicy
                             .getPlacementGroup(replica.getDatanodeDetails()),
             Collectors.counting()));
-    Set<Node> racks = replicas.stream()
+    Set<Node> racks = replicas.keySet().stream()
             .map(ContainerReplica::getDatanodeDetails)
             .map(placementPolicy::getPlacementGroup)
             .collect(Collectors.toSet());
     for (Node rack: racks) {
-      Assertions.assertEquals(
+      assertEquals(
               expectedNumberOfCopyOperationFromRack.getOrDefault(rack, 0),
               rackCopyMap.getOrDefault(rack, 0L).intValue());
     }
+    return replicasToCopy;
   }
 
   @Test
@@ -238,28 +265,274 @@ public class TestSCMCommonPlacementPolicy {
   }
 
   @Test
+  public void
+      testReplicasToFixMisreplicationMaxReplicaPerRackWithUncopyableReplicas() {
+    DummyPlacementPolicy dummyPlacementPolicy =
+            new DummyPlacementPolicy(nodeManager, conf, 2);
+    List<Node> racks = dummyPlacementPolicy.racks;
+    List<DatanodeDetails> list = nodeManager.getAllNodes();
+    List<DatanodeDetails> replicaDns = Stream.of(0, 2, 4, 6, 8)
+            .map(list::get).collect(Collectors.toList());
+    List<ContainerReplica> replicas =
+            HddsTestUtils.getReplicasWithReplicaIndex(new ContainerID(1),
+                    CLOSED, 0, 0, 0, replicaDns);
+    Map<ContainerReplica, Boolean> replicaMap = replicas.stream().distinct()
+            .collect(Collectors.toMap(Function.identity(), r -> false));
+    replicaMap.put(replicas.get(0), true);
+    assertEquals(testReplicasToFixMisreplication(replicaMap,
+            dummyPlacementPolicy, 1,
+            ImmutableMap.of(racks.get(0), 1)),
+            Sets.newHashSet(replicas.get(0)));
+  }
+
+  @Test
   public void testReplicasWithoutMisreplication() {
     DummyPlacementPolicy dummyPlacementPolicy =
             new DummyPlacementPolicy(nodeManager, conf, 5);
     List<DatanodeDetails> list = nodeManager.getAllNodes();
     List<DatanodeDetails> replicaDns = Stream.of(0, 1, 2, 3, 4)
                     .map(list::get).collect(Collectors.toList());
-    List<ContainerReplica> replicas =
+    Map<ContainerReplica, Boolean> replicas =
             HddsTestUtils.getReplicasWithReplicaIndex(new ContainerID(1),
-                    CLOSED, 0, 0, 0, replicaDns);
-
+                    CLOSED, 0, 0, 0, replicaDns)
+                    .stream()
+                    .collect(Collectors.toMap(Function.identity(), r -> true));
     Set<ContainerReplica> replicasToCopy = dummyPlacementPolicy
-            .replicasToCopyToFixMisreplication(Sets.newHashSet(replicas));
-    Assertions.assertEquals(0, replicasToCopy.size());
+            .replicasToCopyToFixMisreplication(replicas);
+    assertEquals(0, replicasToCopy.size());
   }
 
+  @Test
+  public void testReplicasToRemoveWithOneOverreplication() {
+    DummyPlacementPolicy dummyPlacementPolicy =
+            new DummyPlacementPolicy(nodeManager, conf, 5);
+    List<DatanodeDetails> list = nodeManager.getAllNodes();
+    Set<ContainerReplica> replicas = Sets.newHashSet(
+            HddsTestUtils.getReplicasWithReplicaIndex(
+                    new ContainerID(1), CLOSED, 0, 0, 0, list.subList(1, 6)));
+    ContainerReplica replica = ContainerReplica.newBuilder()
+            .setContainerID(new ContainerID(1))
+            .setContainerState(CLOSED)
+            .setReplicaIndex(1)
+            .setDatanodeDetails(list.get(7)).build();
+    replicas.add(replica);
 
+    Set<ContainerReplica> replicasToRemove = dummyPlacementPolicy
+            .replicasToRemoveToFixOverreplication(replicas, 1);
+    assertEquals(1, replicasToRemove.size());
+    assertEquals(replicasToRemove.toArray()[0], replica);
+  }
+
+  @Test
+  public void testReplicasToRemoveWithTwoOverreplication() {
+    DummyPlacementPolicy dummyPlacementPolicy =
+            new DummyPlacementPolicy(nodeManager, conf, 5);
+    List<DatanodeDetails> list = nodeManager.getAllNodes();
+
+    Set<ContainerReplica> replicas = Sets.newHashSet(
+            HddsTestUtils.getReplicasWithReplicaIndex(
+                    new ContainerID(1), CLOSED, 0, 0, 0, list.subList(1, 6)));
+
+    Set<ContainerReplica> replicasToBeRemoved = Sets.newHashSet(
+            HddsTestUtils.getReplicasWithReplicaIndex(
+                    new ContainerID(1), CLOSED, 0, 0, 0, list.subList(7, 9)));
+    replicas.addAll(replicasToBeRemoved);
+
+    Set<ContainerReplica> replicasToRemove = dummyPlacementPolicy
+            .replicasToRemoveToFixOverreplication(replicas, 1);
+    assertEquals(2, replicasToRemove.size());
+    assertEquals(replicasToRemove, replicasToBeRemoved);
+  }
+
+  @Test
+  public void testReplicasToRemoveWith2CountPerUniqueReplica() {
+    DummyPlacementPolicy dummyPlacementPolicy =
+            new DummyPlacementPolicy(nodeManager, conf, 3);
+    List<DatanodeDetails> list = nodeManager.getAllNodes();
+
+    Set<ContainerReplica> replicas = Sets.newHashSet(
+            HddsTestUtils.getReplicasWithReplicaIndex(
+                    new ContainerID(1), CLOSED, 0, 0, 0, list.subList(0, 3)));
+    replicas.addAll(HddsTestUtils.getReplicasWithReplicaIndex(
+            new ContainerID(1), CLOSED, 0, 0, 0, list.subList(3, 6)));
+    Set<ContainerReplica> replicasToBeRemoved = Sets.newHashSet(
+            HddsTestUtils.getReplicaBuilder(new ContainerID(1), CLOSED, 0, 0, 0,
+                    list.get(7).getUuid(), list.get(7))
+                    .setReplicaIndex(1).build(),
+            HddsTestUtils.getReplicaBuilder(new ContainerID(1), CLOSED, 0, 0, 0,
+                    list.get(8).getUuid(), list.get(8)).setReplicaIndex(1)
+                    .build());
+    replicas.addAll(replicasToBeRemoved);
+
+    Set<ContainerReplica> replicasToRemove = dummyPlacementPolicy
+            .replicasToRemoveToFixOverreplication(replicas, 2);
+    assertEquals(2, replicasToRemove.size());
+    assertEquals(replicasToRemove, replicasToBeRemoved);
+  }
+
+  @Test
+  public void testReplicasToRemoveWithoutReplicaIndex() {
+    DummyPlacementPolicy dummyPlacementPolicy =
+            new DummyPlacementPolicy(nodeManager, conf, 3);
+    List<DatanodeDetails> list = nodeManager.getAllNodes();
+
+    Set<ContainerReplica> replicas = Sets.newHashSet(HddsTestUtils.getReplicas(
+                    new ContainerID(1), CLOSED, 0, list.subList(0, 5)));
+
+    Set<ContainerReplica> replicasToRemove = dummyPlacementPolicy
+            .replicasToRemoveToFixOverreplication(replicas, 3);
+    assertEquals(2, replicasToRemove.size());
+    Set<Node> racksToBeRemoved = Arrays.asList(0, 1).stream()
+            .map(dummyPlacementPolicy.racks::get).collect(Collectors.toSet());
+    assertEquals(replicasToRemove.stream()
+            .map(ContainerReplica::getDatanodeDetails)
+            .map(dummyPlacementPolicy::getPlacementGroup)
+            .collect(Collectors.toSet()), racksToBeRemoved);
+  }
+
+  @Test
+  public void testReplicasToRemoveWithOverreplicationWithinSameRack() {
+    DummyPlacementPolicy dummyPlacementPolicy =
+            new DummyPlacementPolicy(nodeManager, conf, 3);
+    List<DatanodeDetails> list = nodeManager.getAllNodes();
+
+    Set<ContainerReplica> replicas = Sets.newHashSet(
+            HddsTestUtils.getReplicasWithReplicaIndex(
+                    new ContainerID(1), CLOSED, 0, 0, 0, list.subList(1, 6)));
+
+    ContainerReplica replica1 = ContainerReplica.newBuilder()
+            .setContainerID(new ContainerID(1))
+            .setContainerState(CLOSED)
+            .setReplicaIndex(1)
+            .setDatanodeDetails(list.get(6)).build();
+    replicas.add(replica1);
+    ContainerReplica replica2 = ContainerReplica.newBuilder()
+            .setContainerID(new ContainerID(1))
+            .setContainerState(CLOSED)
+            .setReplicaIndex(1)
+            .setDatanodeDetails(list.get(0)).build();
+    replicas.add(replica2);
+
+    Set<ContainerReplica> replicasToRemove = dummyPlacementPolicy
+            .replicasToRemoveToFixOverreplication(replicas, 1);
+    Map<Node, Long> removedReplicasRackCntMap = replicasToRemove.stream()
+            .map(ContainerReplica::getDatanodeDetails)
+            .map(dummyPlacementPolicy::getPlacementGroup)
+            .collect(Collectors.groupingBy(Function.identity(),
+                    Collectors.counting()));
+    assertEquals(2, replicasToRemove.size());
+    assertThat(Sets.newHashSet(1L, 2L)).contains(
+            removedReplicasRackCntMap.get(dummyPlacementPolicy.racks.get(0)));
+    assertEquals(
+            removedReplicasRackCntMap.get(dummyPlacementPolicy.racks.get(1)),
+            removedReplicasRackCntMap.get(dummyPlacementPolicy.racks.get(0))
+                    == 2 ? 0 : 1);
+  }
+
+  @Test
+  public void testReplicasToRemoveWithNoOverreplication() {
+    DummyPlacementPolicy dummyPlacementPolicy =
+            new DummyPlacementPolicy(nodeManager, conf, 5);
+    List<DatanodeDetails> list = nodeManager.getAllNodes();
+    Set<ContainerReplica> replicas = Sets.newHashSet(
+            HddsTestUtils.getReplicasWithReplicaIndex(
+                    new ContainerID(1), CLOSED, 0, 0, 0, list.subList(1, 6)));
+
+    Set<ContainerReplica> replicasToRemove = dummyPlacementPolicy
+            .replicasToRemoveToFixOverreplication(replicas, 1);
+    assertEquals(replicasToRemove.size(), 0);
+  }
+
+  @Test
+  public void testIdentityUsedNodesWhenUsedNotPassed() throws SCMException {
+    AtomicBoolean usedNodesIdentity = new AtomicBoolean(true);
+    DummyPlacementPolicy dummyPlacementPolicy =
+        new DummyPlacementPolicy(nodeManager, conf, 5) {
+          @Override
+          protected List<DatanodeDetails> chooseDatanodesInternal(
+              List<DatanodeDetails> usedNodes,
+              List<DatanodeDetails> excludedNodes,
+              List<DatanodeDetails> favoredNodes,
+              int nodesRequired, long metadataSizeRequired,
+              long dataSizeRequired) {
+            usedNodesIdentity.set(usedNodesPassed(usedNodes));
+            return null;
+          }
+        };
+    dummyPlacementPolicy.chooseDatanodes(null, null, 1, 1, 1);
+    assertFalse(usedNodesIdentity.get());
+    dummyPlacementPolicy.chooseDatanodes(null, null, null, 1, 1, 1);
+    assertTrue(usedNodesIdentity.get());
+  }
+
+  @Test
+  public void testDatanodeIsInvalidInCaseOfIncreasingCommittedBytes() {
+    NodeManager nodeMngr = mock(NodeManager.class);
+    UUID datanodeUuid = UUID.randomUUID();
+    DummyPlacementPolicy placementPolicy =
+        new DummyPlacementPolicy(nodeMngr, conf, 1);
+    DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
+    when(datanodeDetails.getUuid()).thenReturn(datanodeUuid);
+
+    DatanodeInfo datanodeInfo = mock(DatanodeInfo.class);
+    NodeStatus nodeStatus = mock(NodeStatus.class);
+    when(nodeStatus.isNodeWritable()).thenReturn(true);
+    when(datanodeInfo.getNodeStatus()).thenReturn(nodeStatus);
+    when(nodeMngr.getNodeByUuid(eq(datanodeUuid))).thenReturn(datanodeInfo);
+
+    // capacity = 200000, used = 90000, remaining = 101000, committed = 500
+    StorageContainerDatanodeProtocolProtos.StorageReportProto storageReport1 =
+        HddsTestUtils.createStorageReport(UUID.randomUUID(), "/data/hdds",
+                200000, 90000, 101000, DISK).toBuilder()
+            .setCommitted(500)
+            .setFreeSpaceToSpare(10000)
+            .build();
+    // capacity = 200000, used = 90000, remaining = 101000, committed = 1000
+    StorageContainerDatanodeProtocolProtos.StorageReportProto storageReport2 =
+        HddsTestUtils.createStorageReport(UUID.randomUUID(), "/data/hdds",
+                200000, 90000, 101000, DISK).toBuilder()
+            .setCommitted(1000)
+            .setFreeSpaceToSpare(100000)
+            .build();
+    StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto
+        metaReport = HddsTestUtils.createMetadataStorageReport("/data/metadata",
+          200);
+    when(datanodeInfo.getStorageReports())
+        .thenReturn(Collections.singletonList(storageReport1))
+        .thenReturn(Collections.singletonList(storageReport2));
+    when(datanodeInfo.getMetadataStorageReports())
+        .thenReturn(Collections.singletonList(metaReport));
+
+
+    // 500 committed bytes:
+    //
+    //   101000       500
+    //     |           |
+    // (remaining - committed) > Math.max(4000, freeSpaceToSpare)
+    //                                                    |
+    //                                                  100000
+    //
+    // Summary: 101000 - 500 > 100000 == true
+    assertTrue(placementPolicy.isValidNode(datanodeDetails, 100, 4000));
+
+    // 1000 committed bytes:
+    // Summary: 101000 - 1000 > 100000 == false
+    assertFalse(placementPolicy.isValidNode(datanodeDetails, 100, 4000));
+  }
 
   private static class DummyPlacementPolicy extends SCMCommonPlacementPolicy {
     private Map<DatanodeDetails, Node> rackMap;
     private List<Node> racks;
     private int rackCnt;
 
+
+    /**
+     * Creates Dummy Placement Policy with dn index to rack Mapping
+     * in round robin fashion (rack Index = dn Index % total number of racks).
+     * @param nodeManager
+     * @param conf
+     * @param rackCnt
+     */
     DummyPlacementPolicy(NodeManager nodeManager, ConfigurationSource conf,
         int rackCnt) {
       this(nodeManager, conf,
@@ -268,12 +541,18 @@ public class TestSCMCommonPlacementPolicy {
                    idx -> idx % rackCnt)), rackCnt);
     }
 
+    /**
+     * Creates Dummy Placement Policy with dn index -> rack index mapping.
+     * @param nodeManager
+     * @param conf
+     * @param rackCnt
+     */
     DummyPlacementPolicy(NodeManager nodeManager, ConfigurationSource conf,
             Map<Integer, Integer> datanodeRackMap, int rackCnt) {
       super(nodeManager, conf);
       this.rackCnt = rackCnt;
       this.racks = IntStream.range(0, rackCnt)
-      .mapToObj(i -> Mockito.mock(Node.class)).collect(Collectors.toList());
+      .mapToObj(i -> mock(Node.class)).collect(Collectors.toList());
       List<DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
       rackMap = datanodeRackMap.entrySet().stream()
               .collect(Collectors.toMap(
@@ -289,12 +568,12 @@ public class TestSCMCommonPlacementPolicy {
     }
 
     @Override
-    public Node getPlacementGroup(DatanodeDetails dn) {
+    protected Node getPlacementGroup(DatanodeDetails dn) {
       return rackMap.get(dn);
     }
 
     @Override
-    protected int getRequiredRackCount(int numReplicas) {
+    protected int getRequiredRackCount(int numReplicas, int excludedRackCount) {
       return Math.min(numReplicas, rackCnt);
     }
   }

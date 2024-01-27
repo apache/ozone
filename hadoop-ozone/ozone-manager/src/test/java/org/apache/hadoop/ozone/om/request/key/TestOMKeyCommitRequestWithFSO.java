@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -28,8 +29,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
-import org.jetbrains.annotations.NotNull;
-import org.junit.Assert;
+import jakarta.annotation.Nonnull;
 
 import java.io.IOException;
 import java.util.List;
@@ -57,11 +57,12 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
 
   @Override
   protected String getOzonePathKey() throws IOException {
-    final long volumeId = getVolumeID();
+    final long volumeID = getVolumeID();
     final long bucketID = getBucketID();
     String fileName = OzoneFSUtils.getFileName(keyName);
-    return omMetadataManager.getOzonePathKey(volumeId, bucketID,
-            bucketID, fileName);
+
+    return omMetadataManager.getOzonePathKey(volumeID, bucketID,
+            parentID, fileName);
   }
 
   @Override
@@ -84,26 +85,26 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
     omKeyInfoFSO.appendNewBlocks(locationList, false);
 
     String fileName = OzoneFSUtils.getFileName(keyName);
-    OMRequestTestUtils.addFileToKeyTable(true, false,
+    return OMRequestTestUtils.addFileToKeyTable(true, false,
             fileName, omKeyInfoFSO, clientID, txnLogId, omMetadataManager);
 
-    return omMetadataManager.getOzonePathKey(getVolumeID(), getBucketID(),
-            parentID, fileName);
   }
 
-  @NotNull
+  @Nonnull
   protected OMKeyCommitRequest getOmKeyCommitRequest(OMRequest omRequest) {
     return new OMKeyCommitRequestWithFSO(omRequest,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
+  }
+
+  public BucketLayout getBucketLayout() {
+    return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 
   @Override
   protected void verifyKeyName(OmKeyInfo omKeyInfo) {
     // prefix layout format - stores fileName in the keyName DB field.
     String fileName = OzoneFSUtils.getFileName(keyName);
-    Assert.assertEquals("Incorrect FileName", fileName,
-            omKeyInfo.getFileName());
-    Assert.assertEquals("Incorrect KeyName", fileName,
-            omKeyInfo.getKeyName());
+    assertEquals(fileName, omKeyInfo.getFileName(), "Incorrect FileName");
+    assertEquals(fileName, omKeyInfo.getKeyName(), "Incorrect KeyName");
   }
 }

@@ -17,11 +17,13 @@
  */
 package org.apache.hadoop.ozone.insight;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
 import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test common insight point utility methods.
@@ -42,14 +44,14 @@ public class TestBaseInsightPoint {
     Map<String, String> filters = new HashMap<>();
     filters.put("datanode", "123");
 
-    Assert.assertTrue(insightPoint
+    assertTrue(insightPoint
         .filterLog(filters, "This a log specific to [datanode=123]"));
 
-    Assert.assertFalse(insightPoint
+    assertFalse(insightPoint
         .filterLog(filters, "This a log specific to [datanode=234]"));
 
     //with empty filters
-    Assert.assertTrue(insightPoint
+    assertTrue(insightPoint
         .filterLog(new HashMap<>(), "This a log specific to [datanode=234]"));
 
     //with multiple filters
@@ -57,14 +59,14 @@ public class TestBaseInsightPoint {
     filters.put("datanode", "123");
     filters.put("pipeline", "abcd");
 
-    Assert.assertFalse(insightPoint
+    assertFalse(insightPoint
         .filterLog(filters, "This a log specific to [datanode=123]"));
 
-    Assert.assertTrue(insightPoint
+    assertTrue(insightPoint
         .filterLog(filters,
             "This a log specific to [datanode=123] [pipeline=abcd]"));
 
-    Assert.assertFalse(insightPoint
+    assertFalse(insightPoint
         .filterLog(filters,
             "This a log specific to [datanode=456] [pipeline=abcd]"));
 

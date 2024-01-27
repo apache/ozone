@@ -22,6 +22,7 @@ import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -51,6 +52,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
 import org.apache.ozone.erasurecode.rawcoder.util.CodecUtil;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -61,7 +63,8 @@ import org.slf4j.LoggerFactory;
  * ECKeyOutputStream handles the EC writes by writing the data into underlying
  * block output streams chunk by chunk.
  */
-public final class ECKeyOutputStream extends KeyOutputStream {
+public final class ECKeyOutputStream extends KeyOutputStream
+    implements KeyMetadataAware {
   private OzoneClientConfig config;
   private ECChunkBuffers ecChunkBufferCache;
   private final BlockingQueue<ECChunkBuffers> ecStripeQueue;
@@ -75,6 +78,14 @@ public final class ECKeyOutputStream extends KeyOutputStream {
   private final Future<Boolean> flushFuture;
   private final AtomicLong flushCheckpoint;
 
+  /**
+   * Indicates if an atomic write is required. When set to true,
+   * the amount of data written must match the declared size during the commit.
+   * A mismatch will prevent the commit from succeeding.
+   * This is essential for operations like S3 put to ensure atomicity.
+   */
+  private boolean atomicKeyCreation;
+
   private enum StripeWriteStatus {
     SUCCESS,
     FAILED
@@ -83,7 +94,8 @@ public final class ECKeyOutputStream extends KeyOutputStream {
   public static final Logger LOG =
       LoggerFactory.getLogger(KeyOutputStream.class);
 
-  private boolean closed;
+  private volatile boolean closed;
+  private volatile boolean closing;
   // how much of data is actually written yet to underlying stream
   private long offset;
   // how much data has been ingested into the stream
@@ -116,14 +128,12 @@ public final class ECKeyOutputStream extends KeyOutputStream {
   }
 
   private ECKeyOutputStream(Builder builder) {
-    super(builder.getClientMetrics());
+    super(builder.getReplicationConfig(), builder.getClientMetrics(),
+        builder.getClientConfig(), builder.getStreamBufferArgs());
     this.config = builder.getClientConfig();
     this.bufferPool = builder.getByteBufferPool();
     // For EC, cell/chunk size and buffer size can be same for now.
     ecChunkSize = builder.getReplicationConfig().getEcChunkSize();
-    this.config.setStreamBufferMaxSize(ecChunkSize);
-    this.config.setStreamBufferFlushSize(ecChunkSize);
-    this.config.setStreamBufferSize(ecChunkSize);
     this.numDataBlks = builder.getReplicationConfig().getData();
     this.numParityBlks = builder.getReplicationConfig().getParity();
     ecChunkBufferCache = new ECChunkBuffers(
@@ -139,14 +149,19 @@ public final class ECKeyOutputStream extends KeyOutputStream {
             builder.isMultipartKey(),
             info, builder.isUnsafeByteBufferConversionEnabled(),
             builder.getXceiverManager(), builder.getOpenHandler().getId(),
-            builder.getClientMetrics());
+            builder.getClientMetrics(), builder.getStreamBufferArgs());
 
     this.writeOffset = 0;
     this.encoder = CodecUtil.createRawEncoderWithFallback(
         builder.getReplicationConfig());
     this.flushExecutor = Executors.newSingleThreadExecutor();
+    S3Auth s3Auth = builder.getS3CredentialsProvider().get();
+    ThreadLocal<S3Auth> s3CredentialsProvider =
+        builder.getS3CredentialsProvider();
+    flushExecutor.submit(() -> s3CredentialsProvider.set(s3Auth));
     this.flushFuture = this.flushExecutor.submit(this::flushStripeFromQueue);
     this.flushCheckpoint = new AtomicLong(0);
+    this.atomicKeyCreation = builder.getAtomicKeyCreation();
   }
 
   /**
@@ -217,6 +232,10 @@ public final class ECKeyOutputStream extends KeyOutputStream {
 
   private void logStreamError(List<ECBlockOutputStream> failedStreams,
                               String operation) {
+    if (!LOG.isWarnEnabled()) {
+      return;
+    }
+
     Set<Integer> failedStreamIndexSet =
             failedStreams.stream().map(ECBlockOutputStream::getReplicationIndex)
                     .collect(Collectors.toSet());
@@ -242,9 +261,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     List<ECBlockOutputStream> failedStreams =
         streamEntry.streamsWithWriteFailure();
     if (!failedStreams.isEmpty()) {
-      if (LOG.isDebugEnabled()) {
-        logStreamError(failedStreams, "EC stripe write");
-      }
+      logStreamError(failedStreams, "EC stripe write");
       excludePipelineAndFailedDN(streamEntry.getPipeline(), failedStreams);
       return StripeWriteStatus.FAILED;
     }
@@ -259,9 +276,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
 
     failedStreams = streamEntry.streamsWithPutBlockFailure();
     if (!failedStreams.isEmpty()) {
-      if (LOG.isDebugEnabled()) {
-        logStreamError(failedStreams, "Put block");
-      }
+      logStreamError(failedStreams, "Put block");
       excludePipelineAndFailedDN(streamEntry.getPipeline(), failedStreams);
       return StripeWriteStatus.FAILED;
     }
@@ -408,6 +423,9 @@ public final class ECKeyOutputStream extends KeyOutputStream {
   private void writeToOutputStream(ECBlockOutputStreamEntry current,
       byte[] b, int writeLen, int off, boolean isParity)
       throws IOException {
+    if (closing) {
+      throw new IOException("Stream is closing, avoid re-opening streams");
+    }
     try {
       if (!isParity) {
         // In case if exception while writing, this length will be updated back
@@ -438,8 +456,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
   }
 
   private void markStreamClosed() {
-    blockOutputStreamEntryPool.cleanup();
-    closed = true;
+    closing = true;
   }
 
   private void markStreamAsFailed(Exception e) {
@@ -487,23 +504,29 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     }
     closed = true;
     try {
-      // If stripe buffer is not empty, encode and flush the stripe.
-      if (ecChunkBufferCache.getFirstDataCell().position() > 0) {
-        generateParityCells();
-        addStripeToQueue(ecChunkBufferCache);
+      if (!closing) {
+        // If stripe buffer is not empty, encode and flush the stripe.
+        if (ecChunkBufferCache.getFirstDataCell().position() > 0) {
+          generateParityCells();
+          addStripeToQueue(ecChunkBufferCache);
+        }
+        // Send EOF mark to flush thread.
+        addStripeToQueue(new EOFDummyStripe());
+
+        // Wait for all the stripes to be written.
+        flushFuture.get();
+
+        Preconditions.checkArgument(writeOffset == offset,
+            "Expected writeOffset= " + writeOffset
+                + " Expected offset=" + offset);
+        if (atomicKeyCreation) {
+          long expectedSize = blockOutputStreamEntryPool.getDataSize();
+          Preconditions.checkState(expectedSize == offset, String.format(
+              "Expected: %d and actual %d write sizes do not match",
+                  expectedSize, offset));
+        }
+        blockOutputStreamEntryPool.commitKey(offset);
       }
-      // Send EOF mark to flush thread.
-      addStripeToQueue(new EOFDummyStripe());
-
-      // Wait for all the stripes to be written.
-      flushFuture.get();
-      flushExecutor.shutdownNow();
-
-      closeCurrentStreamEntry();
-      Preconditions.checkArgument(writeOffset == offset,
-          "Expected writeOffset= " + writeOffset
-              + " Expected offset=" + offset);
-      blockOutputStreamEntryPool.commitKey(offset);
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof IOException) {
@@ -516,6 +539,8 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     } catch (InterruptedException e) {
       throw new IOException("Flushing thread was interrupted", e);
     } finally {
+      flushExecutor.shutdownNow();
+      closeCurrentStreamEntry();
       blockOutputStreamEntryPool.cleanup();
     }
   }
@@ -548,7 +573,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
   private boolean flushStripeFromQueue() throws IOException {
     try {
       ECChunkBuffers stripe = ecStripeQueue.take();
-      while (!(stripe instanceof EOFDummyStripe)) {
+      while (!closing && !(stripe instanceof EOFDummyStripe)) {
         if (stripe instanceof CheckpointDummyStripe) {
           flushCheckpoint.set(((CheckpointDummyStripe) stripe).version);
         } else {
@@ -598,12 +623,19 @@ public final class ECKeyOutputStream extends KeyOutputStream {
     return blockOutputStreamEntryPool.getExcludeList();
   }
 
+  @Override
+  public Map<String, String> getMetadata() {
+    return this.blockOutputStreamEntryPool.getMetadata();
+  }
+
   /**
    * Builder class of ECKeyOutputStream.
    */
   public static class Builder extends KeyOutputStream.Builder {
     private ECReplicationConfig replicationConfig;
     private ByteBufferPool byteBufferPool;
+
+    private ThreadLocal<S3Auth> s3CredentialsProvider;
 
     @Override
     public ECReplicationConfig getReplicationConfig() {
@@ -626,6 +658,16 @@ public final class ECKeyOutputStream extends KeyOutputStream {
       return this;
     }
 
+    public ECKeyOutputStream.Builder setS3CredentialsProvider(
+        ThreadLocal<S3Auth> s3CredentialsThreadLocal) {
+      this.s3CredentialsProvider = s3CredentialsThreadLocal;
+      return this;
+    }
+
+    public ThreadLocal<S3Auth> getS3CredentialsProvider() {
+      return s3CredentialsProvider;
+    }
+
     @Override
     public ECKeyOutputStream build() {
       return new ECKeyOutputStream(this);
@@ -639,7 +681,7 @@ public final class ECKeyOutputStream extends KeyOutputStream {
    * @throws IOException if the connection is closed.
    */
   private void checkNotClosed() throws IOException {
-    if (closed) {
+    if (closing || closed) {
       throw new IOException(
           ": " + FSExceptionMessages.STREAM_IS_CLOSED + " Key: "
               + blockOutputStreamEntryPool.getKeyName());

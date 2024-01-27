@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.om;
 
 import java.util.HashMap;
 import java.util.UUID;
+
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -36,13 +38,12 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OmUtils.EPOCH_ID_SHIFT;
 import static org.apache.hadoop.ozone.OmUtils.EPOCH_WHEN_RATIS_NOT_ENABLED;
@@ -51,17 +52,16 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 /**
  * Tests OM epoch generation for when Ratis is not enabled.
  */
+@Timeout(240)
 public class TestOMEpochForNonRatis {
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
   private static String clusterId;
   private static String scmId;
   private static String omId;
+  private static OzoneClient client;
 
-  @Rule
-  public Timeout timeout = Timeout.seconds(240);
-
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     clusterId = UUID.randomUUID().toString();
@@ -74,14 +74,15 @@ public class TestOMEpochForNonRatis {
         .setOmId(omId)
         .build();
     cluster.waitForClusterToBeReady();
-
+    client = cluster.newClient();
   }
 
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -98,7 +99,6 @@ public class TestOMEpochForNonRatis {
     String keyName = "key" + RandomStringUtils.randomNumeric(5);
 
     OzoneManager om = cluster.getOzoneManager();
-    OzoneClient client = cluster.getClient();
     ObjectStore objectStore = client.getObjectStore();
 
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
@@ -116,8 +116,8 @@ public class TestOMEpochForNonRatis {
     OmVolumeArgs volumeInfo = omClient.getVolumeInfo(volumeName);
     long volumeTrxnIndex = OmUtils.getTxIdFromObjectId(
         volumeInfo.getObjectID());
-    Assert.assertEquals(1, volumeTrxnIndex);
-    Assert.assertEquals(volumeTrxnIndex, om.getLastTrxnIndexForNonRatis());
+    assertEquals(1, volumeTrxnIndex);
+    assertEquals(volumeTrxnIndex, om.getLastTrxnIndexForNonRatis());
 
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
     ozoneVolume.createBucket(bucketName);
@@ -126,8 +126,8 @@ public class TestOMEpochForNonRatis {
     OmBucketInfo bucketInfo = omClient.getBucketInfo(volumeName, bucketName);
     long bucketTrxnIndex = OmUtils.getTxIdFromObjectId(
         bucketInfo.getObjectID());
-    Assert.assertEquals(2, bucketTrxnIndex);
-    Assert.assertEquals(bucketTrxnIndex, om.getLastTrxnIndexForNonRatis());
+    assertEquals(2, bucketTrxnIndex);
+    assertEquals(bucketTrxnIndex, om.getLastTrxnIndexForNonRatis());
 
     // Restart the OM and create new object
     cluster.restartOzoneManager();
@@ -149,10 +149,10 @@ public class TestOMEpochForNonRatis {
         .build());
     long keyTrxnIndex = OmUtils.getTxIdFromObjectId(
         omKeyInfo.getObjectID());
-    Assert.assertEquals(3, keyTrxnIndex);
+    assertEquals(3, keyTrxnIndex);
     // Key commit is a separate transaction. Hence, the last trxn index in DB
     // should be 1 more than KeyTrxnIndex
-    Assert.assertEquals(4, om.getLastTrxnIndexForNonRatis());
+    assertEquals(4, om.getLastTrxnIndexForNonRatis());
   }
 
   @Test
@@ -160,7 +160,6 @@ public class TestOMEpochForNonRatis {
     // Create a volume and check the objectID has the epoch as
     // EPOCH_FOR_RATIS_NOT_ENABLED in the first 2 bits.
 
-    OzoneClient client = cluster.getClient();
     ObjectStore objectStore = client.getObjectStore();
 
     String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
@@ -175,6 +174,6 @@ public class TestOMEpochForNonRatis {
     long volObjId = omClient.getVolumeInfo(volumeName).getObjectID();
     long epochInVolObjId = volObjId >> EPOCH_ID_SHIFT;
 
-    Assert.assertEquals(EPOCH_WHEN_RATIS_NOT_ENABLED, epochInVolObjId);
+    assertEquals(EPOCH_WHEN_RATIS_NOT_ENABLED, epochInVolObjId);
   }
 }

@@ -21,13 +21,13 @@ package org.apache.hadoop.ozone.recon.tasks;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.PUT;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.UPDATE;
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.DELETE;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
@@ -47,11 +48,10 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
-import org.jetbrains.annotations.NotNull;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import jakarta.annotation.Nonnull;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.TransactionLogIterator;
 import org.rocksdb.WriteBatch;
@@ -61,31 +61,31 @@ import org.rocksdb.WriteBatch;
  */
 public class TestOMDBUpdatesHandler {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path temporaryFolder;
 
   private OMMetadataManager omMetadataManager;
   private OMMetadataManager reconOmMetadataManager;
   private OMDBDefinition omdbDefinition = new OMDBDefinition();
   private Random random = new Random();
 
-  private OzoneConfiguration createNewTestPath() throws IOException {
+  private OzoneConfiguration createNewTestPath(String folderName)
+      throws IOException {
     OzoneConfiguration configuration = new OzoneConfiguration();
-    File newFolder = folder.newFolder();
-    if (!newFolder.exists()) {
-      assertTrue(newFolder.mkdirs());
-    }
-    ServerUtils.setOzoneMetaDirPath(configuration, newFolder.toString());
+    Path tempDirPath =
+        Files.createDirectory(temporaryFolder.resolve(folderName));
+    ServerUtils.setOzoneMetaDirPath(configuration, tempDirPath.toString());
     return configuration;
   }
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
-    OzoneConfiguration configuration = createNewTestPath();
-    omMetadataManager = new OmMetadataManagerImpl(configuration);
+    OzoneConfiguration configuration = createNewTestPath("config");
+    omMetadataManager = new OmMetadataManagerImpl(configuration, null);
 
-    OzoneConfiguration reconConfiguration = createNewTestPath();
-    reconOmMetadataManager = new OmMetadataManagerImpl(reconConfiguration);
+    OzoneConfiguration reconConfiguration = createNewTestPath("reconConfig");
+    reconOmMetadataManager = new OmMetadataManagerImpl(reconConfiguration,
+        null);
   }
 
   @Test
@@ -112,11 +112,20 @@ public class TestOMDBUpdatesHandler {
     reconOmMetadataManager.getKeyTable(getBucketLayout())
         .put("/sampleVol/bucketOne/key_two", secondKey);
 
+
+    Text tester = new Text("tester");
+    OzoneTokenIdentifier identifier =
+        new OzoneTokenIdentifier(tester, tester, tester);
+    identifier.setOmCertSerialId("certID");
+    identifier.setOmServiceId("");
+
+    omMetadataManager.getDelegationTokenTable().put(identifier, 12345L);
+
     List<byte[]> writeBatches = getBytesFromOmMetaManager(0);
     OMDBUpdatesHandler omdbUpdatesHandler = captureEvents(writeBatches);
 
     List<OMDBUpdateEvent> events = omdbUpdatesHandler.getEvents();
-    assertEquals(3, events.size());
+    assertEquals(4, events.size());
 
     OMDBUpdateEvent volEvent = events.get(0);
     assertEquals(PUT, volEvent.getAction());
@@ -141,8 +150,6 @@ public class TestOMDBUpdatesHandler {
   public void testDelete() throws Exception {
     // Write 1 volume, 1 key into source and target OM DBs.
     String volumeKey = omMetadataManager.getVolumeKey("sampleVol");
-    String nonExistVolumeKey = omMetadataManager
-        .getVolumeKey("nonExistingVolume");
     OmVolumeArgs args =
         OmVolumeArgs.newBuilder()
             .setVolume("sampleVol")
@@ -172,7 +179,9 @@ public class TestOMDBUpdatesHandler {
     OMDBUpdatesHandler omdbUpdatesHandler = captureEvents(writeBatches);
 
     List<OMDBUpdateEvent> events = omdbUpdatesHandler.getEvents();
-    assertEquals(4, events.size());
+
+    // Assert for non existent keys, no events will be captured and handled.
+    assertEquals(2, events.size());
 
     OMDBUpdateEvent keyEvent = events.get(0);
     assertEquals(OMDBUpdateEvent.OMDBUpdateAction.DELETE, keyEvent.getAction());
@@ -185,19 +194,6 @@ public class TestOMDBUpdatesHandler {
     assertNotNull(volEvent.getValue());
     OmVolumeArgs volumeInfo = (OmVolumeArgs) volEvent.getValue();
     assertEquals("sampleVol", volumeInfo.getVolume());
-
-    // Assert the values of non existent keys are set to null.
-    OMDBUpdateEvent nonExistKey = events.get(2);
-    assertEquals(OMDBUpdateEvent.OMDBUpdateAction.DELETE,
-        nonExistKey.getAction());
-    assertEquals("/sampleVol/bucketOne/key_two", nonExistKey.getKey());
-    assertNull(nonExistKey.getValue());
-
-    OMDBUpdateEvent nonExistVolume = events.get(3);
-    assertEquals(OMDBUpdateEvent.OMDBUpdateAction.DELETE,
-        nonExistVolume.getAction());
-    assertEquals(nonExistVolumeKey, nonExistVolume.getKey());
-    assertNull(nonExistVolume.getValue());
   }
 
   @Test
@@ -292,23 +288,34 @@ public class TestOMDBUpdatesHandler {
 
   @Test
   public void testGetKeyType() throws IOException {
-    assertEquals(String.class, omdbDefinition.getKeyType(
-        omMetadataManager.getKeyTable(getBucketLayout()).getName()).get());
-    assertEquals(OzoneTokenIdentifier.class, omdbDefinition.getKeyType(
-        omMetadataManager.getDelegationTokenTable().getName()).get());
+    final String keyTable = omMetadataManager
+        .getKeyTable(getBucketLayout()).getName();
+    assertEquals(String.class,
+        omdbDefinition.getColumnFamily(keyTable).getKeyType());
+
+    final String delegationTokenTable = omMetadataManager
+        .getDelegationTokenTable().getName();
+    assertEquals(OzoneTokenIdentifier.class,
+        omdbDefinition.getColumnFamily(delegationTokenTable).getKeyType());
   }
 
   @Test
   public void testGetValueType() throws IOException {
-    assertEquals(OmKeyInfo.class, omdbDefinition.getValueType(
-        omMetadataManager.getKeyTable(getBucketLayout()).getName()).get());
-    assertEquals(OmVolumeArgs.class, omdbDefinition.getValueType(
-        omMetadataManager.getVolumeTable().getName()).get());
-    assertEquals(OmBucketInfo.class, omdbDefinition.getValueType(
-        omMetadataManager.getBucketTable().getName()).get());
+    final String keyTable = omMetadataManager
+        .getKeyTable(getBucketLayout()).getName();
+    assertEquals(OmKeyInfo.class,
+        omdbDefinition.getColumnFamily(keyTable).getValueType());
+
+    final String volumeTable = omMetadataManager.getVolumeTable().getName();
+    assertEquals(OmVolumeArgs.class,
+        omdbDefinition.getColumnFamily(volumeTable).getValueType());
+
+    final String bucketTable = omMetadataManager.getBucketTable().getName();
+    assertEquals(OmBucketInfo.class,
+        omdbDefinition.getColumnFamily(bucketTable).getValueType());
   }
 
-  @NotNull
+  @Nonnull
   private List<byte[]> getBytesFromOmMetaManager(int getUpdatesSince)
       throws RocksDBException, IOException {
     RDBStore rdbStore = (RDBStore) omMetadataManager.getStore();
@@ -329,7 +336,7 @@ public class TestOMDBUpdatesHandler {
     return writeBatches;
   }
 
-  @NotNull
+  @Nonnull
   private OMDBUpdatesHandler captureEvents(List<byte[]> writeBatches)
       throws RocksDBException {
     OMDBUpdatesHandler omdbUpdatesHandler =

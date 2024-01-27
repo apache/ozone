@@ -13,6 +13,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+#checks:basic
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
@@ -27,12 +30,13 @@ declare -i rc
 mvn ${MAVEN_OPTIONS} checkstyle:check > "${REPORT_DIR}/output.log"
 rc=$?
 if [[ ${rc} -ne 0 ]]; then
-  mvn ${MAVEN_OPTIONS} clean test-compile checkstyle:check
+  mvn ${MAVEN_OPTIONS} clean test-compile checkstyle:check > output.log
   rc=$?
   mkdir -p "$REPORT_DIR" # removed by mvn clean
-else
-  cat "${REPORT_DIR}/output.log"
+  mv output.log "${REPORT_DIR}"/
 fi
+
+cat "${REPORT_DIR}/output.log"
 
 #Print out the exact violations with parsing XML results with sed
 find "." -name checkstyle-errors.xml -print0 \
@@ -48,6 +52,11 @@ find "." -name checkstyle-errors.xml -print0 \
       -e "s/&lt;/</g" \
       -e "s/&gt;/>/g" \
   | tee "$REPORT_FILE"
+
+# check if Maven failed due to some error other than checkstyle violation
+if [[ ${rc} -ne 0 ]] && [[ ! -s "${REPORT_FILE}" ]]; then
+  grep -m1 -F '[ERROR]' "${REPORT_DIR}/output.log" > "${REPORT_FILE}"
+fi
 
 ## generate counter
 grep -c ':' "$REPORT_FILE" > "$REPORT_DIR/failures"

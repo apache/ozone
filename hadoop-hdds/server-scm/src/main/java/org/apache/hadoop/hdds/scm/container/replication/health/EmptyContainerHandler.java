@@ -60,13 +60,31 @@ public class EmptyContainerHandler extends AbstractCheck {
       request.getReport()
           .incrementAndSample(ReplicationManagerReport.HealthState.EMPTY,
               containerInfo.containerID());
+      if (!request.isReadOnly()) {
+        LOG.debug("Container {} is empty and closed, marking as DELETING",
+            containerInfo);
+        // delete replicas if they are closed and empty
+        deleteContainerReplicas(containerInfo, replicas);
 
-      // delete replicas if they are closed and empty
-      deleteContainerReplicas(containerInfo, replicas);
-
-      // Update the container's state
-      replicationManager.updateContainerState(
-          containerInfo.containerID(), HddsProtos.LifeCycleEvent.DELETE);
+        // Update the container's state
+        replicationManager.updateContainerState(
+            containerInfo.containerID(), HddsProtos.LifeCycleEvent.DELETE);
+      }
+      return true;
+    } else if (containerInfo.getState() == HddsProtos.LifeCycleState.CLOSED
+        && containerInfo.getNumberOfKeys() == 0 && replicas.isEmpty()) {
+      // If the container is empty and has no replicas, it is possible it was
+      // a container which stuck in the closing state which never got any
+      // replicas created on the datanodes. In this case, we don't have enough
+      // information to delete the container, so we just log it as EMPTY,
+      // leaving it as CLOSED and return true, otherwise, it will end up marked
+      // as missing in the replication check handlers.
+      request.getReport()
+          .incrementAndSample(ReplicationManagerReport.HealthState.EMPTY,
+              containerInfo.containerID());
+      LOG.debug("Container {} appears empty and is closed, but cannot be " +
+              "deleted because it has no replicas. Marking as EMPTY.",
+          containerInfo);
       return true;
     }
 
@@ -87,9 +105,10 @@ public class EmptyContainerHandler extends AbstractCheck {
   private boolean isContainerEmptyAndClosed(final ContainerInfo container,
       final Set<ContainerReplica> replicas) {
     return container.getState() == HddsProtos.LifeCycleState.CLOSED &&
-        container.getNumberOfKeys() == 0 && replicas.stream()
-        .allMatch(r -> r.getState() == ContainerReplicaProto.State.CLOSED &&
-            r.getKeyCount() == 0);
+        !replicas.isEmpty() &&
+        replicas.stream().allMatch(
+            r -> r.getState() == ContainerReplicaProto.State.CLOSED &&
+                r.isEmpty());
   }
 
   /**
@@ -100,21 +119,17 @@ public class EmptyContainerHandler extends AbstractCheck {
    */
   private void deleteContainerReplicas(final ContainerInfo containerInfo,
       final Set<ContainerReplica> replicas) {
-    Preconditions.assertTrue(containerInfo.getState() ==
-        HddsProtos.LifeCycleState.CLOSED);
-    Preconditions.assertTrue(containerInfo.getNumberOfKeys() == 0);
+    Preconditions.assertSame(HddsProtos.LifeCycleState.CLOSED,
+        containerInfo.getState(), "container state");
 
     for (ContainerReplica rp : replicas) {
-      Preconditions.assertTrue(
-          rp.getState() == ContainerReplicaProto.State.CLOSED);
-      Preconditions.assertTrue(rp.getKeyCount() == 0);
+      Preconditions.assertSame(ContainerReplicaProto.State.CLOSED,
+          rp.getState(), "replica state");
+      Preconditions.assertSame(true, rp.isEmpty(), "replica empty");
 
-      LOG.debug("Trying to delete empty replica with index {} for container " +
-              "{} on datanode {}", rp.getReplicaIndex(),
-          containerInfo.containerID(), rp.getDatanodeDetails().getUuidString());
       try {
         replicationManager.sendDeleteCommand(containerInfo,
-            rp.getReplicaIndex(), rp.getDatanodeDetails());
+            rp.getReplicaIndex(), rp.getDatanodeDetails(), false);
       } catch (NotLeaderException e) {
         LOG.warn("Failed to delete empty replica with index {} for container" +
                 " {} on datanode {}",

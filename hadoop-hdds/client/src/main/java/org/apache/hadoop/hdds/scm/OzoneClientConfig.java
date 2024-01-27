@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -65,6 +66,37 @@ public class OzoneClientConfig {
       description = "The size of chunks the client will send to the server",
       tags = ConfigTag.CLIENT)
   private int streamBufferSize = 4 * 1024 * 1024;
+
+  @Config(key = "datastream.buffer.flush.size",
+      defaultValue = "16MB",
+      type = ConfigType.SIZE,
+      description = "The boundary at which putBlock is executed",
+      tags = ConfigTag.CLIENT)
+  private long dataStreamBufferFlushSize = 16 * 1024 * 1024;
+
+  @Config(key = "datastream.min.packet.size",
+      defaultValue = "1MB",
+      type = ConfigType.SIZE,
+      description = "The maximum size of the ByteBuffer "
+          + "(used via ratis streaming)",
+      tags = ConfigTag.CLIENT)
+  private int dataStreamMinPacketSize = 1024 * 1024;
+
+  @Config(key = "datastream.window.size",
+      defaultValue = "64MB",
+      type = ConfigType.SIZE,
+      description = "Maximum size of BufferList(used for retry) size per " +
+          "BlockDataStreamOutput instance",
+      tags = ConfigTag.CLIENT)
+  private long streamWindowSize = 64 * 1024 * 1024;
+
+  @Config(key = "datastream.pipeline.mode",
+      defaultValue = "true",
+      description = "Streaming write support both pipeline mode(datanode1->" +
+          "datanode2->datanode3) and star mode(datanode1->datanode2, " +
+          "datanode1->datanode3). By default we use pipeline mode.",
+      tags = ConfigTag.CLIENT)
+  private boolean datastreamPipelineMode = true;
 
   @Config(key = "stream.buffer.increment",
       defaultValue = "0B",
@@ -153,7 +185,7 @@ public class OzoneClientConfig {
   @Config(key = "exclude.nodes.expiry.time",
       defaultValue = "600000",
       description = "Time after which an excluded node is reconsidered for" +
-          " writes in EC. If the value is zero, the node is excluded for the" +
+          " writes. If the value is zero, the node is excluded for the" +
           " life of the client",
       tags = ConfigTag.CLIENT)
   private long excludeNodesExpiryTime = 10 * 60 * 1000;
@@ -223,6 +255,7 @@ public class OzoneClientConfig {
     return streamBufferFlushSize;
   }
 
+  @VisibleForTesting
   public void setStreamBufferFlushSize(long streamBufferFlushSize) {
     this.streamBufferFlushSize = streamBufferFlushSize;
   }
@@ -231,6 +264,7 @@ public class OzoneClientConfig {
     return streamBufferSize;
   }
 
+  @VisibleForTesting
   public void setStreamBufferSize(int streamBufferSize) {
     this.streamBufferSize = streamBufferSize;
   }
@@ -239,6 +273,7 @@ public class OzoneClientConfig {
     return streamBufferFlushDelay;
   }
 
+  @VisibleForTesting
   public void setStreamBufferFlushDelay(boolean streamBufferFlushDelay) {
     this.streamBufferFlushDelay = streamBufferFlushDelay;
   }
@@ -247,8 +282,25 @@ public class OzoneClientConfig {
     return streamBufferMaxSize;
   }
 
+  @VisibleForTesting
   public void setStreamBufferMaxSize(long streamBufferMaxSize) {
     this.streamBufferMaxSize = streamBufferMaxSize;
+  }
+
+  public int getDataStreamMinPacketSize() {
+    return dataStreamMinPacketSize;
+  }
+
+  public void setDataStreamMinPacketSize(int dataStreamMinPacketSize) {
+    this.dataStreamMinPacketSize = dataStreamMinPacketSize;
+  }
+
+  public long getStreamWindowSize() {
+    return streamWindowSize;
+  }
+
+  public void setStreamWindowSize(long streamWindowSize) {
+    this.streamWindowSize = streamWindowSize;
   }
 
   public int getMaxRetryCount() {
@@ -307,6 +359,14 @@ public class OzoneClientConfig {
     return bufferIncrement;
   }
 
+  public long getDataStreamBufferFlushSize() {
+    return dataStreamBufferFlushSize;
+  }
+
+  public void setDataStreamBufferFlushSize(long dataStreamBufferFlushSize) {
+    this.dataStreamBufferFlushSize = dataStreamBufferFlushSize;
+  }
+
   public ChecksumCombineMode getChecksumCombineMode() {
     try {
       return ChecksumCombineMode.valueOf(checksumCombineMode);
@@ -335,5 +395,13 @@ public class OzoneClientConfig {
 
   public String getFsDefaultBucketLayout() {
     return fsDefaultBucketLayout;
+  }
+
+  public boolean isDatastreamPipelineMode() {
+    return datastreamPipelineMode;
+  }
+
+  public void setDatastreamPipelineMode(boolean datastreamPipelineMode) {
+    this.datastreamPipelineMode = datastreamPipelineMode;
   }
 }
