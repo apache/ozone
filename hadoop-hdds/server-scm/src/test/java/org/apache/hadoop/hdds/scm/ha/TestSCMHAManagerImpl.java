@@ -89,8 +89,8 @@ class TestSCMHAManagerImpl {
     final StorageContainerManager scm = getMockStorageContainerManager(conf);
     SCMRatisServerImpl.initialize(clusterID, scm.getScmId(),
         scm.getScmNodeDetails(), conf);
-    scm.getScmHAManager().start();
     primarySCMHAManager = scm.getScmHAManager();
+    primarySCMHAManager.start();
     final DivisionInfo ratisDivision = primarySCMHAManager.getRatisServer()
         .getDivision().getInfo();
     // Wait for Ratis Server to be ready
