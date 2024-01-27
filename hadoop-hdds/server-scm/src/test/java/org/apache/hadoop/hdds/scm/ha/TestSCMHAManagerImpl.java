@@ -124,7 +124,7 @@ class TestSCMHAManagerImpl {
 
   @Test
   @Order(1)
-  void testAddSCM() throws IOException, InterruptedException {
+  void testAddSCM() throws IOException {
     assertEquals(1, primarySCMHAManager.getRatisServer()
         .getDivision().getGroup().getPeers().size());
 
@@ -170,7 +170,7 @@ class TestSCMHAManagerImpl {
   }
   @Test
   @Order(2) // requires testAddSCM
-  void testRemoveSCM() throws IOException, InterruptedException {
+  void testRemoveSCM() throws IOException {
     assumeThat(primarySCMHAManager.getRatisServer()
         .getDivision().getGroup().getPeers().size()).isEqualTo(2);
 
