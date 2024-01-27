@@ -1350,10 +1350,10 @@ public class TestRocksDBCheckpointDiffer {
           });
       // Confirm that the consumer doesn't finish with lock taken.
       assertThrows(TimeoutException.class,
-          () -> future.get(5000, TimeUnit.MILLISECONDS));
+          () -> future.get(1000, TimeUnit.MILLISECONDS));
     }
     // Confirm consumer finishes when unlocked.
-    assertTrue(future.get(1000, TimeUnit.MILLISECONDS));
+    assertTrue(future.get(100, TimeUnit.MILLISECONDS));
   }
 
   private static Stream<Arguments> sstFilePruningScenarios() {
