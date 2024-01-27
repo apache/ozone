@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.om.response.snapshot;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
 
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
-import javax.annotation.Nonnull;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
