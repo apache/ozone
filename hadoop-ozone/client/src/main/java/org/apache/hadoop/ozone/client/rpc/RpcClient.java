@@ -235,7 +235,7 @@ public class RpcClient implements ClientProtocol {
   private final boolean volumeBucketCacheEnable;
   private LoadingCache<String, OmVolumeArgs> volumeCache;
   private LoadingCache<String, OmBucketInfo> bucketCache;
-  private ExecutorService executor;
+  private ExecutorService cacheExecutor;
 
   /**
    * Creates RpcClient instance with the given configuration.
@@ -344,7 +344,7 @@ public class RpcClient implements ClientProtocol {
       int maximumSize = conf.getInt(OZONE_CLIENT_CACHE_VOLUME_BUCKET_MAXIMUM_SIZE,
           OZONE_CLIENT_CACHE_VOLUME_BUCKET_MAXIMUM_SIZE_DEFAULT);
 
-      executor = newDirectExecutorService();
+      cacheExecutor = newDirectExecutorService();
       volumeCache = newCacheBuilder(expiresAfterWriteSeconds, refreshSeconds, maximumSize)
           .build(CacheLoader.asyncReloading(new CacheLoader<String, OmVolumeArgs>() {
             @Nonnull
@@ -352,7 +352,7 @@ public class RpcClient implements ClientProtocol {
             public OmVolumeArgs load(@Nonnull String volumeCacheKey) throws Exception {
               return getOmVolumeArgs(volumeCacheKey);
             }
-          }, executor));
+          }, cacheExecutor));
 
       bucketCache = newCacheBuilder(expiresAfterWriteSeconds, refreshSeconds, maximumSize)
           .build(CacheLoader.asyncReloading(new CacheLoader<String, OmBucketInfo>() {
@@ -362,7 +362,7 @@ public class RpcClient implements ClientProtocol {
               String[] volumeBucket = bucketCacheKey.split(OZONE_URI_DELIMITER);
               return getBucketInfo(volumeBucket[0], volumeBucket[1]);
             }
-          }, executor));
+          }, cacheExecutor));
     }
 
   }
@@ -2605,8 +2605,7 @@ public class RpcClient implements ClientProtocol {
     if (volumeBucketCacheEnable) {
       try {
         return cache.getUnchecked(key);
-      }
-      catch (UncheckedExecutionException e) {
+      } catch (UncheckedExecutionException e) {
         throwIfInstanceOf(e.getCause(), UncheckedExecutionException.class);
         throw e;
       }
