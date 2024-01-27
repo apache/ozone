@@ -73,10 +73,12 @@ import static org.mockito.Mockito.when;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class TestSCMHAManagerImpl {
 
+  private static final String FOLLOWER_SCM_ID = "follower";
+
   private Path storageBaseDir;
   private String clusterID;
   private SCMHAManager primarySCMHAManager;
-  private StorageContainerManager scm2;
+  private SCMRatisServer follower;
 
   @BeforeAll
   void setup(@TempDir Path tempDir) throws IOException, InterruptedException,
@@ -93,7 +95,8 @@ class TestSCMHAManagerImpl {
         .getDivision().getInfo();
     // Wait for Ratis Server to be ready
     waitForSCMToBeReady(ratisDivision);
-    scm2 = getMockStorageContainerManager(getConfig("follower", 9898));
+    follower = getMockStorageContainerManager(getConfig(FOLLOWER_SCM_ID, 9898))
+        .getScmHAManager().getRatisServer();
   }
 
   private OzoneConfiguration getConfig(String scmId, int ratisPort) {
@@ -115,7 +118,7 @@ class TestSCMHAManagerImpl {
 
   @AfterAll
   void cleanup() throws IOException {
-    scm2.getScmHAManager().getRatisServer().stop();
+    follower.stop();
     primarySCMHAManager.stop();
   }
 
@@ -125,10 +128,10 @@ class TestSCMHAManagerImpl {
     assertEquals(1, primarySCMHAManager.getRatisServer()
         .getDivision().getGroup().getPeers().size());
 
-    scm2.getScmHAManager().getRatisServer().start();
+    follower.start();
     final AddSCMRequest request = new AddSCMRequest(
-        clusterID, scm2.getScmId(),
-        "localhost:" + scm2.getScmHAManager().getRatisServer()
+        clusterID, FOLLOWER_SCM_ID,
+        "localhost:" + follower
             .getDivision().getRaftServer().getServerRpc()
             .getInetSocketAddress().getPort());
     primarySCMHAManager.addSCM(request);
@@ -172,8 +175,8 @@ class TestSCMHAManagerImpl {
         .getDivision().getGroup().getPeers().size()).isEqualTo(2);
 
     final RemoveSCMRequest removeSCMRequest = new RemoveSCMRequest(
-        clusterID, scm2.getScmId(), "localhost:" +
-        scm2.getScmHAManager().getRatisServer().getDivision()
+        clusterID, FOLLOWER_SCM_ID, "localhost:" +
+        follower.getDivision()
             .getRaftServer().getServerRpc().getInetSocketAddress().getPort());
     primarySCMHAManager.removeSCM(removeSCMRequest);
     assertEquals(1, primarySCMHAManager.getRatisServer()
