@@ -125,28 +125,29 @@ class TestSCMHAManagerImpl {
   @Test
   @Order(1)
   void testAddSCM() throws IOException {
-    assertEquals(1, primarySCMHAManager.getRatisServer()
-        .getDivision().getGroup().getPeers().size());
+    assertEquals(1, getPeerCount());
 
     follower.start();
     final AddSCMRequest request = new AddSCMRequest(
         clusterID, FOLLOWER_SCM_ID, getFollowerAddress());
     primarySCMHAManager.addSCM(request);
-    assertEquals(2, primarySCMHAManager.getRatisServer()
-        .getDivision().getGroup().getPeers().size());
+    assertEquals(2, getPeerCount());
   }
 
   @Test
   @Order(2) // requires testAddSCM
   void testRemoveSCM() throws IOException {
-    assumeThat(primarySCMHAManager.getRatisServer()
-        .getDivision().getGroup().getPeers().size()).isEqualTo(2);
+    assumeThat(getPeerCount()).isEqualTo(2);
 
     final RemoveSCMRequest removeSCMRequest = new RemoveSCMRequest(
         clusterID, FOLLOWER_SCM_ID, getFollowerAddress());
     primarySCMHAManager.removeSCM(removeSCMRequest);
-    assertEquals(1, primarySCMHAManager.getRatisServer()
-        .getDivision().getGroup().getPeers().size());
+    assertEquals(1, getPeerCount());
+  }
+
+  private int getPeerCount() {
+    return primarySCMHAManager.getRatisServer()
+        .getDivision().getGroup().getPeers().size();
   }
 
   private String getFollowerAddress() {
