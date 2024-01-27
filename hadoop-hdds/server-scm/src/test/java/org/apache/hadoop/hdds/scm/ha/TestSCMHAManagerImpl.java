@@ -109,7 +109,7 @@ class TestSCMHAManagerImpl {
     return conf;
   }
 
-  public void waitForSCMToBeReady(DivisionInfo ratisDivision)
+  private void waitForSCMToBeReady(DivisionInfo ratisDivision)
       throws TimeoutException,
       InterruptedException {
     GenericTestUtils.waitFor(ratisDivision::isLeaderReady,
@@ -124,7 +124,7 @@ class TestSCMHAManagerImpl {
 
   @Test
   @Order(1)
-  public void testAddSCM() throws IOException, InterruptedException {
+  void testAddSCM() throws IOException, InterruptedException {
     assertEquals(1, primarySCMHAManager.getRatisServer()
         .getDivision().getGroup().getPeers().size());
 
@@ -140,7 +140,7 @@ class TestSCMHAManagerImpl {
   }
 
   @Test
-  public void testHARingRemovalErrors() throws IOException,
+  void testHARingRemovalErrors() throws IOException,
       AuthenticationException {
     OzoneConfiguration config = new OzoneConfiguration();
     config.set(ScmConfigKeys.OZONE_SCM_PRIMORDIAL_NODE_ID_KEY, "scm1");
@@ -170,7 +170,7 @@ class TestSCMHAManagerImpl {
   }
   @Test
   @Order(2) // requires testAddSCM
-  public void testRemoveSCM() throws IOException, InterruptedException {
+  void testRemoveSCM() throws IOException, InterruptedException {
     assumeThat(primarySCMHAManager.getRatisServer()
         .getDivision().getGroup().getPeers().size()).isEqualTo(2);
 
