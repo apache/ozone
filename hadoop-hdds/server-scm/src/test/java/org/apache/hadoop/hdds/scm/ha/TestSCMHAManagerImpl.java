@@ -45,9 +45,13 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.DivisionInfo;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
@@ -55,6 +59,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assumptions.assumeThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
@@ -64,16 +69,19 @@ import static org.mockito.Mockito.when;
 /**
  * Test cases to verify {@link org.apache.hadoop.hdds.scm.ha.SCMHAManagerImpl}.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class TestSCMHAManagerImpl {
 
-  @TempDir
   private Path storageBaseDir;
   private String clusterID;
   private SCMHAManager primarySCMHAManager;
+  private StorageContainerManager scm2;
 
-  @BeforeEach
-  void setup() throws IOException, InterruptedException,
+  @BeforeAll
+  void setup(@TempDir Path tempDir) throws IOException, InterruptedException,
       TimeoutException {
+    storageBaseDir = tempDir;
     clusterID = UUID.randomUUID().toString();
     OzoneConfiguration conf = getConfig("scm1", 9894);
     final StorageContainerManager scm = getMockStorageContainerManager(conf);
@@ -85,6 +93,7 @@ class TestSCMHAManagerImpl {
         .getDivision().getInfo();
     // Wait for Ratis Server to be ready
     waitForSCMToBeReady(ratisDivision);
+    scm2 = getMockStorageContainerManager(getConfig("follower", 9898));
   }
 
   private OzoneConfiguration getConfig(String scmId, int ratisPort) {
@@ -104,31 +113,27 @@ class TestSCMHAManagerImpl {
           1000, 10000);
   }
 
-  @AfterEach
-  public void cleanup() throws IOException {
+  @AfterAll
+  void cleanup() throws IOException {
+    scm2.getScmHAManager().getRatisServer().stop();
     primarySCMHAManager.stop();
   }
 
   @Test
+  @Order(1)
   public void testAddSCM() throws IOException, InterruptedException {
     assertEquals(1, primarySCMHAManager.getRatisServer()
         .getDivision().getGroup().getPeers().size());
 
-    final StorageContainerManager scm2 = getMockStorageContainerManager(
-        getConfig("scm2", 9898));
-    try {
-      scm2.getScmHAManager().getRatisServer().start();
-      final AddSCMRequest request = new AddSCMRequest(
-          clusterID, scm2.getScmId(),
-          "localhost:" + scm2.getScmHAManager().getRatisServer()
-              .getDivision().getRaftServer().getServerRpc()
-              .getInetSocketAddress().getPort());
-      primarySCMHAManager.addSCM(request);
-      assertEquals(2, primarySCMHAManager.getRatisServer()
-          .getDivision().getGroup().getPeers().size());
-    } finally {
-      scm2.getScmHAManager().getRatisServer().stop();
-    }
+    scm2.getScmHAManager().getRatisServer().start();
+    final AddSCMRequest request = new AddSCMRequest(
+        clusterID, scm2.getScmId(),
+        "localhost:" + scm2.getScmHAManager().getRatisServer()
+            .getDivision().getRaftServer().getServerRpc()
+            .getInetSocketAddress().getPort());
+    primarySCMHAManager.addSCM(request);
+    assertEquals(2, primarySCMHAManager.getRatisServer()
+        .getDivision().getGroup().getPeers().size());
   }
 
   @Test
@@ -161,33 +166,18 @@ class TestSCMHAManagerImpl {
     }
   }
   @Test
+  @Order(2) // requires testAddSCM
   public void testRemoveSCM() throws IOException, InterruptedException {
+    assumeThat(primarySCMHAManager.getRatisServer()
+        .getDivision().getGroup().getPeers().size()).isEqualTo(2);
+
+    final RemoveSCMRequest removeSCMRequest = new RemoveSCMRequest(
+        clusterID, scm2.getScmId(), "localhost:" +
+        scm2.getScmHAManager().getRatisServer().getDivision()
+            .getRaftServer().getServerRpc().getInetSocketAddress().getPort());
+    primarySCMHAManager.removeSCM(removeSCMRequest);
     assertEquals(1, primarySCMHAManager.getRatisServer()
         .getDivision().getGroup().getPeers().size());
-
-    final StorageContainerManager scm2 = getMockStorageContainerManager(
-        getConfig("scm2", 9898));
-    try {
-      scm2.getScmHAManager().getRatisServer().start();
-      final AddSCMRequest addSCMRequest = new AddSCMRequest(
-          clusterID, scm2.getScmId(),
-          "localhost:" + scm2.getScmHAManager().getRatisServer()
-              .getDivision().getRaftServer().getServerRpc()
-              .getInetSocketAddress().getPort());
-      primarySCMHAManager.addSCM(addSCMRequest);
-      assertEquals(2, primarySCMHAManager.getRatisServer()
-          .getDivision().getGroup().getPeers().size());
-
-      final RemoveSCMRequest removeSCMRequest = new RemoveSCMRequest(
-          clusterID, scm2.getScmId(), "localhost:" +
-          scm2.getScmHAManager().getRatisServer().getDivision()
-              .getRaftServer().getServerRpc().getInetSocketAddress().getPort());
-      primarySCMHAManager.removeSCM(removeSCMRequest);
-      assertEquals(1, primarySCMHAManager.getRatisServer()
-          .getDivision().getGroup().getPeers().size());
-    } finally {
-      scm2.getScmHAManager().getRatisServer().stop();
-    }
   }
 
   private StorageContainerManager getMockStorageContainerManager(
