@@ -65,7 +65,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static java.util.stream.Collectors.toList;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -205,7 +207,7 @@ public final class TestHelper {
         containerIdList.add(id);
       }
     }
-    assertFalse(containerIdList.isEmpty());
+    assertThat(containerIdList).isNotEmpty();
     waitForContainerClose(cluster, containerIdList.toArray(new Long[0]));
   }
 
@@ -223,7 +225,7 @@ public final class TestHelper {
         containerIdList.add(id);
       }
     }
-    assertFalse(containerIdList.isEmpty());
+    assertThat(containerIdList).isNotEmpty();
     waitForContainerClose(cluster, containerIdList.toArray(new Long[0]));
   }
 
@@ -241,7 +243,7 @@ public final class TestHelper {
         containerIdList.add(id);
       }
     }
-    assertFalse(containerIdList.isEmpty());
+    assertThat(containerIdList).isNotEmpty();
     waitForPipelineClose(cluster, waitForContainerCreation,
         containerIdList.toArray(new Long[0]));
   }
@@ -296,7 +298,7 @@ public final class TestHelper {
         XceiverServerSpi server =
             cluster.getHddsDatanodes().get(cluster.getHddsDatanodeIndex(dn))
                 .getDatanodeStateMachine().getContainer().getWriteChannel();
-        assertTrue(server instanceof XceiverServerRatis);
+        assertInstanceOf(XceiverServerRatis.class, server);
         GenericTestUtils.waitFor(() -> !server.isExist(pipelineId),
             100, 30_000);
       }
@@ -313,7 +315,7 @@ public final class TestHelper {
               cluster.getHddsDatanodes().get(cluster.getHddsDatanodeIndex(dn))
                       .getDatanodeStateMachine().getContainer()
                       .getWriteChannel();
-      assertTrue(server instanceof XceiverServerRatis);
+      assertInstanceOf(XceiverServerRatis.class, server);
       try {
         server.addGroup(pipeline.getId().getProtobuf(), Collections.
                 unmodifiableList(pipeline.getNodes()));

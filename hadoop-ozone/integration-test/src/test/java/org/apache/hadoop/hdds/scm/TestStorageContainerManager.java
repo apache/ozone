@@ -147,10 +147,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.argThat;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -326,7 +326,7 @@ public class TestStorageContainerManager {
           delLog, keyLocations, helper);
 
       // Verify a few TX gets created in the TX log.
-      assertTrue(delLog.getNumOfValidTransactions() > 0);
+      assertThat(delLog.getNumOfValidTransactions()).isGreaterThan(0);
 
       // Once TXs are written into the log, SCM starts to fetch TX
       // entries from the log and schedule block deletions in HB interval,
@@ -359,7 +359,7 @@ public class TestStorageContainerManager {
       }
 
       // Verify a few TX gets created in the TX log.
-      assertTrue(delLog.getNumOfValidTransactions() > 0);
+      assertThat(delLog.getNumOfValidTransactions()).isGreaterThan(0);
 
       // These blocks cannot be found in the container, skip deleting them
       // eventually these TX will success.
@@ -420,8 +420,8 @@ public class TestStorageContainerManager {
       GenericTestUtils.LogCapturer versionEndPointTaskLog =
           GenericTestUtils.LogCapturer.captureLogs(VersionEndpointTask.LOG);
       // Initially empty
-      assertTrue(scmDnHBDispatcherLog.getOutput().isEmpty());
-      assertTrue(versionEndPointTaskLog.getOutput().isEmpty());
+      assertThat(scmDnHBDispatcherLog.getOutput()).isEmpty();
+      assertThat(versionEndPointTaskLog.getOutput()).isEmpty();
       // start the new SCM
       scm.start();
       // Initially DatanodeStateMachine will be in Running state
@@ -451,9 +451,9 @@ public class TestStorageContainerManager {
           5000);
       assertEquals(DatanodeStateMachine.DatanodeStates.SHUTDOWN,
           dsm.getContext().getState());
-      assertTrue(versionEndPointTaskLog.getOutput().contains(
+      assertThat(versionEndPointTaskLog.getOutput()).contains(
           "org.apache.hadoop.ozone.common" +
-              ".InconsistentStorageStateException: Mismatched ClusterIDs"));
+              ".InconsistentStorageStateException: Mismatched ClusterIDs");
     } finally {
       cluster.shutdown();
     }
@@ -508,7 +508,7 @@ public class TestStorageContainerManager {
       createDeleteTXLog(cluster.getStorageContainerManager(),
           delLog, keyLocations, helper);
       // Verify a few TX gets created in the TX log.
-      assertTrue(delLog.getNumOfValidTransactions() > 0);
+      assertThat(delLog.getNumOfValidTransactions()).isGreaterThan(0);
 
       // Verify the size in delete commands is expected.
       GenericTestUtils.waitFor(() -> {
@@ -562,7 +562,7 @@ public class TestStorageContainerManager {
     for (OmKeyInfo info : keyLocations.values()) {
       totalCreatedBlocks += info.getKeyLocationVersions().size();
     }
-    assertTrue(totalCreatedBlocks > 0);
+    assertThat(totalCreatedBlocks).isGreaterThan(0);
     assertEquals(totalCreatedBlocks,
         helper.getAllBlocks(containerNames).size());
 
@@ -831,7 +831,7 @@ public class TestStorageContainerManager {
       for (DatanodeDetails node : allNodes) {
         DatanodeInfo datanodeInfo = (DatanodeInfo) scm.getScmNodeManager()
             .getNodeByUuid(node.getUuidString());
-        assertTrue(datanodeInfo.getLastHeartbeatTime() > start);
+        assertThat(datanodeInfo.getLastHeartbeatTime()).isGreaterThan(start);
         assertEquals(datanodeInfo.getUuidString(),
             datanodeInfo.getNetworkName());
         assertEquals("/rack1", datanodeInfo.getNetworkLocation());
@@ -975,7 +975,7 @@ public class TestStorageContainerManager {
     eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata);
     eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata);
     eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata);
-    assertTrue(containerReportExecutors.droppedEvents() > 1);
+    assertThat(containerReportExecutors.droppedEvents()).isGreaterThan(1);
     Thread.currentThread().sleep(1000);
     assertEquals(containerReportExecutors.droppedEvents()
             + containerReportExecutors.scheduledEvents(),
@@ -1031,8 +1031,8 @@ public class TestStorageContainerManager {
         = new ContainerReportFromDatanode(dn, report);
     eventQueue.fireEvent(SCMEvents.CONTAINER_REPORT, dndata2);
     semaphore.acquire(2);
-    assertTrue(containerReportExecutors.longWaitInQueueEvents() >= 1);
-    assertTrue(containerReportExecutors.longTimeExecutionEvents() >= 1);
+    assertThat(containerReportExecutors.longWaitInQueueEvents()).isGreaterThanOrEqualTo(1);
+    assertThat(containerReportExecutors.longTimeExecutionEvents()).isGreaterThanOrEqualTo(1);
     containerReportExecutors.close();
     semaphore.release(2);
   }

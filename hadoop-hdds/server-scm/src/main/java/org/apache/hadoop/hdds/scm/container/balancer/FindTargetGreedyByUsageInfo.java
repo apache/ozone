@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,7 +67,7 @@ public class FindTargetGreedyByUsageInfo extends AbstractFindTargetGreedy {
    */
   @Override
   public void resetPotentialTargets(
-      @NotNull Collection<DatanodeDetails> targets) {
+      @Nonnull Collection<DatanodeDetails> targets) {
     // create DatanodeUsageInfo from DatanodeDetails
     List<DatanodeUsageInfo> usageInfos = new ArrayList<>(targets.size());
     targets.forEach(datanodeDetails -> usageInfos.add(

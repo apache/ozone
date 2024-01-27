@@ -87,7 +87,7 @@ import org.apache.log4j.Logger;
 import org.apache.ozone.rocksdiff.CompactionNode;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Slow;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -1944,7 +1944,7 @@ public abstract class TestOmSnapshot {
     assertEquals(buckUsedBytesIntial, bucket1.getUsedBytes());
   }
 
-  @NotNull
+  @Nonnull
   private List<LiveFileMetaData> getKeyTableSstFiles()
       throws IOException {
     if (!bucketLayout.isFileSystemOptimized()) {

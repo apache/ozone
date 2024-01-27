@@ -151,7 +151,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -2102,7 +2102,7 @@ public class KeyManagerImpl implements KeyManager {
     }
   }
 
-  @NotNull
+  @Nonnull
   private Stream<Long> extractContainerIDs(OmKeyInfo keyInfo) {
     return keyInfo.getKeyLocationVersions().stream()
         .flatMap(v -> v.getLocationList().stream())

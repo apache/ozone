@@ -59,15 +59,15 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -203,15 +203,13 @@ public class TestSCMDbCheckpointServlet {
 
     doEndpoint();
 
-    assertTrue(outputPath.toFile().length() > 0);
-    assertTrue(
-        scmMetrics.getDBCheckpointMetrics().
-            getLastCheckpointCreationTimeTaken() > 0);
-    assertTrue(
-        scmMetrics.getDBCheckpointMetrics().
-            getLastCheckpointStreamingTimeTaken() > 0);
-    assertTrue(scmMetrics.getDBCheckpointMetrics().
-        getNumCheckpoints() > initialCheckpointCount);
+    assertThat(outputPath.toFile().length()).isGreaterThan(0);
+    assertThat(scmMetrics.getDBCheckpointMetrics().getLastCheckpointCreationTimeTaken())
+        .isGreaterThan(0);
+    assertThat(scmMetrics.getDBCheckpointMetrics().getLastCheckpointStreamingTimeTaken())
+        .isGreaterThan(0);
+    assertThat(scmMetrics.getDBCheckpointMetrics().getNumCheckpoints())
+        .isGreaterThan(initialCheckpointCount);
 
     verify(scmDbCheckpointServletMock).writeDbDataToStream(any(),
         any(), any(), eq(toExcludeList), any(), any());

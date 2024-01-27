@@ -115,7 +115,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 
 import org.apache.ratis.util.ExitUtils;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -134,10 +134,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -854,7 +854,7 @@ public class TestKeyManagerImpl {
             .getLocationList().get(0).getPipeline().getNodesInOrder());
   }
 
-  @NotNull
+  @Nonnull
   private ResolvedBucket resolvedBucket() {
     ResolvedBucket bucket = new ResolvedBucket(VOLUME_NAME, BUCKET_NAME,
         VOLUME_NAME, BUCKET_NAME, "", BucketLayout.DEFAULT);

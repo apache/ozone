@@ -41,8 +41,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -97,11 +98,10 @@ public class TestContainerOperations {
       storageClient.getPipeline(PipelineID.randomId().getProtobuf());
       fail("Get Pipeline should fail");
     } catch (Exception e) {
-      assertTrue(
-          SCMHAUtils.unwrapException(e) instanceof PipelineNotFoundException);
+      assertInstanceOf(PipelineNotFoundException.class, SCMHAUtils.unwrapException(e));
     }
 
-    assertFalse(storageClient.listPipelines().isEmpty());
+    assertThat(storageClient.listPipelines()).isNotEmpty();
   }
 
   @Test
@@ -156,8 +156,7 @@ public class TestContainerOperations {
                       dn.getIpAddress(), dn.getUuidString());
 
       assertEquals(1, usageInfoList.size());
-      assertTrue(usageInfoList.get(0).getContainerCount() >= 0 &&
-              usageInfoList.get(0).getContainerCount() <= 1);
+      assertThat(usageInfoList.get(0).getContainerCount()).isGreaterThanOrEqualTo(0).isLessThanOrEqualTo(1);
       totalContainerCount[(int)usageInfoList.get(0).getContainerCount()]++;
     }
     assertEquals(2, totalContainerCount[0]);

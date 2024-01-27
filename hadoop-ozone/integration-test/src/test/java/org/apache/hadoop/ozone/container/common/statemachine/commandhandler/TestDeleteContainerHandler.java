@@ -76,6 +76,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -243,7 +244,7 @@ public class TestDeleteContainerHandler {
         500,
         5 * 2000);
     assertTrue(!isContainerDeleted(hddsDatanodeService, containerId.getId()));
-    assertTrue(beforeDeleteFailedCount < metrics.getContainerDeleteFailedNonEmpty());
+    assertThat(beforeDeleteFailedCount).isLessThan(metrics.getContainerDeleteFailedNonEmpty());
     // Send the delete command. It should pass with force flag.
     // Deleting a non-empty container should pass on the DN when the force flag
     // is true
@@ -258,7 +259,7 @@ public class TestDeleteContainerHandler {
             isContainerDeleted(hddsDatanodeService, containerId.getId()),
         500, 5 * 1000);
     assertTrue(isContainerDeleted(hddsDatanodeService, containerId.getId()));
-    assertTrue(beforeForceCount < metrics.getContainerForceDelete());
+    assertThat(beforeForceCount).isLessThan(metrics.getContainerForceDelete());
 
     kv.setCheckChunksFilePath(false);
   }
@@ -438,8 +439,8 @@ public class TestDeleteContainerHandler {
         5 * 2000);
     assertTrue(!isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
-    assertTrue(containerDeleteFailedNonEmptyBlockDB <
-        metrics.getContainerDeleteFailedNonEmpty());
+    assertThat(containerDeleteFailedNonEmptyBlockDB)
+        .isLessThan(metrics.getContainerDeleteFailedNonEmpty());
 
     // Now empty the container Dir and try with a non-empty block table
     Container containerToDelete = getContainerfromDN(
@@ -474,8 +475,7 @@ public class TestDeleteContainerHandler {
         500, 5 * 1000);
     assertTrue(isContainerDeleted(hddsDatanodeService,
         containerId.getId()));
-    assertTrue(beforeForceCount <
-        metrics.getContainerForceDelete());
+    assertThat(beforeForceCount).isLessThan(metrics.getContainerForceDelete());
   }
 
   @Test

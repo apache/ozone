@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -570,7 +570,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
    * @param replicationType
    * @return OMRequest
    */
-  @NotNull
+  @Nonnull
   protected OMRequest createFileRequest(
       String volumeName, String bucketName, String keyName,
       HddsProtos.ReplicationFactor replicationFactor,
@@ -600,7 +600,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
    * @param omRequest om request
    * @return OMFileCreateRequest reference
    */
-  @NotNull
+  @Nonnull
   protected OMFileCreateRequest getOMFileCreateRequest(OMRequest omRequest) {
     return new OMFileCreateRequest(omRequest, getBucketLayout());
   }
