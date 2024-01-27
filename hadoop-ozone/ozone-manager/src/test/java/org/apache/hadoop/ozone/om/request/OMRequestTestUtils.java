@@ -25,7 +25,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -1650,7 +1649,7 @@ public final class OMRequestTestUtils {
     if (addToCache) {
       omMetadataManager.getPrefixTable()
           .addCacheEntry(new CacheKey<>(omPrefixInfo.getName()),
-              new CacheValue<>(Optional.of(omPrefixInfo), trxnLogIndex));
+              CacheValue.get(trxnLogIndex, omPrefixInfo));
     }
     omMetadataManager.getPrefixTable().put(prefixName, omPrefixInfo);
   }
@@ -1658,7 +1657,6 @@ public final class OMRequestTestUtils {
   /**
    * Create OmPrefixInfo.
    */
-  @SuppressWarnings("parameterNumber")
   public static OmPrefixInfo createOmPrefixInfo(String volumeName, String bucketName, String prefixName,
         long trxnLogIndex) {
     OzoneObjInfo prefixObj = OzoneObjInfo.Builder
