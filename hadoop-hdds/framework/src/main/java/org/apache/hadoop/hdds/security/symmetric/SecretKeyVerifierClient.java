@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.security.symmetric;
 
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 
-import javax.annotation.Nullable;
+import jakarta.annotation.Nullable;
 import java.util.UUID;
 
 /**

@@ -17,8 +17,10 @@
  */
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,7 +31,9 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -38,7 +42,7 @@ import picocli.CommandLine;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -55,6 +59,7 @@ public class TestDecommissionStatusSubCommand {
   private final PrintStream originalErr = System.err;
   private DecommissionStatusSubCommand cmd;
   private List<HddsProtos.Node> nodes = getNodeDetails(2);
+  private Map<String, List<ContainerID>> containerOnDecom = getContainersOnDecomNodes();
 
   @BeforeEach
   public void setup() throws UnsupportedEncodingException {
@@ -74,6 +79,7 @@ public class TestDecommissionStatusSubCommand {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.queryNode(any(), any(), any(), any()))
         .thenAnswer(invocation -> nodes); // 2 nodes decommissioning
+    when(scmClient.getContainersOnDecomNode(any())).thenReturn(containerOnDecom);
 
     cmd.execute(scmClient);
     Pattern p = Pattern.compile("Decommission\\sStatus:\\s" +
@@ -85,7 +91,13 @@ public class TestDecommissionStatusSubCommand {
     p = Pattern.compile("Datanode:\\s.*host0\\)");
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
+    p = Pattern.compile("host0.*[\r\n].*UnderReplicated.*UnClosed", Pattern.MULTILINE);
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
     p = Pattern.compile("Datanode:\\s.*host1\\)");
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
+    p = Pattern.compile("host1.*[\r\n].*UnderReplicated.*UnClosed", Pattern.MULTILINE);
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
   }
@@ -96,6 +108,7 @@ public class TestDecommissionStatusSubCommand {
     // No nodes in decommissioning. No error is printed
     when(scmClient.queryNode(any(), any(), any(), any()))
         .thenReturn(new ArrayList<>());
+    when(scmClient.getContainersOnDecomNode(any())).thenReturn(new HashMap<>());
     cmd.execute(scmClient);
 
     Pattern p = Pattern.compile("Decommission\\sStatus:\\s" +
@@ -117,6 +130,7 @@ public class TestDecommissionStatusSubCommand {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.queryNode(any(), any(), any(), any()))
         .thenAnswer(invocation -> nodes); // 2 nodes decommissioning
+    when(scmClient.getContainersOnDecomNode(any())).thenReturn(containerOnDecom);
 
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("--id", nodes.get(0).getNodeID().getUuid());
@@ -125,9 +139,15 @@ public class TestDecommissionStatusSubCommand {
     Pattern p = Pattern.compile("Datanode:\\s.*host0\\)", Pattern.MULTILINE);
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
+    p = Pattern.compile("host0.*[\r\n].*UnderReplicated.*UnClosed", Pattern.MULTILINE);
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
 
     // as uuid of only host0 is passed, host1 should NOT be displayed
     p = Pattern.compile("Datanode:\\s.*host1.\\)", Pattern.MULTILINE);
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertFalse(m.find());
+    p = Pattern.compile("host1.*[\r\n].*UnderReplicated.*UnClosed", Pattern.MULTILINE);
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertFalse(m.find());
   }
@@ -137,6 +157,10 @@ public class TestDecommissionStatusSubCommand {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.queryNode(any(), any(), any(), any()))
         .thenAnswer(invocation -> nodes.subList(0, 1)); // host0 decommissioning
+    when(scmClient.getContainersOnDecomNode(DatanodeDetails.getFromProtoBuf(nodes.get(0).getNodeID())))
+        .thenReturn(containerOnDecom);
+    when(scmClient.getContainersOnDecomNode(DatanodeDetails.getFromProtoBuf(nodes.get(1).getNodeID())))
+        .thenReturn(new HashMap<>());
 
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("--id", nodes.get(1).getNodeID().getUuid());
@@ -161,6 +185,7 @@ public class TestDecommissionStatusSubCommand {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.queryNode(any(), any(), any(), any()))
         .thenAnswer(invocation -> nodes); // 2 nodes decommissioning
+    when(scmClient.getContainersOnDecomNode(any())).thenReturn(containerOnDecom);
 
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("--ip", nodes.get(1).getNodeID().getIpAddress());
@@ -169,9 +194,15 @@ public class TestDecommissionStatusSubCommand {
     Pattern p = Pattern.compile("Datanode:\\s.*host1\\)", Pattern.MULTILINE);
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
+    p = Pattern.compile("host1.*[\r\n].*UnderReplicated.*UnClosed", Pattern.MULTILINE);
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
 
     // as IpAddress of only host1 is passed, host0 should NOT be displayed
     p = Pattern.compile("Datanode:\\s.*host0.\\)", Pattern.MULTILINE);
+    m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+    assertFalse(m.find());
+    p = Pattern.compile("host0.*[\r\n].*UnderReplicated.*UnClosed", Pattern.MULTILINE);
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertFalse(m.find());
   }
@@ -181,6 +212,10 @@ public class TestDecommissionStatusSubCommand {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.queryNode(any(), any(), any(), any()))
         .thenAnswer(invocation -> nodes.subList(0, 1)); // host0 decommissioning
+    when(scmClient.getContainersOnDecomNode(DatanodeDetails.getFromProtoBuf(nodes.get(0).getNodeID())))
+        .thenReturn(containerOnDecom);
+    when(scmClient.getContainersOnDecomNode(DatanodeDetails.getFromProtoBuf(nodes.get(1).getNodeID())))
+        .thenReturn(new HashMap<>());
 
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("--ip", nodes.get(1).getNodeID().getIpAddress());
@@ -223,6 +258,21 @@ public class TestDecommissionStatusSubCommand {
       nodesList.add(builder.build());
     }
     return nodesList;
+  }
+
+  private Map<String, List<ContainerID>> getContainersOnDecomNodes() {
+    Map<String, List<ContainerID>> containerMap = new HashMap<>();
+    List<ContainerID> underReplicated = new ArrayList<>();
+    underReplicated.add(new ContainerID(1L));
+    underReplicated.add(new ContainerID(2L));
+    underReplicated.add(new ContainerID(3L));
+    containerMap.put("UnderReplicated", underReplicated);
+    List<ContainerID> unclosed = new ArrayList<>();
+    unclosed.add(new ContainerID(10L));
+    unclosed.add(new ContainerID(11L));
+    unclosed.add(new ContainerID(12L));
+    containerMap.put("UnClosed", unclosed);
+    return containerMap;
   }
 
 }

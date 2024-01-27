@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm;
 
-import java.io.Closeable;
 import java.io.IOException;
 
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -25,7 +24,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 /**
  * Interface to provide XceiverClient when needed.
  */
-public interface XceiverClientFactory extends Closeable {
+public interface XceiverClientFactory extends AutoCloseable {
 
   XceiverClientSpi acquireClient(Pipeline pipeline) throws IOException;
 

@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone;
 
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -31,7 +32,6 @@ import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +42,6 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.UUID;
 import java.util.List;
@@ -53,6 +52,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -89,13 +89,13 @@ public class TestMultipartObjectGet {
     client = cluster.newClient();
     client.getObjectStore().createS3Bucket(BUCKET);
 
-    headers = Mockito.mock(HttpHeaders.class);
+    headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
 
-    context = Mockito.mock(ContainerRequestContext.class);
-    Mockito.when(context.getUriInfo()).thenReturn(Mockito.mock(UriInfo.class));
-    Mockito.when(context.getUriInfo().getQueryParameters())
+    context = mock(ContainerRequestContext.class);
+    when(context.getUriInfo()).thenReturn(mock(UriInfo.class));
+    when(context.getUriInfo().getQueryParameters())
         .thenReturn(new MultivaluedHashMap<>());
 
     REST.setHeaders(headers);
@@ -217,8 +217,7 @@ public class TestMultipartObjectGet {
 
   private static String generateRandomContent(int sizeInMB) {
     int bytesToGenerate = sizeInMB * 1024 * 1024;
-    byte[] randomBytes = new byte[bytesToGenerate];
-    new SecureRandom().nextBytes(randomBytes);
+    byte[] randomBytes = RandomUtils.nextBytes(bytesToGenerate);
     return Base64.getEncoder().encodeToString(randomBytes);
   }
 }

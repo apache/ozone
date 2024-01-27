@@ -25,7 +25,6 @@
   <artifactId>ozone-recon</artifactId>
   <properties>
     <pnpm.version>7.33.6</pnpm.version>
-    <allow.junit4>false</allow.junit4>
   </properties>
   <build>
     <resources>

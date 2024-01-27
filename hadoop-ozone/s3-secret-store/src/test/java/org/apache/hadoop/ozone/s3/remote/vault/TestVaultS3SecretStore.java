@@ -89,7 +89,7 @@ public class TestVaultS3SecretStore {
   @Test
   public void testReadWrite() throws IOException {
     SUCCESS_OPERATION_LIMIT.set(2);
-    S3SecretValue secret = new S3SecretValue("id", "value");
+    S3SecretValue secret = S3SecretValue.of("id", "value");
     s3SecretStore.storeSecret(
         "id",
         secret);
@@ -101,7 +101,7 @@ public class TestVaultS3SecretStore {
   public void testReAuth() throws IOException {
     SUCCESS_OPERATION_LIMIT.set(1);
     AUTH_OPERATION_PROVIDER.set(1);
-    S3SecretValue secret = new S3SecretValue("id", "value");
+    S3SecretValue secret = S3SecretValue.of("id", "value");
     s3SecretStore.storeSecret("id", secret);
 
     assertEquals(secret, s3SecretStore.getSecret("id"));
@@ -112,7 +112,7 @@ public class TestVaultS3SecretStore {
   @Test
   public void testAuthFail() throws IOException {
     SUCCESS_OPERATION_LIMIT.set(1);
-    S3SecretValue secret = new S3SecretValue("id", "value");
+    S3SecretValue secret = S3SecretValue.of("id", "value");
     s3SecretStore.storeSecret("id", secret);
 
     assertThrows(IOException.class,

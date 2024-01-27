@@ -377,7 +377,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
    * @return minimum commit index replicated to all nodes
    * @throws IOException IOException in case watch gets timed out
    */
-  private void watchForCommit(boolean bufferFull) throws IOException {
+  public void watchForCommit(boolean bufferFull) throws IOException {
     checkOpen();
     try {
       XceiverClientReply reply = bufferFull ?
@@ -405,7 +405,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
    * @param force true if no data was written since most recent putBlock and
    *            stream is being closed
    */
-  private void executePutBlock(boolean close,
+  public void executePutBlock(boolean close,
       boolean force) throws IOException {
     checkOpen();
     long flushPos = totalDataFlushedLength;

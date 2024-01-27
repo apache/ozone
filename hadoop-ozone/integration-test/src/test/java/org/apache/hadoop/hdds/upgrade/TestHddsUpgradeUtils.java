@@ -49,6 +49,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.ALREADY_FINALIZED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -117,7 +118,7 @@ public final class TestHddsUpgradeUtils {
     HDDSLayoutVersionManager scmVersionManager = scm.getLayoutVersionManager();
     assertEquals(scmVersionManager.getSoftwareLayoutVersion(),
         scmVersionManager.getMetadataLayoutVersion());
-    assertTrue(scmVersionManager.getMetadataLayoutVersion() >= 1);
+    assertThat(scmVersionManager.getMetadataLayoutVersion()).isGreaterThanOrEqualTo(1);
 
     // SCM should not return from finalization until there is at least one
     // pipeline to use.
@@ -147,7 +148,7 @@ public final class TestHddsUpgradeUtils {
           (ciState == HddsProtos.LifeCycleState.QUASI_CLOSED));
       countContainers++;
     }
-    assertTrue(countContainers >= numContainers);
+    assertThat(countContainers).isGreaterThanOrEqualTo(numContainers);
   }
 
   /*
@@ -173,7 +174,7 @@ public final class TestHddsUpgradeUtils {
         countContainers++;
       }
     }
-    assertTrue(countContainers >= 1);
+    assertThat(countContainers).isGreaterThanOrEqualTo(1);
   }
 
   /*
@@ -217,7 +218,7 @@ public final class TestHddsUpgradeUtils {
           dsm.getLayoutVersionManager();
       assertEquals(dnVersionManager.getSoftwareLayoutVersion(),
           dnVersionManager.getMetadataLayoutVersion());
-      assertTrue(dnVersionManager.getMetadataLayoutVersion() >= 1);
+      assertThat(dnVersionManager.getMetadataLayoutVersion()).isGreaterThanOrEqualTo(1);
 
       // Also verify that all the existing containers are closed.
       for (Container<?> container :
@@ -228,7 +229,7 @@ public final class TestHddsUpgradeUtils {
         countContainers++;
       }
     }
-    assertTrue(countContainers >= numContainers);
+    assertThat(countContainers).isGreaterThanOrEqualTo(numContainers);
   }
 
   public static void testDataNodesStateOnSCM(List<StorageContainerManager> scms,

@@ -72,9 +72,21 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
     try {
       List<String> snapshotDbKeys = snapshotPurgeRequest
           .getSnapshotDBKeysList();
+      List<String> snapInfosToUpdate = snapshotPurgeRequest
+          .getUpdatedSnapshotDBKeyList();
       Map<String, SnapshotInfo> updatedSnapInfos = new HashMap<>();
       Map<String, SnapshotInfo> updatedPathPreviousAndGlobalSnapshots =
           new HashMap<>();
+
+      // Snapshots that are already deepCleaned by the KeyDeletingService
+      // can be marked as deepCleaned.
+      for (String snapTableKey : snapInfosToUpdate) {
+        SnapshotInfo snapInfo = omMetadataManager.getSnapshotInfoTable()
+            .get(snapTableKey);
+
+        updateSnapshotInfoAndCache(snapInfo, omMetadataManager,
+            trxnLogIndex, updatedSnapInfos, false);
+      }
 
       // Snapshots that are purged by the SnapshotDeletingService
       // will update the next snapshot so that is can be deep cleaned
@@ -88,7 +100,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
                 snapshotChainManager, omSnapshotManager);
 
         updateSnapshotInfoAndCache(nextSnapshot, omMetadataManager,
-            trxnLogIndex, updatedSnapInfos);
+            trxnLogIndex, updatedSnapInfos, true);
         updateSnapshotChainAndCache(omMetadataManager, fromSnapshot,
             trxnLogIndex, updatedPathPreviousAndGlobalSnapshots);
         ozoneManager.getOmSnapshotManager().getSnapshotCache()
@@ -108,12 +120,9 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
 
   private void updateSnapshotInfoAndCache(SnapshotInfo snapInfo,
       OmMetadataManagerImpl omMetadataManager, long trxnLogIndex,
-      Map<String, SnapshotInfo> updatedSnapInfos) {
+      Map<String, SnapshotInfo> updatedSnapInfos, boolean deepClean) {
     if (snapInfo != null) {
-      // Setting next snapshot deep clean to false, Since the
-      // current snapshot is deleted. We can potentially
-      // reclaim more keys in the next snapshot.
-      snapInfo.setDeepClean(false);
+      snapInfo.setDeepClean(deepClean);
 
       // Update table cache first
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(
