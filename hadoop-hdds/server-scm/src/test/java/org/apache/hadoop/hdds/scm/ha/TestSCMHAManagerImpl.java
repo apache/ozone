@@ -140,6 +140,21 @@ class TestSCMHAManagerImpl {
   }
 
   @Test
+  @Order(2) // requires testAddSCM
+  void testRemoveSCM() throws IOException {
+    assumeThat(primarySCMHAManager.getRatisServer()
+        .getDivision().getGroup().getPeers().size()).isEqualTo(2);
+
+    final RemoveSCMRequest removeSCMRequest = new RemoveSCMRequest(
+        clusterID, FOLLOWER_SCM_ID, "localhost:" +
+        follower.getDivision()
+            .getRaftServer().getServerRpc().getInetSocketAddress().getPort());
+    primarySCMHAManager.removeSCM(removeSCMRequest);
+    assertEquals(1, primarySCMHAManager.getRatisServer()
+        .getDivision().getGroup().getPeers().size());
+  }
+
+  @Test
   void testHARingRemovalErrors() throws IOException,
       AuthenticationException {
     OzoneConfiguration config = new OzoneConfiguration();
@@ -167,20 +182,6 @@ class TestSCMHAManagerImpl {
     } finally {
       scm2.getScmHAManager().getRatisServer().stop();
     }
-  }
-  @Test
-  @Order(2) // requires testAddSCM
-  void testRemoveSCM() throws IOException {
-    assumeThat(primarySCMHAManager.getRatisServer()
-        .getDivision().getGroup().getPeers().size()).isEqualTo(2);
-
-    final RemoveSCMRequest removeSCMRequest = new RemoveSCMRequest(
-        clusterID, FOLLOWER_SCM_ID, "localhost:" +
-        follower.getDivision()
-            .getRaftServer().getServerRpc().getInetSocketAddress().getPort());
-    primarySCMHAManager.removeSCM(removeSCMRequest);
-    assertEquals(1, primarySCMHAManager.getRatisServer()
-        .getDivision().getGroup().getPeers().size());
   }
 
   private StorageContainerManager getMockStorageContainerManager(
