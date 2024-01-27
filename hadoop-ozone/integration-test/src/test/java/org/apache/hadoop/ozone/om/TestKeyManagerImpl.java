@@ -642,7 +642,9 @@ public class TestKeyManagerImpl {
         .build();
 
     // add acl with invalid prefix name
-    writeClient.addAcl(ozInvalidPrefix, ozAcl1);
+    Exception ex = assertThrows(OMException.class,
+        () -> writeClient.addAcl(ozInvalidPrefix, ozAcl1));
+    assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
 
     OzoneObj ozPrefix1 = new OzoneObjInfo.Builder()
         .setVolumeName(volumeName)
@@ -658,17 +660,22 @@ public class TestKeyManagerImpl {
     assertEquals(ozAcl1, ozAclGet.get(0));
 
     // get acl with invalid prefix name
-    Exception ex = assertThrows(OMException.class,
+    ex = assertThrows(OMException.class,
         () -> writeClient.getAcl(ozInvalidPrefix));
     assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
 
     // set acl with invalid prefix name
     List<OzoneAcl> ozoneAcls = new ArrayList<OzoneAcl>();
     ozoneAcls.add(ozAcl1);
-    writeClient.setAcl(ozInvalidPrefix, ozoneAcls);
+
+    ex = assertThrows(OMException.class,
+        () -> writeClient.setAcl(ozInvalidPrefix, ozoneAcls));
+    assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
 
     // remove acl with invalid prefix name
-    writeClient.removeAcl(ozInvalidPrefix, ozAcl1);
+    ex = assertThrows(OMException.class,
+        () -> writeClient.removeAcl(ozInvalidPrefix, ozAcl1));
+    assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
   }
 
   @Test
