@@ -61,7 +61,7 @@ import org.apache.ozone.rocksdb.util.RdbUtil;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -555,7 +555,7 @@ public class SnapshotDiffManager implements AutoCloseable {
     }
   }
 
-  @NotNull
+  @Nonnull
   public static OFSPath getSnapshotRootPath(String volume, String bucket) {
     org.apache.hadoop.fs.Path bucketPath = new org.apache.hadoop.fs.Path(
         OZONE_URI_DELIMITER + volume + OZONE_URI_DELIMITER + bucket);

@@ -36,7 +36,7 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Named;
@@ -61,8 +61,8 @@ import java.util.TreeMap;
 import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class tests `ozone debug ldb` CLI that reads from a RocksDB directory.
@@ -198,8 +198,8 @@ public class TestLDBCli {
   @ParameterizedTest
   @MethodSource("scanTestCases")
   void testLDBScan(
-      @NotNull Pair<String, Boolean> tableAndOption,
-      @NotNull Pair<Integer, String> expectedExitCodeStderrPair,
+      @Nonnull Pair<String, Boolean> tableAndOption,
+      @Nonnull Pair<Integer, String> expectedExitCodeStderrPair,
       List<String> scanArgs,
       Pair<String, String> dbMapRange) throws IOException {
 
@@ -236,7 +236,7 @@ public class TestLDBCli {
 
     // Check stderr
     final String stderrShouldContain = expectedExitCodeStderrPair.getRight();
-    assertTrue(stderr.toString().contains(stderrShouldContain));
+    assertThat(stderr.toString()).contains(stderrShouldContain);
   }
 
   @Test

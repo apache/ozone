@@ -21,8 +21,9 @@ package org.apache.hadoop.ozone.om.request.key;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
+
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -33,7 +34,6 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.security.acl.OzonePrefixPath;
 import org.apache.hadoop.util.Time;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -112,7 +112,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
     String ozoneKey = addKeyToTable();
     OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
-    Assertions.assertNotNull(omKeyInfo);
+    assertNotNull(omKeyInfo);
 
     doPreExecute(createDeleteKeyRequest());
   }
@@ -142,19 +142,14 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
     verifyPath(ozonePrefixPath, "c/d", "c/d/e");
     verifyPath(ozonePrefixPath, "c/d/e", "c/d/e/file1");
 
-    try {
-      ozonePrefixPath.getChildren("c/d/e/file1");
-      fail("Should throw INVALID_KEY_NAME as the given " +
-          "path is a file.");
-    } catch (OMException ome) {
-      assertEquals(OMException.ResultCodes.INVALID_KEY_NAME,
-          ome.getResult());
-    }
+    OMException ome = assertThrows(OMException.class, () -> ozonePrefixPath.getChildren("c/d/e/file1"),
+        "Should throw INVALID_KEY_NAME as the given path is a file.");
+    assertEquals(OMException.ResultCodes.INVALID_KEY_NAME, ome.getResult());
 
     // OzonePrefixPathImpl on a file
-    ozonePrefixPath = new OzonePrefixPathImpl(volumeName,
+    OzonePrefixPathImpl ozonePrefixPathFile1 = new OzonePrefixPathImpl(volumeName,
         bucketName, "c/d/e/file1", keyManager);
-    status = ozonePrefixPath.getOzoneFileStatus();
+    status = ozonePrefixPathFile1.getOzoneFileStatus();
     assertNotNull(status);
     assertEquals("c/d/e/file1", status.getTrimmedName());
     assertEquals("c/d/e/file1", status.getKeyInfo().getKeyName());
@@ -168,12 +163,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
         pathName);
     assertTrue(pathItr.hasNext(), "Failed to list keyPaths");
     assertEquals(expectedPath, pathItr.next().getTrimmedName());
-    try {
-      pathItr.next();
-      fail("Reached end of the list!");
-    } catch (NoSuchElementException nse) {
-      // expected
-    }
+    assertThrows(NoSuchElementException.class, () -> pathItr.next(), "Reached end of the list!");
   }
 
   @Test

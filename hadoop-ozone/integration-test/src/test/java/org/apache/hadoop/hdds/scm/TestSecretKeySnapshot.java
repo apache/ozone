@@ -68,6 +68,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -237,7 +238,7 @@ public final class TestSecretKeySnapshot {
         100, 3000);
     long followerLastAppliedIndex =
         followerSM.getLastAppliedTermIndex().getIndex();
-    assertTrue(followerLastAppliedIndex >= 200);
+    assertThat(followerLastAppliedIndex).isGreaterThanOrEqualTo(200);
     assertFalse(followerSM.getLifeCycleState().isPausingOrPaused());
 
     // Verify that the follower has the secret keys created
@@ -248,8 +249,8 @@ public final class TestSecretKeySnapshot {
     List<ManagedSecretKey> followerKeys =
         followerSecretKeyManager.getSortedKeys();
     LOG.info("Follower secret keys after snapshot: {}", followerKeys);
-    assertTrue(followerKeys.size() >= 2);
-    assertTrue(followerKeys.contains(currentKeyInLeader));
+    assertThat(followerKeys.size()).isGreaterThanOrEqualTo(2);
+    assertThat(followerKeys).contains(currentKeyInLeader);
     assertEquals(leaderSecretKeyManager.getSortedKeys(), followerKeys);
 
     // Wait for the next rotation, assert that the updates can be synchronized

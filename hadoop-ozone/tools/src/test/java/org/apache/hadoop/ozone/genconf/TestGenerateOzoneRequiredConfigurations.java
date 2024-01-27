@@ -22,7 +22,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import org.junit.jupiter.api.BeforeAll;
@@ -124,7 +124,7 @@ public class TestGenerateOzoneRequiredConfigurations {
         };
     cmd.parseWithHandlers(new CommandLine.RunLast(),
         exceptionHandler, args);
-    assertTrue(out.toString(DEFAULT_ENCODING).contains(msg));
+    assertThat(out.toString(DEFAULT_ENCODING)).contains(msg);
   }
 
   private void executeWithException(String[] args, String msg) {
@@ -150,8 +150,7 @@ public class TestGenerateOzoneRequiredConfigurations {
       cmd.parseWithHandlers(new CommandLine.RunLast(),
           exceptionHandler, args);
     }  catch (Exception ex) {
-      assertTrue(ex.getMessage().contains(msg),
-          "Expected " + msg + ", but got: " + ex.getMessage());
+      assertThat(ex.getMessage()).contains(msg);
     }
   }
 
@@ -178,7 +177,7 @@ public class TestGenerateOzoneRequiredConfigurations {
 
     //Asserts all properties have a non-empty value
     for (OzoneConfiguration.Property p : allProperties) {
-      assertTrue(p.getValue() != null && p.getValue().length() > 0);
+      assertThat(p.getValue()).isNotNull().isNotEmpty();
     }
   }
 
@@ -206,7 +205,7 @@ public class TestGenerateOzoneRequiredConfigurations {
         oc.readPropertyFromXml(url);
 
     for (OzoneConfiguration.Property p : allProperties) {
-      assertTrue(p.getValue() != null && p.getValue().length() > 0);
+      assertThat(p.getValue()).isNotNull().isNotEmpty();
     }
     ozoneConfigurationCount = allProperties.size();
 
@@ -222,7 +221,7 @@ public class TestGenerateOzoneRequiredConfigurations {
     allProperties = oc.readPropertyFromXml(url);
 
     for (OzoneConfiguration.Property p : allProperties) {
-      assertTrue(p.getValue() != null && p.getValue().length() > 0);
+      assertThat(p.getValue()).isNotNull().isNotEmpty();
     }
     ozoneSecurityConfigurationCount = allProperties.size();
 

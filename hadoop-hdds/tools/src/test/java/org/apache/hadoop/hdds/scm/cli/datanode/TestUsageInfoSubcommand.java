@@ -37,9 +37,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static com.fasterxml.jackson.databind.node.JsonNodeType.ARRAY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.mock;
@@ -111,20 +111,20 @@ public class TestUsageInfoSubcommand {
 
     // then
     String output = outContent.toString(CharEncoding.UTF_8);
-    assertTrue(output.contains("UUID         :"));
-    assertTrue(output.contains("IP Address   :"));
-    assertTrue(output.contains("Hostname     :"));
-    assertTrue(output.contains("Capacity     :"));
-    assertTrue(output.contains("Total Used   :"));
-    assertTrue(output.contains("Total Used % :"));
-    assertTrue(output.contains("Ozone Used   :"));
-    assertTrue(output.contains("Ozone Used % :"));
-    assertTrue(output.contains("Remaining    :"));
-    assertTrue(output.contains("Remaining %  :"));
-    assertTrue(output.contains("Container(s) :"));
-    assertTrue(output.contains("Container Pre-allocated :"));
-    assertTrue(output.contains("Remaining Allocatable   :"));
-    assertTrue(output.contains("Free Space To Spare     :"));
+    assertThat(output).contains("UUID         :");
+    assertThat(output).contains("IP Address   :");
+    assertThat(output).contains("Hostname     :");
+    assertThat(output).contains("Capacity     :");
+    assertThat(output).contains("Total Used   :");
+    assertThat(output).contains("Total Used % :");
+    assertThat(output).contains("Ozone Used   :");
+    assertThat(output).contains("Ozone Used % :");
+    assertThat(output).contains("Remaining    :");
+    assertThat(output).contains("Remaining %  :");
+    assertThat(output).contains("Container(s) :");
+    assertThat(output).contains("Container Pre-allocated :");
+    assertThat(output).contains("Remaining Allocatable   :");
+    assertThat(output).contains("Free Space To Spare     :");
   }
 
   private List<HddsProtos.DatanodeUsageInfoProto> getUsageProto() {

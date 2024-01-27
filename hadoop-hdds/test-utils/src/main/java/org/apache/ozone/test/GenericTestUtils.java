@@ -24,6 +24,8 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -226,7 +228,7 @@ public abstract class GenericTestUtils {
     boolean isAccessible = field.isAccessible();
 
     field.setAccessible(true);
-    Field modifiersField = Field.class.getDeclaredField("modifiers");
+    Field modifiersField = ReflectionUtils.getModifiersField();
     boolean modifierFieldAccessible = modifiersField.isAccessible();
     modifiersField.setAccessible(true);
     int modifierVal = modifiersField.getInt(field);
@@ -246,7 +248,7 @@ public abstract class GenericTestUtils {
     boolean isAccessible = field.isAccessible();
 
     field.setAccessible(true);
-    Field modifiersField = Field.class.getDeclaredField("modifiers");
+    Field modifiersField = ReflectionUtils.getModifiersField();
     boolean modifierFieldAccessible = modifiersField.isAccessible();
     modifiersField.setAccessible(true);
     int modifierVal = modifiersField.getInt(field);
@@ -468,4 +470,45 @@ public abstract class GenericTestUtils {
     }
   }
 
+  /**
+   * This class is a utility class for java reflection operations.
+   */
+  public static final class ReflectionUtils {
+
+    /**
+     * This method provides the modifiers field using reflection approach which is compatible
+     * for both pre Java 9 and post java 9 versions.
+     * @return modifiers field
+     * @throws IllegalAccessException
+     * @throws NoSuchFieldException
+     */
+    public static Field getModifiersField() throws IllegalAccessException, NoSuchFieldException {
+      Field modifiersField = null;
+      try {
+        modifiersField = Field.class.getDeclaredField("modifiers");
+      } catch (NoSuchFieldException e) {
+        try {
+          Method getDeclaredFields0 = Class.class.getDeclaredMethod(
+              "getDeclaredFields0", boolean.class);
+          boolean accessibleBeforeSet = getDeclaredFields0.isAccessible();
+          getDeclaredFields0.setAccessible(true);
+          Field[] fields = (Field[]) getDeclaredFields0.invoke(Field.class, false);
+          getDeclaredFields0.setAccessible(accessibleBeforeSet);
+          for (Field field : fields) {
+            if ("modifiers".equals(field.getName())) {
+              modifiersField = field;
+              break;
+            }
+          }
+          if (modifiersField == null) {
+            throw e;
+          }
+        } catch (InvocationTargetException | NoSuchMethodException ex) {
+          e.addSuppressed(ex);
+          throw e;
+        }
+      }
+      return modifiersField;
+    }
+  }
 }

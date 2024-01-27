@@ -20,8 +20,8 @@ package org.apache.ozone.test;
 import static org.apache.hadoop.metrics2.lib.Interns.info;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.AdditionalMatchers.geq;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.argThat;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -47,6 +47,8 @@ import java.util.Objects;
 
 /**
  * Helpers for metrics source tests.
+ * <p/>
+ * Copied from Hadoop and migrated to AssertJ.
  */
 public final class MetricsAsserts {
 

@@ -70,8 +70,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.anyList;
+import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -358,7 +358,7 @@ public class TestContainerReader {
         hddsVolume1, containerSet1, conf, true);
     containerReader.readVolume(hddsVolume1.getHddsRootDir());
     assertEquals(0, containerSet1.containerCount());
-    assertTrue(dnLogs.getOutput().contains("Container DB file is missing"));
+    assertThat(dnLogs.getOutput()).contains("Container DB file is missing");
   }
 
   @ContainerTestVersionInfo.ContainerTest

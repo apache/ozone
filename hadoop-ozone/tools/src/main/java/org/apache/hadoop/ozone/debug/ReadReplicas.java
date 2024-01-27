@@ -36,7 +36,7 @@ import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import org.apache.hadoop.ozone.shell.keys.KeyHandler;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
 
@@ -239,7 +239,7 @@ public class ReadReplicas extends KeyHandler implements SubcommandWithParent {
     return input != null ? input : new ByteArrayInputStream(new byte[0]);
   }
 
-  @NotNull
+  @Nonnull
   private File createDirectory(String volumeName, String bucketName,
                                  String keyName) throws IOException {
     String fileSuffix

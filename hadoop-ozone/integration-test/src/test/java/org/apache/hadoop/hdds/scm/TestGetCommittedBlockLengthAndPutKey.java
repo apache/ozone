@@ -46,9 +46,9 @@ import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test Container calls.
@@ -144,7 +144,7 @@ public class TestGetCommittedBlockLengthAndPutKey {
     Throwable t = assertThrows(StorageContainerException.class,
         () -> ContainerProtocolCalls.getCommittedBlockLength(client, blockID,
             null));
-    assertTrue(t.getMessage().contains("Unable to find the block"));
+    assertThat(t.getMessage()).contains("Unable to find the block");
 
     xceiverClientManager.releaseClient(client, false);
   }
@@ -175,8 +175,8 @@ public class TestGetCommittedBlockLengthAndPutKey {
             .getPutBlockRequest(pipeline, writeChunkRequest.getWriteChunk());
     response = client.sendCommand(putKeyRequest).getPutBlock();
     assertEquals(response.getCommittedBlockLength().getBlockLength(), data.length);
-    assertTrue(response.getCommittedBlockLength().getBlockID()
-        .getBlockCommitSequenceId() > 0);
+    assertThat(response.getCommittedBlockLength().getBlockID().getBlockCommitSequenceId())
+        .isGreaterThan(0);
     BlockID responseBlockID = BlockID
         .getFromProtobuf(response.getCommittedBlockLength().getBlockID());
     blockID

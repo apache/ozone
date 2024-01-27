@@ -74,7 +74,7 @@ public class TestSCMPipelineMetrics {
     long numPipelineCreated =
         getLongCounter("NumPipelineCreated", metrics);
     // Pipelines are created in background when the cluster starts.
-    assertTrue(numPipelineCreated > 0);
+    assertThat(numPipelineCreated).isGreaterThan(0);
   }
 
   /**
