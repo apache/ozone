@@ -130,10 +130,7 @@ class TestSCMHAManagerImpl {
 
     follower.start();
     final AddSCMRequest request = new AddSCMRequest(
-        clusterID, FOLLOWER_SCM_ID,
-        "localhost:" + follower
-            .getDivision().getRaftServer().getServerRpc()
-            .getInetSocketAddress().getPort());
+        clusterID, FOLLOWER_SCM_ID, getFollowerAddress());
     primarySCMHAManager.addSCM(request);
     assertEquals(2, primarySCMHAManager.getRatisServer()
         .getDivision().getGroup().getPeers().size());
@@ -146,12 +143,16 @@ class TestSCMHAManagerImpl {
         .getDivision().getGroup().getPeers().size()).isEqualTo(2);
 
     final RemoveSCMRequest removeSCMRequest = new RemoveSCMRequest(
-        clusterID, FOLLOWER_SCM_ID, "localhost:" +
-        follower.getDivision()
-            .getRaftServer().getServerRpc().getInetSocketAddress().getPort());
+        clusterID, FOLLOWER_SCM_ID, getFollowerAddress());
     primarySCMHAManager.removeSCM(removeSCMRequest);
     assertEquals(1, primarySCMHAManager.getRatisServer()
         .getDivision().getGroup().getPeers().size());
+  }
+
+  private String getFollowerAddress() {
+    return "localhost:" +
+        follower.getDivision()
+            .getRaftServer().getServerRpc().getInetSocketAddress().getPort();
   }
 
   @Test
