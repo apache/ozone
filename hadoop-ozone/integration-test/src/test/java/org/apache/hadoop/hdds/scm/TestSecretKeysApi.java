@@ -35,7 +35,7 @@ import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -342,12 +342,12 @@ public final class TestSecretKeysApi {
     cluster.waitForClusterToBeReady();
   }
 
-  @NotNull
+  @Nonnull
   private SecretKeyProtocol getSecretKeyProtocol() throws IOException {
     return getSecretKeyProtocol(ozonePrincipal, ozoneKeytab);
   }
 
-  @NotNull
+  @Nonnull
   private SecretKeyProtocol getSecretKeyProtocol(
       String user, File keyTab) throws IOException {
     UserGroupInformation ugi =

@@ -48,7 +48,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -315,7 +315,7 @@ public class TestOMDBUpdatesHandler {
         omdbDefinition.getColumnFamily(bucketTable).getValueType());
   }
 
-  @NotNull
+  @Nonnull
   private List<byte[]> getBytesFromOmMetaManager(int getUpdatesSince)
       throws RocksDBException, IOException {
     RDBStore rdbStore = (RDBStore) omMetadataManager.getStore();
@@ -336,7 +336,7 @@ public class TestOMDBUpdatesHandler {
     return writeBatches;
   }
 
-  @NotNull
+  @Nonnull
   private OMDBUpdatesHandler captureEvents(List<byte[]> writeBatches)
       throws RocksDBException {
     OMDBUpdatesHandler omdbUpdatesHandler =

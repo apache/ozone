@@ -36,7 +36,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -167,7 +167,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
     }
   }
 
-  @NotNull
+  @Nonnull
   protected OMRequest createRecoverLeaseRequest(
       String volumeName, String bucketName, String keyName) {
 

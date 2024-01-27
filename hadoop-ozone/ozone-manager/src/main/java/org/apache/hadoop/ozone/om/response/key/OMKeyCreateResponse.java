@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.response.key;
 
 import java.io.IOException;
 import java.util.List;
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
