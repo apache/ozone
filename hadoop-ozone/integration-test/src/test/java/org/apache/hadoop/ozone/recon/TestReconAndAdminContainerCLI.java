@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.recon;
 
-import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -36,7 +35,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -59,7 +57,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -96,6 +93,10 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERV
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Integration tests for ensuring Recon's consistency
@@ -151,18 +152,15 @@ public class TestReconAndAdminContainerCLI {
 
     // Verify that Recon has all the pipelines from SCM.
     scmPipelineManager.getPipelines().forEach(p -> {
-      try {
-        Assertions.assertNotNull(reconPipelineManager.getPipeline(p.getId()));
-      } catch (PipelineNotFoundException e) {
-        Assertions.fail();
-      }
+      Pipeline pipeline = assertDoesNotThrow(() -> reconPipelineManager.getPipeline(p.getId()));
+      assertNotNull(pipeline);
     });
 
-    Assertions.assertTrue(scmContainerManager.getContainers().isEmpty());
+    assertThat(scmContainerManager.getContainers()).isEmpty();
 
     // Verify that all nodes are registered with Recon.
     NodeManager reconNodeManager = reconScm.getScmNodeManager();
-    Assertions.assertEquals(scmNodeManager.getAllNodes().size(),
+    assertEquals(scmNodeManager.getAllNodes().size(),
         reconNodeManager.getAllNodes().size());
 
     OzoneClient client = cluster.newClient();
@@ -318,7 +316,9 @@ public class TestReconAndAdminContainerCLI {
    */
   private static void compareRMReportToReconResponse(String containerState)
       throws Exception {
-    Assertions.assertFalse(Strings.isNullOrEmpty(containerState));
+    assertThat(containerState)
+        .isNotNull()
+        .isNotEmpty();
 
     // Both threads are running every 1 second.
     // Wait until all values are equal.
@@ -344,10 +344,10 @@ public class TestReconAndAdminContainerCLI {
       long rmMisReplCounter = rmReport.getStat(
           ReplicationManagerReport.HealthState.MIS_REPLICATED);
 
-      Assertions.assertEquals(rmMissingCounter, reconResponse.getMissingCount());
-      Assertions.assertEquals(rmUnderReplCounter, reconResponse.getUnderReplicatedCount());
-      Assertions.assertEquals(rmOverReplCounter, reconResponse.getOverReplicatedCount());
-      Assertions.assertEquals(rmMisReplCounter, reconResponse.getMisReplicatedCount());
+      assertEquals(rmMissingCounter, reconResponse.getMissingCount());
+      assertEquals(rmUnderReplCounter, reconResponse.getUnderReplicatedCount());
+      assertEquals(rmOverReplCounter, reconResponse.getOverReplicatedCount());
+      assertEquals(rmMisReplCounter, reconResponse.getMisReplicatedCount());
     } catch (IOException e) {
       LOG.info("Error getting report", e);
       return false;
@@ -398,7 +398,7 @@ public class TestReconAndAdminContainerCLI {
             .stream()
             .map(UnhealthyContainerMetadata::getContainerID)
             .collect(Collectors.toList());
-    Assertions.assertTrue(reconContainerIDs.containsAll(rmIDsToLong));
+    assertThat(reconContainerIDs).containsAll(rmIDsToLong);
 
     return true;
   }
@@ -413,11 +413,11 @@ public class TestReconAndAdminContainerCLI {
 
     List<Long> containerIDs = getContainerIdsForKey(omKeyInfo);
     // The list has only 1 containerID.
-    Assertions.assertEquals(1, containerIDs.size());
+    assertEquals(1, containerIDs.size());
     long containerID = containerIDs.get(0);
 
     // Verify Recon picked up the new container.
-    Assertions.assertEquals(scmContainerManager.getContainers(),
+    assertEquals(scmContainerManager.getContainers(),
         reconContainerManager.getContainers());
 
     ReconContainerMetadataManager reconContainerMetadataManager =
@@ -455,7 +455,7 @@ public class TestReconAndAdminContainerCLI {
   }
 
   private static List<Long> getContainerIdsForKey(OmKeyInfo omKeyInfo) {
-    Assertions.assertNotNull(omKeyInfo.getLatestVersionLocations());
+    assertNotNull(omKeyInfo.getLatestVersionLocations());
     List<OmKeyLocationInfo> locations =
         omKeyInfo.getLatestVersionLocations().getLocationList();
 
