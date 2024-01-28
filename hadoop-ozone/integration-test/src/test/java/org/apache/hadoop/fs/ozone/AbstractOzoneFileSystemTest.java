@@ -117,6 +117,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -392,7 +393,7 @@ abstract class AbstractOzoneFileSystemTest {
     InvalidPathException pathException = assertThrows(
         InvalidPathException.class, () -> fs.create(path, false)
     );
-    assertTrue(pathException.getMessage().contains("Invalid path Name"));
+    assertThat(pathException.getMessage()).contains("Invalid path Name");
   }
 
   @Test
@@ -466,7 +467,7 @@ abstract class AbstractOzoneFileSystemTest {
     // delete a dir with sub-file
     try {
       FileStatus[] parents = fs.listStatus(grandparent);
-      assertTrue(parents.length > 0);
+      assertThat(parents.length).isGreaterThan(0);
       fs.delete(parents[0].getPath(), false);
       fail("Must throw exception as dir is not empty!");
     } catch (PathIsNotEmptyDirectoryException pde) {
@@ -537,8 +538,8 @@ abstract class AbstractOzoneFileSystemTest {
       fs.getFileStatus(path);
       fail("testRecursiveDelete failed");
     } catch (IOException ex) {
-      assertTrue(ex instanceof FileNotFoundException);
-      assertTrue(ex.getMessage().contains("No such file or directory"));
+      assertInstanceOf(FileNotFoundException.class, ex);
+      assertThat(ex.getMessage()).contains("No such file or directory");
     }
   }
 
@@ -748,7 +749,7 @@ abstract class AbstractOzoneFileSystemTest {
     assertEquals(numDirs, fileStatuses.length, "Total directories listed do not match the existing directories");
 
     for (int i = 0; i < numDirs; i++) {
-      assertTrue(paths.contains(fileStatuses[i].getPath().getName()));
+      assertThat(paths).contains(fileStatuses[i].getPath().getName());
     }
   }
 
@@ -1003,7 +1004,7 @@ abstract class AbstractOzoneFileSystemTest {
       fs.open(fileNotExists);
       fail("Should throw FileNotFoundException as file doesn't exist!");
     } catch (FileNotFoundException fnfe) {
-      assertTrue(fnfe.getMessage().contains("KEY_NOT_FOUND"), "Expected KEY_NOT_FOUND error");
+      assertThat(fnfe.getMessage()).contains("KEY_NOT_FOUND");
     }
   }
 
@@ -1026,12 +1027,16 @@ abstract class AbstractOzoneFileSystemTest {
       FileStatus fileStatus = fs.getFileStatus(file);
       long blkSize = fileStatus.getBlockSize();
       long fileLength = fileStatus.getLen();
-      assertTrue(fileLength > blkSize, "Block allocation should happen");
+      assertThat(fileLength)
+          .withFailMessage("Block allocation should happen")
+          .isGreaterThan(blkSize);
 
       long newNumBlockAllocations =
               cluster.getOzoneManager().getMetrics().getNumBlockAllocates();
 
-      assertTrue((newNumBlockAllocations > numBlockAllocationsOrg), "Block allocation should happen");
+      assertThat(newNumBlockAllocations)
+          .withFailMessage("Block allocation should happen")
+          .isGreaterThan(numBlockAllocationsOrg);
 
       stream.seek(fileLength);
       assertEquals(-1, stream.read());
@@ -1366,7 +1371,7 @@ abstract class AbstractOzoneFileSystemTest {
     IllegalArgumentException exception = assertThrows(
         IllegalArgumentException.class,
         () -> fs.rename(new Path(fs.getUri().toString() + "fake" + dir), dest));
-    assertTrue(exception.getMessage().contains("Wrong FS"));
+    assertThat(exception.getMessage()).contains("Wrong FS");
   }
 
   private OzoneKeyDetails getKey(Path keyPath, boolean isDirectory)
@@ -1419,7 +1424,7 @@ abstract class AbstractOzoneFileSystemTest {
     for (int i = 0; i < 5; i++) {
       Thread.sleep(10);
       fileStatuses = o3fs.listStatus(mdir1);
-      assertTrue(modificationTime <= fileStatuses[0].getModificationTime());
+      assertThat(modificationTime).isLessThanOrEqualTo(fileStatuses[0].getModificationTime());
     }
   }
 
@@ -1817,7 +1822,7 @@ abstract class AbstractOzoneFileSystemTest {
 
     // The timestamp of the newly created file should always be greater than
     // the time when the test was started
-    assertTrue(status.getModificationTime() > currentTime);
+    assertThat(status.getModificationTime()).isGreaterThan(currentTime);
 
     assertFalse(status.isDirectory());
     assertEquals(FsPermission.getFileDefault(), status.getPermission());
@@ -1968,7 +1973,7 @@ abstract class AbstractOzoneFileSystemTest {
     assertChange(initialStats, statistics, Statistic.OBJECTS_LIST.getSymbol(), 2);
     assertEquals(initialListStatusCount + 2, omMetrics.getNumListStatus());
     for (Path p : paths) {
-      assertTrue(Arrays.asList(statusList).contains(fs.getFileStatus(p)));
+      assertThat(Arrays.asList(statusList)).contains(fs.getFileStatus(p));
     }
   }
 
@@ -2006,7 +2011,7 @@ abstract class AbstractOzoneFileSystemTest {
     // doesn't actually exist on server; if it exists, it will be a fixed value.
     // In this case, the dir key exists.
     assertEquals(0, omStatus.getKeyInfo().getDataSize());
-    assertTrue(omStatus.getKeyInfo().getModificationTime() <= currentTime);
+    assertThat(omStatus.getKeyInfo().getModificationTime()).isLessThanOrEqualTo(currentTime);
     assertEquals(new Path(omStatus.getPath()).getName(),
         o3fs.pathToKey(path));
   }
@@ -2020,13 +2025,12 @@ abstract class AbstractOzoneFileSystemTest {
       stream.writeBytes(data);
     }
     FileStatus status = fs.getFileStatus(path);
-    assertTrue(status instanceof LocatedFileStatus);
-    LocatedFileStatus locatedFileStatus = (LocatedFileStatus) status;
-    assertTrue(locatedFileStatus.getBlockLocations().length >= 1);
+    LocatedFileStatus locatedFileStatus = assertInstanceOf(LocatedFileStatus.class, status);
+    assertThat(locatedFileStatus.getBlockLocations().length).isGreaterThanOrEqualTo(1);
 
     for (BlockLocation blockLocation : locatedFileStatus.getBlockLocations()) {
-      assertTrue(blockLocation.getNames().length >= 1);
-      assertTrue(blockLocation.getHosts().length >= 1);
+      assertThat(blockLocation.getNames().length).isGreaterThanOrEqualTo(1);
+      assertThat(blockLocation.getHosts().length).isGreaterThanOrEqualTo(1);
     }
   }
 
@@ -2046,8 +2050,7 @@ abstract class AbstractOzoneFileSystemTest {
       stream.writeBytes(data);
     }
     FileStatus status = fs.getFileStatus(path);
-    assertTrue(status instanceof LocatedFileStatus);
-    LocatedFileStatus locatedFileStatus = (LocatedFileStatus) status;
+    LocatedFileStatus locatedFileStatus = assertInstanceOf(LocatedFileStatus.class, status);
     BlockLocation[] blockLocations = locatedFileStatus.getBlockLocations();
 
     assertEquals(0, blockLocations[0].getOffset());
@@ -2099,7 +2102,7 @@ abstract class AbstractOzoneFileSystemTest {
       config.set(FS_DEFAULT_NAME_KEY, obsRootPath);
 
       IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> FileSystem.get(config));
-      assertTrue(e.getMessage().contains("OBJECT_STORE, which does not support file system semantics"));
+      assertThat(e.getMessage()).contains("OBJECT_STORE, which does not support file system semantics");
     }
   }
 

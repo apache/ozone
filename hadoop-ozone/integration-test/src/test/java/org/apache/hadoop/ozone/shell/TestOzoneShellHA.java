@@ -82,8 +82,10 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCK
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_EMPTY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -278,10 +280,7 @@ public class TestOzoneShellHA {
           if (exceptionToCheck.getCause() != null) {
             exceptionToCheck = exceptionToCheck.getCause();
           }
-          assertTrue(exceptionToCheck.getMessage().contains(expectedError),
-              String.format("Error of OzoneShell code doesn't contain the " +
-                      "exception [%s] in [%s]",
-                  expectedError, exceptionToCheck.getMessage()));
+          assertThat(exceptionToCheck.getMessage()).contains(expectedError);
         }
       }
     }
@@ -429,7 +428,7 @@ public class TestOzoneShellHA {
     Throwable t = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, args));
     Throwable c = t.getCause();
-    assertTrue(c instanceof IllegalArgumentException);
+    assertInstanceOf(IllegalArgumentException.class, c);
     assertEquals("rs-3-2-1024k is not supported for " +
             ReplicationType.RATIS + " replication type", c.getMessage());
   }
@@ -1046,36 +1045,36 @@ public class TestOzoneShellHA {
         "--space-quota", "0GB"};
     ExecutionException eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, volumeArgs1));
-    assertTrue(eException.getMessage()
-        .contains("Invalid value for space quota"));
+    assertThat(eException.getMessage())
+        .contains("Invalid value for space quota");
     out.reset();
 
     String[] volumeArgs2 = new String[]{"volume", "setquota", "vol4",
         "--space-quota", "-1GB"};
     eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, volumeArgs2));
-    assertTrue(eException.getMessage()
-        .contains("Invalid value for space quota"));
+    assertThat(eException.getMessage())
+        .contains("Invalid value for space quota");
     out.reset();
 
     String[] volumeArgs3 = new String[]{"volume", "setquota", "vol4",
         "--space-quota", "test"};
     eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, volumeArgs3));
-    assertTrue(eException.getMessage()
+    assertThat(eException.getMessage())
         .contains("test is invalid. " +
             "The quota value should be a positive integer " +
-            "with byte numeration(B, KB, MB, GB and TB)"));
+            "with byte numeration(B, KB, MB, GB and TB)");
     out.reset();
 
     String[] volumeArgs4 = new String[]{"volume", "setquota", "vol4",
         "--space-quota", "1.5GB"};
     eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, volumeArgs4));
-    assertTrue(eException.getMessage()
+    assertThat(eException.getMessage())
         .contains("1.5GB is invalid. " +
             "The quota value should be a positive integer " +
-            "with byte numeration(B, KB, MB, GB and TB)"));
+            "with byte numeration(B, KB, MB, GB and TB)");
     out.reset();
 
     String[] volumeArgs5 = new String[]{"volume", "setquota", "vol4",
@@ -1083,24 +1082,24 @@ public class TestOzoneShellHA {
     MissingParameterException mException = assertThrows(
         MissingParameterException.class,
         () -> execute(ozoneShell, volumeArgs5));
-    assertTrue(mException.getMessage()
-        .contains("Missing required parameter"));
+    assertThat(mException.getMessage())
+        .contains("Missing required parameter");
     out.reset();
 
     String[] volumeArgs6 = new String[]{"volume", "setquota", "vol4",
         "--namespace-quota", "0"};
     eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, volumeArgs6));
-    assertTrue(eException.getMessage()
-        .contains("Invalid value for namespace quota"));
+    assertThat(eException.getMessage())
+        .contains("Invalid value for namespace quota");
     out.reset();
 
     String[] volumeArgs7 = new String[]{"volume", "setquota", "vol4",
         "--namespace-quota"};
     mException = assertThrows(MissingParameterException.class,
         () -> execute(ozoneShell, volumeArgs7));
-    assertTrue(mException.getMessage()
-        .contains("Missing required parameter"));
+    assertThat(mException.getMessage())
+        .contains("Missing required parameter");
     out.reset();
 
     // Test set bucket quota to invalid values
@@ -1108,60 +1107,60 @@ public class TestOzoneShellHA {
         "--space-quota", "0GB"};
     eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, bucketArgs1));
-    assertTrue(eException.getMessage()
-        .contains("Invalid value for space quota"));
+    assertThat(eException.getMessage())
+        .contains("Invalid value for space quota");
     out.reset();
 
     String[] bucketArgs2 = new String[]{"bucket", "setquota", "vol4/buck4",
         "--space-quota", "-1GB"};
     eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, bucketArgs2));
-    assertTrue(eException.getMessage()
-        .contains("Invalid value for space quota"));
+    assertThat(eException.getMessage())
+        .contains("Invalid value for space quota");
     out.reset();
 
     String[] bucketArgs3 = new String[]{"bucket", "setquota", "vol4/buck4",
         "--space-quota", "test"};
     eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, bucketArgs3));
-    assertTrue(eException.getMessage()
+    assertThat(eException.getMessage())
         .contains("test is invalid. " +
             "The quota value should be a positive integer " +
-            "with byte numeration(B, KB, MB, GB and TB)"));
+            "with byte numeration(B, KB, MB, GB and TB)");
     out.reset();
 
     String[] bucketArgs4 = new String[]{"bucket", "setquota", "vol4/buck4",
         "--space-quota", "1.5GB"};
     eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, bucketArgs4));
-    assertTrue(eException.getMessage()
+    assertThat(eException.getMessage())
         .contains("1.5GB is invalid. " +
             "The quota value should be a positive integer " +
-            "with byte numeration(B, KB, MB, GB and TB)"));
+            "with byte numeration(B, KB, MB, GB and TB)");
     out.reset();
 
     String[] bucketArgs5 = new String[]{"bucket", "setquota", "vol4/buck4",
         "--space-quota"};
     mException = assertThrows(MissingParameterException.class,
         () -> execute(ozoneShell, bucketArgs5));
-    assertTrue(mException.getMessage()
-        .contains("Missing required parameter"));
+    assertThat(mException.getMessage())
+        .contains("Missing required parameter");
     out.reset();
 
     String[] bucketArgs6 = new String[]{"bucket", "setquota", "vol4/buck4",
         "--namespace-quota", "0"};
     eException = assertThrows(ExecutionException.class,
         () -> execute(ozoneShell, bucketArgs6));
-    assertTrue(eException.getMessage()
-        .contains("Invalid value for namespace quota"));
+    assertThat(eException.getMessage())
+        .contains("Invalid value for namespace quota");
     out.reset();
 
     String[] bucketArgs7 = new String[]{"bucket", "setquota", "vol4/buck4",
         "--namespace-quota"};
     mException = assertThrows(MissingParameterException.class,
         () -> execute(ozoneShell, bucketArgs7));
-    assertTrue(mException.getMessage()
-        .contains("Missing required parameter"));
+    assertThat(mException.getMessage())
+        .contains("Missing required parameter");
     out.reset();
 
     // Test set bucket spaceQuota or nameSpaceQuota to normal value.
@@ -1249,7 +1248,7 @@ public class TestOzoneShellHA {
         client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket("bucket0");
     try (OzoneOutputStream out = bucket.createKey("myKey", 2000)) {
-      assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
+      assertInstanceOf(ECKeyOutputStream.class, out.getOutputStream());
     }
   }
 
@@ -1313,7 +1312,7 @@ public class TestOzoneShellHA {
         client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket("bucket1");
     try (OzoneOutputStream out = bucket.createKey("myKey", 2000)) {
-      assertTrue(out.getOutputStream() instanceof KeyOutputStream);
+      assertInstanceOf(KeyOutputStream.class, out.getOutputStream());
       assertFalse(out.getOutputStream() instanceof ECKeyOutputStream);
     }
   }
@@ -1338,7 +1337,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
     bucket = volume.getBucket("bucket0");
     try (OzoneOutputStream out = bucket.createKey("newECKey", 1024)) {
-      assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
+      assertInstanceOf(ECKeyOutputStream.class, out.getOutputStream());
     }
 
     args = new String[] {"bucket", "set-replication-config", bucketPath, "-t",
@@ -1677,7 +1676,7 @@ public class TestOzoneShellHA {
         parseOutputIntoArrayList();
     // Can include s3v and volumes from other test cases that aren't cleaned up,
     //  hence >= instead of equals.
-    assertTrue(volumeListOut.size() >= testVolumes.size());
+    assertThat(volumeListOut.size()).isGreaterThanOrEqualTo(testVolumes.size());
     final HashSet<String> volumeSet = new HashSet<>(testVolumes);
     volumeListOut.forEach(map -> volumeSet.remove(map.get("name")));
     // Should have found all the volumes created for this test
@@ -1731,9 +1730,9 @@ public class TestOzoneShellHA {
     };
     ParameterException exception = assertThrows(ParameterException.class,
         () -> execute(ozoneShell, arg2));
-    assertTrue(exception.getMessage()
+    assertThat(exception.getMessage())
         .contains("expected one of [FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, " +
-            "LEGACY]"));
+            "LEGACY]");
 
 
     String[] arg3 = new String[]{
@@ -1743,9 +1742,9 @@ public class TestOzoneShellHA {
 
     exception = assertThrows(ParameterException.class,
         () -> execute(ozoneShell, arg3));
-    assertTrue(exception.getMessage()
+    assertThat(exception.getMessage())
         .contains("expected one of [FILE_SYSTEM_OPTIMIZED, OBJECT_STORE, " +
-            "LEGACY] "));
+            "LEGACY] ");
   }
 
   @Test
@@ -1778,7 +1777,7 @@ public class TestOzoneShellHA {
     // Number of keys should return less than 120(100 by default)
     args = new String[]{"key", "list", volumeName};
     execute(ozoneShell, args);
-    assertTrue(getNumOfKeys() < 120);
+    assertThat(getNumOfKeys()).isLessThan(120);
 
     out.reset();
     // Use --all option to get all the keys

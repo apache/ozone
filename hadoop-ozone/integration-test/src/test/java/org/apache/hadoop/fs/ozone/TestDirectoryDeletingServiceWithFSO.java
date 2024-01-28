@@ -57,7 +57,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.LongSupplier;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
@@ -177,7 +179,7 @@ public class TestDirectoryDeletingServiceWithFSO {
       assertEquals(root.getName(), iterator.next().getValue().getName());
     }
 
-    assertTrue(dirDeletingService.getRunCount().get() > 1);
+    assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(1);
   }
 
   /**
@@ -244,9 +246,9 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 19);
 
     long elapsedRunCount = dirDeletingService.getRunCount().get() - preRunCount;
-    assertTrue(dirDeletingService.getRunCount().get() > 1);
+    assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(1);
     // Ensure dir deleting speed, here provide a backup value for safe CI
-    assertTrue(elapsedRunCount >= 7);
+    assertThat(elapsedRunCount).isGreaterThanOrEqualTo(7);
   }
 
   @Test
@@ -295,7 +297,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 2);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 5);
 
-    assertTrue(dirDeletingService.getRunCount().get() > 1);
+    assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(1);
   }
 
   @Test
@@ -549,8 +551,8 @@ public class TestDirectoryDeletingServiceWithFSO {
       fs.getFileStatus(path);
       fail("testRecursiveDelete failed");
     } catch (IOException ex) {
-      assertTrue(ex instanceof FileNotFoundException);
-      assertTrue(ex.getMessage().contains("No such file or directory"));
+      assertInstanceOf(FileNotFoundException.class, ex);
+      assertThat(ex.getMessage()).contains("No such file or directory");
     }
   }
 

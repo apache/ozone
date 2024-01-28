@@ -35,7 +35,7 @@ import org.apache.hadoop.security.authorize.AuthorizationException;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -74,11 +74,11 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration test to verify symmetric SecretKeys APIs in a secure cluster.
@@ -309,9 +309,9 @@ public final class TestSecretKeysApi {
         assertThrows(RemoteException.class,
             secretKeyProtocol::getCurrentSecretKey);
     assertEquals(AuthorizationException.class.getName(), ex.getClassName());
-    assertTrue(ex.getMessage().contains(
+    assertThat(ex.getMessage()).contains(
         "User test@EXAMPLE.COM (auth:KERBEROS) is not authorized " +
-            "for protocol"));
+            "for protocol");
   }
 
   @Test
@@ -342,12 +342,12 @@ public final class TestSecretKeysApi {
     cluster.waitForClusterToBeReady();
   }
 
-  @NotNull
+  @Nonnull
   private SecretKeyProtocol getSecretKeyProtocol() throws IOException {
     return getSecretKeyProtocol(ozonePrincipal, ozoneKeytab);
   }
 
-  @NotNull
+  @Nonnull
   private SecretKeyProtocol getSecretKeyProtocol(
       String user, File keyTab) throws IOException {
     UserGroupInformation ugi =

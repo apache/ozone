@@ -71,7 +71,7 @@ import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.TimeDuration;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -384,9 +384,9 @@ public class TestSnapshotDiffManager {
 
     CacheLoader<String, OmSnapshot> loader =
         new CacheLoader<String, OmSnapshot>() {
-          @NotNull
+          @Nonnull
           @Override
-          public OmSnapshot load(@NotNull String key) {
+          public OmSnapshot load(@Nonnull String key) {
             return getMockedOmSnapshot(key);
           }
         };

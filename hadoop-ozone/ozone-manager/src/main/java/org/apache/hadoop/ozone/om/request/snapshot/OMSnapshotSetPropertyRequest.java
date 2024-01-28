@@ -30,7 +30,7 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotSetPropertyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotProperty;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,16 +60,10 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
     OzoneManagerProtocolProtos.SetSnapshotPropertyRequest
         setSnapshotPropertyRequest = getOmRequest()
         .getSetSnapshotPropertyRequest();
-
-    SnapshotProperty snapshotProperty = setSnapshotPropertyRequest
-        .getSnapshotProperty();
     SnapshotInfo updatedSnapInfo = null;
 
     try {
-      String snapshotKey = snapshotProperty.getSnapshotKey();
-      long exclusiveSize = snapshotProperty.getExclusiveSize();
-      long exclusiveReplicatedSize = snapshotProperty
-          .getExclusiveReplicatedSize();
+      String snapshotKey = setSnapshotPropertyRequest.getSnapshotKey();
       updatedSnapInfo = metadataManager.getSnapshotInfoTable()
           .get(snapshotKey);
 
@@ -79,9 +73,28 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
             " is not found", INVALID_SNAPSHOT_ERROR);
       }
 
-      // Set Exclusive size.
-      updatedSnapInfo.setExclusiveSize(exclusiveSize);
-      updatedSnapInfo.setExclusiveReplicatedSize(exclusiveReplicatedSize);
+      if (setSnapshotPropertyRequest.hasDeepCleanedDeletedDir()) {
+        updatedSnapInfo.setDeepCleanedDeletedDir(setSnapshotPropertyRequest
+            .getDeepCleanedDeletedDir());
+      }
+
+      if (setSnapshotPropertyRequest.hasDeepCleanedDeletedKey()) {
+        updatedSnapInfo.setDeepClean(setSnapshotPropertyRequest
+            .getDeepCleanedDeletedKey());
+      }
+
+      if (setSnapshotPropertyRequest.hasSnapshotSize()) {
+        SnapshotSize snapshotSize = setSnapshotPropertyRequest
+            .getSnapshotSize();
+        long exclusiveSize = updatedSnapInfo.getExclusiveSize() +
+            snapshotSize.getExclusiveSize();
+        long exclusiveReplicatedSize = updatedSnapInfo
+            .getExclusiveReplicatedSize() + snapshotSize
+            .getExclusiveReplicatedSize();
+        // Set Exclusive size.
+        updatedSnapInfo.setExclusiveSize(exclusiveSize);
+        updatedSnapInfo.setExclusiveReplicatedSize(exclusiveReplicatedSize);
+      }
       // Update Table Cache
       metadataManager.getSnapshotInfoTable().addCacheEntry(
           new CacheKey<>(snapshotKey),

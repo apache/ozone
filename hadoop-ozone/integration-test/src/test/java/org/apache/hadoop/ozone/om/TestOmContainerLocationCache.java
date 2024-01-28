@@ -72,7 +72,7 @@ import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.StatusException;
 import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.apache.ratis.util.ExitUtils;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -169,7 +169,7 @@ public class TestOmContainerLocationCache {
     metadataManager = omTestManagers.getMetadataManager();
 
     rpcClient = new RpcClient(conf, null) {
-      @NotNull
+      @Nonnull
       @Override
       protected XceiverClientFactory createXceiverClientFactory(
           ServiceInfoEx serviceInfo) throws IOException {
@@ -588,7 +588,7 @@ public class TestOmContainerLocationCache {
         .sendCommandAsync(argThat(matchCmd(Type.PutBlock)));
   }
 
-  @NotNull
+  @Nonnull
   private ContainerProtos.DatanodeBlockID createBlockId(long containerId,
                                                         long localId) {
     return ContainerProtos.DatanodeBlockID.newBuilder()
@@ -696,7 +696,7 @@ public class TestOmContainerLocationCache {
         .sendCommandAsync(argThat(matchCmd(Type.GetBlock)), any());
   }
 
-  @NotNull
+  @Nonnull
   private ChunkInfo createChunkInfo(byte[] data) throws Exception {
     Checksum checksum = new Checksum(ChecksumType.CRC32, 4);
     return ChunkInfo.newBuilder()

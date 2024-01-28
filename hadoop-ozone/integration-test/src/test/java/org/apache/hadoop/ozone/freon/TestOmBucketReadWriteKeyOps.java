@@ -44,8 +44,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Iterator;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test for OmBucketReadWriteKeyOps.
@@ -206,7 +206,7 @@ public class TestOmBucketReadWriteKeyOps {
         omLockMetrics.getLongestReadLockWaitingTimeMs());
     int readWaitingSamples =
         Integer.parseInt(readLockWaitingTimeMsStat.split(" ")[2]);
-    assertTrue(readWaitingSamples > 0, "Read Lock Waiting Samples should be positive");
+    assertThat(readWaitingSamples).isGreaterThan(0);
 
     String readLockHeldTimeMsStat = omLockMetrics.getReadLockHeldTimeMsStat();
     LOG.info("Read Lock Held Time Stat: " + readLockHeldTimeMsStat);
@@ -214,7 +214,7 @@ public class TestOmBucketReadWriteKeyOps {
         omLockMetrics.getLongestReadLockHeldTimeMs());
     int readHeldSamples =
         Integer.parseInt(readLockHeldTimeMsStat.split(" ")[2]);
-    assertTrue(readHeldSamples > 0, "Read Lock Held Samples should be positive");
+    assertThat(readHeldSamples).isGreaterThan(0);
 
     String writeLockWaitingTimeMsStat =
         omLockMetrics.getWriteLockWaitingTimeMsStat();
@@ -223,7 +223,7 @@ public class TestOmBucketReadWriteKeyOps {
         omLockMetrics.getLongestWriteLockWaitingTimeMs());
     int writeWaitingSamples =
         Integer.parseInt(writeLockWaitingTimeMsStat.split(" ")[2]);
-    assertTrue(writeWaitingSamples > 0, "Write Lock Waiting Samples should be positive");
+    assertThat(writeWaitingSamples).isGreaterThan(0);
 
     String writeLockHeldTimeMsStat = omLockMetrics.getWriteLockHeldTimeMsStat();
     LOG.info("Write Lock Held Time Stat: " + writeLockHeldTimeMsStat);
@@ -231,7 +231,7 @@ public class TestOmBucketReadWriteKeyOps {
         omLockMetrics.getLongestWriteLockHeldTimeMs());
     int writeHeldSamples =
         Integer.parseInt(writeLockHeldTimeMsStat.split(" ")[2]);
-    assertTrue(writeHeldSamples > 0, "Write Lock Held Samples should be positive");
+    assertThat(writeHeldSamples).isGreaterThan(0);
   }
 
   private static class ParameterBuilder {

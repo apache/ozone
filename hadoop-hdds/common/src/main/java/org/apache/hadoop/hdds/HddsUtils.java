@@ -20,8 +20,8 @@ package org.apache.hadoop.hdds;
 
 import com.google.protobuf.ServiceException;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import jakarta.annotation.Nonnull;
+import jakarta.annotation.Nullable;
 import javax.management.ObjectName;
 import java.io.File;
 import java.io.IOException;
