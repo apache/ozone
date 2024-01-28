@@ -66,6 +66,8 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 import java.io.IOException;
@@ -101,6 +103,8 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM
  */
 @Timeout(300)
 public class TestReconAndAdminContainerCLI {
+
+  private static final Logger LOG = LoggerFactory.getLogger(TestReconAndAdminContainerCLI.class);
 
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
   private static ScmClient scmClient;
@@ -316,10 +320,41 @@ public class TestReconAndAdminContainerCLI {
       throws Exception {
     Assertions.assertFalse(Strings.isNullOrEmpty(containerState));
 
-    ReplicationManagerReport rmReport = scmClient.getReplicationManagerReport();
-    UnhealthyContainersResponse reconResponse =
-        TestReconEndpointUtil
-            .getUnhealthyContainersFromRecon(CONF, containerState);
+    // Both threads are running every 1 second.
+    // Wait until all values are equal.
+    GenericTestUtils.waitFor(() -> assertReportsMatch(containerState),
+        1000, 40000);
+  }
+
+  private static boolean assertReportsMatch(String containerState) {
+    ReplicationManagerReport rmReport;
+    UnhealthyContainersResponse reconResponse;
+
+    try {
+      rmReport = scmClient.getReplicationManagerReport();
+      reconResponse = TestReconEndpointUtil
+          .getUnhealthyContainersFromRecon(CONF, containerState);
+
+      long rmMissingCounter = rmReport.getStat(
+          ReplicationManagerReport.HealthState.MISSING);
+      long rmUnderReplCounter = rmReport.getStat(
+          ReplicationManagerReport.HealthState.UNDER_REPLICATED);
+      long rmOverReplCounter = rmReport.getStat(
+          ReplicationManagerReport.HealthState.OVER_REPLICATED);
+      long rmMisReplCounter = rmReport.getStat(
+          ReplicationManagerReport.HealthState.MIS_REPLICATED);
+
+      Assertions.assertEquals(rmMissingCounter, reconResponse.getMissingCount());
+      Assertions.assertEquals(rmUnderReplCounter, reconResponse.getUnderReplicatedCount());
+      Assertions.assertEquals(rmOverReplCounter, reconResponse.getOverReplicatedCount());
+      Assertions.assertEquals(rmMisReplCounter, reconResponse.getMisReplicatedCount());
+    } catch (IOException e) {
+      LOG.info("Error getting report", e);
+      return false;
+    } catch (AssertionError e) {
+      LOG.info("Reports do not match (yet): {}", e.getMessage());
+      return false;
+    }
 
     long rmMissingCounter = rmReport.getStat(
         ReplicationManagerReport.HealthState.MISSING);
@@ -329,15 +364,6 @@ public class TestReconAndAdminContainerCLI {
         ReplicationManagerReport.HealthState.OVER_REPLICATED);
     long rmMisReplCounter = rmReport.getStat(
         ReplicationManagerReport.HealthState.MIS_REPLICATED);
-
-    // Both threads are running every 1 second.
-    // Wait until all values are equal.
-    GenericTestUtils.waitFor(
-            () -> rmMissingCounter == reconResponse.getMissingCount() &&
-                    rmUnderReplCounter == reconResponse.getUnderReplicatedCount() &&
-                    rmOverReplCounter == reconResponse.getOverReplicatedCount() &&
-                    rmMisReplCounter == reconResponse.getMisReplicatedCount(),
-            1000, 40000);
 
     // Recon's UnhealthyContainerResponse contains a list of containers
     // for a particular state. Check if RMs sample of containers can be
@@ -373,6 +399,8 @@ public class TestReconAndAdminContainerCLI {
             .map(UnhealthyContainerMetadata::getContainerID)
             .collect(Collectors.toList());
     Assertions.assertTrue(reconContainerIDs.containsAll(rmIDsToLong));
+
+    return true;
   }
 
   private static long setupRatisKey(String keyName,
