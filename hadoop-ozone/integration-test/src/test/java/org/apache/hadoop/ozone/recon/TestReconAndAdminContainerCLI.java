@@ -103,7 +103,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  * with the "ozone admin container" CLI.
  */
 @Timeout(300)
-public class TestReconAndAdminContainerCLI {
+class TestReconAndAdminContainerCLI {
 
   private static final Logger LOG = LoggerFactory.getLogger(TestReconAndAdminContainerCLI.class);
 
@@ -126,7 +126,7 @@ public class TestReconAndAdminContainerCLI {
   }
 
   @BeforeAll
-  public static void init() throws Exception {
+  static void init() throws Exception {
     setupConfigKeys();
     cluster = MiniOzoneCluster.newBuilder(CONF)
                   .setNumDatanodes(5)
@@ -176,7 +176,7 @@ public class TestReconAndAdminContainerCLI {
   }
 
   @AfterAll
-  public static void shutdown() {
+  static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -187,7 +187,7 @@ public class TestReconAndAdminContainerCLI {
    * but it's easier to test with Ratis ONE.
    */
   @Test
-  public void testMissingContainer() throws Exception {
+  void testMissingContainer() throws Exception {
     String keyNameR1 = "key2";
     long containerID = setupRatisKey(keyNameR1,
         HddsProtos.ReplicationFactor.ONE);
@@ -221,7 +221,7 @@ public class TestReconAndAdminContainerCLI {
 
   @ParameterizedTest
   @MethodSource("outOfServiceNodeStateArgs")
-  public void testNodesInDecommissionOrMaintenance(
+  void testNodesInDecommissionOrMaintenance(
       NodeOperationalState initialState, NodeOperationalState finalState,
       boolean isMaintenance) throws Exception {
     Pipeline pipeline =
