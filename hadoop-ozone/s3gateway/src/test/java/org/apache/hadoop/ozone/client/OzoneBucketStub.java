@@ -57,6 +57,8 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.util.Time;
 
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
+import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
 /**
@@ -272,7 +274,7 @@ public class OzoneBucketStub extends OzoneBucket {
               buffer.get(bytes);
 
               Part part = new Part(key + size, bytes,
-                  getMetadata().get("ETag"));
+                  getMetadata().get(ETAG));
               if (partList.get(key) == null) {
                 Map<Integer, Part> parts = new TreeMap<>();
                 parts.put(partNumber, part);
@@ -430,7 +432,7 @@ public class OzoneBucketStub extends OzoneBucket {
             @Override
             public void close() throws IOException {
               Part part = new Part(key + size,
-                  toByteArray(), getMetadata().get("ETag"));
+                  toByteArray(), getMetadata().get(ETAG));
               if (partList.get(key) == null) {
                 Map<Integer, Part> parts = new TreeMap<>();
                 parts.put(partNumber, part);
@@ -513,7 +515,7 @@ public class OzoneBucketStub extends OzoneBucket {
       boolean truncated = false;
       MessageDigest eTagProvider;
       try {
-        eTagProvider = MessageDigest.getInstance("Md5");
+        eTagProvider = MessageDigest.getInstance(MD5_HASH);
       } catch (NoSuchAlgorithmException e) {
         throw new RuntimeException(e);
       }

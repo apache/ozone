@@ -101,6 +101,7 @@ import java.util.Map;
 import java.util.OptionalLong;
 
 import static javax.ws.rs.core.HttpHeaders.CONTENT_LENGTH;
+import static javax.ws.rs.core.HttpHeaders.ETAG;
 import static javax.ws.rs.core.HttpHeaders.LAST_MODIFIED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT;
@@ -150,7 +151,7 @@ public class ObjectEndpoint extends EndpointBase {
   static {
     E_TAG_PROVIDER = ThreadLocal.withInitial(() -> {
       try {
-        return MessageDigest.getInstance("Md5");
+        return MessageDigest.getInstance(OzoneConsts.MD5_HASH);
       } catch (NoSuchAlgorithmException e) {
         throw new RuntimeException(e);
       }

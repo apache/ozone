@@ -232,8 +232,8 @@ public class TestObjectStoreWithLegacyFS {
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         data.length, 1, uploadID);
     ozoneOutputStream.write(data, 0, data.length);
-    ozoneOutputStream.getMetadata().put("ETag",
-        DatatypeConverter.printHexBinary(MessageDigest.getInstance("Md5")
+    ozoneOutputStream.getMetadata().put(OzoneConsts.ETAG,
+        DatatypeConverter.printHexBinary(MessageDigest.getInstance(OzoneConsts.MD5_HASH)
             .digest(data)).toLowerCase());
     ozoneOutputStream.close();
 

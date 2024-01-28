@@ -1065,7 +1065,7 @@ public final class OMRequestTestUtils {
 
     MessageDigest eTagProvider;
     try {
-      eTagProvider = MessageDigest.getInstance("Md5");
+      eTagProvider = MessageDigest.getInstance(OzoneConsts.MD5_HASH);
     } catch (NoSuchAlgorithmException e) {
       throw new RuntimeException(e);
     }
@@ -1079,7 +1079,7 @@ public final class OMRequestTestUtils {
         .setMultipartUploadID(multipartUploadID)
         .addAllKeyLocations(new ArrayList<>())
         .addMetadata(HddsProtos.KeyValue.newBuilder()
-            .setKey("ETag")
+            .setKey(OzoneConsts.ETAG)
             .setValue(DatatypeConverter.printHexBinary(
                 new DigestInputStream(
                     new ByteArrayInputStream(

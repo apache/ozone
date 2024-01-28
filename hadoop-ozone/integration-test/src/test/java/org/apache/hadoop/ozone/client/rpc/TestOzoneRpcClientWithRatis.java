@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -209,8 +210,8 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
         keyName, valueLength, 1, uploadID);
     ozoneStreamOutput.write(ByteBuffer.wrap(sampleData), 0,
         valueLength);
-    ozoneStreamOutput.getMetadata().put("ETag",
-        DatatypeConverter.printHexBinary(MessageDigest.getInstance("Md5")
+    ozoneStreamOutput.getMetadata().put(OzoneConsts.ETAG,
+        DatatypeConverter.printHexBinary(MessageDigest.getInstance(OzoneConsts.MD5_HASH)
             .digest(sampleData)).toLowerCase());
     ozoneStreamOutput.close();
 

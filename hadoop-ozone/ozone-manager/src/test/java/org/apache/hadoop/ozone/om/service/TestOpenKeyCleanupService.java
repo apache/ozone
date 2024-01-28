@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.ExpiredOpenKeys;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -479,7 +480,7 @@ class TestOpenKeyCleanupService {
                 .setReplicationConfig(RatisReplicationConfig.getInstance(
                     HddsProtos.ReplicationFactor.ONE))
                 .setLocationInfoList(Collections.emptyList())
-                .addMetadata("ETag", DigestUtils.md5Hex(UUID.randomUUID()
+                .addMetadata(OzoneConsts.ETAG, DigestUtils.md5Hex(UUID.randomUUID()
                     .toString()))
                 .build();
 

@@ -31,6 +31,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -137,7 +138,7 @@ public class TestS3MultipartUploadCompleteRequest
         .getKeyArgs()
         .getMetadataList()
         .stream()
-        .filter(keyValue -> keyValue.getKey().equals("ETag"))
+        .filter(keyValue -> keyValue.getKey().equals(OzoneConsts.ETAG))
         .findFirst().get().getValue();
     partList.add(Part.newBuilder().setETag(eTag).setPartNumber(1)
         .build());

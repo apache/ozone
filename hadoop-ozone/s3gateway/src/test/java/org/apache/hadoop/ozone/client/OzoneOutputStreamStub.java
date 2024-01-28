@@ -22,6 +22,7 @@ package org.apache.hadoop.ozone.client;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.KeyMetadataAware;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.StreamBufferArgs;
@@ -95,7 +96,7 @@ public class OzoneOutputStreamStub extends OzoneOutputStream {
   @Override
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
     return closed ? new OmMultipartCommitUploadPartInfo(partName,
-        ((KeyMetadataAware)getOutputStream()).getMetadata().get("ETag")) : null;
+        ((KeyMetadataAware)getOutputStream()).getMetadata().get(OzoneConsts.ETAG)) : null;
   }
 
 }

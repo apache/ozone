@@ -274,7 +274,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
                 .setVolume(requestedVolume)
                 .setBucket(requestedBucket)
                 .setKey(keyName)
-                .setHash(omKeyInfo.getMetadata().get("ETag")));
+                .setHash(omKeyInfo.getMetadata().get(OzoneConsts.ETAG)));
 
         long volumeId = omMetadataManager.getVolumeId(volumeName);
         long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
@@ -414,7 +414,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
           .setOmKeyLocationInfos(
               Collections.singletonList(keyLocationInfoGroup))
           .setAcls(dbOpenKeyInfo.getAcls())
-          .addMetadata("ETag",
+          .addMetadata(OzoneConsts.ETAG,
               multipartUploadedKeyHash(partKeyInfoMap));
       // Check if db entry has ObjectID. This check is required because
       // it is possible that between multipart key uploads and complete,
@@ -444,7 +444,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
       omKeyInfo.setDataSize(dataSize);
       omKeyInfo.setReplicationConfig(dbOpenKeyInfo.getReplicationConfig());
-      omKeyInfo.getMetadata().put("ETag",
+      omKeyInfo.getMetadata().put(OzoneConsts.ETAG,
           multipartUploadedKeyHash(partKeyInfoMap));
     }
     omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
@@ -662,7 +662,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
     StringBuffer keysConcatenated = new StringBuffer();
     for (PartKeyInfo partKeyInfo: partsList) {
       keysConcatenated.append(KeyValueUtil.getFromProtobuf(partKeyInfo
-          .getPartKeyInfo().getMetadataList()).get("ETag"));
+          .getPartKeyInfo().getMetadataList()).get(OzoneConsts.ETAG));
     }
     return DigestUtils.md5Hex(keysConcatenated.toString()) + "-"
         + partsList.size();

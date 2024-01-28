@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdfs.LogVerificationAppender;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
@@ -188,7 +189,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createMultipartKey(
         keyName, value.length(), 1, uploadID);
     ozoneOutputStream.write(value.getBytes(UTF_8), 0, value.length());
-    ozoneOutputStream.getMetadata().put("ETag", DigestUtils.md5Hex(value));
+    ozoneOutputStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(value));
     ozoneOutputStream.close();
 
 
@@ -381,7 +382,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createMultipartKey(
         keyName, value.length(), partNumber, uploadID);
     ozoneOutputStream.write(value.getBytes(UTF_8), 0, value.length());
-    ozoneOutputStream.getMetadata().put("ETag", DigestUtils.md5Hex(value));
+    ozoneOutputStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(value));
     ozoneOutputStream.close();
 
     return ozoneOutputStream.getCommitUploadPartInfo().getETag();

@@ -102,8 +102,6 @@ import org.junit.jupiter.params.provider.EnumSource;
 
 class TestOzoneAtRestEncryption {
 
-  private static final String ETAG = "ETag";
-
   private static MiniOzoneCluster cluster = null;
   private static MiniKMS miniKMS;
   private static OzoneClient ozClient = null;
@@ -175,7 +173,7 @@ class TestOzoneAtRestEncryption {
 
     // create test key
     createKey(TEST_KEY, cluster.getOzoneManager().getKmsProvider(), conf);
-    eTagProvider = MessageDigest.getInstance("Md5");
+    eTagProvider = MessageDigest.getInstance(OzoneConsts.MD5_HASH);
   }
 
   @AfterAll
@@ -638,7 +636,7 @@ class TestOzoneAtRestEncryption {
 
     ByteBuffer dataBuffer = ByteBuffer.wrap(data);
     multipartStreamKey.write(dataBuffer, 0, length);
-    multipartStreamKey.getMetadata().put(ETAG,
+    multipartStreamKey.getMetadata().put(OzoneConsts.ETAG,
         DatatypeConverter.printHexBinary(eTagProvider.digest(data))
             .toLowerCase());
     multipartStreamKey.close();
@@ -656,7 +654,7 @@ class TestOzoneAtRestEncryption {
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         data.length, partNumber, uploadID);
     ozoneOutputStream.write(data, 0, data.length);
-    ozoneOutputStream.getMetadata().put(ETAG,
+    ozoneOutputStream.getMetadata().put(OzoneConsts.ETAG,
         DatatypeConverter.printHexBinary(eTagProvider.digest(data))
             .toLowerCase());
     ozoneOutputStream.close();

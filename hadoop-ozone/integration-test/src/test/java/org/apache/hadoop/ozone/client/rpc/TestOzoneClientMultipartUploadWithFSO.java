@@ -103,8 +103,6 @@ import static org.junit.jupiter.api.Assertions.fail;
 @Timeout(300)
 public class TestOzoneClientMultipartUploadWithFSO {
 
-  private static final String ETAG = "ETag";
-
   private static ObjectStore store = null;
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient ozClient = null;
@@ -130,7 +128,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     OzoneConfiguration conf = new OzoneConfiguration();
     OMRequestTestUtils.configureFSOptimizedPaths(conf, true);
     startCluster(conf);
-    eTagProvider = MessageDigest.getInstance("Md5");
+    eTagProvider = MessageDigest.getInstance(OzoneConsts.MD5_HASH);
   }
 
   /**
@@ -229,7 +227,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         sampleData.length(), 1, uploadID);
     ozoneOutputStream.write(string2Bytes(sampleData), 0, sampleData.length());
-    ozoneOutputStream.getMetadata().put(ETAG, DigestUtils.md5Hex(sampleData));
+    ozoneOutputStream.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(sampleData));
     ozoneOutputStream.close();
 
     OmMultipartCommitUploadPartInfo commitUploadPartInfo = ozoneOutputStream
@@ -486,7 +484,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         data.length, 1, uploadID);
     ozoneOutputStream.write(data, 0, data.length);
-    ozoneOutputStream.getMetadata().put(ETAG,
+    ozoneOutputStream.getMetadata().put(OzoneConsts.ETAG,
         DatatypeConverter.printHexBinary(eTagProvider.digest(data))
             .toLowerCase());
     ozoneOutputStream.close();
@@ -497,7 +495,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     // Do not close output stream for part 2.
     ozoneOutputStream = bucket.createMultipartKey(keyName,
         data.length, 2, uploadID);
-    ozoneOutputStream.getMetadata().put(ETAG,
+    ozoneOutputStream.getMetadata().put(OzoneConsts.ETAG,
         DatatypeConverter.printHexBinary(eTagProvider.digest(data))
             .toLowerCase());
     ozoneOutputStream.write(data, 0, data.length);
@@ -962,7 +960,7 @@ public class TestOzoneClientMultipartUploadWithFSO {
     OzoneOutputStream ozoneOutputStream = oBucket.createMultipartKey(kName,
         data.length, partNumber, uploadID);
     ozoneOutputStream.write(data, 0, data.length);
-    ozoneOutputStream.getMetadata().put(ETAG,
+    ozoneOutputStream.getMetadata().put(OzoneConsts.ETAG,
         DatatypeConverter.printHexBinary(eTagProvider.digest(data))
             .toLowerCase());
     ozoneOutputStream.close();

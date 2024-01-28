@@ -60,6 +60,8 @@ import java.util.List;
 import java.util.Map;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
+import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -304,8 +306,8 @@ public class TestOzoneFSWithObjectStoreCreate {
 
     // This should succeed, as we check during creation of part or during
     // complete MPU.
-    ozoneOutputStream.getMetadata().put("ETag",
-        DatatypeConverter.printHexBinary(MessageDigest.getInstance("Md5")
+    ozoneOutputStream.getMetadata().put(ETAG,
+        DatatypeConverter.printHexBinary(MessageDigest.getInstance(MD5_HASH)
             .digest(b)).toLowerCase());
     ozoneOutputStream.close();
 
