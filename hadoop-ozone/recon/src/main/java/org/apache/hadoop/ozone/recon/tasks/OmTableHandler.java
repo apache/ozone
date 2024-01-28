@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 
 import java.io.IOException;
-import java.util.Collection;
 import java.util.HashMap;
 
 /**
@@ -38,7 +37,6 @@ public interface OmTableHandler {
    *
    * @param event                    The PUT event to be processed.
    * @param tableName                Table name associated with the event.
-   * @param sizeRelatedTables        Tables Requiring Size Calculation.
    * @param objectCountMap           A map storing object counts.
    * @param unReplicatedSizeMap A map storing unReplicated size counts.
    * @param replicatedSizeMap   A map storing replicated size counts.
@@ -54,7 +52,6 @@ public interface OmTableHandler {
    *
    * @param event                    The DELETE event to be processed.
    * @param tableName                Table name associated with the event.
-   * @param sizeRelatedTables        Tables Requiring Size Calculation.
    * @param objectCountMap           A map storing object counts.
    * @param unReplicatedSizeMap A map storing unReplicated size counts.
    * @param replicatedSizeMap   A map storing replicated size counts.
@@ -71,7 +68,6 @@ public interface OmTableHandler {
    *
    * @param event                    The UPDATE event to be processed.
    * @param tableName                Table name associated with the event.
-   * @param sizeRelatedTables        Tables Requiring Size Calculation.
    * @param objectCountMap           A map storing object counts.
    * @param unReplicatedSizeMap A map storing unReplicated size counts.
    * @param replicatedSizeMap   A map storing replicated size counts.

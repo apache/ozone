@@ -286,7 +286,6 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
         omTableInsightTask.reprocess(reconOMMetadataManager);
     assertTrue(result.getRight());
     assertEquals(3, getCountForTable(DELETED_DIR_TABLE));
-    assertEquals(3525, getUnReplicatedSizeForTable(DELETED_DIR_TABLE));
   }
 
   @Test
@@ -303,7 +302,6 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     when(nsSummaryTable.get(3L)).thenReturn(nsSummary2);
     when(nsSummaryTable.get(4L)).thenReturn(nsSummary2);
     when(nsSummaryTable.get(5L)).thenReturn(nsSummary2);
-    omTableInsightTask.setNsSummaryTable(nsSummaryTable);
 
     /* DB key in DeletedDirectoryTable =>
                   "/volumeId/bucketId/parentId/dirName/dirObjectId" */
@@ -325,8 +323,6 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     }
     OMUpdateEventBatch putEventBatch = new OMUpdateEventBatch(putEvents);
     omTableInsightTask.process(putEventBatch);
-    // After 5 PUTs, size should be 1000*2 + 2000*3 = 8000
-    assertEquals(8000L, getUnReplicatedSizeForTable(DELETED_DIR_TABLE));
     assertEquals(5, getCountForTable(DELETED_DIR_TABLE));
 
 
@@ -341,8 +337,6 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
         DELETE, null));
     OMUpdateEventBatch deleteEventBatch = new OMUpdateEventBatch(deleteEvents);
     omTableInsightTask.process(deleteEventBatch);
-    // After 2 DELETEs, size should be 8000-(1000+2000) = 3000
-    assertEquals(5000L, getUnReplicatedSizeForTable(DELETED_DIR_TABLE));
     assertEquals(3, getCountForTable(DELETED_DIR_TABLE));
   }
 

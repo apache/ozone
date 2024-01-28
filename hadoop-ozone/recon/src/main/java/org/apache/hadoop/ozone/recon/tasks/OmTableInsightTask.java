@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterators;
 import com.google.inject.Inject;
 import org.apache.commons.lang3.tuple.ImmutablePair;
@@ -49,7 +48,6 @@ import java.util.List;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE;
 import static org.jooq.impl.DSL.select;
 import static org.jooq.impl.DSL.using;
 import static org.jooq.impl.DSL.currentTimestamp;
@@ -86,8 +84,6 @@ public class OmTableInsightTask implements ReconOmTask {
     tableHandlers.put(OPEN_KEY_TABLE, new OpenKeysInsightHandler());
     tableHandlers.put(OPEN_FILE_TABLE, new OpenKeysInsightHandler());
     tableHandlers.put(DELETED_TABLE, new DeletedKeysInsightHandler());
-    tableHandlers.put(DELETED_DIR_TABLE,
-        new DeletedDirectoriesInsightHandler(reconNamespaceSummaryManager));
   }
 
   /**
@@ -158,7 +154,6 @@ public class OmTableInsightTask implements ReconOmTask {
     taskTables.add(OPEN_KEY_TABLE);
     taskTables.add(OPEN_FILE_TABLE);
     taskTables.add(DELETED_TABLE);
-    taskTables.add(DELETED_DIR_TABLE);
     return taskTables;
   }
 
@@ -381,11 +376,6 @@ public class OmTableInsightTask implements ReconOmTask {
     GlobalStats record = globalStatsDao.fetchOneByKey(key);
 
     return (record == null) ? 0L : record.getValue();
-  }
-
-  @VisibleForTesting
-  public void setNsSummaryTable(Table<Long, NSSummary> nsSummaryTable) {
-    this.reconNamespaceSummaryManager.setNsSummaryTable(nsSummaryTable);
   }
 
 }
