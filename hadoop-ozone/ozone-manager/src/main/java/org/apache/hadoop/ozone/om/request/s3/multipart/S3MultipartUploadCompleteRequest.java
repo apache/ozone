@@ -28,7 +28,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
-import java.util.function.Function;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.ratis.server.protocol.TermIndex;
@@ -84,26 +83,26 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
   private BiFunction<OzoneManagerProtocolProtos.Part, PartKeyInfo, MultipartCommitRequestPart> eTagBasedValidator =
       (part, partKeyInfo) -> {
-    String eTag = part.getETag();
-    String dbPartETag = null;
-    String dbPartName = null;
-    if (partKeyInfo != null) {
-      dbPartETag = partKeyInfo.getPartKeyInfo().getMetadata(0).getValue();
-      dbPartName = partKeyInfo.getPartName();
-    }
-    return new MultipartCommitRequestPart(eTag, partKeyInfo == null ? null :
-        dbPartETag, StringUtils.equals(eTag, dbPartETag) || StringUtils.equals(eTag, dbPartName));
-  };
+        String eTag = part.getETag();
+        String dbPartETag = null;
+        String dbPartName = null;
+        if (partKeyInfo != null) {
+          dbPartETag = partKeyInfo.getPartKeyInfo().getMetadata(0).getValue();
+          dbPartName = partKeyInfo.getPartName();
+        }
+        return new MultipartCommitRequestPart(eTag, partKeyInfo == null ? null :
+            dbPartETag, StringUtils.equals(eTag, dbPartETag) || StringUtils.equals(eTag, dbPartName));
+      };
   private BiFunction<OzoneManagerProtocolProtos.Part, PartKeyInfo, MultipartCommitRequestPart> partNameBasedValidator =
       (part, partKeyInfo) -> {
-    String partName = part.getPartName();
-    String dbPartName = null;
-    if (partKeyInfo != null) {
-      dbPartName = partKeyInfo.getPartName();
-    }
-    return new MultipartCommitRequestPart(partName, partKeyInfo == null ? null :
-        dbPartName, StringUtils.equals(partName, dbPartName));
-  };
+        String partName = part.getPartName();
+        String dbPartName = null;
+        if (partKeyInfo != null) {
+          dbPartName = partKeyInfo.getPartName();
+        }
+        return new MultipartCommitRequestPart(partName, partKeyInfo == null ? null :
+            dbPartName, StringUtils.equals(partName, dbPartName));
+      };
 
   public S3MultipartUploadCompleteRequest(OMRequest omRequest,
       BucketLayout bucketLayout) {
@@ -675,7 +674,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
     private boolean isValid;
 
-    public MultipartCommitRequestPart(String requestPartId, String omPartId, boolean isValid) {
+    MultipartCommitRequestPart(String requestPartId, String omPartId, boolean isValid) {
       this.requestPartId = requestPartId;
       this.omPartId = omPartId;
       this.isValid = isValid;

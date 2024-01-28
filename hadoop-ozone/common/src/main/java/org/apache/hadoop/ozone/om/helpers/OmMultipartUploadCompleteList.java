@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Part;
 
 import java.util.ArrayList;

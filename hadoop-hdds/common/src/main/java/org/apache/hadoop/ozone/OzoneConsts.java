@@ -600,12 +600,7 @@ public final class OzoneConsts {
       "compactionLogTable";
 
   /**
-   * Algo to compute message digest (s3g multipart upload request's part ETag)
-   */
-  public static final String MD5 = "Md5";
-
-  /**
-   * S3G multipart upload request's ETag header key
+   * S3G multipart upload request's ETag header key.
    */
   public static final String ETAG = "ETag";
 }
