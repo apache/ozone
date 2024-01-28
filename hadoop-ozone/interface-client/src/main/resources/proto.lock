@@ -4852,12 +4852,6 @@
                 "name": "partName",
                 "type": "string",
                 "optional": true
-              },
-              {
-                "id": 2,
-                "name": "eTag",
-                "type": "string",
-                "optional": true
               }
             ]
           },
@@ -4921,12 +4915,6 @@
                 "name": "partName",
                 "type": "string",
                 "required": true
-              },
-              {
-                "id": 3,
-                "name": "eTag",
-                "type": "string",
-                "optional": true
               }
             ]
           },
