@@ -360,16 +360,13 @@ public class HddsVolume extends StorageVolume {
     try {
       if (!clusterIdDir.exists()) {
         throw new IOException("Working dir " + clusterIdDir.getAbsolutePath() +
-            " not created for HddsVolume: " +
-            getStorageDir().getAbsolutePath());
+            " not created for HddsVolume: " + getStorageDir().getAbsolutePath());
       }
 
       File storageIdDir = new File(clusterIdDir, getStorageID());
       if (!storageIdDir.exists()) {
-        throw new IOException(
-            "Db parent dir " + storageIdDir.getAbsolutePath() +
-                " not found for HddsVolume: " +
-                getStorageDir().getAbsolutePath());
+        throw new IOException("Db parent dir " + storageIdDir.getAbsolutePath() +
+            " not found for HddsVolume: " + getStorageDir().getAbsolutePath());
       }
 
       File containerDBFile = new File(storageIdDir, CONTAINER_DB_NAME);
@@ -385,6 +382,7 @@ public class HddsVolume extends StorageVolume {
         throw new IOException("Can't init db instance under path "
             + containerDBPath + " for volume " + getStorageID(), e);
       }
+
       dbParentDir = storageIdDir;
       dbLoaded.set(true);
       dbLoadFailure.set(false);
