@@ -211,7 +211,7 @@ class TestReconAndAdminContainerCLI {
 
     UnHealthyContainerStates containerStateForTesting =
         UnHealthyContainerStates.MISSING;
-    compareRMReportToReconResponse(containerStateForTesting.toString());
+    compareRMReportToReconResponse(containerStateForTesting);
 
     for (DatanodeDetails details : pipeline.getNodes()) {
       cluster.restartHddsDatanode(details, false);
@@ -252,8 +252,8 @@ class TestReconAndAdminContainerCLI {
     TestNodeUtil.waitForDnToReachOpState(scmNodeManager,
         nodeToGoOffline1, initialState);
 
-    compareRMReportToReconResponse(underReplicatedState.toString());
-    compareRMReportToReconResponse(overReplicatedState.toString());
+    compareRMReportToReconResponse(underReplicatedState);
+    compareRMReportToReconResponse(overReplicatedState);
 
     TestNodeUtil.waitForDnToReachOpState(scmNodeManager,
         nodeToGoOffline1, finalState);
@@ -264,8 +264,8 @@ class TestReconAndAdminContainerCLI {
       TestHelper.waitForReplicaCount(containerIdR3, 4, cluster);
     }
 
-    compareRMReportToReconResponse(underReplicatedState.toString());
-    compareRMReportToReconResponse(overReplicatedState.toString());
+    compareRMReportToReconResponse(underReplicatedState);
+    compareRMReportToReconResponse(overReplicatedState);
 
     // Second node goes offline.
     if (isMaintenance) {
@@ -279,8 +279,8 @@ class TestReconAndAdminContainerCLI {
     TestNodeUtil.waitForDnToReachOpState(scmNodeManager,
         nodeToGoOffline2, initialState);
 
-    compareRMReportToReconResponse(underReplicatedState.toString());
-    compareRMReportToReconResponse(overReplicatedState.toString());
+    compareRMReportToReconResponse(underReplicatedState);
+    compareRMReportToReconResponse(overReplicatedState);
 
     TestNodeUtil.waitForDnToReachOpState(scmNodeManager,
         nodeToGoOffline2, finalState);
@@ -290,8 +290,8 @@ class TestReconAndAdminContainerCLI {
     int expectedReplicaNum = isMaintenance ? 4 : 5;
     TestHelper.waitForReplicaCount(containerIdR3, expectedReplicaNum, cluster);
 
-    compareRMReportToReconResponse(underReplicatedState.toString());
-    compareRMReportToReconResponse(overReplicatedState.toString());
+    compareRMReportToReconResponse(underReplicatedState);
+    compareRMReportToReconResponse(overReplicatedState);
 
     scmClient.recommissionNodes(Arrays.asList(
         TestNodeUtil.getDNHostAndPort(nodeToGoOffline1),
@@ -305,8 +305,8 @@ class TestReconAndAdminContainerCLI {
     TestNodeUtil.waitForDnToReachPersistedOpState(nodeToGoOffline1, IN_SERVICE);
     TestNodeUtil.waitForDnToReachPersistedOpState(nodeToGoOffline2, IN_SERVICE);
 
-    compareRMReportToReconResponse(underReplicatedState.toString());
-    compareRMReportToReconResponse(overReplicatedState.toString());
+    compareRMReportToReconResponse(underReplicatedState);
+    compareRMReportToReconResponse(overReplicatedState);
   }
 
   /**
@@ -314,11 +314,9 @@ class TestReconAndAdminContainerCLI {
    * but to make sure that they are consistent between
    * Recon and the ReplicationManager.
    */
-  private static void compareRMReportToReconResponse(String containerState)
+  private static void compareRMReportToReconResponse(UnHealthyContainerStates containerState)
       throws Exception {
-    assertThat(containerState)
-        .isNotNull()
-        .isNotEmpty();
+    assertNotNull(containerState);
 
     // Both threads are running every 1 second.
     // Wait until all values are equal.
@@ -326,14 +324,14 @@ class TestReconAndAdminContainerCLI {
         1000, 40000);
   }
 
-  private static boolean assertReportsMatch(String containerState) {
+  private static boolean assertReportsMatch(UnHealthyContainerStates state) {
     ReplicationManagerReport rmReport;
     UnhealthyContainersResponse reconResponse;
 
     try {
       rmReport = scmClient.getReplicationManagerReport();
       reconResponse = TestReconEndpointUtil
-          .getUnhealthyContainersFromRecon(CONF, containerState);
+          .getUnhealthyContainersFromRecon(CONF, state);
 
       long rmMissingCounter = rmReport.getStat(
           ReplicationManagerReport.HealthState.MISSING);
@@ -370,20 +368,16 @@ class TestReconAndAdminContainerCLI {
     // found in Recon's list of containers for a particular state.
     HealthState rmState = HealthState.UNHEALTHY;
 
-    if (UnHealthyContainerStates.valueOf(containerState)
-            .equals(UnHealthyContainerStates.MISSING) &&
+    if (state.equals(UnHealthyContainerStates.MISSING) &&
         rmMissingCounter > 0) {
       rmState = HealthState.MISSING;
-    } else if (UnHealthyContainerStates.valueOf(containerState)
-                   .equals(UnHealthyContainerStates.UNDER_REPLICATED) &&
+    } else if (state.equals(UnHealthyContainerStates.UNDER_REPLICATED) &&
                rmUnderReplCounter > 0) {
       rmState = HealthState.UNDER_REPLICATED;
-    } else if (UnHealthyContainerStates.valueOf(containerState)
-                   .equals(UnHealthyContainerStates.OVER_REPLICATED) &&
+    } else if (state.equals(UnHealthyContainerStates.OVER_REPLICATED) &&
                rmOverReplCounter > 0) {
       rmState = HealthState.OVER_REPLICATED;
-    } else if (UnHealthyContainerStates.valueOf(containerState)
-                   .equals(UnHealthyContainerStates.MIS_REPLICATED) &&
+    } else if (state.equals(UnHealthyContainerStates.MIS_REPLICATED) &&
                rmMisReplCounter > 0) {
       rmState = HealthState.MIS_REPLICATED;
     }
