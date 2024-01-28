@@ -17,6 +17,10 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -40,10 +44,8 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,16 +67,13 @@ public class TestNodeReportHandler implements EventPublisher {
   @BeforeEach
   public void resetEventCollector() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
-    SCMStorageConfig storageConfig = Mockito.mock(SCMStorageConfig.class);
-    Mockito.when(storageConfig.getClusterID()).thenReturn("cluster1");
+    SCMStorageConfig storageConfig = mock(SCMStorageConfig.class);
+    when(storageConfig.getClusterID()).thenReturn("cluster1");
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
 
-    this.versionManager =
-        Mockito.mock(HDDSLayoutVersionManager.class);
-    Mockito.when(versionManager.getMetadataLayoutVersion())
-        .thenReturn(maxLayoutVersion());
-    Mockito.when(versionManager.getSoftwareLayoutVersion())
-        .thenReturn(maxLayoutVersion());
+    this.versionManager = mock(HDDSLayoutVersionManager.class);
+    when(versionManager.getMetadataLayoutVersion()).thenReturn(maxLayoutVersion());
+    when(versionManager.getSoftwareLayoutVersion()).thenReturn(maxLayoutVersion());
     nodeManager =
         new SCMNodeManager(conf, storageConfig, new EventQueue(), clusterMap,
             SCMContext.emptyContext(), versionManager);
@@ -90,15 +89,15 @@ public class TestNodeReportHandler implements EventPublisher {
         .createMetadataStorageReport(metaStoragePath, 100, 10, 90, null);
 
     SCMNodeMetric nodeMetric = nodeManager.getNodeStat(dn);
-    Assertions.assertNull(nodeMetric);
+    assertNull(nodeMetric);
 
     nodeManager.register(dn, getNodeReport(dn, Arrays.asList(storageOne),
         Arrays.asList(metaStorageOne)).getReport(), null);
     nodeMetric = nodeManager.getNodeStat(dn);
 
-    Assertions.assertEquals(100, (long) nodeMetric.get().getCapacity().get());
-    Assertions.assertEquals(90, (long) nodeMetric.get().getRemaining().get());
-    Assertions.assertEquals(10, (long) nodeMetric.get().getScmUsed().get());
+    assertEquals(100, (long) nodeMetric.get().getCapacity().get());
+    assertEquals(90, (long) nodeMetric.get().getRemaining().get());
+    assertEquals(10, (long) nodeMetric.get().getScmUsed().get());
 
     StorageReportProto storageTwo = HddsTestUtils
         .createStorageReport(dn.getUuid(), storagePath, 100, 10, 90, null);
@@ -107,9 +106,9 @@ public class TestNodeReportHandler implements EventPublisher {
             Arrays.asList(metaStorageOne)), this);
     nodeMetric = nodeManager.getNodeStat(dn);
 
-    Assertions.assertEquals(200, (long) nodeMetric.get().getCapacity().get());
-    Assertions.assertEquals(180, (long) nodeMetric.get().getRemaining().get());
-    Assertions.assertEquals(20, (long) nodeMetric.get().getScmUsed().get());
+    assertEquals(200, (long) nodeMetric.get().getCapacity().get());
+    assertEquals(180, (long) nodeMetric.get().getRemaining().get());
+    assertEquals(20, (long) nodeMetric.get().getScmUsed().get());
 
   }
 

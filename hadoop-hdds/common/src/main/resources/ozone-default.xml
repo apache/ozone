@@ -1097,8 +1097,42 @@
 
       Set a value that is appropriate for the cluster size. Generally, HDFS
       recommends RPC handler count is set to 20 * log2(Cluster Size) with an
-      upper limit of 200. However, SCM will not have the same amount of
-      traffic as Namenode, so a value much smaller than that will work well too.
+      upper limit of 200. However, Ozone SCM will not have the same amount of
+      traffic as HDFS Namenode, so a value much smaller than that will work well too.
+
+      To specify handlers for individual RPC servers,
+      set the following configuration properties instead:
+      ---- RPC type ----       : ---- Configuration properties ----
+      SCMClientProtocolServer  : 'ozone.scm.client.handler.count.key'
+      SCMBlockProtocolServer   : 'ozone.scm.block.handler.count.key'
+      SCMDatanodeProtocolServer: 'ozone.scm.datanode.handler.count.key'
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.client.handler.count.key</name>
+    <value>100</value>
+    <tag>OZONE, MANAGEMENT, PERFORMANCE</tag>
+    <description>
+      Used to set the number of RPC handlers used by Client to access SCM.
+      The default value is 100.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.block.handler.count.key</name>
+    <value>100</value>
+    <tag>OZONE, MANAGEMENT, PERFORMANCE</tag>
+    <description>
+      Used to set the number of RPC handlers when accessing blocks.
+      The default value is 100.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.datanode.handler.count.key</name>
+    <value>100</value>
+    <tag>OZONE, MANAGEMENT, PERFORMANCE</tag>
+    <description>
+      Used to set the number of RPC handlers used by DataNode to access SCM.
+      The default value is 100.
     </description>
   </property>
   <property>
@@ -1874,6 +1908,14 @@
     <tag>S3GATEWAY, SECURITY, KERBEROS</tag>
     <description> simple or kerberos. If kerberos is set, Kerberos SPNEOGO
       will be used for http authentication.
+    </description>
+  </property>
+  <property>
+    <name>ozone.s3g.metrics.percentiles.intervals.seconds</name>
+    <value>60</value>
+    <tag>S3GATEWAY, PERFORMANCE</tag>
+    <description>Specifies the interval in seconds for the rollover of MutableQuantiles metrics.
+      Setting this interval equal to the metrics sampling time ensures more detailed metrics.
     </description>
   </property>
 
@@ -3116,6 +3158,32 @@
     <description>
       Connection timeout for HTTP call in milliseconds made by Recon to request
       SCM snapshot.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.scmclient.rpc.timeout</name>
+    <value>1m</value>
+    <tag>OZONE, RECON, SCM</tag>
+    <description>
+      RpcClient timeout on waiting for the response from SCM when Recon connects to SCM.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.scmclient.max.retry.timeout</name>
+    <value>6s</value>
+    <tag>OZONE, RECON, SCM</tag>
+    <description>
+      Max retry timeout for SCM Client when Recon connects to SCM. This config is used to
+      dynamically compute the max retry count for SCM Client when failover happens. Check the
+      SCMClientConfig class getRetryCount method.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.scmclient.failover.max.retry</name>
+    <value>3</value>
+    <tag>OZONE, RECON, SCM</tag>
+    <description>
+      Max retry count for SCM Client when failover happens.
     </description>
   </property>
   <property>

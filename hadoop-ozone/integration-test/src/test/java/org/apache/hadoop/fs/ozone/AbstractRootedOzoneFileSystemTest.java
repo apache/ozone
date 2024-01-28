@@ -96,7 +96,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
-import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -125,6 +124,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.REA
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.DELETE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -163,12 +163,11 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
   @AfterAll
   void shutdown() {
-    IOUtils.closeQuietly(client);
+    IOUtils.closeQuietly(fs, userOfs, client);
     // Tear down the cluster after EACH set of parameters
     if (cluster != null) {
       cluster.shutdown();
     }
-    IOUtils.closeQuietly(fs, userOfs);
   }
 
   @BeforeEach
@@ -276,15 +275,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
             -> (RootedOzoneFileSystem) FileSystem.get(conf));
 
     if (useOnlyCache) {
-      if (omRatisEnabled) {
-        cluster.getOzoneManager().getOmRatisServer().getOmStateMachine()
-            .getOzoneManagerDoubleBuffer().stopDaemon();
-      } else {
-        cluster.getOzoneManager().getOmServerProtocol()
-            .getOzoneManagerDoubleBuffer().stopDaemon();
-        cluster.getOzoneManager().getOmServerProtocol()
-            .setShouldFlushCache(false);
-      }
+      cluster.getOzoneManager().getOmServerProtocol().setShouldFlushCache(omRatisEnabled);
     }
   }
 
@@ -784,7 +775,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
       assertEquals(numDirs, fileStatuses.length, "Total directories listed do not match the existing directories");
 
       for (int i = 0; i < numDirs; i++) {
-        assertTrue(paths.contains(fileStatuses[i].getPath().getName()));
+        assertThat(paths).contains(fileStatuses[i].getPath().getName());
       }
     } finally {
       // Cleanup
@@ -1117,7 +1108,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
    */
   private FileStatus[] customListStatus(Path f, boolean recursive,
       String startPath, int numEntries) throws IOException {
-    assertTrue(numEntries > 0);
+    assertThat(numEntries).isGreaterThan(0);
     LinkedList<FileStatus> statuses = new LinkedList<>();
     List<FileStatus> tmpStatusList;
     do {
@@ -1494,9 +1485,9 @@ abstract class AbstractRootedOzoneFileSystemTest {
                new GenericTestUtils.SystemOutCapturer()) {
         String linkPathStr = rootPath + destVolume;
         ToolRunner.run(shell, new String[]{"-ls", linkPathStr});
-        assertTrue(capture.getOutput().contains("drwxrwxrwx"));
-        assertTrue(capture.getOutput().contains(linkPathStr +
-            OZONE_URI_DELIMITER + srcBucket));
+        assertThat(capture.getOutput()).contains("drwxrwxrwx");
+        assertThat(capture.getOutput()).contains(linkPathStr +
+            OZONE_URI_DELIMITER + srcBucket);
       } finally {
         shell.close();
       }
@@ -1517,12 +1508,12 @@ abstract class AbstractRootedOzoneFileSystemTest {
         String linkPathStr = rootPath + destVolume;
         ToolRunner.run(shell, new String[]{"-ls", "-R",
             linkPathStr + OZONE_URI_DELIMITER + srcBucket});
-        assertTrue(capture.getOutput().contains("drwxrwxrwx"));
-        assertTrue(capture.getOutput().contains(linkPathStr +
-            OZONE_URI_DELIMITER + srcBucket));
-        assertTrue(capture.getOutput().contains("-rw-rw-rw-"));
-        assertTrue(capture.getOutput().contains(linkPathStr +
-            OZONE_URI_DELIMITER + srcBucket + OZONE_URI_DELIMITER + key));
+        assertThat(capture.getOutput()).contains("drwxrwxrwx");
+        assertThat(capture.getOutput()).contains(linkPathStr +
+            OZONE_URI_DELIMITER + srcBucket);
+        assertThat(capture.getOutput()).contains("-rw-rw-rw-");
+        assertThat(capture.getOutput()).contains(linkPathStr +
+            OZONE_URI_DELIMITER + srcBucket + OZONE_URI_DELIMITER + key);
       } finally {
         shell.close();
       }
@@ -1686,7 +1677,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     // confirm link is gone
     FileNotFoundException exception = assertThrows(FileNotFoundException.class,
         () -> fs.getFileStatus(dirPathLink));
-    assertTrue(exception.getMessage().contains("File not found."));
+    assertThat(exception.getMessage()).contains("File not found.");
 
     // Cleanup
     fs.delete(bucketPath1, true);
@@ -1936,15 +1927,15 @@ abstract class AbstractRootedOzoneFileSystemTest {
     }, 1000, 180000);
 
     if (isBucketFSOptimized) {
-      assertTrue(getOMMetrics()
-          .getNumTrashAtomicDirRenames() > prevNumTrashAtomicDirRenames);
+      assertThat(getOMMetrics().getNumTrashAtomicDirRenames())
+          .isGreaterThan(prevNumTrashAtomicDirRenames);
     } else {
       // This condition should pass after the checkpoint
-      assertTrue(getOMMetrics()
-          .getNumTrashRenames() > prevNumTrashRenames);
+      assertThat(getOMMetrics().getNumTrashRenames())
+          .isGreaterThan(prevNumTrashRenames);
       // With new layout version, file renames wouldn't be counted
-      assertTrue(getOMMetrics()
-          .getNumTrashFilesRenames() > prevNumTrashFileRenames);
+      assertThat(getOMMetrics().getNumTrashFilesRenames())
+          .isGreaterThan(prevNumTrashFileRenames);
     }
 
     // wait for deletion of checkpoint dir
@@ -2003,13 +1994,13 @@ abstract class AbstractRootedOzoneFileSystemTest {
   private void checkInvalidPath(Path path) {
     InvalidPathException exception = assertThrows(InvalidPathException.class,
         () -> fs.create(path, false));
-    assertTrue(exception.getMessage().contains("Invalid path Name"));
+    assertThat(exception.getMessage()).contains("Invalid path Name");
   }
 
 
   @Test
   void testRenameFile() throws Exception {
-    final String dir = "/dir" + new Random().nextInt(1000);
+    final String dir = "/dir" + RandomUtils.nextInt(0, 1000);
     Path dirPath = new Path(getBucketPath() + dir);
     Path file1Source = new Path(getBucketPath() + dir
         + "/file1_Copy");
@@ -2035,7 +2026,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
    */
   @Test
   void testRenameFileToDir() throws Exception {
-    final String dir = "/dir" + new Random().nextInt(1000);
+    final String dir = "/dir" + RandomUtils.nextInt(0, 1000);
     Path dirPath = new Path(getBucketPath() + dir);
     getFs().mkdirs(dirPath);
 
@@ -2455,7 +2446,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
         IllegalArgumentException.class,
         () -> ofs.getSnapshotDiffReport(volumePath1, finalFromSnap,
             finalToSnap));
-    assertTrue(exception.getMessage().contains(errorMsg));
+    assertThat(exception.getMessage()).contains(errorMsg);
   }
 
   @Test

@@ -33,7 +33,6 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -46,6 +45,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVA
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -131,7 +132,7 @@ public class TestSCMSafeModeWithPipelineRules {
         !scmSafeModeManager.getOneReplicaPipelineSafeModeRule()
             .validate(), 1000, 60000);
 
-    Assertions.assertTrue(cluster.getStorageContainerManager().isInSafeMode());
+    assertTrue(cluster.getStorageContainerManager().isInSafeMode());
 
     DatanodeDetails restartedDatanode = pipelineList.get(1).getFirstNode();
     // Now restart one datanode from the 2nd pipeline
@@ -152,8 +153,7 @@ public class TestSCMSafeModeWithPipelineRules {
 
     // As after safeMode wait time is not completed, we should have total
     // pipeline's as original count 6(1 node pipelines) + 2 (3 node pipeline)
-    Assertions.assertEquals(totalPipelineCount,
-        pipelineManager.getPipelines().size());
+    assertEquals(totalPipelineCount, pipelineManager.getPipelines().size());
 
     // The below check calls pipelineManager.getPipelines()
     // which is a call to the SCM to get the list of pipeline infos.

@@ -22,7 +22,7 @@ import com.google.protobuf.MessageLite;
 import com.google.protobuf.Parser;
 import org.apache.ratis.util.function.CheckedFunction;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;

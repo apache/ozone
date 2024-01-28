@@ -40,9 +40,12 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.Assertions;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * This class tests container operations (TODO currently only supports create)
@@ -93,13 +96,12 @@ public class TestContainerOperations {
   public void testGetPipeline() throws Exception {
     try {
       storageClient.getPipeline(PipelineID.randomId().getProtobuf());
-      Assertions.fail("Get Pipeline should fail");
+      fail("Get Pipeline should fail");
     } catch (Exception e) {
-      assertTrue(
-          SCMHAUtils.unwrapException(e) instanceof PipelineNotFoundException);
+      assertInstanceOf(PipelineNotFoundException.class, SCMHAUtils.unwrapException(e));
     }
 
-    Assertions.assertFalse(storageClient.listPipelines().isEmpty());
+    assertThat(storageClient.listPipelines()).isNotEmpty();
   }
 
   @Test
@@ -154,8 +156,7 @@ public class TestContainerOperations {
                       dn.getIpAddress(), dn.getUuidString());
 
       assertEquals(1, usageInfoList.size());
-      assertTrue(usageInfoList.get(0).getContainerCount() >= 0 &&
-              usageInfoList.get(0).getContainerCount() <= 1);
+      assertThat(usageInfoList.get(0).getContainerCount()).isGreaterThanOrEqualTo(0).isLessThanOrEqualTo(1);
       totalContainerCount[(int)usageInfoList.get(0).getContainerCount()]++;
     }
     assertEquals(2, totalContainerCount[0]);

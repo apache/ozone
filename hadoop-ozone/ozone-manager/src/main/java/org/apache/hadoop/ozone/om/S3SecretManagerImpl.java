@@ -62,8 +62,7 @@ public class S3SecretManagerImpl implements S3SecretManager {
         // purposely deleted the secret. Hence, we do not have to check the DB.
         return null;
       }
-      return new S3SecretValue(cacheValue.getKerberosID(),
-          cacheValue.getAwsSecret());
+      return cacheValue;
     }
     S3SecretValue result = s3SecretStore.getSecret(kerberosID);
     if (result != null) {

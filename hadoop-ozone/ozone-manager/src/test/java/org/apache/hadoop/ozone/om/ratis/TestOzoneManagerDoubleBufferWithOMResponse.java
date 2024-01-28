@@ -68,7 +68,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -87,8 +87,6 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
   private OMMetadataManager omMetadataManager;
   private OzoneManagerDoubleBuffer doubleBuffer;
   private final AtomicLong trxId = new AtomicLong(0);
-  private OzoneManagerRatisSnapshot ozoneManagerRatisSnapshot;
-  private volatile long lastAppliedIndex;
   private long term = 1L;
 
   @TempDir
@@ -109,13 +107,9 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
-    ozoneManagerRatisSnapshot = index -> {
-      lastAppliedIndex = index.get(index.size() - 1);
-    };
-    doubleBuffer = new OzoneManagerDoubleBuffer.Builder()
+    doubleBuffer = OzoneManagerDoubleBuffer.newBuilder()
         .setOmMetadataManager(omMetadataManager)
-        .setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
-        .setmaxUnFlushedTransactionCount(100000)
+        .setMaxUnFlushedTransactionCount(100000)
         .enableRatis(true)
         .build();
   }
@@ -179,9 +173,9 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     final int deleteCount = 5;
 
     // We are doing +1 for volume transaction.
-    GenericTestUtils.waitFor(() ->
-        doubleBuffer.getFlushedTransactionCount() ==
-            (bucketCount + deleteCount + 1), 100, 120000);
+    GenericTestUtils.waitFor(
+        () -> doubleBuffer.getFlushedTransactionCountForTesting() == bucketCount + deleteCount + 1,
+        100, 120000);
 
     assertEquals(1, omMetadataManager.countRowsInTable(
         omMetadataManager.getVolumeTable()));
@@ -198,16 +192,21 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     checkDeletedBuckets(deleteBucketQueue);
 
     // Check lastAppliedIndex is updated correctly or not.
-    GenericTestUtils.waitFor(() ->
-        bucketCount + deleteCount + 1 == lastAppliedIndex,
+    final long expectedIndex = bucketCount + deleteCount + 1;
+    GenericTestUtils.waitFor(() -> assertTransactionInfo(expectedIndex),
         100, 30000);
+  }
 
-    TransactionInfo transactionInfo =
-        omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
-    assertNotNull(transactionInfo);
-
-    assertEquals(lastAppliedIndex, transactionInfo.getTransactionIndex());
-    assertEquals(term, transactionInfo.getTerm());
+  private boolean assertTransactionInfo(long lastAppliedIndex) {
+    final TransactionInfo info;
+    try {
+      info = omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
+    } catch (IOException e) {
+      return false;
+    }
+    return info != null
+        && info.getTransactionIndex() == lastAppliedIndex
+        && info.getTerm() == term;
   }
 
   /**
@@ -252,8 +251,9 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     final int deleteCount = 10;
 
     // We are doing +1 for volume transaction.
-    GenericTestUtils.waitFor(() -> doubleBuffer.getFlushedTransactionCount()
-            == (bucketCount + deleteCount + 2), 100, 120000);
+    GenericTestUtils.waitFor(
+        () -> doubleBuffer.getFlushedTransactionCountForTesting() == bucketCount + deleteCount + 2,
+        100, 120000);
 
     assertEquals(2, omMetadataManager.countRowsInTable(
         omMetadataManager.getVolumeTable()));
@@ -275,7 +275,8 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     // running in parallel, so lastAppliedIndex cannot be always
     // total transaction count. So, just checking here whether it is less
     // than total transaction count.
-    assertThat(lastAppliedIndex).isLessThanOrEqualTo(bucketCount + deleteCount + 2);
+    final TransactionInfo info = omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
+    assertThat(info.getTransactionIndex()).isLessThanOrEqualTo(bucketCount + deleteCount + 2);
   }
 
   /**
@@ -398,8 +399,8 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     int expectedBuckets = bucketsPerVolume * volumeCount;
     long expectedTransactions = volumeCount + expectedBuckets;
 
-    GenericTestUtils.waitFor(() ->
-        expectedTransactions == doubleBuffer.getFlushedTransactionCount(),
+    GenericTestUtils.waitFor(
+        () -> expectedTransactions == doubleBuffer.getFlushedTransactionCountForTesting(),
         100, volumeCount * 500);
 
     GenericTestUtils.waitFor(() ->
@@ -411,7 +412,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
         assertRowCount(expectedBuckets, omMetadataManager.getBucketTable()),
         300, volumeCount * 300);
 
-    assertThat(doubleBuffer.getFlushIterations()).isGreaterThan(0);
+    assertThat(doubleBuffer.getFlushIterationsForTesting()).isGreaterThan(0);
   }
 
   private boolean assertRowCount(int expected, Table<String, ?> table) {

@@ -115,7 +115,7 @@ public class VaultS3SecretStore implements S3SecretStore {
         return null;
       }
 
-      return new S3SecretValue(kerberosID, s3Secret);
+      return S3SecretValue.of(kerberosID, s3Secret);
     } catch (VaultException e) {
       LOG.error("Failed to read secret", e);
       throw new IOException("Failed to read secret", e);

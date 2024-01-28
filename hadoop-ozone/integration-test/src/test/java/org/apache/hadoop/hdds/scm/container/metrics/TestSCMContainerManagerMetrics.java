@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -47,8 +46,10 @@ import java.util.HashMap;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
-import static org.apache.hadoop.test.MetricsAsserts.getLongCounter;
-import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Class used to test {@link SCMContainerManagerMetrics}.
@@ -91,18 +92,18 @@ public class TestSCMContainerManagerMetrics {
             HddsProtos.ReplicationFactor.ONE), OzoneConsts.OZONE);
 
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
-    Assertions.assertEquals(getLongCounter("NumSuccessfulCreateContainers",
+    assertEquals(getLongCounter("NumSuccessfulCreateContainers",
         metrics), ++numSuccessfulCreateContainers);
 
-    Assertions.assertThrows(IOException.class, () ->
+    assertThrows(IOException.class, () ->
         containerManager.allocateContainer(
             RatisReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.THREE), OzoneConsts.OZONE));
     // allocateContainer should fail, so it should have the old metric value.
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
-    Assertions.assertEquals(getLongCounter("NumSuccessfulCreateContainers",
+    assertEquals(getLongCounter("NumSuccessfulCreateContainers",
         metrics), numSuccessfulCreateContainers);
-    Assertions.assertEquals(getLongCounter("NumFailureCreateContainers",
+    assertEquals(getLongCounter("NumFailureCreateContainers",
         metrics), 1);
 
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
@@ -113,24 +114,24 @@ public class TestSCMContainerManagerMetrics {
         ContainerID.valueOf(containerInfo.getContainerID()));
 
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
-    Assertions.assertEquals(getLongCounter("NumSuccessfulDeleteContainers",
+    assertEquals(getLongCounter("NumSuccessfulDeleteContainers",
         metrics), numSuccessfulDeleteContainers + 1);
 
-    Assertions.assertThrows(ContainerNotFoundException.class, () ->
+    assertThrows(ContainerNotFoundException.class, () ->
         containerManager.deleteContainer(
             ContainerID.valueOf(RandomUtils.nextLong(10000, 20000))));
     // deleteContainer should fail, so it should have the old metric value.
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
-    Assertions.assertEquals(getLongCounter("NumSuccessfulDeleteContainers",
+    assertEquals(getLongCounter("NumSuccessfulDeleteContainers",
         metrics), numSuccessfulCreateContainers);
-    Assertions.assertEquals(getLongCounter("NumFailureDeleteContainers",
+    assertEquals(getLongCounter("NumFailureDeleteContainers",
         metrics), 1);
 
     long currentValue = getLongCounter("NumListContainerOps", metrics);
     containerManager.getContainers(
         ContainerID.valueOf(containerInfo.getContainerID()), 1);
     metrics = getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
-    Assertions.assertEquals(currentValue + 1,
+    assertEquals(currentValue + 1,
         getLongCounter("NumListContainerOps", metrics));
 
   }
@@ -143,7 +144,7 @@ public class TestSCMContainerManagerMetrics {
 
     MetricsRecordBuilder metrics =
         getMetrics(SCMContainerManagerMetrics.class.getSimpleName());
-    Assertions.assertEquals(1L,
+    assertEquals(1L,
         getLongCounter("NumContainerReportsProcessedSuccessful", metrics));
 
     // Create key should create container on DN.

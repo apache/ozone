@@ -175,6 +175,9 @@
             "name": "Type",
             "enum_fields": [
               {
+                "name": "UnknownCommand"
+              },
+              {
                 "name": "CreateVolume",
                 "integer": 11
               },
@@ -445,6 +448,103 @@
               {
                 "name": "GetKeyInfo",
                 "integer": 111
+              },
+              {
+                "name": "CreateSnapshot",
+                "integer": 112
+              },
+              {
+                "name": "ListSnapshot",
+                "integer": 113
+              },
+              {
+                "name": "SnapshotDiff",
+                "integer": 114
+              },
+              {
+                "name": "DeleteSnapshot",
+                "integer": 115
+              },
+              {
+                "name": "SnapshotMoveDeletedKeys",
+                "integer": 116
+              },
+              {
+                "name": "TransferLeadership",
+                "integer": 117
+              },
+              {
+                "name": "SnapshotPurge",
+                "integer": 118
+              },
+              {
+                "name": "RecoverLease",
+                "integer": 119
+              },
+              {
+                "name": "SetTimes",
+                "integer": 120
+              },
+              {
+                "name": "RefetchSecretKey",
+                "integer": 121
+              },
+              {
+                "name": "ListSnapshotDiffJobs",
+                "integer": 122
+              },
+              {
+                "name": "CancelSnapshotDiff",
+                "integer": 123
+              },
+              {
+                "name": "SetSafeMode",
+                "integer": 124
+              },
+              {
+                "name": "PrintCompactionLogDag",
+                "integer": 125
+              },
+              {
+                "name": "ListKeysLight",
+                "integer": 126
+              },
+              {
+                "name": "AbortExpiredMultiPartUploads",
+                "integer": 127
+              },
+              {
+                "name": "SetSnapshotProperty",
+                "integer": 128
+              },
+              {
+                "name": "ListStatusLight",
+                "integer": 129
+              },
+              {
+                "name": "GetSnapshotInfo",
+                "integer": 130
+              }
+            ]
+          },
+          {
+            "name": "SafeMode",
+            "enum_fields": [
+              {
+                "name": "ENTER",
+                "integer": 1
+              },
+              {
+                "name": "LEAVE",
+                "integer": 2
+              },
+              {
+                "name": "FORCE_EXIT",
+                "integer": 3
+              },
+              {
+                "name": "GET",
+                "integer": 4
               }
             ]
           },
@@ -782,6 +882,38 @@
               {
                 "name": "FEATURE_NOT_ENABLED",
                 "integer": 86
+              },
+              {
+                "name": "INVALID_SNAPSHOT_ERROR",
+                "integer": 87
+              },
+              {
+                "name": "CONTAINS_SNAPSHOT",
+                "integer": 88
+              },
+              {
+                "name": "SSL_CONNECTION_FAILURE",
+                "integer": 89
+              },
+              {
+                "name": "RENAME_OPEN_FILE",
+                "integer": 90
+              },
+              {
+                "name": "UNAUTHORIZED",
+                "integer": 91
+              },
+              {
+                "name": "S3_SECRET_ALREADY_EXISTS",
+                "integer": 92
+              },
+              {
+                "name": "INVALID_PATH",
+                "integer": 93
+              },
+              {
+                "name": "TOO_MANY_BUCKETS",
+                "integer": 94
               }
             ]
           },
@@ -862,6 +994,19 @@
               },
               {
                 "name": "ENCRYPTION_ZONES",
+                "integer": 2
+              }
+            ]
+          },
+          {
+            "name": "SnapshotStatusProto",
+            "enum_fields": [
+              {
+                "name": "SNAPSHOT_ACTIVE",
+                "integer": 1
+              },
+              {
+                "name": "SNAPSHOT_DELETED",
                 "integer": 2
               }
             ]
@@ -1013,6 +1158,56 @@
               },
               {
                 "name": "RATIS",
+                "integer": 4
+              }
+            ]
+          },
+          {
+            "name": "SnapshotDiffResponse.JobStatusProto",
+            "enum_fields": [
+              {
+                "name": "QUEUED",
+                "integer": 1
+              },
+              {
+                "name": "IN_PROGRESS",
+                "integer": 2
+              },
+              {
+                "name": "DONE",
+                "integer": 3
+              },
+              {
+                "name": "REJECTED",
+                "integer": 4
+              },
+              {
+                "name": "FAILED",
+                "integer": 5
+              },
+              {
+                "name": "CANCELLED",
+                "integer": 6
+              }
+            ]
+          },
+          {
+            "name": "DiffReportEntryProto.DiffTypeProto",
+            "enum_fields": [
+              {
+                "name": "CREATE",
+                "integer": 1
+              },
+              {
+                "name": "MODIFY",
+                "integer": 2
+              },
+              {
+                "name": "DELETE",
+                "integer": 3
+              },
+              {
+                "name": "RENAME",
                 "integer": 4
               }
             ]
@@ -1495,6 +1690,108 @@
                 "name": "GetKeyInfoRequest",
                 "type": "GetKeyInfoRequest",
                 "optional": true
+              },
+              {
+                "id": 112,
+                "name": "CreateSnapshotRequest",
+                "type": "CreateSnapshotRequest",
+                "optional": true
+              },
+              {
+                "id": 113,
+                "name": "ListSnapshotRequest",
+                "type": "ListSnapshotRequest",
+                "optional": true
+              },
+              {
+                "id": 114,
+                "name": "snapshotDiffRequest",
+                "type": "SnapshotDiffRequest",
+                "optional": true
+              },
+              {
+                "id": 115,
+                "name": "DeleteSnapshotRequest",
+                "type": "DeleteSnapshotRequest",
+                "optional": true
+              },
+              {
+                "id": 116,
+                "name": "SnapshotMoveDeletedKeysRequest",
+                "type": "SnapshotMoveDeletedKeysRequest",
+                "optional": true
+              },
+              {
+                "id": 117,
+                "name": "TransferOmLeadershipRequest",
+                "type": "hdds.TransferLeadershipRequestProto",
+                "optional": true
+              },
+              {
+                "id": 118,
+                "name": "SnapshotPurgeRequest",
+                "type": "SnapshotPurgeRequest",
+                "optional": true
+              },
+              {
+                "id": 119,
+                "name": "RecoverLeaseRequest",
+                "type": "RecoverLeaseRequest",
+                "optional": true
+              },
+              {
+                "id": 120,
+                "name": "SetTimesRequest",
+                "type": "SetTimesRequest",
+                "optional": true
+              },
+              {
+                "id": 121,
+                "name": "RefetchSecretKeyRequest",
+                "type": "RefetchSecretKeyRequest",
+                "optional": true
+              },
+              {
+                "id": 122,
+                "name": "ListSnapshotDiffJobRequest",
+                "type": "ListSnapshotDiffJobRequest",
+                "optional": true
+              },
+              {
+                "id": 123,
+                "name": "CancelSnapshotDiffRequest",
+                "type": "CancelSnapshotDiffRequest",
+                "optional": true
+              },
+              {
+                "id": 124,
+                "name": "SetSafeModeRequest",
+                "type": "SetSafeModeRequest",
+                "optional": true
+              },
+              {
+                "id": 125,
+                "name": "PrintCompactionLogDagRequest",
+                "type": "PrintCompactionLogDagRequest",
+                "optional": true
+              },
+              {
+                "id": 126,
+                "name": "multipartUploadsExpiredAbortRequest",
+                "type": "MultipartUploadsExpiredAbortRequest",
+                "optional": true
+              },
+              {
+                "id": 127,
+                "name": "SetSnapshotPropertyRequest",
+                "type": "SetSnapshotPropertyRequest",
+                "optional": true
+              },
+              {
+                "id": 128,
+                "name": "SnapshotInfoRequest",
+                "type": "SnapshotInfoRequest",
+                "optional": true
               }
             ]
           },
@@ -1944,6 +2241,126 @@
                 "name": "GetKeyInfoResponse",
                 "type": "GetKeyInfoResponse",
                 "optional": true
+              },
+              {
+                "id": 112,
+                "name": "CreateSnapshotResponse",
+                "type": "CreateSnapshotResponse",
+                "optional": true
+              },
+              {
+                "id": 113,
+                "name": "ListSnapshotResponse",
+                "type": "ListSnapshotResponse",
+                "optional": true
+              },
+              {
+                "id": 114,
+                "name": "snapshotDiffResponse",
+                "type": "SnapshotDiffResponse",
+                "optional": true
+              },
+              {
+                "id": 115,
+                "name": "DeleteSnapshotResponse",
+                "type": "DeleteSnapshotResponse",
+                "optional": true
+              },
+              {
+                "id": 116,
+                "name": "SnapshotMoveDeletedKeysResponse",
+                "type": "SnapshotMoveDeletedKeysResponse",
+                "optional": true
+              },
+              {
+                "id": 117,
+                "name": "TransferOmLeadershipResponse",
+                "type": "hdds.TransferLeadershipResponseProto",
+                "optional": true
+              },
+              {
+                "id": 118,
+                "name": "SnapshotPurgeResponse",
+                "type": "SnapshotPurgeResponse",
+                "optional": true
+              },
+              {
+                "id": 119,
+                "name": "RecoverLeaseResponse",
+                "type": "RecoverLeaseResponse",
+                "optional": true
+              },
+              {
+                "id": 120,
+                "name": "SetTimesResponse",
+                "type": "SetTimesResponse",
+                "optional": true
+              },
+              {
+                "id": 121,
+                "name": "RefetchSecretKeyResponse",
+                "type": "RefetchSecretKeyResponse",
+                "optional": true
+              },
+              {
+                "id": 122,
+                "name": "ListSnapshotDiffJobResponse",
+                "type": "ListSnapshotDiffJobResponse",
+                "optional": true
+              },
+              {
+                "id": 123,
+                "name": "cancelSnapshotDiffResponse",
+                "type": "CancelSnapshotDiffResponse",
+                "optional": true
+              },
+              {
+                "id": 124,
+                "name": "SetSafeModeResponse",
+                "type": "SetSafeModeResponse",
+                "optional": true
+              },
+              {
+                "id": 125,
+                "name": "PrintCompactionLogDagResponse",
+                "type": "PrintCompactionLogDagResponse",
+                "optional": true
+              },
+              {
+                "id": 126,
+                "name": "listKeysLightResponse",
+                "type": "ListKeysLightResponse",
+                "optional": true
+              },
+              {
+                "id": 127,
+                "name": "multipartUploadsExpiredAbortResponse",
+                "type": "MultipartUploadsExpiredAbortResponse",
+                "optional": true
+              },
+              {
+                "id": 128,
+                "name": "SetSnapshotPropertyResponse",
+                "type": "SetSnapshotPropertyResponse",
+                "optional": true
+              },
+              {
+                "id": 129,
+                "name": "listStatusLightResponse",
+                "type": "ListStatusLightResponse",
+                "optional": true
+              },
+              {
+                "id": 130,
+                "name": "SnapshotInfoResponse",
+                "type": "SnapshotInfoResponse",
+                "optional": true
+              },
+              {
+                "id": 131,
+                "name": "omLockDetails",
+                "type": "OMLockDetailsProto",
+                "optional": true
               }
             ]
           },
@@ -2258,6 +2675,20 @@
                 "id": 1,
                 "name": "response",
                 "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "RefetchSecretKeyRequest"
+          },
+          {
+            "name": "RefetchSecretKeyResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "id",
+                "type": "hdds.UUID",
                 "optional": true
               }
             ]
@@ -2730,6 +3161,190 @@
             ]
           },
           {
+            "name": "SnapshotInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "snapshotID",
+                "type": "hadoop.hdds.UUID",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "name",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "volumeName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "bucketName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "snapshotStatus",
+                "type": "SnapshotStatusProto",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "creationTime",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 7,
+                "name": "deletionTime",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 8,
+                "name": "pathPreviousSnapshotID",
+                "type": "hadoop.hdds.UUID",
+                "optional": true
+              },
+              {
+                "id": 9,
+                "name": "globalPreviousSnapshotID",
+                "type": "hadoop.hdds.UUID",
+                "optional": true
+              },
+              {
+                "id": 10,
+                "name": "snapshotPath",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 11,
+                "name": "checkpointDir",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 12,
+                "name": "dbTxSequenceNumber",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 13,
+                "name": "deepClean",
+                "type": "bool",
+                "optional": true
+              },
+              {
+                "id": 14,
+                "name": "sstFiltered",
+                "type": "bool",
+                "optional": true
+              },
+              {
+                "id": 15,
+                "name": "referencedSize",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 16,
+                "name": "referencedReplicatedSize",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 17,
+                "name": "exclusiveSize",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 18,
+                "name": "exclusiveReplicatedSize",
+                "type": "uint64",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "SnapshotDiffJobProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "creationTime",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "jobId",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "status",
+                "type": "SnapshotDiffResponse.JobStatusProto",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "volume",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "bucket",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "fromSnapshot",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 7,
+                "name": "toSnapshot",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 8,
+                "name": "forceFullDiff",
+                "type": "bool",
+                "optional": true
+              },
+              {
+                "id": 9,
+                "name": "totalDiffEntries",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 10,
+                "name": "message",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 11,
+                "name": "disableNativeDiff",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
             "name": "OzoneObj",
             "fields": [
               {
@@ -3032,6 +3647,12 @@
                 "id": 4,
                 "name": "count",
                 "type": "int32",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "hasSnapshot",
+                "type": "bool",
                 "optional": true
               }
             ]
@@ -3463,6 +4084,59 @@
                 "name": "fileChecksum",
                 "type": "FileChecksumProto",
                 "optional": true
+              },
+              {
+                "id": 19,
+                "name": "isFile",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "BasicKeyInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "dataSize",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "creationTime",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "modificationTime",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "type",
+                "type": "hadoop.hdds.ReplicationType",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "factor",
+                "type": "hadoop.hdds.ReplicationFactor",
+                "optional": true
+              },
+              {
+                "id": 7,
+                "name": "ecReplicationConfig",
+                "type": "hadoop.hdds.ECReplicationConfig",
+                "optional": true
               }
             ]
           },
@@ -3554,6 +4228,41 @@
             ]
           },
           {
+            "name": "OzoneFileStatusProtoLight",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "basicKeyInfo",
+                "type": "BasicKeyInfo",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "blockSize",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "isDirectory",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
             "name": "GetFileStatusRequest",
             "fields": [
               {
@@ -3571,6 +4280,17 @@
                 "id": 1,
                 "name": "status",
                 "type": "OzoneFileStatusProto",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "GetFileStatusLightResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "status",
+                "type": "OzoneFileStatusProtoLight",
                 "required": true
               }
             ]
@@ -3705,6 +4425,17 @@
                 "id": 1,
                 "name": "statuses",
                 "type": "OzoneFileStatusProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "ListStatusLightResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "statuses",
+                "type": "OzoneFileStatusProtoLight",
                 "is_repeated": true
               }
             ]
@@ -4027,6 +4758,18 @@
                 "name": "deletedKeys",
                 "type": "DeletedKeys",
                 "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "snapshotTableKey",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "keysToUpdate",
+                "type": "SnapshotMoveKeyInfos",
+                "is_repeated": true
               }
             ]
           },
@@ -4067,6 +4810,12 @@
                 "name": "deletedPath",
                 "type": "PurgePathRequest",
                 "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "snapshotTableKey",
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -4338,6 +5087,29 @@
                 "name": "keyInfo",
                 "type": "KeyInfo",
                 "is_repeated": true
+              },
+              {
+                "id": 3,
+                "name": "isTruncated",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ListKeysLightResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "basicKeyInfo",
+                "type": "BasicKeyInfo",
+                "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "isTruncated",
+                "type": "bool",
+                "optional": true
               }
             ]
           },
@@ -4355,6 +5127,12 @@
                 "name": "clientID",
                 "type": "uint64",
                 "required": true
+              },
+              {
+                "id": 3,
+                "name": "hsync",
+                "type": "bool",
+                "optional": true
               }
             ]
           },
@@ -4463,6 +5241,12 @@
                 "id": 3,
                 "name": "latestSequenceNumber",
                 "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "dbUpdateSuccess",
+                "type": "bool",
                 "optional": true
               }
             ]
@@ -4933,6 +5717,54 @@
             "name": "MultipartUploadAbortResponse"
           },
           {
+            "name": "MultipartUploadsExpiredAbortRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "expiredMultipartUploadsPerBucket",
+                "type": "ExpiredMultipartUploadsBucket",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "ExpiredMultipartUploadsBucket",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "multipartUploads",
+                "type": "ExpiredMultipartUploadInfo",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "ExpiredMultipartUploadInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "name",
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "MultipartUploadsExpiredAbortResponse"
+          },
+          {
             "name": "MultipartUploadListPartsRequest",
             "fields": [
               {
@@ -5150,6 +5982,18 @@
                 "name": "payloadSizeResp",
                 "type": "int32",
                 "optional": true
+              },
+              {
+                "id": 3,
+                "name": "readOnly",
+                "type": "bool",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "true"
+                  }
+                ]
               }
             ]
           },
@@ -5492,6 +6336,12 @@
                 "name": "adminRoleName",
                 "type": "string",
                 "optional": true
+              },
+              {
+                "id": 5,
+                "name": "forceCreationWhenVolumeExists",
+                "type": "bool",
+                "optional": true
               }
             ]
           },
@@ -5503,6 +6353,359 @@
                 "name": "rangerServiceVersion",
                 "type": "uint64",
                 "required": true
+              }
+            ]
+          },
+          {
+            "name": "CreateSnapshotRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "snapshotName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "snapshotId",
+                "type": "hadoop.hdds.UUID",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "creationTime",
+                "type": "uint64",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ListSnapshotRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "prefix",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "prevSnapshot",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "maxListResult",
+                "type": "uint32",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "SnapshotDiffRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "fromSnapshot",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "toSnapshot",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "token",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "pageSize",
+                "type": "uint32",
+                "optional": true
+              },
+              {
+                "id": 7,
+                "name": "forceFullDiff",
+                "type": "bool",
+                "optional": true
+              },
+              {
+                "id": 8,
+                "name": "disableNativeDiff",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "CancelSnapshotDiffRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "fromSnapshot",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "toSnapshot",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ListSnapshotDiffJobRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "jobStatus",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "listAll",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "DeleteSnapshotRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "snapshotName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "deletionTime",
+                "type": "uint64",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "SnapshotInfoRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "snapshotName",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "PrintCompactionLogDagRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "fileNamePrefix",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "graphType",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "SnapshotMoveDeletedKeysRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "fromSnapshot",
+                "type": "SnapshotInfo",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "nextDBKeys",
+                "type": "SnapshotMoveKeyInfos",
+                "is_repeated": true
+              },
+              {
+                "id": 3,
+                "name": "reclaimKeys",
+                "type": "SnapshotMoveKeyInfos",
+                "is_repeated": true
+              },
+              {
+                "id": 4,
+                "name": "renamedKeys",
+                "type": "hadoop.hdds.KeyValue",
+                "is_repeated": true
+              },
+              {
+                "id": 5,
+                "name": "deletedDirsToMove",
+                "type": "string",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "SnapshotMoveKeyInfos",
+            "fields": [
+              {
+                "id": 1,
+                "name": "key",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "keyInfos",
+                "type": "KeyInfo",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "SnapshotPurgeRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "snapshotDBKeys",
+                "type": "string",
+                "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "updatedSnapshotDBKey",
+                "type": "string",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "SetSnapshotPropertyRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "snapshotProperty",
+                "type": "SnapshotProperty",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "SnapshotProperty",
+            "fields": [
+              {
+                "id": 1,
+                "name": "snapshotKey",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "exclusiveSize",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "exclusiveReplicatedSize",
+                "type": "uint64",
+                "optional": true
               }
             ]
           },
@@ -5607,6 +6810,177 @@
             "name": "SetRangerServiceVersionResponse"
           },
           {
+            "name": "CreateSnapshotResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "snapshotInfo",
+                "type": "SnapshotInfo",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ListSnapshotResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "snapshotInfo",
+                "type": "SnapshotInfo",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "SnapshotDiffResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "snapshotDiffReport",
+                "type": "SnapshotDiffReportProto",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "jobStatus",
+                "type": "JobStatusProto",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "waitTimeInMs",
+                "type": "int64",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "reason",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "CancelSnapshotDiffResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "reason",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ListSnapshotDiffJobResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "snapshotDiffJob",
+                "type": "SnapshotDiffJobProto",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "DeleteSnapshotResponse"
+          },
+          {
+            "name": "SnapshotInfoResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "snapshotInfo",
+                "type": "SnapshotInfo",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "PrintCompactionLogDagResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "message",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "SnapshotMoveDeletedKeysResponse"
+          },
+          {
+            "name": "SnapshotPurgeResponse"
+          },
+          {
+            "name": "SetSnapshotPropertyResponse"
+          },
+          {
+            "name": "SnapshotDiffReportProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "fromSnapshot",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "toSnapshot",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "diffList",
+                "type": "DiffReportEntryProto",
+                "is_repeated": true
+              },
+              {
+                "id": 6,
+                "name": "token",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "DiffReportEntryProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "diffType",
+                "type": "DiffTypeProto",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "sourcePath",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "targetPath",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
             "name": "DeleteTenantResponse",
             "fields": [
               {
@@ -5696,6 +7070,117 @@
                 "id": 3,
                 "name": "accessId",
                 "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "RecoverLeaseRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "keyName",
+                "type": "string",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "RecoverLeaseResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "response",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "SetTimesRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "keyArgs",
+                "type": "KeyArgs",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "mtime",
+                "type": "uint64",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "atime",
+                "type": "uint64",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "SetTimesResponse"
+          },
+          {
+            "name": "SetSafeModeRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "safeMode",
+                "type": "SafeMode",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "SetSafeModeResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "response",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "OMLockDetailsProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "isLockAcquired",
+                "type": "bool",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "waitLockNanos",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "readLockNanos",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "writeLockNanos",
+                "type": "uint64",
                 "optional": true
               }
             ]

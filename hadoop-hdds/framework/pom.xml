@@ -30,7 +30,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <packaging>jar</packaging>
 
   <properties>
-    <allow.junit4>false</allow.junit4>
   </properties>
 
   <dependencies>
@@ -154,10 +153,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <groupId>org.apache.ozone</groupId>
       <artifactId>rocksdb-checkpoint-differ</artifactId>
       <version>${hdds.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.awaitility</groupId>
-      <artifactId>awaitility</artifactId>
     </dependency>
 
     <!-- Test dependencies -->

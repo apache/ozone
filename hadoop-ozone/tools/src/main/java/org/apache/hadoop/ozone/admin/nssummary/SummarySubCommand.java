@@ -76,8 +76,7 @@ public class SummarySubCommand implements Callable<Void> {
     if (summaryResponse.get("status").equals("PATH_NOT_FOUND")) {
       printPathNotFound();
     } else {
-      if (parent.isObjectStoreBucket(path) ||
-          !parent.bucketIsPresentInThePath(path)) {
+      if (parent.isNotValidBucketOrOBSBucket(path)) {
         printBucketReminder();
       }
 

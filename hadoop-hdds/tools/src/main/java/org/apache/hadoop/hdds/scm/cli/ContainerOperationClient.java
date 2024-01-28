@@ -59,6 +59,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED_DEFAULT;
@@ -216,6 +217,11 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
+  public Map<String, List<ContainerID>> getContainersOnDecomNode(DatanodeDetails dn) throws IOException {
+    return storageContainerLocationClient.getContainersOnDecomNode(dn);
+  }
+
+  @Override
   public List<HddsProtos.Node> queryNode(
       HddsProtos.NodeOperationalState opState,
       HddsProtos.NodeState nodeState,
@@ -223,6 +229,11 @@ public class ContainerOperationClient implements ScmClient {
       throws IOException {
     return storageContainerLocationClient.queryNode(opState, nodeState,
         queryScope, poolName, ClientVersion.CURRENT_VERSION);
+  }
+
+  @Override
+  public HddsProtos.Node queryNode(UUID uuid) throws IOException {
+    return storageContainerLocationClient.queryNode(uuid);
   }
 
   @Override

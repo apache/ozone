@@ -54,7 +54,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PART
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_ALREADY_EXISTS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test some client operations after cluster starts. And perform restart and
@@ -117,7 +116,7 @@ public class TestOzoneManagerRestart {
     objectStore.createVolume(volumeName);
 
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
-    assertTrue(ozoneVolume.getName().equals(volumeName));
+    assertEquals(volumeName, ozoneVolume.getName());
 
     cluster.restartOzoneManager();
     cluster.restartStorageContainerManager(true);
@@ -128,7 +127,7 @@ public class TestOzoneManagerRestart {
 
     // Get Volume.
     ozoneVolume = objectStore.getVolume(volumeName);
-    assertTrue(ozoneVolume.getName().equals(volumeName));
+    assertEquals(volumeName, ozoneVolume.getName());
 
   }
 
@@ -143,12 +142,12 @@ public class TestOzoneManagerRestart {
     objectStore.createVolume(volumeName);
 
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
-    assertTrue(ozoneVolume.getName().equals(volumeName));
+    assertEquals(volumeName, ozoneVolume.getName());
 
     ozoneVolume.createBucket(bucketName);
 
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
-    assertTrue(ozoneBucket.getName().equals(bucketName));
+    assertEquals(bucketName, ozoneBucket.getName());
 
     cluster.restartOzoneManager();
     cluster.restartStorageContainerManager(true);
@@ -160,8 +159,7 @@ public class TestOzoneManagerRestart {
 
     // Get bucket.
     ozoneBucket = ozoneVolume.getBucket(bucketName);
-    assertTrue(ozoneBucket.getName().equals(bucketName));
-
+    assertEquals(bucketName, ozoneBucket.getName());
   }
 
 
@@ -180,12 +178,12 @@ public class TestOzoneManagerRestart {
     objectStore.createVolume(volumeName);
 
     OzoneVolume ozoneVolume = objectStore.getVolume(volumeName);
-    assertTrue(ozoneVolume.getName().equals(volumeName));
+    assertEquals(volumeName, ozoneVolume.getName());
 
     ozoneVolume.createBucket(bucketName);
 
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
-    assertTrue(ozoneBucket.getName().equals(bucketName));
+    assertEquals(bucketName, ozoneBucket.getName());
 
     String data = "random data";
     OzoneOutputStream ozoneOutputStream1 = ozoneBucket.createKey(key1,
@@ -221,9 +219,8 @@ public class TestOzoneManagerRestart {
 
     // Get newKey1.
     OzoneKey ozoneKey = ozoneBucket.getKey(newKey1);
-    assertTrue(ozoneKey.getName().equals(newKey1));
-    assertTrue(ozoneKey.getReplicationType().equals(
-        ReplicationType.RATIS));
+    assertEquals(newKey1, ozoneKey.getName());
+    assertEquals(ReplicationType.RATIS, ozoneKey.getReplicationType());
 
     // Get newKey2, it should not exist
     try {
