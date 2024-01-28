@@ -55,7 +55,7 @@ public class OmPartInfo {
     return size;
   }
 
-  public String geteTag() {
+  public String getETag() {
     return eTag;
   }
 

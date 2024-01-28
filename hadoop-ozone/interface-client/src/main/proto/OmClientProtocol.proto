@@ -1583,7 +1583,7 @@ message MultipartCommitUploadPartRequest {
 }
 
 message MultipartCommitUploadPartResponse {
-    optional string partName = 1;
+    required string partName = 1;
     // This one is returned as Etag for S3.
     optional string eTag = 2;
 }
@@ -1602,7 +1602,7 @@ message MultipartUploadCompleteResponse {
 
 message Part {
     required uint32 partNumber = 1;
-    optional string partName = 2;
+    required string partName = 2;
     optional string eTag = 3;
 }
 

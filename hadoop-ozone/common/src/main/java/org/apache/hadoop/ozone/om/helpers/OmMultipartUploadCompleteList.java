@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Part;
 
 import java.util.ArrayList;
@@ -57,7 +58,8 @@ public class OmMultipartUploadCompleteList {
   public List<Part> getPartsList() {
     List<Part> partList = new ArrayList<>();
     multipartMap.forEach((partNumber, eTag) -> partList.add(Part
-        .newBuilder().setETag(eTag).setPartNumber(partNumber).build()));
+        // set partName equal to eTag for back compatibility (partName is a required property)
+        .newBuilder().setPartName(eTag).setETag(eTag).setPartNumber(partNumber).build()));
     return partList;
   }
 }

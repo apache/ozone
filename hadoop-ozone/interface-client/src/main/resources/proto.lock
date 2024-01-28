@@ -4926,7 +4926,7 @@
                 "id": 3,
                 "name": "eTag",
                 "type": "string",
-                "required": true
+                "optional": true
               }
             ]
           },
