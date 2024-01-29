@@ -140,7 +140,7 @@ public class TestS3MultipartUploadCompleteRequest
         .stream()
         .filter(keyValue -> keyValue.getKey().equals(OzoneConsts.ETAG))
         .findFirst().get().getValue();
-    partList.add(Part.newBuilder().setETag(eTag).setPartNumber(1)
+    partList.add(Part.newBuilder().setETag(eTag).setPartName(eTag).setPartNumber(1)
         .build());
 
     OMRequest completeMultipartRequest = doPreExecuteCompleteMPU(volumeName,
@@ -228,10 +228,10 @@ public class TestS3MultipartUploadCompleteRequest
     String partName = getPartName(volumeName, bucketName, keyName,
         multipartUploadID, 23);
 
-    partList.add(Part.newBuilder().setETag(partName).setPartNumber(23).build());
+    partList.add(Part.newBuilder().setETag(partName).setPartName(partName).setPartNumber(23).build());
 
     partName = getPartName(volumeName, bucketName, keyName, multipartUploadID, 1);
-    partList.add(Part.newBuilder().setETag(partName).setPartNumber(1).build());
+    partList.add(Part.newBuilder().setETag(partName).setPartName(partName).setPartNumber(1).build());
 
     OMRequest completeMultipartRequest = doPreExecuteCompleteMPU(volumeName,
         bucketName, keyName, multipartUploadID, partList);
