@@ -287,6 +287,7 @@ public class OzoneContainer {
   /**
    * Build's container map after volume format.
    */
+  @VisibleForTesting
   public void buildContainerSet() {
     Iterator<StorageVolume> volumeSetIterator = volumeSet.getVolumesList()
         .iterator();
@@ -440,6 +441,8 @@ public class OzoneContainer {
       LOG.info("Ignore. OzoneContainer already started.");
       return;
     }
+
+    buildContainerSet();
 
     // Start background volume checks, which will begin after the configured
     // delay.
