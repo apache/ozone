@@ -40,9 +40,9 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.protocol.StorageContainerDatanodeProtocol;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolServerSideTranslatorPB;
-import org.apache.ozone.test.GenericTestUtils;
 
 import com.google.protobuf.BlockingService;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
 import static org.apache.logging.log4j.util.StackLocatorUtil.getCallerClass;
@@ -52,6 +52,9 @@ import static org.mockito.Mockito.mock;
  * Test Endpoint class.
  */
 public final class SCMTestUtils {
+
+  @TempDir
+  private static File testRoot;
   /**
    * Never constructed.
    */
@@ -128,7 +131,7 @@ public final class SCMTestUtils {
   public static OzoneConfiguration getConf() {
     String name = getCallerClass(2).getSimpleName()
         + "-" + randomAlphanumeric(10);
-    File testDir = GenericTestUtils.getTestDir(name);
+    File testDir = new File(testRoot, name);
     Runtime.getRuntime().addShutdownHook(new Thread(
         () -> FileUtils.deleteQuietly(testDir)));
     return getConf(testDir);

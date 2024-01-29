@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.cli.container.upgrade;
 
 import com.google.common.collect.Lists;
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -45,10 +44,9 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.FilePerBlockStrategy;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
@@ -78,6 +76,7 @@ public class TestUpgradeManager {
   private static final String SCM_ID = UUID.randomUUID().toString();
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
 
+  @TempDir
   private File testRoot;
   private MutableVolumeSet volumeSet;
   private UUID datanodeId;
@@ -92,12 +91,6 @@ public class TestUpgradeManager {
     DatanodeConfiguration dc = CONF.getObject(DatanodeConfiguration.class);
     dc.setContainerSchemaV3Enabled(true);
     CONF.setFromObject(dc);
-
-    testRoot =
-        GenericTestUtils.getTestDir(TestUpgradeManager.class.getSimpleName());
-    if (testRoot.exists()) {
-      FileUtils.cleanDirectory(testRoot);
-    }
 
     final File volume1Path = new File(testRoot, "volume1");
     final File volume2Path = new File(testRoot, "volume2");
@@ -140,11 +133,6 @@ public class TestUpgradeManager {
 
     blockManager = new BlockManagerImpl(CONF);
     chunkManager = new FilePerBlockStrategy(true, blockManager, null);
-  }
-
-  @AfterEach
-  public void after() throws IOException {
-    FileUtils.deleteDirectory(testRoot);
   }
 
   @Test

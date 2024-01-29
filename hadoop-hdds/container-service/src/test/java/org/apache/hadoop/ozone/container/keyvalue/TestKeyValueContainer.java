@@ -51,7 +51,6 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker;
 
 import org.assertj.core.api.Fail;
@@ -1020,16 +1019,10 @@ public class TestKeyValueContainer {
    */
   @ContainerTestVersionInfo.ContainerTest
   public void testImportV2ReplicaToV3HddsVolume(
-      ContainerTestVersionInfo versionInfo) throws Exception {
+      ContainerTestVersionInfo versionInfo, @TempDir File tempFile) throws Exception {
     init(versionInfo);
-    final String testDir = GenericTestUtils.getTempPath(
-        TestKeyValueContainer.class.getSimpleName() + "-"
-            + UUID.randomUUID());
-    try {
-      testMixedSchemaImport(testDir, false);
-    } finally {
-      FileUtils.deleteDirectory(new File(testDir));
-    }
+    final String testDir = tempFile.getPath();
+    testMixedSchemaImport(testDir, false);
   }
 
   /**
@@ -1037,16 +1030,10 @@ public class TestKeyValueContainer {
    */
   @ContainerTestVersionInfo.ContainerTest
   public void testImportV3ReplicaToV2HddsVolume(
-      ContainerTestVersionInfo versionInfo) throws Exception {
+      ContainerTestVersionInfo versionInfo, @TempDir File tempFile) throws Exception {
     init(versionInfo);
-    final String testDir = GenericTestUtils.getTempPath(
-        TestKeyValueContainer.class.getSimpleName() + "-"
-            + UUID.randomUUID());
-    try {
-      testMixedSchemaImport(testDir, true);
-    } finally {
-      FileUtils.deleteDirectory(new File(testDir));
-    }
+    final String testDir = tempFile.getPath();
+    testMixedSchemaImport(testDir, true);
   }
 
   private void testMixedSchemaImport(String dir,

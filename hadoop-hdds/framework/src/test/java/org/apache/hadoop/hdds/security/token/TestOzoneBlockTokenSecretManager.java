@@ -31,12 +31,13 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyTestUtil;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.security.token.Token;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
+import java.io.File;
 import java.security.NoSuchAlgorithmException;
 import java.util.EnumSet;
 import java.util.UUID;
@@ -61,8 +62,8 @@ import static org.mockito.Mockito.when;
  */
 public class TestOzoneBlockTokenSecretManager {
 
-  private static final String BASEDIR = GenericTestUtils
-      .getTempPath(TestOzoneBlockTokenSecretManager.class.getSimpleName());
+  @TempDir
+  private static File baseDir;
   private static final String ALGORITHM = "HmacSHA256";
 
   private OzoneBlockTokenSecretManager secretManager;
@@ -77,7 +78,7 @@ public class TestOzoneBlockTokenSecretManager {
     pipeline = MockPipeline.createPipeline(3);
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, BASEDIR);
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, baseDir.getPath());
     conf.setBoolean(HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED, true);
     SecurityConfig securityConfig = new SecurityConfig(conf);
 

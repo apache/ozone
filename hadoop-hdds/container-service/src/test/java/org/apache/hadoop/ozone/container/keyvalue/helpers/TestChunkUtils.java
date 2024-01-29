@@ -225,8 +225,8 @@ class TestChunkUtils {
   }
 
   @Test
-  void testReadData() throws Exception {
-    final File dir = GenericTestUtils.getTestDir("testReadData");
+  void testReadData(@TempDir File testRoot) throws Exception {
+    final File dir = new File(testRoot, "testReadData");
     try {
       assertTrue(dir.mkdirs());
 

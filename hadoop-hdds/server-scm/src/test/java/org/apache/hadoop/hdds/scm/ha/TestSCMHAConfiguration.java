@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.ha.ConfUtils;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.util.TimeDuration;
@@ -84,7 +83,7 @@ class TestSCMHAConfiguration {
   }
 
   @Test
-  public void testSCMHAConfig() throws Exception {
+  public void testSCMHAConfig(@TempDir File testDir) throws Exception {
     String scmServiceId = "scmserviceId";
     conf.set(ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY, scmServiceId);
 
@@ -214,7 +213,6 @@ class TestSCMHAConfiguration {
     assertEquals(0, scmRatisConfig.getLogAppenderWaitTimeMin(),
         "getLogAppenderWaitTimeMin");
 
-    final File testDir = GenericTestUtils.getRandomizedTestDir();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getPath());
 
     final RaftProperties p = RatisUtil.newRaftProperties(conf);

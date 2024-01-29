@@ -27,12 +27,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -553,14 +551,12 @@ public class TestSCMSafeModeManager {
   }
 
   @Test
-  public void testSafeModePipelineExitRule() throws Exception {
+  public void testSafeModePipelineExitRule(@TempDir File tempFile) throws Exception {
     containers = new ArrayList<>();
     containers.addAll(HddsTestUtils.getContainerInfo(25 * 4));
-    String storageDir = GenericTestUtils.getTempPath(
-        TestSCMSafeModeManager.class.getName() + UUID.randomUUID());
     try {
       MockNodeManager nodeManager = new MockNodeManager(true, 3);
-      config.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
+      config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFile.getPath());
       // enable pipeline check
       config.setBoolean(
           HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
@@ -606,12 +602,11 @@ public class TestSCMSafeModeManager {
       config.setBoolean(
           HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
           false);
-      FileUtil.fullyDelete(new File(storageDir));
     }
   }
 
   @Test
-  public void testPipelinesNotCreatedUntilPreCheckPasses()
+  public void testPipelinesNotCreatedUntilPreCheckPasses(@TempDir File tempFile)
       throws Exception {
     int numOfDns = 5;
     // enable pipeline check
@@ -622,9 +617,7 @@ public class TestSCMSafeModeManager {
         true);
 
     MockNodeManager nodeManager = new MockNodeManager(true, numOfDns);
-    String storageDir = GenericTestUtils.getTempPath(
-        TestSCMSafeModeManager.class.getName() + UUID.randomUUID());
-    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
+    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFile.getPath());
     // enable pipeline check
     config.setBoolean(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);

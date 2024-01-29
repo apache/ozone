@@ -29,7 +29,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -66,16 +65,17 @@ import static org.mockito.Mockito.when;
 
 import org.apache.ozone.test.tag.Flaky;
 import org.bouncycastle.cert.X509CertificateHolder;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test class for {@link HddsDatanodeService}.
  */
 public class TestHddsSecureDatanodeInit {
+  @TempDir
   private static File testDir;
   private static OzoneConfiguration conf;
   private static HddsDatanodeService service;
@@ -96,7 +96,6 @@ public class TestHddsSecureDatanodeInit {
 
   @BeforeAll
   public static void setUp() throws Exception {
-    testDir = GenericTestUtils.getRandomizedTestDir();
     conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getPath());
     //conf.set(ScmConfigKeys.OZONE_SCM_NAMES, "localhost");
@@ -141,11 +140,6 @@ public class TestHddsSecureDatanodeInit {
     datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
 
     scmClient = mock(SCMSecurityProtocolClientSideTranslatorPB.class);
-  }
-
-  @AfterAll
-  public static void tearDown() {
-    FileUtil.fullyDelete(testDir);
   }
 
   @BeforeEach
