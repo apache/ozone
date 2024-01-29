@@ -261,23 +261,23 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         }
       }
 
+      omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
+
       // non-null indicates it is necessary to update the open key
       OmKeyInfo newOpenKeyInfo = null;
 
       if (isHSync) {
         if (!OmKeyHSyncUtil.isHSyncedPreviously(omKeyInfo, clientIdString, dbOpenKey)) {
+          // Update open key as well if it is the first hsync of this key
           omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID, clientIdString);
           newOpenKeyInfo = omKeyInfo.copyObject();
         }
-      } else if (isRecovery) {
-        omKeyInfo.getMetadata().remove(OzoneConsts.HSYNC_CLIENT_ID);
-        omKeyInfo.getMetadata().remove(OzoneConsts.LEASE_RECOVERY);
       }
 
       omKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
           commitKeyArgs.getMetadataList()));
       omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
-      omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
+
       // Update the block length for each block, return the allocated but
       // uncommitted blocks
       List<OmKeyLocationInfo> uncommitted =
@@ -347,6 +347,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
         // Prevent hsync metadata from getting committed to the final key
         omKeyInfo.getMetadata().remove(OzoneConsts.HSYNC_CLIENT_ID);
+        if (isRecovery) {
+          omKeyInfo.getMetadata().remove(OzoneConsts.LEASE_RECOVERY);
+        }
       } else if (newOpenKeyInfo != null) {
         // isHSync is true and newOpenKeyInfo is set, update OpenKeyTable
         omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
