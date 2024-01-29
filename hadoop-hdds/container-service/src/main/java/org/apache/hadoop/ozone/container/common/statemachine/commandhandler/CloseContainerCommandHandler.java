@@ -16,6 +16,13 @@
  */
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto
@@ -49,13 +56,23 @@ public class CloseContainerCommandHandler implements CommandHandler {
   private static final Logger LOG =
       LoggerFactory.getLogger(CloseContainerCommandHandler.class);
 
-  private AtomicLong invocationCount = new AtomicLong(0);
+  private final AtomicLong invocationCount = new AtomicLong(0);
+  private final AtomicInteger queuedCount = new AtomicInteger(0);
+  private final ExecutorService executor;
   private long totalTime;
 
   /**
    * Constructs a ContainerReport handler.
    */
-  public CloseContainerCommandHandler() {
+  public CloseContainerCommandHandler(
+      int threadPoolSize, int queueSize, String threadNamePrefix) {
+    executor = new ThreadPoolExecutor(
+        threadPoolSize, threadPoolSize,
+        0L, TimeUnit.MILLISECONDS,
+        new LinkedBlockingQueue<>(queueSize),
+        new ThreadFactoryBuilder()
+            .setNameFormat(threadNamePrefix + "CloseContainerThread-%d")
+            .build());
   }
 
   /**
@@ -69,72 +86,79 @@ public class CloseContainerCommandHandler implements CommandHandler {
   @Override
   public void handle(SCMCommand command, OzoneContainer ozoneContainer,
       StateContext context, SCMConnectionManager connectionManager) {
-    invocationCount.incrementAndGet();
-    final long startTime = Time.monotonicNow();
-    final DatanodeDetails datanodeDetails = context.getParent()
-        .getDatanodeDetails();
-    final CloseContainerCommandProto closeCommand =
-        ((CloseContainerCommand)command).getProto();
-    final ContainerController controller = ozoneContainer.getController();
-    final long containerId = closeCommand.getContainerID();
-    LOG.debug("Processing Close Container command container #{}",
-        containerId);
-    try {
-      final Container container = controller.getContainer(containerId);
+    queuedCount.incrementAndGet();
+    CompletableFuture.runAsync(() -> {
+      invocationCount.incrementAndGet();
+      final long startTime = Time.monotonicNow();
+      final DatanodeDetails datanodeDetails = context.getParent()
+          .getDatanodeDetails();
+      final CloseContainerCommandProto closeCommand =
+          ((CloseContainerCommand) command).getProto();
+      final ContainerController controller = ozoneContainer.getController();
+      final long containerId = closeCommand.getContainerID();
+      LOG.debug("Processing Close Container command container #{}",
+          containerId);
+      try {
+        final Container container = controller.getContainer(containerId);
 
-      if (container == null) {
-        LOG.error("Container #{} does not exist in datanode. "
-            + "Container close failed.", containerId);
-        return;
-      }
-
-      // move the container to CLOSING if in OPEN state
-      controller.markContainerForClose(containerId);
-
-      switch (container.getContainerState()) {
-      case OPEN:
-      case CLOSING:
-        // If the container is part of open pipeline, close it via write channel
-        if (ozoneContainer.getWriteChannel()
-            .isExist(closeCommand.getPipelineID())) {
-          ContainerCommandRequestProto request =
-              getContainerCommandRequestProto(datanodeDetails,
-                  closeCommand.getContainerID(),
-                  command.getEncodedToken());
-          ozoneContainer.getWriteChannel()
-              .submitRequest(request, closeCommand.getPipelineID());
-        } else if (closeCommand.getForce()) {
-          // Non-RATIS containers should have the force close flag set, so they
-          // are moved to CLOSED immediately rather than going to quasi-closed.
-          controller.closeContainer(containerId);
-        } else {
-          controller.quasiCloseContainer(containerId);
-          LOG.info("Marking Container {} quasi closed", containerId);
+        if (container == null) {
+          LOG.info("Container #{} does not exist in datanode. "
+              + "Its pipeline may have closed before it was created. "
+              + "Container close failed.", containerId);
+          return;
         }
-        break;
-      case QUASI_CLOSED:
-        if (closeCommand.getForce()) {
-          controller.closeContainer(containerId);
+
+        // move the container to CLOSING if in OPEN state
+        controller.markContainerForClose(containerId);
+
+        switch (container.getContainerState()) {
+        case OPEN:
+        case CLOSING:
+          // If the container is part of open pipeline, close it via
+          // write channel
+          if (ozoneContainer.getWriteChannel()
+              .isExist(closeCommand.getPipelineID())) {
+            ContainerCommandRequestProto request =
+                getContainerCommandRequestProto(datanodeDetails,
+                    closeCommand.getContainerID(),
+                    command.getEncodedToken());
+            ozoneContainer.getWriteChannel()
+                .submitRequest(request, closeCommand.getPipelineID());
+          } else if (closeCommand.getForce()) {
+            // Non-RATIS containers should have the force close flag set, so
+            // they are moved to CLOSED immediately rather than going to
+            // quasi-closed
+            controller.closeContainer(containerId);
+          } else {
+            controller.quasiCloseContainer(containerId,
+                "Ratis pipeline does not exist");
+            LOG.info("Marking Container {} quasi closed", containerId);
+          }
+          break;
+        case QUASI_CLOSED:
+          if (closeCommand.getForce()) {
+            controller.closeContainer(containerId);
+          }
+          break;
+        case CLOSED:
+          break;
+        case UNHEALTHY:
+        case INVALID:
+          LOG.debug("Cannot close the container #{}, the container is"
+              + " in {} state.", containerId, container.getContainerState());
+          break;
+        default:
+          break;
         }
-        break;
-      case CLOSED:
-        break;
-      case UNHEALTHY:
-      case INVALID:
-        LOG.debug("Cannot close the container #{}, the container is"
-            + " in {} state.", containerId, container.getContainerState());
-        break;
-      default:
-        break;
+      } catch (NotLeaderException e) {
+        LOG.info("Follower cannot close container #{}.", containerId);
+      } catch (IOException e) {
+        LOG.error("Can't close container #{}", containerId, e);
+      } finally {
+        long endTime = Time.monotonicNow();
+        totalTime += endTime - startTime;
       }
-    } catch (NotLeaderException e) {
-      LOG.debug("Follower cannot close container #{}.", containerId);
-    } catch (IOException e) {
-      LOG.error("Can't close container #{}", containerId, e);
-    } finally {
-      long endTime = Time.monotonicNow();
-      totalTime += endTime - startTime;
-    }
+    }, executor).whenComplete((v, e) -> queuedCount.decrementAndGet());
   }
 
   private ContainerCommandRequestProto getContainerCommandRequestProto(
@@ -188,7 +212,12 @@ public class CloseContainerCommandHandler implements CommandHandler {
   }
 
   @Override
+  public long getTotalRunTime() {
+    return totalTime;
+  }
+
+  @Override
   public int getQueuedCount() {
-    return 0;
+    return queuedCount.get();
   }
 }

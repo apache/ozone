@@ -18,7 +18,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import java.util.Iterator;
+import org.apache.hadoop.util.ClosableIterator;
 
 /**
  * Define an interface for persistent list.
@@ -31,5 +31,5 @@ public interface PersistentList<E> {
 
   E get(int index);
 
-  Iterator<E> iterator();
+  ClosableIterator<E> iterator();
 }

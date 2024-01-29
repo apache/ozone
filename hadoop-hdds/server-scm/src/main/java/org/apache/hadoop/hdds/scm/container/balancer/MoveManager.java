@@ -109,9 +109,11 @@ public final class MoveManager implements
   // TODO - Should pending ops notify under lock to allow MM to schedule a
   //        delete after the move, but before anything else can, eg RM?
 
-  // TODO - these need to be config defined somewhere, probably in the balancer
-  private static final long MOVE_DEADLINE = 1000 * 60 * 60; // 1 hour
-  private static final double MOVE_DEADLINE_FACTOR = 0.95;
+  /*
+  moveTimeout and replicationTimeout are set by ContainerBalancer.
+   */
+  private long moveTimeout = 1000 * 65 * 60;
+  private long replicationTimeout = 1000 * 50 * 60;
 
   private final ReplicationManager replicationManager;
   private final ContainerManager containerManager;
@@ -156,6 +158,8 @@ public final class MoveManager implements
         // for example , after becoming a new leader, we might need
         // to complete some moves and we know these futures does not
         // exist.
+        LOG.debug("Completing container move for container {} with result {}.",
+            cid, mr);
         future.complete(mr);
       }
     }
@@ -320,8 +324,11 @@ public final class MoveManager implements
         try {
           handleSuccessfulAdd(containerID);
         } catch (ContainerNotFoundException | NodeNotFoundException |
-                 ContainerReplicaNotFoundException e) {
-          LOG.warn("Can not handle successful Add for move", e);
+                 ContainerReplicaNotFoundException | NotLeaderException e) {
+          LOG.warn("Failed to handle successful Add for container {} being " +
+              "moved from source {} to target {}.", containerID,
+              mdnp.getSrc(), mdnp.getTgt(), e);
+          pair.getLeft().complete(MoveResult.FAIL_UNEXPECTED_ERROR);
         }
       } else if (
             opType.equals(PendingOpType.DELETE) && mdnp.getSrc().equals(dn)) {
@@ -355,8 +362,8 @@ public final class MoveManager implements
 
   private void handleSuccessfulAdd(final ContainerID cid)
       throws ContainerNotFoundException,
-      ContainerReplicaNotFoundException, NodeNotFoundException {
-
+      ContainerReplicaNotFoundException, NodeNotFoundException,
+      NotLeaderException {
     Pair<CompletableFuture<MoveResult>, MoveDataNodePair> pair =
         pendingMoves.get(cid);
     if (pair == null) {
@@ -364,6 +371,9 @@ public final class MoveManager implements
     }
     MoveDataNodePair movePair = pair.getRight();
     final DatanodeDetails src = movePair.getSrc();
+    final DatanodeDetails tgt = movePair.getTgt();
+    LOG.debug("Handling successful addition of Container {} from" +
+        " source {} to target {}.", cid, src, tgt);
 
     ContainerInfo containerInfo = containerManager.getContainer(cid);
     synchronized (containerInfo) {
@@ -442,8 +452,7 @@ public final class MoveManager implements
         containerInfo.containerID(), src);
     long now = clock.millis();
     replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo,
-        replicaIndex, src, tgt, now + MOVE_DEADLINE,
-        now + Math.round(MOVE_DEADLINE * MOVE_DEADLINE_FACTOR));
+        replicaIndex, src, tgt, now + replicationTimeout);
   }
 
   /**
@@ -451,20 +460,18 @@ public final class MoveManager implements
    * datanode.
    *
    * @param containerInfo Container to be deleted
-   * @param datanode      The datanode on which the replica should be deleted
+   * @param datanode The datanode on which the replica should be deleted
    */
   private void sendDeleteCommand(
       final ContainerInfo containerInfo, final DatanodeDetails datanode)
-      throws ContainerReplicaNotFoundException, ContainerNotFoundException {
+      throws ContainerReplicaNotFoundException, ContainerNotFoundException,
+      NotLeaderException {
     int replicaIndex = getContainerReplicaIndex(
         containerInfo.containerID(), datanode);
-    try {
-      replicationManager.sendDeleteCommand(
-          containerInfo, replicaIndex, datanode, true);
-    } catch (NotLeaderException nle) {
-      LOG.warn("Skipped deleting the container as this SCM is not the leader.",
-          nle);
-    }
+    long deleteTimeout = moveTimeout - replicationTimeout;
+    long now = clock.millis();
+    replicationManager.sendDeleteCommand(
+        containerInfo, replicaIndex, datanode, true, now + deleteTimeout);
   }
 
   private int getContainerReplicaIndex(
@@ -487,5 +494,13 @@ public final class MoveManager implements
     } else {
       notifyContainerOpCompleted(op, containerID);
     }
+  }
+
+  void setMoveTimeout(long moveTimeout) {
+    this.moveTimeout = moveTimeout;
+  }
+
+  void setReplicationTimeout(long replicationTimeout) {
+    this.replicationTimeout = replicationTimeout;
   }
 }

@@ -21,13 +21,12 @@ import org.apache.hadoop.conf.ReconfigurationTaskStatus;
 import org.apache.hadoop.conf.ReconfigurationUtil;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
+import java.io.IOException;
 import java.util.Date;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.Callable;
 
 /**
  * Handler of ozone admin reconfig status command.
@@ -37,21 +36,23 @@ import java.util.concurrent.Callable;
     description = "Check reconfig status",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class ReconfigureStatusSubcommand implements Callable<Void> {
-
-  @CommandLine.ParentCommand
-  private ReconfigureCommands parent;
+public class ReconfigureStatusSubcommand
+    extends AbstractReconfigureSubCommand {
 
   @Override
-  public Void call() throws Exception {
-    ReconfigureProtocol reconfigProxy = ReconfigureSubCommandUtil
-        .getSingleNodeReconfigureProxy(parent.getAddress());
-    String serverName = reconfigProxy.getServerName();
-    ReconfigurationTaskStatus status = reconfigProxy.getReconfigureStatus();
-    System.out.printf("%s: Reconfiguring status for node [%s]: ",
-        serverName, parent.getAddress());
-    printReconfigurationStatus(status);
-    return null;
+  protected void executeCommand(String address) {
+    try (ReconfigureProtocol reconfigProxy = ReconfigureSubCommandUtil
+        .getSingleNodeReconfigureProxy(address)) {
+      String serverName = reconfigProxy.getServerName();
+      ReconfigurationTaskStatus status = reconfigProxy.getReconfigureStatus();
+      System.out.printf("%s: Reconfiguring status for node [%s]: ",
+          serverName, address);
+      printReconfigurationStatus(status);
+    } catch (IOException e) {
+      System.out.println("An error occurred while executing the command for :"
+          + address);
+      e.printStackTrace(System.out);
+    }
   }
 
   private void printReconfigurationStatus(ReconfigurationTaskStatus status) {

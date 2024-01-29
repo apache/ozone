@@ -19,10 +19,10 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import java.io.IOException;
-import java.util.Iterator;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.hadoop.util.ClosableIterator;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
 
@@ -63,7 +63,9 @@ public class RocksDbPersistentList<E> implements PersistentList<E> {
 
   @Override
   public boolean addAll(PersistentList<E> from) {
-    from.iterator().forEachRemaining(this::add);
+    try (ClosableIterator<E> iterator = from.iterator()) {
+      iterator.forEachRemaining(this::add);
+    }
     return true;
   }
 
@@ -80,12 +82,12 @@ public class RocksDbPersistentList<E> implements PersistentList<E> {
   }
 
   @Override
-  public Iterator<E> iterator() {
+  public ClosableIterator<E> iterator() {
     ManagedRocksIterator managedRocksIterator
         = new ManagedRocksIterator(db.get().newIterator(columnFamilyHandle));
     managedRocksIterator.get().seekToFirst();
 
-    return new Iterator<E>() {
+    return new ClosableIterator<E>() {
       @Override
       public boolean hasNext() {
         return managedRocksIterator.get().isValid();
@@ -101,6 +103,11 @@ public class RocksDbPersistentList<E> implements PersistentList<E> {
           // TODO: [SNAPSHOT] Fail gracefully.
           throw new RuntimeException(exception);
         }
+      }
+
+      @Override
+      public void close() {
+        managedRocksIterator.close();
       }
     };
   }

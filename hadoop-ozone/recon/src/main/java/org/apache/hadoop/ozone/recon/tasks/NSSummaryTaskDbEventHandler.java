@@ -106,7 +106,7 @@ public class NSSummaryTaskDbEventHandler {
     nsSummary.setNumOfFiles(numOfFile + 1);
     long dataSize = keyInfo.getDataSize();
     nsSummary.setSizeOfFiles(sizeOfFile + dataSize);
-    int binIndex = ReconUtils.getBinIndex(dataSize);
+    int binIndex = ReconUtils.getFileSizeBinIndex(dataSize);
 
     ++fileBucket[binIndex];
     nsSummary.setFileSizeBucket(fileBucket);
@@ -171,7 +171,7 @@ public class NSSummaryTaskDbEventHandler {
     int[] fileBucket = nsSummary.getFileSizeBucket();
 
     long dataSize = keyInfo.getDataSize();
-    int binIndex = ReconUtils.getBinIndex(dataSize);
+    int binIndex = ReconUtils.getFileSizeBinIndex(dataSize);
 
     // decrement count, data size, and bucket count
     // even if there's no direct key, we still keep the entry because

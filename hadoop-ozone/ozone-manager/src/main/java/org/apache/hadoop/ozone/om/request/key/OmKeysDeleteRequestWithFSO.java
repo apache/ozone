@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.ozone.om.request.key;
 
-import com.google.common.base.Optional;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -26,14 +25,11 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeysDeleteResponseWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import jakarta.annotation.Nonnull;
 
 import java.io.IOException;
 import java.util.List;
@@ -46,9 +42,6 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
  */
 public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OmKeysDeleteRequestWithFSO.class);
-
   public OmKeysDeleteRequestWithFSO(
       OzoneManagerProtocolProtos.OMRequest omRequest,
       BucketLayout bucketLayout) {
@@ -56,18 +49,12 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
-    return super.validateAndUpdateCache(ozoneManager, trxnLogIndex,
-        omDoubleBufferHelper);
-  }
-
-  @Override
-  protected OmKeyInfo getOmKeyInfo(OMMetadataManager omMetadataManager,
+  protected OmKeyInfo getOmKeyInfo(
+      OzoneManager ozoneManager, OMMetadataManager omMetadataManager,
       String volumeName, String bucketName, String keyName)
       throws IOException {
-    OzoneFileStatus keyStatus =
-        getOzoneKeyStatus(omMetadataManager, volumeName, bucketName, keyName);
+    OzoneFileStatus keyStatus = getOzoneKeyStatus(
+        ozoneManager, omMetadataManager, volumeName, bucketName, keyName);
     return keyStatus != null ? keyStatus.getKeyInfo() : null;
   }
 
@@ -83,12 +70,11 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
 
   @Override
   protected OzoneFileStatus getOzoneKeyStatus(
-      OMMetadataManager omMetadataManager, String volumeName, String bucketName,
-      String keyName) throws IOException {
-    OzoneFileStatus keyStatus = OMFileRequest
-        .getOMKeyInfoIfExists(omMetadataManager, volumeName, bucketName,
-            keyName, 0);
-    return keyStatus;
+      OzoneManager ozoneManager, OMMetadataManager omMetadataManager,
+      String volumeName, String bucketName, String keyName) throws IOException {
+    return OMFileRequest.getOMKeyInfoIfExists(omMetadataManager,
+        volumeName, bucketName, keyName, 0,
+        ozoneManager.getDefaultReplicationConfig());
   }
 
   @Override
@@ -109,7 +95,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
               .getOzonePathKey(volumeId, bucketId,
                       omKeyInfo.getParentObjectID(),
                       omKeyInfo.getFileName())),
-          new CacheValue<>(Optional.absent(), trxnLogIndex));
+          CacheValue.get(trxnLogIndex));
 
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
       quotaReleased += sumBlockLengths(omKeyInfo);
@@ -124,7 +110,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
               omMetadataManager.getOzonePathKey(volumeId, bucketId,
                       omKeyInfo.getParentObjectID(),
                   omKeyInfo.getFileName())),
-          new CacheValue<>(Optional.absent(), trxnLogIndex));
+          CacheValue.get(trxnLogIndex));
 
       omKeyInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
       quotaReleased += sumBlockLengths(omKeyInfo);
@@ -132,7 +118,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
     return quotaReleased;
   }
 
-  @NotNull @Override
+  @Nonnull @Override
   protected OMClientResponse getOmClientResponse(OzoneManager ozoneManager,
       List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
       OzoneManagerProtocolProtos.OMResponse.Builder omResponse,

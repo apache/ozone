@@ -19,9 +19,11 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.Time;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import java.nio.file.Paths;
+import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -277,5 +279,17 @@ public final class OzoneFSUtils {
     } else {
       return key;
     }
+  }
+
+  public static String generateUniqueTempSnapshotName() {
+    return "temp" + UUID.randomUUID() + SnapshotInfo.generateName(Time.now());
+  }
+
+  public static Path trimPathToDepth(Path path, int maxDepth) {
+    Path res = path;
+    while (res.depth() > maxDepth) {
+      res = res.getParent();
+    }
+    return res;
   }
 }

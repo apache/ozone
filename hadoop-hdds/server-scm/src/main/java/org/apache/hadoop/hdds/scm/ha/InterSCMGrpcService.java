@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import java.io.IOException;
-import java.util.Arrays;
 
 import com.google.common.base.Preconditions;
 
@@ -27,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.scm.proto.InterSCMProtocolProtos.CopyDBCh
 import org.apache.hadoop.hdds.protocol.scm.proto.InterSCMProtocolServiceGrpc;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
@@ -49,10 +49,13 @@ public class InterSCMGrpcService extends
   private final SCMDBCheckpointProvider provider;
 
   private final StorageContainerManager scm;
+  private final Table<String, TransactionInfo> transactionInfoTable;
 
-  public InterSCMGrpcService(final StorageContainerManager scm) {
+  InterSCMGrpcService(final StorageContainerManager scm) throws IOException {
     Preconditions.checkNotNull(scm);
     this.scm = scm;
+    this.transactionInfoTable = HAUtils.getTransactionInfoTable(
+        scm.getScmMetadataStore().getStore(), new SCMDBDefinition());
     provider =
         new SCMDBCheckpointProvider(scm.getScmMetadataStore().getStore());
   }
@@ -62,11 +65,6 @@ public class InterSCMGrpcService extends
       StreamObserver<CopyDBCheckpointResponseProto> responseObserver) {
     try {
       scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
-      Table<String, TransactionInfo> transactionInfoTable =
-          Arrays.stream(new SCMDBDefinition().getColumnFamilies())
-              .filter(t -> t.getValueType() == TransactionInfo.class)
-              .findFirst().get().getTable(scm.getScmMetadataStore().getStore());
-
       TransactionInfo transactionInfo =
           transactionInfoTable.get(TRANSACTION_INFO_KEY);
       Preconditions.checkNotNull(transactionInfo);

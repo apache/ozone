@@ -68,7 +68,7 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
   public int processAndSendCommands(
       Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
       ContainerHealthResult result, int remainingMaintenanceRedundancy)
-      throws NotLeaderException {
+      throws NotLeaderException, CommandTargetOverloadedException {
     ContainerInfo container = result.getContainerInfo();
 
     // We are going to check for over replication, so we should filter out any
@@ -154,6 +154,7 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
       replicaIndexCounts.put(r.getReplicaIndex(),
           replicaIndexCounts.getOrDefault(r.getReplicaIndex(), 0) + 1);
     }
+    CommandTargetOverloadedException firstException = null;
     for (ContainerReplica r : replicasToRemove) {
       int currentCount = replicaIndexCounts.getOrDefault(
           r.getReplicaIndex(), 0);
@@ -162,15 +163,31 @@ public class ECOverReplicationHandler extends AbstractOverReplicationHandler {
             "for that index to zero. Candidate Replicas: {}", r, candidates);
         continue;
       }
-      replicaIndexCounts.put(r.getReplicaIndex(), currentCount - 1);
-      replicationManager.sendDeleteCommand(container, r.getReplicaIndex(),
-          r.getDatanodeDetails(), true);
-      commandsSent++;
+      try {
+        replicationManager.sendThrottledDeleteCommand(container,
+            r.getReplicaIndex(), r.getDatanodeDetails(), true);
+        replicaIndexCounts.put(r.getReplicaIndex(), currentCount - 1);
+        commandsSent++;
+      } catch (CommandTargetOverloadedException e) {
+        LOG.debug("Unable to send delete command for container {} replica " +
+            "index {} to {}",
+            container.getContainerID(), r.getReplicaIndex(),
+            r.getDatanodeDetails());
+        if (firstException == null) {
+          firstException = e;
+        }
+      }
     }
 
     if (commandsSent == 0) {
       LOG.warn("With the current state of available replicas {}, no" +
           " commands were created to remove excess replicas.", replicas);
+    }
+    // If any of the "to remove" replicas were not able to be removed due to
+    // load on the datanodes, then throw the first exception we encountered.
+    // This will allow the container to be re-queued and tried again later.
+    if (firstException != null) {
+      throw firstException;
     }
     return commandsSent;
   }

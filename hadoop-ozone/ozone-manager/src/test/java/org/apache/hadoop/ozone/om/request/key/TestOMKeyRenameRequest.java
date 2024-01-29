@@ -18,14 +18,18 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import java.io.IOException;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.fs.Path;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -47,7 +51,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
   protected String toKeyName;
   protected String dbToKey;
 
-  @Before
+  @BeforeEach
   public void createParentKey() throws Exception {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, getBucketLayout());
@@ -59,34 +63,33 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
 
   @Test
   public void testPreExecute() throws Exception {
+    addKeyToTable(fromKeyInfo);
     doPreExecute(createRenameKeyRequest(
         volumeName, bucketName, fromKeyName, toKeyName));
   }
 
   @Test
   public void testValidateAndUpdateCache() throws Exception {
+    String dbFromKey = addKeyToTable(fromKeyInfo);
     OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
             volumeName, bucketName, fromKeyName, toKeyName));
-    String dbFromKey = addKeyToTable(fromKeyInfo);
 
     OMKeyRenameRequest omKeyRenameRequest =
             getOMKeyRenameRequest(modifiedOmRequest);
 
     OMClientResponse omKeyRenameResponse =
-        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omKeyRenameResponse.getOMResponse().getStatus());
 
     // Original key should be deleted, toKey should exist.
-    Assert.assertNull(omMetadataManager.getKeyTable(getBucketLayout())
-        .get(dbFromKey));
+    assertNull(omMetadataManager.getKeyTable(getBucketLayout()).get(dbFromKey));
 
     OmKeyInfo toKeyInfo =
             omMetadataManager.getKeyTable(getBucketLayout()).get(dbToKey);
 
-    Assert.assertNotNull(toKeyInfo);
+    assertNotNull(toKeyInfo);
 
     KeyArgs keyArgs = modifiedOmRequest.getRenameKeyRequest().getKeyArgs();
 
@@ -95,8 +98,8 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
 
   @Test
   public void testValidateAndUpdateCacheWithKeyNotFound() throws Exception {
-    OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
-        volumeName, bucketName, fromKeyName, toKeyName));
+    OMRequest omRequest = createRenameKeyRequest(
+        volumeName, bucketName, fromKeyName, toKeyName);
 
     // Add only volume and bucket entry to DB.
 
@@ -106,48 +109,45 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         omMetadataManager);
 
     OMKeyRenameRequest omKeyRenameRequest =
-        new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
+        new OMKeyRenameRequest(omRequest, getBucketLayout());
 
     OMClientResponse omKeyRenameResponse =
-        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND,
+    assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND,
         omKeyRenameResponse.getOMResponse().getStatus());
   }
 
   @Test
   public void testValidateAndUpdateCacheWithVolumeNotFound() throws Exception {
-    OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
-        "not_exist_volume", "not_exist_bucket", fromKeyName, toKeyName));
+    OMRequest omRequest = createRenameKeyRequest(
+        "not_exist_volume", "not_exist_bucket", fromKeyName, toKeyName);
 
     OMKeyRenameRequest omKeyRenameRequest =
-        new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
+        new OMKeyRenameRequest(omRequest, getBucketLayout());
 
     OMClientResponse omKeyRenameResponse =
-        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
+    assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omKeyRenameResponse.getOMResponse().getStatus());
   }
 
   @Test
   public void testValidateAndUpdateCacheWithBucketNotFound() throws Exception {
-    OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
-        volumeName, "not_exist_bucket", fromKeyName, toKeyName));
+    OMRequest omRequest = createRenameKeyRequest(
+        volumeName, "not_exist_bucket", fromKeyName, toKeyName);
 
     // Add only volume entry to DB.
     OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
 
     OMKeyRenameRequest omKeyRenameRequest =
-        new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
+        new OMKeyRenameRequest(omRequest, getBucketLayout());
 
     OMClientResponse omKeyRenameResponse =
-        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
+    assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
         omKeyRenameResponse.getOMResponse().getStatus());
   }
 
@@ -168,10 +168,9 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omKeyRenameResponse =
-        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_KEY_NAME,
+    assertEquals(OzoneManagerProtocolProtos.Status.INVALID_KEY_NAME,
         omKeyRenameResponse.getOMResponse().getStatus());
   }
 
@@ -192,10 +191,9 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         new OMKeyRenameRequest(modifiedOmRequest, getBucketLayout());
 
     OMClientResponse omKeyRenameResponse =
-        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.INVALID_KEY_NAME,
+    assertEquals(OzoneManagerProtocolProtos.Status.INVALID_KEY_NAME,
         omKeyRenameResponse.getOMResponse().getStatus());
   }
 
@@ -214,10 +212,10 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
 
     // Will not be equal, as UserInfo will be set and modification time is
     // set in KeyArgs.
-    Assert.assertNotEquals(originalOmRequest, modifiedOmRequest);
+    assertNotEquals(originalOmRequest, modifiedOmRequest);
 
-    Assert.assertTrue(modifiedOmRequest.getRenameKeyRequest()
-        .getKeyArgs().getModificationTime() > 0);
+    assertThat(modifiedOmRequest.getRenameKeyRequest()
+        .getKeyArgs().getModificationTime()).isGreaterThan(0);
 
     return modifiedOmRequest;
   }
@@ -265,6 +263,6 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
     // For new key modification time should be updated.
     OmKeyInfo toKeyInfo =
         omMetadataManager.getKeyTable(getBucketLayout()).get(dbToKey);
-    Assert.assertEquals(except, toKeyInfo.getModificationTime());
+    assertEquals(except, toKeyInfo.getModificationTime());
   }
 }

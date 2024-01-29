@@ -123,16 +123,16 @@ A.ozone-logo {
  * Main content
  */
 
-.main {
+.main-content {
   padding: 20px;
 }
 @media (min-width: 768px) {
-  .main {
+  .main-content {
     padding-right: 40px;
     padding-left: 40px;
   }
 }
-.main .page-header {
+.main-content .page-header {
   margin-top: 0;
 }
 

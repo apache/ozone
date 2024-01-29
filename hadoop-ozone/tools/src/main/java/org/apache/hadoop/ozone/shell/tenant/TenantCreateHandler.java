@@ -21,6 +21,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.TenantArgs;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine;
 
@@ -37,11 +38,23 @@ public class TenantCreateHandler extends TenantHandler {
   @CommandLine.Parameters(description = "Tenant name", arity = "1..1")
   private String tenantId;
 
+  @CommandLine.Option(names = {"-f", "--force"},
+      description = "(Optional) Force tenant creation even when volume exists. "
+          + "This does NOT override other errors like Ranger failure.",
+      hidden = true)
+  // This option is intentionally hidden to avoid abuse.
+  private boolean forceCreationWhenVolumeExists;
+
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
 
-    client.getObjectStore().createTenant(tenantId);
+    final TenantArgs tenantArgs = TenantArgs.newBuilder()
+        .setVolumeName(tenantId)
+        .setForceCreationWhenVolumeExists(forceCreationWhenVolumeExists)
+        .build();
+
+    client.getObjectStore().createTenant(tenantId, tenantArgs);
     // RpcClient#createTenant prints INFO level log of tenant and volume name
 
     if (isVerbose()) {

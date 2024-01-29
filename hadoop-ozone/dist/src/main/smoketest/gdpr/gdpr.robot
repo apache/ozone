@@ -66,6 +66,11 @@ Test GDPR with --enforcegdpr=true
     ${result} =     Execute             ozone sh key info /${volume}/mybucket2/mykey | jq -r '. | select(.name=="mykey") | .metadata | .gdprEnabled'
                     Should Be Equal     ${result}       true
                     Execute             ozone sh key delete /${volume}/mybucket2/mykey
+                    Execute             ozone sh key put --stream /${volume}/mybucket2/myStreamKey /opt/hadoop/NOTICE.txt
+                    Execute             rm -f NOTICE.txt.1
+    ${result} =     Execute             ozone sh key info /${volume}/mybucket2/myStreamKey | jq -r '. | select(.name=="myStreamKey") | .metadata | .gdprEnabled'
+                    Should Be Equal     ${result}       true
+                    Execute             ozone sh key delete /${volume}/mybucket2/myStreamKey
 
 Test GDPR with -g=true
     [arguments]     ${volume}

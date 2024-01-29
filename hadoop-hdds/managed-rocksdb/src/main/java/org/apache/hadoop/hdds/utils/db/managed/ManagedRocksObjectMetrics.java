@@ -18,6 +18,7 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
@@ -32,7 +33,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 @Metrics(about = "Ozone Manage RocksObject Metrics",
     context = OzoneConsts.OZONE)
 public class ManagedRocksObjectMetrics {
-  static final ManagedRocksObjectMetrics INSTANCE = create();
+  public static final ManagedRocksObjectMetrics INSTANCE = create();
 
   private static final String SOURCE_NAME =
       ManagedRocksObjectMetrics.class.getSimpleName();
@@ -54,7 +55,24 @@ public class ManagedRocksObjectMetrics {
     totalLeakObjects.incr();
   }
 
+  public void assertNoLeaks() {
+    final long cnt = totalLeakObjects.value();
+    if (cnt > 0) {
+      throw new AssertionError("Found " + cnt + " leaked objects, check logs");
+    }
+  }
+
   void increaseManagedObject() {
     totalManagedObjects.incr();
+  }
+
+  @VisibleForTesting
+  long totalLeakObjects() {
+    return totalLeakObjects.value();
+  }
+
+  @VisibleForTesting
+  long totalManagedObjects() {
+    return totalManagedObjects.value();
   }
 }

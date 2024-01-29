@@ -22,10 +22,10 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -37,7 +37,6 @@ import com.google.common.collect.Lists;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.util.BooleanBiFunction;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.bucket.acl.OMBucketAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -53,16 +52,9 @@ public class OMBucketRemoveAclRequest extends OMBucketAclRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMBucketRemoveAclRequest.class);
 
-  private static BooleanBiFunction<List<OzoneAcl>, OmBucketInfo> bucketAddAclOp;
-  private String path;
-  private List<OzoneAcl> ozoneAcls;
-  private OzoneObj obj;
-
-  static {
-    bucketAddAclOp = (ozoneAcls, omBucketInfo) -> {
-      return omBucketInfo.removeAcl(ozoneAcls.get(0));
-    };
-  }
+  private final String path;
+  private final List<OzoneAcl> ozoneAcls;
+  private final OzoneObj obj;
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
@@ -78,7 +70,8 @@ public class OMBucketRemoveAclRequest extends OMBucketAclRequest {
   }
 
   public OMBucketRemoveAclRequest(OMRequest omRequest) {
-    super(omRequest, bucketAddAclOp);
+    super(omRequest,
+        (acls, omBucketInfo) -> omBucketInfo.removeAcl(acls.get(0)));
     OzoneManagerProtocolProtos.RemoveAclRequest removeAclRequest =
         getOmRequest().getRemoveAclRequest();
     obj = OzoneObjInfo.fromProtobuf(removeAclRequest.getObj());
@@ -117,7 +110,7 @@ public class OMBucketRemoveAclRequest extends OMBucketAclRequest {
   }
 
   @Override
-  void onComplete(boolean operationResult, IOException exception,
+  void onComplete(boolean operationResult, Exception exception,
       OMMetrics omMetrics, AuditLogger auditLogger,
       Map<String, String> auditMap) {
     auditLog(auditLogger, buildAuditMessage(OMAction.REMOVE_ACL, auditMap,
@@ -139,11 +132,9 @@ public class OMBucketRemoveAclRequest extends OMBucketAclRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
     ozoneManager.getMetrics().incNumRemoveAcl();
-    return super.validateAndUpdateCache(ozoneManager, trxnLogIndex,
-        omDoubleBufferHelper);
+    return super.validateAndUpdateCache(ozoneManager, termIndex);
   }
 
 }

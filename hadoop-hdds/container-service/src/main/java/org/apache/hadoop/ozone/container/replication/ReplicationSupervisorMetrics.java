@@ -19,12 +19,15 @@ package org.apache.hadoop.ozone.container.replication;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.ozone.OzoneConsts;
+
+import java.util.Map;
 
 /**
  * Metrics source to report number of replication tasks.
@@ -34,7 +37,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
     context = OzoneConsts.OZONE)
 public class ReplicationSupervisorMetrics implements MetricsSource {
 
-  private static final String SOURCE =
+  public static final String SOURCE =
       ReplicationSupervisorMetrics.class.getSimpleName();
   private final ReplicationSupervisor supervisor;
 
@@ -57,9 +60,10 @@ public class ReplicationSupervisorMetrics implements MetricsSource {
 
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
-    collector.addRecord(SOURCE)
-        .addGauge(Interns.info("numInFlightReplications",
-            "Number of pending replications(including queued replications"),
+    MetricsRecordBuilder builder = collector.addRecord(SOURCE);
+    builder.addGauge(Interns.info("numInFlightReplications",
+        "Total number of pending replications and reconstructions both low "
+            + "and normal priority"),
             supervisor.getTotalInFlightReplications())
         .addGauge(Interns.info("numQueuedReplications",
             "Number of replications in queue"),
@@ -72,6 +76,16 @@ public class ReplicationSupervisorMetrics implements MetricsSource {
             supervisor.getReplicationTimeoutCount())
         .addGauge(Interns.info("numSkippedReplications",
             "Number of replication requests skipped as the container is "
-            + "already present"), supervisor.getReplicationSkippedCount());
+            + "already present"), supervisor.getReplicationSkippedCount())
+        .addGauge(Interns.info("maxReplicationStreams", "Maximum number of "
+            + "concurrent replication tasks which can run simultaneously"),
+            supervisor.getMaxReplicationStreams());
+
+    Map<String, Integer> tasks = supervisor.getInFlightReplicationSummary();
+    for (Map.Entry<String, Integer> entry : tasks.entrySet()) {
+      builder.addGauge(Interns.info("numInflight" + entry.getKey(),
+          "Number of normal priority" + entry.getKey() + " tasks pending"),
+          entry.getValue());
+    }
   }
 }

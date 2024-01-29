@@ -26,6 +26,8 @@ import java.util.List;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.SafeModeAction;
+import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 
@@ -86,4 +88,19 @@ public interface OzoneClientAdapter {
   FileChecksum getFileChecksum(String keyName, long length) throws IOException;
 
   String createSnapshot(String pathStr, String snapshotName) throws IOException;
+
+  void deleteSnapshot(String pathStr, String snapshotName) throws IOException;
+
+  SnapshotDiffReport getSnapshotDiffReport(Path snapshotDir,
+      String fromSnapshot, String toSnapshot)
+      throws IOException, InterruptedException;
+
+  boolean recoverLease(String pathStr) throws IOException;
+
+  void setTimes(String key, long mtime, long atime) throws IOException;
+
+  boolean isFileClosed(String pathStr) throws IOException;
+
+  boolean setSafeMode(SafeModeAction action, boolean isChecked)
+      throws IOException;
 }

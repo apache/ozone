@@ -17,7 +17,7 @@
  */
 package org.apache.ozone.erasurecode.rawcoder;
 
-import org.junit.Before;
+import org.junit.jupiter.api.BeforeEach;
 
 /**
  * Test the new raw Reed-solomon coder implemented in Java.
@@ -28,7 +28,7 @@ public class TestRSRawCoder extends TestRSRawCoderBase {
     super(RSRawErasureCoderFactory.class, RSRawErasureCoderFactory.class);
   }
 
-  @Before
+  @BeforeEach
   public void setup() {
     setAllowDump(false);
   }

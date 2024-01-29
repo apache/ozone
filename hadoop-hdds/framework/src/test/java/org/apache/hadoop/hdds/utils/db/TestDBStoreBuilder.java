@@ -24,11 +24,9 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.Assert;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -38,6 +36,13 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collection;
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests RDBStore creation.
@@ -52,21 +57,21 @@ public class TestDBStoreBuilder {
   @Test
   public void builderWithoutAnyParams() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    Assertions.assertThrows(IOException.class,
+    assertThrows(IOException.class,
         () -> DBStoreBuilder.newBuilder(conf).build());
   }
 
   @Test
   public void builderWithOneParamV1() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    Assertions.assertThrows(IOException.class,
+    assertThrows(IOException.class,
         () -> DBStoreBuilder.newBuilder(conf).setName("Test.db").build());
   }
 
   @Test
   public void builderWithOneParamV2(@TempDir Path tempDir) {
     OzoneConfiguration conf = new OzoneConfiguration();
-    Assertions.assertThrows(IOException.class,
+    assertThrows(IOException.class,
         () -> DBStoreBuilder.newBuilder(conf).setPath(tempDir).build());
   }
 
@@ -102,7 +107,7 @@ public class TestDBStoreBuilder {
           RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
       firstTable.put(key, value);
       byte[] temp = firstTable.get(key);
-      Assertions.assertArrayEquals(value, temp);
+      assertArrayEquals(value, temp);
     }
 
     dbStore.close();
@@ -124,11 +129,11 @@ public class TestDBStoreBuilder {
             RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
         firstTable.put(key, value);
         byte[] temp = firstTable.get(key);
-        Assertions.assertArrayEquals(value, temp);
+        assertArrayEquals(value, temp);
       }
 
       try (Table secondTable = dbStore.getTable("Second")) {
-        Assertions.assertTrue(secondTable.isEmpty());
+        assertTrue(secondTable.isEmpty());
       }
     }
   }
@@ -151,11 +156,11 @@ public class TestDBStoreBuilder {
             RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
         firstTable.put(key, value);
         byte[] temp = firstTable.get(key);
-        Assertions.assertArrayEquals(value, temp);
+        assertArrayEquals(value, temp);
       }
 
       try (Table secondTable = dbStore.getTable("Second")) {
-        Assertions.assertTrue(secondTable.isEmpty());
+        assertTrue(secondTable.isEmpty());
       }
     }
   }
@@ -168,15 +173,15 @@ public class TestDBStoreBuilder {
     File newFolder = new File(tempDir.toString() + "/newFolder");
 
     if (!newFolder.exists()) {
-      Assert.assertTrue(newFolder.mkdirs());
+      assertTrue(newFolder.mkdirs());
     }
 
     String sampleTableName = "sampleTable";
-    final DBDefinition sampleDB = new DBDefinition() {
-
-      private final DBColumnFamilyDefinition<String, Long> sampleTable =
-          new DBColumnFamilyDefinition<>(sampleTableName,
-              String.class, new StringCodec(), Long.class, new LongCodec());
+    final DBColumnFamilyDefinition<String, Long> sampleTable =
+        new DBColumnFamilyDefinition<>(sampleTableName,
+            String.class, StringCodec.get(), Long.class, LongCodec.get());
+    final DBDefinition sampleDB = new DBDefinition.WithMap(
+        DBColumnFamilyDefinition.newUnmodifiableMap(sampleTable)) {
       {
         ManagedColumnFamilyOptions cfOptions = new ManagedColumnFamilyOptions();
         // reverse the default option for check
@@ -196,11 +201,6 @@ public class TestDBStoreBuilder {
       }
 
       @Override
-      public DBColumnFamilyDefinition[] getColumnFamilies() {
-        return new DBColumnFamilyDefinition[]{sampleTable};
-      }
-
-      @Override
       public File getDBLocation(ConfigurationSource conf) {
         return null;
       }
@@ -208,14 +208,14 @@ public class TestDBStoreBuilder {
 
     try (DBStore dbStore = DBStoreBuilder.newBuilder(conf, sampleDB)
         .setName("SampleStore").setPath(newFolder.toPath()).build()) {
-      Assert.assertTrue(dbStore instanceof RDBStore);
+      assertInstanceOf(RDBStore.class, dbStore);
 
       RDBStore rdbStore = (RDBStore) dbStore;
       Collection<RocksDatabase.ColumnFamily> cfFamilies =
           rdbStore.getColumnFamilies();
 
       // we also have the default column family, so there are 2
-      Assert.assertEquals(2, cfFamilies.size());
+      assertEquals(2, cfFamilies.size());
 
       boolean checked = false;
       for (RocksDatabase.ColumnFamily cfFamily : cfFamilies) {
@@ -226,12 +226,12 @@ public class TestDBStoreBuilder {
               .forceConsistencyChecks();
 
           // the value should be different from the default value
-          Assert.assertNotEquals(cfFamily.getHandle().getDescriptor()
+          assertNotEquals(cfFamily.getHandle().getDescriptor()
               .getOptions().forceConsistencyChecks(), defaultValue);
           checked = true;
         }
       }
-      Assert.assertTrue(checked);
+      assertTrue(checked);
     }
   }
 
@@ -245,17 +245,15 @@ public class TestDBStoreBuilder {
     File newFolder = new File(tempDir.toString(), "newFolder");
 
     if (!newFolder.exists()) {
-      Assert.assertTrue(newFolder.mkdirs());
+      assertTrue(newFolder.mkdirs());
     }
 
     String sampleTableName = "sampleTable";
-    final DBDefinition sampleDB = new DBDefinition() {
-
-      private final DBColumnFamilyDefinition<String, Long> sampleTable =
-              new DBColumnFamilyDefinition<>(sampleTableName, String.class,
-                      new StringCodec(), Long.class, new LongCodec());
-
-
+    final DBColumnFamilyDefinition<String, Long> sampleTable =
+        new DBColumnFamilyDefinition<>(sampleTableName, String.class,
+            StringCodec.get(), Long.class, LongCodec.get());
+    final DBDefinition sampleDB = new DBDefinition.WithMap(
+        DBColumnFamilyDefinition.newUnmodifiableMap(sampleTable)) {
       @Override
       public String getName() {
         return "sampleDB";
@@ -264,11 +262,6 @@ public class TestDBStoreBuilder {
       @Override
       public String getLocationConfigKey() {
         return null;
-      }
-
-      @Override
-      public DBColumnFamilyDefinition[] getColumnFamilies() {
-        return new DBColumnFamilyDefinition[]{sampleTable};
       }
 
       @Override
@@ -281,18 +274,18 @@ public class TestDBStoreBuilder {
             .setName("SampleStore")
             .disableDefaultCFAutoCompaction(disableAutoCompaction)
             .setPath(newFolder.toPath()).build()) {
-      Assert.assertTrue(dbStore instanceof RDBStore);
+      assertInstanceOf(RDBStore.class, dbStore);
 
       RDBStore rdbStore = (RDBStore) dbStore;
       Collection<RocksDatabase.ColumnFamily> cfFamilies =
               rdbStore.getColumnFamilies();
 
       // we also have the default column family, so there are 2
-      Assert.assertEquals(2, cfFamilies.size());
+      assertEquals(2, cfFamilies.size());
 
       for (RocksDatabase.ColumnFamily cfFamily : cfFamilies) {
         // the value should be different from the default value
-        Assertions.assertEquals(cfFamily.getHandle().getDescriptor()
+        assertEquals(cfFamily.getHandle().getDescriptor()
                 .getOptions().disableAutoCompactions(),
                 disableAutoCompaction);
       }

@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.node;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -55,9 +54,6 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.metrics2.util.MBeans;
-import org.apache.hadoop.net.CachedDNSToSwitchMapping;
-import org.apache.hadoop.net.DNSToSwitchMapping;
-import org.apache.hadoop.net.TableMapping;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
@@ -66,7 +62,6 @@ import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
-import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
@@ -74,7 +69,9 @@ import org.slf4j.LoggerFactory;
 
 import javax.management.ObjectName;
 import java.io.IOException;
+import java.math.RoundingMode;
 import java.net.InetAddress;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -83,13 +80,19 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
+import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
@@ -121,31 +124,49 @@ public class SCMNodeManager implements NodeManager {
   private ObjectName nmInfoBean;
   private final SCMStorageConfig scmStorageConfig;
   private final NetworkTopology clusterMap;
-  private final DNSToSwitchMapping dnsToSwitchMapping;
+  private final Function<String, String> nodeResolver;
   private final boolean useHostname;
-  private final ConcurrentHashMap<String, Set<String>> dnsToUuidMap =
-      new ConcurrentHashMap<>();
+  private final Map<String, Set<UUID>> dnsToUuidMap = new ConcurrentHashMap<>();
   private final int numPipelinesPerMetadataVolume;
   private final int heavyNodeCriteria;
   private final HDDSLayoutVersionManager scmLayoutVersionManager;
   private final EventPublisher scmNodeEventPublisher;
   private final SCMContext scmContext;
+  private final Map<SCMCommandProto.Type,
+      BiConsumer<DatanodeDetails, SCMCommand<?>>> sendCommandNotifyMap;
 
   /**
    * Lock used to synchronize some operation in Node manager to ensure a
    * consistent view of the node state.
    */
   private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
-
+  private static final String OPESTATE = "OPSTATE";
+  private static final String COMSTATE = "COMSTATE";
+  private static final String LASTHEARTBEAT = "LASTHEARTBEAT";
+  private static final String USEDSPACEPERCENT = "USEDSPACEPERCENT";
+  private static final String TOTALCAPACITY = "CAPACITY";
   /**
    * Constructs SCM machine Manager.
    */
-  public SCMNodeManager(OzoneConfiguration conf,
-                        SCMStorageConfig scmStorageConfig,
-                        EventPublisher eventPublisher,
-                        NetworkTopology networkTopology,
-                        SCMContext scmContext,
-                        HDDSLayoutVersionManager layoutVersionManager) {
+  public SCMNodeManager(
+      OzoneConfiguration conf,
+      SCMStorageConfig scmStorageConfig,
+      EventPublisher eventPublisher,
+      NetworkTopology networkTopology,
+      SCMContext scmContext,
+      HDDSLayoutVersionManager layoutVersionManager) {
+    this(conf, scmStorageConfig, eventPublisher, networkTopology, scmContext,
+        layoutVersionManager, hostname -> null);
+  }
+
+  public SCMNodeManager(
+      OzoneConfiguration conf,
+      SCMStorageConfig scmStorageConfig,
+      EventPublisher eventPublisher,
+      NetworkTopology networkTopology,
+      SCMContext scmContext,
+      HDDSLayoutVersionManager layoutVersionManager,
+      Function<String, String> nodeResolver) {
     this.scmNodeEventPublisher = eventPublisher;
     this.nodeStateManager = new NodeStateManager(conf, eventPublisher,
         layoutVersionManager, scmContext);
@@ -157,15 +178,7 @@ public class SCMNodeManager implements NodeManager {
     registerMXBean();
     this.metrics = SCMNodeMetrics.create(this);
     this.clusterMap = networkTopology;
-    Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
-        conf.getClass(
-            DFSConfigKeysLegacy.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
-            TableMapping.class, DNSToSwitchMapping.class);
-    DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
-        dnsToSwitchMappingClass, conf);
-    this.dnsToSwitchMapping =
-        ((newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
-            : new CachedDNSToSwitchMapping(newInstance));
+    this.nodeResolver = nodeResolver;
     this.useHostname = conf.getBoolean(
         DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME,
         DFSConfigKeysLegacy.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
@@ -175,6 +188,13 @@ public class SCMNodeManager implements NodeManager {
     String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
     this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
     this.scmContext = scmContext;
+    this.sendCommandNotifyMap = new HashMap<>();
+  }
+
+  @Override
+  public void registerSendCommandNotify(SCMCommandProto.Type type,
+      BiConsumer<DatanodeDetails, SCMCommand<?>> scmCommand) {
+    this.sendCommandNotifyMap.put(type, scmCommand);
   }
 
   private void registerMXBean() {
@@ -378,19 +398,16 @@ public class SCMNodeManager implements NodeManager {
       datanodeDetails.setIpAddress(dnAddress.getHostAddress());
     }
 
-    String dnsName;
-    String networkLocation;
+    final String ipAddress = datanodeDetails.getIpAddress();
+    final String hostName = datanodeDetails.getHostName();
     datanodeDetails.setNetworkName(datanodeDetails.getUuidString());
-    if (useHostname) {
-      dnsName = datanodeDetails.getHostName();
-    } else {
-      dnsName = datanodeDetails.getIpAddress();
-    }
-    networkLocation = nodeResolve(dnsName);
+    String networkLocation = nodeResolver.apply(
+        useHostname ? hostName : ipAddress);
     if (networkLocation != null) {
       datanodeDetails.setNetworkLocation(networkLocation);
     }
 
+    final UUID uuid = datanodeDetails.getUuid();
     if (!isNodeRegistered(datanodeDetails)) {
       try {
         clusterMap.add(datanodeDetails);
@@ -398,14 +415,14 @@ public class SCMNodeManager implements NodeManager {
         // Check that datanode in nodeStateManager has topology parent set
         DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
         Preconditions.checkState(dn.getParent() != null);
-        addEntryToDnsToUuidMap(dnsName, datanodeDetails.getUuidString());
+        addToDnsToUuidMap(uuid, ipAddress, hostName);
         // Updating Node Report, as registration is successful
         processNodeReport(datanodeDetails, nodeReport);
-        LOG.info("Registered Data node : {}", datanodeDetails.toDebugString());
+        LOG.info("Registered datanode: {}", datanodeDetails.toDebugString());
         scmNodeEventPublisher.fireEvent(SCMEvents.NEW_NODE, datanodeDetails);
       } catch (NodeAlreadyExistsException e) {
         if (LOG.isTraceEnabled()) {
-          LOG.trace("Datanode is already registered. Datanode: {}",
+          LOG.trace("Datanode is already registered: {}",
               datanodeDetails);
         }
       } catch (NodeNotFoundException e) {
@@ -415,34 +432,20 @@ public class SCMNodeManager implements NodeManager {
     } else {
       // Update datanode if it is registered but the ip or hostname changes
       try {
-        final DatanodeInfo datanodeInfo =
-                nodeStateManager.getNode(datanodeDetails);
-        if (!datanodeInfo.getIpAddress().equals(datanodeDetails.getIpAddress())
-                || !datanodeInfo.getHostName()
-                .equals(datanodeDetails.getHostName())) {
-          LOG.info("Updating data node {} from {} to {}",
+        final DatanodeInfo oldNode = nodeStateManager.getNode(datanodeDetails);
+        if (updateDnsToUuidMap(oldNode.getHostName(), oldNode.getIpAddress(),
+            hostName, ipAddress, uuid)) {
+          LOG.info("Updating datanode {} from {} to {}",
                   datanodeDetails.getUuidString(),
-                  datanodeInfo,
+                  oldNode,
                   datanodeDetails);
-          clusterMap.update(datanodeInfo, datanodeDetails);
-
-          String oldDnsName;
-          if (useHostname) {
-            oldDnsName = datanodeInfo.getHostName();
-          } else {
-            oldDnsName = datanodeInfo.getIpAddress();
-          }
-          updateEntryFromDnsToUuidMap(oldDnsName,
-                  dnsName,
-                  datanodeDetails.getUuidString());
-
+          clusterMap.update(oldNode, datanodeDetails);
           nodeStateManager.updateNode(datanodeDetails, layoutInfo);
           DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
           Preconditions.checkState(dn.getParent() != null);
           processNodeReport(datanodeDetails, nodeReport);
-          LOG.info("Updated Datanode to: {}", dn);
-          scmNodeEventPublisher
-                  .fireEvent(SCMEvents.NODE_ADDRESS_UPDATE, dn);
+          LOG.info("Updated datanode to: {}", dn);
+          scmNodeEventPublisher.fireEvent(SCMEvents.NODE_ADDRESS_UPDATE, dn);
         }
       } catch (NodeNotFoundException e) {
         LOG.error("Cannot find datanode {} from nodeStateManager",
@@ -459,40 +462,49 @@ public class SCMNodeManager implements NodeManager {
   /**
    * Add an entry to the dnsToUuidMap, which maps hostname / IP to the DNs
    * running on that host. As each address can have many DNs running on it,
-   * this is a one to many mapping.
+   * and each host can have multiple addresses,
+   * this is a many to many mapping.
    *
-   * @param dnsName String representing the hostname or IP of the node
-   * @param uuid    String representing the UUID of the registered node.
+   * @param uuid the UUID of the registered node.
+   * @param addresses hostname and/or IP of the node
    */
-  @SuppressFBWarnings(value = "AT_OPERATION_SEQUENCE_ON_CONCURRENT_ABSTRACTION")
-  private synchronized void addEntryToDnsToUuidMap(
-          String dnsName, String uuid) {
-    Set<String> dnList = dnsToUuidMap.get(dnsName);
-    if (dnList == null) {
-      dnList = ConcurrentHashMap.newKeySet();
-      dnsToUuidMap.put(dnsName, dnList);
-    }
-    dnList.add(uuid);
-  }
-
-  private synchronized void removeEntryFromDnsToUuidMap(String dnsName) {
-    if (!dnsToUuidMap.containsKey(dnsName)) {
-      return;
-    }
-    Set<String> dnSet = dnsToUuidMap.get(dnsName);
-    if (dnSet.contains(dnsName)) {
-      dnSet.remove(dnsName);
-    }
-    if (dnSet.isEmpty()) {
-      dnsToUuidMap.remove(dnsName);
+  private synchronized void addToDnsToUuidMap(UUID uuid, String... addresses) {
+    for (String addr : addresses) {
+      if (!Strings.isNullOrEmpty(addr)) {
+        dnsToUuidMap.computeIfAbsent(addr, k -> ConcurrentHashMap.newKeySet())
+            .add(uuid);
+      }
     }
   }
 
-  private synchronized void updateEntryFromDnsToUuidMap(String oldDnsName,
-                                                        String newDnsName,
-                                                        String uuid) {
-    removeEntryFromDnsToUuidMap(oldDnsName);
-    addEntryToDnsToUuidMap(newDnsName, uuid);
+  private synchronized void removeFromDnsToUuidMap(UUID uuid, String address) {
+    if (address != null) {
+      Set<UUID> dnSet = dnsToUuidMap.get(address);
+      if (dnSet != null && dnSet.remove(uuid) && dnSet.isEmpty()) {
+        dnsToUuidMap.remove(address);
+      }
+    }
+  }
+
+  private boolean updateDnsToUuidMap(
+      String oldHostName, String oldIpAddress,
+      String newHostName, String newIpAddress,
+      UUID uuid) {
+    final boolean ipChanged = !Objects.equals(oldIpAddress, newIpAddress);
+    final boolean hostNameChanged = !Objects.equals(oldHostName, newHostName);
+    if (ipChanged || hostNameChanged) {
+      synchronized (this) {
+        if (ipChanged) {
+          removeFromDnsToUuidMap(uuid, oldIpAddress);
+          addToDnsToUuidMap(uuid, newIpAddress);
+        }
+        if (hostNameChanged) {
+          removeFromDnsToUuidMap(uuid, oldHostName);
+          addToDnsToUuidMap(uuid, newHostName);
+        }
+      }
+    }
+    return ipChanged || hostNameChanged;
   }
 
   /**
@@ -525,6 +537,15 @@ public class SCMNodeManager implements NodeManager {
           commandQueue.getDatanodeCommandSummary(datanodeDetails.getUuid());
       List<SCMCommand> commands =
           commandQueue.getCommand(datanodeDetails.getUuid());
+
+      // Update the SCMCommand of deleteBlocksCommand Status
+      for (SCMCommand<?> command : commands) {
+        if (sendCommandNotifyMap.get(command.getType()) != null) {
+          sendCommandNotifyMap.get(command.getType())
+              .accept(datanodeDetails, command);
+        }
+      }
+
       if (queueReport != null) {
         processNodeCommandQueueReport(datanodeDetails, queueReport, summary);
       }
@@ -819,6 +840,37 @@ public class SCMNodeManager implements NodeManager {
   }
 
   /**
+   * Get the total number of pending commands of the given types on the given
+   * datanode. For each command, this includes both the number of commands
+   * queued in SCM which will be sent to the datanode on the next heartbeat,
+   * and the number of commands reported by the datanode in the last heartbeat.
+   * If the datanode has not reported any information for the given command,
+   * zero is assumed.
+   * All commands are retrieved under a single read lock, so the counts are
+   * consistent.
+   * @param datanodeDetails The datanode to query.
+   * @param cmdType The list of command Types To query.
+   * @return A Map of commandType to Integer with an entry for each command type
+   *         passed.
+   * @throws NodeNotFoundException
+   */
+  @Override
+  public Map<SCMCommandProto.Type, Integer> getTotalDatanodeCommandCounts(
+      DatanodeDetails datanodeDetails, SCMCommandProto.Type... cmdType)
+      throws NodeNotFoundException {
+    Map<SCMCommandProto.Type, Integer> counts = new HashMap<>();
+    readLock().lock();
+    try {
+      for (SCMCommandProto.Type type : cmdType) {
+        counts.put(type, getTotalDatanodeCommandCount(datanodeDetails, type));
+      }
+      return counts;
+    } finally {
+      readLock().unlock();
+    }
+  }
+
+  /**
    * Returns the aggregated node stats.
    *
    * @return the aggregated node stats.
@@ -828,13 +880,18 @@ public class SCMNodeManager implements NodeManager {
     long capacity = 0L;
     long used = 0L;
     long remaining = 0L;
+    long committed = 0L;
+    long freeSpaceToSpare = 0L;
 
     for (SCMNodeStat stat : getNodeStats().values()) {
       capacity += stat.getCapacity().get();
       used += stat.getScmUsed().get();
       remaining += stat.getRemaining().get();
+      committed += stat.getCommitted().get();
+      freeSpaceToSpare += stat.getFreeSpaceToSpare().get();
     }
-    return new SCMNodeStat(capacity, used, remaining);
+    return new SCMNodeStat(capacity, used, remaining, committed,
+        freeSpaceToSpare);
   }
 
   /**
@@ -939,6 +996,8 @@ public class SCMNodeManager implements NodeManager {
       long capacity = 0L;
       long used = 0L;
       long remaining = 0L;
+      long committed = 0L;
+      long freeSpaceToSpare = 0L;
 
       final DatanodeInfo datanodeInfo = nodeStateManager
           .getNode(datanodeDetails);
@@ -948,11 +1007,14 @@ public class SCMNodeManager implements NodeManager {
         capacity += reportProto.getCapacity();
         used += reportProto.getScmUsed();
         remaining += reportProto.getRemaining();
+        committed += reportProto.getCommitted();
+        freeSpaceToSpare += reportProto.getFreeSpaceToSpare();
       }
-      return new SCMNodeStat(capacity, used, remaining);
+      return new SCMNodeStat(capacity, used, remaining, committed,
+          freeSpaceToSpare);
     } catch (NodeNotFoundException e) {
       LOG.warn("Cannot generate NodeStat, datanode {} not found.",
-          datanodeDetails.getUuid());
+          datanodeDetails.getUuidString());
       return null;
     }
   }
@@ -986,6 +1048,8 @@ public class SCMNodeManager implements NodeManager {
         nodeInfo.put(s.label + stat.name(), 0L);
       }
     }
+    nodeInfo.put("TotalCapacity", 0L);
+    nodeInfo.put("TotalUsed", 0L);
 
     for (DatanodeInfo node : nodeStateManager.getAllNodes()) {
       String keyPrefix = "";
@@ -1020,25 +1084,170 @@ public class SCMNodeManager implements NodeManager {
           nodeInfo.compute(keyPrefix + UsageMetrics.SSDUsed.name(),
               (k, v) -> v + reportProto.getScmUsed());
         }
+        nodeInfo.compute("TotalCapacity", (k, v) -> v + reportProto.getCapacity());
+        nodeInfo.compute("TotalUsed", (k, v) -> v + reportProto.getScmUsed());
       }
     }
     return nodeInfo;
   }
 
   @Override
-  public Map<String, List<String>> getNodeStatusInfo() {
-    Map<String, List<String>> nodes = new HashMap<>();
+  public Map<String, Map<String, String>> getNodeStatusInfo() {
+    Map<String, Map<String, String>> nodes = new HashMap<>();
     for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
       String hostName = dni.getHostName();
-      NodeStatus nodestatus = dni.getNodeStatus();
-      NodeState health = nodestatus.getHealth();
-      NodeOperationalState operationalState = nodestatus.getOperationalState();
-      List<String> ls = new ArrayList<>();
-      ls.add(health.name());
-      ls.add(operationalState.name());
-      nodes.put(hostName, ls);
+      DatanodeDetails.Port httpPort = dni.getPort(HTTP);
+      DatanodeDetails.Port httpsPort = dni.getPort(HTTPS);
+      String opstate = "";
+      String healthState = "";
+      String heartbeatTimeDiff = "";
+      if (dni.getNodeStatus() != null) {
+        opstate = dni.getNodeStatus().getOperationalState().toString();
+        healthState = dni.getNodeStatus().getHealth().toString();
+        heartbeatTimeDiff = getLastHeartbeatTimeDiff(dni.getLastHeartbeatTime());
+      }
+      Map<String, String> map = new HashMap<>();
+      map.put(OPESTATE, opstate);
+      map.put(COMSTATE, healthState);
+      map.put(LASTHEARTBEAT, heartbeatTimeDiff);
+      if (httpPort != null) {
+        map.put(httpPort.getName().toString(), httpPort.getValue().toString());
+      }
+      if (httpsPort != null) {
+        map.put(httpsPort.getName().toString(),
+                  httpsPort.getValue().toString());
+      }
+      String capacity = calculateStorageCapacity(dni.getStorageReports());
+      map.put(TOTALCAPACITY, capacity);
+      String[] storagePercentage = calculateStoragePercentage(
+          dni.getStorageReports());
+      String scmUsedPerc = storagePercentage[0];
+      String nonScmUsedPerc = storagePercentage[1];
+      map.put(USEDSPACEPERCENT,
+          "Ozone: " + scmUsedPerc + "%, other: " + nonScmUsedPerc + "%");
+      nodes.put(hostName, map);
     }
     return nodes;
+  }
+
+  /**
+   * Calculate the storage capacity of the DataNode node.
+   * @param storageReports Calculate the storage capacity corresponding
+   *                       to the storage collection.
+   * @return
+   */
+  public static String calculateStorageCapacity(
+      List<StorageReportProto> storageReports) {
+    long capacityByte = 0;
+    if (storageReports != null && !storageReports.isEmpty()) {
+      for (StorageReportProto storageReport : storageReports) {
+        capacityByte += storageReport.getCapacity();
+      }
+    }
+
+    double ua = capacityByte;
+    StringBuilder unit = new StringBuilder("B");
+    if (ua > 1024) {
+      ua = ua / 1024;
+      unit.replace(0, 1, "KB");
+    }
+    if (ua > 1024) {
+      ua = ua / 1024;
+      unit.replace(0, 2, "MB");
+    }
+    if (ua > 1024) {
+      ua = ua / 1024;
+      unit.replace(0, 2, "GB");
+    }
+    if (ua > 1024) {
+      ua = ua / 1024;
+      unit.replace(0, 2, "TB");
+    }
+
+    DecimalFormat decimalFormat = new DecimalFormat("#0.0");
+    decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
+    String capacity = decimalFormat.format(ua);
+    return capacity + unit.toString();
+  }
+
+  /**
+   * Calculate the storage usage percentage of a DataNode node.
+   * @param storageReports Calculate the storage percentage corresponding
+   *                       to the storage collection.
+   * @return
+   */
+  public static String[] calculateStoragePercentage(
+      List<StorageReportProto> storageReports) {
+    String[] storagePercentage = new String[2];
+    String usedPercentage = "N/A";
+    String nonUsedPercentage = "N/A";
+    if (storageReports != null && !storageReports.isEmpty()) {
+      long capacity = 0;
+      long scmUsed = 0;
+      long remaining = 0;
+      for (StorageReportProto storageReport : storageReports) {
+        capacity += storageReport.getCapacity();
+        scmUsed += storageReport.getScmUsed();
+        remaining += storageReport.getRemaining();
+      }
+      long scmNonUsed = capacity - scmUsed - remaining;
+
+      DecimalFormat decimalFormat = new DecimalFormat("#0.00");
+      decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
+
+      double usedPerc = ((double) scmUsed / capacity) * 100;
+      usedPerc = usedPerc > 100.0 ? 100.0 : usedPerc;
+      double nonUsedPerc = ((double) scmNonUsed / capacity) * 100;
+      nonUsedPerc = nonUsedPerc > 100.0 ? 100.0 : nonUsedPerc;
+      usedPercentage = decimalFormat.format(usedPerc);
+      nonUsedPercentage = decimalFormat.format(nonUsedPerc);
+    }
+
+    storagePercentage[0] = usedPercentage;
+    storagePercentage[1] = nonUsedPercentage;
+    return storagePercentage;
+  }
+
+  /**
+   * Based on the current time and the last heartbeat, calculate the time difference
+   * and get a string of the relative value. E.g. "2s ago", "1m 2s ago", etc.
+   *
+   * @return string with the relative value of the time diff.
+   */
+  public String getLastHeartbeatTimeDiff(long lastHeartbeatTime) {
+    long currentTime = Time.monotonicNow();
+    long timeDiff = currentTime - lastHeartbeatTime;
+
+    // Time is in ms. Calculate total time in seconds.
+    long seconds = TimeUnit.MILLISECONDS.toSeconds(timeDiff);
+    // Calculate days, convert the number back to seconds and subtract it from seconds.
+    long days = TimeUnit.SECONDS.toDays(seconds);
+    seconds -= TimeUnit.DAYS.toSeconds(days);
+    // Calculate hours, convert the number back to seconds and subtract it from seconds.
+    long hours = TimeUnit.SECONDS.toHours(seconds);
+    seconds -= TimeUnit.HOURS.toSeconds(hours);
+    // Calculate minutes, convert the number back to seconds and subtract it from seconds.
+    long minutes = TimeUnit.SECONDS.toMinutes(seconds);
+    seconds -= TimeUnit.MINUTES.toSeconds(minutes);
+
+    StringBuilder stringBuilder = new StringBuilder();
+    if (days > 0) {
+      stringBuilder.append(days).append("d ");
+    }
+    if (hours > 0) {
+      stringBuilder.append(hours).append("h ");
+    }
+    if (minutes > 0) {
+      stringBuilder.append(minutes).append("m ");
+    }
+    if (seconds > 0) {
+      stringBuilder.append(seconds).append("s ");
+    }
+    String str = stringBuilder.length() == 0 ? "Just now" : "ago";
+
+    stringBuilder.append(str);
+
+    return stringBuilder.toString();
   }
 
   private enum UsageMetrics {
@@ -1084,6 +1293,15 @@ public class SCMNodeManager implements NodeManager {
     }
     Preconditions.checkArgument(!volumeCountList.isEmpty());
     return Collections.min(volumeCountList);
+  }
+
+  @Override
+  public int totalHealthyVolumeCount() {
+    int sum = 0;
+    for (DatanodeInfo dn : nodeStateManager.getNodes(IN_SERVICE, HEALTHY)) {
+      sum += dn.getHealthyVolumeCount();
+    }
+    return sum;
   }
 
   /**
@@ -1293,14 +1511,19 @@ public class SCMNodeManager implements NodeManager {
    */
   @Override
   public DatanodeDetails getNodeByUuid(String uuid) {
-    if (Strings.isNullOrEmpty(uuid)) {
-      LOG.warn("uuid is null");
+    return uuid != null && !uuid.isEmpty()
+        ? getNodeByUuid(UUID.fromString(uuid))
+        : null;
+  }
+
+  @Override
+  public DatanodeDetails getNodeByUuid(UUID uuid) {
+    if (uuid == null) {
       return null;
     }
-    DatanodeDetails temp = DatanodeDetails.newBuilder()
-        .setUuid(UUID.fromString(uuid)).build();
+
     try {
-      return nodeStateManager.getNode(temp);
+      return nodeStateManager.getNode(uuid);
     } catch (NodeNotFoundException e) {
       LOG.warn("Cannot find node for uuid {}", uuid);
       return null;
@@ -1321,17 +1544,15 @@ public class SCMNodeManager implements NodeManager {
       LOG.warn("address is null");
       return results;
     }
-    Set<String> uuids = dnsToUuidMap.get(address);
+    Set<UUID> uuids = dnsToUuidMap.get(address);
     if (uuids == null) {
       LOG.warn("Cannot find node for address {}", address);
       return results;
     }
 
-    for (String uuid : uuids) {
-      DatanodeDetails temp = DatanodeDetails.newBuilder()
-          .setUuid(UUID.fromString(uuid)).build();
+    for (UUID uuid : uuids) {
       try {
-        results.add(nodeStateManager.getNode(temp));
+        results.add(nodeStateManager.getNode(uuid));
       } catch (NodeNotFoundException e) {
         LOG.warn("Cannot find node for uuid {}", uuid);
       }
@@ -1348,20 +1569,19 @@ public class SCMNodeManager implements NodeManager {
     return clusterMap;
   }
 
-  private String nodeResolve(String hostname) {
-    List<String> hosts = new ArrayList<>(1);
-    hosts.add(hostname);
-    List<String> resolvedHosts = dnsToSwitchMapping.resolve(hosts);
-    if (resolvedHosts != null && !resolvedHosts.isEmpty()) {
-      String location = resolvedHosts.get(0);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Resolve datanode {} return location {}", hostname, location);
-      }
-      return location;
-    } else {
-      LOG.error("Node {} Resolution failed. Please make sure that DNS table " +
-          "mapping or configured mapping is functional.", hostname);
-      return null;
+  /**
+   * For the given node, retried the last heartbeat time.
+   * @param datanodeDetails DatanodeDetails of the node.
+   * @return The last heartbeat time in milliseconds or -1 if the node does not
+   *         exist.
+   */
+  @Override
+  public long getLastHeartbeat(DatanodeDetails datanodeDetails) {
+    try {
+      DatanodeInfo node = nodeStateManager.getNode(datanodeDetails);
+      return node.getLastHeartbeatTime();
+    } catch (NodeNotFoundException e) {
+      return -1;
     }
   }
 

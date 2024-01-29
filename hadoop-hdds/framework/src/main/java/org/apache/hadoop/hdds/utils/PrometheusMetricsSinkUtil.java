@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hdds.utils;
 
-import static org.apache.hadoop.hdds.utils.RocksDBStoreMBean.ROCKSDB_CONTEXT_PREFIX;
+import static org.apache.hadoop.hdds.utils.RocksDBStoreMetrics.ROCKSDB_CONTEXT_PREFIX;
 
 import java.util.ArrayList;
 import java.util.Collection;

@@ -34,29 +34,44 @@ if [ "$1" == "internal" ]; then
    export_keytab testuser/scm scm
    export_keytab testuser2/scm scm
 
-   export_keytab testuser/scm testuser
-   export_keytab testuser/s3g testuser
+   export_keytab testuser/dn testuser
    export_keytab testuser/httpfs testuser
    export_keytab testuser/om testuser
+   export_keytab testuser/recon testuser
+   export_keytab testuser/s3g testuser
+   export_keytab testuser/scm testuser
 
+   export_keytab testuser2/dn testuser2
+   export_keytab testuser2/httpfs testuser2
+   export_keytab testuser2/om testuser2
+   export_keytab testuser2/recon testuser2
+   export_keytab testuser2/s3g testuser2
    export_keytab testuser2/scm testuser2
 
    export_keytab om/om om
    export_keytab HTTP/om om
+   export_keytab testuser/om om
+   export_keytab testuser2/om om
 
    export_keytab s3g/s3g s3g
    export_keytab HTTP/s3g s3g
    export_keytab testuser/s3g s3g
+   export_keytab testuser2/s3g s3g
 
    export_keytab httpfs/httpfs httpfs
    export_keytab HTTP/httpfs httpfs
    export_keytab testuser/httpfs httpfs
+   export_keytab testuser2/httpfs httpfs
 
    export_keytab recon/recon recon
    export_keytab HTTP/recon recon
+   export_keytab testuser/recon recon
+   export_keytab testuser2/recon recon
 
    export_keytab dn/dn dn
    export_keytab HTTP/dn dn
+   export_keytab testuser/dn dn
+   export_keytab testuser2/dn dn
 
    export_keytab HTTP/scm HTTP
    export_keytab HTTP/s3g HTTP

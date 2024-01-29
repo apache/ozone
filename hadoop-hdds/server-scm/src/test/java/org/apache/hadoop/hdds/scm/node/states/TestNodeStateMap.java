@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -105,7 +106,7 @@ public class TestNodeStateMap {
       }
     }
     NodeStatus requestedState = NodeStatus.inServiceStale();
-    List<UUID> nodes = map.getNodes(requestedState);
+    List<DatanodeInfo> nodes = map.getDatanodeInfos(requestedState);
     assertEquals(1, nodes.size());
     assertEquals(1, map.getNodeCount(requestedState));
     assertEquals(nodeCount, map.getTotalNodeCount());

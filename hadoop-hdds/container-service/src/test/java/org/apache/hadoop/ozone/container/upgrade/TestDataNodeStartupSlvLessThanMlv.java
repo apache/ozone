@@ -19,9 +19,13 @@ package org.apache.hadoop.ozone.container.upgrade;
 
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.OzoneConsts.DATANODE_LAYOUT_VERSION_DIR;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -30,11 +34,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.UpgradeTestUtils;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Tests that DataNode will throw an exception on creation when it reads in a
@@ -42,18 +43,18 @@ import org.junit.rules.TemporaryFolder;
  * software layout version.
  */
 public class TestDataNodeStartupSlvLessThanMlv {
-  @Rule
-  public TemporaryFolder tempFolder = new TemporaryFolder();
+  @TempDir
+  private Path tempFolder;
 
   @Test
   public void testStartupSlvLessThanMlv() throws Exception {
     // Add subdirectories under the temporary folder where the version file
     // will be placed.
-    File datanodeSubdir = tempFolder.newFolder(DATANODE_LAYOUT_VERSION_DIR);
+    File datanodeSubdir = Files.createDirectory(
+        tempFolder.resolve(DATANODE_LAYOUT_VERSION_DIR)).toFile();
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        tempFolder.getRoot().getAbsolutePath());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFolder.toString());
 
     // Set metadata layout version larger then software layout version.
     int largestSlv = maxLayoutVersion();
@@ -64,18 +65,11 @@ public class TestDataNodeStartupSlvLessThanMlv {
     UpgradeTestUtils.createVersionFile(datanodeSubdir,
         HddsProtos.NodeType.DATANODE, mlv);
 
-    try {
-      new DatanodeStateMachine(getNewDatanodeDetails(), conf, null,
-                   null, null);
-      Assert.fail("Expected IOException due to incorrect MLV on DataNode " +
-          "creation.");
-    } catch (IOException e) {
-      String expectedMessage = String.format("Metadata layout version (%s) > " +
-          "software layout version (%s)", mlv, largestSlv);
-      GenericTestUtils.assertExceptionContains(expectedMessage, e);
-    }
+    IOException ioException = assertThrows(IOException.class,
+        () -> new DatanodeStateMachine(getNewDatanodeDetails(), conf));
+    assertThat(ioException).hasMessageEndingWith(
+        String.format("Metadata layout version (%s) > software layout version (%s)", mlv, largestSlv));
   }
-
 
   private DatanodeDetails getNewDatanodeDetails() {
     DatanodeDetails.Port containerPort = DatanodeDetails.newPort(

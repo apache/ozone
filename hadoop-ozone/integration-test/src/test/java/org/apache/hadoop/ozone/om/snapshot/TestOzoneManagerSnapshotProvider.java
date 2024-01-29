@@ -37,16 +37,18 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test OM's snapshot provider service.
  */
+@Timeout(300)
 public class TestOzoneManagerSnapshotProvider {
 
   private MiniOzoneHAClusterImpl cluster = null;
@@ -57,14 +59,12 @@ public class TestOzoneManagerSnapshotProvider {
   private String omServiceId;
   private int numOfOMs = 3;
 
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
   private OzoneClient client;
 
   /**
    * Create a MiniDFSCluster for testing.
    */
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
     clusterId = UUID.randomUUID().toString();
@@ -86,7 +86,7 @@ public class TestOzoneManagerSnapshotProvider {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -123,16 +123,16 @@ public class TestOzoneManagerSnapshotProvider {
 
     // Download latest checkpoint from leader OM to follower OM
     DBCheckpoint omSnapshot = followerOM.getOmSnapshotProvider()
-        .getOzoneManagerDBSnapshot(leaderOMNodeId);
+        .downloadDBSnapshotFromLeader(leaderOMNodeId);
 
     long leaderSnapshotIndex = leaderOM.getRatisSnapshotIndex();
     long downloadedSnapshotIndex = getDownloadedSnapshotIndex(omSnapshot);
 
     // The snapshot index downloaded from leader OM should match the ratis
     // snapshot index on the leader OM
-    Assert.assertEquals("The snapshot index downloaded from leader OM does " +
-        "not match its ratis snapshot index",
-        leaderSnapshotIndex, downloadedSnapshotIndex);
+    assertEquals(leaderSnapshotIndex, downloadedSnapshotIndex,
+        "The snapshot index downloaded from leader OM " +
+            "does not match its ratis snapshot index");
   }
 
   private long getDownloadedSnapshotIndex(DBCheckpoint dbCheckpoint)

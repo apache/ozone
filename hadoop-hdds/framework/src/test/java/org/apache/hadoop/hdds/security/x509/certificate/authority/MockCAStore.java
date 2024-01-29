@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -69,6 +70,11 @@ public class MockCAStore implements CertificateStore {
   public void removeExpiredCertificate(BigInteger serialID)
       throws IOException {
 
+  }
+
+  @Override
+  public List<X509Certificate> removeAllExpiredCertificates() {
+    return new ArrayList<>();
   }
 
   @Override

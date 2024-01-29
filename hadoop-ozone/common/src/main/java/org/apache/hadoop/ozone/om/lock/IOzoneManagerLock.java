@@ -23,74 +23,34 @@ import com.google.common.annotations.VisibleForTesting;
  * Interface for OM Metadata locks.
  */
 public interface IOzoneManagerLock {
-  @Deprecated
-  boolean acquireLock(OzoneManagerLock.Resource resource, String... resources);
 
-  boolean acquireReadLock(OzoneManagerLock.Resource resource,
-                          String... resources);
+  OMLockDetails acquireReadLock(OzoneManagerLock.Resource resource,
+                                String... resources);
 
-  boolean acquireReadHashedLock(OzoneManagerLock.Resource resource,
-                           String resourceName);
-
-  boolean acquireWriteLock(OzoneManagerLock.Resource resource,
-                           String... resources);
-
-  boolean acquireWriteHashedLock(OzoneManagerLock.Resource resource,
-                                 String resourceName);
-
-  String generateResourceName(OzoneManagerLock.Resource resource,
-                        String... resources);
+  OMLockDetails acquireWriteLock(OzoneManagerLock.Resource resource,
+                                 String... resources);
 
   boolean acquireMultiUserLock(String firstUser, String secondUser);
 
   void releaseMultiUserLock(String firstUser, String secondUser);
 
-  void releaseWriteLock(OzoneManagerLock.Resource resource,
+  OMLockDetails releaseWriteLock(OzoneManagerLock.Resource resource,
                         String... resources);
 
-  void releaseWriteHashedLock(OzoneManagerLock.Resource resource,
-                        String resourceName);
-
-  void releaseReadLock(OzoneManagerLock.Resource resource, String... resources);
-
-  void releaseReadHashedLock(OzoneManagerLock.Resource resource,
-                        String resourceName);
-
-  @Deprecated
-  void releaseLock(OzoneManagerLock.Resource resource, String... resources);
+  OMLockDetails releaseReadLock(OzoneManagerLock.Resource resource,
+                                String... resources);
 
   @VisibleForTesting
-  int getReadHoldCount(String resourceName);
+  int getReadHoldCount(OzoneManagerLock.Resource resource,
+      String... resources);
 
   @VisibleForTesting
-  String getReadLockWaitingTimeMsStat();
+  int getWriteHoldCount(OzoneManagerLock.Resource resource,
+      String... resources);
 
   @VisibleForTesting
-  long getLongestReadLockWaitingTimeMs();
-
-  @VisibleForTesting
-  String getReadLockHeldTimeMsStat();
-
-  @VisibleForTesting
-  long getLongestReadLockHeldTimeMs();
-
-  @VisibleForTesting
-  int getWriteHoldCount(String resourceName);
-
-  @VisibleForTesting
-  boolean isWriteLockedByCurrentThread(String resourceName);
-
-  @VisibleForTesting
-  String getWriteLockWaitingTimeMsStat();
-
-  @VisibleForTesting
-  long getLongestWriteLockWaitingTimeMs();
-
-  @VisibleForTesting
-  String getWriteLockHeldTimeMsStat();
-
-  @VisibleForTesting
-  long getLongestWriteLockHeldTimeMs();
+  boolean isWriteLockedByCurrentThread(OzoneManagerLock.Resource resource,
+      String... resources);
 
   void cleanup();
 

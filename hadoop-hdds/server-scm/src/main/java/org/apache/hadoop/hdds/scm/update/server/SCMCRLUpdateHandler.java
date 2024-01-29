@@ -23,10 +23,8 @@ import org.apache.hadoop.hdds.protocol.scm.proto.SCMUpdateServiceProtos.CRLUpdat
 import org.apache.hadoop.hdds.protocol.scm.proto.SCMUpdateServiceProtos.UpdateResponse;
 import org.apache.hadoop.hdds.scm.update.client.CRLStore;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.x509.crl.CRLCodec;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.apache.ratis.thirdparty.io.grpc.Status;
-import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -135,17 +133,10 @@ public class SCMCRLUpdateHandler implements SCMUpdateHandler {
       throws SCMSecurityException {
     LOG.debug("Sending client# {} with crl: {} ",
         clientInfo.getClientId(), crl.getCrlSequenceID());
-    StreamObserver<UpdateResponse> responseObserver =
-        clientInfo.getResponseObserver();
-    SCMUpdateServiceProtos.CRLInfoProto crlInfoProto =
-        SCMUpdateServiceProtos.CRLInfoProto.newBuilder()
-            .setCrlSequenceID(crl.getCrlSequenceID())
-            .setX509CRL(CRLCodec.getPEMEncodedString(crl.getX509CRL()))
-            .setCreationTimestamp(crl.getCreationTimestamp()).build();
-    responseObserver.onNext(
-        UpdateResponse.newBuilder()
-            .setUpdateType(SCMUpdateServiceProtos.Type.CRLUpdate)
-            .setCrlUpdateResponse(CRLUpdateResponse.newBuilder()
-                .setCrlInfo(crlInfoProto).build()).build());
+    clientInfo.getResponseObserver().onNext(UpdateResponse.newBuilder()
+        .setUpdateType(SCMUpdateServiceProtos.Type.CRLUpdate)
+        .setCrlUpdateResponse(
+            CRLUpdateResponse.newBuilder().setCrlInfo(crl.getCRLProto3()))
+        .build());
   }
 }

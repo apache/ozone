@@ -40,12 +40,14 @@ import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
+import jakarta.annotation.Nullable;
 import java.io.Closeable;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.Collection;
+import java.util.function.BiConsumer;
 
 /**
  * A node manager supports a simple interface for managing a datanode.
@@ -87,6 +89,18 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       PipelineReportsProto pipelineReportsProto) {
     return register(datanodeDetails, nodeReport, pipelineReportsProto,
         defaultLayoutVersionProto());
+  }
+
+  /**
+   * Register a SendCommandNotify handler for a specific type of SCMCommand.
+   * @param type The type of the SCMCommand.
+   * @param scmCommand A BiConsumer that takes a DatanodeDetails and a
+   *                   SCMCommand object and performs the necessary actions.
+   * @return whatever the regular register command returns with default
+   * layout version passed in.
+   */
+  default void registerSendCommandNotify(SCMCommandProto.Type type,
+      BiConsumer<DatanodeDetails, SCMCommand<?>> scmCommand) {
   }
 
   /**
@@ -332,6 +346,25 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       SCMCommandProto.Type cmdType) throws NodeNotFoundException;
 
   /**
+   * Get the total number of pending commands of the given types on the given
+   * datanode. For each command, this includes both the number of commands
+   * queued in SCM which will be sent to the datanode on the next heartbeat,
+   * and the number of commands reported by the datanode in the last heartbeat.
+   * If the datanode has not reported any information for the given command,
+   * zero is assumed.
+   * All commands are retrieved under a single read lock, so the counts are
+   * consistent.
+   * @param datanodeDetails The datanode to query.
+   * @param cmdType The list of command Types To query.
+   * @return A Map of commandType to Integer with an entry for each command type
+   *         passed.
+   * @throws NodeNotFoundException
+   */
+  Map<SCMCommandProto.Type, Integer> getTotalDatanodeCommandCounts(
+      DatanodeDetails datanodeDetails, SCMCommandProto.Type... cmdType)
+      throws NodeNotFoundException;
+
+  /**
    * Get list of SCMCommands in the Command Queue for a particular Datanode.
    * @param dnID - Datanode uuid.
    * @return list of commands
@@ -345,7 +378,11 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    * @param uuid datanode uuid
    * @return the given datanode, or null if not found
    */
-  DatanodeDetails getNodeByUuid(String uuid);
+  @Nullable DatanodeDetails getNodeByUuid(@Nullable String uuid);
+
+  default @Nullable DatanodeDetails getNodeByUuid(@Nullable UUID uuid) {
+    return uuid != null ? getNodeByUuid(uuid.toString()) : null;
+  };
 
   /**
    * Given datanode address(Ipaddress or hostname), returns a list of
@@ -357,12 +394,22 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   List<DatanodeDetails> getNodesByAddress(String address);
 
   /**
+   * For the given node, retried the last heartbeat time.
+   * @param datanodeDetails DatanodeDetails of the node.
+   * @return The last heartbeat time in milliseconds or -1 if the node does not
+   *         existing in the nodeManager.
+   */
+  long getLastHeartbeat(DatanodeDetails datanodeDetails);
+
+  /**
    * Get cluster map as in network topology for this node manager.
    * @return cluster map
    */
   NetworkTopology getClusterNetworkTopologyMap();
 
   int minHealthyVolumeNum(List <DatanodeDetails> dnList);
+
+  int totalHealthyVolumeCount();
 
   int pipelineLimit(DatanodeDetails dn);
 

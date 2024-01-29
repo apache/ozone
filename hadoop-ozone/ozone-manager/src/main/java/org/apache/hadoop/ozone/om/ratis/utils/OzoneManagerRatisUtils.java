@@ -21,10 +21,14 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.protobuf.ServiceException;
 import java.io.File;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -44,10 +48,10 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketAddAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketSetAclRequest;
+import org.apache.hadoop.ozone.om.request.file.OMRecoverLeaseRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.OMOpenKeysDeleteRequest;
-import org.apache.hadoop.ozone.om.request.key.OMTrashRecoverRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyRemoveAclRequest;
@@ -57,6 +61,7 @@ import org.apache.hadoop.ozone.om.request.key.acl.OMKeySetAclRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixAddAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixSetAclRequest;
+import org.apache.hadoop.ozone.om.request.s3.multipart.S3ExpiredMultipartUploadsAbortRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.OMSetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3GetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3RevokeSecretRequest;
@@ -73,9 +78,12 @@ import org.apache.hadoop.ozone.om.request.security.OMRenewDelegationTokenRequest
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotDeleteRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotMoveDeletedKeysRequest;
+import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotPurgeRequest;
+import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotSetPropertyRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMCancelPrepareRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMFinalizeUpgradeRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMPrepareRequest;
+import org.apache.hadoop.ozone.om.request.util.OMEchoRPCWriteRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeCreateRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeDeleteRequest;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeSetOwnerRequest;
@@ -88,6 +96,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.rocksdb.RocksDBException;
 
 import java.io.IOException;
@@ -99,6 +108,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
 
 /**
  * Utility class used by OzoneManager HA.
@@ -176,8 +186,6 @@ public final class OzoneManagerRatisUtils {
       return new OMRenewDelegationTokenRequest(omRequest);
     case GetS3Secret:
       return new S3GetSecretRequest(omRequest);
-    case RecoverTrash:
-      return new OMTrashRecoverRequest(omRequest);
     case FinalizeUpgrade:
       return new OMFinalizeUpgradeRequest(omRequest);
     case Prepare:
@@ -218,6 +226,10 @@ public final class OzoneManagerRatisUtils {
       return new OMSnapshotDeleteRequest(omRequest);
     case SnapshotMoveDeletedKeys:
       return new OMSnapshotMoveDeletedKeysRequest(omRequest);
+    case SnapshotPurge:
+      return new OMSnapshotPurgeRequest(omRequest);
+    case SetSnapshotProperty:
+      return new OMSnapshotSetPropertyRequest(omRequest);
     case DeleteOpenKeys:
       BucketLayout bktLayout = BucketLayout.DEFAULT;
       if (omRequest.getDeleteOpenKeysRequest().hasBucketLayout()) {
@@ -225,6 +237,17 @@ public final class OzoneManagerRatisUtils {
             omRequest.getDeleteOpenKeysRequest().getBucketLayout());
       }
       return new OMOpenKeysDeleteRequest(omRequest, bktLayout);
+    case RecoverLease:
+      volumeName = omRequest.getRecoverLeaseRequest().getVolumeName();
+      bucketName = omRequest.getRecoverLeaseRequest().getBucketName();
+      bucketLayout =
+        getBucketLayout(ozoneManager.getMetadataManager(), volumeName,
+          bucketName);
+      if (bucketLayout != BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+        throw new IOException("Bucket " + bucketName + " is not FSO layout. " +
+                "It does not support lease recovery");
+      }
+      return new OMRecoverLeaseRequest(omRequest);
     /*
      * Key requests that can have multiple variants based on the bucket layout
      * should be created using {@link BucketLayoutAwareOMKeyRequestFactory}.
@@ -297,9 +320,18 @@ public final class OzoneManagerRatisUtils {
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
       break;
+    case SetTimes:
+      keyArgs = omRequest.getSetTimesRequest().getKeyArgs();
+      volumeName = keyArgs.getVolumeName();
+      bucketName = keyArgs.getBucketName();
+      break;
+    case EchoRPC:
+      return new OMEchoRPCWriteRequest(omRequest);
+    case AbortExpiredMultiPartUploads:
+      return new S3ExpiredMultipartUploadsAbortRequest(omRequest);
     default:
-      throw new IllegalStateException("Unrecognized write command " +
-          "type request" + cmdType);
+      throw new OMException("Unrecognized write command type request "
+          + cmdType, OMException.ResultCodes.INVALID_REQUEST);
     }
 
     return BucketLayoutAwareOMKeyRequestFactory.createRequest(
@@ -368,9 +400,11 @@ public final class OzoneManagerRatisUtils {
    * @param exception
    * @return OzoneManagerProtocolProtos.Status
    */
-  public static Status exceptionToResponseStatus(IOException exception) {
+  public static Status exceptionToResponseStatus(Exception exception) {
     if (exception instanceof OMException) {
       return Status.values()[((OMException) exception).getResult().ordinal()];
+    } else if (exception instanceof InvalidPathException) {
+      return Status.INVALID_PATH;
     } else {
       // Doing this here, because when DB error happens we need to return
       // correct error code, so that in applyTransaction we can
@@ -453,5 +487,16 @@ public final class OzoneManagerRatisUtils {
       LOG.debug(e.getMessage());
       throw new ServiceException(e);
     }
+  }
+
+  public static GrpcTlsConfig createServerTlsConfig(SecurityConfig conf,
+      CertificateClient caClient) throws IOException {
+    if (conf.isSecurityEnabled() && conf.isGrpcTlsEnabled()) {
+      KeyStoresFactory serverKeyFactory = caClient.getServerKeyStoresFactory();
+      return new GrpcTlsConfig(serverKeyFactory.getKeyManagers()[0],
+          serverKeyFactory.getTrustManagers()[0], true);
+    }
+
+    return null;
   }
 }

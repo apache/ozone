@@ -23,6 +23,8 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.ratis.statemachine.StateMachine;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -30,14 +32,23 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
 
 /**
  * For write state machine data.
  */
-abstract class StreamDataChannelBase implements StateMachine.DataChannel {
+abstract class StreamDataChannelBase
+    implements StateMachine.DataChannel {
+  static final Logger LOG = LoggerFactory.getLogger(
+      StreamDataChannelBase.class);
+
   private final RandomAccessFile randomAccessFile;
 
   private final File file;
+  private final AtomicBoolean linked = new AtomicBoolean();
+  private final AtomicBoolean cleaned = new AtomicBoolean();
 
   private final ContainerData containerData;
   private final ContainerMetrics metrics;
@@ -64,9 +75,18 @@ abstract class StreamDataChannelBase implements StateMachine.DataChannel {
     return randomAccessFile.getChannel();
   }
 
+  protected void checkVolume() {
+    onFailure(containerData.getVolume());
+  }
+
   @Override
   public final void force(boolean metadata) throws IOException {
-    getChannel().force(metadata);
+    try {
+      getChannel().force(metadata);
+    } catch (IOException e) {
+      checkVolume();
+      throw e;
+    }
   }
 
   @Override
@@ -74,16 +94,53 @@ abstract class StreamDataChannelBase implements StateMachine.DataChannel {
     return getChannel().isOpen();
   }
 
+  public void setLinked() {
+    linked.set(true);
+  }
+
+  /** @return true iff {@link StateMachine.DataChannel} is already linked. */
+  public boolean cleanUp() {
+    if (linked.get()) {
+      // already linked, nothing to do.
+      return true;
+    }
+    if (cleaned.compareAndSet(false, true)) {
+      // close and then delete the file.
+      try {
+        cleanupInternal();
+      } catch (IOException e) {
+        LOG.warn("Failed to close " + this, e);
+      }
+    }
+    return false;
+  }
+
+  protected abstract void cleanupInternal() throws IOException;
+
   @Override
   public void close() throws IOException {
-    randomAccessFile.close();
+    try {
+      randomAccessFile.close();
+    } catch (IOException e) {
+      checkVolume();
+      throw e;
+    }
   }
 
   final int writeFileChannel(ByteBuffer src) throws IOException {
-    final int writeBytes = getChannel().write(src);
-    metrics.incContainerBytesStats(getType(), writeBytes);
-    containerData.updateWriteStats(writeBytes, false);
-    return writeBytes;
+    try {
+      final int writeBytes = getChannel().write(src);
+      metrics.incContainerBytesStats(getType(), writeBytes);
+      containerData.updateWriteStats(writeBytes, false);
+      return writeBytes;
+    } catch (IOException e) {
+      checkVolume();
+      throw e;
+    }
+  }
+
+  public ContainerMetrics getMetrics() {
+    return metrics;
   }
 
   @Override

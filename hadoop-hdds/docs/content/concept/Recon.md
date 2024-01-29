@@ -145,14 +145,15 @@ to the Prometheus endpoint like `ozone.recon.prometheus.http.endpoint=http://pro
 ## Notable configurations
 
 key | default | <div style="width: 300px;">description</div>
-----|---------|------------
+----|--------|------------
 ozone.recon.http-address | 0.0.0.0:9888 | The address and the base port where the Recon web UI will listen on.
 ozone.recon.address | 0.0.0.0:9891 | RPC address of the Recon.
+ozone.recon.heatmap.provider | none | HeatMapProvider for Recon.
 ozone.recon.db.dir | none | Directory where the Recon Server stores its metadata.
 ozone.recon.om.db.dir | none | Directory where the Recon Server stores its OM snapshot DB.
 ozone.recon.om.snapshot<br>.task.interval.delay | 10m | Interval in MINUTES by Recon to request OM DB Snapshot / delta updates.
 ozone.recon.task<br>.missingcontainer.interval | 300s | Time interval of the periodic check for Unhealthy Containers in the cluster.
-ozone.recon.task<br>.safemode.wait.threshold | 300s | Time interval of the periodic check for Recon to exit out of safe or warmup mode.
+ozone.recon.task<br>.safemode.wait.threshold | 300s | Max time for Recon to wait before it exit out of safe or warmup mode.
 ozone.recon.sql.db.jooq.dialect | DERBY | Please refer to [SQL Dialect](https://www.jooq.org/javadoc/latest/org.jooq/org/jooq/SQLDialect.html) to specify a different dialect.
 ozone.recon.sql.db.jdbc.url | jdbc:derby:${ozone.recon.db.dir}<br>/ozone_recon_derby.db | Recon SQL database jdbc url.
 ozone.recon.sql.db.username | none | Recon SQL database username.

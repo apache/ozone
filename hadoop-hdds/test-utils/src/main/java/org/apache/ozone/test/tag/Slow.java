@@ -25,8 +25,10 @@ import java.lang.annotation.Target;
 import org.junit.jupiter.api.Tag;
 
 /**
- * Annotation to mark test classes or methods that take too much time.
- * These are excluded from CI runs for each commit and run periodically.
+ * Annotation to mark JUnit5 test classes or methods that take too much time.
+ * These are excluded from CI runs for each commit, but can be run manually or
+ * in scheduled runs.
+ * Usage: <code>@Slow("HDDS-123")</code>
  */
 @Target({ ElementType.TYPE, ElementType.METHOD })
 @Retention(RetentionPolicy.RUNTIME)

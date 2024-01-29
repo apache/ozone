@@ -72,6 +72,11 @@ public class RefreshVolumeUsageCommandHandler implements CommandHandler {
   }
 
   @Override
+  public long getTotalRunTime() {
+    return totalTime.get();
+  }
+
+  @Override
   public int getQueuedCount() {
     return 0;
   }

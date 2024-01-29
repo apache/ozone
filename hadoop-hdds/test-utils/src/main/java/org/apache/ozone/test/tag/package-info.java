@@ -19,4 +19,4 @@
 /**
  * Tags are annotations for grouping tests.
  */
-package org.apache.ozone.test;
+package org.apache.ozone.test.tag;

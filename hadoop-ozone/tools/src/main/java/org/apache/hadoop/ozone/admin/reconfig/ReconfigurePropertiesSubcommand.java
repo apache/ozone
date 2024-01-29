@@ -19,10 +19,10 @@ package org.apache.hadoop.ozone.admin.reconfig;
 
 import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
+
+import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.Callable;
 
 /**
  * Handler of ozone admin reconfig properties command.
@@ -32,23 +32,25 @@ import java.util.concurrent.Callable;
     description = "List reconfigurable properties",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class ReconfigurePropertiesSubcommand implements Callable<Void> {
-
-  @CommandLine.ParentCommand
-  private ReconfigureCommands parent;
+public class ReconfigurePropertiesSubcommand
+    extends AbstractReconfigureSubCommand {
 
   @Override
-  public Void call() throws Exception {
-    ReconfigureProtocol reconfigProxy = ReconfigureSubCommandUtil
-        .getSingleNodeReconfigureProxy(parent.getAddress());
-    String serverName = reconfigProxy.getServerName();
-    List<String> properties = reconfigProxy.listReconfigureProperties();
-    System.out.printf("%s: Node [%s] Reconfigurable properties:%n",
-        serverName, parent.getAddress());
-    for (String name : properties) {
-      System.out.println(name);
+  protected void executeCommand(String address) {
+    try (ReconfigureProtocol reconfigProxy = ReconfigureSubCommandUtil
+        .getSingleNodeReconfigureProxy(address)) {
+      String serverName = reconfigProxy.getServerName();
+      List<String> properties = reconfigProxy.listReconfigureProperties();
+      System.out.printf("%s: Node [%s] Reconfigurable properties:%n",
+          serverName, address);
+      for (String name : properties) {
+        System.out.println(name);
+      }
+    } catch (IOException e) {
+      System.out.println("An error occurred while executing the command for :"
+          + address);
+      throw new RuntimeException(e);
     }
-    return null;
   }
 
 }

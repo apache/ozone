@@ -22,9 +22,4 @@ package org.apache.hadoop.hdds.scm.block;
  * JMX interface for the block manager.
  */
 public interface BlockmanagerMXBean {
-
-  /**
-   * Number of open containers manager by the block manager.
-   */
-  int getOpenContainersNo();
 }

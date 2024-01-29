@@ -21,8 +21,12 @@ import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
+import org.apache.hadoop.hdds.utils.CollectionUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
+
+import java.util.List;
+import java.util.Map;
 
 import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 
@@ -48,27 +52,33 @@ public class DatanodeSchemaOneDBDefinition
       new DBColumnFamilyDefinition<>(
           StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY),
           String.class,
-          new SchemaOneKeyCodec(),
+          SchemaOneKeyCodec.get(),
           BlockData.class,
-          new BlockDataCodec());
+          BlockData.getCodec());
 
   public static final DBColumnFamilyDefinition<String, Long>
         METADATA =
         new DBColumnFamilyDefinition<>(
             StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY),
             String.class,
-            new SchemaOneKeyCodec(),
+            SchemaOneKeyCodec.get(),
             Long.class,
-            new LongCodec());
+            LongCodec.get());
 
   public static final DBColumnFamilyDefinition<String, ChunkInfoList>
         DELETED_BLOCKS =
         new DBColumnFamilyDefinition<>(
             StringUtils.bytes2String(DEFAULT_COLUMN_FAMILY),
             String.class,
-            new SchemaOneKeyCodec(),
+            SchemaOneKeyCodec.get(),
             ChunkInfoList.class,
-            new SchemaOneChunkInfoListCodec());
+            SchemaOneChunkInfoListCodec.get());
+
+  private static final Map<String, List<DBColumnFamilyDefinition<?, ?>>>
+      COLUMN_FAMILIES = DBColumnFamilyDefinition.newUnmodifiableMultiMap(
+          BLOCK_DATA,
+          METADATA,
+          DELETED_BLOCKS);
 
   public DatanodeSchemaOneDBDefinition(String dbPath,
       ConfigurationSource config) {
@@ -93,8 +103,12 @@ public class DatanodeSchemaOneDBDefinition
   }
 
   @Override
-  public DBColumnFamilyDefinition[] getColumnFamilies() {
-    return new DBColumnFamilyDefinition[] {getMetadataColumnFamily(),
-        getDeletedBlocksColumnFamily(), getBlockDataColumnFamily()};
+  public List<DBColumnFamilyDefinition<?, ?>> getColumnFamilies(String name) {
+    return COLUMN_FAMILIES.get(name);
+  }
+
+  @Override
+  public Iterable<DBColumnFamilyDefinition<?, ?>> getColumnFamilies() {
+    return () -> CollectionUtils.newIterator(COLUMN_FAMILIES.values());
   }
 }

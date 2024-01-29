@@ -20,6 +20,7 @@ import:
     transformations:
     - type: Image
       image: "@docker.image@"
+    - type: ozone/scm-ha
     - type: ozone/persistence
   - path: ozone/freon
     destination: freon

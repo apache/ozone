@@ -28,8 +28,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OFSPath;
@@ -49,7 +47,6 @@ import org.apache.ratis.protocol.RaftClientRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
@@ -59,6 +56,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_O3TRASH_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -75,6 +73,8 @@ public class TrashOzoneFileSystem extends FileSystem {
 
   private static final int OZONE_FS_ITERATE_BATCH_SIZE = 100;
 
+  private static final int OZONE_MAX_LIST_KEYS_SIZE = 10000;
+
   private final OzoneManager ozoneManager;
 
   private final String userName;
@@ -86,12 +86,15 @@ public class TrashOzoneFileSystem extends FileSystem {
   private static final Logger LOG =
       LoggerFactory.getLogger(TrashOzoneFileSystem.class);
 
+  private final OzoneConfiguration ozoneConfiguration;
+
   public TrashOzoneFileSystem(OzoneManager ozoneManager) throws IOException {
     this.ozoneManager = ozoneManager;
     this.userName =
           UserGroupInformation.getCurrentUser().getShortUserName();
     this.runCount = new AtomicLong(0);
     setConf(ozoneManager.getConfiguration());
+    ozoneConfiguration = OzoneConfiguration.of(getConf());
   }
 
   private RaftClientRequest getRatisRequest(
@@ -156,8 +159,8 @@ public class TrashOzoneFileSystem extends FileSystem {
     ozoneManager.getMetrics().incNumTrashRenames();
     LOG.trace("Src:" + src + "Dst:" + dst);
     // check whether the src and dst belong to the same bucket & trashroot.
-    OFSPath srcPath = new OFSPath(src, OzoneConfiguration.of(getConf()));
-    OFSPath dstPath = new OFSPath(dst, OzoneConfiguration.of(getConf()));
+    OFSPath srcPath = new OFSPath(src, ozoneConfiguration);
+    OFSPath dstPath = new OFSPath(dst, ozoneConfiguration);
     OmBucketInfo bucket = ozoneManager.getBucketInfo(srcPath.getVolumeName(),
         srcPath.getBucketName());
     if (bucket.getBucketLayout().isFileSystemOptimized()) {
@@ -167,9 +170,8 @@ public class TrashOzoneFileSystem extends FileSystem {
         equals(dstPath.getBucketName()));
     Preconditions.checkArgument(srcPath.getTrashRoot().
         toString().equals(dstPath.getTrashRoot().toString()));
-    try (RenameIterator iterator = new RenameIterator(src, dst)) {
-      iterator.iterate();
-    }
+    RenameIterator iterator = new RenameIterator(src, dst);
+    iterator.iterate();
     return true;
   }
 
@@ -192,15 +194,14 @@ public class TrashOzoneFileSystem extends FileSystem {
   @Override
   public boolean delete(Path path, boolean b) throws IOException {
     ozoneManager.getMetrics().incNumTrashDeletes();
-    OFSPath srcPath = new OFSPath(path, OzoneConfiguration.of(getConf()));
+    OFSPath srcPath = new OFSPath(path, ozoneConfiguration);
     OmBucketInfo bucket = ozoneManager.getBucketInfo(srcPath.getVolumeName(),
         srcPath.getBucketName());
     if (bucket.getBucketLayout().isFileSystemOptimized()) {
       return deleteFSO(srcPath);
     }
-    try (DeleteIterator iterator = new DeleteIterator(path, true)) {
-      iterator.iterate();
-    }
+    DeleteIterator iterator = new DeleteIterator(path, true);
+    iterator.iterate();
     return true;
   }
 
@@ -285,7 +286,7 @@ public class TrashOzoneFileSystem extends FileSystem {
   }
 
   private OmKeyArgs constructOmKeyArgs(Path path) {
-    OFSPath ofsPath = new OFSPath(path, OzoneConfiguration.of(getConf()));
+    OFSPath ofsPath = new OFSPath(path, ozoneConfiguration);
     String volume = ofsPath.getVolumeName();
     String bucket = ofsPath.getBucketName();
     String key = ofsPath.getKeyName();
@@ -310,6 +311,9 @@ public class TrashOzoneFileSystem extends FileSystem {
       Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>> entry =
           bucketIterator.next();
       OmBucketInfo omBucketInfo = entry.getValue().getCacheValue();
+      if (omBucketInfo == null) {
+        continue;
+      }
       Path volumePath = new Path(OZONE_URI_DELIMITER,
           omBucketInfo.getVolumeName());
       Path bucketPath = new Path(volumePath, omBucketInfo.getBucketName());
@@ -347,12 +351,11 @@ public class TrashOzoneFileSystem extends FileSystem {
     }
   }
 
-  private abstract class OzoneListingIterator implements Closeable {
+  private abstract class OzoneListingIterator {
     private final Path path;
     private final FileStatus status;
     private String pathKey;
-    private TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-          keyIterator;
+    private Iterator<String> keyIterator;
 
     OzoneListingIterator(Path path)
           throws IOException {
@@ -362,10 +365,30 @@ public class TrashOzoneFileSystem extends FileSystem {
       if (status.isDirectory()) {
         this.pathKey = addTrailingSlashIfNeeded(pathKey);
       }
-      keyIterator = ozoneManager.getMetadataManager().getKeyIterator();
+      OFSPath fsPath = new OFSPath(pathKey,
+          ozoneConfiguration);
+      keyIterator =
+          getKeyIterator(fsPath.getVolumeName(), fsPath.getBucketName(),
+              fsPath.getKeyName());
     }
 
-      /**
+    private Iterator<String> getKeyIterator(String volumeName,
+        String bucketName, String keyName) throws IOException {
+      List<String> keys = new ArrayList<>(
+          listKeys(volumeName, bucketName, "", keyName));
+      String lastKey = keys.get(keys.size() - 1);
+      List<String> nextBatchKeys =
+          listKeys(volumeName, bucketName, lastKey, keyName);
+
+      while (!nextBatchKeys.isEmpty()) {
+        keys.addAll(nextBatchKeys);
+        lastKey = nextBatchKeys.get(nextBatchKeys.size() - 1);
+        nextBatchKeys = listKeys(volumeName, bucketName, lastKey, keyName);
+      }
+      return keys.iterator();
+    }
+
+    /**
        * The output of processKey determines if further iteration through the
        * keys should be done or not.
        *
@@ -391,17 +414,14 @@ public class TrashOzoneFileSystem extends FileSystem {
       if (status.isDirectory()) {
         LOG.trace("Iterating directory: {}", pathKey);
         OFSPath ofsPath = new OFSPath(pathKey,
-            OzoneConfiguration.of(getConf()));
+            ozoneConfiguration);
         String ofsPathprefix =
             ofsPath.getNonKeyPathNoPrefixDelim() + OZONE_URI_DELIMITER;
         while (keyIterator.hasNext()) {
-          Table.KeyValue< String, OmKeyInfo > kv = keyIterator.next();
-          String keyPath = ofsPathprefix + kv.getValue().getKeyName();
+          String keyName = keyIterator.next();
+          String keyPath = ofsPathprefix + keyName;
           LOG.trace("iterating key path: {}", keyPath);
-          if (!kv.getValue().getKeyName().equals("")
-              && kv.getKey().startsWith("/" + pathKey)) {
-            keyPathList.add(keyPath);
-          }
+          keyPathList.add(keyPath);
           if (keyPathList.size() >= OZONE_FS_ITERATE_BATCH_SIZE) {
             if (!processKeyPath(keyPathList)) {
               return false;
@@ -427,12 +447,31 @@ public class TrashOzoneFileSystem extends FileSystem {
       return status;
     }
 
-    @Override
-    public void close() throws IOException {
-      keyIterator.close();
+    /**
+     * Return a listKeys output with only a list of keyNames.
+     */
+    List<String> listKeys(String volumeName, String bucketName, String startKey,
+        String keyPrefix) throws IOException {
+      OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+      return metadataManager.listKeys(volumeName, bucketName, startKey,
+              keyPrefix, OZONE_MAX_LIST_KEYS_SIZE).getKeys().stream()
+          .map(OmKeyInfo::getKeyName)
+          .collect(Collectors.toList());
     }
   }
 
+  /**
+   * Returns a OMRequest builder with specified type.
+   * @param cmdType type of the request
+   */
+  private OzoneManagerProtocolProtos.OMRequest.Builder
+       createOMRequest(OzoneManagerProtocolProtos.Type cmdType) throws IOException {
+    return OzoneManagerProtocolProtos.OMRequest.newBuilder()
+        .setClientId(CLIENT_ID.toString())
+        .setVersion(ClientVersion.CURRENT_VERSION)
+        .setUserInfo(getUserInfo())
+        .setCmdType(cmdType);
+  }
 
   private OzoneManagerProtocolProtos.OMRequest
       getRenameKeyRequest(
@@ -456,12 +495,8 @@ public class TrashOzoneFileSystem extends FileSystem {
     OzoneManagerProtocolProtos.OMRequest omRequest =
         null;
     try {
-      omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
-              .setClientId(CLIENT_ID.toString())
-              .setVersion(ClientVersion.CURRENT_VERSION)
-              .setUserInfo(getUserInfo())
+      omRequest = createOMRequest(OzoneManagerProtocolProtos.Type.RenameKey)
               .setRenameKeyRequest(renameKeyRequest)
-              .setCmdType(OzoneManagerProtocolProtos.Type.RenameKey)
               .build();
     } catch (IOException e) {
       LOG.error("Couldn't get userinfo", e);
@@ -486,9 +521,9 @@ public class TrashOzoneFileSystem extends FileSystem {
       for (String keyPath : keyPathList) {
         String newPath = dstPath.concat(keyPath.substring(srcPath.length()));
         OFSPath src = new OFSPath(keyPath,
-            OzoneConfiguration.of(getConf()));
+            ozoneConfiguration);
         OFSPath dst = new OFSPath(newPath,
-            OzoneConfiguration.of(getConf()));
+            ozoneConfiguration);
 
         OzoneManagerProtocolProtos.OMRequest omRequest =
             getRenameKeyRequest(src, dst);
@@ -522,13 +557,8 @@ public class TrashOzoneFileSystem extends FileSystem {
     OzoneManagerProtocolProtos.OMRequest omRequest =
         null;
     try {
-      omRequest =
-          OzoneManagerProtocolProtos.OMRequest.newBuilder()
-              .setClientId(CLIENT_ID.toString())
-              .setVersion(ClientVersion.CURRENT_VERSION)
-              .setUserInfo(getUserInfo())
+      omRequest = createOMRequest(OzoneManagerProtocolProtos.Type.DeleteKey)
               .setDeleteKeyRequest(deleteKeyRequest)
-              .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKey)
               .build();
     } catch (IOException e) {
       LOG.error("Couldn't get userinfo", e);
@@ -558,7 +588,7 @@ public class TrashOzoneFileSystem extends FileSystem {
       LOG.trace("Deleting keys: {}", keyPathList);
       for (String keyPath : keyPathList) {
         OFSPath path = new OFSPath(keyPath,
-            OzoneConfiguration.of(getConf()));
+            ozoneConfiguration);
         OzoneManagerProtocolProtos.OMRequest omRequest =
             getDeleteKeysRequest(path);
         try {
@@ -592,12 +622,8 @@ public class TrashOzoneFileSystem extends FileSystem {
       OzoneManagerProtocolProtos.OMRequest omRequest =
           null;
       try {
-        omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
-            .setClientId(CLIENT_ID.toString())
-            .setVersion(ClientVersion.CURRENT_VERSION)
-            .setUserInfo(getUserInfo())
+        omRequest = createOMRequest(OzoneManagerProtocolProtos.Type.DeleteKeys)
             .setDeleteKeysRequest(deleteKeysRequest)
-            .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKeys)
             .build();
       } catch (IOException e) {
         LOG.error("Couldn't get userinfo", e);

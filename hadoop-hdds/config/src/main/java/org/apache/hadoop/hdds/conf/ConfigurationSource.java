@@ -175,13 +175,22 @@ public interface ConfigurationSource {
 
     ConfigurationReflectionUtil
         .injectConfiguration(this, configurationClass, configObject,
-            prefix);
+            prefix, false);
 
-    ConfigurationReflectionUtil
-        .callPostConstruct(configurationClass, configObject);
+    ConfigurationReflectionUtil.callPostConstruct(configObject);
 
     return configObject;
 
+  }
+
+  /**
+   * Update {@code object}'s reconfigurable properties from this configuration.
+   */
+  default <T> void reconfigure(Class<T> configClass, T object) {
+    ConfigGroup configGroup = configClass.getAnnotation(ConfigGroup.class);
+    String prefix = configGroup.prefix();
+    ConfigurationReflectionUtil.injectConfiguration(
+        this, configClass, object, prefix, true);
   }
 
   /**
@@ -274,6 +283,17 @@ public interface ConfigurationSource {
     } else {
       return TimeDurationUtil.getTimeDurationHelper(name, vStr, unit);
     }
+  }
+
+  default int getBufferSize(String name, String defaultValue) {
+    final double size = getStorageSize(name, defaultValue, StorageUnit.BYTES);
+    if (size <= 0) {
+      throw new IllegalArgumentException(name + " <= 0");
+    } else if (size > Integer.MAX_VALUE) {
+      throw new IllegalArgumentException(
+          name + " > Integer.MAX_VALUE = " + Integer.MAX_VALUE);
+    }
+    return (int) size;
   }
 
   default double getStorageSize(String name, String defaultValue,

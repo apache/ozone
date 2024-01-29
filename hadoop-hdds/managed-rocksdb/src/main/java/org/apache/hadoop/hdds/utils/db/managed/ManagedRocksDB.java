@@ -21,16 +21,25 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.DBOptions;
+import org.rocksdb.LiveFileMetaData;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 
 /**
- * Managed BloomFilter.
+ * Managed {@link RocksDB}.
  */
 public class ManagedRocksDB extends ManagedObject<RocksDB> {
   public static final Class<RocksDB> ORIGINAL_CLASS = RocksDB.class;
+  public static final int NOT_FOUND = RocksDB.NOT_FOUND;
+
+  static final Logger LOG = LoggerFactory.getLogger(ManagedRocksDB.class);
 
   ManagedRocksDB(RocksDB original) {
     super(original);
@@ -76,5 +85,21 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
     return new ManagedRocksDB(
         RocksDB.open(path, columnFamilyDescriptors, columnFamilyHandles)
     );
+  }
+
+  /**
+   * Delete liveMetaDataFile from rocks db using RocksDB#deleteFile Api.
+   * This function makes the RocksDB#deleteFile Api synchronized by waiting
+   * for the deletes to happen.
+   * @param fileToBeDeleted File to be deleted.
+   * @throws RocksDBException In the underlying db throws an exception.
+   * @throws IOException In the case file is not deleted.
+   */
+  public void deleteFile(LiveFileMetaData fileToBeDeleted)
+      throws RocksDBException, IOException {
+    String sstFileName = fileToBeDeleted.fileName();
+    this.get().deleteFile(sstFileName);
+    File file = new File(fileToBeDeleted.path(), fileToBeDeleted.fileName());
+    ManagedRocksObjectUtils.waitForFileDelete(file, Duration.ofSeconds(60));
   }
 }

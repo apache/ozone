@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import com.google.common.base.CaseFormat;
+import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.metrics2.MetricsCollector;
@@ -79,6 +80,14 @@ public final class ReplicationManagerMetrics implements MetricsSource {
       "InflightEcDeletion",
       "Tracked inflight EC container deletion requests.");
 
+  private static final MetricsInfo UNDER_REPLICATED_QUEUE = Interns.info(
+      "UnderReplicatedQueueSize",
+      "Number of containers currently in the under replicated queue");
+
+  private static final MetricsInfo OVER_REPLICATED_QUEUE = Interns.info(
+      "OverReplicatedQueueSize",
+      "Number of containers currently in the over replicated queue");
+
   // Setup metric names and descriptions for Container Lifecycle states
   private static final Map<LifeCycleState, MetricsInfo> LIFECYCLE_STATE_METRICS
       = Collections.unmodifiableMap(
@@ -86,8 +95,9 @@ public final class ReplicationManagerMetrics implements MetricsSource {
             for (LifeCycleState s : LifeCycleState.values()) {
               String name = CaseFormat.UPPER_UNDERSCORE
                   .to(CaseFormat.UPPER_CAMEL, s.toString());
-              String metric = "Num" + name + "Containers";
-              String description = "Containers in " + name + " state";
+              String metric = name + "Containers";
+              String description = "Current count of Containers in " + name +
+                  " state";
               put(s, Interns.info(metric, description));
             }
           }});
@@ -102,34 +112,34 @@ public final class ReplicationManagerMetrics implements MetricsSource {
           }});
 
   @Metric("Number of replication commands sent.")
-  private MutableCounterLong numReplicationCmdsSent;
+  private MutableCounterLong replicationCmdsSentTotal;
 
-  @Metric("Number of replication commands completed.")
-  private MutableCounterLong numReplicationCmdsCompleted;
+  @Metric("Number of container replicas created successfully.")
+  private MutableCounterLong replicasCreatedTotal;
 
-  @Metric("Number of replication commands timeout.")
-  private MutableCounterLong numReplicationCmdsTimeout;
+  @Metric("Number of container replicas which timed out before being created.")
+  private MutableCounterLong replicaCreateTimeoutTotal;
 
   @Metric("Number of deletion commands sent.")
-  private MutableCounterLong numDeletionCmdsSent;
+  private MutableCounterLong deletionCmdsSentTotal;
 
-  @Metric("Number of deletion commands completed.")
-  private MutableCounterLong numDeletionCmdsCompleted;
+  @Metric("Number of container replicas deleted successfully.")
+  private MutableCounterLong replicasDeletedTotal;
 
-  @Metric("Number of deletion commands timeout.")
-  private MutableCounterLong numDeletionCmdsTimeout;
+  @Metric("Number of container replicas which timed out before being deleted.")
+  private MutableCounterLong replicaDeleteTimeoutTotal;
 
   @Metric("Number of replication bytes total.")
-  private MutableCounterLong numReplicationBytesTotal;
+  private MutableCounterLong replicationBytesTotal;
 
   @Metric("Number of replication bytes completed.")
-  private MutableCounterLong numReplicationBytesCompleted;
+  private MutableCounterLong replicationBytesCompletedTotal;
 
   @Metric("Number of deletion bytes total.")
-  private MutableCounterLong numDeletionBytesTotal;
+  private MutableCounterLong deletionBytesTotal;
 
   @Metric("Number of deletion bytes completed.")
-  private MutableCounterLong numDeletionBytesCompleted;
+  private MutableCounterLong deletionBytesCompletedTotal;
 
   @Metric("Time elapsed for replication")
   private MutableRate replicationTime;
@@ -139,15 +149,21 @@ public final class ReplicationManagerMetrics implements MetricsSource {
 
   @Metric("Number of inflight replication skipped" +
       " due to the configured limit.")
-  private MutableCounterLong numInflightReplicationSkipped;
+  private MutableCounterLong inflightReplicationSkippedTotal;
 
   @Metric("Number of inflight replication skipped" +
       " due to the configured limit.")
-  private MutableCounterLong numInflightDeletionSkipped;
+  private MutableCounterLong inflightDeletionSkippedTotal;
+
+  @Metric("Number of times under replication processing has paused due to" +
+      " reaching the cluster inflight replication limit.")
+  private MutableCounterLong pendingReplicationLimitReachedTotal;
 
   private MetricsRegistry registry;
 
-  private ReplicationManager replicationManager;
+  private final ReplicationManager replicationManager;
+
+  private final boolean legacyReplicationManager;
 
   //EC Metrics
   @Metric("Number of EC Replication commands sent.")
@@ -171,9 +187,51 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   @Metric("Number of EC replicas scheduled for delete which timed out.")
   private MutableCounterLong ecReplicaDeleteTimeoutTotal;
 
+  @Metric("Number of times partial EC reconstruction was needed due to " +
+      "overloaded nodes, but skipped as there was still sufficient redundancy.")
+  private MutableCounterLong ecPartialReconstructionSkippedTotal;
+
+  @Metric("Number of times partial EC reconstruction was used due to " +
+      "insufficient nodes available and reconstruction was critical.")
+  private MutableCounterLong ecPartialReconstructionCriticalTotal;
+
+  @Metric("Number of times partial EC reconstruction was used due to " +
+      "insufficient nodes available and with no overloaded nodes.")
+  private MutableCounterLong ecPartialReconstructionNoneOverloadedTotal;
+
+  @Metric("Number of times EC decommissioning or entering maintenance mode " +
+      "replicas were not all replicated due to insufficient nodes available.")
+  private MutableCounterLong ecPartialReplicationForOutOfServiceReplicasTotal;
+
+  @Metric("Number of times partial Ratis replication occurred due to " +
+      "insufficient nodes available.")
+  private MutableCounterLong partialReplicationTotal;
+
+  @Metric("Number of times partial replication occurred to fix a " +
+      "mis-replicated ratis container due to insufficient nodes available.")
+  private MutableCounterLong partialReplicationForMisReplicationTotal;
+
+  @Metric("Number of times partial replication occurred to fix a " +
+      "mis-replicated EC container due to insufficient nodes available.")
+  private MutableCounterLong ecPartialReplicationForMisReplicationTotal;
+
+  @Metric("NUmber of Reconstruct EC Container commands that could not be sent "
+      + "due to the pending commands on the target datanode")
+  private MutableCounterLong ecReconstructionCmdsDeferredTotal;
+
+  @Metric("Number of delete container commands that could not be sent due "
+      + "to the pending commands on the target datanode")
+  private MutableCounterLong deleteContainerCmdsDeferredTotal;
+
+  @Metric("Number of replicate container commands that could not be sent due "
+      + "to the pending commands on all source datanodes")
+  private MutableCounterLong replicateContainerCmdsDeferredTotal;
+
+
   public ReplicationManagerMetrics(ReplicationManager manager) {
     this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
     this.replicationManager = manager;
+    legacyReplicationManager = replicationManager.getConfig().isLegacyEnabled();
   }
 
   public static ReplicationManagerMetrics create(ReplicationManager manager) {
@@ -187,12 +245,28 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   public void getMetrics(MetricsCollector collector, boolean all) {
     MetricsRecordBuilder builder = collector.addRecord(METRICS_SOURCE_NAME)
         .addGauge(INFLIGHT_REPLICATION, getInflightReplication())
-        .addGauge(INFLIGHT_REPLICATION_SKIPPED, getInflightReplicationSkipped())
         .addGauge(INFLIGHT_DELETION, getInflightDeletion())
-        .addGauge(INFLIGHT_DELETION_SKIPPED, getInflightDeletionSkipped())
-        .addGauge(INFLIGHT_MOVE, getInflightMove())
         .addGauge(INFLIGHT_EC_REPLICATION, getEcReplication())
         .addGauge(INFLIGHT_EC_DELETION, getEcDeletion());
+
+    if (legacyReplicationManager) {
+      // For non-legacy RM, we don't need to expose these metrics as the timeout
+      // metrics below replace them.
+      builder
+          .addGauge(INFLIGHT_REPLICATION_SKIPPED,
+              getInflightReplicationSkipped())
+          .addGauge(INFLIGHT_DELETION_SKIPPED, getInflightDeletionSkipped())
+          // If not using Legacy RM, move manager should expose its own metrics
+          // and therefore we don't need IN_FLIGHT_MOVE here.
+          .addGauge(INFLIGHT_MOVE, getInflightMove());
+    }
+    if (!legacyReplicationManager) {
+      builder
+          .addGauge(UNDER_REPLICATED_QUEUE,
+              replicationManager.getQueue().underReplicatedQueueSize())
+          .addGauge(OVER_REPLICATED_QUEUE,
+              replicationManager.getQueue().overReplicatedQueueSize());
+    }
 
     ReplicationManagerReport report = replicationManager.getContainerReport();
     for (Map.Entry<HddsProtos.LifeCycleState, MetricsInfo> e :
@@ -204,18 +278,21 @@ public final class ReplicationManagerMetrics implements MetricsSource {
       builder.addGauge(e.getValue(), report.getStat(e.getKey()));
     }
 
-    numReplicationCmdsSent.snapshot(builder, all);
-    numReplicationCmdsCompleted.snapshot(builder, all);
-    numReplicationCmdsTimeout.snapshot(builder, all);
-    numDeletionCmdsSent.snapshot(builder, all);
-    numDeletionCmdsCompleted.snapshot(builder, all);
-    numDeletionCmdsTimeout.snapshot(builder, all);
-    numReplicationBytesTotal.snapshot(builder, all);
-    numReplicationBytesCompleted.snapshot(builder, all);
-    numDeletionBytesTotal.snapshot(builder, all);
-    numDeletionBytesCompleted.snapshot(builder, all);
-    replicationTime.snapshot(builder, all);
-    deletionTime.snapshot(builder, all);
+    replicationCmdsSentTotal.snapshot(builder, all);
+    replicasCreatedTotal.snapshot(builder, all);
+    replicaCreateTimeoutTotal.snapshot(builder, all);
+    deletionCmdsSentTotal.snapshot(builder, all);
+    replicasDeletedTotal.snapshot(builder, all);
+    replicaDeleteTimeoutTotal.snapshot(builder, all);
+    if (legacyReplicationManager) {
+      // As things stand, the new RM does not track bytes sent / completed
+      replicationBytesTotal.snapshot(builder, all);
+      replicationBytesCompletedTotal.snapshot(builder, all);
+      deletionBytesTotal.snapshot(builder, all);
+      deletionBytesCompletedTotal.snapshot(builder, all);
+      replicationTime.snapshot(builder, all);
+      deletionTime.snapshot(builder, all);
+    }
     ecReplicationCmdsSentTotal.snapshot(builder, all);
     ecDeletionCmdsSentTotal.snapshot(builder, all);
     ecReplicasCreatedTotal.snapshot(builder, all);
@@ -223,50 +300,62 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     ecReconstructionCmdsSentTotal.snapshot(builder, all);
     ecReplicaCreateTimeoutTotal.snapshot(builder, all);
     ecReplicasDeletedTotal.snapshot(builder, all);
+    ecReplicaDeleteTimeoutTotal.snapshot(builder, all);
+    ecReconstructionCmdsDeferredTotal.snapshot(builder, all);
+    deleteContainerCmdsDeferredTotal.snapshot(builder, all);
+    replicateContainerCmdsDeferredTotal.snapshot(builder, all);
+    pendingReplicationLimitReachedTotal.snapshot(builder, all);
+    ecPartialReconstructionSkippedTotal.snapshot(builder, all);
+    ecPartialReconstructionCriticalTotal.snapshot(builder, all);
+    ecPartialReconstructionNoneOverloadedTotal.snapshot(builder, all);
+    ecPartialReplicationForOutOfServiceReplicasTotal.snapshot(builder, all);
+    partialReplicationTotal.snapshot(builder, all);
+    ecPartialReplicationForMisReplicationTotal.snapshot(builder, all);
+    partialReplicationForMisReplicationTotal.snapshot(builder, all);
   }
 
   public void unRegister() {
     DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
   }
 
-  public void incrNumReplicationCmdsSent() {
-    this.numReplicationCmdsSent.incr();
+  public void incrReplicationCmdsSentTotal() {
+    this.replicationCmdsSentTotal.incr();
   }
 
-  public void incrNumReplicationCmdsCompleted() {
-    this.numReplicationCmdsCompleted.incr();
+  public void incrReplicasCreatedTotal() {
+    this.replicasCreatedTotal.incr();
   }
 
-  public void incrNumReplicationCmdsTimeout() {
-    this.numReplicationCmdsTimeout.incr();
+  public void incrReplicaCreateTimeoutTotal() {
+    this.replicaCreateTimeoutTotal.incr();
   }
 
-  public void incrNumDeletionCmdsSent() {
-    this.numDeletionCmdsSent.incr();
+  public void incrDeletionCmdsSentTotal() {
+    this.deletionCmdsSentTotal.incr();
   }
 
-  public void incrNumDeletionCmdsCompleted() {
-    this.numDeletionCmdsCompleted.incr();
+  public void incrReplicasDeletedTotal() {
+    this.replicasDeletedTotal.incr();
   }
 
-  public void incrNumDeletionCmdsTimeout() {
-    this.numDeletionCmdsTimeout.incr();
+  public void incrReplicaDeleteTimeoutTotal() {
+    this.replicaDeleteTimeoutTotal.incr();
   }
 
-  public void incrNumReplicationBytesTotal(long bytes) {
-    this.numReplicationBytesTotal.incr(bytes);
+  public void incrReplicationBytesTotal(long bytes) {
+    this.replicationBytesTotal.incr(bytes);
   }
 
-  public void incrNumReplicationBytesCompleted(long bytes) {
-    this.numReplicationBytesCompleted.incr(bytes);
+  public void incrReplicationBytesCompletedTotal(long bytes) {
+    this.replicationBytesCompletedTotal.incr(bytes);
   }
 
-  public void incrNumDeletionBytesTotal(long bytes) {
-    this.numDeletionBytesTotal.incr(bytes);
+  public void incrDeletionBytesTotal(long bytes) {
+    this.deletionBytesTotal.incr(bytes);
   }
 
-  public void incrNumDeletionBytesCompleted(long bytes) {
-    this.numDeletionBytesCompleted.incr(bytes);
+  public void incrDeletionBytesCompletedTotal(long bytes) {
+    this.deletionBytesCompletedTotal.incr(bytes);
   }
 
   public void addReplicationTime(long millis) {
@@ -280,10 +369,10 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   public void incrInflightSkipped(InflightType type) {
     switch (type) {
     case REPLICATION:
-      this.numInflightReplicationSkipped.incr();
+      this.inflightReplicationSkippedTotal.incr();
       return;
     case DELETION:
-      this.numInflightDeletionSkipped.incr();
+      this.inflightDeletionSkippedTotal.incr();
       return;
     default:
       throw new IllegalArgumentException("Unexpected type " + type);
@@ -291,65 +380,77 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   }
 
   public long getInflightReplication() {
-    return replicationManager.getLegacyReplicationManager()
-        .getInflightCount(InflightType.REPLICATION);
+    if (legacyReplicationManager) {
+      return replicationManager.getLegacyReplicationManager()
+          .getInflightCount(InflightType.REPLICATION);
+    } else {
+      return replicationManager.getContainerReplicaPendingOps()
+          .getPendingOpCount(ContainerReplicaOp.PendingOpType.ADD,
+              ReplicationType.RATIS);
+    }
   }
 
   public long getInflightReplicationSkipped() {
-    return this.numInflightReplicationSkipped.value();
+    return this.inflightReplicationSkippedTotal.value();
   }
 
   public long getInflightDeletion() {
-    return replicationManager.getLegacyReplicationManager()
-        .getInflightCount(InflightType.DELETION);
+    if (legacyReplicationManager) {
+      return replicationManager.getLegacyReplicationManager()
+          .getInflightCount(InflightType.DELETION);
+    } else {
+      return replicationManager.getContainerReplicaPendingOps()
+          .getPendingOpCount(ContainerReplicaOp.PendingOpType.DELETE,
+              ReplicationType.RATIS);
+    }
   }
 
   public long getInflightDeletionSkipped() {
-    return this.numInflightDeletionSkipped.value();
+    return this.inflightDeletionSkippedTotal.value();
   }
 
   public long getInflightMove() {
     return replicationManager.getInflightMove().size();
   }
 
-  public long getNumReplicationCmdsSent() {
-    return this.numReplicationCmdsSent.value();
+  public long getReplicationCmdsSentTotal() {
+    return this.replicationCmdsSentTotal.value();
   }
 
-  public long getNumReplicationCmdsCompleted() {
-    return this.numReplicationCmdsCompleted.value();
+  public long getReplicasCreatedTotal() {
+    return this.replicasCreatedTotal.value();
   }
 
-  public long getNumReplicationCmdsTimeout() {
-    return this.numReplicationCmdsTimeout.value();
+  public long getReplicaCreateTimeoutTotal() {
+    return this.replicaCreateTimeoutTotal.value();
   }
 
-  public long getNumDeletionCmdsSent() {
-    return this.numDeletionCmdsSent.value();
+  public long getDeletionCmdsSentTotal() {
+    return this.deletionCmdsSentTotal.value();
   }
 
-  public long getNumDeletionCmdsCompleted() {
-    return this.numDeletionCmdsCompleted.value();
+  public long getReplicasDeletedTotal() {
+    return this.replicasDeletedTotal.value();
   }
 
-  public long getNumDeletionCmdsTimeout() {
-    return this.numDeletionCmdsTimeout.value();
+  public long getReplicaDeleteTimeoutTotal() {
+    return this.replicaDeleteTimeoutTotal.value();
   }
 
-  public long getNumDeletionBytesTotal() {
-    return this.numDeletionBytesTotal.value();
+  public long getDeletionBytesTotal() {
+    return this.deletionBytesTotal.value();
   }
 
-  public long getNumDeletionBytesCompleted() {
-    return this.numDeletionBytesCompleted.value();
+  public long getDeletionBytesCompletedTotal() {
+    return this.deletionBytesCompletedTotal.value();
   }
 
-  public long getNumReplicationBytesTotal() {
-    return this.numReplicationBytesTotal.value();
+  public long getReplicationBytesTotal() {
+    return this.replicationBytesTotal.value();
   }
 
-  public long getNumReplicationBytesCompleted() {
-    return this.numReplicationBytesCompleted.value();
+  public long getReplicationBytesCompletedTotal() {
+    return this.replicationBytesCompletedTotal.value();
   }
 
   public void incrEcReplicationCmdsSentTotal() {
@@ -372,14 +473,28 @@ public final class ReplicationManagerMetrics implements MetricsSource {
     this.ecReconstructionCmdsSentTotal.incr();
   }
 
+  public void incrECReconstructionCmdsDeferredTotal() {
+    this.ecReconstructionCmdsDeferredTotal.incr();
+  }
+
+  public void incrDeleteContainerCmdsDeferredTotal() {
+    this.deleteContainerCmdsDeferredTotal.incr();
+  }
+
+  public void incrReplicateContainerCmdsDeferredTotal() {
+    this.replicateContainerCmdsDeferredTotal.incr();
+  }
+
   public long getEcReplication() {
     return replicationManager.getContainerReplicaPendingOps()
-        .getPendingOpCount(ContainerReplicaOp.PendingOpType.ADD);
+        .getPendingOpCount(ContainerReplicaOp.PendingOpType.ADD,
+            ReplicationType.EC);
   }
 
   public long getEcDeletion() {
     return replicationManager.getContainerReplicaPendingOps()
-        .getPendingOpCount(ContainerReplicaOp.PendingOpType.DELETE);
+        .getPendingOpCount(ContainerReplicaOp.PendingOpType.DELETE,
+            ReplicationType.EC);
   }
 
   public void incrEcReplicaCreateTimeoutTotal() {
@@ -417,4 +532,81 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   public long getEcReplicasDeletedTotal() {
     return ecReplicasDeletedTotal.value();
   }
+
+  public long getEcReconstructionCmdsDeferredTotal() {
+    return ecReconstructionCmdsDeferredTotal.value();
+  }
+
+  public long getDeleteContainerCmdsDeferredTotal() {
+    return deleteContainerCmdsDeferredTotal.value();
+  }
+
+  public long getReplicateContainerCmdsDeferredTotal() {
+    return replicateContainerCmdsDeferredTotal.value();
+  }
+
+  public void incrPendingReplicationLimitReachedTotal() {
+    this.pendingReplicationLimitReachedTotal.incr();
+  }
+
+  public long getPendingReplicationLimitReachedTotal() {
+    return pendingReplicationLimitReachedTotal.value();
+  }
+
+  public long getECPartialReconstructionSkippedTotal() {
+    return ecPartialReconstructionSkippedTotal.value();
+  }
+
+  public void incrECPartialReconstructionSkippedTotal() {
+    this.ecPartialReconstructionSkippedTotal.incr();
+  }
+
+  public long getECPartialReconstructionCriticalTotal() {
+    return ecPartialReconstructionCriticalTotal.value();
+  }
+
+  public void incrECPartialReconstructionCriticalTotal() {
+    this.ecPartialReconstructionCriticalTotal.incr();
+  }
+
+  public long getEcPartialReconstructionNoneOverloadedTotal() {
+    return ecPartialReconstructionNoneOverloadedTotal.value();
+  }
+
+  public void incrEcPartialReconstructionNoneOverloadedTotal() {
+    this.ecPartialReconstructionNoneOverloadedTotal.incr();
+  }
+
+  public long getEcPartialReplicationForOutOfServiceReplicasTotal() {
+    return ecPartialReplicationForOutOfServiceReplicasTotal.value();
+  }
+
+  public void incrEcPartialReplicationForOutOfServiceReplicasTotal() {
+    this.ecPartialReplicationForOutOfServiceReplicasTotal.incr();
+  }
+
+  public long getPartialReplicationTotal() {
+    return partialReplicationTotal.value();
+  }
+
+  public void incrPartialReplicationTotal() {
+    this.partialReplicationTotal.incr();
+  }
+
+  public void incrEcPartialReplicationForMisReplicationTotal() {
+    this.ecPartialReplicationForMisReplicationTotal.incr();
+  }
+
+  public long getEcPartialReplicationForMisReplicationTotal() {
+    return this.ecPartialReplicationForMisReplicationTotal.value();
+  }
+
+  public void incrPartialReplicationForMisReplicationTotal() {
+    this.partialReplicationForMisReplicationTotal.incr();
+  }
+
+  public long getPartialReplicationForMisReplicationTotal() {
+    return this.partialReplicationForMisReplicationTotal.value();
+  }
+
 }

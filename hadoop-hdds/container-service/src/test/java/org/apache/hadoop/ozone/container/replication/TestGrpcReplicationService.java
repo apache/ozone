@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.container.replication;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.CopyContainerResponseProto;
-import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
+import org.apache.ratis.thirdparty.io.grpc.stub.CallStreamObserver;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -27,6 +27,7 @@ import java.io.OutputStream;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests {@link GrpcReplicationService}.
@@ -57,8 +58,9 @@ class TestGrpcReplicationService {
         .setReadOffset(0)
         .setLen(123)
         .build();
-    StreamObserver<CopyContainerResponseProto> observer =
-        mock(StreamObserver.class);
+    CallStreamObserver<CopyContainerResponseProto> observer =
+        mock(CallStreamObserver.class);
+    when(observer.isReady()).thenReturn(true);
 
     // WHEN
     subject.download(request, observer);

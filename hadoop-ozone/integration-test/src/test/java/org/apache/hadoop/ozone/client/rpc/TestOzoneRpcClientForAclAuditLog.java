@@ -37,13 +37,12 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.FixMethodOrder;
-import org.junit.Ignore;
-import org.junit.Test;
-import org.junit.runners.MethodSorters;
+import org.apache.ozone.test.tag.Unhealthy;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,7 +61,9 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class is to test audit logs for xxxACL APIs of Ozone Client.
@@ -73,9 +74,9 @@ import static org.junit.Assert.assertTrue;
  * all assertion based test in this class.
  */
 @NotThreadSafe
-@FixMethodOrder(MethodSorters.NAME_ASCENDING)
-@Ignore("Fix this after adding audit support for HA Acl code. This will be " +
-    "fixed by HDDS-2038")
+@TestMethodOrder(MethodOrderer.MethodName.class)
+@Unhealthy("Fix this after adding audit support for HA Acl code. This will " +
+    "be fixed by HDDS-2038")
 public class TestOzoneRpcClientForAclAuditLog {
 
   private static final Logger LOG =
@@ -83,10 +84,10 @@ public class TestOzoneRpcClientForAclAuditLog {
   private static UserGroupInformation ugi;
   private static final OzoneAcl USER_ACL =
       new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER,
-      "johndoe", IAccessAuthorizer.ACLType.ALL, ACCESS);
+          "johndoe", IAccessAuthorizer.ACLType.ALL, ACCESS);
   private static final OzoneAcl USER_ACL_2 =
       new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER,
-      "jane", IAccessAuthorizer.ACLType.ALL, ACCESS);
+          "jane", IAccessAuthorizer.ACLType.ALL, ACCESS);
   private static List<OzoneAcl> aclListToAdd = new ArrayList<>();
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient ozClient = null;
@@ -103,7 +104,7 @@ public class TestOzoneRpcClientForAclAuditLog {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     System.setProperty("log4j.configurationFile", "auditlog.properties");
     ugi = UserGroupInformation.getCurrentUser();
@@ -138,7 +139,7 @@ public class TestOzoneRpcClientForAclAuditLog {
   /**
    * Close OzoneClient and shutdown MiniOzoneCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void teardown() throws IOException {
     shutdownCluster();
     deleteAuditLog();
@@ -192,7 +193,7 @@ public class TestOzoneRpcClientForAclAuditLog {
     OzoneVolume retVolumeinfo = store.getVolume(volumeName);
     verifyLog(OMAction.READ_VOLUME.name(), volumeName,
         AuditEventStatus.SUCCESS.name());
-    Assert.assertTrue(retVolumeinfo.getName().equalsIgnoreCase(volumeName));
+    assertTrue(retVolumeinfo.getName().equalsIgnoreCase(volumeName));
 
     OzoneObj volObj = new OzoneObjInfo.Builder()
         .setVolumeName(volumeName)
@@ -204,7 +205,7 @@ public class TestOzoneRpcClientForAclAuditLog {
     List<OzoneAcl> acls = store.getAcl(volObj);
     verifyLog(OMAction.GET_ACL.name(), volumeName,
         AuditEventStatus.SUCCESS.name());
-    Assert.assertTrue(acls.size() > 0);
+    assertThat(acls.size()).isGreaterThan(0);
 
     //Testing addAcl
     store.addAcl(volObj, USER_ACL);
@@ -284,9 +285,9 @@ public class TestOzoneRpcClientForAclAuditLog {
     try {
       // When log entry is expected, the log file will contain one line and
       // that must be equal to the expected string
-      assertTrue(lines.size() != 0);
+      assertNotEquals(0, lines.size());
       for (String exp: expected) {
-        assertTrue(lines.get(0).contains(exp));
+        assertThat(lines.get(0)).contains(exp);
       }
     } catch (AssertionError ex) {
       LOG.error("Error occurred in log verification", ex);

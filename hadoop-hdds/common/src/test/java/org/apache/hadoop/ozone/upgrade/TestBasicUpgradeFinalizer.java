@@ -28,7 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -45,7 +46,6 @@ import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.StatusAndMessages;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentMatchers;
 import org.mockito.InOrder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,23 +65,23 @@ public class TestBasicUpgradeFinalizer {
 
     Object mockObj = mock(Object.class);
     doCallRealMethod().when(finalizer).finalize(anyString(),
-        ArgumentMatchers.eq(mockObj));
+        eq(mockObj));
 
     finalizer.finalize("test-client-1", mockObj);
 
     StatusAndMessages res = finalizer.reportStatus("test-client-1", false);
     assertEquals(FINALIZATION_DONE, res.status());
 
-    inOrder.verify(finalizer).preFinalizeUpgrade(ArgumentMatchers.eq(mockObj));
+    inOrder.verify(finalizer).preFinalizeUpgrade(eq(mockObj));
     inOrder.verify(finalizer).finalizeLayoutFeature(
-        ArgumentMatchers.eq(
+        eq(
             TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_2),
-        ArgumentMatchers.eq(mockObj));
+        eq(mockObj));
     inOrder.verify(finalizer).finalizeLayoutFeature(
-        ArgumentMatchers.eq(
+        eq(
             TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_3),
-        ArgumentMatchers.eq(mockObj));
-    inOrder.verify(finalizer).postFinalizeUpgrade(ArgumentMatchers.eq(mockObj));
+        eq(mockObj));
+    inOrder.verify(finalizer).postFinalizeUpgrade(eq(mockObj));
 
     assertTrue(finalizer.isFinalizationDone());
     assertTrue(finalizer.preCalled && finalizer.finalizeCalled &&
@@ -227,8 +227,7 @@ public class TestBasicUpgradeFinalizer {
       super.finalizeLayoutFeature(lf,
           lf.action(LayoutFeature.UpgradeActionType.ON_FINALIZE), mockStorage);
 
-      inOrder.verify(mockStorage)
-          .setLayoutVersion(ArgumentMatchers.eq(lf.layoutVersion()));
+      inOrder.verify(mockStorage).setLayoutVersion(eq(lf.layoutVersion()));
       try {
         inOrder.verify(mockStorage).persistCurrentState();
       } catch (IOException ex) {

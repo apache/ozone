@@ -47,7 +47,6 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
@@ -56,11 +55,12 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVA
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.ratis.grpc.server.GrpcLogAppender;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.Assert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -68,7 +68,6 @@ import org.junit.jupiter.api.Timeout;
 /**
  * Test to verify pipeline is closed on readStateMachine failure.
  */
-@Flaky("see HDDS-3294")
 public class TestContainerStateMachineFailureOnRead {
   private MiniOzoneCluster cluster;
   private ObjectStore objectStore;
@@ -147,7 +146,7 @@ public class TestContainerStateMachineFailureOnRead {
         cluster.getStorageContainerManager().getPipelineManager()
             .getPipelines(RatisReplicationConfig.getInstance(
                 HddsProtos.ReplicationFactor.THREE));
-    Assert.assertEquals(1, pipelines.size());
+    assertEquals(1, pipelines.size());
     Pipeline ratisPipeline = pipelines.iterator().next();
 
     Optional<HddsDatanodeService> dnToStop =
@@ -161,13 +160,14 @@ public class TestContainerStateMachineFailureOnRead {
               }
             }).findFirst();
 
-    Assert.assertTrue(dnToStop.isPresent());
+    assertTrue(dnToStop.isPresent());
     cluster.shutdownHddsDatanode(dnToStop.get().getDatanodeDetails());
     // Verify healthy pipeline before creating key
-    XceiverClientRatis xceiverClientRatis =
-        XceiverClientRatis.newXceiverClientRatis(ratisPipeline, conf);
-    xceiverClientRatis.connect();
-    TestOzoneContainer.createContainerForTesting(xceiverClientRatis, 100L);
+    try (XceiverClientRatis xceiverClientRatis =
+        XceiverClientRatis.newXceiverClientRatis(ratisPipeline, conf)) {
+      xceiverClientRatis.connect();
+      TestOzoneContainer.createContainerForTesting(xceiverClientRatis, 100L);
+    }
 
     OmKeyLocationInfo omKeyLocationInfo;
     OzoneOutputStream key = objectStore.getVolume(volumeName)
@@ -183,7 +183,7 @@ public class TestContainerStateMachineFailureOnRead {
 
     List<OmKeyLocationInfo> locationInfoList =
         groupOutputStream.getLocationInfoList();
-    Assert.assertEquals(1, locationInfoList.size());
+    assertEquals(1, locationInfoList.size());
     omKeyLocationInfo = locationInfoList.get(0);
     key.close();
     groupOutputStream.close();
@@ -198,7 +198,7 @@ public class TestContainerStateMachineFailureOnRead {
           }
         }).findFirst();
 
-    Assert.assertTrue(leaderDn.isPresent());
+    assertTrue(leaderDn.isPresent());
     // delete the container dir from leader
     FileUtil.fullyDelete(new File(
         leaderDn.get().getDatanodeStateMachine()
@@ -215,10 +215,8 @@ public class TestContainerStateMachineFailureOnRead {
     try {
       Pipeline pipeline = cluster.getStorageContainerManager()
           .getPipelineManager().getPipeline(pipelines.get(0).getId());
-      Assert.assertEquals("Pipeline " + pipeline.getId()
-              + "should be in CLOSED state",
-          Pipeline.PipelineState.CLOSED,
-          pipeline.getPipelineState());
+      assertEquals(Pipeline.PipelineState.CLOSED, pipeline.getPipelineState(),
+          "Pipeline " + pipeline.getId() + "should be in CLOSED state");
     } catch (PipelineNotFoundException e) {
       // do nothing
     }

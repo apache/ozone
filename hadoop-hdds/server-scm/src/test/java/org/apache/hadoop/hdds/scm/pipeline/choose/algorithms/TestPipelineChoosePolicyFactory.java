@@ -21,16 +21,18 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
 import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.PipelineChoosePolicyFactory.OZONE_SCM_EC_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT;
 import static org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.PipelineChoosePolicyFactory.OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT;
 
 /**
@@ -42,24 +44,44 @@ public class TestPipelineChoosePolicyFactory {
 
   private ScmConfig scmConfig;
 
+  private NodeManager nodeManager;
+
   @BeforeEach
   public void setup() {
     //initialize network topology instance
     conf = new OzoneConfiguration();
     scmConfig = conf.getObject(ScmConfig.class);
+    nodeManager = new MockNodeManager(true, 5);
   }
 
   @Test
   public void testDefaultPolicy() throws IOException {
     PipelineChoosePolicy policy = PipelineChoosePolicyFactory
-        .getPolicy(conf);
-    Assertions.assertSame(OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
+        .getPolicy(nodeManager, scmConfig, false);
+    assertSame(OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
         policy.getClass());
+  }
+
+  @Test
+  public void testDefaultPolicyEC() throws IOException {
+    PipelineChoosePolicy policy = PipelineChoosePolicyFactory
+        .getPolicy(nodeManager, scmConfig, true);
+    assertSame(OZONE_SCM_EC_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
+        policy.getClass());
+  }
+
+  @Test
+  public void testNonDefaultPolicyEC() throws IOException {
+    scmConfig.setECPipelineChoosePolicyName(DummyGoodImpl.class.getName());
+    PipelineChoosePolicy policy = PipelineChoosePolicyFactory
+        .getPolicy(nodeManager, scmConfig, true);
+    assertSame(DummyGoodImpl.class, policy.getClass());
   }
 
 
   /**
-   * A dummy pipeline choose policy implementation for test.
+   * A dummy pipeline choose policy implementation for test with an invalid
+   * constructor.
    */
   public static class DummyImpl implements PipelineChoosePolicy {
 
@@ -71,24 +93,60 @@ public class TestPipelineChoosePolicyFactory {
         PipelineRequestInformation pri) {
       return null;
     }
+
+    @Override
+    public int choosePipelineIndex(List<Pipeline> pipelineList,
+        PipelineRequestInformation pri) {
+      return -1;
+    }
   }
 
+  /**
+   * A dummy pipeline choose policy implementation for test that is valid.
+   */
+  public static class DummyGoodImpl implements PipelineChoosePolicy {
+
+    @Override
+    public Pipeline choosePipeline(List<Pipeline> pipelineList,
+                                   PipelineRequestInformation pri) {
+      return null;
+    }
+
+    @Override
+    public int choosePipelineIndex(List<Pipeline> pipelineList,
+                                   PipelineRequestInformation pri) {
+      return -1;
+    }
+  }
+
+
   @Test
-  public void testConstuctorNotFound() throws SCMException {
+  public void testConstructorNotFound() throws SCMException {
     // set a policy class which does't have the right constructor implemented
     scmConfig.setPipelineChoosePolicyName(DummyImpl.class.getName());
-    PipelineChoosePolicy policy = PipelineChoosePolicyFactory.getPolicy(conf);
-    Assertions.assertSame(OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
+    scmConfig.setECPipelineChoosePolicyName(DummyImpl.class.getName());
+    PipelineChoosePolicy policy =
+        PipelineChoosePolicyFactory.getPolicy(nodeManager, scmConfig, false);
+    assertSame(OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
+        policy.getClass());
+    policy = PipelineChoosePolicyFactory.getPolicy(nodeManager, scmConfig, true);
+    assertSame(OZONE_SCM_EC_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
         policy.getClass());
   }
 
   @Test
   public void testClassNotImplemented() throws SCMException {
     // set a placement class not implemented
-    conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
+    scmConfig.setPipelineChoosePolicyName(
         "org.apache.hadoop.hdds.scm.pipeline.choose.policy.HelloWorld");
-    PipelineChoosePolicy policy = PipelineChoosePolicyFactory.getPolicy(conf);
-    Assertions.assertSame(OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
+    scmConfig.setECPipelineChoosePolicyName(
+        "org.apache.hadoop.hdds.scm.pipeline.choose.policy.HelloWorld");
+    PipelineChoosePolicy policy =
+        PipelineChoosePolicyFactory.getPolicy(nodeManager, scmConfig, false);
+    assertSame(OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
+        policy.getClass());
+    policy = PipelineChoosePolicyFactory.getPolicy(nodeManager, scmConfig, true);
+    assertSame(OZONE_SCM_EC_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
         policy.getClass());
   }
 }

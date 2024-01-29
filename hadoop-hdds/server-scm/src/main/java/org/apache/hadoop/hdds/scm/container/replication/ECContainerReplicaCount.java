@@ -23,6 +23,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -75,8 +76,10 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   private final List<Integer> pendingDelete;
   private final int remainingMaintenanceRedundancy;
   private final Map<Integer, Integer> healthyIndexes = new HashMap<>();
+  private final Map<Integer, Integer> unHealthyIndexes = new HashMap<>();
   private final Map<Integer, Integer> decommissionIndexes = new HashMap<>();
   private final Map<Integer, Integer> maintenanceIndexes = new HashMap<>();
+  private final Set<DatanodeDetails> unhealthyReplicaDNs;
   private final List<ContainerReplica> replicas;
 
   public ECContainerReplicaCount(ContainerInfo containerInfo,
@@ -97,7 +100,7 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     this.remainingMaintenanceRedundancy
         = Math.min(repConfig.getParity(), remainingMaintenanceRedundancy);
 
-    Set<DatanodeDetails> unhealthyReplicaDNs = new HashSet<>();
+    unhealthyReplicaDNs = new HashSet<>();
     for (ContainerReplica r : replicas) {
       if (r.getState() == ContainerReplicaProto.State.UNHEALTHY) {
         unhealthyReplicaDNs.add(r.getDatanodeDetails());
@@ -105,17 +108,7 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     }
 
     for (ContainerReplicaOp op : replicaPendingOps) {
-      if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
-        pendingAdd.add(op.getReplicaIndex());
-      } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
-        if (!unhealthyReplicaDNs.contains(op.getTarget())) {
-          // We ignore unhealthy replicas later in this method, so we also
-          // need to ignore pending deletes on those unhealthy replicas,
-          // otherwise the pending delete will decrement the healthy count and
-          // make the container appear under-replicated when it is not.
-          pendingDelete.add(op.getReplicaIndex());
-        }
-      }
+      processPendingOp(op);
     }
 
     for (ContainerReplica replica : replicas) {
@@ -136,6 +129,9 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
       3 is not considered over replicated because its second copy is unhealthy.
       */
       if (replica.getState() == ContainerReplicaProto.State.UNHEALTHY) {
+        int val = unHealthyIndexes
+            .getOrDefault(replica.getReplicaIndex(), 0);
+        unHealthyIndexes.put(replica.getReplicaIndex(), val + 1);
         continue;
       }
       HddsProtos.NodeOperationalState state =
@@ -157,20 +153,7 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
     // will eventually be removed and reduce the count for this replica. If the
     // count goes to zero, remove it from the map.
     for (Integer i : pendingDelete) {
-      ensureIndexWithinBounds(i, "pendingDelete");
-      Integer count = healthyIndexes.get(i);
-      if (count != null) {
-        count = count - 1;
-        if (count < 1) {
-          healthyIndexes.remove(i);
-        } else {
-          healthyIndexes.put(i, count);
-        }
-      }
-    }
-    // Ensure any pending adds are within bounds
-    for (Integer i : pendingAdd) {
-      ensureIndexWithinBounds(i, "pendingAdd");
+      adjustHealthyCountWithPendingDelete(i);
     }
   }
 
@@ -192,6 +175,57 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   @Override
   public int getMaintenanceCount() {
     return maintenanceIndexes.size();
+  }
+
+  /**
+   * Given a ContainerReplicaOp, check its index is within the expected
+   * bounds and then add it to the relevant list.
+   */
+  private void processPendingOp(ContainerReplicaOp op) {
+    ensureIndexWithinBounds(op.getReplicaIndex(), "pending" + op.getOpType());
+    if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
+      pendingAdd.add(op.getReplicaIndex());
+    } else if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
+      if (!unhealthyReplicaDNs.contains(op.getTarget())) {
+        // We ignore unhealthy replicas later in this method, so we also
+        // need to ignore pending deletes on those unhealthy replicas,
+        // otherwise the pending delete will decrement the healthy count and
+        // make the container appear under-replicated when it is not.
+        pendingDelete.add(op.getReplicaIndex());
+      }
+    }
+  }
+
+  /**
+   * Remove the pending delete replicas from the healthy set as we assume they
+   * will eventually be removed and reduce the count for this replica. If the
+   * count goes to zero, remove it from the map.
+   * @param index The replica Index which is pending delete.
+   */
+  private void adjustHealthyCountWithPendingDelete(int index) {
+    Integer count = healthyIndexes.get(index);
+    if (count != null) {
+      count = count - 1;
+      if (count < 1) {
+        healthyIndexes.remove(index);
+      } else {
+        healthyIndexes.put(index, count);
+      }
+    }
+  }
+
+  /**
+   * Add a pending op to the object. This allows the same
+   * ECContainerReplicaCount object to be used for multiple processing stages
+   * where commands are created at each state. The addition of a new pending
+   * op could influence what further replicas are needed in subsequent stages.
+   * @param op The ContainerReplicaOp to add.
+   */
+  public void addPendingOp(ContainerReplicaOp op) {
+    processPendingOp(op);
+    if (op.getOpType() == ContainerReplicaOp.PendingOpType.DELETE) {
+      adjustHealthyCountWithPendingDelete(op.getReplicaIndex());
+    }
   }
 
   /**
@@ -275,13 +309,28 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
    */
   @Override
   public boolean isUnrecoverable() {
+    Set<Integer> distinct = healthyReplicas();
+    return distinct.size() < repConfig.getData();
+  }
+
+  /**
+   * Return true if there are insufficient replicas to recover this container
+   * when unhealthy replicas are included.
+   * @return True if the container is missing, false otherwise.
+   */
+  public boolean isMissing() {
+    Set<Integer> distinct = healthyReplicas();
+    distinct.addAll(unHealthyIndexes.keySet());
+    return distinct.size() < repConfig.getData();
+  }
+
+  private Set<Integer> healthyReplicas() {
     Set<Integer> distinct = new HashSet<>();
     distinct.addAll(healthyIndexes.keySet());
     distinct.addAll(decommissionIndexes.keySet());
     distinct.addAll(maintenanceIndexes.keySet());
-    return distinct.size() < repConfig.getData();
+    return distinct;
   }
-
   /**
    * Returns an unsorted list of indexes which need additional copies to
    * ensure the container is sufficiently replicated. These missing indexes will
@@ -333,7 +382,6 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
    * remainingMaintenanceRedundancy of 1, and two replicas in maintenance,
    * this will return 1, indicating one of the maintenance replicas must be
    * copied to an in-service node to meet the redundancy guarantee.
-   * @return
    */
   public int additionalMaintenanceCopiesNeeded(boolean includePendingAdd) {
     Set<Integer> maintenanceOnly = maintenanceOnlyIndexes(includePendingAdd);
@@ -450,11 +498,13 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
    * replica on the node going offline has a copy elsewhere on another
    * IN_SERVICE node, and if so that replica is sufficiently replicated.
    * @param datanode The datanode being checked to go offline.
+   * @param nodeManager not used in this implementation
    * @return True if the container is sufficiently replicated or if this replica
    *         on the passed node is present elsewhere on an IN_SERVICE node.
    */
   @Override
-  public boolean isSufficientlyReplicatedForOffline(DatanodeDetails datanode) {
+  public boolean isSufficientlyReplicatedForOffline(DatanodeDetails datanode,
+      NodeManager nodeManager) {
     boolean sufficientlyReplicated = isSufficientlyReplicated(false);
     if (sufficientlyReplicated) {
       return true;
@@ -487,8 +537,45 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   }
 
   @Override
+  public boolean isHealthyEnoughForOffline() {
+    return isHealthy();
+  }
+
+  @Override
   public boolean isSufficientlyReplicated() {
     return isSufficientlyReplicated(false);
+  }
+
+
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append("Container State: ").append(containerInfo.getState())
+        .append(", Replicas: (Count: ").append(replicas.size());
+    if (healthyIndexes.size() > 0) {
+      sb.append(", Healthy: ").append(healthyIndexes.size());
+    }
+    if (unhealthyReplicaDNs.size() > 0) {
+      sb.append(", Unhealthy: ").append(unhealthyReplicaDNs.size());
+    }
+    if (decommissionIndexes.size() > 0) {
+      sb.append(", Decommission: ").append(decommissionIndexes.size());
+    }
+    if (maintenanceIndexes.size() > 0) {
+      sb.append(", Maintenance: ").append(maintenanceIndexes.size());
+    }
+    if (pendingAdd.size() > 0) {
+      sb.append(", PendingAdd: ").append(pendingAdd.size());
+    }
+    if (pendingDelete.size() > 0) {
+      sb.append(", PendingDelete: ").append(pendingDelete.size());
+    }
+    sb.append(")")
+        .append(", ReplicationConfig: ").append(repConfig)
+        .append(", RemainingMaintenanceRedundancy: ")
+        .append(remainingMaintenanceRedundancy);
+    return sb.toString();
   }
 
   /**
@@ -505,7 +592,6 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
   /**
    * Returns the maximum number of replicas that are allowed to be only on a
    * maintenance node, with no other copies on in-service nodes.
-   * @return
    */
   private int getMaxMaintenance() {
     return Math.max(0, repConfig.getParity() - remainingMaintenanceRedundancy);
@@ -515,7 +601,7 @@ public class ECContainerReplicaCount implements ContainerReplicaCount {
    * Validate to ensure that the replia index is between 1 and the max expected
    * replica index for the replication config, eg 5 for 3-2, 9 for 6-3 etc.
    * @param index The replica index to check.
-   * @Throws IllegalArgumentException if the index is out of bounds.
+   * @throws IllegalArgumentException if the index is out of bounds.
    */
   private void ensureIndexWithinBounds(Integer index, String setName) {
     if (index < 1 || index > repConfig.getRequiredNodes()) {

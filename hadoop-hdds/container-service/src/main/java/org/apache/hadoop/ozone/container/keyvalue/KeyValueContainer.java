@@ -29,10 +29,13 @@ import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -52,6 +55,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
@@ -108,6 +112,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   // container are synchronous.
   private Set<Long> pendingPutBlockCache;
 
+  private boolean bCheckChunksFilePath;
+
   public KeyValueContainer(KeyValueContainerData containerData,
       ConfigurationSource ozoneConfig) {
     Preconditions.checkNotNull(containerData,
@@ -123,6 +129,14 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     } else {
       this.pendingPutBlockCache = Collections.emptySet();
     }
+    DatanodeConfiguration dnConf =
+        config.getObject(DatanodeConfiguration.class);
+    bCheckChunksFilePath = dnConf.getCheckEmptyContainerDir();
+  }
+
+  @VisibleForTesting
+  public void setCheckChunksFilePath(boolean bCheckChunksDirFilePath) {
+    this.bCheckChunksFilePath = bCheckChunksDirFilePath;
   }
 
   @Override
@@ -138,72 +152,108 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     long maxSize = containerData.getMaxSize();
     volumeSet.readLock();
     try {
-      HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
-          StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-          maxSize);
-      String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
-      // Set volume before getContainerDBFile(), because we may need the
-      // volume to deduce the db file.
-      containerData.setVolume(containerVolume);
+      List<HddsVolume> volumes
+          = StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList());
+      while (true) {
+        HddsVolume containerVolume;
+        try {
+          containerVolume = volumeChoosingPolicy.chooseVolume(volumes, maxSize);
+        } catch (DiskOutOfSpaceException ex) {
+          throw new StorageContainerException("Container creation failed, " +
+              "due to disk out of space", ex, DISK_OUT_OF_SPACE);
+        } catch (IOException ex) {
+          throw new StorageContainerException(
+              "Container creation failed. " + ex.getMessage(), ex,
+              CONTAINER_INTERNAL_ERROR);
+        }
 
-      long containerID = containerData.getContainerID();
-      String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
+        try {
+          String hddsVolumeDir = containerVolume.getHddsRootDir().toString();
+          // Set volume before getContainerDBFile(), because we may need the
+          // volume to deduce the db file.
+          containerData.setVolume(containerVolume);
+
+          long containerID = containerData.getContainerID();
+          String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
               containerVolume, clusterId);
-      // Set schemaVersion before the dbFile since we have to
-      // choose the dbFile location based on schema version.
-      String schemaVersion = VersionedDatanodeFeatures.SchemaV3
-          .chooseSchemaVersion(config);
-      containerData.setSchemaVersion(schemaVersion);
+          // Set schemaVersion before the dbFile since we have to
+          // choose the dbFile location based on schema version.
+          String schemaVersion = VersionedDatanodeFeatures.SchemaV3
+              .chooseSchemaVersion(config);
+          containerData.setSchemaVersion(schemaVersion);
 
-      containerMetaDataPath = KeyValueContainerLocationUtil
-          .getContainerMetaDataPath(hddsVolumeDir, idDir, containerID);
-      containerData.setMetadataPath(containerMetaDataPath.getPath());
+          containerMetaDataPath = KeyValueContainerLocationUtil
+              .getContainerMetaDataPath(hddsVolumeDir, idDir, containerID);
+          containerData.setMetadataPath(containerMetaDataPath.getPath());
 
-      File chunksPath = KeyValueContainerLocationUtil.getChunksLocationPath(
-          hddsVolumeDir, idDir, containerID);
+          File chunksPath = KeyValueContainerLocationUtil.getChunksLocationPath(
+              hddsVolumeDir, idDir, containerID);
 
-      // Check if it is new Container.
-      ContainerUtils.verifyIsNewContainer(containerMetaDataPath);
+          // Check if it is new Container.
+          ContainerUtils.verifyIsNewContainer(containerMetaDataPath);
 
-      //Create Metadata path chunks path and metadata db
-      File dbFile = getContainerDBFile();
+          //Create Metadata path chunks path and metadata db
+          File dbFile = getContainerDBFile();
 
-      KeyValueContainerUtil.createContainerMetaData(
-              containerMetaDataPath, chunksPath, dbFile,
+          createContainerMetaData(containerMetaDataPath, chunksPath, dbFile,
               containerData.getSchemaVersion(), config);
 
-      //Set containerData for the KeyValueContainer.
-      containerData.setChunksPath(chunksPath.getPath());
-      containerData.setDbFile(dbFile);
+          //Set containerData for the KeyValueContainer.
+          containerData.setChunksPath(chunksPath.getPath());
+          containerData.setDbFile(dbFile);
 
-      // Create .container file
-      File containerFile = getContainerFile();
-      createContainerFile(containerFile);
+          // Create .container file
+          File containerFile = getContainerFile();
+          createContainerFile(containerFile);
 
-    } catch (StorageContainerException ex) {
-      if (containerMetaDataPath != null && containerMetaDataPath.getParentFile()
-          .exists()) {
-        FileUtil.fullyDelete(containerMetaDataPath.getParentFile());
+          return;
+        } catch (StorageContainerException ex) {
+          if (containerMetaDataPath != null
+              && containerMetaDataPath.getParentFile().exists()) {
+            FileUtil.fullyDelete(containerMetaDataPath.getParentFile());
+          }
+          throw ex;
+        } catch (FileAlreadyExistsException ex) {
+          throw new StorageContainerException("Container creation failed " +
+              "because ContainerFile already exists", ex,
+              CONTAINER_ALREADY_EXISTS);
+        } catch (IOException ex) {
+          // This is a general catch all - no space left of device, which should
+          // not happen as the volume Choosing policy should filter out full
+          // disks, but it may still be possible if the disk quickly fills,
+          // or some IO error on the disk etc. In this case we try again with a
+          // different volume if there are any left to try.
+          if (containerMetaDataPath != null &&
+              containerMetaDataPath.getParentFile().exists()) {
+            FileUtil.fullyDelete(containerMetaDataPath.getParentFile());
+          }
+          volumes.remove(containerVolume);
+          LOG.error("Exception attempting to create container {} on volume {}" +
+              " remaining volumes to try {}", containerData.getContainerID(),
+              containerVolume.getHddsRootDir(), volumes.size(), ex);
+          if (volumes.size() == 0) {
+            throw new StorageContainerException(
+                "Container creation failed. " + ex.getMessage(), ex,
+                CONTAINER_INTERNAL_ERROR);
+          }
+        }
       }
-      throw ex;
-    } catch (DiskOutOfSpaceException ex) {
-      throw new StorageContainerException("Container creation failed, due to " +
-          "disk out of space", ex, DISK_OUT_OF_SPACE);
-    } catch (FileAlreadyExistsException ex) {
-      throw new StorageContainerException("Container creation failed because " +
-          "ContainerFile already exists", ex, CONTAINER_ALREADY_EXISTS);
-    } catch (IOException ex) {
-      if (containerMetaDataPath != null && containerMetaDataPath.getParentFile()
-          .exists()) {
-        FileUtil.fullyDelete(containerMetaDataPath.getParentFile());
-      }
-
-      throw new StorageContainerException(
-          "Container creation failed. " + ex.getMessage(), ex,
-          CONTAINER_INTERNAL_ERROR);
     } finally {
       volumeSet.readUnlock();
     }
+  }
+
+
+  /**
+   * The Static method call is wrapped in a protected instance method so it can
+   * be overridden in tests.
+   */
+  @VisibleForTesting
+  protected void createContainerMetaData(File containerMetaDataPath,
+      File chunksPath, File dbFile, String schemaVersion,
+      ConfigurationSource configuration) throws IOException {
+    KeyValueContainerUtil.createContainerMetaData(containerMetaDataPath,
+        chunksPath, dbFile, schemaVersion, configuration);
   }
 
   /**
@@ -294,7 +344,10 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   public void delete() throws StorageContainerException {
     long containerId = containerData.getContainerID();
     try {
-      KeyValueContainerUtil.removeContainer(containerData, config);
+      // Delete the Container from tmp directory.
+      File tmpDirectoryPath = KeyValueContainerUtil.getTmpDirectoryPath(
+          containerData, containerData.getVolume()).toFile();
+      FileUtils.deleteDirectory(tmpDirectoryPath);
     } catch (StorageContainerException ex) {
       // Disk needs replacement.
       throw ex;
@@ -311,8 +364,11 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   @Override
-  public boolean isEmpty() throws IOException {
-    return KeyValueContainerUtil.noBlocksInContainer(containerData);
+  public boolean hasBlocks() throws IOException {
+    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
+      return !KeyValueContainerUtil.noBlocksInContainer(db.getStore(),
+          containerData, bCheckChunksFilePath);
+    }
   }
 
   @Override
@@ -348,6 +404,26 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     LOG.warn("Moving container {} to state {} from state:{}",
             containerData.getContainerPath(), containerData.getState(),
             prevState);
+  }
+
+  @Override
+  public void markContainerForDelete() {
+    writeLock();
+    ContainerDataProto.State prevState = containerData.getState();
+    try {
+      containerData.setState(ContainerDataProto.State.DELETED);
+      File containerFile = getContainerFile();
+      // update the new container data to .container File
+      updateContainerFile(containerFile);
+    } catch (IOException ioe) {
+      LOG.error("Exception occur while update container {} state",
+          containerData.getContainerID(), ioe);
+    } finally {
+      writeUnlock();
+    }
+    LOG.info("Moving container {} to state {} from state:{}",
+        containerData.getContainerPath(), containerData.getState(),
+        prevState);
   }
 
   @Override
@@ -566,8 +642,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
       // delete all other temporary data in case of any exception.
       try {
-        if (containerData.getSchemaVersion() != null &&
-            containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+        if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
           BlockUtils.removeContainerFromDB(containerData, config);
         }
         FileUtils.deleteDirectory(new File(containerData.getMetadataPath()));
@@ -595,7 +670,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     //rewriting the yaml file with new checksum calculation.
     update(originalContainerData.getMetadata(), true);
 
-    if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+    if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
       // load metadata from received dump files before we try to parse kv
       BlockUtils.loadKVContainerDataFromFiles(containerData, config);
     }
@@ -609,20 +684,21 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       ContainerPacker<KeyValueContainerData> packer) throws IOException {
     writeLock();
     try {
-      // Closed/ Quasi closed containers are considered for replication by
-      // replication manager if they are under-replicated.
+      // Closed/ Quasi closed and unhealthy containers are considered for
+      // replication by replication manager if they are under-replicated.
       ContainerProtos.ContainerDataProto.State state =
           getContainerData().getState();
       if (!(state == ContainerProtos.ContainerDataProto.State.CLOSED ||
-          state == ContainerDataProto.State.QUASI_CLOSED)) {
+          state == ContainerDataProto.State.QUASI_CLOSED
+          || state == ContainerDataProto.State.UNHEALTHY)) {
         throw new IllegalStateException(
-            "Only (quasi)closed containers can be exported, but " +
+            "Only (quasi)closed and unhealthy containers can be exported. " +
                 "ContainerId=" + getContainerData().getContainerID() +
                 " is in state " + state);
       }
 
       try {
-        if (!containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+        if (!containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
           compactDB();
           // Close DB (and remove from cache) to avoid concurrent modification
           // while packing it.
@@ -714,6 +790,11 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   }
 
+  public boolean writeLockTryLock(long time, TimeUnit unit)
+      throws InterruptedException {
+    return this.lock.writeLock().tryLock(time, unit);
+  }
+
   /**
    * Returns containerFile.
    * @return .container File name
@@ -724,7 +805,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
             containerData.getContainerID());
   }
 
-  static File getContainerFile(String metadataPath, long containerId) {
+  public static File getContainerFile(String metadataPath, long containerId) {
     return new File(metadataPath,
         containerId + OzoneConsts.CONTAINER_EXTENSION);
   }
@@ -803,7 +884,8 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         .setReplicaIndex(containerData.getReplicaIndex())
         .setDeleteTransactionId(containerData.getDeleteTransactionId())
         .setBlockCommitSequenceId(containerData.getBlockCommitSequenceId())
-        .setOriginNodeId(containerData.getOriginNodeId());
+        .setOriginNodeId(containerData.getOriginNodeId())
+        .setIsEmpty(containerData.isEmpty());
     return ciBuilder.build();
   }
 
@@ -847,10 +929,23 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
    */
   public File getContainerDBFile() {
     return KeyValueContainerLocationUtil.getContainerDBFile(containerData);
+
   }
 
   @Override
-  public boolean scanMetaData() {
+  public boolean shouldScanMetadata() {
+    boolean shouldScan =
+        getContainerState() != ContainerDataProto.State.UNHEALTHY;
+    if (!shouldScan && LOG.isDebugEnabled()) {
+      LOG.debug("Container {} in state {} should not have its metadata " +
+              "scanned.",
+          containerData.getContainerID(), containerData.getState());
+    }
+    return shouldScan;
+  }
+
+  @Override
+  public ScanResult scanMetaData() throws InterruptedException {
     long containerId = containerData.getContainerID();
     KeyValueContainerCheck checker =
         new KeyValueContainerCheck(containerData.getMetadataPath(), config,
@@ -860,12 +955,20 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
 
   @Override
   public boolean shouldScanData() {
-    return containerData.getState() == ContainerDataProto.State.CLOSED
-        || containerData.getState() == ContainerDataProto.State.QUASI_CLOSED;
+    boolean shouldScan =
+        getContainerState() == ContainerDataProto.State.CLOSED
+        || getContainerState() == ContainerDataProto.State.QUASI_CLOSED;
+    if (!shouldScan && LOG.isDebugEnabled()) {
+      LOG.debug("Container {} in state {} should not have its data scanned.",
+          containerData.getContainerID(), containerData.getState());
+    }
+
+    return shouldScan;
   }
 
   @Override
-  public boolean scanData(DataTransferThrottler throttler, Canceler canceler) {
+  public ScanResult scanData(DataTransferThrottler throttler, Canceler canceler)
+      throws InterruptedException {
     if (!shouldScanData()) {
       throw new IllegalStateException("The checksum verification can not be" +
           " done for container in state "
@@ -878,10 +981,6 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
             containerId, containerData.getVolume(), this);
 
     return checker.fullCheck(throttler, canceler);
-  }
-
-  private enum ContainerCheckLevel {
-    NO_CHECK, FAST_CHECK, FULL_CHECK
   }
 
   /**
@@ -898,7 +997,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   private void packContainerToDestination(OutputStream destination,
       ContainerPacker<KeyValueContainerData> packer)
       throws IOException {
-    if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+    if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
       // Synchronize the dump and pack operation,
       // so concurrent exports don't get dump files overwritten.
       // We seldom got concurrent exports for a container,

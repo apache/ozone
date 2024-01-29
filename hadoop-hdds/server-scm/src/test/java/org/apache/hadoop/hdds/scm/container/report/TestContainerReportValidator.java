@@ -29,10 +29,12 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  *
@@ -56,7 +58,7 @@ public class TestContainerReportValidator {
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     ContainerReplicaProto replica = getContainerReplica(
             containerInfo.containerID(), 1, dn);
-    Assertions.assertTrue(ContainerReportValidator.validate(containerInfo, dn,
+    assertTrue(ContainerReportValidator.validate(containerInfo, dn,
             replica));
   }
 
@@ -70,7 +72,7 @@ public class TestContainerReportValidator {
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     ContainerReplicaProto replica = getContainerReplica(
             containerInfo.containerID(), replicaIndex, dn);
-    Assertions.assertFalse(ContainerReportValidator.validate(containerInfo, dn,
+    assertFalse(ContainerReportValidator.validate(containerInfo, dn,
             replica));
   }
 

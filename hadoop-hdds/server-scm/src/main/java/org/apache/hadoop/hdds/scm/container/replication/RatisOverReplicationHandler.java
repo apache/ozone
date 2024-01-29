@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -34,11 +33,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -83,8 +79,8 @@ public class RatisOverReplicationHandler
 
     // We are going to check for over replication, so we should filter out any
     // replicas that are not in a HEALTHY state. This is because a replica can
-    // be healthy, stale or dead. If it is dead is will be quickly removed from
-    // scm. If it is state, there is a good chance the DN is offline and the
+    // be healthy, stale or dead. If it is dead it will be quickly removed from
+    // scm. If it is stale, there is a good chance the DN is offline and the
     // replica will go away soon. So, if we have a container that is over
     // replicated with a HEALTHY and STALE replica, and we decide to delete the
     // HEALTHY one, and then the STALE ones goes away, we will lose them both.
@@ -165,13 +161,6 @@ public class RatisOverReplicationHandler
         sortReplicas(replicaCount.getReplicas(),
             replicaCount.getHealthyReplicaCount() == 0);
 
-    // retain one replica per unique origin datanode if the container is not
-    // closed
-    if (replicaCount.getContainer().getState() !=
-        HddsProtos.LifeCycleState.CLOSED) {
-      saveReplicasWithUniqueOrigins(eligibleReplicas);
-    }
-
     Set<DatanodeDetails> pendingDeletion = new HashSet<>();
     // collect the DNs that are going to have their container replica deleted
     for (ContainerReplicaOp op : pendingOps) {
@@ -187,6 +176,14 @@ public class RatisOverReplicationHandler
             HddsProtos.NodeOperationalState.IN_SERVICE ||
             pendingDeletion.contains(replica.getDatanodeDetails()));
 
+    // retain one replica per unique origin datanode if the container is not
+    // closed
+    if (replicaCount.getContainer().getState() !=
+        HddsProtos.LifeCycleState.CLOSED) {
+      saveReplicasWithUniqueOrigins(replicaCount.getContainer(),
+          eligibleReplicas);
+    }
+
     return eligibleReplicas;
   }
 
@@ -199,29 +196,26 @@ public class RatisOverReplicationHandler
    * @param eligibleReplicas List of replicas that are eligible to be deleted
    * and from which replicas with unique origin node ID need to be saved
    */
-  private void saveReplicasWithUniqueOrigins(
+  private void saveReplicasWithUniqueOrigins(ContainerInfo container,
       List<ContainerReplica> eligibleReplicas) {
-    final Map<UUID, ContainerReplica> uniqueOrigins = new LinkedHashMap<>();
-    eligibleReplicas.stream()
-        // get unique origin nodes of healthy replicas
-        .filter(r -> r.getState() != ContainerReplicaProto.State.UNHEALTHY)
-        .forEach(r -> uniqueOrigins.putIfAbsent(r.getOriginDatanodeId(), r));
-
-    /*
-     Now that we've checked healthy replicas, see if some unhealthy replicas
-     need to be saved. For example, in the case of {QUASI_CLOSED,
-     QUASI_CLOSED, QUASI_CLOSED, UNHEALTHY}, if both the first and last
-     replicas have the same origin node ID (and no other replicas have it), we
-     prefer saving the QUASI_CLOSED replica and deleting the UNHEALTHY one.
-     */
-    for (ContainerReplica replica : eligibleReplicas) {
-      if (replica.getState() == ContainerReplicaProto.State.UNHEALTHY) {
-        uniqueOrigins.putIfAbsent(replica.getOriginDatanodeId(), replica);
-      }
-    }
+    List<ContainerReplica> nonUniqueDeleteCandidates =
+        ReplicationManagerUtil.findNonUniqueDeleteCandidates(
+            new HashSet<>(eligibleReplicas),
+            eligibleReplicas, (dnd) -> {
+              try {
+                return replicationManager.getNodeStatus(dnd);
+              } catch (NodeNotFoundException e) {
+                LOG.warn(
+                    "Exception while finding excess unhealthy replicas to " +
+                        "delete for container {} with eligible replicas {}.",
+                    container, eligibleReplicas, e);
+                return null;
+              }
+            });
 
     // note that this preserves order of the List
-    eligibleReplicas.removeAll(uniqueOrigins.values());
+    eligibleReplicas.removeIf(
+        replica -> !nonUniqueDeleteCandidates.contains(replica));
   }
 
   /**
@@ -237,7 +231,7 @@ public class RatisOverReplicationHandler
       // prefer deleting replicas with lower sequence IDs
       return replicas.stream()
           .sorted(Comparator.comparingLong(ContainerReplica::getSequenceId)
-              .reversed())
+              .thenComparing(ContainerReplica::hashCode))
           .collect(Collectors.toList());
     }
 
@@ -248,7 +242,7 @@ public class RatisOverReplicationHandler
 
   private int createCommands(
       ContainerInfo containerInfo, List<ContainerReplica> replicas,
-      int excess) throws NotLeaderException {
+      int excess) throws NotLeaderException, CommandTargetOverloadedException {
 
     /*
     Being in the over replication queue means we have enough replicas that
@@ -256,16 +250,31 @@ public class RatisOverReplicationHandler
     deleted. This might make the container violate placement policy.
      */
     int commandsSent = 0;
+    int initialExcess = excess;
+    CommandTargetOverloadedException firstOverloadedException = null;
     List<ContainerReplica> replicasRemoved = new ArrayList<>();
     for (ContainerReplica replica : replicas) {
       if (excess == 0) {
-        return commandsSent;
+        break;
       }
       if (!ReplicationManager.compareState(
           containerInfo.getState(), replica.getState())) {
-        replicationManager.sendDeleteCommand(containerInfo,
-            replica.getReplicaIndex(), replica.getDatanodeDetails(), true);
-        commandsSent++;
+        // Delete commands are throttled, so they may fail to send. However, the
+        // replicas here are not in the same state as the container, so they
+        // must be deleted in preference to "healthy" replicas later. Therefore,
+        // if they fail to delete, we continue to mark them as deleted by
+        // reducing the excess so healthy container are not removed later in
+        // this method.
+        try {
+          replicationManager.sendThrottledDeleteCommand(containerInfo,
+              replica.getReplicaIndex(), replica.getDatanodeDetails(), true);
+          commandsSent++;
+        } catch (CommandTargetOverloadedException e) {
+          LOG.debug("Unable to send delete command for a mis-matched state " +
+              "container {} to {} as it has too many pending delete commands",
+              containerInfo.containerID(), replica.getDatanodeDetails());
+          firstOverloadedException = e;
+        }
         replicasRemoved.add(replica);
         excess--;
       }
@@ -281,16 +290,33 @@ public class RatisOverReplicationHandler
     // iterate through replicas in deterministic order
     for (ContainerReplica replica : replicas) {
       if (excess == 0) {
-        return commandsSent;
+        break;
       }
 
       if (super.isPlacementStatusActuallyEqualAfterRemove(replicaSet, replica,
           containerInfo.getReplicationFactor().getNumber())) {
-        replicationManager.sendDeleteCommand(containerInfo,
-            replica.getReplicaIndex(), replica.getDatanodeDetails(), true);
-        commandsSent++;
-        excess--;
+        try {
+          replicationManager.sendThrottledDeleteCommand(containerInfo,
+              replica.getReplicaIndex(), replica.getDatanodeDetails(), true);
+          commandsSent++;
+          excess--;
+        } catch (CommandTargetOverloadedException e) {
+          LOG.debug("Unable to send delete command for container {} to {} as " +
+              "it has too many pending delete commands",
+              containerInfo.containerID(), replica.getDatanodeDetails());
+          if (firstOverloadedException == null) {
+            firstOverloadedException = e;
+          }
+        }
       }
+    }
+    // If we encountered an overloaded exception, and then did not send as many
+    // delete commands as the original excess number, then it means there must
+    // be some replicas we did not delete when we should have. In this case,
+    // throw the exception so that container is requeued and processed again
+    // later.
+    if (firstOverloadedException != null && commandsSent != initialExcess) {
+      throw firstOverloadedException;
     }
     return commandsSent;
   }

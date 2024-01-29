@@ -17,50 +17,83 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Secret;
 
 import java.util.Objects;
 
 /**
  * S3Secret to be saved in database.
  */
-public class S3SecretValue {
-  // TODO: This field should be renamed to accessId for generalization.
-  private String kerberosID;
-  private String awsSecret;
+public final class S3SecretValue {
+  private static final Codec<S3SecretValue> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(S3Secret.getDefaultInstance()),
+      S3SecretValue::fromProtobuf,
+      S3SecretValue::getProtobuf);
 
-  public S3SecretValue(String kerberosID, String awsSecret) {
+  public static Codec<S3SecretValue> getCodec() {
+    return CODEC;
+  }
+
+  // TODO: This field should be renamed to accessId for generalization.
+  private final String kerberosID;
+  private final String awsSecret;
+  private final boolean isDeleted;
+  private final long transactionLogIndex;
+
+  public static S3SecretValue of(String kerberosID, String awsSecret) {
+    return of(kerberosID, awsSecret, 0);
+  }
+
+  public static S3SecretValue of(String kerberosID, String awsSecret, long transactionLogIndex) {
+    return new S3SecretValue(
+        Objects.requireNonNull(kerberosID),
+        Objects.requireNonNull(awsSecret),
+        false,
+        transactionLogIndex
+    );
+  }
+
+  public S3SecretValue deleted() {
+    return new S3SecretValue(kerberosID, "", true, transactionLogIndex);
+  }
+
+  private S3SecretValue(String kerberosID, String awsSecret, boolean isDeleted,
+                       long transactionLogIndex) {
     this.kerberosID = kerberosID;
     this.awsSecret = awsSecret;
+    this.isDeleted = isDeleted;
+    this.transactionLogIndex = transactionLogIndex;
   }
 
   public String getKerberosID() {
     return kerberosID;
   }
 
-  public void setKerberosID(String kerberosID) {
-    this.kerberosID = kerberosID;
-  }
-
   public String getAwsSecret() {
     return awsSecret;
   }
 
-  public void setAwsSecret(String awsSecret) {
-    this.awsSecret = awsSecret;
+  public boolean isDeleted() {
+    return isDeleted;
   }
 
   public String getAwsAccessKey() {
     return kerberosID;
   }
 
-  public static S3SecretValue fromProtobuf(
-      OzoneManagerProtocolProtos.S3Secret s3Secret) {
-    return new S3SecretValue(s3Secret.getKerberosID(), s3Secret.getAwsSecret());
+  public long getTransactionLogIndex() {
+    return transactionLogIndex;
   }
 
-  public OzoneManagerProtocolProtos.S3Secret getProtobuf() {
-    return OzoneManagerProtocolProtos.S3Secret.newBuilder()
+  public static S3SecretValue fromProtobuf(S3Secret s3Secret) {
+    return S3SecretValue.of(s3Secret.getKerberosID(), s3Secret.getAwsSecret());
+  }
+
+  public S3Secret getProtobuf() {
+    return S3Secret.newBuilder()
         .setAwsSecret(this.awsSecret)
         .setKerberosID(this.kerberosID)
         .build();
@@ -68,7 +101,9 @@ public class S3SecretValue {
 
   @Override
   public String toString() {
-    return "awsAccessKey=" + kerberosID + "\nawsSecret=" + awsSecret;
+    return "awsAccessKey=" + kerberosID + "\nawsSecret=" + awsSecret +
+        "\nisDeleted=" + isDeleted + "\ntransactionLogIndex=" +
+        transactionLogIndex;
   }
 
   @Override
@@ -81,11 +116,12 @@ public class S3SecretValue {
     }
     S3SecretValue that = (S3SecretValue) o;
     return kerberosID.equals(that.kerberosID) &&
-        awsSecret.equals(that.awsSecret);
+        awsSecret.equals(that.awsSecret) && isDeleted == that.isDeleted &&
+        transactionLogIndex == that.transactionLogIndex;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(kerberosID, awsSecret);
+    return Objects.hash(kerberosID, awsSecret, isDeleted, transactionLogIndex);
   }
 }

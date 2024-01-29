@@ -19,11 +19,12 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.container.ContainerException;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -35,10 +36,13 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Preconditions;
+
+import jakarta.annotation.Nullable;
 
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CLOSE_CONTAINER;
 
@@ -50,6 +54,8 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
   private final NodeManager nodeManager;
   private final PipelineManager pipelineManager;
   private final ContainerManager containerManager;
+  @Nullable
+  private final DeletedBlockLog deletedBlockLog;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DeadNodeHandler.class);
@@ -57,9 +63,17 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
   public DeadNodeHandler(final NodeManager nodeManager,
                          final PipelineManager pipelineManager,
                          final ContainerManager containerManager) {
+    this(nodeManager, pipelineManager, containerManager, null);
+  }
+
+  public DeadNodeHandler(final NodeManager nodeManager,
+                         final PipelineManager pipelineManager,
+                         final ContainerManager containerManager,
+                         @Nullable final DeletedBlockLog deletedBlockLog) {
     this.nodeManager = nodeManager;
     this.pipelineManager = pipelineManager;
     this.containerManager = containerManager;
+    this.deletedBlockLog = deletedBlockLog;
   }
 
   @Override
@@ -79,13 +93,26 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
        * action.
        */
       LOG.info("A dead datanode is detected. {}", datanodeDetails);
-      destroyPipelines(datanodeDetails);
       closeContainers(datanodeDetails, publisher);
+      destroyPipelines(datanodeDetails);
 
       // Remove the container replicas associated with the dead node unless it
       // is IN_MAINTENANCE
       if (!nodeManager.getNodeStatus(datanodeDetails).isInMaintenance()) {
         removeContainerReplicas(datanodeDetails);
+      }
+      
+      // remove commands in command queue for the DN
+      final List<SCMCommand> cmdList = nodeManager.getCommandQueue(
+          datanodeDetails.getUuid());
+      LOG.info("Clearing command queue of size {} for DN {}",
+          cmdList.size(), datanodeDetails);
+
+      // remove DeleteBlocksCommand associated with the dead node unless it
+      // is IN_MAINTENANCE
+      if (deletedBlockLog != null &&
+          !nodeManager.getNodeStatus(datanodeDetails).isInMaintenance()) {
+        deletedBlockLog.onDatanodeDead(datanodeDetails.getUuid());
       }
 
       //move dead datanode out of ClusterNetworkTopology
@@ -95,7 +122,7 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
         //make sure after DN is removed from topology,
         //DatanodeDetails instance returned from nodeStateManager has no parent.
         Preconditions.checkState(
-            nodeManager.getNodeByUuid(datanodeDetails.getUuidString())
+            nodeManager.getNodeByUuid(datanodeDetails.getUuid())
                 .getParent() == null);
       }
     } catch (NodeNotFoundException ex) {
@@ -115,12 +142,12 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
         .ifPresent(pipelines ->
             pipelines.forEach(id -> {
               try {
-                pipelineManager.closePipeline(
-                    pipelineManager.getPipeline(id), false);
+                pipelineManager.closePipeline(id);
+                pipelineManager.deletePipeline(id);
               } catch (PipelineNotFoundException ignore) {
                 // Pipeline is not there in pipeline manager,
                 // should we care?
-              } catch (IOException | TimeoutException ex) {
+              } catch (IOException ex) {
                 LOG.warn("Exception while finalizing pipeline {}",
                     id, ex);
               }

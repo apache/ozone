@@ -52,7 +52,6 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,6 +71,8 @@ import java.util.stream.Collectors;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
 
 /**
  * Tests the EC recovery and over replication processing.
@@ -97,7 +98,7 @@ public class TestECContainerRecovery {
    */
   @BeforeAll
   public static void init() throws Exception {
-    chunkSize = 1024;
+    chunkSize = 1024 * 1024;
     flushSize = 2 * chunkSize;
     maxFlushSize = 2 * flushSize;
     blockSize = 2 * maxFlushSize;
@@ -248,12 +249,15 @@ public class TestECContainerRecovery {
     cluster.restartHddsDatanode(pipeline.getFirstNode(), true);
     // Check container is over replicated.
     waitForContainerCount(6, container.containerID(), scm);
+
+    // Resume RM and wait the over replicated replica deleted.
+    // ReplicationManager fix container replica state if different
+    scm.getReplicationManager().start();
+
     // Wait for all the replicas to be closed.
     container = scm.getContainerInfo(container.getContainerID());
     waitForDNContainerState(container, scm);
 
-    // Resume RM and wait the over replicated replica deleted.
-    scm.getReplicationManager().start();
     waitForContainerCount(5, container.containerID(), scm);
   }
 
@@ -305,7 +309,7 @@ public class TestECContainerRecovery {
               .mockFieldReflection(handler,
                       "coordinator");
 
-      Mockito.doAnswer(invocation -> {
+      doAnswer(invocation -> {
         GenericTestUtils.waitFor(() ->
             dn.getDatanodeStateMachine()
                 .getContainer()
@@ -317,8 +321,8 @@ public class TestECContainerRecovery {
         reconstructedDN.set(dn);
         invocation.callRealMethod();
         return null;
-      }).when(coordinator).reconstructECBlockGroup(Mockito.any(), Mockito.any(),
-              Mockito.any(), Mockito.any());
+      }).when(coordinator).reconstructECBlockGroup(any(), any(),
+              any(), any());
     }
 
     // Shutting down DN triggers close pipeline and close container.

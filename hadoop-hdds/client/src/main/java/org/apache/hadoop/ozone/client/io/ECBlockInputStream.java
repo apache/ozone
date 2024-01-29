@@ -181,12 +181,13 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
       // single location for the block index we want to read. The EC blocks are
       // indexed from 1 to N, however the data locations are stored in the
       // dataLocations array indexed from zero.
+      DatanodeDetails dataLocation = dataLocations[locationIndex];
       Pipeline pipeline = Pipeline.newBuilder()
           .setReplicationConfig(StandaloneReplicationConfig.getInstance(
               HddsProtos.ReplicationFactor.ONE))
-          .setNodes(Arrays.asList(dataLocations[locationIndex]))
-          .setId(PipelineID.randomId()).setReplicaIndexes(
-              ImmutableMap.of(dataLocations[locationIndex], locationIndex + 1))
+          .setNodes(Arrays.asList(dataLocation))
+          .setId(PipelineID.valueOf(dataLocation.getUuid())).setReplicaIndexes(
+              ImmutableMap.of(dataLocation, locationIndex + 1))
           .setState(Pipeline.PipelineState.CLOSED)
           .build();
 
@@ -334,7 +335,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
     }
   }
 
-  private boolean shouldRetryFailedRead(int failedIndex) {
+  protected boolean shouldRetryFailedRead(int failedIndex) {
     Deque<DatanodeDetails> spareLocations = spareDataLocations.get(failedIndex);
     if (spareLocations != null && spareLocations.size() > 0) {
       failedLocations.add(dataLocations[failedIndex]);
@@ -470,7 +471,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
     seeked = true;
   }
 
-  private void closeStream(int i) {
+  protected void closeStream(int i) {
     if (blockStreams[i] != null) {
       try {
         blockStreams[i].close();

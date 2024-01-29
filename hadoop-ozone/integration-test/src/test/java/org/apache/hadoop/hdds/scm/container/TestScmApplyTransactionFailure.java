@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.pipeline.DuplicatedPipelineIdException;
 import org.apache.hadoop.hdds.scm.pipeline.InvalidPipelineStateException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -43,9 +44,9 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.ozone.ClientVersion.CURRENT_VERSION;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test-cases to verify SCMStateMachine.applyTransaction failure scenarios.
@@ -98,10 +99,11 @@ public class TestScmApplyTransactionFailure {
 
     // adding container to a closed pipeline should yield an error.
     ContainerInfoProto containerInfo = createContainer(pipeline);
-    StateMachineException ex = assertThrows(StateMachineException.class,
+    Throwable ex = assertThrows(SCMException.class,
         () -> containerManager.getContainerStateManager()
             .addContainer(containerInfo));
-    assertTrue(ex.getCause() instanceof InvalidPipelineStateException);
+    assertCause(ex, StateMachineException.class,
+        InvalidPipelineStateException.class);
     assertThrows(ContainerNotFoundException.class,
         () -> containerManager.getContainer(
             new ContainerID(containerInfo.getContainerID())));
@@ -121,10 +123,11 @@ public class TestScmApplyTransactionFailure {
 
     HddsProtos.Pipeline pipelineToCreate =
         existing.getProtobufMessage(CURRENT_VERSION);
-    StateMachineException ex = assertThrows(StateMachineException.class,
+    Throwable ex = assertThrows(SCMException.class,
         () -> pipelineManager.getStateManager().addPipeline(
             pipelineToCreate));
-    assertTrue(ex.getCause() instanceof DuplicatedPipelineIdException);
+    assertCause(ex, StateMachineException.class,
+        DuplicatedPipelineIdException.class);
   }
 
   private ContainerInfoProto createContainer(Pipeline pipeline) {
@@ -143,5 +146,14 @@ public class TestScmApplyTransactionFailure {
     containerInfoBuilder.setReplicationFactor(
         ReplicationConfig.getLegacyFactor(pipeline.getReplicationConfig()));
     return containerInfoBuilder.build();
+  }
+
+  @SafeVarargs
+  private static void assertCause(Throwable ex,
+      Class<? extends Throwable>... causes) {
+    for (Class<? extends Throwable> cause : causes) {
+      assertInstanceOf(cause, ex.getCause());
+      ex = ex.getCause();
+    }
   }
 }

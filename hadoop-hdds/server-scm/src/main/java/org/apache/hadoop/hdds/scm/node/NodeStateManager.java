@@ -196,8 +196,12 @@ public class NodeStateManager implements Runnable, Closeable {
         OZONE_SCM_STALENODE_INTERVAL + " should be less than" +
             OZONE_SCM_DEADNODE_INTERVAL);
     executorService = HadoopExecutors.newScheduledThreadPool(1,
-        new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat("SCM Heartbeat Processing Thread - %d").build());
+        new ThreadFactoryBuilder()
+            .setDaemon(true)
+            .setNameFormat(
+                scmContext.threadNamePrefix() + "SCMHeartbeatProcessor-%d")
+            .build()
+    );
 
     skippedHealthChecks = 0;
     checkPaused = false; // accessed only from test functions
@@ -374,7 +378,12 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   public DatanodeInfo getNode(DatanodeDetails datanodeDetails)
       throws NodeNotFoundException {
-    return nodeStateMap.getNodeInfo(datanodeDetails.getUuid());
+    return getNode(datanodeDetails.getUuid());
+  }
+
+  public DatanodeInfo getNode(UUID uuid)
+      throws NodeNotFoundException {
+    return nodeStateMap.getNodeInfo(uuid);
   }
 
   /**
@@ -729,9 +738,8 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   public synchronized void forceNodesToHealthyReadOnly() {
     try {
-      List<UUID> nodes = nodeStateMap.getNodes(null, HEALTHY);
-      for (UUID id : nodes) {
-        DatanodeInfo node = nodeStateMap.getNodeInfo(id);
+      List<DatanodeInfo> nodes = nodeStateMap.filterNodes(null, HEALTHY);
+      for (DatanodeInfo node : nodes) {
         nodeStateMap.updateNodeHealthState(node.getUuid(),
             HEALTHY_READONLY);
         if (state2EventMap.containsKey(HEALTHY_READONLY)) {
