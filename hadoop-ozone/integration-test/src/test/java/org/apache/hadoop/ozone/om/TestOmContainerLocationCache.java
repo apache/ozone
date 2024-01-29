@@ -253,10 +253,13 @@ public class TestOmContainerLocationCache {
   }
 
   @BeforeEach
-  public void beforeEach() {
+  public void beforeEach() throws IOException {
     CONTAINER_ID.getAndIncrement();
     reset(mockScmBlockLocationProtocol, mockScmContainerClient,
         mockDn1Protocol, mockDn2Protocol);
+    InnerNode.Factory factory = InnerNodeImpl.FACTORY;
+    when(mockScmBlockLocationProtocol.getClusterTree()).thenReturn(
+        factory.newInnerNode("", "", null, NetConstants.ROOT_LEVEL, 1));
     when(mockDn1Protocol.getPipeline()).thenReturn(createPipeline(DN1));
     when(mockDn2Protocol.getPipeline()).thenReturn(createPipeline(DN2));
   }
