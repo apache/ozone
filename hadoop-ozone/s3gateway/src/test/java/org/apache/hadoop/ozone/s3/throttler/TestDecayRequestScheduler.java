@@ -20,7 +20,8 @@ package org.apache.hadoop.ozone.s3.throttler;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -29,14 +30,14 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.hadoop.http.HttpServer2.HTTP_MAX_THREADS_KEY;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Testing of DecayRequestScheduler.
  */
-public class TestDecayRequestScheduler {
+class TestDecayRequestScheduler {
   private static final double DECAY_FACTOR = 0.5;
   private static final long DECAY_PERIOD = 2000;
   private static final long MAX_REQUESTS = 10;
@@ -79,28 +80,29 @@ public class TestDecayRequestScheduler {
 
 
   @Test
-  public void testSingleUserNoPriorRequests() throws Exception {
+  void testSingleUserNoPriorRequests() {
     RequestScheduler requestScheduler = getRequestScheduler();
     String user = "ozone";
     Request request = getRequest(user);
 
-    assertFalse("Expected user " + user + " request to be granted",
-        requestScheduler.shouldReject(request));
+    assertFalse(requestScheduler.shouldReject(request),
+        "Expected user " + user + " request to be granted");
   }
 
   @Test
-  public void testSingleUserFewRequests() throws Exception {
+  void testSingleUserFewRequests() {
     RequestScheduler requestScheduler = getRequestScheduler();
     String user = "ozone";
     Request request = getRequest(user);
     requestScheduler.addRequest(request);
 
-    assertFalse("Expected user " + user + " request to be granted",
-        requestScheduler.shouldReject(request));
+    assertFalse(requestScheduler.shouldReject(request),
+        "Expected user " + user + " request to be granted");
   }
 
-  @Test(timeout = 6000)
-  public void testSingleUserAfterDecay() throws Exception {
+  @Test
+  @Timeout(6)
+  void testSingleUserAfterDecay() throws Exception {
     RequestScheduler requestScheduler = getRequestScheduler();
     Request testRequest = getRequest("testUser");
 
@@ -120,18 +122,18 @@ public class TestDecayRequestScheduler {
     }
 
     // Total requests = 6, ozone made 4 requests (should be rejected now).
-    assertTrue("Expected user " + user + " request to be rejected",
-        requestScheduler.shouldReject(request));
+    assertTrue(requestScheduler.shouldReject(request),
+        "Expected user " + user + " request to be rejected");
   }
 
-  @Test(timeout = 6000)
-  public void testMultipleUsersWithDecay() throws Exception {
+  @Test
+  @Timeout(6)
+  void testMultipleUsersWithDecay() throws Exception {
     // Prepare users and requests for testing
     String[] users = {"user1", "user2", "user3"};
     long[] requestsCount =
         {MAX_REQUESTS - 2, MAX_REQUESTS + 2, MAX_REQUESTS * 2};
     boolean[] firstDecay = {false, false, true};
-    boolean[] secondDecay = {false, false, false};
     final int usersCount = users.length;
     Request[] requests = new Request[usersCount];
     for (int i = 0; i < usersCount; i++) {
@@ -161,10 +163,9 @@ public class TestDecayRequestScheduler {
     }
 
     for (int i = 0; i < usersCount; i++) {
-      assertEquals(
+      assertEquals(firstDecay[i], requestScheduler.shouldReject(requests[i]),
           "Expected user " + users[i] + " request to be " +
-              (firstDecay[i] ? "rejected" : "granted"),
-          firstDecay[i], requestScheduler.shouldReject(requests[i]));
+                    (firstDecay[i] ? "rejected" : "granted"));
     }
 
     // Wait for a decay.
@@ -174,10 +175,8 @@ public class TestDecayRequestScheduler {
 
     // All users should pass now.
     for (int i = 0; i < usersCount; i++) {
-      assertEquals(
-          "Expected user " + users[i] + " request to be " +
-              (secondDecay[i] ? "rejected" : "granted"),
-          secondDecay[i], requestScheduler.shouldReject(requests[i]));
+      assertFalse(requestScheduler.shouldReject(requests[i]),
+          "Expected user " + users[i] + " request to be granted");
     }
   }
 }

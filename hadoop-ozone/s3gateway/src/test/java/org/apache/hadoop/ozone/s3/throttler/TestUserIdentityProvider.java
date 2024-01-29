@@ -18,19 +18,20 @@
 package org.apache.hadoop.ozone.s3.throttler;
 
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests for UserIdentityProvider.
  */
-public class TestUserIdentityProvider {
+class TestUserIdentityProvider {
   private final String curDate = DATE_FORMATTER.format(LocalDate.now());
 
   private final IdentityProvider identityProvider = new UserIdentityProvider();
@@ -52,7 +53,7 @@ public class TestUserIdentityProvider {
   }
 
   @Test
-  public void testMakeIdentityValidCredential() throws Exception {
+  void testMakeIdentityValidCredential() throws Exception {
     String auth = "AWS4-HMAC-SHA256 " +
         "Credential=ozone/" + curDate + "/us-east-1/s3/aws4_request, " +
         "SignedHeaders=host;range;x-amz-date, " +
@@ -60,12 +61,12 @@ public class TestUserIdentityProvider {
 
     Request request = getRequest(auth);
     String identity = identityProvider.makeIdentity(request);
-    String message = String.format("Expected identity ozone got %s", identity);
-    Assert.assertEquals(message, "ozone", identity);
+
+    assertEquals("ozone", identity);
   }
 
   @Test
-  public void testMakeIdentityInvalidCredential() {
+  void testMakeIdentityInvalidCredential() {
     try {
       String auth = "AWS4-HMAC-SHA256 " +
           "Credential=" + curDate + "/us-east-1/s3/aws4_request, " +
@@ -73,9 +74,9 @@ public class TestUserIdentityProvider {
           "Signature=fe5f80f77d5fa3beca038a248ff027";
       Request request = getRequest(auth);
       identityProvider.makeIdentity(request);
-      Assert.fail("Exception is expected in case of malformed header");
+      fail("Exception is expected in case of malformed header");
     } catch (OS3Exception ex) {
-      Assert.assertEquals("AuthorizationHeaderMalformed", ex.getCode());
+      assertEquals("AuthorizationHeaderMalformed", ex.getCode());
     }
   }
 }
