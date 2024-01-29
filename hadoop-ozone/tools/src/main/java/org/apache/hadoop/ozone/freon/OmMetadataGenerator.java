@@ -40,8 +40,6 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
@@ -56,6 +54,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import com.codahale.metrics.Timer;
 import org.apache.hadoop.security.UserGroupInformation;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
 
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
@@ -155,6 +154,9 @@ public class OmMetadataGenerator extends BaseFreonGenerator
   )
   private String omServiceID;
 
+  @Mixin
+  private FreonReplicationOptions replication;
+
   private OzoneManagerProtocol ozoneManagerClient;
 
   private ThreadLocal<OmKeyArgs.Builder> omKeyArgsBuilder;
@@ -166,9 +168,6 @@ public class OmMetadataGenerator extends BaseFreonGenerator
   private ReplicationConfig replicationConfig;
   private Operation[] operations;
   private boolean mixedOperation = false;
-
-  private final ReplicationConfig ratisThree =
-      ReplicationConfig.fromProtoTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.THREE);
 
   @Override
   public Void call() throws Exception {
@@ -184,7 +183,7 @@ public class OmMetadataGenerator extends BaseFreonGenerator
     contentGenerator = new ContentGenerator(dataSize.toBytes(), bufferSize);
     omKeyArgsBuilder = ThreadLocal.withInitial(this::createKeyArgsBuilder);
     OzoneConfiguration conf = createOzoneConfiguration();
-    replicationConfig = ReplicationConfig.getDefault(conf);
+    replicationConfig = replication.fromParamsOrConfig(conf);
 
     try (OzoneClient rpcClient = createOzoneClient(omServiceID, conf)) {
       ensureVolumeAndBucketExist(rpcClient, volumeName, bucketName);
@@ -336,11 +335,11 @@ public class OmMetadataGenerator extends BaseFreonGenerator
     switch (operation) {
     case CREATE_KEY:
       getMetrics().timer(operation.name()).time(() -> performWriteOperation(() ->
-          bucket.createKey(keyName, dataSize.toBytes(), ratisThree, emptyMap()), contentGenerator));
+          bucket.createKey(keyName, dataSize.toBytes(), replicationConfig, emptyMap()), contentGenerator));
       break;
     case CREATE_STREAM_KEY:
       getMetrics().timer(operation.name()).time(() -> performWriteOperation(() ->
-          bucket.createStreamKey(keyName, dataSize.toBytes(), ratisThree, emptyMap()), contentGenerator));
+          bucket.createStreamKey(keyName, dataSize.toBytes(), replicationConfig, emptyMap()), contentGenerator));
       break;
     case LOOKUP_KEY:
       keyArgs = omKeyArgsBuilder.get().setKeyName(keyName).build();
@@ -363,11 +362,11 @@ public class OmMetadataGenerator extends BaseFreonGenerator
       break;
     case CREATE_FILE:
       getMetrics().timer(operation.name()).time(() -> performWriteOperation(() ->
-          bucket.createFile(keyName, dataSize.toBytes(), ratisThree, true, false), contentGenerator));
+          bucket.createFile(keyName, dataSize.toBytes(), replicationConfig, true, false), contentGenerator));
       break;
     case CREATE_STREAM_FILE:
       getMetrics().timer(operation.name()).time(() -> performWriteOperation(() ->
-          bucket.createStreamFile(keyName, dataSize.toBytes(), ratisThree, true, false), contentGenerator));
+          bucket.createStreamFile(keyName, dataSize.toBytes(), replicationConfig, true, false), contentGenerator));
       break;
     case LOOKUP_FILE:
       keyArgs = omKeyArgsBuilder.get().setKeyName(keyName).build();
