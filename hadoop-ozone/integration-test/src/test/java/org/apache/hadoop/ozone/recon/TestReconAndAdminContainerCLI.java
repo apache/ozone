@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.recon;
 
-import com.google.common.base.Strings;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -36,7 +35,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -59,13 +57,14 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 import java.io.IOException;
@@ -94,13 +93,19 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERV
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Integration tests for ensuring Recon's consistency
  * with the "ozone admin container" CLI.
  */
 @Timeout(300)
-public class TestReconAndAdminContainerCLI {
+class TestReconAndAdminContainerCLI {
+
+  private static final Logger LOG = LoggerFactory.getLogger(TestReconAndAdminContainerCLI.class);
 
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
   private static ScmClient scmClient;
@@ -121,7 +126,7 @@ public class TestReconAndAdminContainerCLI {
   }
 
   @BeforeAll
-  public static void init() throws Exception {
+  static void init() throws Exception {
     setupConfigKeys();
     cluster = MiniOzoneCluster.newBuilder(CONF)
                   .setNumDatanodes(5)
@@ -147,18 +152,15 @@ public class TestReconAndAdminContainerCLI {
 
     // Verify that Recon has all the pipelines from SCM.
     scmPipelineManager.getPipelines().forEach(p -> {
-      try {
-        Assertions.assertNotNull(reconPipelineManager.getPipeline(p.getId()));
-      } catch (PipelineNotFoundException e) {
-        Assertions.fail();
-      }
+      Pipeline pipeline = assertDoesNotThrow(() -> reconPipelineManager.getPipeline(p.getId()));
+      assertNotNull(pipeline);
     });
 
-    Assertions.assertTrue(scmContainerManager.getContainers().isEmpty());
+    assertThat(scmContainerManager.getContainers()).isEmpty();
 
     // Verify that all nodes are registered with Recon.
     NodeManager reconNodeManager = reconScm.getScmNodeManager();
-    Assertions.assertEquals(scmNodeManager.getAllNodes().size(),
+    assertEquals(scmNodeManager.getAllNodes().size(),
         reconNodeManager.getAllNodes().size());
 
     OzoneClient client = cluster.newClient();
@@ -174,7 +176,7 @@ public class TestReconAndAdminContainerCLI {
   }
 
   @AfterAll
-  public static void shutdown() {
+  static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -185,7 +187,7 @@ public class TestReconAndAdminContainerCLI {
    * but it's easier to test with Ratis ONE.
    */
   @Test
-  public void testMissingContainer() throws Exception {
+  void testMissingContainer() throws Exception {
     String keyNameR1 = "key2";
     long containerID = setupRatisKey(keyNameR1,
         HddsProtos.ReplicationFactor.ONE);
@@ -209,7 +211,7 @@ public class TestReconAndAdminContainerCLI {
 
     UnHealthyContainerStates containerStateForTesting =
         UnHealthyContainerStates.MISSING;
-    compareRMReportToReconResponse(containerStateForTesting.toString());
+    compareRMReportToReconResponse(containerStateForTesting);
 
     for (DatanodeDetails details : pipeline.getNodes()) {
       cluster.restartHddsDatanode(details, false);
@@ -219,7 +221,7 @@ public class TestReconAndAdminContainerCLI {
 
   @ParameterizedTest
   @MethodSource("outOfServiceNodeStateArgs")
-  public void testNodesInDecommissionOrMaintenance(
+  void testNodesInDecommissionOrMaintenance(
       NodeOperationalState initialState, NodeOperationalState finalState,
       boolean isMaintenance) throws Exception {
     Pipeline pipeline =
@@ -250,8 +252,8 @@ public class TestReconAndAdminContainerCLI {
     TestNodeUtil.waitForDnToReachOpState(scmNodeManager,
         nodeToGoOffline1, initialState);
 
-    compareRMReportToReconResponse(underReplicatedState.toString());
-    compareRMReportToReconResponse(overReplicatedState.toString());
+    compareRMReportToReconResponse(underReplicatedState);
+    compareRMReportToReconResponse(overReplicatedState);
 
     TestNodeUtil.waitForDnToReachOpState(scmNodeManager,
         nodeToGoOffline1, finalState);
@@ -262,8 +264,8 @@ public class TestReconAndAdminContainerCLI {
       TestHelper.waitForReplicaCount(containerIdR3, 4, cluster);
     }
 
-    compareRMReportToReconResponse(underReplicatedState.toString());
-    compareRMReportToReconResponse(overReplicatedState.toString());
+    compareRMReportToReconResponse(underReplicatedState);
+    compareRMReportToReconResponse(overReplicatedState);
 
     // Second node goes offline.
     if (isMaintenance) {
@@ -277,8 +279,8 @@ public class TestReconAndAdminContainerCLI {
     TestNodeUtil.waitForDnToReachOpState(scmNodeManager,
         nodeToGoOffline2, initialState);
 
-    compareRMReportToReconResponse(underReplicatedState.toString());
-    compareRMReportToReconResponse(overReplicatedState.toString());
+    compareRMReportToReconResponse(underReplicatedState);
+    compareRMReportToReconResponse(overReplicatedState);
 
     TestNodeUtil.waitForDnToReachOpState(scmNodeManager,
         nodeToGoOffline2, finalState);
@@ -288,8 +290,8 @@ public class TestReconAndAdminContainerCLI {
     int expectedReplicaNum = isMaintenance ? 4 : 5;
     TestHelper.waitForReplicaCount(containerIdR3, expectedReplicaNum, cluster);
 
-    compareRMReportToReconResponse(underReplicatedState.toString());
-    compareRMReportToReconResponse(overReplicatedState.toString());
+    compareRMReportToReconResponse(underReplicatedState);
+    compareRMReportToReconResponse(overReplicatedState);
 
     scmClient.recommissionNodes(Arrays.asList(
         TestNodeUtil.getDNHostAndPort(nodeToGoOffline1),
@@ -303,8 +305,8 @@ public class TestReconAndAdminContainerCLI {
     TestNodeUtil.waitForDnToReachPersistedOpState(nodeToGoOffline1, IN_SERVICE);
     TestNodeUtil.waitForDnToReachPersistedOpState(nodeToGoOffline2, IN_SERVICE);
 
-    compareRMReportToReconResponse(underReplicatedState.toString());
-    compareRMReportToReconResponse(overReplicatedState.toString());
+    compareRMReportToReconResponse(underReplicatedState);
+    compareRMReportToReconResponse(overReplicatedState);
   }
 
   /**
@@ -312,53 +314,53 @@ public class TestReconAndAdminContainerCLI {
    * but to make sure that they are consistent between
    * Recon and the ReplicationManager.
    */
-  private static void compareRMReportToReconResponse(String containerState)
+  private static void compareRMReportToReconResponse(UnHealthyContainerStates containerState)
       throws Exception {
-    Assertions.assertFalse(Strings.isNullOrEmpty(containerState));
-
-    ReplicationManagerReport rmReport = scmClient.getReplicationManagerReport();
-    UnhealthyContainersResponse reconResponse =
-        TestReconEndpointUtil
-            .getUnhealthyContainersFromRecon(CONF, containerState);
-
-    long rmMissingCounter = rmReport.getStat(
-        ReplicationManagerReport.HealthState.MISSING);
-    long rmUnderReplCounter = rmReport.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED);
-    long rmOverReplCounter = rmReport.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED);
-    long rmMisReplCounter = rmReport.getStat(
-        ReplicationManagerReport.HealthState.MIS_REPLICATED);
+    assertNotNull(containerState);
 
     // Both threads are running every 1 second.
     // Wait until all values are equal.
-    GenericTestUtils.waitFor(
-            () -> rmMissingCounter == reconResponse.getMissingCount() &&
-                    rmUnderReplCounter == reconResponse.getUnderReplicatedCount() &&
-                    rmOverReplCounter == reconResponse.getOverReplicatedCount() &&
-                    rmMisReplCounter == reconResponse.getMisReplicatedCount(),
-            1000, 40000);
+    GenericTestUtils.waitFor(() -> assertReportsMatch(containerState),
+        1000, 40000);
+  }
+
+  private static boolean assertReportsMatch(UnHealthyContainerStates state) {
+    ReplicationManagerReport rmReport;
+    UnhealthyContainersResponse reconResponse;
+
+    try {
+      rmReport = scmClient.getReplicationManagerReport();
+      reconResponse = TestReconEndpointUtil
+          .getUnhealthyContainersFromRecon(CONF, state);
+
+      assertEquals(rmReport.getStat(HealthState.MISSING), reconResponse.getMissingCount());
+      assertEquals(rmReport.getStat(HealthState.UNDER_REPLICATED), reconResponse.getUnderReplicatedCount());
+      assertEquals(rmReport.getStat(HealthState.OVER_REPLICATED), reconResponse.getOverReplicatedCount());
+      assertEquals(rmReport.getStat(HealthState.MIS_REPLICATED), reconResponse.getMisReplicatedCount());
+    } catch (IOException e) {
+      LOG.info("Error getting report", e);
+      return false;
+    } catch (AssertionError e) {
+      LOG.info("Reports do not match (yet): {}", e.getMessage());
+      return false;
+    }
 
     // Recon's UnhealthyContainerResponse contains a list of containers
     // for a particular state. Check if RMs sample of containers can be
     // found in Recon's list of containers for a particular state.
     HealthState rmState = HealthState.UNHEALTHY;
 
-    if (UnHealthyContainerStates.valueOf(containerState)
-            .equals(UnHealthyContainerStates.MISSING) &&
-        rmMissingCounter > 0) {
+    if (state.equals(UnHealthyContainerStates.MISSING) &&
+        reconResponse.getMissingCount() > 0) {
       rmState = HealthState.MISSING;
-    } else if (UnHealthyContainerStates.valueOf(containerState)
-                   .equals(UnHealthyContainerStates.UNDER_REPLICATED) &&
-               rmUnderReplCounter > 0) {
+    } else if (state.equals(UnHealthyContainerStates.UNDER_REPLICATED) &&
+               reconResponse.getUnderReplicatedCount() > 0) {
       rmState = HealthState.UNDER_REPLICATED;
-    } else if (UnHealthyContainerStates.valueOf(containerState)
-                   .equals(UnHealthyContainerStates.OVER_REPLICATED) &&
-               rmOverReplCounter > 0) {
+    } else if (state.equals(UnHealthyContainerStates.OVER_REPLICATED) &&
+               reconResponse.getOverReplicatedCount() > 0) {
       rmState = HealthState.OVER_REPLICATED;
-    } else if (UnHealthyContainerStates.valueOf(containerState)
-                   .equals(UnHealthyContainerStates.MIS_REPLICATED) &&
-               rmMisReplCounter > 0) {
+    } else if (state.equals(UnHealthyContainerStates.MIS_REPLICATED) &&
+               reconResponse.getMisReplicatedCount() > 0) {
       rmState = HealthState.MIS_REPLICATED;
     }
 
@@ -372,7 +374,9 @@ public class TestReconAndAdminContainerCLI {
             .stream()
             .map(UnhealthyContainerMetadata::getContainerID)
             .collect(Collectors.toList());
-    Assertions.assertTrue(reconContainerIDs.containsAll(rmIDsToLong));
+    assertThat(reconContainerIDs).containsAll(rmIDsToLong);
+
+    return true;
   }
 
   private static long setupRatisKey(String keyName,
@@ -385,11 +389,11 @@ public class TestReconAndAdminContainerCLI {
 
     List<Long> containerIDs = getContainerIdsForKey(omKeyInfo);
     // The list has only 1 containerID.
-    Assertions.assertEquals(1, containerIDs.size());
+    assertEquals(1, containerIDs.size());
     long containerID = containerIDs.get(0);
 
     // Verify Recon picked up the new container.
-    Assertions.assertEquals(scmContainerManager.getContainers(),
+    assertEquals(scmContainerManager.getContainers(),
         reconContainerManager.getContainers());
 
     ReconContainerMetadataManager reconContainerMetadataManager =
@@ -427,7 +431,7 @@ public class TestReconAndAdminContainerCLI {
   }
 
   private static List<Long> getContainerIdsForKey(OmKeyInfo omKeyInfo) {
-    Assertions.assertNotNull(omKeyInfo.getLatestVersionLocations());
+    assertNotNull(omKeyInfo.getLatestVersionLocations());
     List<OmKeyLocationInfo> locations =
         omKeyInfo.getLatestVersionLocations().getLocationList();
 
