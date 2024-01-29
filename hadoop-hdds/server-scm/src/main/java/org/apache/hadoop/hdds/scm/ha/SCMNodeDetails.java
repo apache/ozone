@@ -30,38 +30,26 @@ import java.net.InetSocketAddress;
  * Construct SCM node details.
  */
 public final class SCMNodeDetails extends NodeDetails {
-  private InetSocketAddress blockProtocolServerAddress;
-  private String blockProtocolServerAddressKey;
-  private InetSocketAddress clientProtocolServerAddress;
-  private String clientProtocolServerAddressKey;
-  private InetSocketAddress datanodeProtocolServerAddress;
-  private String datanodeAddressKey;
-  private int grpcPort;
+  private final InetSocketAddress blockProtocolServerAddress;
+  private final String blockProtocolServerAddressKey;
+  private final InetSocketAddress clientProtocolServerAddress;
+  private final String clientProtocolServerAddressKey;
+  private final InetSocketAddress datanodeProtocolServerAddress;
+  private final String datanodeAddressKey;
+  private final int grpcPort;
+
   public static final Logger LOG =
       LoggerFactory.getLogger(SCMNodeDetails.class);
 
-  /**
-   * Constructs SCMNodeDetails object.
-   */
-  @SuppressWarnings("checkstyle:ParameterNumber")
-  private SCMNodeDetails(String serviceId, String nodeId,
-      InetSocketAddress rpcAddr, int ratisPort, int grpcPort,
-      String httpAddress, String httpsAddress,
-      InetSocketAddress blockProtocolServerAddress,
-      InetSocketAddress clientProtocolServerAddress,
-      InetSocketAddress datanodeProtocolServerAddress, RaftGroup group,
-      RaftPeerId selfPeerId, String datanodeAddressKey,
-      String blockProtocolServerAddressKey,
-      String clientProtocolServerAddressAddressKey) {
-    super(serviceId, nodeId, rpcAddr, ratisPort,
-        httpAddress, httpsAddress);
-    this.grpcPort = grpcPort;
-    this.blockProtocolServerAddress = blockProtocolServerAddress;
-    this.clientProtocolServerAddress = clientProtocolServerAddress;
-    this.datanodeProtocolServerAddress = datanodeProtocolServerAddress;
-    this.datanodeAddressKey = datanodeAddressKey;
-    this.blockProtocolServerAddressKey = blockProtocolServerAddressKey;
-    this.clientProtocolServerAddressKey = clientProtocolServerAddressAddressKey;
+  private SCMNodeDetails(Builder b) {
+    super(b.scmServiceId, b.scmNodeId, b.rpcAddress, b.ratisPort, b.httpAddr, b.httpsAddr);
+    grpcPort = b.grpcPort;
+    blockProtocolServerAddress = b.blockProtocolServerAddress;
+    clientProtocolServerAddress = b.clientProtocolServerAddress;
+    datanodeProtocolServerAddress = b.datanodeProtocolServerAddress;
+    datanodeAddressKey = b.datanodeAddressKey;
+    blockProtocolServerAddressKey = b.blockProtocolServerAddressKey;
+    clientProtocolServerAddressKey = b.clientProtocolServerAddressKey;
   }
 
   @Override
@@ -175,11 +163,7 @@ public final class SCMNodeDetails extends NodeDetails {
     }
 
     public SCMNodeDetails build() {
-      return new SCMNodeDetails(scmServiceId, scmNodeId, rpcAddress,
-          ratisPort, grpcPort, httpAddr, httpsAddr, blockProtocolServerAddress,
-          clientProtocolServerAddress, datanodeProtocolServerAddress,
-          raftGroup, selfPeerId, datanodeAddressKey,
-          blockProtocolServerAddressKey, clientProtocolServerAddressKey);
+      return new SCMNodeDetails(this);
     }
   }
 
