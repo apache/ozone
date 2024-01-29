@@ -382,6 +382,7 @@ public class DatanodeInfo extends DatanodeDetails {
   public ScmBlockLocationProtocolProtos.NodeType toProtobuf(int clientVersion) {
     ScmBlockLocationProtocolProtos.DatanodeInfo.Builder datanodeInfo =
         ScmBlockLocationProtocolProtos.DatanodeInfo.newBuilder()
+            .setDatanodeDetails(toProtoBuilder(clientVersion).build())
             .setLastHeartbeatTime(lastHeartbeatTime)
             .setLastStatsUpdatedTime(lastStatsUpdatedTime)
             .setFailedVolumeCount(failedVolumeCount)
