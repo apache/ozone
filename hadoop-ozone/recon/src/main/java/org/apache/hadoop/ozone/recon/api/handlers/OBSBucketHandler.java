@@ -65,23 +65,23 @@ public class OBSBucketHandler extends BucketHandler {
    * @throws IOException
    */
   @Override
-  public EntityType determineKeyPath(String keyName)
-      throws IOException {
+  public EntityType determineKeyPath(String keyName) throws IOException {
     String key = OM_KEY_PREFIX + vol +
         OM_KEY_PREFIX + bucket +
         OM_KEY_PREFIX + keyName;
 
     Table<String, OmKeyInfo> keyTable = getKeyTable();
 
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        iterator = keyTable.iterator();
-
-    iterator.seek(key);
-    if (iterator.hasNext()) {
-      Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
-      String dbKey = kv.getKey();
-      if (dbKey.equals(key)) {
-        return EntityType.KEY;
+    try (
+        TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+            iterator = keyTable.iterator()) {
+      iterator.seek(key);
+      if (iterator.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
+        String dbKey = kv.getKey();
+        if (dbKey.equals(key)) {
+          return EntityType.KEY;
+        }
       }
     }
     return EntityType.UNKNOWN;
@@ -106,6 +106,13 @@ public class OBSBucketHandler extends BucketHandler {
                                List<DUResponse.DiskUsage> duData,
                                String normalizedPath) throws IOException {
 
+    NSSummary nsSummary = getReconNamespaceSummaryManager()
+        .getNSSummary(parentId);
+    // Handle the case of an empty bucket.
+    if (nsSummary == null) {
+      return 0;
+    }
+
     Table<String, OmKeyInfo> keyTable = getKeyTable();
     long keyDataSizeWithReplica = 0L;
 
@@ -117,13 +124,6 @@ public class OBSBucketHandler extends BucketHandler {
         OM_KEY_PREFIX +
         bucket +
         OM_KEY_PREFIX;
-
-    NSSummary nsSummary = getReconNamespaceSummaryManager()
-        .getNSSummary(parentId);
-    // Handle the case of an empty bucket.
-    if (nsSummary == null) {
-      return 0;
-    }
 
     iterator.seek(seekPrefix);
 
@@ -161,34 +161,39 @@ public class OBSBucketHandler extends BucketHandler {
   }
 
   /**
-   * Object stores do not support directories, hence return null.
+   * Object stores do not support directories.
    *
-   * @return null
+   * @return UnsupportedOperationException
    */
   @Override
   public long calculateDUUnderObject(long parentId)
       throws IOException {
-    return Long.parseLong(null);
+    throw new UnsupportedOperationException(
+        "Object stores do not support directories.");
   }
 
   /**
-   * Object stores do not support directories, hence return null.
+   * Object stores do not support directories.
    *
-   * @return null
+   * @return UnsupportedOperationException
    */
   @Override
-  public long getDirObjectId(String[] names) throws IOException {
-    return Long.parseLong(null);
+  public long getDirObjectId(String[] names)
+      throws UnsupportedOperationException {
+    throw new UnsupportedOperationException(
+        "Object stores do not support directories.");
   }
 
   /**
-   * Object stores do not support directories, hence return null.
+   * Object stores do not support directories.
    *
-   * @return null
+   * @return UnsupportedOperationException
    */
   @Override
-  public long getDirObjectId(String[] names, int cutoff) throws IOException {
-    return Long.parseLong(null);
+  public long getDirObjectId(String[] names, int cutoff)
+      throws UnsupportedOperationException {
+    throw new UnsupportedOperationException(
+        "Object stores do not support directories.");
   }
 
   /**
@@ -200,24 +205,22 @@ public class OBSBucketHandler extends BucketHandler {
     String ozoneKey = OM_KEY_PREFIX;
     ozoneKey += String.join(OM_KEY_PREFIX, names);
 
-    OmKeyInfo keyInfo = getKeyTable().getSkipCache(ozoneKey);
-    return keyInfo;
+    return getKeyTable().getSkipCache(ozoneKey);
   }
 
   /**
-   * Object stores do not support directories, hence return null.
+   * Object stores do not support directories.
    *
-   * @return null
+   * @return UnsupportedOperationException
    */
   @Override
   public OmDirectoryInfo getDirInfo(String[] names) throws IOException {
-    return null;
+    throw new UnsupportedOperationException(
+        "Object stores do not support directories.");
   }
 
   public Table<String, OmKeyInfo> getKeyTable() {
-    Table keyTable =
-        getOmMetadataManager().getKeyTable(getBucketLayout());
-    return keyTable;
+    return getOmMetadataManager().getKeyTable(getBucketLayout());
   }
 
   public BucketLayout getBucketLayout() {

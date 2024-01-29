@@ -38,6 +38,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Task to query data from OMDB and write into Recon RocksDB.
@@ -159,8 +160,10 @@ public class NSSummaryTask implements ReconOmTask {
     } finally {
       executorService.shutdown();
 
-      long endTime = System.nanoTime(); // Record end time
-      long durationInMillis = (endTime - startTime) / 1_000_000; // Convert to milliseconds
+      long endTime = System.nanoTime();
+      // Convert to milliseconds
+      long durationInMillis =
+          TimeUnit.NANOSECONDS.toMillis(endTime - startTime);
 
       // Log performance metrics
       LOG.info("Task execution time: {} milliseconds", durationInMillis);
