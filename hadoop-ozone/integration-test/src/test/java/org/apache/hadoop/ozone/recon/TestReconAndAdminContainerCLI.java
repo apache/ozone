@@ -333,19 +333,10 @@ class TestReconAndAdminContainerCLI {
       reconResponse = TestReconEndpointUtil
           .getUnhealthyContainersFromRecon(CONF, state);
 
-      long rmMissingCounter = rmReport.getStat(
-          ReplicationManagerReport.HealthState.MISSING);
-      long rmUnderReplCounter = rmReport.getStat(
-          ReplicationManagerReport.HealthState.UNDER_REPLICATED);
-      long rmOverReplCounter = rmReport.getStat(
-          ReplicationManagerReport.HealthState.OVER_REPLICATED);
-      long rmMisReplCounter = rmReport.getStat(
-          ReplicationManagerReport.HealthState.MIS_REPLICATED);
-
-      assertEquals(rmMissingCounter, reconResponse.getMissingCount());
-      assertEquals(rmUnderReplCounter, reconResponse.getUnderReplicatedCount());
-      assertEquals(rmOverReplCounter, reconResponse.getOverReplicatedCount());
-      assertEquals(rmMisReplCounter, reconResponse.getMisReplicatedCount());
+      assertEquals(rmReport.getStat(HealthState.MISSING), reconResponse.getMissingCount());
+      assertEquals(rmReport.getStat(HealthState.UNDER_REPLICATED), reconResponse.getUnderReplicatedCount());
+      assertEquals(rmReport.getStat(HealthState.OVER_REPLICATED), reconResponse.getOverReplicatedCount());
+      assertEquals(rmReport.getStat(HealthState.MIS_REPLICATED), reconResponse.getMisReplicatedCount());
     } catch (IOException e) {
       LOG.info("Error getting report", e);
       return false;
@@ -354,31 +345,22 @@ class TestReconAndAdminContainerCLI {
       return false;
     }
 
-    long rmMissingCounter = rmReport.getStat(
-        ReplicationManagerReport.HealthState.MISSING);
-    long rmUnderReplCounter = rmReport.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED);
-    long rmOverReplCounter = rmReport.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED);
-    long rmMisReplCounter = rmReport.getStat(
-        ReplicationManagerReport.HealthState.MIS_REPLICATED);
-
     // Recon's UnhealthyContainerResponse contains a list of containers
     // for a particular state. Check if RMs sample of containers can be
     // found in Recon's list of containers for a particular state.
     HealthState rmState = HealthState.UNHEALTHY;
 
     if (state.equals(UnHealthyContainerStates.MISSING) &&
-        rmMissingCounter > 0) {
+        reconResponse.getMissingCount() > 0) {
       rmState = HealthState.MISSING;
     } else if (state.equals(UnHealthyContainerStates.UNDER_REPLICATED) &&
-               rmUnderReplCounter > 0) {
+               reconResponse.getUnderReplicatedCount() > 0) {
       rmState = HealthState.UNDER_REPLICATED;
     } else if (state.equals(UnHealthyContainerStates.OVER_REPLICATED) &&
-               rmOverReplCounter > 0) {
+               reconResponse.getOverReplicatedCount() > 0) {
       rmState = HealthState.OVER_REPLICATED;
     } else if (state.equals(UnHealthyContainerStates.MIS_REPLICATED) &&
-               rmMisReplCounter > 0) {
+               reconResponse.getMisReplicatedCount() > 0) {
       rmState = HealthState.MIS_REPLICATED;
     }
 
