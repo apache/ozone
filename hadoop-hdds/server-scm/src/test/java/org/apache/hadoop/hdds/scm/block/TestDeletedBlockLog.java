@@ -128,12 +128,9 @@ public class TestDeletedBlockLog {
         new SCMHADBTransactionBufferStub(scm.getScmMetadataStore().getStore());
     metrics = mock(ScmBlockDeletingServiceMetrics.class);
     deletedBlockLog = new DeletedBlockLogImpl(conf,
+        scm,
         containerManager,
-        scm.getScmHAManager().getRatisServer(),
-        scm.getScmMetadataStore().getDeletedBlocksTXTable(),
         scmHADBTransactionBuffer,
-        scm.getScmContext(),
-        scm.getSequenceIdGen(),
         metrics);
     dnList = new ArrayList<>(3);
     setupContainerManager();
@@ -734,12 +731,9 @@ public class TestDeletedBlockLog {
     // transactions are stored persistently.
     deletedBlockLog.close();
     deletedBlockLog = new DeletedBlockLogImpl(conf,
+        scm,
         containerManager,
-        scm.getScmHAManager().getRatisServer(),
-        scm.getScmMetadataStore().getDeletedBlocksTXTable(),
         scmHADBTransactionBuffer,
-        scm.getScmContext(),
-        scm.getSequenceIdGen(),
         metrics);
     List<DeletedBlocksTransaction> blocks =
         getTransactions(10 * BLOCKS_PER_TXN * THREE);
@@ -753,12 +747,9 @@ public class TestDeletedBlockLog {
     // currentTxnID = 50
     deletedBlockLog.close();
     new DeletedBlockLogImpl(conf,
+        scm,
         containerManager,
-        scm.getScmHAManager().getRatisServer(),
-        scm.getScmMetadataStore().getDeletedBlocksTXTable(),
         scmHADBTransactionBuffer,
-        scm.getScmContext(),
-        scm.getSequenceIdGen(),
         metrics);
     blocks = getTransactions(40 * BLOCKS_PER_TXN * THREE);
     assertEquals(0, blocks.size());
