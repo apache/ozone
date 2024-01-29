@@ -26,7 +26,7 @@ import java.util.Map;
 
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests for UserIdentityProvider.
@@ -67,16 +67,14 @@ class TestUserIdentityProvider {
 
   @Test
   void testMakeIdentityInvalidCredential() {
-    try {
-      String auth = "AWS4-HMAC-SHA256 " +
-          "Credential=" + curDate + "/us-east-1/s3/aws4_request, " +
-          "SignedHeaders=host;range;x-amz-date, " +
-          "Signature=fe5f80f77d5fa3beca038a248ff027";
-      Request request = getRequest(auth);
-      identityProvider.makeIdentity(request);
-      fail("Exception is expected in case of malformed header");
-    } catch (OS3Exception ex) {
-      assertEquals("AuthorizationHeaderMalformed", ex.getCode());
-    }
+    String auth = "AWS4-HMAC-SHA256 " +
+        "Credential=" + curDate + "/us-east-1/s3/aws4_request, " +
+        "SignedHeaders=host;range;x-amz-date, " +
+        "Signature=fe5f80f77d5fa3beca038a248ff027";
+    Request request = getRequest(auth);
+
+    OS3Exception ex = assertThrows(OS3Exception.class,
+        () -> identityProvider.makeIdentity(request));
+    assertEquals("AuthorizationHeaderMalformed", ex.getCode());
   }
 }
