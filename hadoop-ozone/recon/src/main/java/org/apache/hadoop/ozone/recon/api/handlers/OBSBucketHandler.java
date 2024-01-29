@@ -116,43 +116,45 @@ public class OBSBucketHandler extends BucketHandler {
     Table<String, OmKeyInfo> keyTable = getKeyTable();
     long keyDataSizeWithReplica = 0L;
 
-    TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-        iterator = keyTable.iterator();
+    try (
+        TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+            iterator = keyTable.iterator()) {
 
-    String seekPrefix = OM_KEY_PREFIX +
-        vol +
-        OM_KEY_PREFIX +
-        bucket +
-        OM_KEY_PREFIX;
+      String seekPrefix = OM_KEY_PREFIX +
+          vol +
+          OM_KEY_PREFIX +
+          bucket +
+          OM_KEY_PREFIX;
 
-    iterator.seek(seekPrefix);
+      iterator.seek(seekPrefix);
 
-    while (iterator.hasNext()) {
-      // KeyName : OmKeyInfo-Object
-      Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
-      String dbKey = kv.getKey();
+      while (iterator.hasNext()) {
+        // KeyName : OmKeyInfo-Object
+        Table.KeyValue<String, OmKeyInfo> kv = iterator.next();
+        String dbKey = kv.getKey();
 
-      // Exit loop if the key doesn't match the seekPrefix.
-      if (!dbKey.startsWith(seekPrefix)) {
-        break;
-      }
-
-      OmKeyInfo keyInfo = kv.getValue();
-      if (keyInfo != null) {
-        DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
-        String objectName = keyInfo.getKeyName();
-        diskUsage.setSubpath(objectName);
-        diskUsage.setKey(true);
-        diskUsage.setSize(keyInfo.getDataSize());
-
-        if (withReplica) {
-          long keyDU = keyInfo.getReplicatedSize();
-          keyDataSizeWithReplica += keyDU;
-          diskUsage.setSizeWithReplica(keyDU);
+        // Exit loop if the key doesn't match the seekPrefix.
+        if (!dbKey.startsWith(seekPrefix)) {
+          break;
         }
-        // List all the keys for the OBS bucket if requested.
-        if (listFile) {
-          duData.add(diskUsage);
+
+        OmKeyInfo keyInfo = kv.getValue();
+        if (keyInfo != null) {
+          DUResponse.DiskUsage diskUsage = new DUResponse.DiskUsage();
+          String objectName = keyInfo.getKeyName();
+          diskUsage.setSubpath(objectName);
+          diskUsage.setKey(true);
+          diskUsage.setSize(keyInfo.getDataSize());
+
+          if (withReplica) {
+            long keyDU = keyInfo.getReplicatedSize();
+            keyDataSizeWithReplica += keyDU;
+            diskUsage.setSizeWithReplica(keyDU);
+          }
+          // List all the keys for the OBS bucket if requested.
+          if (listFile) {
+            duData.add(diskUsage);
+          }
         }
       }
     }
@@ -163,7 +165,7 @@ public class OBSBucketHandler extends BucketHandler {
   /**
    * Object stores do not support directories.
    *
-   * @return UnsupportedOperationException
+   * @throws UnsupportedOperationException
    */
   @Override
   public long calculateDUUnderObject(long parentId)
@@ -175,7 +177,7 @@ public class OBSBucketHandler extends BucketHandler {
   /**
    * Object stores do not support directories.
    *
-   * @return UnsupportedOperationException
+   * @throws UnsupportedOperationException
    */
   @Override
   public long getDirObjectId(String[] names)
@@ -187,7 +189,7 @@ public class OBSBucketHandler extends BucketHandler {
   /**
    * Object stores do not support directories.
    *
-   * @return UnsupportedOperationException
+   * @throws UnsupportedOperationException
    */
   @Override
   public long getDirObjectId(String[] names, int cutoff)
@@ -211,7 +213,7 @@ public class OBSBucketHandler extends BucketHandler {
   /**
    * Object stores do not support directories.
    *
-   * @return UnsupportedOperationException
+   * @throws UnsupportedOperationException
    */
   @Override
   public OmDirectoryInfo getDirInfo(String[] names) throws IOException {
