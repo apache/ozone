@@ -99,9 +99,9 @@ public final class SCMContext {
       isLeader = leader;
       // If it is not leader, set isLeaderReady to false.
       if (!isLeader) {
-        isLeaderReady = false;
         LOG.info("update <isLeaderReady> from <{}> to <{}>", isLeaderReady,
             false);
+        isLeaderReady = false;
       }
       term = newTerm;
     } finally {
