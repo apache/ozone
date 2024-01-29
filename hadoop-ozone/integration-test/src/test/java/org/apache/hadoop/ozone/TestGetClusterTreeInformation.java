@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Assertions;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  *
@@ -81,6 +82,6 @@ public class TestGetClusterTreeInformation {
 
     InnerNode expectedInnerNode = scm.getClusterMap().getClusterTree();
     InnerNode actualInnerNode = scmBlockLocationClient.getClusterTree();
-    Assertions.assertEquals(expectedInnerNode, actualInnerNode);
+    assertEquals(expectedInnerNode, actualInnerNode);
   }
 }
