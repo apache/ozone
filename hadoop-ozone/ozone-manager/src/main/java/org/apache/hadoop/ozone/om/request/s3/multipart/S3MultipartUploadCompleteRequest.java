@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -84,14 +85,17 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   private BiFunction<OzoneManagerProtocolProtos.Part, PartKeyInfo, MultipartCommitRequestPart> eTagBasedValidator =
       (part, partKeyInfo) -> {
         String eTag = part.getETag();
-        String dbPartETag = null;
+        AtomicReference<String> dbPartETag = new AtomicReference<>();
         String dbPartName = null;
         if (partKeyInfo != null) {
-          dbPartETag = partKeyInfo.getPartKeyInfo().getMetadata(0).getValue();
+          partKeyInfo.getPartKeyInfo().getMetadataList()
+              .stream()
+              .filter(keyValue -> keyValue.getKey().equals(OzoneConsts.ETAG))
+              .findFirst().ifPresent(kv -> dbPartETag.set(kv.getValue()));
           dbPartName = partKeyInfo.getPartName();
         }
         return new MultipartCommitRequestPart(eTag, partKeyInfo == null ? null :
-            dbPartETag, StringUtils.equals(eTag, dbPartETag) || StringUtils.equals(eTag, dbPartName));
+            dbPartETag.get(), StringUtils.equals(eTag, dbPartETag.get()) || StringUtils.equals(eTag, dbPartName));
       };
   private BiFunction<OzoneManagerProtocolProtos.Part, PartKeyInfo, MultipartCommitRequestPart> partNameBasedValidator =
       (part, partKeyInfo) -> {
@@ -660,8 +664,12 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       OmMultipartKeyInfo.PartKeyInfoMap partsList) {
     StringBuffer keysConcatenated = new StringBuffer();
     for (PartKeyInfo partKeyInfo: partsList) {
-      keysConcatenated.append(KeyValueUtil.getFromProtobuf(partKeyInfo
-          .getPartKeyInfo().getMetadataList()).get(OzoneConsts.ETAG));
+      String partPropertyToComputeHash = KeyValueUtil.getFromProtobuf(partKeyInfo.getPartKeyInfo().getMetadataList())
+          .get(OzoneConsts.ETAG);
+      if (partPropertyToComputeHash == null) {
+        partPropertyToComputeHash = partKeyInfo.getPartName();
+      }
+      keysConcatenated.append(partPropertyToComputeHash);
     }
     return DigestUtils.md5Hex(keysConcatenated.toString()) + "-"
         + partsList.size();

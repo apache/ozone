@@ -238,10 +238,13 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           correctedSpace);
       omBucketInfo.incrUsedBytes(correctedSpace);
 
-      omResponse.setCommitMultiPartUploadResponse(
-          MultipartCommitUploadPartResponse.newBuilder()
-              .setPartName(partName)
-              .setETag(omKeyInfo.getMetadata().get(OzoneConsts.ETAG)));
+      MultipartCommitUploadPartResponse.Builder commitResponseBuilder = MultipartCommitUploadPartResponse.newBuilder()
+          .setPartName(partName);
+      String eTag = omKeyInfo.getMetadata().get(OzoneConsts.ETAG);
+      if (eTag != null) {
+        commitResponseBuilder.setETag(eTag);
+      }
+      omResponse.setCommitMultiPartUploadResponse(commitResponseBuilder);
       omClientResponse =
           getOmClientResponse(ozoneManager, oldPartKeyInfo, openKey,
               omKeyInfo, multipartKey, multipartKeyInfo, omResponse.build(),
