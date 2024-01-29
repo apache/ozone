@@ -149,19 +149,6 @@ public class ContainerReader implements Runnable {
       File currentDir = new File(idDir, Storage.STORAGE_DIR_CURRENT);
       File[] containerTopDirs = currentDir.listFiles();
       if (containerTopDirs != null && containerTopDirs.length > 0) {
-        if (shouldDelete) {
-          try {
-            // idDir is working directory having data
-            // and volume is initialized with temp path
-            hddsVolume.createTmpDirs(idDir.getName());
-          } catch (IOException e) {
-            LOG.error("Tmp directory can not be created inside {}" +
-                " for Volume {}.", idDir.getName(), hddsVolumeRootDir, e);
-            volumeSet.failVolume(hddsVolumeRootDir.getPath());
-            return;
-          }
-        }
-
         for (File containerTopDir : containerTopDirs) {
           if (containerTopDir.isDirectory()) {
             File[] containerDirs = containerTopDir.listFiles();

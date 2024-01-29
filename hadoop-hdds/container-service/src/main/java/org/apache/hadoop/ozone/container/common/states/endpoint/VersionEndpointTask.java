@@ -88,6 +88,9 @@ public class VersionEndpointTask implements
           // Check HddsVolumes
           checkVolumeSet(ozoneContainer.getVolumeSet(), scmId, clusterId);
 
+          // build container set
+          ozoneContainer.buildContainerSet();
+
           DatanodeLayoutStorage layoutStorage
               = new DatanodeLayoutStorage(configuration);
           layoutStorage.setClusterId(clusterId);

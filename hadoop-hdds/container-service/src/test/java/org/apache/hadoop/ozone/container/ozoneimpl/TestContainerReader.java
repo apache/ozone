@@ -45,7 +45,6 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
-import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.FileUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -560,14 +559,6 @@ public class TestContainerReader {
       baseCount = addDbEntry(containerData);
     }
 
-    // create hdds volume with re-build and reloading db for v3 schema
-    // to simulate restart case and dn not registered
-    hddsVolume = new HddsVolume.Builder(hddsVolume.getVolumeRootDir())
-        .conf(conf).datanodeUuid(datanodeId
-            .toString()).clusterID(clusterId).build();
-    if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
-      hddsVolume.loadDbStore(true);
-    }
     // verify container data and perform cleanup
     ContainerReader containerReader = new ContainerReader(volumeSet,
         hddsVolume, containerSet, conf, true);
