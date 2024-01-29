@@ -31,6 +31,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -49,6 +50,7 @@ public class TestRocksObjectLeakDetector {
   static void setUp() throws IOException, InterruptedException,
       TimeoutException {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_METADATA_STORE_ROCKSDB_STATISTICS, "ALL");
     String clusterId = UUID.randomUUID().toString();
     String scmId = UUID.randomUUID().toString();
     String omServiceId = "omServiceId1";

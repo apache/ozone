@@ -35,7 +35,7 @@ import org.junit.platform.engine.TestExecutionResult;
 import org.junit.platform.launcher.TestExecutionListener;
 import org.junit.platform.launcher.TestIdentifier;
 
-import javax.annotation.Nullable;
+import jakarta.annotation.Nullable;
 
 /**
  * JUnit test execution listener which prints full thread dump to System.err

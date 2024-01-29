@@ -16,34 +16,33 @@
  *  limitations under the License.
  */
 
-package org.apache.hadoop.fs.ozone.contract.rooted;
+package org.apache.hadoop.fs.ozone.contract;
 
-import java.io.IOException;
-
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.contract.AbstractContractDeleteTest;
-import org.apache.hadoop.fs.contract.AbstractFSContract;
-
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
- * Ozone contract tests covering deletes.
+ * Filesystem contract for OFS.
  */
-public class ITestRootedOzoneContractDelete extends AbstractContractDeleteTest {
+final class RootedOzoneContract extends AbstractOzoneContract {
 
-  @BeforeClass
-  public static void createCluster() throws IOException {
-    RootedOzoneContract.createCluster();
-  }
-
-  @AfterClass
-  public static void teardownCluster() {
-    RootedOzoneContract.destroyCluster();
+  RootedOzoneContract(MiniOzoneCluster cluster) {
+    super(cluster);
   }
 
   @Override
-  protected AbstractFSContract createContract(Configuration conf) {
-    return new RootedOzoneContract(conf);
+  public String getScheme() {
+    return OzoneConsts.OZONE_OFS_URI_SCHEME;
+  }
+
+  @Override
+  public Path getTestPath() {
+    return new Path("/testvol1/testbucket1/test");
+  }
+
+  @Override
+  protected String getRootURI() {
+    return String.format("%s://localhost", getScheme());
   }
 }

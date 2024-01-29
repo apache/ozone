@@ -34,8 +34,8 @@ import org.junit.jupiter.api.Timeout;
 import picocli.CommandLine;
 import java.util.concurrent.TimeUnit;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests Freon with Datanode restarts without waiting for pipeline to close.
@@ -93,8 +93,8 @@ public class TestFreonWithDatanodeFastRestart {
     // After restart the term index might have progressed to apply pending
     // transactions.
     TermIndex termIndexAfterRestart = sm.getLastAppliedTermIndex();
-    assertTrue(termIndexAfterRestart.getIndex() >=
-        termIndexBeforeRestart.getIndex());
+    assertThat(termIndexAfterRestart.getIndex())
+        .isGreaterThanOrEqualTo(termIndexBeforeRestart.getIndex());
     // TODO: fix me
     // Give some time for the datanode to register again with SCM.
     // If we try to use the pipeline before the datanode registers with SCM

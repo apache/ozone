@@ -17,9 +17,8 @@
  */
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -104,7 +103,7 @@ public class TestNode2PipelineMap {
     // get pipeline details by dnid
     Set<PipelineID> pipelines = scm.getScmNodeManager()
         .getPipelines(dns.get(0));
-    assertTrue(pipelines.contains(ratisContainer.getPipeline().getId()));
+    assertThat(pipelines).contains(ratisContainer.getPipeline().getId());
 
     // Now close the container and it should not show up while fetching
     // containers by pipeline
@@ -120,6 +119,6 @@ public class TestNode2PipelineMap {
     pipelineManager.deletePipeline(ratisContainer.getPipeline().getId());
     pipelines = scm.getScmNodeManager()
         .getPipelines(dns.get(0));
-    assertFalse(pipelines.contains(ratisContainer.getPipeline().getId()));
+    assertThat(pipelines).doesNotContain(ratisContainer.getPipeline().getId());
   }
 }

@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.protocol;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
@@ -44,6 +45,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * ContainerLocationProtocol is used by an HDFS node to find the set of nodes
@@ -220,6 +222,14 @@ public interface StorageContainerLocationProtocol extends Closeable {
   void deleteContainer(long containerID) throws IOException;
 
   /**
+   * Gets the list of underReplicated and unClosed containers on a decommissioning node.
+   *
+   * @param dn - Datanode detail
+   * @return Lists of underReplicated and unClosed containers
+   */
+  Map<String, List<ContainerID>> getContainersOnDecomNode(DatanodeDetails dn) throws IOException;
+
+  /**
    *  Queries a list of Node Statuses. Passing a null for either opState or
    *  state acts like a wildcard returning all nodes in that state.
    * @param opState The node operational state
@@ -231,6 +241,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
   List<HddsProtos.Node> queryNode(HddsProtos.NodeOperationalState opState,
       HddsProtos.NodeState state, HddsProtos.QueryScope queryScope,
       String poolName, int clientVersion) throws IOException;
+
+  HddsProtos.Node queryNode(UUID uuid) throws IOException;
 
   List<DatanodeAdminError> decommissionNodes(List<String> nodes)
       throws IOException;

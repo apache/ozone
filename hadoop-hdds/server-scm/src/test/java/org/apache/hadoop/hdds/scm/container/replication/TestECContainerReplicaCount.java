@@ -26,7 +26,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -524,7 +524,7 @@ public class TestECContainerReplicaCount {
     assertEquals(0, rcnt.unavailableIndexes(true).size());
   }
 
-  @NotNull
+  @Nonnull
   private List<ContainerReplicaOp> getContainerReplicaOps(
       List<Integer> addIndexes, List<Integer> deleteIndexes) {
     List<ContainerReplicaOp> pending = new ArrayList<>();

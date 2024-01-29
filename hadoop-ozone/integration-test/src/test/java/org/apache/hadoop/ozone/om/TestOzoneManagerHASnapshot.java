@@ -123,7 +123,7 @@ public class TestOzoneManagerHASnapshot {
     cluster.shutdownOzoneManager(omLeader);
     cluster.restartOzoneManager(omLeader, true);
 
-    await(120_000, 100, () -> cluster.getOMLeader() != null);
+    cluster.waitForLeaderOM();
 
     String newLeader = cluster.getOMLeader().getOMNodeId();
 
@@ -250,7 +250,7 @@ public class TestOzoneManagerHASnapshot {
     cluster.shutdownOzoneManager(omLeader);
     cluster.restartOzoneManager(omLeader, true);
 
-    await(180_000, 100, () -> cluster.getOMLeader() != null);
+    cluster.waitForLeaderOM();
     assertNotNull(cluster.getOMLeader());
     OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl) cluster
         .getOMLeader().getMetadataManager();

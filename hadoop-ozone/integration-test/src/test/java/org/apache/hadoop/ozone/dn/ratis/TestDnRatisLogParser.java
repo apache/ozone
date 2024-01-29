@@ -30,12 +30,12 @@ import org.apache.hadoop.ozone.segmentparser.DatanodeRatisLogParser;
 
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Test Datanode Ratis log parser.
@@ -78,14 +78,14 @@ public class TestDnRatisLogParser {
     File currentDir = new File(pipelineDir, "current");
     File logFile = new File(currentDir, "log_inprogress_0");
     GenericTestUtils.waitFor(logFile::exists, 100, 15000);
-    Assertions.assertTrue(logFile.isFile());
+    assertThat(logFile).isFile();
 
     DatanodeRatisLogParser datanodeRatisLogParser =
         new DatanodeRatisLogParser();
     datanodeRatisLogParser.setSegmentFile(logFile);
     datanodeRatisLogParser.parseRatisLogs(
         DatanodeRatisLogParser::smToContainerLogString);
-    Assertions.assertTrue(out.toString(StandardCharsets.UTF_8.name())
-        .contains("Num Total Entries:"));
+    assertThat(out.toString(StandardCharsets.UTF_8.name()))
+        .contains("Num Total Entries:");
   }
 }

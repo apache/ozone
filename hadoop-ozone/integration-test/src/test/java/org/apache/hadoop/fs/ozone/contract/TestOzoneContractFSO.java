@@ -15,30 +15,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.ozone.test;
+package org.apache.hadoop.fs.ozone.contract;
 
-import org.junit.rules.TestRule;
-import org.junit.runner.Description;
-import org.junit.runners.model.Statement;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.contract.AbstractFSContract;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
-import java.util.Objects;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
+import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 
 /**
- * Disables the delegate rule if the given system property matches a specific
- * value.
+ * Tests O3FS with FSO bucket.
  */
-public class DisableOnProperty implements TestRule {
+class TestOzoneContractFSO extends AbstractOzoneContractTest {
 
-  private final TestRule delegate;
-  private final boolean enabled;
-
-  public DisableOnProperty(TestRule delegate, String key, String value) {
-    this.delegate = delegate;
-    enabled = !Objects.equals(value, System.getProperty(key, ""));
+  @Override
+  OzoneConfiguration createOzoneConfig() {
+    OzoneConfiguration conf = createBaseConfiguration();
+    conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, FILE_SYSTEM_OPTIMIZED.name());
+    return conf;
   }
 
   @Override
-  public Statement apply(Statement base, Description description) {
-    return enabled ? delegate.apply(base, description) : base;
+  AbstractFSContract createOzoneContract(Configuration conf) {
+    return new OzoneContract(getCluster());
   }
 }

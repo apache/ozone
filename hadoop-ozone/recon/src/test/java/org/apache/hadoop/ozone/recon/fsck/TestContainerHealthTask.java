@@ -22,8 +22,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hadoop.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates.ALL_REPLICAS_UNHEALTHY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -38,6 +38,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -68,6 +69,10 @@ import org.junit.jupiter.api.Test;
  * Class to test a single run of the Container Health Task.
  */
 public class TestContainerHealthTask extends AbstractReconSqlDBTest {
+
+  public TestContainerHealthTask() {
+    super();
+  }
 
   @SuppressWarnings("checkstyle:methodlength")
   @Test
@@ -152,7 +157,8 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
         new ContainerHealthTask(scmMock.getContainerManager(),
             scmMock.getScmServiceProvider(),
             reconTaskStatusDao, containerHealthSchemaManager,
-            placementMock, reconTaskConfig, reconContainerMetadataManager);
+            placementMock, reconTaskConfig,
+            reconContainerMetadataManager, new OzoneConfiguration());
     containerHealthTask.start();
     LambdaTestUtils.await(60000, 1000, () ->
         (unHealthyContainersTableHandle.count() == 6));
@@ -316,7 +322,8 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
         new ContainerHealthTask(scmMock.getContainerManager(),
             scmMock.getScmServiceProvider(),
             reconTaskStatusDao, containerHealthSchemaManager,
-            placementMock, reconTaskConfig, reconContainerMetadataManager);
+            placementMock, reconTaskConfig,
+            reconContainerMetadataManager, new OzoneConfiguration());
     containerHealthTask.start();
     LambdaTestUtils.await(6000, 1000, () ->
         (unHealthyContainersTableHandle.count() == 2));
@@ -358,6 +365,9 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
       when(c.getReplicationConfig())
           .thenReturn(RatisReplicationConfig.getInstance(
               HddsProtos.ReplicationFactor.THREE));
+      when(c.getReplicationFactor())
+          .thenReturn(HddsProtos.ReplicationFactor.THREE);
+      when(c.getState()).thenReturn(HddsProtos.LifeCycleState.CLOSED);
       when(c.containerID()).thenReturn(ContainerID.valueOf(i));
       containers.add(c);
     }
