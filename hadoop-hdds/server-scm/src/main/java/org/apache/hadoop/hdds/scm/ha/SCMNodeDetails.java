@@ -19,8 +19,6 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.hdds.NodeDetails;
-import org.apache.ratis.protocol.RaftGroup;
-import org.apache.ratis.protocol.RaftPeerId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,8 +82,6 @@ public final class SCMNodeDetails extends NodeDetails {
     private String clientProtocolServerAddressKey;
     private InetSocketAddress datanodeProtocolServerAddress;
     private String datanodeAddressKey;
-    private RaftGroup raftGroup;
-    private RaftPeerId selfPeerId;
 
     public Builder setDatanodeAddressKey(String addressKey) {
       this.datanodeAddressKey = addressKey;
@@ -114,16 +110,6 @@ public final class SCMNodeDetails extends NodeDetails {
 
     public Builder setDatanodeProtocolServerAddress(InetSocketAddress address) {
       this.datanodeProtocolServerAddress = address;
-      return this;
-    }
-
-    public Builder setRaftGroup(RaftGroup group) {
-      this.raftGroup = group;
-      return this;
-    }
-
-    public Builder setSelfPeerId(RaftPeerId peerId) {
-      this.selfPeerId = peerId;
       return this;
     }
 
