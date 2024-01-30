@@ -129,6 +129,7 @@ import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
+import static org.apache.hadoop.ozone.OmUtils.LOG;
 import static org.apache.hadoop.ozone.OmUtils.MAX_TRXN_ID;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
@@ -2840,10 +2841,12 @@ public abstract class TestOzoneRpcClientAbstract {
       completeMultipartUpload(bucket2, keyName2, uploadId, partsMap);
 
       // User without permission cannot read multi-uploaded object
-      try (OzoneInputStream ignored = bucket2.readKey(keyName)) {
-        OMException ex = assertThrows(OMException.class, () -> { }, "User without permission should fail");
-        assertEquals(ResultCodes.PERMISSION_DENIED, ex.getResult());
-      }
+      OMException ex = assertThrows(OMException.class, () -> {
+        try (OzoneInputStream ignored = bucket2.readKey(keyName)) {
+          LOG.error("User without permission should fail");
+        }
+      }, "User without permission should fail");
+      assertEquals(ResultCodes.PERMISSION_DENIED, ex.getResult());
     }
   }
 
