@@ -112,6 +112,7 @@ public class TestReplicationManagerReport {
     assertEquals(0, stats.get("EMPTY").longValue());
     assertEquals(0, stats.get("OPEN_UNHEALTHY").longValue());
     assertEquals(0, stats.get("QUASI_CLOSED_STUCK").longValue());
+    assertEquals(0, stats.get("OPEN_WITHOUT_PIPELINE").longValue());
 
     JsonNode samples = json.get("samples");
     assertEquals(ARRAY, samples.get("UNDER_REPLICATED").getNodeType());

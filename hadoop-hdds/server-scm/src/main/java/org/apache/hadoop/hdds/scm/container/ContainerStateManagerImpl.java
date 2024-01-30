@@ -251,16 +251,12 @@ public final class ContainerStateManagerImpl
             pipelineManager.addContainerToPipelineSCMStart(
                 container.getPipelineID(), container.containerID());
           } catch (PipelineNotFoundException ex) {
+            // We are ignoring this here. The container will be moved to
+            // CLOSING state by ReplicationManager's OpenContainerHandler
+            // For more info: HDDS-10231
             LOG.warn("Found container {} which is in OPEN state with " +
                 "pipeline {} that does not exist. Marking container for " +
                 "closing.", container, container.getPipelineID());
-            try {
-              updateContainerState(container.containerID().getProtobuf(),
-                  LifeCycleEvent.FINALIZE);
-            } catch (InvalidStateTransitionException e) {
-              // This cannot happen.
-              LOG.warn("Unable to finalize Container {}.", container);
-            }
           }
         }
       }
