@@ -155,16 +155,14 @@ public class ContainerBalancerSelectionCriteria {
   /**
    * Gets containers that are suitable for moving based on the following
    * required criteria:
-   * 1. Container must not be in ExcludedContainers.
-   * 2. Container must not be in SelectedContainers.
-   * 3. Container must not be undergoing replication.
-   * 4. Container must not already be selected for balancing.
-   * 5. Container size should be closer to 5GB.
-   * 6. Container must not be in the configured exclude containers list.
-   * 7. Container should be closed.
-   * 8. If the {@link LegacyReplicationManager} is enabled, then the container should not be an EC container.
+   * 1. Container must not be undergoing replication.
+   * 2. Container must not already be selected for balancing.
+   * 3. Container size should be closer to 5GB.
+   * 4. Container must not be in the configured exclude containers list.
+   * 5. Container should be closed.
+   * 6. If the {@link LegacyReplicationManager} is enabled, then the container should not be an EC container.
    * @param node DatanodeDetails for which to find candidate containers.
-   * @return Set of candidate containers that satisfy the criteria.
+   * @return true if the container should be excluded, else false
    */
   public boolean shouldBeExcluded(ContainerID containerID,
       DatanodeDetails node, long sizeMovedAlready) {
