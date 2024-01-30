@@ -18,10 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.client;
 
-import java.text.ParseException;
-import java.time.Instant;
 import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
@@ -71,37 +68,6 @@ public final class HddsClientUtils {
           // does not succeed
           .add(NotReplicatedException.class)
           .build();
-
-  /**
-   * Date format that used in ozone. Here the format is thread safe to use.
-   */
-  private static final ThreadLocal<DateTimeFormatter> DATE_FORMAT =
-      ThreadLocal.withInitial(() -> {
-        DateTimeFormatter format =
-            DateTimeFormatter.ofPattern(OzoneConsts.OZONE_DATE_FORMAT);
-        return format.withZone(ZoneId.of(OzoneConsts.OZONE_TIME_ZONE));
-      });
-
-
-  /**
-   * Convert time in millisecond to a human readable format required in ozone.
-   * @return a human readable string for the input time
-   */
-  public static String formatDateTime(long millis) {
-    ZonedDateTime dateTime = ZonedDateTime.ofInstant(
-        Instant.ofEpochMilli(millis), DATE_FORMAT.get().getZone());
-    return DATE_FORMAT.get().format(dateTime);
-  }
-
-  /**
-   * Convert time in ozone date format to millisecond.
-   * @return time in milliseconds
-   */
-  public static long formatDateTime(String date) throws ParseException {
-    Preconditions.checkNotNull(date, "Date string should not be null.");
-    return ZonedDateTime.parse(date, DATE_FORMAT.get())
-        .toInstant().toEpochMilli();
-  }
 
   private static void doNameChecks(String resName) {
     if (resName == null) {
@@ -205,17 +171,6 @@ public final class HddsClientUtils {
     if (isIPv4) {
       throw new IllegalArgumentException(
           "Bucket or Volume name cannot be an IPv4 address or all numeric");
-    }
-  }
-
-  /**
-   * verifies that bucket / volume name is a valid DNS name.
-   *
-   * @param resourceNames Array of bucket / volume names to be verified.
-   */
-  public static void verifyResourceName(String... resourceNames) {
-    for (String resourceName : resourceNames) {
-      HddsClientUtils.verifyResourceName(resourceName);
     }
   }
 

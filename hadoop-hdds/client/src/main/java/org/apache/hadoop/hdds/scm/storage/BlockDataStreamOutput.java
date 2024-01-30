@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -239,11 +238,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     return failedServers;
   }
 
-  @VisibleForTesting
-  public XceiverClientRatis getXceiverClient() {
-    return xceiverClient;
-  }
-
   public IOException getIoException() {
     return ioException.get();
   }
@@ -331,10 +325,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     totalDataFlushedLength = writtenDataLength;
   }
 
-  @VisibleForTesting
-  public long getTotalDataFlushedLength() {
-    return totalDataFlushedLength;
-  }
   /**
    * Will be called on the retryPath in case closedContainerException/
    * TimeoutException.
@@ -701,11 +691,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
 
     futures.add(future);
     containerBlockData.addChunks(chunkInfo);
-  }
-
-  @VisibleForTesting
-  public void setXceiverClient(XceiverClientRatis xceiverClient) {
-    this.xceiverClient = xceiverClient;
   }
 
   /**
