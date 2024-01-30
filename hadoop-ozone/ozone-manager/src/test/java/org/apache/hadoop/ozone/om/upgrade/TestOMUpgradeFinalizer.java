@@ -45,7 +45,6 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.STARTING_F
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.lenient;
@@ -194,13 +193,9 @@ public class TestOMUpgradeFinalizer {
     setupVersionManagerMockToFinalize(lfs);
 
     OMUpgradeFinalizer finalizer = new OMUpgradeFinalizer(versionManager);
-    Exception e = assertThrows(Exception.class, () -> finalizer.finalize(CLIENT_ID, om));
-    assertInstanceOf(UpgradeException.class, e);
+    UpgradeException e = assertThrows(UpgradeException.class, () -> finalizer.finalize(CLIENT_ID, om));
     assertThat(e.getMessage()).contains(lfs.iterator().next().name());
-    assertEquals(
-        ((UpgradeException) e).getResult(),
-        LAYOUT_FEATURE_FINALIZATION_FAILED
-    );
+    assertEquals(e.getResult(), LAYOUT_FEATURE_FINALIZATION_FAILED);
     if (finalizer.isFinalizationDone()) {
       when(versionManager.getUpgradeState()).thenReturn(FINALIZATION_DONE);
     }

@@ -59,7 +59,6 @@ import java.util.function.LongSupplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -548,8 +547,7 @@ public class TestDirectoryDeletingServiceWithFSO {
   }
 
   private void checkPath(Path path) {
-    IOException ex = assertThrows(IOException.class, () -> fs.getFileStatus(path));
-    assertInstanceOf(FileNotFoundException.class, ex);
+    FileNotFoundException ex = assertThrows(FileNotFoundException.class, () -> fs.getFileStatus(path));
     assertThat(ex.getMessage()).contains("No such file or directory");
   }
 

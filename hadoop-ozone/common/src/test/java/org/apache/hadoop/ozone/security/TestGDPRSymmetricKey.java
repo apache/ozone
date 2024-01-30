@@ -58,7 +58,6 @@ public class TestGDPRSymmetricKey {
   public void testKeyGenerationWithInvalidInput() throws Exception {
     IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
         () -> new GDPRSymmetricKey(RandomStringUtils.randomAlphabetic(5), OzoneConsts.GDPR_ALGORITHM_NAME));
-    assertTrue(e.getMessage()
-        .equalsIgnoreCase("Secret must be exactly 16 characters"));
+    assertTrue(e.getMessage().equalsIgnoreCase("Secret must be exactly 16 characters"));
   }
 }

@@ -491,7 +491,6 @@ public class TestRangerBGSyncService {
     for (String policy : policiesCreated) {
       IOException ex = assertThrows(IOException.class, () -> accessController.getPolicy(policy));
       RangerServiceException rse = assertInstanceOf(RangerServiceException.class, ex.getCause());
-      assertEquals(400, rse.getStatus().getStatusCode());
       assertEquals(404, rse.getStatus().getStatusCode());
     }
 

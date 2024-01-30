@@ -384,8 +384,7 @@ public class TestKeyManagerImpl {
     OMException e =
         assertThrows(OMException.class, () -> writeClient.createDirectory(finalKeyArgs),
             "Creation should fail for directory.");
-    assertEquals(e.getResult(),
-        OMException.ResultCodes.FILE_ALREADY_EXISTS);
+    assertEquals(e.getResult(), OMException.ResultCodes.FILE_ALREADY_EXISTS);
 
     // create directory where parent is root
     keyName = RandomStringUtils.randomAlphabetic(5);

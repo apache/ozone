@@ -313,10 +313,10 @@ public class TestCommitWatcher {
         // and the write may fail with RaftRetryFailureException
         assertTrue(
             t instanceof RaftRetryFailureException ||
-                        t instanceof TimeoutIOException ||
-                        t instanceof AlreadyClosedException ||
-                        t instanceof NotReplicatedException,
-                "Unexpected exception: " + t.getClass());
+                t instanceof TimeoutIOException ||
+                t instanceof AlreadyClosedException ||
+                t instanceof NotReplicatedException,
+            "Unexpected exception: " + t.getClass());
         if (ratisClient.getReplicatedMinCommitIndex() < replies.get(1)
             .getLogIndex()) {
           assertEquals(chunkSize, watcher.getTotalAckDataLength());

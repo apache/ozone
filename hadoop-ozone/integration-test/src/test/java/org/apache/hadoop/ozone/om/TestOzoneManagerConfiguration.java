@@ -380,8 +380,7 @@ public class TestOzoneManagerConfiguration {
     OzoneIllegalArgumentException e =
         assertThrows(OzoneIllegalArgumentException.class, () -> startCluster());
     // Expect error message
-    assertTrue(e.getMessage().contains(
-        "List of OM Node ID's should be specified"));
+    assertTrue(e.getMessage().contains("List of OM Node ID's should be specified"));
   }
 
   /**
@@ -405,8 +404,7 @@ public class TestOzoneManagerConfiguration {
     // Deliberately skip OZONE_OM_ADDRESS_KEY config
     OzoneIllegalArgumentException e = assertThrows(OzoneIllegalArgumentException.class, () -> startCluster());
     // Expect error message
-    assertTrue(e.getMessage().contains(
-        "OM RPC Address should be set for all node"));
+    assertTrue(e.getMessage().contains("OM RPC Address should be set for all node"));
   }
 
   /**

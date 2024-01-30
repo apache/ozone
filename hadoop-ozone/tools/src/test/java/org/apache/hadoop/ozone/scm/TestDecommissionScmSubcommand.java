@@ -97,13 +97,9 @@ public class TestDecommissionScmSubcommand {
         .thenAnswer(invocation -> (
             response));
 
-    GenericTestUtils.SystemOutCapturer capture = null;
-    try {
-      capture = new GenericTestUtils.SystemOutCapturer();
+    try (GenericTestUtils.SystemOutCapturer capture = new GenericTestUtils.SystemOutCapturer()) {
       IOException ioe = assertThrows(IOException.class, () -> cmd.execute(client));
       assertThat(ioe.getMessage()).contains("remove current leader");
-    } finally {
-      capture.close();
     }
   }
 }

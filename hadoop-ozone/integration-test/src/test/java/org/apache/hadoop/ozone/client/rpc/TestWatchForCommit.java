@@ -278,9 +278,8 @@ public class TestWatchForCommit {
       // just watch for a log index which in not updated in the commitInfo Map
       // as well as there is no logIndex generate in Ratis.
       // The basic idea here is just to test if its throws an exception.
-      Exception e = assertThrows(Exception.class,
+      ExecutionException e = assertThrows(ExecutionException.class,
           () -> xceiverClient.watchForCommit(index + RandomUtils.nextInt(0, 100) + 10));
-      assertInstanceOf(ExecutionException.class, e);
       // since the timeout value is quite long, the watch request will either
       // fail with NotReplicated exceptio, RetryFailureException or
       // RuntimeException

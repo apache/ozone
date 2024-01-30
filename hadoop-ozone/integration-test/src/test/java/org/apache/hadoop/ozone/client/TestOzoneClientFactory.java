@@ -42,25 +42,24 @@ public class TestOzoneClientFactory {
     OzoneConfiguration conf = new OzoneConfiguration();
     Exception e = assertThrows(Exception.class, () -> {
       MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
-            .setNumDatanodes(3)
-            .setTotalPipelineNumLimit(10)
-            .setScmId(scmId)
-            .setClusterId(clusterId)
-            .build();
+          .setNumDatanodes(3)
+          .setTotalPipelineNumLimit(10)
+          .setScmId(scmId)
+          .setClusterId(clusterId)
+          .build();
 
       String omPort = cluster.getOzoneManager().getRpcPort();
 
       UserGroupInformation realUser =
-              UserGroupInformation.createRemoteUser("realUser");
+          UserGroupInformation.createRemoteUser("realUser");
       UserGroupInformation proxyUser = UserGroupInformation.createProxyUser(
-              "user", realUser);
+          "user", realUser);
       proxyUser.doAs(new PrivilegedExceptionAction<Void>() {
         @Override
         public Void run() throws IOException {
           conf.set("ozone.security.enabled", "true");
           try (OzoneClient ozoneClient =
-                       OzoneClientFactory.getRpcClient("localhost",
-                               Integer.parseInt(omPort), conf)) {
+                   OzoneClientFactory.getRpcClient("localhost", Integer.parseInt(omPort), conf)) {
             ozoneClient.getObjectStore().listVolumes("/");
           }
           return null;

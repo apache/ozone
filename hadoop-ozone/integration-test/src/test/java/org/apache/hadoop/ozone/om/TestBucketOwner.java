@@ -140,8 +140,7 @@ public class TestBucketOwner {
     UserGroupInformation.setLoginUser(user3);
     try (OzoneClient client = cluster.newClient()) {
       assertThrows(Exception.class, () -> {
-        OzoneVolume volume = client.getObjectStore()
-            .getVolume("volume1");
+        OzoneVolume volume = client.getObjectStore().getVolume("volume1");
         OzoneBucket ozoneBucket = volume.getBucket("bucket1");
         createKey(ozoneBucket, "key3", 10, new byte[10]);
       }, "Create key as non-volume and non-bucket owner should fail");
@@ -149,8 +148,7 @@ public class TestBucketOwner {
     //Key Delete - should fail
     try (OzoneClient client = cluster.newClient()) {
       assertThrows(Exception.class, () -> {
-        OzoneVolume volume = client.getObjectStore()
-            .getVolume("volume1");
+        OzoneVolume volume = client.getObjectStore().getVolume("volume1");
         OzoneBucket ozoneBucket = volume.getBucket("bucket1");
         ozoneBucket.deleteKey("key2");
       }, "Delete key as non-volume and non-bucket owner should fail");
@@ -158,8 +156,7 @@ public class TestBucketOwner {
     //Key Rename - should fail
     try (OzoneClient client = cluster.newClient()) {
       assertThrows(Exception.class, () -> {
-        OzoneVolume volume = client.getObjectStore()
-            .getVolume("volume1");
+        OzoneVolume volume = client.getObjectStore().getVolume("volume1");
         OzoneBucket ozoneBucket = volume.getBucket("bucket1");
         ozoneBucket.renameKey("key2", "key4");
       }, "Rename key as non-volume and non-bucket owner should fail");
@@ -167,8 +164,7 @@ public class TestBucketOwner {
     //List Keys - should fail
     try (OzoneClient client = cluster.newClient()) {
       assertThrows(Exception.class, () -> {
-        OzoneVolume volume = client.getObjectStore()
-            .getVolume("volume1");
+        OzoneVolume volume = client.getObjectStore().getVolume("volume1");
         OzoneBucket ozoneBucket = volume.getBucket("bucket1");
         ozoneBucket.listKeys("key");
       }, "List keys as non-volume and non-bucket owner should fail");
@@ -176,8 +172,7 @@ public class TestBucketOwner {
     //Get Acls - should fail
     try (OzoneClient client = cluster.newClient()) {
       assertThrows(Exception.class, () -> {
-        OzoneVolume volume = client.getObjectStore()
-            .getVolume("volume1");
+        OzoneVolume volume = client.getObjectStore().getVolume("volume1");
         OzoneBucket ozoneBucket = volume.getBucket("bucket1");
         ozoneBucket.getAcls();
       }, "Get Acls as non-volume and non-bucket owner should fail");
@@ -186,8 +181,7 @@ public class TestBucketOwner {
     //Add Acls - should fail
     try (OzoneClient client = cluster.newClient()) {
       assertThrows(Exception.class, () -> {
-        OzoneVolume volume = client.getObjectStore()
-            .getVolume("volume1");
+        OzoneVolume volume = client.getObjectStore().getVolume("volume1");
         OzoneBucket ozoneBucket = volume.getBucket("bucket1");
         OzoneAcl acl = new OzoneAcl(USER, "testuser1",
             IAccessAuthorizer.ACLType.ALL, DEFAULT);

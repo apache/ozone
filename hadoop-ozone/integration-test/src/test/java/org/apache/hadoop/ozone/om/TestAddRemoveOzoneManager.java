@@ -343,7 +343,7 @@ public class TestAddRemoveOzoneManager {
     omLog.clearOutput();
 
     // Update configs on all active OMs and Force Bootstrap a new node
-    final String newNodeId1 = "omNode-bootstrap-2";
+    String newNodeId1 = "omNode-bootstrap-2";
     cluster.bootstrapOzoneManager(newNodeId1, true, true);
     OzoneManager newOM = cluster.getOzoneManager(newNodeId1);
 

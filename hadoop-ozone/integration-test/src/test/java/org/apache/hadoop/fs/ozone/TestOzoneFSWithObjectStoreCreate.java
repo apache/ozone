@@ -47,7 +47,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -62,7 +61,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -265,9 +263,8 @@ public class TestOzoneFSWithObjectStoreCreate {
 
     // Before close create directory with same name.
     o3fs.mkdirs(new Path("/a/b/c"));
-    IOException ex = assertThrows(IOException.class, () -> ozoneOutputStream.close());
-    OMException e = assertInstanceOf(OMException.class, ex);
-    assertEquals(NOT_A_FILE, e.getResult());
+    OMException ex = assertThrows(OMException.class, () -> ozoneOutputStream.close());
+    assertEquals(NOT_A_FILE, ex.getResult());
   }
 
 
@@ -304,7 +301,6 @@ public class TestOzoneFSWithObjectStoreCreate {
     // Should fail, as we have directory with same name.
     OMException ex = assertThrows(OMException.class, () -> ozoneBucket.completeMultipartUpload(keyName,
         omMultipartInfo.getUploadID(), partsMap));
-    assertInstanceOf(OMException.class, ex);
     assertEquals(NOT_A_FILE, ex.getResult());
 
 
@@ -338,7 +334,6 @@ public class TestOzoneFSWithObjectStoreCreate {
     OzoneBucket ozoneBucket = ozoneVolume.getBucket(bucketName);
     ozoneBucket.createDirectory("t1/t2");
     OMException ex = assertThrows(OMException.class, () -> ozoneBucket.createKey("t1/t2", 0));
-    assertInstanceOf(OMException.class, ex);
     assertEquals(NOT_A_FILE, ex.getResult());
   }
 
