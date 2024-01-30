@@ -46,6 +46,8 @@ public interface OmTableHandler {
                       HashMap<String, Long> objectCountMap,
                       HashMap<String, Long> unReplicatedSizeMap,
                       HashMap<String, Long> replicatedSizeMap);
+
+
   /**
    * Handles a DELETE event for size-related tables by updating both the data
    * sizes and their corresponding record counts in the tables.
@@ -61,6 +63,7 @@ public interface OmTableHandler {
                          HashMap<String, Long> objectCountMap,
                          HashMap<String, Long> unReplicatedSizeMap,
                          HashMap<String, Long> replicatedSizeMap);
+
 
   /**
    * Handles an UPDATE event for size-related tables by updating both the data
