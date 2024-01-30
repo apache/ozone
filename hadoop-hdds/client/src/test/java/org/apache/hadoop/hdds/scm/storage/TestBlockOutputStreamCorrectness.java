@@ -63,7 +63,7 @@ class TestBlockOutputStreamCorrectness {
   private static final byte[] DATA = RandomUtils.nextBytes(DATA_SIZE);
 
   @ParameterizedTest
-  @ValueSource(ints = { 1, 1024, 1024*1024 })
+  @ValueSource(ints = { 1, 1024, 1024 * 1024 })
   void test(final int writeSize) throws IOException {
     assertEquals(0, DATA_SIZE % writeSize);
 
