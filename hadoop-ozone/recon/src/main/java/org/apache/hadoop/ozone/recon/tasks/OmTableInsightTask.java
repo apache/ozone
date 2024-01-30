@@ -105,7 +105,7 @@ public class OmTableInsightTask implements ReconOmTask {
 
       try (TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator
                = table.iterator()) {
-        if (getTablesToCalculateSize().contains(tableName)) {
+        if (tableHandlers.containsKey(tableName)) {
           Triple<Long, Long, Long> details =
               tableHandlers.get(tableName).getTableSizeAndCount(iterator);
           objectCountMap.put(getTableCountKeyFromTable(tableName),
@@ -173,7 +173,6 @@ public class OmTableInsightTask implements ReconOmTask {
     HashMap<String, Long> unReplicatedSizeMap = initializeSizeMap(false);
     HashMap<String, Long> replicatedSizeMap = initializeSizeMap(true);
     final Collection<String> taskTables = getTaskTables();
-    final Collection<String> sizeRelatedTables = getTablesToCalculateSize();
 
     // Process each update event
     while (eventIterator.hasNext()) {
@@ -185,18 +184,18 @@ public class OmTableInsightTask implements ReconOmTask {
       try {
         switch (omdbUpdateEvent.getAction()) {
         case PUT:
-          handlePutEvent(omdbUpdateEvent, tableName, sizeRelatedTables,
-              objectCountMap, unReplicatedSizeMap, replicatedSizeMap);
+          handlePutEvent(omdbUpdateEvent, tableName, objectCountMap,
+              unReplicatedSizeMap, replicatedSizeMap);
           break;
 
         case DELETE:
-          handleDeleteEvent(omdbUpdateEvent, tableName, sizeRelatedTables,
-              objectCountMap, unReplicatedSizeMap, replicatedSizeMap);
+          handleDeleteEvent(omdbUpdateEvent, tableName, objectCountMap,
+              unReplicatedSizeMap, replicatedSizeMap);
           break;
 
         case UPDATE:
-          handleUpdateEvent(omdbUpdateEvent, tableName, sizeRelatedTables,
-              objectCountMap, unReplicatedSizeMap, replicatedSizeMap);
+          handleUpdateEvent(omdbUpdateEvent, tableName, objectCountMap,
+              unReplicatedSizeMap, replicatedSizeMap);
           break;
 
         default:
@@ -226,14 +225,13 @@ public class OmTableInsightTask implements ReconOmTask {
 
   private void handlePutEvent(OMDBUpdateEvent<String, Object> event,
                               String tableName,
-                              Collection<String> sizeRelatedTables,
                               HashMap<String, Long> objectCountMap,
                               HashMap<String, Long> unReplicatedSizeMap,
                               HashMap<String, Long> replicatedSizeMap)
       throws IOException {
     OmTableHandler tableHandler = tableHandlers.get(tableName);
     if (event.getValue() != null) {
-      if (sizeRelatedTables.contains(tableName) && tableHandler != null) {
+      if (tableHandler != null) {
         tableHandler.handlePutEvent(event, tableName, objectCountMap,
             unReplicatedSizeMap, replicatedSizeMap);
       } else {
@@ -243,17 +241,16 @@ public class OmTableInsightTask implements ReconOmTask {
     }
   }
 
+
   private void handleDeleteEvent(OMDBUpdateEvent<String, Object> event,
                                  String tableName,
-                                 Collection<String> sizeRelatedTables,
                                  HashMap<String, Long> objectCountMap,
                                  HashMap<String, Long> unReplicatedSizeMap,
                                  HashMap<String, Long> replicatedSizeMap)
       throws IOException {
     OmTableHandler tableHandler = tableHandlers.get(tableName);
-
     if (event.getValue() != null) {
-      if (sizeRelatedTables.contains(tableName)) {
+      if (tableHandler != null) {
         tableHandler.handleDeleteEvent(event, tableName, objectCountMap,
             unReplicatedSizeMap, replicatedSizeMap);
       } else {
@@ -265,20 +262,15 @@ public class OmTableInsightTask implements ReconOmTask {
   }
 
 
-  /**
-   * Handle update events for size related tables.
-   */
   private void handleUpdateEvent(OMDBUpdateEvent<String, Object> event,
                                  String tableName,
-                                 Collection<String> sizeRelatedTables,
                                  HashMap<String, Long> objectCountMap,
                                  HashMap<String, Long> unReplicatedSizeMap,
                                  HashMap<String, Long> replicatedSizeMap) {
 
     OmTableHandler tableHandler = tableHandlers.get(tableName);
-
     if (event.getValue() != null) {
-      if (sizeRelatedTables.contains(tableName)) {
+      if (tableHandler != null) {
         // Handle update for only size related tables
         tableHandler.handleUpdateEvent(event, tableName, objectCountMap,
             unReplicatedSizeMap, replicatedSizeMap);
@@ -336,11 +328,12 @@ public class OmTableInsightTask implements ReconOmTask {
    * @return The size map containing the size counts for each table.
    */
   private HashMap<String, Long> initializeSizeMap(boolean replicated) {
-    Collection<String> tables = getTablesToCalculateSize();
-    HashMap<String, Long> sizeCountMap = new HashMap<>(tables.size());
-    for (String tableName : tables) {
-      String key = replicated ? getReplicatedSizeKeyFromTable(tableName) :
-          getUnReplicatedSizeKeyFromTable(tableName);
+    HashMap<String, Long> sizeCountMap = new HashMap<>();
+    for (String tableName : tableHandlers.keySet()) {
+      OmTableHandler tableHandler = tableHandlers.get(tableName);
+      String key =
+          replicated ? tableHandler.getReplicatedSizeKeyFromTable(tableName) :
+              tableHandler.getUnReplicatedSizeKeyFromTable(tableName);
       sizeCountMap.put(key, getValueForKey(key));
     }
     return sizeCountMap;
