@@ -196,7 +196,7 @@ public class RpcClient implements ClientProtocol {
   // we should have at least 1 core thread for each necessary chunk
   // for reconstruction.
   private static final int EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE = 3;
-  private static final int EC_WRITE_POOL_MIN_SIZE = 1;
+  private static final int WRITE_POOL_MIN_SIZE = 1;
 
   private final ConfigurationSource conf;
   private final OzoneManagerClientProtocol ozoneManagerClient;
@@ -217,7 +217,7 @@ public class RpcClient implements ClientProtocol {
   private final BlockInputStreamFactory blockInputStreamFactory;
   private final OzoneManagerVersion omVersion;
   private volatile ExecutorService ecReconstructExecutor;
-  private volatile ExecutorService ecWriteExecutor;
+  private volatile ExecutorService writeExecutor;
   private final AtomicBoolean isS3GRequest = new AtomicBoolean(false);
   private final BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider;
 
@@ -317,7 +317,7 @@ public class RpcClient implements ClientProtocol {
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, this::getECReconstructExecutor);
     this.blockOutPutStreamResourceProvider = BlockOutPutStreamResourceProvider
-        .create(this::getECWriteThreadPool, ContainerClientMetrics.acquire());
+        .create(this::getWriteThreadPool, ContainerClientMetrics.acquire());
   }
 
   public XceiverClientFactory getXceiverClientManager() {
@@ -1745,9 +1745,9 @@ public class RpcClient implements ClientProtocol {
       ecReconstructExecutor.shutdownNow();
       ecReconstructExecutor = null;
     }
-    if (ecWriteExecutor != null) {
-      ecWriteExecutor.shutdownNow();
-      ecWriteExecutor = null;
+    if (writeExecutor != null) {
+      writeExecutor.shutdownNow();
+      writeExecutor = null;
     }
     IOUtils.cleanupWithLogger(LOG, ozoneManagerClient, xceiverClientManager);
     keyProviderCache.invalidateAll();
@@ -2514,16 +2514,16 @@ public class RpcClient implements ClientProtocol {
     return localRef;
   }
 
-  public ExecutorService getECWriteThreadPool() {
-    ExecutorService localRef = ecWriteExecutor;
+  public ExecutorService getWriteThreadPool() {
+    ExecutorService localRef = writeExecutor;
     if (localRef == null) {
       synchronized (this) {
-        localRef = ecWriteExecutor;
+        localRef = writeExecutor;
         if (localRef == null) {
-          localRef = createThreadPoolExecutor(EC_WRITE_POOL_MIN_SIZE,
-              clientConfig.getEcClientWritePoolLimit(),
-              "ec-client-write-TID-%d");
-          ecWriteExecutor = localRef;
+          localRef = createThreadPoolExecutor(WRITE_POOL_MIN_SIZE,
+              clientConfig.getClientWritePoolLimit(),
+              "client-write-TID-%d");
+          writeExecutor = localRef;
         }
       }
     }

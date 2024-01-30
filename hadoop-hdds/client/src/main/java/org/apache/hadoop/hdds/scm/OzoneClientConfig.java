@@ -208,14 +208,13 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private int ecReconstructStripeWritePoolLimit = 10 * 3;
 
-  @Config(key = "ec.client.write.pool.limit",
+  @Config(key = "client.write.pool.limit",
       defaultValue = "200",
-      description = "Maximum number of threads in the pool for handling client-side" +
-          " write operations in erasure coding. This setting controls the concurrency " +
-          "level for writing data blocks, ensuring efficient data processing and" +
-          " throughput while managing resource utilization.",
+      description = "Maximum number of threads in the pool for handling client-side write operations." +
+          " This setting controls the concurrency level for writing data blocks," +
+          " ensuring efficient data processing and throughput while managing resource utilization.",
       tags = ConfigTag.CLIENT)
-  private int ecClientWritePoolLimit = 200;
+  private int clientWritePoolLimit = 200;
   @Config(key = "checksum.combine.mode",
       defaultValue = "COMPOSITE_CRC",
       description = "The combined checksum type [MD5MD5CRC / COMPOSITE_CRC] "
@@ -410,12 +409,12 @@ public class OzoneClientConfig {
     return ecReconstructStripeWritePoolLimit;
   }
 
-  public void setEcClientWritePoolLimit(int poolLimit) {
-    this.ecClientWritePoolLimit = poolLimit;
+  public void setClientWritePoolLimit(int poolLimit) {
+    this.clientWritePoolLimit = poolLimit;
   }
 
-  public int getEcClientWritePoolLimit() {
-    return ecClientWritePoolLimit;
+  public int getClientWritePoolLimit() {
+    return clientWritePoolLimit;
   }
 
   public void setFsDefaultBucketLayout(String bucketLayout) {
