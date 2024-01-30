@@ -19,7 +19,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
@@ -31,9 +30,12 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
@@ -79,10 +81,10 @@ import static org.mockito.Mockito.when;
 /**
  * Unit test ozone snapshot manager.
  */
-public class TestOmSnapshotManager {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class TestOmSnapshotManager {
 
   private OzoneManager om;
-  private File testDir;
   private static final String CANDIDATE_DIR_NAME = OM_DB_NAME +
       SNAPSHOT_CANDIDATE_DIR;
   private File leaderDir;
@@ -94,12 +96,10 @@ public class TestOmSnapshotManager {
   private File s1File;
   private File f1File;
 
-  @BeforeEach
-  public void init() throws Exception {
+  @BeforeAll
+  void init(@TempDir File tempDir) throws Exception {
     OzoneConfiguration configuration = new OzoneConfiguration();
-    testDir = GenericTestUtils.getRandomizedTestDir();
-    configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        testDir.toString());
+    configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempDir.toString());
     // Enable filesystem snapshot feature for the test regardless of the default
     configuration.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY,
         true);
@@ -110,13 +110,11 @@ public class TestOmSnapshotManager {
 
     OmTestManagers omTestManagers = new OmTestManagers(configuration);
     om = omTestManagers.getOzoneManager();
-    setupData();
   }
 
-  @AfterEach
-  public void cleanup() throws Exception {
+  @AfterAll
+  void stop() {
     om.stop();
-    FileUtils.deleteDirectory(testDir);
   }
 
   @Test
@@ -206,7 +204,8 @@ public class TestOmSnapshotManager {
     verify(firstSnapshotStore, timeout(3000).times(1)).close();
   }
 
-  private void setupData() throws IOException {
+  @BeforeEach
+  void setupData(@TempDir File testDir) throws IOException {
     // Set up the leader with the following files:
     // leader/db.checkpoints/checkpoint1/f1.sst
     // leader/db.snapshots/checkpointState/snap1/s1.sst
@@ -230,8 +229,7 @@ public class TestOmSnapshotManager {
     byte[] dummyData = {0};
 
     // Create dummy leader files to calculate links.
-    leaderDir = new File(testDir.toString(),
-        "leader");
+    leaderDir = new File(testDir, "leader");
     assertTrue(leaderDir.mkdirs());
     String pathSnap1 = OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX + "snap1";
     String pathSnap2 = OM_SNAPSHOT_CHECKPOINT_DIR + OM_KEY_PREFIX + "snap2";
@@ -245,8 +243,7 @@ public class TestOmSnapshotManager {
     Files.write(Paths.get(leaderSnapDir2.toString(), "nonSstFile"), dummyData);
 
     // Also create the follower files.
-    candidateDir = new File(testDir.toString(),
-        CANDIDATE_DIR_NAME);
+    candidateDir = new File(testDir, CANDIDATE_DIR_NAME);
     File followerSnapDir1 = new File(candidateDir.toString(), pathSnap1);
     followerSnapDir2 = new File(candidateDir.toString(), pathSnap2);
     copyDirectory(leaderDir.toPath(), candidateDir.toPath());
@@ -359,9 +356,9 @@ public class TestOmSnapshotManager {
    * This test always passes in a null dest dir.
    */
   @Test
-  public void testProcessFileWithNullDestDirParameter() throws IOException {
-    assertTrue(new File(testDir.toString(), "snap1").mkdirs());
-    assertTrue(new File(testDir.toString(), "snap2").mkdirs());
+  void testProcessFileWithNullDestDirParameter(@TempDir File testDir) throws IOException {
+    assertTrue(new File(testDir, "snap1").mkdirs());
+    assertTrue(new File(testDir, "snap2").mkdirs());
     Path copyFile = Paths.get(testDir.toString(),
         "snap1/copyfile.sst");
     Files.write(copyFile,
@@ -450,10 +447,10 @@ public class TestOmSnapshotManager {
    * This test always passes in a non-null dest dir.
    */
   @Test
-  public void testProcessFileWithDestDirParameter() throws IOException {
-    assertTrue(new File(testDir.toString(), "snap1").mkdirs());
-    assertTrue(new File(testDir.toString(), "snap2").mkdirs());
-    assertTrue(new File(testDir.toString(), "snap3").mkdirs());
+  void testProcessFileWithDestDirParameter(@TempDir File testDir) throws IOException {
+    assertTrue(new File(testDir, "snap1").mkdirs());
+    assertTrue(new File(testDir, "snap2").mkdirs());
+    assertTrue(new File(testDir, "snap3").mkdirs());
     Path destDir = Paths.get(testDir.toString(), "destDir");
     assertTrue(new File(destDir.toString()).mkdirs());
 

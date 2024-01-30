@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.mockito.Mockito.mock;
+
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
@@ -28,9 +30,11 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Test utility for creating a dummy OM, the associated
@@ -38,15 +42,15 @@ import java.io.IOException;
  */
 public final class OmTestManagers {
 
-  private OzoneManagerProtocol writeClient;
-  private OzoneManager om;
-  private KeyManager keyManager;
-  private OMMetadataManager metadataManager;
+  private final OzoneManagerProtocol writeClient;
+  private final OzoneManager om;
+  private final KeyManager keyManager;
+  private final OMMetadataManager metadataManager;
   private KeyProviderCryptoExtension kmsProvider;
-  private VolumeManager volumeManager;
-  private BucketManager bucketManager;
-  private PrefixManager prefixManager;
-  private ScmBlockLocationProtocol scmBlockClient;
+  private final VolumeManager volumeManager;
+  private final BucketManager bucketManager;
+  private final PrefixManager prefixManager;
+  private final ScmBlockLocationProtocol scmBlockClient;
 
   public OzoneManager getOzoneManager() {
     return om;
@@ -74,14 +78,14 @@ public final class OmTestManagers {
   }
 
   public OmTestManagers(OzoneConfiguration conf)
-      throws AuthenticationException, IOException {
+      throws AuthenticationException, IOException, InterruptedException, TimeoutException {
     this(conf, null, null);
   }
 
   public OmTestManagers(OzoneConfiguration conf,
                         ScmBlockLocationProtocol blockClient,
                         StorageContainerLocationProtocol containerClient)
-      throws AuthenticationException, IOException {
+      throws AuthenticationException, IOException, InterruptedException, TimeoutException {
     if (containerClient == null) {
       containerClient = mock(StorageContainerLocationProtocol.class);
     }
@@ -109,6 +113,9 @@ public final class OmTestManagers {
         "secretManager", mock(OzoneBlockTokenSecretManager.class));
 
     om.start();
+    waitFor(() -> om.getOmRatisServer().checkLeaderStatus() == RaftServerStatus.LEADER_AND_READY,
+        10, 10_000);
+
     writeClient = OzoneClientFactory.getRpcClient(conf)
         .getObjectStore().getClientProxy().getOzoneManagerClient();
     metadataManager = (OmMetadataManagerImpl) HddsWhiteboxTestUtils
