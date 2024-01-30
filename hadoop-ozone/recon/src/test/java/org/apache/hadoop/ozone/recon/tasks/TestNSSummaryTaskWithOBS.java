@@ -15,7 +15,6 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.NSSummaryEndpoint;
-import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -27,7 +26,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import javax.ws.rs.core.Response;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -36,11 +34,15 @@ import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.*;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDirToOm;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 import static org.mockito.Mockito.mock;
 
-public class TestNSSummaryTaskWithOBS {
+/**
+ * Unit test for NSSummaryTaskWithOBS.
+ */
+public final class TestNSSummaryTaskWithOBS {
   private static ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private static OMMetadataManager omMetadataManager;
   private static ReconOMMetadataManager reconOMMetadataManager;
@@ -151,9 +153,6 @@ public class TestNSSummaryTaskWithOBS {
       NSSummaryEndpoint nsSummaryEndpoint = new NSSummaryEndpoint(
           reconNamespaceSummaryManager, reconOMMetadataManager, mock(
           OzoneStorageContainerManager.class));
-
-      Response resp = nsSummaryEndpoint.getDiskUsage("/vol/bucket2",true,false);
-      DUResponse duDirReponse = (DUResponse) resp.getEntity();
 
       nsSummaryForBucket1 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
@@ -321,13 +320,15 @@ public class TestNSSummaryTaskWithOBS {
           .setAction(OMDBUpdateEvent.OMDBUpdateAction.UPDATE)
           .build();
 
-      OMUpdateEventBatch omUpdateEventBatch = new OMUpdateEventBatch(
-          new ArrayList<OMDBUpdateEvent>() {{
-            add(keyEvent1);
-            add(keyEvent2);
-            add(keyEvent3);
-            add(keyEvent4);
-          }});
+      OMUpdateEventBatch omUpdateEventBatch =
+          new OMUpdateEventBatch(new ArrayList<OMDBUpdateEvent>() {
+            {
+              add(keyEvent1);
+              add(keyEvent2);
+              add(keyEvent3);
+              add(keyEvent4);
+            }
+          });
 
       return omUpdateEventBatch;
     }
@@ -370,7 +371,6 @@ public class TestNSSummaryTaskWithOBS {
       int[] expectedIndexes1 = {1, 3, 40};
       for (int index = 0; index < fileDistBucket1.length; index++) {
         if (contains(expectedIndexes1, index)) {
-          System.out.println("######## index: " + index + " value: " + fileDistBucket1[index]+"########");
           Assertions.assertEquals(1, fileDistBucket1[index]);
         } else {
           Assertions.assertEquals(0, fileDistBucket1[index]);
@@ -462,6 +462,7 @@ public class TestNSSummaryTaskWithOBS {
   /**
    * Create a new OM Metadata manager instance with one user, one vol, and two
    * buckets.
+   *
    * @throws IOException ioEx
    */
   private static void initializeNewOmMetadataManager(
