@@ -144,16 +144,4 @@ public class DeletedKeysInsightHandler implements OmTableHandler {
     }
     return Triple.of(count, unReplicatedSize, replicatedSize);
   }
-
-  public static String getTableCountKeyFromTable(String tableName) {
-    return tableName + "Count";
-  }
-
-  public static String getReplicatedSizeKeyFromTable(String tableName) {
-    return tableName + "ReplicatedDataSize";
-  }
-
-  public static String getUnReplicatedSizeKeyFromTable(String tableName) {
-    return tableName + "UnReplicatedDataSize";
-  }
 }

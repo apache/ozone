@@ -85,9 +85,4 @@ public class ReconNamespaceSummaryManagerImpl
   public Table getNSSummaryTable() {
     return nsSummaryTable;
   }
-
-  @VisibleForTesting
-  public void setNsSummaryTable(Table<Long, NSSummary> nsSummaryTable) {
-    this.nsSummaryTable = nsSummaryTable;
-  }
 }

@@ -95,4 +95,34 @@ public interface OmTableHandler {
       TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator)
       throws IOException;
 
+
+  /**
+   * Returns the count key for the given table.
+   *
+   * @param tableName The name of the table.
+   * @return The count key for the table.
+   */
+  default String getTableCountKeyFromTable(String tableName) {
+    return tableName + "Count";
+  }
+
+  /**
+   * Returns the replicated size key for the given table.
+   *
+   * @param tableName The name of the table.
+   * @return The replicated size key for the table.
+   */
+  default String getReplicatedSizeKeyFromTable(String tableName) {
+    return tableName + "ReplicatedDataSize";
+  }
+
+  /**
+   * Returns the unreplicated size key for the given table.
+   *
+   * @param tableName The name of the table.
+   * @return The unreplicated size key for the table.
+   */
+  default String getUnReplicatedSizeKeyFromTable(String tableName) {
+    return tableName + "UnReplicatedDataSize";
+  }
 }

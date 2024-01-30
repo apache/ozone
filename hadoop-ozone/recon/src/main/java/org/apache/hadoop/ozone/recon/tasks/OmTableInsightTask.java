@@ -26,9 +26,7 @@ import org.apache.commons.lang3.tuple.Triple;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
 import org.jooq.Configuration;
@@ -63,21 +61,15 @@ public class OmTableInsightTask implements ReconOmTask {
   private GlobalStatsDao globalStatsDao;
   private Configuration sqlConfiguration;
   private ReconOMMetadataManager reconOMMetadataManager;
-  private ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
-  private Table<Long, NSSummary> nsSummaryTable;
   private Map<String, OmTableHandler> tableHandlers;
 
   @Inject
   public OmTableInsightTask(GlobalStatsDao globalStatsDao,
                              Configuration sqlConfiguration,
-                             ReconOMMetadataManager reconOMMetadataManager,
-                             ReconNamespaceSummaryManagerImpl
-                                  reconNamespaceSummaryManager) {
+                             ReconOMMetadataManager reconOMMetadataManager) {
     this.globalStatsDao = globalStatsDao;
     this.sqlConfiguration = sqlConfiguration;
     this.reconOMMetadataManager = reconOMMetadataManager;
-    this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
-    this.nsSummaryTable = reconNamespaceSummaryManager.getNSSummaryTable();
 
     // Initialize table handlers
     tableHandlers = new HashMap<>();
@@ -240,13 +232,14 @@ public class OmTableInsightTask implements ReconOmTask {
                               HashMap<String, Long> replicatedSizeMap)
       throws IOException {
     OmTableHandler tableHandler = tableHandlers.get(tableName);
-
-    if (sizeRelatedTables.contains(tableName) && tableHandler != null) {
-      tableHandler.handlePutEvent(event, tableName, objectCountMap,
-          unReplicatedSizeMap, replicatedSizeMap);
-    } else {
-      String countKey = getTableCountKeyFromTable(tableName);
-      objectCountMap.computeIfPresent(countKey, (k, count) -> count + 1L);
+    if (event.getValue() != null) {
+      if (sizeRelatedTables.contains(tableName) && tableHandler != null) {
+        tableHandler.handlePutEvent(event, tableName, objectCountMap,
+            unReplicatedSizeMap, replicatedSizeMap);
+      } else {
+        String countKey = getTableCountKeyFromTable(tableName);
+        objectCountMap.computeIfPresent(countKey, (k, count) -> count + 1L);
+      }
     }
   }
 

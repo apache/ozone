@@ -666,7 +666,7 @@ public class OMDBInsightEndpoint {
    */
   @GET
   @Path("/deletePending/dirs/summary")
-  public Response getDeletedDirectorySummary() throws IOException {
+  public Response getDeletedDirectorySummary() {
     Map<String, Long> dirSummary = new HashMap<>();
     // Create a keys summary for deleted directories
     createSummaryForDeletedDirectories(dirSummary);
