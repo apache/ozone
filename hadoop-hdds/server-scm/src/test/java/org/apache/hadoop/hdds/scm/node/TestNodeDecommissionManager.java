@@ -41,7 +41,6 @@ import java.util.Arrays;
 import java.util.ArrayList;
 
 import static java.util.Collections.singletonList;
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;

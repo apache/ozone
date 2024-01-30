@@ -25,7 +25,6 @@ import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -66,7 +65,6 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.test.PathUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.ozone.test.GenericTestUtils;
@@ -78,7 +76,6 @@ import static java.util.Collections.emptyList;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -181,7 +178,7 @@ public class TestContainerPlacement {
    */
   @Test
   public void testContainerPlacementCapacity() throws IOException,
-      InterruptedException, TimeoutException {
+      InterruptedException {
     final int nodeCount = 4;
     final long capacity = 10L * OzoneConsts.GB;
     final long used = 2L * OzoneConsts.GB;
@@ -200,8 +197,6 @@ public class TestContainerPlacement {
     List<DatanodeDetails> datanodes = HddsTestUtils
         .getListOfRegisteredDatanodeDetails(scmNodeManager, nodeCount);
     XceiverClientManager xceiverClientManager = null;
-    LayoutVersionManager versionManager =
-        scmNodeManager.getLayoutVersionManager();
     try {
       for (DatanodeDetails datanodeDetails : datanodes) {
         UUID dnId = datanodeDetails.getUuid();
