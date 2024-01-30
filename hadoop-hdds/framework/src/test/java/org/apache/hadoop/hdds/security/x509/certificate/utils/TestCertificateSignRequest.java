@@ -290,7 +290,7 @@ public class TestCertificateSignRequest {
             assertEquals("2.16.840.1.113730.3.1.34", oid);
           }
           if (o instanceof DERTaggedObject) {
-            String serviceName = ((DERTaggedObject)o).getObject().toString();
+            String serviceName = ((DERTaggedObject)o).toASN1Primitive().toString();
             assertEquals("OzoneMarketingCluster003", serviceName);
           }
         }
