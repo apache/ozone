@@ -165,7 +165,7 @@ public class TestNodeDecommissionManager {
 
     // Attempt to decommission on dn(9) which has another instance at
     // dn(11) with identical ports.
-    nodeManager.processHeartbeat(dns.get(9), defaultLayoutVersionProto());
+    nodeManager.processHeartbeat(dns.get(9));
     DatanodeDetails duplicatePorts = dns.get(9);
     decom.decommissionNodes(singletonList(duplicatePorts.getIpAddress()));
     assertEquals(HddsProtos.NodeOperationalState.DECOMMISSIONING,
@@ -237,7 +237,7 @@ public class TestNodeDecommissionManager {
 
     // Now decommission one of the DNs with the duplicate port
     DatanodeDetails expectedDN = dns.get(9);
-    nodeManager.processHeartbeat(expectedDN, defaultLayoutVersionProto());
+    nodeManager.processHeartbeat(expectedDN);
 
     decom.decommissionNodes(singletonList(
         expectedDN.getIpAddress() + ":" + ratisPort));
@@ -287,7 +287,7 @@ public class TestNodeDecommissionManager {
 
     // Attempt to enable maintenance on dn(9) which has another instance at
     // dn(11) with identical ports.
-    nodeManager.processHeartbeat(dns.get(9), defaultLayoutVersionProto());
+    nodeManager.processHeartbeat(dns.get(9));
     DatanodeDetails duplicatePorts = dns.get(9);
     decom.startMaintenanceNodes(singletonList(duplicatePorts.getIpAddress()),
         100);

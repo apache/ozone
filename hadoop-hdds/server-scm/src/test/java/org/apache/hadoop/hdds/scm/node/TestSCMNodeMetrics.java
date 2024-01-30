@@ -98,16 +98,8 @@ public class TestSCMNodeMetrics {
   @Test
   public void testHBProcessing() throws InterruptedException {
     long hbProcessed = getCounter("NumHBProcessed");
-
     createNodeReport();
-
-    LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
-    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-        .build();
-    nodeManager.processHeartbeat(registeredDatanode, layoutInfo);
-
+    nodeManager.processHeartbeat(registeredDatanode);
     assertEquals(hbProcessed + 1, getCounter("NumHBProcessed"),
         "NumHBProcessed");
   }
@@ -117,17 +109,8 @@ public class TestSCMNodeMetrics {
    */
   @Test
   public void testHBProcessingFailure() {
-
     long hbProcessedFailed = getCounter("NumHBProcessingFailed");
-
-    LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
-    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-        .build();
-    nodeManager.processHeartbeat(MockDatanodeDetails
-        .randomDatanodeDetails(), layoutInfo);
-
+    nodeManager.processHeartbeat(MockDatanodeDetails.randomDatanodeDetails());
     assertEquals(hbProcessedFailed + 1, getCounter("NumHBProcessingFailed"),
         "NumHBProcessingFailed");
   }
@@ -252,13 +235,7 @@ public class TestSCMNodeMetrics {
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
     assertGauge("TotalUsed", 10L,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
-
-    LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
-    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-        .build();
-    nodeManager.processHeartbeat(registeredDatanode, layoutInfo);
+    nodeManager.processHeartbeat(registeredDatanode);
     sleep(4000);
     metricsSource = getMetrics(SCMNodeMetrics.SOURCE_NAME);
     assertGauge("InServiceHealthyReadonlyNodes", 0, metricsSource);

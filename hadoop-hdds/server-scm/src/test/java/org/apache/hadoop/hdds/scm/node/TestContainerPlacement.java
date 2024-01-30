@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
@@ -203,9 +202,6 @@ public class TestContainerPlacement {
     XceiverClientManager xceiverClientManager = null;
     LayoutVersionManager versionManager =
         scmNodeManager.getLayoutVersionManager();
-    LayoutVersionProto layoutInfo =
-        toLayoutVersionProto(versionManager.getMetadataLayoutVersion(),
-            versionManager.getSoftwareLayoutVersion());
     try {
       for (DatanodeDetails datanodeDetails : datanodes) {
         UUID dnId = datanodeDetails.getUuid();
@@ -221,7 +217,7 @@ public class TestContainerPlacement {
                 Arrays.asList(report), emptyList());
         datanodeInfo.updateStorageReports(
             nodeReportProto.getStorageReportList());
-        scmNodeManager.processHeartbeat(datanodeDetails, layoutInfo);
+        scmNodeManager.processHeartbeat(datanodeDetails);
       }
 
       //TODO: wait for heartbeat to be processed

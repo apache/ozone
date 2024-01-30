@@ -122,19 +122,13 @@ public class TestStatisticsUpdate {
 
     //TODO: Support logic to mark a node as dead in NodeManager.
 
-    LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
-    StorageContainerDatanodeProtocolProtos.LayoutVersionProto layoutInfo =
-        StorageContainerDatanodeProtocolProtos.LayoutVersionProto.newBuilder()
-        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-        .build();
-    nodeManager.processHeartbeat(datanode2, layoutInfo);
+    nodeManager.processHeartbeat(datanode2);
     Thread.sleep(1000);
-    nodeManager.processHeartbeat(datanode2, layoutInfo);
+    nodeManager.processHeartbeat(datanode2);
     Thread.sleep(1000);
-    nodeManager.processHeartbeat(datanode2, layoutInfo);
+    nodeManager.processHeartbeat(datanode2);
     Thread.sleep(1000);
-    nodeManager.processHeartbeat(datanode2, layoutInfo);
+    nodeManager.processHeartbeat(datanode2);
     //THEN statistics in SCM should changed.
     stat = nodeManager.getStats();
     assertEquals(200L, stat.getCapacity().get());
