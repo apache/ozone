@@ -104,7 +104,6 @@ import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
-import static org.apache.hadoop.ozone.OzoneConsts.HSYNC_CLIENT_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_FS_SNAPSHOT_MAX_LIMIT;
@@ -1207,10 +1206,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     //  listKeys do. But that complicates the iteration logic by quite a bit.
     //  And if we do that, we need to refactor listKeys as well to dedup.
 
-    final Table<String, OmKeyInfo> okTable, kTable;
+    final Table<String, OmKeyInfo> okTable;
     okTable = getOpenKeyTable(bucketLayout);
-    // keyTable required to check key hsync metadata. TODO: HDDS-10077
-    kTable = getKeyTable(bucketLayout);
 
     // No lock required since table iterator creates a "snapshot"
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
@@ -1228,13 +1225,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           String dbKey = kv.getKey();
           long clientID = OMMetadataManager.getClientIDFromOpenKeyDBKey(dbKey);
           OmKeyInfo omKeyInfo = kv.getValue();
-
-          // Trim client ID to get the keyTable dbKey
-          int lastSlashIdx = dbKey.lastIndexOf(OM_KEY_PREFIX);
-          String ktDbKey = dbKey.substring(0, lastSlashIdx);
-          // Check whether the key has been hsync'ed by checking keyTable
-          checkAndUpdateKeyHsyncStatus(omKeyInfo, ktDbKey, kTable);
-
+          // Note with HDDS-10077, there is no need to check KeyTable for hsync metadata
           openKeySessionList.add(
               new OpenKeySession(clientID, omKeyInfo,
                   omKeyInfo.getLatestVersionLocations().getVersion()));
@@ -1259,23 +1250,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         hasMore,
         retContToken,
         openKeySessionList);
-  }
-
-  /**
-   * Check and update OmKeyInfo from OpenKeyTable with hsync status in KeyTable.
-   */
-  private void checkAndUpdateKeyHsyncStatus(OmKeyInfo omKeyInfo,
-                                            String dbKey,
-                                            Table<String, OmKeyInfo> kTable)
-      throws IOException {
-    OmKeyInfo ktOmKeyInfo = kTable.get(dbKey);
-    if (ktOmKeyInfo != null) {
-      // The same key in OpenKeyTable also exists in KeyTable, indicating
-      // the key has been hsync'ed
-      String hsyncClientId = ktOmKeyInfo.getMetadata().get(HSYNC_CLIENT_ID);
-      // Append HSYNC_CLIENT_ID to OmKeyInfo to be returned to the client
-      omKeyInfo.getMetadata().put(HSYNC_CLIENT_ID, hsyncClientId);
-    }
   }
 
   @Override
@@ -1878,8 +1852,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           final String clientIdString
               = dbOpenKeyName.substring(lastPrefix + 1);
 
-          final OmKeyInfo info = kt.get(dbKeyName);
-          final boolean isHsync = java.util.Optional.ofNullable(info)
+          final boolean isHsync = java.util.Optional.of(openKeyInfo)
               .map(WithMetadata::getMetadata)
               .map(meta -> meta.get(OzoneConsts.HSYNC_CLIENT_ID))
               .filter(id -> id.equals(clientIdString))
@@ -1892,6 +1865,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           } else if (isHsync && openKeyInfo.getModificationTime() <= expiredLeaseTimestamp &&
               !openKeyInfo.getMetadata().containsKey(OzoneConsts.LEASE_RECOVERY)) {
             // add hsync'ed keys
+            final OmKeyInfo info = kt.get(dbKeyName);
             final KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
                 .setVolumeName(info.getVolumeName())
                 .setBucketName(info.getBucketName())

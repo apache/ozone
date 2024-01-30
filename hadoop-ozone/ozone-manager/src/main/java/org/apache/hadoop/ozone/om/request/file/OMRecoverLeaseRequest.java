@@ -22,8 +22,6 @@ import com.google.common.base.Preconditions;
 
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -238,7 +236,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       openKeyInfo.setModificationTime(Time.now());
       // add to cache.
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
-          new CacheKey<>(dbOpenFileKey), CacheValue.get(transactionLogIndex, openKeyInfo));
+          dbOpenFileKey, openKeyInfo, transactionLogIndex);
     }
     // override key name with normalizedKeyPath
     keyInfo.setKeyName(keyName);

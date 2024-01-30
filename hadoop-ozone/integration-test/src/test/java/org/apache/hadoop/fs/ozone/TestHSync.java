@@ -26,6 +26,7 @@ import java.security.PrivilegedExceptionAction;
 import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.commons.lang3.RandomStringUtils;
@@ -66,6 +67,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequestWithFSO;
@@ -75,13 +77,17 @@ import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -89,6 +95,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -101,6 +108,7 @@ import static org.mockito.Mockito.when;
  * Test HSync.
  */
 @Timeout(value = 300)
+@TestMethodOrder(OrderAnnotation.class)
 public class TestHSync {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestHSync.class);
@@ -110,6 +118,7 @@ public class TestHSync {
 
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
   private static OzoneClient client;
+  private static final BucketLayout BUCKET_LAYOUT = BucketLayout.FILE_SYSTEM_OPTIMIZED;
 
   @BeforeAll
   public static void init() throws Exception {
@@ -117,11 +126,13 @@ public class TestHSync {
     final int flushSize = 2 * chunkSize;
     final int maxFlushSize = 2 * flushSize;
     final int blockSize = 2 * maxFlushSize;
-    final BucketLayout layout = BucketLayout.FILE_SYSTEM_OPTIMIZED;
+    final BucketLayout layout = BUCKET_LAYOUT;
 
     CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
     CONF.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
     CONF.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
+    // Reduce KeyDeletingService interval
+    CONF.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
     cluster = MiniOzoneCluster.newBuilder(CONF)
         .setNumDatanodes(5)
         .setTotalPipelineNumLimit(10)
@@ -151,6 +162,83 @@ public class TestHSync {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
+    }
+  }
+
+  @Test
+  // Making this the first test to be run to avoid db key composition headaches
+  @Order(1)
+  public void testKeyMetadata() throws Exception {
+    // Tests key metadata behavior upon create(), hsync() and close():
+    // 1. When a key is create()'d, neither OpenKeyTable nor KeyTable entry shall have hsync metadata.
+    // 2. When the key is hsync()'ed, both OpenKeyTable and KeyTable shall have hsync metadata.
+    // 3. When the key is hsync()'ed again, both OpenKeyTable and KeyTable shall have hsync metadata.
+    // 4. When the key is close()'d, KeyTable entry shall not have hsync metadata. Key shall not exist in OpenKeyTable.
+
+    final String rootPath = String.format("%s://%s/",
+        OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
+    CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+
+    final String dir = OZONE_ROOT + bucket.getVolumeName()
+        + OZONE_URI_DELIMITER + bucket.getName();
+    final String keyName = "file-test-key-metadata";
+    final Path file = new Path(dir, keyName);
+
+    OMMetadataManager omMetadataManager =
+        cluster.getOzoneManager().getMetadataManager();
+
+    // Expect empty OpenKeyTable and KeyTable before key creation
+    Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(BUCKET_LAYOUT);
+    assertTrue(openKeyTable.isEmpty());
+    Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable(BUCKET_LAYOUT);
+    assertTrue(keyTable.isEmpty());
+
+    try (FileSystem fs = FileSystem.get(CONF)) {
+      try (FSDataOutputStream os = fs.create(file, true)) {
+        // Wait for double buffer flush to avoid flakiness because RDB iterator bypasses table cache
+        cluster.getOzoneManager().awaitDoubleBufferFlush();
+        // OpenKeyTable key should NOT have HSYNC_CLIENT_ID
+        OmKeyInfo keyInfo = getFirstKeyInTable(keyName, openKeyTable);
+        assertFalse(keyInfo.getMetadata().containsKey(OzoneConsts.HSYNC_CLIENT_ID));
+        // KeyTable should still be empty
+        assertTrue(keyTable.isEmpty());
+
+        os.hsync();
+        cluster.getOzoneManager().awaitDoubleBufferFlush();
+        // OpenKeyTable key should have HSYNC_CLIENT_ID now
+        keyInfo = getFirstKeyInTable(keyName, openKeyTable);
+        assertTrue(keyInfo.getMetadata().containsKey(OzoneConsts.HSYNC_CLIENT_ID));
+        // KeyTable key should be there and have HSYNC_CLIENT_ID
+        keyInfo = getFirstKeyInTable(keyName, keyTable);
+        assertTrue(keyInfo.getMetadata().containsKey(OzoneConsts.HSYNC_CLIENT_ID));
+
+        // hsync again, metadata should not change
+        os.hsync();
+        cluster.getOzoneManager().awaitDoubleBufferFlush();
+        keyInfo = getFirstKeyInTable(keyName, openKeyTable);
+        assertTrue(keyInfo.getMetadata().containsKey(OzoneConsts.HSYNC_CLIENT_ID));
+        keyInfo = getFirstKeyInTable(keyName, keyTable);
+        assertTrue(keyInfo.getMetadata().containsKey(OzoneConsts.HSYNC_CLIENT_ID));
+      }
+      // key is closed, OpenKeyTable should be empty
+      cluster.getOzoneManager().awaitDoubleBufferFlush();
+      assertTrue(openKeyTable.isEmpty());
+      // KeyTable should have the key. But the key shouldn't have metadata HSYNC_CLIENT_ID anymore
+      OmKeyInfo keyInfo = getFirstKeyInTable(keyName, keyTable);
+      assertFalse(keyInfo.getMetadata().containsKey(OzoneConsts.HSYNC_CLIENT_ID));
+
+      // Clean up
+      assertTrue(fs.delete(file, false));
+      // Wait for KeyDeletingService to finish to avoid interfering other tests
+      Table<String, RepeatedOmKeyInfo> deletedTable = omMetadataManager.getDeletedTable();
+      GenericTestUtils.waitFor(
+          () -> {
+            try {
+              return deletedTable.isEmpty();
+            } catch (IOException e) {
+              return false;
+            }
+          }, 250, 10000);
     }
   }
 
@@ -594,6 +682,23 @@ public class TestHSync {
     } finally {
       // re-enable the feature flag
       CONF.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
+    }
+  }
+
+  /**
+   * Helper method to check and get the first key in the OpenKeyTable.
+   * @param keyName expect key name to contain this string
+   * @param openKeyTable Table<String, OmKeyInfo>
+   * @return OmKeyInfo
+   */
+  private OmKeyInfo getFirstKeyInTable(String keyName, Table<String, OmKeyInfo> openKeyTable) throws IOException {
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> it = openKeyTable.iterator()) {
+      assertTrue(it.hasNext());
+      Table.KeyValue<String, OmKeyInfo> kv = it.next();
+      String dbOpenKey = kv.getKey();
+      assertNotNull(dbOpenKey);
+      assertTrue(dbOpenKey.contains(keyName));
+      return kv.getValue();
     }
   }
 

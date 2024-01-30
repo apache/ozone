@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.request.util.OmKeyHSyncUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
@@ -81,8 +82,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
 public class OMKeyCommitRequest extends OMKeyRequest {
 
   @VisibleForTesting
-  public static final Logger LOG =
-      LoggerFactory.getLogger(OMKeyCommitRequest.class);
+  public static final Logger LOG = LoggerFactory.getLogger(OMKeyCommitRequest.class);
 
   public OMKeyCommitRequest(OMRequest omRequest, BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
@@ -237,7 +237,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       final String clientIdString = String.valueOf(writerClientId);
       if (null != keyToDelete) {
-        isPreviousCommitHsync = java.util.Optional.ofNullable(keyToDelete)
+        isPreviousCommitHsync = java.util.Optional.of(keyToDelete)
             .map(WithMetadata::getMetadata)
             .map(meta -> meta.get(OzoneConsts.HSYNC_CLIENT_ID))
             .filter(id -> id.equals(clientIdString))
@@ -260,17 +260,24 @@ public class OMKeyCommitRequest extends OMKeyRequest {
               " metadata while recovery flag is not set in request", KEY_UNDER_LEASE_RECOVERY);
         }
       }
-      omKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
-          commitKeyArgs.getMetadataList()));
+
+      omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
+
+      // non-null indicates it is necessary to update the open key
+      OmKeyInfo newOpenKeyInfo = null;
 
       if (isHSync) {
-        omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID, clientIdString);
-      } else if (isRecovery) {
-        omKeyInfo.getMetadata().remove(OzoneConsts.HSYNC_CLIENT_ID);
-        omKeyInfo.getMetadata().remove(OzoneConsts.LEASE_RECOVERY);
+        if (!OmKeyHSyncUtil.isHSyncedPreviously(omKeyInfo, clientIdString, dbOpenKey)) {
+          // Update open key as well if it is the first hsync of this key
+          omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID, clientIdString);
+          newOpenKeyInfo = omKeyInfo.copyObject();
+        }
       }
+
+      omKeyInfo.getMetadata().putAll(KeyValueUtil.getFromProtobuf(
+          commitKeyArgs.getMetadataList()));
       omKeyInfo.setDataSize(commitKeyArgs.getDataSize());
-      omKeyInfo.setModificationTime(commitKeyArgs.getModificationTime());
+
       // Update the block length for each block, return the allocated but
       // uncommitted blocks
       List<OmKeyLocationInfo> uncommitted =
@@ -337,6 +344,16 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         // So that this key can't be committed again.
         omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
             dbOpenKey, trxnLogIndex);
+
+        // Prevent hsync metadata from getting committed to the final key
+        omKeyInfo.getMetadata().remove(OzoneConsts.HSYNC_CLIENT_ID);
+        if (isRecovery) {
+          omKeyInfo.getMetadata().remove(OzoneConsts.LEASE_RECOVERY);
+        }
+      } else if (newOpenKeyInfo != null) {
+        // isHSync is true and newOpenKeyInfo is set, update OpenKeyTable
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
+            dbOpenKey, newOpenKeyInfo, trxnLogIndex);
       }
 
       omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
@@ -346,7 +363,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
       omClientResponse = new OMKeyCommitResponse(omResponse.build(),
           omKeyInfo, dbOzoneKey, dbOpenKey, omBucketInfo.copyObject(),
-          oldKeyVersionsToDeleteMap, isHSync);
+          oldKeyVersionsToDeleteMap, isHSync, newOpenKeyInfo);
 
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {

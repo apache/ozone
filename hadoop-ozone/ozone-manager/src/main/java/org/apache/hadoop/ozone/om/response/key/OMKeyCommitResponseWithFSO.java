@@ -47,16 +47,17 @@ public class OMKeyCommitResponseWithFSO extends OMKeyCommitResponse {
 
   private long volumeId;
 
-  @SuppressWarnings("parameternumber")
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public OMKeyCommitResponseWithFSO(
       @Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo,
       String ozoneKeyName, String openKeyName,
       @Nonnull OmBucketInfo omBucketInfo,
       Map<String, RepeatedOmKeyInfo> deleteKeyMap, long volumeId,
-      boolean isHSync) {
+      boolean isHSync,
+      OmKeyInfo newOpenKeyInfo) {
     super(omResponse, omKeyInfo, ozoneKeyName, openKeyName,
-            omBucketInfo, deleteKeyMap, isHSync);
+            omBucketInfo, deleteKeyMap, isHSync, newOpenKeyInfo);
     this.volumeId = volumeId;
   }
 
@@ -78,6 +79,9 @@ public class OMKeyCommitResponseWithFSO extends OMKeyCommitResponse {
     if (!this.isHSync()) {
       omMetadataManager.getOpenKeyTable(getBucketLayout())
           .deleteWithBatch(batchOperation, getOpenKeyName());
+    } else if (getNewOpenKeyInfo() != null) {
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).putWithBatch(
+          batchOperation, getOpenKeyName(), getNewOpenKeyInfo());
     }
 
     OMFileRequest.addToFileTable(omMetadataManager, batchOperation,
