@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.response.snapshot;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
-import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -42,7 +41,6 @@ import java.io.IOException;
 import java.util.List;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.SNAPSHOT_INFO_TABLE;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 
 /**
  * Response for OMSnapshotMoveDeletedKeysRequest.
@@ -93,24 +91,22 @@ public class OMSnapshotMoveDeletedKeysResponse extends OMClientResponse {
         ((OmMetadataManagerImpl) omMetadataManager)
             .getOzoneManager().getOmSnapshotManager();
 
-    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmFromSnapshot =
-        omSnapshotManager.checkForSnapshot(
+    try (ReferenceCounted<OmSnapshot, SnapshotCache> rcOmFromSnapshot =
+        omSnapshotManager.getSnapshot(
             fromSnapshot.getVolumeName(),
             fromSnapshot.getBucketName(),
-            getSnapshotPrefix(fromSnapshot.getName()),
-            true)) {
+            fromSnapshot.getName())) {
 
-      OmSnapshot fromOmSnapshot = (OmSnapshot) rcOmFromSnapshot.get();
+      OmSnapshot fromOmSnapshot = rcOmFromSnapshot.get();
 
       if (nextSnapshot != null) {
-        try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
-            rcOmNextSnapshot = omSnapshotManager.checkForSnapshot(
+        try (ReferenceCounted<OmSnapshot, SnapshotCache>
+            rcOmNextSnapshot = omSnapshotManager.getSnapshot(
                 nextSnapshot.getVolumeName(),
                 nextSnapshot.getBucketName(),
-                getSnapshotPrefix(nextSnapshot.getName()),
-                true)) {
+                nextSnapshot.getName())) {
 
-          OmSnapshot nextOmSnapshot = (OmSnapshot) rcOmNextSnapshot.get();
+          OmSnapshot nextOmSnapshot = rcOmNextSnapshot.get();
           RDBStore nextSnapshotStore =
               (RDBStore) nextOmSnapshot.getMetadataManager().getStore();
           // Init Batch Operation for snapshot db.

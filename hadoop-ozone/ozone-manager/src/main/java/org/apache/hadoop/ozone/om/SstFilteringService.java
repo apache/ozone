@@ -147,10 +147,9 @@ public class SstFilteringService extends BackgroundService
     @Override
     public BackgroundTaskResult call() throws Exception {
 
-      Optional<SnapshotCache> snapshotCache = Optional.ofNullable(ozoneManager)
-          .map(OzoneManager::getOmSnapshotManager)
-          .map(OmSnapshotManager::getSnapshotCache);
-      if (!snapshotCache.isPresent()) {
+      Optional<OmSnapshotManager> snapshotManager = Optional.ofNullable(ozoneManager)
+          .map(OzoneManager::getOmSnapshotManager);
+      if (!snapshotManager.isPresent()) {
         return BackgroundTaskResult.EmptyTaskResult.newResult();
       }
       Table<String, SnapshotInfo> snapshotInfoTable =
@@ -183,10 +182,13 @@ public class SstFilteringService extends BackgroundService
                     snapshotInfo.getBucketName());
 
             try (
-                ReferenceCounted<IOmMetadataReader, SnapshotCache>
-                    snapshotMetadataReader = snapshotCache.get().get(
-                        snapshotInfo.getTableKey())) {
-              OmSnapshot omSnapshot = (OmSnapshot) snapshotMetadataReader.get();
+                ReferenceCounted<OmSnapshot, SnapshotCache>
+                    snapshotMetadataReader = snapshotManager.get()
+                    .getActiveSnapshot(
+                        snapshotInfo.getVolumeName(),
+                        snapshotInfo.getBucketName(),
+                        snapshotInfo.getName())) {
+              OmSnapshot omSnapshot = snapshotMetadataReader.get();
               RDBStore rdbStore = (RDBStore) omSnapshot.getMetadataManager()
                   .getStore();
               RocksDatabase db = rdbStore.getDb();

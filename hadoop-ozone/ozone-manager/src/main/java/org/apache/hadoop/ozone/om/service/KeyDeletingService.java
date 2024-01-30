@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.BlockGroup;
-import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -58,7 +57,6 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskResult.EmptyTaskResult;
 
 import com.google.common.annotations.VisibleForTesting;
 
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT;
@@ -264,13 +262,12 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             continue;
           }
 
-          try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
-              rcCurrOmSnapshot = omSnapshotManager.checkForSnapshot(
+          try (ReferenceCounted<OmSnapshot, SnapshotCache>
+              rcCurrOmSnapshot = omSnapshotManager.getSnapshot(
                   currSnapInfo.getVolumeName(),
                   currSnapInfo.getBucketName(),
-                  getSnapshotPrefix(currSnapInfo.getName()),
-                  true)) {
-            OmSnapshot currOmSnapshot = (OmSnapshot) rcCurrOmSnapshot.get();
+                  currSnapInfo.getName())) {
+            OmSnapshot currOmSnapshot = rcCurrOmSnapshot.get();
 
             Table<String, RepeatedOmKeyInfo> snapDeletedTable =
                 currOmSnapshot.getMetadataManager().getDeletedTable();
@@ -304,18 +301,17 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
             Table<String, OmKeyInfo> previousKeyTable = null;
             Table<String, String> prevRenamedTable = null;
-            ReferenceCounted<IOmMetadataReader, SnapshotCache>
+            ReferenceCounted<OmSnapshot, SnapshotCache>
                 rcPrevOmSnapshot = null;
 
             // Split RepeatedOmKeyInfo and update current snapshot
             // deletedKeyTable and next snapshot deletedKeyTable.
             if (previousSnapshot != null) {
-              rcPrevOmSnapshot = omSnapshotManager.checkForSnapshot(
+              rcPrevOmSnapshot = omSnapshotManager.getSnapshot(
                   previousSnapshot.getVolumeName(),
                   previousSnapshot.getBucketName(),
-                  getSnapshotPrefix(previousSnapshot.getName()), true);
-              OmSnapshot omPreviousSnapshot = (OmSnapshot)
-                  rcPrevOmSnapshot.get();
+                  previousSnapshot.getName());
+              OmSnapshot omPreviousSnapshot = rcPrevOmSnapshot.get();
 
               previousKeyTable = omPreviousSnapshot.getMetadataManager()
                   .getKeyTable(bucketInfo.getBucketLayout());
@@ -324,15 +320,14 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             }
 
             Table<String, OmKeyInfo> previousToPrevKeyTable = null;
-            ReferenceCounted<IOmMetadataReader, SnapshotCache>
+            ReferenceCounted<OmSnapshot, SnapshotCache>
                 rcPrevToPrevOmSnapshot = null;
             if (previousToPrevSnapshot != null) {
-              rcPrevToPrevOmSnapshot = omSnapshotManager.checkForSnapshot(
+              rcPrevToPrevOmSnapshot = omSnapshotManager.getSnapshot(
                   previousToPrevSnapshot.getVolumeName(),
                   previousToPrevSnapshot.getBucketName(),
-                  getSnapshotPrefix(previousToPrevSnapshot.getName()), true);
-              OmSnapshot omPreviousToPrevSnapshot = (OmSnapshot)
-                  rcPrevToPrevOmSnapshot.get();
+                  previousToPrevSnapshot.getName());
+              OmSnapshot omPreviousToPrevSnapshot = rcPrevToPrevOmSnapshot.get();
 
               previousToPrevKeyTable = omPreviousToPrevSnapshot
                   .getMetadataManager()

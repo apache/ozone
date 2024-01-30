@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.response.key;
 
 import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -41,7 +40,6 @@ import java.util.List;
 import jakarta.annotation.Nonnull;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotMoveDeletedKeysResponse.createRepeatedOmKeyInfo;
 
 /**
@@ -81,14 +79,13 @@ public class OMKeyPurgeResponse extends OmKeyResponse {
           ((OmMetadataManagerImpl) omMetadataManager)
               .getOzoneManager().getOmSnapshotManager();
 
-      try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmFromSnapshot =
-          omSnapshotManager.checkForSnapshot(
+      try (ReferenceCounted<OmSnapshot, SnapshotCache> rcOmFromSnapshot =
+          omSnapshotManager.getSnapshot(
               fromSnapshot.getVolumeName(),
               fromSnapshot.getBucketName(),
-              getSnapshotPrefix(fromSnapshot.getName()),
-              true)) {
+              fromSnapshot.getName())) {
 
-        OmSnapshot fromOmSnapshot = (OmSnapshot) rcOmFromSnapshot.get();
+        OmSnapshot fromOmSnapshot = rcOmFromSnapshot.get();
         DBStore fromSnapshotStore =
             fromOmSnapshot.getMetadataManager().getStore();
         // Init Batch Operation for snapshot db.

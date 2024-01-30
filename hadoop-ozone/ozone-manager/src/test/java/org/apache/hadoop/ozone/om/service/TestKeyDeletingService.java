@@ -36,7 +36,6 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -79,7 +78,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -548,10 +546,10 @@ t
 
     keyDeletingService.resume();
 
-    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot =
-        om.getOmSnapshotManager().checkForSnapshot(
-            volumeName, bucketName, getSnapshotPrefix("snap3"), true)) {
-      OmSnapshot snap3 = (OmSnapshot) rcOmSnapshot.get();
+    try (ReferenceCounted<OmSnapshot, SnapshotCache> rcOmSnapshot =
+        om.getOmSnapshotManager().getSnapshot(
+            volumeName, bucketName, "snap3")) {
+      OmSnapshot snap3 = rcOmSnapshot.get();
 
       Table<String, RepeatedOmKeyInfo> snap3deletedTable =
           snap3.getMetadataManager().getDeletedTable();

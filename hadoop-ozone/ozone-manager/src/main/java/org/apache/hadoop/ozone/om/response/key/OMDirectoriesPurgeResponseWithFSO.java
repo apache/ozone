@@ -23,7 +23,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -50,7 +49,6 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_DIR_TABLE
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 
 /**
  * Response for {@link OMDirectoriesPurgeRequestWithFSO} request.
@@ -86,13 +84,12 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
           ((OmMetadataManagerImpl) metadataManager)
               .getOzoneManager().getOmSnapshotManager();
 
-      try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
-          rcFromSnapshotInfo = omSnapshotManager.checkForSnapshot(
+      try (ReferenceCounted<OmSnapshot, SnapshotCache>
+          rcFromSnapshotInfo = omSnapshotManager.getSnapshot(
               fromSnapshotInfo.getVolumeName(),
               fromSnapshotInfo.getBucketName(),
-              getSnapshotPrefix(fromSnapshotInfo.getName()),
-              true)) {
-        OmSnapshot fromSnapshot = (OmSnapshot) rcFromSnapshotInfo.get();
+              fromSnapshotInfo.getName())) {
+        OmSnapshot fromSnapshot = rcFromSnapshotInfo.get();
         DBStore fromSnapshotStore = fromSnapshot.getMetadataManager()
             .getStore();
         // Init Batch Operation for snapshot db.

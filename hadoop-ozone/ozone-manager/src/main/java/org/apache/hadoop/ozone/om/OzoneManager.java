@@ -3751,7 +3751,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       keyManager.stop();
       stopSecretManager();
       stopTrashEmptier();
-      omSnapshotManager.getSnapshotCache().invalidateAll();
+      omSnapshotManager.invalidateCache();
       // Pause the State Machine so that no new transactions can be applied.
       // This action also clears the OM Double Buffer so that if there are any
       // pending transactions in the buffer, they are discarded.
@@ -4709,8 +4709,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       IOmMetadataReader, SnapshotCache> getReader(OmKeyArgs keyArgs)
       throws IOException {
     return omSnapshotManager.checkForSnapshot(
-        keyArgs.getVolumeName(), keyArgs.getBucketName(), keyArgs.getKeyName(),
-        false);
+        keyArgs.getVolumeName(), keyArgs.getBucketName(), keyArgs.getKeyName());
   }
 
   /**
@@ -4726,7 +4725,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       IOmMetadataReader, SnapshotCache> getReader(
           String volumeName, String bucketName, String key) throws IOException {
     return omSnapshotManager.checkForSnapshot(
-        volumeName, bucketName, key, false);
+        volumeName, bucketName, key);
   }
 
   /**
@@ -4742,8 +4741,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return omSnapshotManager.checkForSnapshot(
         ozoneObj.getVolumeName(),
         ozoneObj.getBucketName(),
-        ozoneObj.getKeyName(),
-        false);
+        ozoneObj.getKeyName());
   }
 
   @SuppressWarnings("parameternumber")

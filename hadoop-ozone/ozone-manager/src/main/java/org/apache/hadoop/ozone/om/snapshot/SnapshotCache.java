@@ -19,9 +19,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheLoader;
-import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.OmSnapshot;
-import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,7 +30,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
 
 /**
  * Thread-safe custom unbounded LRU cache to manage open snapshot DB instances.
@@ -45,26 +42,23 @@ public class SnapshotCache {
   // Key:   DB snapshot table key
   // Value: OmSnapshot instance, each holds a DB instance handle inside
   // TODO: [SNAPSHOT] Consider wrapping SoftReference<> around IOmMetadataReader
-  private final ConcurrentHashMap<String, ReferenceCounted<IOmMetadataReader, SnapshotCache>> dbMap;
+  private final ConcurrentHashMap<String, ReferenceCounted<OmSnapshot, SnapshotCache>> dbMap;
 
-  private final OmSnapshotManager omSnapshotManager;
   private final CacheLoader<String, OmSnapshot> cacheLoader;
   // Soft-limit of the total number of snapshot DB instances allowed to be
   // opened on the OM.
   private final int cacheSizeLimit;
 
   public SnapshotCache(
-      OmSnapshotManager omSnapshotManager,
       CacheLoader<String, OmSnapshot> cacheLoader,
       int cacheSizeLimit) {
     this.dbMap = new ConcurrentHashMap<>();
-    this.omSnapshotManager = omSnapshotManager;
     this.cacheLoader = cacheLoader;
     this.cacheSizeLimit = cacheSizeLimit;
   }
 
   @VisibleForTesting
-  ConcurrentHashMap<String, ReferenceCounted<IOmMetadataReader, SnapshotCache>> getDbMap() {
+  ConcurrentHashMap<String, ReferenceCounted<OmSnapshot, SnapshotCache>> getDbMap() {
     return dbMap;
   }
 
@@ -85,7 +79,7 @@ public class SnapshotCache {
         LOG.warn("Key: '{}' does not exist in cache.", k);
       } else {
         try {
-          ((OmSnapshot) v.get()).close();
+          v.get().close();
         } catch (IOException e) {
           throw new IllegalStateException("Failed to close snapshot: " + key, e);
         }
@@ -98,12 +92,12 @@ public class SnapshotCache {
    * Immediately invalidate all entries and close their DB instances in cache.
    */
   public void invalidateAll() {
-    Iterator<Map.Entry<String, ReferenceCounted<IOmMetadataReader, SnapshotCache>>>
+    Iterator<Map.Entry<String, ReferenceCounted<OmSnapshot, SnapshotCache>>>
         it = dbMap.entrySet().iterator();
 
     while (it.hasNext()) {
-      Map.Entry<String, ReferenceCounted<IOmMetadataReader, SnapshotCache>> entry = it.next();
-      OmSnapshot omSnapshot = (OmSnapshot) entry.getValue().get();
+      Map.Entry<String, ReferenceCounted<OmSnapshot, SnapshotCache>> entry = it.next();
+      OmSnapshot omSnapshot = entry.getValue().get();
       try {
         // TODO: If wrapped with SoftReference<>, omSnapshot could be null?
         omSnapshot.close();
@@ -125,21 +119,17 @@ public class SnapshotCache {
     GARBAGE_COLLECTION_WRITE
   }
 
-  public ReferenceCounted<IOmMetadataReader, SnapshotCache> get(String key) throws IOException {
-    return get(key, false);
-  }
-
   /**
    * Get or load OmSnapshot. Shall be close()d after use.
    * TODO: [SNAPSHOT] Can add reason enum to param list later.
    * @param key snapshot table key
    * @return an OmSnapshot instance, or null on error
    */
-  public ReferenceCounted<IOmMetadataReader, SnapshotCache> get(String key, boolean skipActiveCheck)
+  public ReferenceCounted<OmSnapshot, SnapshotCache> get(String key)
       throws IOException {
     // Atomic operation to initialize the OmSnapshot instance (once) if the key
     // does not exist, and increment the reference count on the instance.
-    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot =
+    ReferenceCounted<OmSnapshot, SnapshotCache> rcOmSnapshot =
         dbMap.compute(key, (k, v) -> {
           if (v == null) {
             LOG.info("Loading snapshot. Table key: {}", k);
@@ -171,17 +161,6 @@ public class SnapshotCache {
       throw new OMException("Snapshot table key '" + key + "' not found, "
           + "or the snapshot is no longer active",
           OMException.ResultCodes.FILE_NOT_FOUND);
-    }
-
-    // If the snapshot is already loaded in cache, the check inside the loader
-    // above is ignored. But we would still want to reject all get()s except
-    // when called from SDT (and some) if the snapshot is not active anymore.
-    if (!skipActiveCheck && !omSnapshotManager.isSnapshotStatus(key, SNAPSHOT_ACTIVE)) {
-      // Ref count was incremented. Need to decrement on exception here.
-      rcOmSnapshot.decrementRefCount();
-      throw new OMException("Unable to load snapshot. " +
-          "Snapshot with table key '" + key + "' is no longer active",
-          FILE_NOT_FOUND);
     }
 
     // Check if any entries can be cleaned up.
@@ -237,7 +216,7 @@ public class SnapshotCache {
    * TODO: [SNAPSHOT] Add new ozone debug CLI command to trigger this directly.
    */
   private void cleanupInternal() {
-    for (Map.Entry<String, ReferenceCounted<IOmMetadataReader, SnapshotCache>> entry : dbMap.entrySet()) {
+    for (Map.Entry<String, ReferenceCounted<OmSnapshot, SnapshotCache>> entry : dbMap.entrySet()) {
       dbMap.compute(entry.getKey(), (k, v) -> {
         if (v == null) {
           throw new IllegalStateException("Key '" + k + "' does not exist in cache. The RocksDB " +
@@ -252,7 +231,7 @@ public class SnapshotCache {
           LOG.debug("Closing Snapshot {}. It is not being referenced anymore.", k);
           // Close the instance, which also closes its DB handle.
           try {
-            ((OmSnapshot) v.get()).close();
+            v.get().close();
           } catch (IOException ex) {
             throw new IllegalStateException("Error while closing snapshot DB", ex);
           }
