@@ -786,7 +786,7 @@ public class MockNodeManager implements NodeManager {
   @Override
   public Boolean isNodeRegistered(
       DatanodeDetails datanodeDetails) {
-    return false;
+    return healthyNodes.contains(datanodeDetails);
   }
 
   @Override
