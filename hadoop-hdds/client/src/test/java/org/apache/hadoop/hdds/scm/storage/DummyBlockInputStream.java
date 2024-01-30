@@ -69,7 +69,7 @@ class DummyBlockInputStream extends BlockInputStream {
   }
 
   @Override
-  protected synchronized void checkOpen() throws IOException {
+  protected synchronized void checkClientOpen() {
     // No action needed
   }
 }
