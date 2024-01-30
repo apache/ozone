@@ -84,7 +84,7 @@ public class TestDecommissionStatusSubCommand {
             "\"modelerType\" : \"NodeDecommissionMetrics\",    \"DecommissioningMaintenanceNodesTotal\" : 0,    " +
             "\"RecommissionNodesTotal\" : 0,    \"PipelinesWaitingToCloseTotal\" : 0,    " +
             "\"ContainersUnderReplicatedTotal\" : 0,    \"ContainersUnClosedTotal\" : 0,    " +
-            "\"ContainersSufficientlyReplicatedTotal\" : 0  } ]}").getBytes();
+            "\"ContainersSufficientlyReplicatedTotal\" : 0  } ]}").getBytes(StandardCharsets.UTF_8);
         exchange.sendResponseHeaders(HttpURLConnection.HTTP_OK, response.length);
         exchange.getResponseBody().write(response);
         exchange.close();
