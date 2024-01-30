@@ -2809,13 +2809,11 @@ public abstract class TestOzoneRpcClientAbstract {
       String keyName2 = UUID.randomUUID().toString();
       OzoneBucket bucket2 = client.getObjectStore().getVolume(volumeName)
           .getBucket(bucketName);
-      try {
-        initiateMultipartUpload(bucket2, keyName2, anyReplication());
-        fail("User without permission should fail");
-      } catch (Exception e) {
-        OMException ome = assertInstanceOf(OMException.class, e);
-        assertEquals(ResultCodes.PERMISSION_DENIED, ome.getResult());
-      }
+      Exception e =
+          assertThrows(Exception.class, () -> initiateMultipartUpload(bucket2, keyName2, anyReplication()),
+              "User without permission should fail");
+      OMException ome = assertInstanceOf(OMException.class, e);
+      assertEquals(ResultCodes.PERMISSION_DENIED, ome.getResult());
 
       // Add create permission for user, and try multi-upload init again
       OzoneAcl acl7 = new OzoneAcl(USER, userName, ACLType.CREATE, DEFAULT);
@@ -2845,10 +2843,8 @@ public abstract class TestOzoneRpcClientAbstract {
 
       // User without permission cannot read multi-uploaded object
       try (OzoneInputStream ignored = bucket2.readKey(keyName)) {
-        fail("User without permission should fail");
-      } catch (Exception e) {
-        OMException ome = assertInstanceOf(OMException.class, e);
-        assertEquals(ResultCodes.PERMISSION_DENIED, ome.getResult());
+        OMException ex = assertThrows(OMException.class, () -> { }, "User without permission should fail");
+        assertEquals(ResultCodes.PERMISSION_DENIED, ex.getResult());
       }
     }
   }
@@ -3053,14 +3049,9 @@ public abstract class TestOzoneRpcClientAbstract {
 
     // Abort before completing part upload.
     bucket.abortMultipartUpload(keyName, omMultipartInfo.getUploadID());
-
-    try {
-      ozoneOutputStream.close();
-      fail("testAbortUploadFailWithInProgressPartUpload failed");
-    } catch (IOException ex) {
-      OMException ome = assertInstanceOf(OMException.class, ex);
-      assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, ome.getResult());
-    }
+    IOException ex = assertThrows(IOException.class, () -> ozoneOutputStream.close());
+    OMException ome = assertInstanceOf(OMException.class, ex);
+    assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, ome.getResult());
   }
 
   @Test
@@ -3084,7 +3075,7 @@ public abstract class TestOzoneRpcClientAbstract {
     // upload part 1.
     byte[] data = generateData(5 * 1024 * 1024,
         (byte) RandomUtils.nextLong());
-    OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
+    final OzoneOutputStream ozoneOutputStream = bucket.createMultipartKey(keyName,
         data.length, 1, uploadID);
     ozoneOutputStream.write(data, 0, data.length);
     ozoneOutputStream.close();
@@ -3115,14 +3106,9 @@ public abstract class TestOzoneRpcClientAbstract {
     String part1 = new String(data, UTF_8);
     sb.append(part1);
     assertEquals(sb.toString(), new String(fileContent, UTF_8));
-
-    try {
-      ozoneOutputStream.close();
-      fail("testCommitPartAfterCompleteUpload failed");
-    } catch (IOException ex) {
-      OMException ome = assertInstanceOf(OMException.class, ex);
-      assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, ome.getResult());
-    }
+    IOException ex = assertThrows(IOException.class, () -> ozoneOutputStream.close());
+    OMException ome = assertInstanceOf(OMException.class, ex);
+    assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, ome.getResult());
   }
 
 

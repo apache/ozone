@@ -45,8 +45,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests AuditParser.
@@ -189,13 +188,9 @@ public class TestAuditParser {
   @Test
   public void testLoadCommand() {
     String[] args1 = new String[]{dbName, "load", LOGS1};
-    try {
-      execute(args1, "");
-      fail("No exception thrown.");
-    } catch (Exception e) {
-      assertInstanceOf(ArrayIndexOutOfBoundsException.class, e.getCause());
-      assertThat(e.getMessage()).contains(": 5");
-    }
+    ArrayIndexOutOfBoundsException e =
+        assertThrows(ArrayIndexOutOfBoundsException.class, () -> execute(args1, ""));
+    assertThat(e.getMessage()).contains(": 5");
   }
 
   /**

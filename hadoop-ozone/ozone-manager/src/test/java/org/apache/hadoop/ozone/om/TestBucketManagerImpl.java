@@ -210,14 +210,10 @@ public class TestBucketManagerImpl {
     OMMetadataManager metaMgr = omTestManagers.getMetadataManager();
     BucketManager bucketManager = omTestManagers.getBucketManager();
     // Check exception thrown when volume does not exist
-    try {
-      bucketManager.getBucketInfo(volumeName, bucketName);
-      fail("Should have thrown OMException");
-    } catch (OMException omEx) {
-      assertEquals(ResultCodes.VOLUME_NOT_FOUND, omEx.getResult(),
-          "getBucketInfo() should have thrown " +
-              "VOLUME_NOT_FOUND as the parent volume is not created!");
-    }
+    OMException omEx = assertThrows(OMException.class, () -> bucketManager.getBucketInfo(volumeName, bucketName));
+    assertEquals(ResultCodes.VOLUME_NOT_FOUND, omEx.getResult(),
+        "getBucketInfo() should have thrown " +
+            "VOLUME_NOT_FOUND as the parent volume is not created!");
     OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
@@ -236,15 +232,12 @@ public class TestBucketManagerImpl {
     // Create bucket
     createBucket(metaMgr, bucketInfo);
     // Check exception thrown when bucket does not exist
-    try {
-      bucketManager.getBucketInfo(volumeName, "bucketNotExist");
-      fail("Should have thrown OMException");
-    } catch (OMException omEx) {
-      assertEquals(
-          ResultCodes.BUCKET_NOT_FOUND, omEx.getResult(),
-          "getBucketInfo() should have thrown BUCKET_NOT_FOUND " +
-              "as the parent volume exists but bucket doesn't!");
-    }
+    omEx =
+        assertThrows(OMException.class, () -> bucketManager.getBucketInfo(volumeName, "bucketNotExist"));
+    assertEquals(
+        ResultCodes.BUCKET_NOT_FOUND, omEx.getResult(),
+        "getBucketInfo() should have thrown BUCKET_NOT_FOUND " +
+            "as the parent volume exists but bucket doesn't!");
     OmBucketInfo result = bucketManager.getBucketInfo(volumeName, bucketName);
     assertEquals(volumeName, result.getVolumeName());
     assertEquals(bucketName, result.getBucketName());

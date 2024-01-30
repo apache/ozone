@@ -90,7 +90,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -270,18 +269,13 @@ public class TestOzoneShellHA {
     if (Strings.isNullOrEmpty(expectedError)) {
       execute(shell, args);
     } else {
-      try {
-        execute(shell, args);
-        fail("Exception is expected from command execution " + Arrays
-            .asList(args));
-      } catch (Exception ex) {
-        if (!Strings.isNullOrEmpty(expectedError)) {
-          Throwable exceptionToCheck = ex;
-          if (exceptionToCheck.getCause() != null) {
-            exceptionToCheck = exceptionToCheck.getCause();
-          }
-          assertThat(exceptionToCheck.getMessage()).contains(expectedError);
+      Exception ex = assertThrows(Exception.class, () -> execute(shell, args));
+      if (!Strings.isNullOrEmpty(expectedError)) {
+        Throwable exceptionToCheck = ex;
+        if (exceptionToCheck.getCause() != null) {
+          exceptionToCheck = exceptionToCheck.getCause();
         }
+        assertThat(exceptionToCheck.getMessage()).contains(expectedError);
       }
     }
   }

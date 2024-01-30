@@ -28,7 +28,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -97,12 +97,13 @@ public class TestDecommissionScmSubcommand {
         .thenAnswer(invocation -> (
             response));
 
-    try (GenericTestUtils.SystemOutCapturer capture =
-             new GenericTestUtils.SystemOutCapturer()) {
-      cmd.execute(client);
-      fail();
-    } catch (IOException ex) {
-      assertThat(ex.getMessage()).contains("remove current leader");
+    GenericTestUtils.SystemOutCapturer capture = null;
+    try {
+      capture = new GenericTestUtils.SystemOutCapturer();
+      IOException ioe = assertThrows(IOException.class, () -> cmd.execute(client));
+      assertThat(ioe.getMessage()).contains("remove current leader");
+    } finally {
+      capture.close();
     }
   }
 }

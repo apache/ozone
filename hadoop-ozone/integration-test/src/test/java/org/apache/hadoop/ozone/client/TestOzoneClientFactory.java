@@ -16,7 +16,8 @@
  */
 package org.apache.hadoop.ozone.client;
 
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.security.AccessControlException;
@@ -39,37 +40,34 @@ public class TestOzoneClientFactory {
   public void testRemoteException() {
 
     OzoneConfiguration conf = new OzoneConfiguration();
-
-    try {
+    Exception e = assertThrows(Exception.class, () -> {
       MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
-          .setNumDatanodes(3)
-          .setTotalPipelineNumLimit(10)
-          .setScmId(scmId)
-          .setClusterId(clusterId)
-          .build();
+            .setNumDatanodes(3)
+            .setTotalPipelineNumLimit(10)
+            .setScmId(scmId)
+            .setClusterId(clusterId)
+            .build();
 
       String omPort = cluster.getOzoneManager().getRpcPort();
 
       UserGroupInformation realUser =
-          UserGroupInformation.createRemoteUser("realUser");
+              UserGroupInformation.createRemoteUser("realUser");
       UserGroupInformation proxyUser = UserGroupInformation.createProxyUser(
-          "user", realUser);
+              "user", realUser);
       proxyUser.doAs(new PrivilegedExceptionAction<Void>() {
         @Override
         public Void run() throws IOException {
           conf.set("ozone.security.enabled", "true");
           try (OzoneClient ozoneClient =
-                   OzoneClientFactory.getRpcClient("localhost",
-                       Integer.parseInt(omPort), conf)) {
+                       OzoneClientFactory.getRpcClient("localhost",
+                               Integer.parseInt(omPort), conf)) {
             ozoneClient.getObjectStore().listVolumes("/");
           }
           return null;
         }
       });
-      fail("Should throw exception here");
-    } catch (IOException | InterruptedException e) {
-      assert e instanceof AccessControlException;
-    }
+    });
+    assertInstanceOf(AccessControlException.class, e);
   }
 
 }

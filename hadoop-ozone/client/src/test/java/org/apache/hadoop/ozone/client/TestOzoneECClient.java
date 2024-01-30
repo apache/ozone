@@ -706,20 +706,15 @@ public class TestOzoneECClient {
     nodesIndexesToMarkFailure[2] = 10;
     //To mark node failed in fourth block group.
     nodesIndexesToMarkFailure[3] = 15;
-    try {
-      // Mocked MultiNodePipelineBlockAllocator#allocateBlock implementation can
-      // pick good block group, but client retries should be limited
-      // OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES_ON_FAILURE(here it was
-      // configured as 3). So, it should fail as we have marked 3 nodes as bad.
-      testStripeWriteRetriesOnFailures(con, 20, nodesIndexesToMarkFailure);
-      fail(
-          "Expecting it to fail as retries should exceed the max allowed times:"
-              + " " + 3);
-    } catch (IOException e) {
-      assertEquals(
-          "Completed max allowed retries 3 on stripe failures.",
-          e.getMessage());
-    }
+    // Mocked MultiNodePipelineBlockAllocator#allocateBlock implementation can
+    // pick good block group, but client retries should be limited
+    // OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES_ON_FAILURE(here it was
+    // configured as 3). So, it should fail as we have marked 3 nodes as bad.
+    IOException e = assertThrows(IOException.class,
+            () -> testStripeWriteRetriesOnFailures(con, 20, nodesIndexesToMarkFailure));
+    assertEquals(
+        "Completed max allowed retries 3 on stripe failures.",
+        e.getMessage());
   }
 
   public void testStripeWriteRetriesOnFailures(OzoneConfiguration con,
