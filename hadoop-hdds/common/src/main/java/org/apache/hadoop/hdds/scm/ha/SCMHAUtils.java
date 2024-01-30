@@ -115,10 +115,6 @@ public final class SCMHAUtils {
     return conf.getTrimmedStringCollection(key);
   }
 
-  public static String  getLocalSCMNodeId(String scmServiceId) {
-    return addSuffix(ScmConfigKeys.OZONE_SCM_NODES_KEY, scmServiceId);
-  }
-
   /**
    * Add non empty and non null suffix to a key.
    */

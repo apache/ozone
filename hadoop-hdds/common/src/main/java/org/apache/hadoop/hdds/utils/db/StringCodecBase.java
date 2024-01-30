@@ -88,8 +88,7 @@ abstract class StringCodecBase implements Codec<String> {
    *         When {@link #isFixedLength()} is true,
    *         the upper bound equals to the serialized size.
    */
-  @Override
-  public int getSerializedSizeUpperBound(String s) {
+  private int getSerializedSizeUpperBound(String s) {
     return maxBytesPerChar * s.length();
   }
 

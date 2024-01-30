@@ -129,11 +129,6 @@ public class ReplicationManagerReport {
     incrementAndSample(stat.toString(), container);
   }
 
-  public void incrementAndSample(HddsProtos.LifeCycleState stat,
-      ContainerID container) {
-    incrementAndSample(stat.toString(), container);
-  }
-
   public void setComplete() {
     reportTimeStamp = System.currentTimeMillis();
   }
@@ -236,10 +231,6 @@ public class ReplicationManagerReport {
           + " is not expected to have existing samples");
     }
     containerSample.put(stat, sample);
-  }
-
-  public List<ContainerID> getSample(HddsProtos.LifeCycleState stat) {
-    return getSample(stat.toString());
   }
 
   public List<ContainerID> getSample(HealthState stat) {
