@@ -223,8 +223,8 @@ public class OMDBInsightEndpoint {
             continue;
           }
           KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
-          keyEntityInfo.setKey(omKeyInfo.getFileName());
-          keyEntityInfo.setPath(createPath(omKeyInfo));
+          keyEntityInfo.setKey(key);
+          keyEntityInfo.setPath(omKeyInfo.getKeyName());
           keyEntityInfo.setInStateSince(omKeyInfo.getCreationTime());
           keyEntityInfo.setSize(omKeyInfo.getDataSize());
           keyEntityInfo.setReplicatedSize(omKeyInfo.getReplicatedSize());
