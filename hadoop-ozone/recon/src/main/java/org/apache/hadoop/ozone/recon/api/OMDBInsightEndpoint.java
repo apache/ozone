@@ -54,6 +54,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DELETED_TABLE;
@@ -222,8 +223,8 @@ public class OMDBInsightEndpoint {
             continue;
           }
           KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
-          keyEntityInfo.setKey(key);
-          keyEntityInfo.setPath(omKeyInfo.getKeyName());
+          keyEntityInfo.setKey(omKeyInfo.getFileName());
+          keyEntityInfo.setPath(createPath(omKeyInfo));
           keyEntityInfo.setInStateSince(omKeyInfo.getCreationTime());
           keyEntityInfo.setSize(omKeyInfo.getDataSize());
           keyEntityInfo.setReplicatedSize(omKeyInfo.getReplicatedSize());
@@ -536,8 +537,8 @@ public class OMDBInsightEndpoint {
           continue;
         }
         KeyEntityInfo keyEntityInfo = new KeyEntityInfo();
-        keyEntityInfo.setKey(key);
-        keyEntityInfo.setPath(omKeyInfo.getKeyName());
+        keyEntityInfo.setKey(omKeyInfo.getFileName());
+        keyEntityInfo.setPath(createPath(omKeyInfo));
         keyEntityInfo.setInStateSince(omKeyInfo.getCreationTime());
         keyEntityInfo.setSize(
             fetchSizeForDeletedDirectory(omKeyInfo.getObjectID()));
@@ -663,6 +664,12 @@ public class OMDBInsightEndpoint {
               omKeyInfo.getReplicatedSize());
     });
   }
+
+  private String createPath(OmKeyInfo omKeyInfo) {
+    return omKeyInfo.getVolumeName() + OM_KEY_PREFIX +
+        omKeyInfo.getBucketName() + OM_KEY_PREFIX + omKeyInfo.getKeyName();
+  }
+
 
   @VisibleForTesting
   public GlobalStatsDao getDao() {
