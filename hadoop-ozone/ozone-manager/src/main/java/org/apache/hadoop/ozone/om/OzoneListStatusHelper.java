@@ -81,26 +81,21 @@ public class OzoneListStatusHelper {
     this.omDefaultReplication = omDefaultReplication;
   }
 
-  @SuppressWarnings("methodlength")
   public Collection<OzoneFileStatus> listStatusFSO(OmKeyArgs args,
       String startKey, long numEntries, String clientAddress,
       boolean allowPartialPrefixes) throws IOException {
     Preconditions.checkNotNull(args, "Key args can not be null");
-
     final String volumeName = args.getVolumeName();
     final String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
     String prefixKey = keyName;
-
     final String volumeKey = metadataManager.getVolumeKey(volumeName);
     final String bucketKey = metadataManager.getBucketKey(volumeName,
             bucketName);
-
     final OmVolumeArgs volumeInfo = metadataManager.getVolumeTable()
             .get(volumeKey);
     final OmBucketInfo omBucketInfo = metadataManager.getBucketTable()
             .get(bucketKey);
-
     if (volumeInfo == null || omBucketInfo == null) {
       if (LOG.isDebugEnabled()) {
         LOG.debug(String.format("%s does not exist.", (volumeInfo == null) ?
@@ -110,16 +105,9 @@ public class OzoneListStatusHelper {
       return new ArrayList<>();
     }
 
-    // Determine if the prefixKey is determined from the startKey
-    // if the keyName is null
     if (StringUtils.isNotBlank(startKey)) {
       if (StringUtils.isNotBlank(keyName)) {
-        if (!OzoneFSUtils.isSibling(keyName, startKey) &&
-            !OzoneFSUtils.isImmediateChild(keyName, startKey)) {
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("StartKey {} is not an immediate child or not a sibling"
-                + " of keyName {}. Returns empty list", startKey, keyName);
-          }
+        if (!validateStartKey(startKey, keyName)) {
           return new ArrayList<>();
         }
       } else {
@@ -132,10 +120,8 @@ public class OzoneListStatusHelper {
             .build();
       }
     }
-
     OzoneFileStatus fileStatus =
         getStatusHelper.apply(args, clientAddress, allowPartialPrefixes);
-
     String dbPrefixKey;
     if (fileStatus == null) {
       // if the file status is null, prefix is a not a valid filesystem path
@@ -187,9 +173,34 @@ public class OzoneListStatusHelper {
         dbPrefixKey =
             metadataManager.getOzonePathKey(volumeId, bucketId, id, "");
       }
-
     }
+    String startKeyPrefix = getStartKeyPrefixIfPresent(args, startKey, volumeInfo, omBucketInfo);
+    TreeMap<String, OzoneFileStatus> map =
+        getSortedEntries(numEntries,  prefixKey, dbPrefixKey, startKeyPrefix, omBucketInfo);
 
+    return map.values().stream().filter(e -> e != null).collect(
+        Collectors.toList());
+  }
+
+  /**
+   * Determine if the prefixKey is determined from the startKey
+   * if the keyName is null.
+   */
+  private static boolean validateStartKey(
+      String startKey, String keyName) {
+    if (!OzoneFSUtils.isSibling(keyName, startKey) &&
+        !OzoneFSUtils.isImmediateChild(keyName, startKey)) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("StartKey {} is not an immediate child or not a sibling"
+            + " of keyName {}. Returns empty list", startKey, keyName);
+      }
+      return false;
+    }
+    return true;
+  }
+
+  private String getStartKeyPrefixIfPresent(OmKeyArgs args, String startKey,
+      OmVolumeArgs volumeInfo, OmBucketInfo omBucketInfo) throws IOException {
     // Determine startKeyPrefix for DB iteration
     String startKeyPrefix = "";
     try {
@@ -201,41 +212,49 @@ public class OzoneListStatusHelper {
         throw ome;
       }
     }
+    return startKeyPrefix;
+  }
 
-    TreeMap<String, OzoneFileStatus> map = new TreeMap<>();
-
-    BucketLayout bucketLayout = omBucketInfo.getBucketLayout();
+  /**
+   *  fetch the sorted output using a min heap iterator where
+   *  every remove from the heap will give the smallest entry and return
+   *  a treemap.
+   */
+  private TreeMap<String, OzoneFileStatus> getSortedEntries(long numEntries,
+      String prefixKey, String dbPrefixKey, String startKeyPrefix,
+      OmBucketInfo bucketInfo) throws IOException {
+    String volumeName = bucketInfo.getVolumeName();
+    String bucketName = bucketInfo.getBucketName();
+    BucketLayout bucketLayout = bucketInfo.getBucketLayout();
     ReplicationConfig replication =
-        Optional.ofNullable(omBucketInfo.getDefaultReplicationConfig())
+        Optional.ofNullable(bucketInfo.getDefaultReplicationConfig())
             .map(DefaultReplicationConfig::getReplicationConfig)
             .orElse(omDefaultReplication);
 
-    // fetch the sorted output using a min heap iterator where
-    // every remove from the heap will give the smallest entry.
-    try (ListIterator.MinHeapIterator heapIterator =
-             new ListIterator.MinHeapIterator(metadataManager, dbPrefixKey,
-                 bucketLayout, startKeyPrefix, volumeName, bucketName)) {
+    TreeMap<String, OzoneFileStatus> map = new TreeMap<>();
+    try (
+        ListIterator.MinHeapIterator heapIterator = new ListIterator.MinHeapIterator(
+            metadataManager, dbPrefixKey, bucketLayout, startKeyPrefix,
+            volumeName, bucketName)) {
 
       try {
         while (map.size() < numEntries && heapIterator.hasNext()) {
           ListIterator.HeapEntry entry = heapIterator.next();
-          OzoneFileStatus status = getStatus(prefixKey,
-              scmBlockSize, volumeName, bucketName, replication, entry);
+          OzoneFileStatus status = getStatus(prefixKey, scmBlockSize, volumeName, bucketName,
+                  replication, entry);
           // Caution: DO NOT use putIfAbsent. putIfAbsent undesirably overwrites
           // the value with `status` when the existing value in the map is null.
           if (!map.containsKey(entry.getKey())) {
             map.put(entry.getKey(), status);
           }
         }
+        return map;
       } catch (NoSuchElementException e) {
         throw new IOException(e);
       } catch (UncheckedIOException e) {
         throw e.getCause();
       }
     }
-
-    return map.values().stream().filter(e -> e != null).collect(
-        Collectors.toList());
   }
 
   private OzoneFileStatus getStatus(String prefixPath, long scmBlockSz,
