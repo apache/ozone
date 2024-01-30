@@ -584,4 +584,8 @@ public class OzoneContainer {
     return blockDeletingService;
   }
 
+  public ReplicationServer getReplicationServer() {
+    return replicationServer;
+  }
+
 }

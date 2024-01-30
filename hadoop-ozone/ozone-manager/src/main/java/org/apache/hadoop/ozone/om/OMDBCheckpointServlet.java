@@ -37,7 +37,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
 import com.google.common.base.Preconditions;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -242,9 +242,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     long startTime = System.currentTimeMillis();
     long pauseCounter = PAUSE_COUNTER.incrementAndGet();
 
-    // Pause compactions, Copy/link files and get checkpoint.
     try {
       LOG.info("Compaction pausing {} started.", pauseCounter);
+      // Pause compactions, Copy/link files and get checkpoint.
       differ.incrementTarballRequestCount();
       FileUtils.copyDirectory(compactionLogDir.getOriginalDir(),
           compactionLogDir.getTmpDir());
@@ -253,13 +253,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       checkpoint = getDbStore().getCheckpoint(flush);
     } finally {
       // Unpause the compaction threads.
-      synchronized (getDbStore().getRocksDBCheckpointDiffer()) {
-        differ.decrementTarballRequestCount();
-        differ.notifyAll();
-        long elapsedTime = System.currentTimeMillis() - startTime;
-        LOG.info("Compaction pausing {} ended. Elapsed ms: {}",
-            pauseCounter, elapsedTime);
-      }
+      differ.decrementTarballRequestCountAndNotify();
+      long elapsedTime = System.currentTimeMillis() - startTime;
+      LOG.info("Compaction pausing {} ended. Elapsed ms: {}", pauseCounter, elapsedTime);
     }
     return checkpoint;
   }
@@ -616,7 +612,7 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     }
   }
 
-  @NotNull
+  @Nonnull
   private static Path getMetaDirPath(Path checkpointLocation) {
     // This check is done to take care of findbugs else below getParent()
     // should not be null.

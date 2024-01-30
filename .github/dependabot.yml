@@ -21,6 +21,13 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "[Recon] Dependabot Package Upgrade: "
+    groups:
+      minor-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
@@ -31,7 +38,5 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-    commit-message:
-      prefix: "[Java] Dependabot Package Upgrade: "
     pull-request-branch-name:
       separator: "-"

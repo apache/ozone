@@ -58,7 +58,6 @@ import static org.apache.hadoop.hdds.HddsUtils.getHostPort;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test client-side URI handling with Ozone Manager HA.
@@ -385,8 +384,7 @@ public class TestOzoneFsHAURLs {
         res = ToolRunner.run(shell,
             new String[] {"-ls", ofsPathWithIncorrectSvcId });
         assertEquals(1, res);
-        assertTrue(
-            capture.getOutput().contains("Cannot resolve OM host"));
+        assertThat(capture.getOutput()).contains("Cannot resolve OM host");
       }
 
       try (GenericTestUtils.SystemErrCapturer capture = new
@@ -394,8 +392,7 @@ public class TestOzoneFsHAURLs {
         res = ToolRunner.run(shell,
             new String[] {"-ls", o3fsPathWithInCorrectSvcId });
         assertEquals(1, res);
-        assertTrue(
-            capture.getOutput().contains("Cannot resolve OM host"));
+        assertThat(capture.getOutput()).contains("Cannot resolve OM host");
       }
     } finally {
       shell.close();

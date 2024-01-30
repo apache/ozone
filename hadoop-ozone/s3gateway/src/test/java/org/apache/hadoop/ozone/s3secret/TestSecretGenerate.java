@@ -42,7 +42,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.notNull;
+import static org.mockito.Mockito.notNull;
 import static org.mockito.Mockito.when;
 
 /**

@@ -32,7 +32,7 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 
 /**
  * Tests OMAllocateBlockRequest class prefix layout.
@@ -40,7 +40,7 @@ import org.jetbrains.annotations.NotNull;
 public class TestOMAllocateBlockRequestWithFSO
     extends TestOMAllocateBlockRequest {
 
-  @NotNull
+  @Nonnull
   @Override
   protected OzoneConfiguration getOzoneConfiguration() {
     OzoneConfiguration config = super.getOzoneConfiguration();
@@ -81,7 +81,7 @@ public class TestOMAllocateBlockRequestWithFSO
             parentID, fileName);
   }
 
-  @NotNull
+  @Nonnull
   @Override
   protected OMAllocateBlockRequest getOmAllocateBlockRequest(
       OzoneManagerProtocolProtos.OMRequest modifiedOmRequest) {

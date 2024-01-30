@@ -85,6 +85,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <groupId>javax.annotation</groupId>
       <artifactId>javax.annotation-api</artifactId>
     </dependency>
+    <dependency>
+      <groupId>jakarta.annotation</groupId>
+      <artifactId>jakarta.annotation-api</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>io.dropwizard.metrics</groupId>

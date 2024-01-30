@@ -46,8 +46,8 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Test for HadoopDirTreeGenerator.
@@ -183,9 +183,10 @@ public class TestHadoopDirTreeGenerator {
       } else {
         assertEquals(perFileSize.toBytes(), fileStatus.getLen(), "Mismatches file len");
         String fName = fileStatus.getPath().getName();
-        assertFalse(files.contains(fName), actualNumFiles + "actualNumFiles:" + fName +
-                ", fName:" + expectedFileCnt + ", expectedFileCnt:" + depth
-                + ", depth:");
+        assertThat(files)
+            .withFailMessage(actualNumFiles + "actualNumFiles:" + fName +
+                ", fName:" + expectedFileCnt + ", expectedFileCnt:" + depth + ", depth:")
+            .doesNotContain(fName);
         files.add(fName);
         actualNumFiles++;
       }

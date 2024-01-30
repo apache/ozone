@@ -19,7 +19,11 @@ package org.apache.hadoop.ozone.container.stream;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import org.jetbrains.annotations.NotNull;
+import org.apache.commons.io.FileUtils;
+import org.apache.ozone.test.GenericTestUtils;
+import jakarta.annotation.Nonnull;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -117,7 +121,7 @@ public class TestDirstreamClientHandler {
     assertEquals("yyy", getContent("bsd.txt"));
   }
 
-  @NotNull
+  @Nonnull
   private String getContent(String name) throws IOException {
     return new String(Files.readAllBytes(tmpDir.resolve(name)),
         StandardCharsets.UTF_8);

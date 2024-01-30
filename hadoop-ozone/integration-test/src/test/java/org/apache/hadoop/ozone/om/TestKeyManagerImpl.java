@@ -115,7 +115,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 
 import org.apache.ratis.util.ExitUtils;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -134,10 +134,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -642,7 +642,9 @@ public class TestKeyManagerImpl {
         .build();
 
     // add acl with invalid prefix name
-    writeClient.addAcl(ozInvalidPrefix, ozAcl1);
+    Exception ex = assertThrows(OMException.class,
+        () -> writeClient.addAcl(ozInvalidPrefix, ozAcl1));
+    assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
 
     OzoneObj ozPrefix1 = new OzoneObjInfo.Builder()
         .setVolumeName(volumeName)
@@ -658,17 +660,22 @@ public class TestKeyManagerImpl {
     assertEquals(ozAcl1, ozAclGet.get(0));
 
     // get acl with invalid prefix name
-    Exception ex = assertThrows(OMException.class,
+    ex = assertThrows(OMException.class,
         () -> writeClient.getAcl(ozInvalidPrefix));
     assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
 
     // set acl with invalid prefix name
     List<OzoneAcl> ozoneAcls = new ArrayList<OzoneAcl>();
     ozoneAcls.add(ozAcl1);
-    writeClient.setAcl(ozInvalidPrefix, ozoneAcls);
+
+    ex = assertThrows(OMException.class,
+        () -> writeClient.setAcl(ozInvalidPrefix, ozoneAcls));
+    assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
 
     // remove acl with invalid prefix name
-    writeClient.removeAcl(ozInvalidPrefix, ozAcl1);
+    ex = assertThrows(OMException.class,
+        () -> writeClient.removeAcl(ozInvalidPrefix, ozAcl1));
+    assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
   }
 
   @Test
@@ -854,7 +861,7 @@ public class TestKeyManagerImpl {
             .getLocationList().get(0).getPipeline().getNodesInOrder());
   }
 
-  @NotNull
+  @Nonnull
   private ResolvedBucket resolvedBucket() {
     ResolvedBucket bucket = new ResolvedBucket(VOLUME_NAME, BUCKET_NAME,
         VOLUME_NAME, BUCKET_NAME, "", BucketLayout.DEFAULT);

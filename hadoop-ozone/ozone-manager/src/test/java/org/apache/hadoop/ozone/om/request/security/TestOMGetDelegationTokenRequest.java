@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.request.security;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import com.google.common.base.Optional;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -39,15 +38,18 @@ import org.apache.hadoop.ozone.security.proto.SecurityProtos.GetDelegationTokenR
 import org.apache.hadoop.security.token.Token;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.io.Text;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -186,10 +188,7 @@ public class TestOMGetDelegationTokenRequest extends
 
     OMClientResponse clientResponse = setValidateAndUpdateCache();
 
-    Optional<Long> responseRenewTime = Optional.fromNullable(
-        omMetadataManager.getDelegationTokenTable().get(identifier));
-    assertEquals(Optional.of(renewTime), responseRenewTime);
-
+    assertEquals(renewTime, omMetadataManager.getDelegationTokenTable().get(identifier));
     assertEquals(Status.OK, clientResponse.getOMResponse().getStatus());
   }
 
@@ -204,10 +203,7 @@ public class TestOMGetDelegationTokenRequest extends
         .getGetDelegationTokenResponse().hasResponse();
     assertFalse(hasResponse);
 
-    Optional<Long> responseRenewTime = Optional.fromNullable(
-        omMetadataManager.getDelegationTokenTable().get(identifier));
-    assertEquals(Optional.absent(), responseRenewTime);
-
+    assertNull(omMetadataManager.getDelegationTokenTable().get(identifier));
     assertEquals(Status.OK, clientResponse.getOMResponse().getStatus());
   }
 

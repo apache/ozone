@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.om.response.key;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -100,7 +100,7 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
             keyName, clientID);
   }
 
-  @NotNull
+  @Nonnull
   protected OMAllocateBlockResponse getOmAllocateBlockResponse(
           OmKeyInfo omKeyInfo, OmBucketInfo omBucketInfo,
           OMResponse omResponse) throws IOException {
