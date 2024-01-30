@@ -749,14 +749,10 @@ public class KeyValueHandler extends Handler {
   @VisibleForTesting
   void checkContainerIsHealthy(KeyValueContainer kvContainer, BlockID blockID,
       Type cmd) {
-    kvContainer.readLock();
-    try {
-      if (kvContainer.getContainerData().getState() == State.UNHEALTHY) {
-        LOG.warn("{} request {} for UNHEALTHY container {} replica", cmd,
-            blockID, kvContainer.getContainerData().getContainerID());
-      }
-    } finally {
-      kvContainer.readUnlock();
+    // No kvContainer.readLock() for performance optimization
+    if (kvContainer.getContainerData().getState() == State.UNHEALTHY) {
+      LOG.warn("{} request {} for UNHEALTHY container {} replica", cmd,
+          blockID, kvContainer.getContainerData().getContainerID());
     }
   }
 
