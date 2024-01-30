@@ -175,7 +175,7 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
       if (webPolicy.isHttpsEnabled()) {
         protocol = HTTPS_SCHEME;
         host = ozoneConf.get(OZONE_SCM_HTTPS_ADDRESS_KEY,
-            OZONE_SCM_HTTP_BIND_HOST_DEFAULT + OZONE_SCM_HTTPS_BIND_PORT_DEFAULT);
+            OZONE_SCM_HTTP_BIND_HOST_DEFAULT + ":" + OZONE_SCM_HTTPS_BIND_PORT_DEFAULT);
         url.append(protocol).append("://").append(host).append("/jmx")
             .append("?qry=Hadoop:service=StorageContainerManager,name=NodeDecommissionMetrics");
 
