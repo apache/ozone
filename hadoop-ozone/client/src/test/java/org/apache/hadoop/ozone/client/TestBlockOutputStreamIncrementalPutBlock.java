@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.UUID;
 
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.jetbrains.annotations.NotNull;
 
@@ -43,6 +44,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_CHUNK_LIST_INCREMENTAL;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 
@@ -69,6 +71,11 @@ public class TestBlockOutputStreamIncrementalPutBlock {
     clientConfig.setChecksumType(ContainerProtos.ChecksumType.CRC32C);
 
     ((InMemoryConfiguration)config).setFromObject(clientConfig);
+
+    ((InMemoryConfiguration) config).setBoolean(
+        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
+    ((InMemoryConfiguration) config).setBoolean(
+        OZONE_CHUNK_LIST_INCREMENTAL, true);
 
     RpcClient rpcClient = new RpcClient(config, null) {
 
@@ -103,7 +110,7 @@ public class TestBlockOutputStreamIncrementalPutBlock {
 
   @ParameterizedTest
   @MethodSource("parameters")
-  public void writeSmallKey(boolean incrementalChunkList)
+  public void writeSmallChunk(boolean incrementalChunkList)
       throws IOException {
     init(incrementalChunkList);
 
@@ -130,7 +137,7 @@ public class TestBlockOutputStreamIncrementalPutBlock {
 
   @ParameterizedTest
   @MethodSource("parameters")
-  public void writeLargeKey(boolean incrementalChunkList)
+  public void writeLargeChunk(boolean incrementalChunkList)
       throws IOException {
     init(incrementalChunkList);
 
