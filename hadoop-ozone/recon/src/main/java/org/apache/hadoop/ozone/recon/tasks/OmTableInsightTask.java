@@ -138,17 +138,6 @@ public class OmTableInsightTask implements ReconOmTask {
     return new ImmutablePair<>(getTaskName(), true);
   }
 
-  /**
-   * Returns a collection of table names that require data size calculation.
-   */
-  public Collection<String> getTablesToCalculateSize() {
-    List<String> taskTables = new ArrayList<>();
-    taskTables.add(OPEN_KEY_TABLE);
-    taskTables.add(OPEN_FILE_TABLE);
-    taskTables.add(DELETED_TABLE);
-    return taskTables;
-  }
-
   @Override
   public String getTaskName() {
     return "OmTableInsightTask";
