@@ -136,9 +136,6 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
     globalStatsDao = getDao(GlobalStatsDao.class);
 
-    OzoneStorageContainerManager ozoneStorageContainerManager =
-        mock(OzoneStorageContainerManager.class);
-
     ReconTestInjector reconTestInjector =
         new ReconTestInjector.Builder(temporaryFolder.toFile())
             .withReconSqlDb()
