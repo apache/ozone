@@ -44,19 +44,19 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
-
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProviderWithFSO;
 /**
  * Unit test for NSSummaryTaskWithOBS.
  */
-public final class TestNSSummaryTaskWithOBS {
+public final class TestNSSummaryTaskWithOBS implements Serializable {
   private static ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private static OMMetadataManager omMetadataManager;
   private static ReconOMMetadataManager reconOMMetadataManager;
@@ -107,7 +107,7 @@ public final class TestNSSummaryTaskWithOBS {
   public static void setUp(@TempDir File tmpDir) throws Exception {
     initializeNewOmMetadataManager(new File(tmpDir, "om"));
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
-        getMockOzoneManagerServiceProvider();
+        getMockOzoneManagerServiceProviderWithFSO();
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
         new File(tmpDir, "recon"));
 
