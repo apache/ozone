@@ -142,10 +142,10 @@ public class TestBucketList {
         (ListObjectResponse) getBucket.get("b1", "/", null, null, 100,
             "key", null, null, null, null, null).getEntity();
 
-    Assert.assertEquals(2, getBucketResponse.getContents().size());
-    Assert.assertEquals(user1.getShortUserName(),
+    assertEquals(2, getBucketResponse.getContents().size());
+    assertEquals(user1.getShortUserName(),
         getBucketResponse.getContents().get(0).getOwner().getDisplayName());
-    Assert.assertEquals(user2.getShortUserName(),
+    assertEquals(user2.getShortUserName(),
         getBucketResponse.getContents().get(1).getOwner().getDisplayName());
 
   }

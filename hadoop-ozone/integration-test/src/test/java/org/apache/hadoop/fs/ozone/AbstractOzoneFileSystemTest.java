@@ -628,7 +628,7 @@ abstract class AbstractOzoneFileSystemTest {
       Path dir1 = new Path(root, "dir1");
       Path file2 = new Path(dir1, "file2");
       FileStatus[] fileStatuses = o3fs.listStatus(root);
-      Assert.assertEquals(0, fileStatuses.length);
+      assertEquals(0, fileStatuses.length);
 
       UserGroupInformation.setLoginUser(user1);
       fs = FileSystem.get(cluster.getConf());
@@ -640,13 +640,13 @@ abstract class AbstractOzoneFileSystemTest {
       fs = FileSystem.get(cluster.getConf());
       ContractTestUtils.touch(fs, file2);
 
-      Assert.assertEquals(2, o3fs.listStatus(root).length);
-      Assert.assertEquals(1, o3fs.listStatus(dir1).length);
-      Assert.assertEquals(user1.getShortUserName(),
+      assertEquals(2, o3fs.listStatus(root).length);
+      assertEquals(1, o3fs.listStatus(dir1).length);
+      assertEquals(user1.getShortUserName(),
           fs.getFileStatus(file1).getOwner());
-      Assert.assertEquals(user2.getShortUserName(),
+      assertEquals(user2.getShortUserName(),
           fs.getFileStatus(dir1).getOwner());
-      Assert.assertEquals(user3.getShortUserName(),
+      assertEquals(user3.getShortUserName(),
           fs.getFileStatus(file2).getOwner());
     } finally {
       UserGroupInformation.setLoginUser(oldUser);
@@ -677,7 +677,7 @@ abstract class AbstractOzoneFileSystemTest {
       UserGroupInformation user3ProxyUser =
           UserGroupInformation.createProxyUser("user3", proxyuser);
       FileStatus[] fileStatuses = o3fs.listStatus(root);
-      Assert.assertEquals(0, fileStatuses.length);
+      assertEquals(0, fileStatuses.length);
 
       UserGroupInformation.setLoginUser(user1ProxyUser);
       fs = FileSystem.get(cluster.getConf());
@@ -689,13 +689,13 @@ abstract class AbstractOzoneFileSystemTest {
       fs = FileSystem.get(cluster.getConf());
       ContractTestUtils.touch(fs, file2);
 
-      Assert.assertEquals(2, o3fs.listStatus(root).length);
-      Assert.assertEquals(1, o3fs.listStatus(dir1).length);
-      Assert.assertEquals(user1ProxyUser.getShortUserName(),
+      assertEquals(2, o3fs.listStatus(root).length);
+      assertEquals(1, o3fs.listStatus(dir1).length);
+      assertEquals(user1ProxyUser.getShortUserName(),
           fs.getFileStatus(file1).getOwner());
-      Assert.assertEquals(user2ProxyUser.getShortUserName(),
+      assertEquals(user2ProxyUser.getShortUserName(),
           fs.getFileStatus(dir1).getOwner());
-      Assert.assertEquals(user3ProxyUser.getShortUserName(),
+      assertEquals(user3ProxyUser.getShortUserName(),
           fs.getFileStatus(file2).getOwner());
     } finally {
       UserGroupInformation.setLoginUser(oldUser);

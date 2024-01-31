@@ -229,7 +229,8 @@ public class OzoneBucketStub extends OzoneBucket {
                 System.currentTimeMillis(),
                 System.currentTimeMillis(),
                 new ArrayList<>(), rConfig, objectMetadata, null,
-                null, false
+                null, false,
+                UserGroupInformation.getCurrentUser().getShortUserName()
             ));
           }
 
@@ -375,7 +376,7 @@ public class OzoneBucketStub extends OzoneBucket {
               key.getDataSize(),
               key.getCreationTime().getEpochSecond() * 1000,
               key.getModificationTime().getEpochSecond() * 1000,
-              key.getReplicationConfig(), key.isFile());
+              key.getReplicationConfig(), key.isFile(), key.getOwner());
         }).collect(Collectors.toList());
 
     if (prevKey != null) {
@@ -601,7 +602,8 @@ public class OzoneBucketStub extends OzoneBucket {
         System.currentTimeMillis(),
         System.currentTimeMillis(),
         new ArrayList<>(), replicationConfig, new HashMap<>(), null,
-        () -> readKey(keyName), false));
+        () -> readKey(keyName), false,
+        UserGroupInformation.getCurrentUser().getShortUserName()));
   }
 
   /**

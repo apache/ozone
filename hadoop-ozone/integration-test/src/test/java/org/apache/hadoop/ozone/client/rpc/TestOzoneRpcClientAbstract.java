@@ -381,11 +381,11 @@ public abstract class TestOzoneRpcClientAbstract {
       createKeyForUser(volumeName, bucketName, key1, content, user1);
       createKeyForUser(volumeName, bucketName, key2, content, user2);
 
-      Assert.assertNotNull(bucket.getKey(key1));
-      Assert.assertNotNull(bucket.getKey(key2));
-      Assert.assertEquals(user1.getShortUserName(),
+      assertNotNull(bucket.getKey(key1));
+      assertNotNull(bucket.getKey(key2));
+      assertEquals(user1.getShortUserName(),
           bucket.getKey(key1).getOwner());
-      Assert.assertEquals(user2.getShortUserName(),
+      assertEquals(user2.getShortUserName(),
           bucket.getKey(key2).getOwner());
     } finally {
       UserGroupInformation.setLoginUser(oldUser);
@@ -2961,7 +2961,7 @@ public abstract class TestOzoneRpcClientAbstract {
       bucket = store.getVolume(volumeName).getBucket(bucketName);
       doMultipartUpload(bucket, keyName1, (byte) 96, replication);
 
-      Assert.assertEquals(user1.getShortUserName(),
+      assertEquals(user1.getShortUserName(),
           bucket.getKey(keyName1).getOwner());
 
       // After HDDS-5881 the user will not be different,
@@ -2982,7 +2982,7 @@ public abstract class TestOzoneRpcClientAbstract {
       S3SecretManager s3SecretManager = cluster.getOzoneManager()
           .getS3SecretManager();
       s3SecretManager.storeSecret(awsUser1.getShortUserName(),
-          new S3SecretValue(awsUser1.getShortUserName(), secret));
+          S3SecretValue.of(awsUser1.getShortUserName(), secret));
       setOzClient(OzoneClientFactory.getRpcClient(cluster.getConf()));
       setStore(ozClient.getObjectStore());
 
@@ -2994,7 +2994,7 @@ public abstract class TestOzoneRpcClientAbstract {
       bucket = store.getVolume(volumeName).getBucket(bucketName);
       doMultipartUpload(bucket, keyName2, (byte)96, replication);
 
-      Assert.assertEquals(awsUser1.getShortUserName(),
+      assertEquals(awsUser1.getShortUserName(),
           bucket.getKey(keyName2).getOwner());
     } finally {
       OzoneManager.setS3Auth(null);

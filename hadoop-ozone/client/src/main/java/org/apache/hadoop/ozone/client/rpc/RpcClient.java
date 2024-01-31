@@ -1419,7 +1419,7 @@ public class RpcClient implements ClientProtocol {
         .addAllMetadataGdpr(metadata)
         .setSortDatanodesInPipeline(true)
         .setAcls(getAclList())
-        .setOwnerName(ownerName)
+        .setOwnerName(ownerName);
 
     OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
     return createDataStreamOutput(openKey);
@@ -1621,21 +1621,21 @@ public class RpcClient implements ClientProtocol {
               key.getCreationTime(),
               key.getModificationTime(),
               key.getReplicationConfig(),
-              key.isFile()
+              key.isFile(),
               key.getOwnerName()))
           .collect(Collectors.toList());
     } else {
       List<OmKeyInfo> keys = ozoneManagerClient.listKeys(
           volumeName, bucketName, prevKey, keyPrefix, maxListResult).getKeys();
-      return keys.stream().map(key -> new OzoneKey(
-              key.getVolumeName(),
+      return keys.stream().map(key -> new OzoneKey(key.getVolumeName(),
               key.getBucketName(),
               key.getKeyName(),
               key.getDataSize(),
               key.getCreationTime(),
               key.getModificationTime(),
               key.getReplicationConfig(),
-              key.isFile()))
+              key.isFile(),
+              key.getOwnerName()))
           .collect(Collectors.toList());
     }
   }
