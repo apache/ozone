@@ -19,7 +19,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -33,7 +32,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -69,7 +67,6 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.ExitUtils;

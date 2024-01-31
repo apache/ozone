@@ -82,7 +82,6 @@ public class TestOmSnapshotUtils {
         map(Path::toString).collect(Collectors.toSet());
 
     assertEquals(tree1Files, tree2Files);
-    GenericTestUtils.deleteDirectory(tempDir);
   }
 
 
