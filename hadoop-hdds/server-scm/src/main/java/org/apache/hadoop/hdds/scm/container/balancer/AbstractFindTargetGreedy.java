@@ -96,7 +96,7 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
    * Find a {@link ContainerMoveSelection} consisting of a target and
    * container to move for a source datanode. Favours more under-utilized nodes.
    * @param source Datanode to find a target for
-   * @param candidateContainers Set of candidate containers satisfying
+   * @param container candidate container satisfying
    *                            selection criteria
    *                            {@link ContainerBalancerSelectionCriteria}
    * (DatanodeDetails, Long) method returns true if the size specified in the
@@ -105,29 +105,27 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
    */
   @Override
   public ContainerMoveSelection findTargetForContainerMove(
-      DatanodeDetails source, Set<ContainerID> candidateContainers) {
+      DatanodeDetails source, ContainerID container) {
     sortTargetForSource(source);
     for (DatanodeUsageInfo targetInfo : potentialTargets) {
       DatanodeDetails target = targetInfo.getDatanodeDetails();
-      for (ContainerID container : candidateContainers) {
-        Set<ContainerReplica> replicas;
-        ContainerInfo containerInfo;
-        try {
-          replicas = containerManager.getContainerReplicas(container);
-          containerInfo = containerManager.getContainer(container);
-        } catch (ContainerNotFoundException e) {
-          logger.warn("Could not get Container {} from Container Manager for " +
-              "obtaining replicas in Container Balancer.", container, e);
-          continue;
-        }
+      Set<ContainerReplica> replicas;
+      ContainerInfo containerInfo;
+      try {
+        replicas = containerManager.getContainerReplicas(container);
+        containerInfo = containerManager.getContainer(container);
+      } catch (ContainerNotFoundException e) {
+        logger.warn("Could not get Container {} from Container Manager for " +
+            "obtaining replicas in Container Balancer.", container, e);
+        return null;
+      }
 
-        if (replicas.stream().noneMatch(
-            replica -> replica.getDatanodeDetails().equals(target)) &&
-            containerMoveSatisfiesPlacementPolicy(container, replicas, source,
-            target) &&
-            canSizeEnterTarget(target, containerInfo.getUsedBytes())) {
-          return new ContainerMoveSelection(target, container);
-        }
+      if (replicas.stream().noneMatch(
+          replica -> replica.getDatanodeDetails().equals(target)) &&
+          containerMoveSatisfiesPlacementPolicy(container, replicas, source,
+          target) &&
+          canSizeEnterTarget(target, containerInfo.getUsedBytes())) {
+        return new ContainerMoveSelection(target, container);
       }
     }
     logger.info("Container Balancer could not find a target for " +

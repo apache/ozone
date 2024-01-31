@@ -74,7 +74,10 @@ public class ReplicationManagerReport {
         "OpenUnhealthyContainers"),
     QUASI_CLOSED_STUCK(
         "Containers QuasiClosed with insufficient datanode origins",
-        "StuckQuasiClosedContainers");
+        "StuckQuasiClosedContainers"),
+    OPEN_WITHOUT_PIPELINE(
+        "Containers in OPEN state without any healthy Pipeline",
+        "OpenContainersWithoutPipeline");
 
     private String description;
     private String metricName;

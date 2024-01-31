@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -43,6 +44,9 @@ import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.security.token.ContainerTokenGenerator;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
@@ -174,6 +178,16 @@ public class TestReplicationManager {
     // Ensure that RM will run when asked.
     when(scmContext.isLeaderReady()).thenReturn(true);
     when(scmContext.isInSafeMode()).thenReturn(false);
+
+    PipelineManager pipelineManager = mock(PipelineManager.class);
+    when(pipelineManager.getPipeline(any()))
+        .thenReturn(HddsTestUtils.getRandomPipeline());
+
+    StorageContainerManager scm = mock(StorageContainerManager.class);
+    when(scm.getPipelineManager()).thenReturn(pipelineManager);
+    when(scm.getContainerTokenGenerator()).thenReturn(ContainerTokenGenerator.DISABLED);
+
+    when(scmContext.getScm()).thenReturn(scm);
   }
 
   private ReplicationManager createReplicationManager() throws IOException {
