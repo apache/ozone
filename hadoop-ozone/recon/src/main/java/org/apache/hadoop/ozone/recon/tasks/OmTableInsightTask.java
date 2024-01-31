@@ -321,7 +321,8 @@ public class OmTableInsightTask implements ReconOmTask {
     for (Map.Entry<String, OmTableHandler> entry : tableHandlers.entrySet()) {
       String tableName = entry.getKey();
       OmTableHandler tableHandler = entry.getValue();
-      String key = replicated ? tableHandler.getReplicatedSizeKeyFromTable(tableName) :
+      String key =
+          replicated ? tableHandler.getReplicatedSizeKeyFromTable(tableName) :
           tableHandler.getUnReplicatedSizeKeyFromTable(tableName);
       sizeCountMap.put(key, getValueForKey(key));
     }
