@@ -101,6 +101,8 @@ import static org.mockito.Mockito.when;
 public class TestHddsDispatcher {
   private static final Logger LOG = LoggerFactory.getLogger(
       TestHddsDispatcher.class);
+  @TempDir
+  private File testDir;
 
   public static final IncrementalReportSender<Container> NO_OP_ICR_SENDER =
       c -> {
@@ -108,7 +110,7 @@ public class TestHddsDispatcher {
 
   @ContainerLayoutTestInfo.ContainerTest
   public void testContainerCloseActionWhenFull(
-      ContainerLayoutVersion layout, @TempDir File testDir) throws IOException {
+      ContainerLayoutVersion layout) throws IOException {
 
     String testDirPath = testDir.getPath();
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -164,7 +166,7 @@ public class TestHddsDispatcher {
 
   @ContainerLayoutTestInfo.ContainerTest
   public void testContainerCloseActionWhenVolumeFull(
-      ContainerLayoutVersion layoutVersion, @TempDir File testDir) throws Exception {
+      ContainerLayoutVersion layoutVersion) throws Exception {
     String testDirPath = testDir.getPath();
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setStorageSize(HddsConfigKeys.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE,
@@ -238,7 +240,7 @@ public class TestHddsDispatcher {
   }
 
   @Test
-  public void testCreateContainerWithWriteChunk(@TempDir File testDir) throws IOException {
+  public void testCreateContainerWithWriteChunk() throws IOException {
     String testDirPath = testDir.getPath();
     try {
       UUID scmId = UUID.randomUUID();
@@ -291,7 +293,7 @@ public class TestHddsDispatcher {
   }
 
   @Test
-  public void testContainerNotFoundWithCommitChunk(@TempDir File testDir) throws IOException {
+  public void testContainerNotFoundWithCommitChunk() throws IOException {
     String testDirPath = testDir.getPath();
     try {
       UUID scmId = UUID.randomUUID();
@@ -326,7 +328,7 @@ public class TestHddsDispatcher {
   }
 
   @Test
-  public void testWriteChunkWithCreateContainerFailure(@TempDir File testDir) throws IOException {
+  public void testWriteChunkWithCreateContainerFailure() throws IOException {
     String testDirPath = testDir.getPath();
     try {
       UUID scmId = UUID.randomUUID();
@@ -361,7 +363,7 @@ public class TestHddsDispatcher {
   }
 
   @Test
-  public void testDuplicateWriteChunkAndPutBlockRequest(@TempDir File testDir) throws  IOException {
+  public void testDuplicateWriteChunkAndPutBlockRequest() throws  IOException {
     String testDirPath = testDir.getPath();
     try {
       UUID scmId = UUID.randomUUID();
@@ -535,7 +537,7 @@ public class TestHddsDispatcher {
   }
 
   @Test
-  public void testValidateToken(@TempDir File testDir) throws Exception {
+  public void testValidateToken() throws Exception {
     try {
       final OzoneConfiguration conf = new OzoneConfiguration();
       conf.set(HDDS_DATANODE_DIR_KEY, testDir.getPath());

@@ -253,7 +253,7 @@ public class TestVolumeSetDiskChecks {
    * @throws IOException
    */
   @Test
-  public void testVolumeFailure(@TempDir File tempFile) throws IOException {
+  public void testVolumeFailure() throws IOException {
     final int numVolumes = 5;
 
     conf = getConfWithDataNodeDirs(numVolumes);
@@ -266,7 +266,7 @@ public class TestVolumeSetDiskChecks {
     ContainerSet conSet = new ContainerSet(20);
     when(ozoneContainer.getContainerSet()).thenReturn(conSet);
 
-    String path = tempFile.getPath();
+    String path = dir.getPath();
     File testRoot = new File(path);
 
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,

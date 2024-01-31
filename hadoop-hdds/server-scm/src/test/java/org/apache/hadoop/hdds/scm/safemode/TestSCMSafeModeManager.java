@@ -19,7 +19,6 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -86,9 +85,11 @@ public class TestSCMSafeModeManager {
   private List<ContainerInfo> containers = Collections.emptyList();
 
   private SCMMetadataStore scmMetadataStore;
+  @TempDir
+  private File tempDir;
 
   @BeforeEach
-  public void setUp(@TempDir Path tempDir) throws IOException {
+  public void setUp() throws IOException {
     queue = new EventQueue();
     scmContext = SCMContext.emptyContext();
     serviceManager = new SCMServiceManager();
@@ -96,7 +97,7 @@ public class TestSCMSafeModeManager {
     config.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION,
         false);
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        tempDir.toAbsolutePath().toString());
+        tempDir.getAbsolutePath().toString());
     scmMetadataStore = new SCMMetadataStoreImpl(config);
   }
 
@@ -551,12 +552,11 @@ public class TestSCMSafeModeManager {
   }
 
   @Test
-  public void testSafeModePipelineExitRule(@TempDir File tempFile) throws Exception {
+  public void testSafeModePipelineExitRule() throws Exception {
     containers = new ArrayList<>();
     containers.addAll(HddsTestUtils.getContainerInfo(25 * 4));
     try {
       MockNodeManager nodeManager = new MockNodeManager(true, 3);
-      config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFile.getPath());
       // enable pipeline check
       config.setBoolean(
           HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
@@ -606,8 +606,7 @@ public class TestSCMSafeModeManager {
   }
 
   @Test
-  public void testPipelinesNotCreatedUntilPreCheckPasses(@TempDir File tempFile)
-      throws Exception {
+  public void testPipelinesNotCreatedUntilPreCheckPasses() throws Exception {
     int numOfDns = 5;
     // enable pipeline check
     config.setBoolean(
@@ -617,10 +616,6 @@ public class TestSCMSafeModeManager {
         true);
 
     MockNodeManager nodeManager = new MockNodeManager(true, numOfDns);
-    config.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFile.getPath());
-    // enable pipeline check
-    config.setBoolean(
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK, true);
 
     PipelineManagerImpl pipelineManager =
         PipelineManagerImpl.newPipelineManager(

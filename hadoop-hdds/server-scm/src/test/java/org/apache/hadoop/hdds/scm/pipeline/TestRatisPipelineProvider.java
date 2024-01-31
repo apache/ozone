@@ -95,20 +95,20 @@ public class TestRatisPipelineProvider {
   public void init(int maxPipelinePerNode, OzoneConfiguration conf, File dir) throws Exception {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
-            conf, new SCMDBDefinition());
+        conf, new SCMDBDefinition());
     nodeManager = new MockNodeManager(true, 10);
     nodeManager.setNumPipelinePerDatanode(maxPipelinePerNode);
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
-            maxPipelinePerNode);
+        maxPipelinePerNode);
     stateManager = PipelineStateManagerImpl.newBuilder()
-            .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
-            .setRatisServer(scmhaManager.getRatisServer())
-            .setNodeManager(nodeManager)
-            .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
-            .build();
+        .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
+        .setRatisServer(scmhaManager.getRatisServer())
+        .setNodeManager(nodeManager)
+        .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
+        .build();
     provider = new MockRatisPipelineProvider(nodeManager,
-            stateManager, conf);
+        stateManager, conf);
   }
 
   @AfterEach

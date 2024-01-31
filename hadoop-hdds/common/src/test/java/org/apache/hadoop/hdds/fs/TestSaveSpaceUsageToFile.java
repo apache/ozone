@@ -40,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class TestSaveSpaceUsageToFile {
 
   @TempDir
-  private static File dir;
+  private File dir;
 
   private static final Duration LONG_EXPIRY = Duration.ofMinutes(15);
 

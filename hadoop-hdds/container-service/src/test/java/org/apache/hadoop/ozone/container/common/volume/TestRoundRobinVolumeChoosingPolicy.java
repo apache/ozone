@@ -18,13 +18,11 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import java.io.File;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageSource;
@@ -34,7 +32,6 @@ import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -53,18 +50,12 @@ public class TestRoundRobinVolumeChoosingPolicy {
 
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
   @TempDir
-  private static Path baseDir;
-  private static String volume1;
-  private static String volume2;
-
-  @BeforeAll
-  public static void init() {
-    volume1 = baseDir + "disk1";
-    volume2 = baseDir + "disk2";
-  }
+  private Path baseDir;
 
   @BeforeEach
   public void setup() throws Exception {
+    String volume1 = baseDir + "disk1";
+    String volume2 = baseDir + "disk2";
     policy = new RoundRobinVolumeChoosingPolicy();
 
     SpaceUsageSource source1 = MockSpaceUsageSource.fixed(500, 100);
@@ -90,8 +81,6 @@ public class TestRoundRobinVolumeChoosingPolicy {
   @AfterEach
   public void cleanUp() {
     volumes.forEach(HddsVolume::shutdown);
-    FileUtil.fullyDelete(new File(volume1));
-    FileUtil.fullyDelete(new File(volume2));
   }
 
   @Test

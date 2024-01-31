@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.container.common.volume;
 
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageSource;
@@ -27,12 +26,10 @@ import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.File;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -55,20 +52,13 @@ public class TestCapacityVolumeChoosingPolicy {
 
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
   @TempDir
-  private static Path baseDir;
-  private static String volume1;
-  private static String volume2;
-  private static String volume3;
-
-  @BeforeAll
-  public static void init() {
-    volume1 = baseDir + "disk1";
-    volume2 = baseDir + "disk2";
-    volume3 = baseDir + "disk3";
-  }
+  private Path baseDir;
 
   @BeforeEach
   public void setup() throws Exception {
+    String volume1 = baseDir + "disk1";
+    String volume2 = baseDir + "disk2";
+    String volume3 = baseDir + "disk3";
     policy = new CapacityVolumeChoosingPolicy();
 
     SpaceUsageSource source1 = MockSpaceUsageSource.fixed(500, 100);
@@ -102,9 +92,6 @@ public class TestCapacityVolumeChoosingPolicy {
   @AfterEach
   public void cleanUp() {
     volumes.forEach(HddsVolume::shutdown);
-    FileUtil.fullyDelete(new File(volume1));
-    FileUtil.fullyDelete(new File(volume2));
-    FileUtil.fullyDelete(new File(volume3));
   }
 
   @Test

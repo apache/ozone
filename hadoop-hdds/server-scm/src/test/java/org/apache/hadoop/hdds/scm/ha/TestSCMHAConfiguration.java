@@ -74,16 +74,18 @@ import static org.mockito.Mockito.when;
  */
 class TestSCMHAConfiguration {
   private OzoneConfiguration conf;
+  @TempDir
+  private File tempDir;
 
   @BeforeEach
-  void setup(@TempDir File tempDir) {
+  void setup() {
     conf = new OzoneConfiguration();
     conf.set(OZONE_METADATA_DIRS, tempDir.getAbsolutePath());
     DefaultConfigManager.clearDefaultConfigs();
   }
 
   @Test
-  public void testSCMHAConfig(@TempDir File testDir) throws Exception {
+  public void testSCMHAConfig() throws Exception {
     String scmServiceId = "scmserviceId";
     conf.set(ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY, scmServiceId);
 
@@ -213,7 +215,7 @@ class TestSCMHAConfiguration {
     assertEquals(0, scmRatisConfig.getLogAppenderWaitTimeMin(),
         "getLogAppenderWaitTimeMin");
 
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getPath());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempDir.getPath());
 
     final RaftProperties p = RatisUtil.newRaftProperties(conf);
     final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);

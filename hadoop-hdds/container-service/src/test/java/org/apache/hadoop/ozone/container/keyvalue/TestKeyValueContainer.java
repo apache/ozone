@@ -109,7 +109,7 @@ import static org.mockito.Mockito.when;
 public class TestKeyValueContainer {
 
   @TempDir
-  private Path folder;
+  private File folder;
 
   private String scmId = UUID.randomUUID().toString();
   private VolumeSet volumeSet;
@@ -228,7 +228,7 @@ public class TestKeyValueContainer {
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
     String volumeDirPath =
-        Files.createDirectory(folder.resolve("volumeDir"))
+        Files.createDirectory(folder.toPath().resolve("volumeDir"))
             .toFile().getAbsolutePath();
     HddsVolume newVolume = new HddsVolume.Builder(volumeDirPath)
         .conf(CONF).datanodeUuid(datanodeId.toString()).build();
@@ -275,7 +275,7 @@ public class TestKeyValueContainer {
 
     //destination path
     File exportTar = Files.createFile(
-        folder.resolve("export.tar")).toFile();
+        folder.toPath().resolve("export.tar")).toFile();
     TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
     //export the container
     try (FileOutputStream fos = new FileOutputStream(exportTar)) {
@@ -308,7 +308,7 @@ public class TestKeyValueContainer {
     keyValueContainer.update(data.getMetadata(), true);
 
     //destination path
-    File exportTar = Files.createFile(folder.resolve("export.tar")).toFile();
+    File exportTar = Files.createFile(folder.toPath().resolve("export.tar")).toFile();
     TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
     //export the container
     try (FileOutputStream fos = new FileOutputStream(exportTar)) {
@@ -346,7 +346,7 @@ public class TestKeyValueContainer {
 
     //destination path
     File folderToExport = Files.createFile(
-        folder.resolve("export.tar")).toFile();
+        folder.toPath().resolve("export.tar")).toFile();
     for (CopyContainerCompression compr : CopyContainerCompression.values()) {
       TarContainerPacker packer = new TarContainerPacker(compr);
 
@@ -523,7 +523,7 @@ public class TestKeyValueContainer {
         .mapToObj(i -> new Thread(() -> {
           try {
             File file = Files.createFile(
-                folder.resolve("concurrent" + i + ".tar")).toFile();
+                folder.toPath().resolve("concurrent" + i + ".tar")).toFile();
             try (OutputStream out = Files.newOutputStream(file.toPath())) {
               keyValueContainer.exportContainerData(out, packer);
             }
@@ -819,7 +819,7 @@ public class TestKeyValueContainer {
     assumeTrue(isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3));
     // Create a new HDDS volume
     String volumeDirPath =
-        Files.createDirectory(folder.resolve("volumeDir")).toFile()
+        Files.createDirectory(folder.toPath().resolve("volumeDir")).toFile()
             .getAbsolutePath();
     HddsVolume newVolume = new HddsVolume.Builder(volumeDirPath)
         .conf(CONF).datanodeUuid(datanodeId.toString()).build();
@@ -858,7 +858,7 @@ public class TestKeyValueContainer {
         if (volume == newVolume) {
           File folderToExport =
               Files.createFile(
-                  folder.resolve(containerId + "_exported.tar.gz")).toFile();
+                  folder.toPath().resolve(containerId + "_exported.tar.gz")).toFile();
           TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
           //export the container
           try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
@@ -928,7 +928,7 @@ public class TestKeyValueContainer {
 
     //destination path
     File folderToExport = Files.createFile(
-        folder.resolve("export.tar")).toFile();
+        folder.toPath().resolve("export.tar")).toFile();
     for (CopyContainerCompression compr : CopyContainerCompression.values()) {
       TarContainerPacker packer = new TarContainerPacker(compr);
 
@@ -977,7 +977,7 @@ public class TestKeyValueContainer {
 
     //destination path
     File folderToExport = Files.createFile(
-        folder.resolve("export.tar")).toFile();
+        folder.toPath().resolve("export.tar")).toFile();
     for (CopyContainerCompression compr : CopyContainerCompression.values()) {
       TarContainerPacker packer = new TarContainerPacker(compr);
 
@@ -1019,9 +1019,9 @@ public class TestKeyValueContainer {
    */
   @ContainerTestVersionInfo.ContainerTest
   public void testImportV2ReplicaToV3HddsVolume(
-      ContainerTestVersionInfo versionInfo, @TempDir File tempFile) throws Exception {
+      ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
-    final String testDir = tempFile.getPath();
+    final String testDir = folder.getPath();
     testMixedSchemaImport(testDir, false);
   }
 
@@ -1030,9 +1030,9 @@ public class TestKeyValueContainer {
    */
   @ContainerTestVersionInfo.ContainerTest
   public void testImportV3ReplicaToV2HddsVolume(
-      ContainerTestVersionInfo versionInfo, @TempDir File tempFile) throws Exception {
+      ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
-    final String testDir = tempFile.getPath();
+    final String testDir = folder.getPath();
     testMixedSchemaImport(testDir, true);
   }
 

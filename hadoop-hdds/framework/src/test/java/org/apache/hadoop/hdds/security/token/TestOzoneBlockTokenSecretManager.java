@@ -63,7 +63,7 @@ import static org.mockito.Mockito.when;
 public class TestOzoneBlockTokenSecretManager {
 
   @TempDir
-  private static File baseDir;
+  private File baseDir;
   private static final String ALGORITHM = "HmacSHA256";
 
   private OzoneBlockTokenSecretManager secretManager;

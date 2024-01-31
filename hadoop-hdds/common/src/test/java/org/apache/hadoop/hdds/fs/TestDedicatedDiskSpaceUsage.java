@@ -32,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TestDedicatedDiskSpaceUsage {
 
   @TempDir
-  private static File dir;
+  private File dir;
 
   private static final int FILE_SIZE = 1024;
 
