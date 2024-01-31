@@ -35,16 +35,13 @@ import org.apache.hadoop.fs.Trash;
 import org.apache.hadoop.fs.TrashPolicy;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.client.*;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
+import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -70,6 +67,9 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.tools.DistCp;
+import org.apache.hadoop.tools.DistCpOptions;
+import org.apache.hadoop.tools.mapred.CopyMapper;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -2344,6 +2344,20 @@ abstract class AbstractRootedOzoneFileSystemTest {
     ozoneVolume.createBucket(linkBucket, builder.build());
   }
 
+  private Path createAndGetBucketPath()
+      throws IOException {
+    BucketArgs.Builder builder = BucketArgs.newBuilder();
+    builder.setStorageType(StorageType.DISK);
+    builder.setBucketLayout(bucketLayout);;
+    BucketArgs omBucketArgs = builder.build();
+    String vol = UUID.randomUUID().toString();
+    String buck = UUID.randomUUID().toString();
+    final OzoneBucket bucket =
+        TestDataUtil.createVolumeAndBucket(client, vol, buck, omBucketArgs);
+    Path volumePath = new Path(OZONE_URI_DELIMITER, bucket.getVolumeName());
+    return new Path(volumePath, bucket.getName());
+  }
+
   @Test
   void testSnapshotRead() throws Exception {
     if (useOnlyCache) {
@@ -2483,6 +2497,44 @@ abstract class AbstractRootedOzoneFileSystemTest {
     fileStatus = fs.getFileStatus(path);
     // verify that mtime is NOT updated as expected.
     assertEquals(mtime, fileStatus.getModificationTime());
+  }
+
+  @Test
+  public void testDistcp() throws Exception {
+    Path srcBucketPath = createAndGetBucketPath();
+    Path insideSrcBucket = new Path(srcBucketPath, "*");
+    Path dstBucketPath = createAndGetBucketPath();
+    // create 2 files on source
+    createFiles(srcBucketPath, 2);
+    // Create target directory/bucket
+    fs.mkdirs(dstBucketPath);
+
+    // perform distcp
+    final DistCpOptions options =
+        new DistCpOptions.Builder(Collections.singletonList(insideSrcBucket),
+            dstBucketPath).build();
+    options.appendToConf(conf);
+    Job distcpJob = new DistCp(conf, options).execute();
+    verifyCopy(dstBucketPath, distcpJob, 2, 2);
+  }
+
+  private void verifyCopy(Path dstBucketPath, Job distcpJob,
+      long expectedFilesToBeCopied, long expectedTotalFilesInDest)
+      throws IOException {
+    long filesCopied =
+        distcpJob.getCounters().findCounter(CopyMapper.Counter.COPY).getValue();
+    FileStatus[] destinationFileStatus = fs.listStatus(dstBucketPath);
+    assertEquals(expectedTotalFilesInDest, destinationFileStatus.length);
+    assertEquals(expectedFilesToBeCopied, filesCopied);
+  }
+
+  private void createFiles(Path srcBucketPath, int fileCount)
+      throws IOException {
+    for (int i = 1; i <= fileCount; i++) {
+      String keyName = "key" + RandomStringUtils.randomNumeric(5);
+      Path file = new Path(srcBucketPath, keyName);
+      ContractTestUtils.touch(fs, file);
+    }
   }
 
 }
