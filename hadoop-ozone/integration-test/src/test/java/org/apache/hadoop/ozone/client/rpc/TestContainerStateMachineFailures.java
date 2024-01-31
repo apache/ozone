@@ -369,7 +369,7 @@ public class TestContainerStateMachineFailures {
     int index = cluster.getHddsDatanodeIndex(dn.getDatanodeDetails());
     // restart the hdds datanode and see if the container is listed in the
     // in the missing container set and not in the regular set
-    cluster.restartHddsDatanode(dn.getDatanodeDetails(), false);
+    cluster.restartHddsDatanode(dn.getDatanodeDetails(), true);
     // make sure the container state is still marked unhealthy after restart
     keyValueContainerData = (KeyValueContainerData) ContainerDataYaml
             .readContainerFile(containerFile);

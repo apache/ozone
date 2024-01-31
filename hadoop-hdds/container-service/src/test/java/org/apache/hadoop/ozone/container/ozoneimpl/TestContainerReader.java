@@ -558,8 +558,10 @@ public class TestContainerReader {
       // add db entry for the container ID 101 for V3
       baseCount = addDbEntry(containerData);
     }
+
+    // verify container data and perform cleanup
     ContainerReader containerReader = new ContainerReader(volumeSet,
-        hddsVolume, containerSet, conf, false);
+        hddsVolume, containerSet, conf, true);
 
     containerReader.run();
 
