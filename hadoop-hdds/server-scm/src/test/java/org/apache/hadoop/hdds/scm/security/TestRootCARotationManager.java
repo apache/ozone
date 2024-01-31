@@ -17,7 +17,6 @@
 package org.apache.hadoop.hdds.scm.security;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -40,6 +39,7 @@ import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
@@ -94,6 +94,7 @@ public class TestRootCARotationManager {
   private SCMSecurityProtocolServer scmSecurityProtocolServer;
   private RootCARotationHandlerImpl handler;
   private StatefulServiceStateManager statefulServiceStateManager;
+  @TempDir
   private File testDir;
   private String cID = UUID.randomUUID().toString();
   private String scmID = UUID.randomUUID().toString();
@@ -103,8 +104,6 @@ public class TestRootCARotationManager {
   public void init() throws IOException, TimeoutException,
       CertificateException {
     ozoneConfig = new OzoneConfiguration();
-    testDir = GenericTestUtils.getTestDir(
-        TestRootCARotationManager.class.getSimpleName() + UUID.randomUUID());
     ozoneConfig
         .set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     ozoneConfig
@@ -146,8 +145,6 @@ public class TestRootCARotationManager {
     if (rootCARotationManager != null) {
       rootCARotationManager.stop();
     }
-
-    FileUtil.fullyDelete(testDir);
   }
 
   @Test

@@ -27,9 +27,7 @@ import static org.mockito.Mockito.any;
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
-import java.util.UUID;
 
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -55,10 +53,10 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test container deletion behaviour of unknown containers
@@ -71,6 +69,7 @@ public class TestUnknownContainerReport {
   private ContainerStateManager containerStateManager;
   private EventPublisher publisher;
   private PipelineManager pipelineManager;
+  @TempDir
   private File testDir;
   private DBStore dbStore;
   private SCMHAManager scmhaManager;
@@ -80,8 +79,6 @@ public class TestUnknownContainerReport {
     final OzoneConfiguration conf = SCMTestUtils.getConf();
     this.nodeManager = new MockNodeManager(true, 10);
     this.containerManager = mock(ContainerManager.class);
-    testDir = GenericTestUtils.getTestDir(
-        TestUnknownContainerReport.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
@@ -107,8 +104,6 @@ public class TestUnknownContainerReport {
     if (dbStore != null) {
       dbStore.close();
     }
-
-    FileUtil.fullyDelete(testDir);
   }
 
   @Test
