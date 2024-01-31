@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.recon.tasks;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -32,7 +31,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
-import org.apache.hadoop.ozone.recon.api.NSSummaryEndpoint;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
@@ -47,7 +45,6 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -55,7 +52,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
-import static org.mockito.Mockito.mock;
 
 /**
  * Unit test for NSSummaryTaskWithOBS.
@@ -103,10 +99,6 @@ public final class TestNSSummaryTaskWithOBS {
   private static final long KEY_FIVE_SIZE = 100L;
   private static final long KEY_SIX_SIZE = 6000L;
   private static final long KEY_SEVEN_SIZE = 7000L;
-
-  private static Set<Long> bucketOneAns = new HashSet<>();
-  private static Set<Long> bucketTwoAns = new HashSet<>();
-  private static Set<Long> dirOneAns = new HashSet<>();
 
   private TestNSSummaryTaskWithOBS() {
   }
@@ -167,10 +159,6 @@ public final class TestNSSummaryTaskWithOBS {
 
       nSSummaryTaskWithOBS.reprocessWithOBS(reconOMMetadataManager);
       Assertions.assertNull(reconNamespaceSummaryManager.getNSSummary(-1L));
-
-      NSSummaryEndpoint nsSummaryEndpoint = new NSSummaryEndpoint(
-          reconNamespaceSummaryManager, reconOMMetadataManager, mock(
-          OzoneStorageContainerManager.class));
 
       nsSummaryForBucket1 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
