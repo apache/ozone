@@ -18,8 +18,10 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -73,9 +75,8 @@ public class TestS3MultipartUploadCompleteRequestWithFSO
 
     OmKeyInfo omKeyInfoFSO =
             OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
-                    HddsProtos.ReplicationType.RATIS,
-                    HddsProtos.ReplicationFactor.ONE, objectId, parentID, txnId,
-                    Time.now(), true);
+                RatisReplicationConfig.getInstance(ONE), objectId, parentID, txnId,
+                Time.now(), true);
 
     // add key to openFileTable
     String fileName = OzoneFSUtils.getFileName(keyName);

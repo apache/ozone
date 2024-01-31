@@ -272,7 +272,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
   String addToOpenFileTable(List<OmKeyLocationInfo> locationList)
       throws Exception {
     OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-        bucketName, keyName, replicationType, replicationFactor, 0, parentId,
+        bucketName, keyName, replicationConfig, 0, parentId,
         0, Time.now(), version);
     omKeyInfo.appendNewBlocks(locationList, false);
     omKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID,
@@ -294,7 +294,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
   String addToFileTable(List<OmKeyLocationInfo> locationList)
       throws Exception {
     OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-        bucketName, keyName, replicationType, replicationFactor, 0, parentId,
+        bucketName, keyName, replicationConfig, 0, parentId,
         0, Time.now(), version);
     omKeyInfo.appendNewBlocks(locationList, false);
 

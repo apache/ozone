@@ -51,10 +51,9 @@ public class TestOMKeyCreateResponseWithFSO extends TestOMKeyCreateResponse {
   protected OmKeyInfo getOmKeyInfo() {
     assertNotNull(omBucketInfo);
     return OMRequestTestUtils.createOmKeyInfo(volumeName,
-            omBucketInfo.getBucketName(), keyName, replicationType,
-            replicationFactor,
-            omBucketInfo.getObjectID() + 1,
-            omBucketInfo.getObjectID(), 100, Time.now());
+        omBucketInfo.getBucketName(), keyName, replicationConfig,
+        omBucketInfo.getObjectID() + 1,
+        omBucketInfo.getObjectID(), 100, Time.now());
   }
 
   @Nonnull

@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -686,7 +687,8 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     KeyArgs keyArgs =
         KeyArgs.newBuilder().setDataSize(dataSize).setVolumeName(volumeName)
             .setKeyName(keyName).setBucketName(bucketName)
-            .setType(replicationType).setFactor(replicationFactor)
+            .setType(replicationConfig.getReplicationType())
+            .setFactor(((RatisReplicationConfig) replicationConfig).getReplicationFactor())
             .addAllKeyLocations(keyLocations).build();
 
     CommitKeyRequest commitKeyRequest =
@@ -731,7 +733,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
   protected String addKeyToOpenKeyTable(List<OmKeyLocationInfo> locationList)
       throws Exception {
     OMRequestTestUtils.addKeyToTable(true, volumeName, bucketName, keyName,
-        clientID, replicationType, replicationFactor, omMetadataManager,
+        clientID, replicationConfig, omMetadataManager,
         locationList, version);
 
     return omMetadataManager.getOpenKey(volumeName, bucketName,

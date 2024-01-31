@@ -19,9 +19,12 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.utils.UniqueId;
@@ -277,9 +280,8 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
       OmBucketInfo omBucketInfo = OMRequestTestUtils.addBucketToDB(volume,
           bucket, omMetadataManager, getBucketLayout());
 
-      final OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volume,
-          bucket, keyName,
-          HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+      ReplicationConfig replicationConfig = RatisReplicationConfig.getInstance(ONE);
+      final OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volume, bucket, keyName, replicationConfig,
           0L, Time.now(), true);
 
       if (getBucketLayout().equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {

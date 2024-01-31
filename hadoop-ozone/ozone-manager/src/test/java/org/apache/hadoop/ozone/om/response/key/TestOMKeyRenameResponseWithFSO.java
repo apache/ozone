@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -39,8 +38,7 @@ public class TestOMKeyRenameResponseWithFSO extends TestOMKeyRenameResponse {
   protected OmKeyInfo getOmKeyInfo(String keyName) {
     long bucketId = random.nextLong();
     return OMRequestTestUtils.createOmKeyInfo(
-        volumeName, bucketName, keyName,
-        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+        volumeName, bucketName, keyName, replicationConfig,
         bucketId + 100L, bucketId + 101L, 0L, Time.now());
   }
 
@@ -48,8 +46,7 @@ public class TestOMKeyRenameResponseWithFSO extends TestOMKeyRenameResponse {
   protected OmKeyInfo getOmKeyInfo(OmKeyInfo toKeyInfo,
                                    String keyName) {
     return OMRequestTestUtils.createOmKeyInfo(toKeyInfo.getVolumeName(),
-        toKeyInfo.getBucketName(), keyName, replicationType,
-        replicationFactor, toKeyInfo.getObjectID(),
+        toKeyInfo.getBucketName(), keyName, replicationConfig, toKeyInfo.getObjectID(),
         toKeyInfo.getParentObjectID(), 0L, toKeyInfo.getCreationTime());
   }
 
@@ -81,10 +78,10 @@ public class TestOMKeyRenameResponseWithFSO extends TestOMKeyRenameResponse {
     String fromKeyParentName = UUID.randomUUID().toString();
     String toKeyParentName = UUID.randomUUID().toString();
     fromKeyParent = OMRequestTestUtils.createOmKeyInfo(volumeName,
-        bucketName, fromKeyParentName, replicationType, replicationFactor,
+        bucketName, fromKeyParentName, replicationConfig,
         bucketId + 100L);
     toKeyParent = OMRequestTestUtils.createOmKeyInfo(volumeName,
-        bucketName, toKeyParentName, replicationType, replicationFactor,
+        bucketName, toKeyParentName, replicationConfig,
         bucketId + 101L);
     fromKeyParent.setParentObjectID(bucketId);
     toKeyParent.setParentObjectID(bucketId);

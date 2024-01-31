@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.file;
 
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -422,8 +423,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     // Add a file into the FileTable, this is to simulate "file exists" check.
     OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-            bucketName, keyName, HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, objID++);
+        bucketName, keyName, RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), objID++);
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omBucketInfo.getObjectID();
 
@@ -499,8 +499,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
 
     // Add a key in second level.
     OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-            bucketName, keyName, HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.THREE, objID);
+        bucketName, keyName, RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE), objID);
 
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omBucketInfo.getObjectID();

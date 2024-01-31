@@ -19,8 +19,10 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -78,10 +80,9 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
     long objectId = 100;
 
     OmKeyInfo omKeyInfoFSO =
-            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
-                    HddsProtos.ReplicationType.RATIS,
-                    HddsProtos.ReplicationFactor.ONE, objectId, parentID, 100,
-                    Time.now(), version);
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+            RatisReplicationConfig.getInstance(ONE), objectId, parentID, 100,
+            Time.now(), version);
     omKeyInfoFSO.appendNewBlocks(locationList, false);
 
     String fileName = OzoneFSUtils.getFileName(keyName);

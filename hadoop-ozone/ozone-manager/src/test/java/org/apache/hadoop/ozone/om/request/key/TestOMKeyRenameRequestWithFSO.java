@@ -18,12 +18,14 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -181,7 +183,7 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
     long bucketId = random.nextLong();
     return OMRequestTestUtils.createOmKeyInfo(
         volumeName, bucketName, keyName,
-        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+        RatisReplicationConfig.getInstance(ONE),
         bucketId + 100L, bucketId + 101L, 0L, Time.now());
   }
 

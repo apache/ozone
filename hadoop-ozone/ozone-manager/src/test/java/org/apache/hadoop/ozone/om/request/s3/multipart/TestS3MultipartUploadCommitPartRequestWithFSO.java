@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -69,9 +70,9 @@ public class TestS3MultipartUploadCommitPartRequestWithFSO
       String keyName, long clientID) throws Exception {
     long txnLogId = 0L;
     OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-            bucketName, keyName, HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, parentID + 1, parentID,
-            txnLogId, Time.now(), true);
+        bucketName, keyName, RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+        parentID + 1, parentID,
+        txnLogId, Time.now(), true);
     String fileName = OzoneFSUtils.getFileName(keyName);
     OMRequestTestUtils.addFileToKeyTable(true, false,
             fileName, omKeyInfo, clientID, txnLogId, omMetadataManager);

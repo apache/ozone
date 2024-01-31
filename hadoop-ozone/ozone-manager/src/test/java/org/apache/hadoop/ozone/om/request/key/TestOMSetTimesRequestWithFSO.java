@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.om.request.key;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -117,7 +118,7 @@ public class TestOMSetTimesRequestWithFSO extends TestOMSetTimesRequest {
 
     OmKeyInfo omKeyInfo = OMRequestTestUtils
         .createOmKeyInfo(volumeName, bucketName, FILE_NAME,
-            HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
+            RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
             parentId + 1, parentId, 100, Time.now());
     OMRequestTestUtils
         .addFileToKeyTable(false, false, FILE_NAME, omKeyInfo, -1, 50,

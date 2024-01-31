@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.file;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -33,6 +34,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -55,8 +57,7 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
             "a/b/c", omMetadataManager);
     String fileNameD = "d";
     OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
-            "a/b/c/" + fileNameD, 0L, HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+        "a/b/c/" + fileNameD, 0L, RatisReplicationConfig.getInstance(ONE), omMetadataManager);
 
     // cannot create file if directory of same name exists
     testNonRecursivePath("a/b/c", false, false, true);
@@ -80,7 +81,7 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
   public void testValidateAndUpdateCacheWithNamespaceQuotaExceeded()
       throws Exception {
     OMRequest omRequest = createFileRequest(volumeName, bucketName,
-        "/test/a1/a2", HddsProtos.ReplicationFactor.ONE,
+        "/test/a1/a2", ONE,
         HddsProtos.ReplicationType.RATIS, false, true);
 
     // create bucket with quota limit 1
@@ -115,10 +116,9 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     OmDirectoryInfo omDirInfo = getDirInfo("c/d/e");
     OmKeyInfo omKeyInfo =
             OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, key,
-                    HddsProtos.ReplicationType.RATIS,
-                    HddsProtos.ReplicationFactor.ONE,
-                    omDirInfo.getObjectID() + 10,
-                    omDirInfo.getObjectID(), 100, Time.now());
+                RatisReplicationConfig.getInstance(ONE),
+                omDirInfo.getObjectID() + 10,
+                omDirInfo.getObjectID(), 100, Time.now());
     OMRequestTestUtils.addFileToKeyTable(false, false,
             "f", omKeyInfo, -1,
             omDirInfo.getObjectID() + 10, omMetadataManager);
@@ -147,10 +147,9 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
 
     OmKeyInfo omKeyInfo =
             OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, key,
-                    HddsProtos.ReplicationType.RATIS,
-                    HddsProtos.ReplicationFactor.ONE,
-                    parentId + 1,
-                    parentId, 100, Time.now());
+                RatisReplicationConfig.getInstance(ONE),
+                parentId + 1,
+                parentId, 100, Time.now());
     OMRequestTestUtils.addFileToKeyTable(false, false,
             fileName, omKeyInfo, -1, 50, omMetadataManager);
 

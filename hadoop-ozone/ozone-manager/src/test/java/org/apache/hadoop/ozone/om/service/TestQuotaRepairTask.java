@@ -19,8 +19,11 @@
 
 package org.apache.hadoop.ozone.om.service;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -48,8 +51,7 @@ public class TestQuotaRepairTask extends TestOMKeyRequest {
     String parentDir = "/user";
     for (int i = 0; i < count; i++) {
       OMRequestTestUtils.addKeyToTableAndCache(volumeName, bucketName,
-          parentDir.concat("/key" + i), -1, HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.THREE, 150 + i, omMetadataManager);
+          parentDir.concat("/key" + i), -1, RatisReplicationConfig.getInstance(THREE), 150 + i, omMetadataManager);
     }
 
     String fsoBucketName = "fso" + bucketName;
@@ -61,8 +63,7 @@ public class TestQuotaRepairTask extends TestOMKeyRequest {
       String fileName = "file1" + i;
       OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(
           volumeName, fsoBucketName, fileName,
-          HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.ONE,
+          RatisReplicationConfig.getInstance(ONE),
           parentId + 1 + i,
           parentId, 100 + i, Time.now());
       omKeyInfo.setKeyName(fileName);

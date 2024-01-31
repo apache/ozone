@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -42,6 +42,7 @@ import java.util.Iterator;
 import java.util.Arrays;
 import java.util.Collection;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -108,8 +109,7 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
     long parentId = checkIntermediatePaths(keyPath);
     String fileName = OzoneFSUtils.getFileName(keyName);
     OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-        bucketName, fileName, HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.ONE,  parentId + 1, parentId, 100,
+        bucketName, fileName, RatisReplicationConfig.getInstance(ONE), parentId + 1, parentId, 100,
         Time.now());
     OMRequestTestUtils.addFileToKeyTable(false, false,
             fileName, omKeyInfo, -1, 50, omMetadataManager);

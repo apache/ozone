@@ -20,10 +20,12 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.fail;
+
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
@@ -66,9 +68,8 @@ public class TestOMAllocateBlockRequestWithFSO
 
     OmKeyInfo omKeyInfoFSO =
             OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
-                    HddsProtos.ReplicationType.RATIS,
-                    HddsProtos.ReplicationFactor.ONE, objectId, parentID, txnId,
-                    Time.now());
+                RatisReplicationConfig.getInstance(ONE), objectId, parentID, txnId,
+                Time.now());
 
     // add key to openFileTable
     OMRequestTestUtils.addFileToKeyTable(true, false,

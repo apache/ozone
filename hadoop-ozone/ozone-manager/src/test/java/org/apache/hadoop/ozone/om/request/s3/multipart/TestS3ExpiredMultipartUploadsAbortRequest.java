@@ -19,6 +19,7 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -27,10 +28,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -481,8 +482,7 @@ public class TestS3ExpiredMultipartUploadsAbortRequest
 
         // Add key to open key table to be used in MPU commit processing
         OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volume,
-            bucket, keyName, HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, parentID + j, parentID,
+            bucket, keyName, RatisReplicationConfig.getInstance(ONE), parentID + j, parentID,
             trxnLogIndex, Time.now(), true);
         String fileName = OzoneFSUtils.getFileName(keyName);
         OMRequestTestUtils.addFileToKeyTable(true, false,
@@ -563,8 +563,7 @@ public class TestS3ExpiredMultipartUploadsAbortRequest
         // Add key to open key table to be used in MPU commit processing
         OMRequestTestUtils.addKeyToTable(
             true, true,
-            volume, bucket, keyName, clientID, HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+            volume, bucket, keyName, clientID, RatisReplicationConfig.getInstance(ONE), omMetadataManager);
 
         OMClientResponse commitResponse =
             s3MultipartUploadCommitPartRequest.validateAndUpdateCache(

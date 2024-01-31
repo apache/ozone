@@ -18,10 +18,13 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -63,10 +66,9 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
   protected OmKeyInfo getOmKeyInfo() {
     assertNotNull(omBucketInfo);
     return OMRequestTestUtils.createOmKeyInfo(volumeName,
-            omBucketInfo.getBucketName(), keyName, replicationType,
-            replicationFactor,
-            omBucketInfo.getObjectID() + 1,
-            omBucketInfo.getObjectID(), 100, Time.now());
+        omBucketInfo.getBucketName(), keyName, replicationConfig,
+        omBucketInfo.getObjectID() + 1,
+        omBucketInfo.getObjectID(), 100, Time.now());
   }
 
   @Nonnull
@@ -77,10 +79,9 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
     long objectId = parentID + 10;
 
     OmKeyInfo omKeyInfoFSO =
-            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
-                    HddsProtos.ReplicationType.RATIS,
-                    HddsProtos.ReplicationFactor.ONE, objectId, parentID, 100,
-                    Time.now());
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+            RatisReplicationConfig.getInstance(ONE), objectId, parentID, 100,
+            Time.now());
 
     String fileName = OzoneFSUtils.getFileName(keyName);
     OMRequestTestUtils.addFileToKeyTable(true, false,

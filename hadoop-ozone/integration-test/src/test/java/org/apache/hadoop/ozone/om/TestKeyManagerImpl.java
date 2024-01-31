@@ -44,9 +44,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -989,12 +987,11 @@ public class TestKeyManagerImpl {
       if (i % 2 == 0) {  // Add to DB
         OMRequestTestUtils.addKeyToTable(false,
             VOLUME_NAME, BUCKET_NAME, prefixKeyInDB + i,
-            1000L, HddsProtos.ReplicationType.RATIS,
-            ONE, metadataManager);
+            1000L, RatisReplicationConfig.getInstance(ONE), metadataManager);
       } else {  // Add to TableCache
         OMRequestTestUtils.addKeyToTableCache(
             VOLUME_NAME, BUCKET_NAME, prefixKeyInCache + i,
-            HddsProtos.ReplicationType.RATIS, ONE,
+            RatisReplicationConfig.getInstance(ONE),
             metadataManager);
       }
     }
@@ -1061,13 +1058,12 @@ public class TestKeyManagerImpl {
         OMRequestTestUtils.addKeyToTable(false,
             VOLUME_NAME, BUCKET_NAME,
             keyNameDir1Subdir1 + OZONE_URI_DELIMITER + prefixKeyInDB + i,
-            1000L, HddsProtos.ReplicationType.RATIS,
-            ONE, metadataManager);
+            1000L, RatisReplicationConfig.getInstance(ONE), metadataManager);
       } else {  // Add to TableCache
         OMRequestTestUtils.addKeyToTableCache(
             VOLUME_NAME, BUCKET_NAME,
             keyNameDir1Subdir1 + OZONE_URI_DELIMITER + prefixKeyInCache + i,
-            HddsProtos.ReplicationType.RATIS, ONE,
+            RatisReplicationConfig.getInstance(ONE),
             metadataManager);
       }
     }
@@ -1105,13 +1101,12 @@ public class TestKeyManagerImpl {
       if (i % 2 == 0) {
         OMRequestTestUtils.addKeyToTable(false,
             VOLUME_NAME, BUCKET_NAME, prefixKey + i,
-            1000L, HddsProtos.ReplicationType.RATIS,
-            ONE, metadataManager);
+            1000L, RatisReplicationConfig.getInstance(ONE), metadataManager);
         existKeySet.add(prefixKey + i);
       } else {
         OMRequestTestUtils.addKeyToTableCache(
             VOLUME_NAME, BUCKET_NAME, prefixKey + i,
-            HddsProtos.ReplicationType.RATIS, ONE,
+            RatisReplicationConfig.getInstance(ONE),
             metadataManager);
 
         String key = metadataManager.getOzoneKey(
@@ -1459,8 +1454,7 @@ public class TestKeyManagerImpl {
     when(scmClientMock.getContainerClient()).thenReturn(sclProtocolMock);
 
     OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo("v1",
-        "b1", "k1", ReplicationType.RATIS,
-        ReplicationFactor.THREE);
+        "b1", "k1", RatisReplicationConfig.getInstance(THREE));
 
     // Add block to key.
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
@@ -1514,8 +1508,7 @@ public class TestKeyManagerImpl {
     OMPerformanceMetrics metrics = mock(OMPerformanceMetrics.class);
 
     OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo("v1",
-        "b1", "k1", ReplicationType.RATIS,
-        ReplicationFactor.THREE);
+        "b1", "k1", RatisReplicationConfig.getInstance(THREE));
 
     // Add block to key.
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();

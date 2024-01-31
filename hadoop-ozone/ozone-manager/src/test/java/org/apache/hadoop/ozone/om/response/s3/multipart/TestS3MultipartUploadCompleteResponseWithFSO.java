@@ -18,11 +18,13 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -85,14 +87,13 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     String dbOpenKey = omMetadataManager.getOpenFileName(volumeId, bucketId,
-            parentID, fileName, clientId);
+        parentID, fileName, clientId);
     String dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
-            parentID, fileName);
+        parentID, fileName);
     OmKeyInfo omKeyInfoFSO =
-            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
-                    HddsProtos.ReplicationType.RATIS,
-                    HddsProtos.ReplicationFactor.ONE, objectId, parentID, txnId,
-                    Time.now(), true);
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+            RatisReplicationConfig.getInstance(ONE), objectId, parentID, txnId,
+            Time.now(), true);
 
     // add key to openFileTable
     omKeyInfoFSO.setKeyName(fileName);
@@ -175,8 +176,7 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
         parentID, fileName);
     OmKeyInfo omKeyInfoFSO =
         OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
-            HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, objectId, parentID, txnId,
+            RatisReplicationConfig.getInstance(ONE), objectId, parentID, txnId,
             Time.now(), true);
 
     // add key to openFileTable
@@ -249,11 +249,10 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
 
     // Put an entry to delete table with the same key prior to multipart commit
     OmKeyInfo prevKey = OMRequestTestUtils.createOmKeyInfo(volumeName,
-            bucketName, keyName,
-            HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE,
-            parentID + 8,
-            parentID, 8, Time.now(), true);
+        bucketName, keyName,
+        RatisReplicationConfig.getInstance(ONE),
+        parentID + 8,
+        parentID, 8, Time.now(), true);
     RepeatedOmKeyInfo prevKeys = new RepeatedOmKeyInfo(prevKey);
     String ozoneKey = omMetadataManager
             .getOzoneKey(prevKey.getVolumeName(),
@@ -312,11 +311,10 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
             omMetadataManager.getBucketTable().get(bucketKey);
 
     OmKeyInfo omKeyInfo =
-            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
-                    HddsProtos.ReplicationType.RATIS,
-                    HddsProtos.ReplicationFactor.ONE,
-                    parentID + 9,
-                    parentID, 100, Time.now(), true);
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+            RatisReplicationConfig.getInstance(ONE),
+            parentID + 9,
+            parentID, 100, Time.now(), true);
     List<OmKeyInfo> unUsedParts = new ArrayList<>();
     unUsedParts.add(omKeyInfo);
     S3MultipartUploadCompleteResponse s3MultipartUploadCompleteResponse =

@@ -18,13 +18,14 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -72,11 +73,10 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
             bucketName, PARENT_DIR, omMetadataManager);
 
     OmKeyInfo omKeyInfo =
-            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, FILE_KEY,
-                    HddsProtos.ReplicationType.RATIS,
-                    HddsProtos.ReplicationFactor.ONE,
-                    parentId + 1,
-                    parentId, 100, Time.now());
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, FILE_KEY,
+            RatisReplicationConfig.getInstance(ONE),
+            parentId + 1,
+            parentId, 100, Time.now());
     omKeyInfo.setKeyName(FILE_NAME);
     OMRequestTestUtils.addFileToKeyTable(false, false,
         FILE_NAME, omKeyInfo, -1, 50, omMetadataManager);
@@ -97,8 +97,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     OmKeyInfo omKeyInfo =
         OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, key,
-            HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE,
+            RatisReplicationConfig.getInstance(ONE),
             parentId + 1,
             parentId, 100, Time.now());
     omKeyInfo.setKeyName(key);
