@@ -24,14 +24,19 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.StorageTypeProto;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
 
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newBucketInfoBuilder;
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newCreateBucketRequest;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketLayoutProto.FILE_SYSTEM_OPTIMIZED;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.when;
 
 /**
@@ -40,7 +45,7 @@ import static org.mockito.Mockito.when;
 public class TestOMBucketCreateRequestWithFSO
     extends TestOMBucketCreateRequest {
 
-  @Before
+  @BeforeEach
   public void setupWithFSO() {
     ozoneManager.getConfiguration()
         .set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
@@ -55,7 +60,7 @@ public class TestOMBucketCreateRequestWithFSO
     String bucketName = UUID.randomUUID().toString();
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
 
-    Assert.assertEquals(0, omMetrics.getNumFSOBucketCreates());
+    assertEquals(0, omMetrics.getNumFSOBucketCreates());
 
     OMBucketCreateRequest omBucketCreateRequest = doPreExecute(volumeName,
         bucketName, true);
@@ -63,8 +68,8 @@ public class TestOMBucketCreateRequestWithFSO
     doValidateAndUpdateCache(volumeName, bucketName,
         omBucketCreateRequest.getOmRequest());
 
-    Assert.assertEquals(1, omMetrics.getNumFSOBucketCreates());
-    Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+    assertEquals(1, omMetrics.getNumFSOBucketCreates());
+    assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
         omMetadataManager.getBucketTable().get(bucketKey).getBucketLayout());
   }
 
@@ -83,11 +88,12 @@ public class TestOMBucketCreateRequestWithFSO
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
 
     // Checking bucket layout from configuration
-    Assert.assertEquals(OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED,
+    assertEquals(
+        OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED,
         ozoneManager.getConfiguration()
             .get(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT));
 
-    Assert.assertEquals(0, omMetrics.getNumFSOBucketCreates());
+    assertEquals(0, omMetrics.getNumFSOBucketCreates());
 
     // OzoneManager is mocked, the bucket layout will return null
     when(ozoneManager.getOMDefaultBucketLayout()).thenReturn(
@@ -99,8 +105,8 @@ public class TestOMBucketCreateRequestWithFSO
     doValidateAndUpdateCache(volumeName, bucketName,
         omBucketCreateRequest.getOmRequest());
 
-    Assert.assertEquals(1, omMetrics.getNumFSOBucketCreates());
-    Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+    assertEquals(1, omMetrics.getNumFSOBucketCreates());
+    assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
         omMetadataManager.getBucketTable().get(bucketKey).getBucketLayout());
   }
 
@@ -109,18 +115,16 @@ public class TestOMBucketCreateRequestWithFSO
       throws Exception {
     addCreateVolumeToTable(volumeName, omMetadataManager);
 
-    OMRequest originalRequest;
+    OzoneManagerProtocolProtos.BucketInfo.Builder bucketInfo =
+        newBucketInfoBuilder(bucketName, volumeName);
 
     if (layoutFSOFromCli) {
-      originalRequest =
-          OMRequestTestUtils.createBucketReqFSO(bucketName, volumeName,
-              false, StorageTypeProto.SSD);
-    } else {
-      originalRequest = OMRequestTestUtils
-          .createBucketRequest(bucketName, volumeName,
-              false, StorageTypeProto.SSD);
+      bucketInfo
+          .setBucketLayout(FILE_SYSTEM_OPTIMIZED)
+          .addMetadata(OMRequestTestUtils.fsoMetadata());
     }
 
+    OMRequest originalRequest = newCreateBucketRequest(bucketInfo).build();
     OMBucketCreateRequest omBucketCreateRequest =
         new OMBucketCreateRequest(originalRequest);
 
@@ -129,27 +133,26 @@ public class TestOMBucketCreateRequestWithFSO
     return new OMBucketCreateRequest(modifiedRequest);
   }
 
-  private void doValidateAndUpdateCache(String volumeName, String bucketName,
+  protected void doValidateAndUpdateCache(String volumeName, String bucketName,
       OMRequest modifiedRequest) throws Exception {
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
 
     // As we have not still called validateAndUpdateCache, get() should
     // return null.
 
-    Assert.assertNull(omMetadataManager.getBucketTable().get(bucketKey));
+    assertNull(omMetadataManager.getBucketTable().get(bucketKey));
     OMBucketCreateRequest omBucketCreateRequest =
         new OMBucketCreateRequest(modifiedRequest);
 
 
     OMClientResponse omClientResponse =
-        omBucketCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-            ozoneManagerDoubleBufferHelper);
+        omBucketCreateRequest.validateAndUpdateCache(ozoneManager, 1);
 
     // As now after validateAndUpdateCache it should add entry to cache, get
     // should return non null value.
     OmBucketInfo dbBucketInfo =
         omMetadataManager.getBucketTable().get(bucketKey);
-    Assert.assertNotNull(omMetadataManager.getBucketTable().get(bucketKey));
+    assertNotNull(omMetadataManager.getBucketTable().get(bucketKey));
 
     BucketLayout bucketLayout = BucketLayout
         .fromString(ozoneManager.getConfiguration()
@@ -159,21 +162,21 @@ public class TestOMBucketCreateRequestWithFSO
     OmBucketInfo bucketInfoFromProto = OmBucketInfo.getFromProtobuf(
         modifiedRequest.getCreateBucketRequest().getBucketInfo(), bucketLayout);
 
-    Assert.assertEquals(bucketInfoFromProto.getCreationTime(),
+    assertEquals(bucketInfoFromProto.getCreationTime(),
         dbBucketInfo.getCreationTime());
-    Assert.assertEquals(bucketInfoFromProto.getModificationTime(),
+    assertEquals(bucketInfoFromProto.getModificationTime(),
         dbBucketInfo.getModificationTime());
-    Assert.assertEquals(bucketInfoFromProto.getAcls(),
+    assertEquals(bucketInfoFromProto.getAcls(),
         dbBucketInfo.getAcls());
-    Assert.assertEquals(bucketInfoFromProto.getIsVersionEnabled(),
+    assertEquals(bucketInfoFromProto.getIsVersionEnabled(),
         dbBucketInfo.getIsVersionEnabled());
-    Assert.assertEquals(bucketInfoFromProto.getStorageType(),
+    assertEquals(bucketInfoFromProto.getStorageType(),
         dbBucketInfo.getStorageType());
-    Assert.assertEquals(bucketInfoFromProto.getMetadata(),
+    assertEquals(bucketInfoFromProto.getMetadata(),
         dbBucketInfo.getMetadata());
-    Assert.assertEquals(bucketInfoFromProto.getEncryptionKeyInfo(),
+    assertEquals(bucketInfoFromProto.getEncryptionKeyInfo(),
         dbBucketInfo.getEncryptionKeyInfo());
-    Assert.assertEquals(bucketInfoFromProto.getBucketLayout(),
+    assertEquals(bucketInfoFromProto.getBucketLayout(),
         dbBucketInfo.getBucketLayout());
 
     // verify OMResponse.

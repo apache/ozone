@@ -20,24 +20,22 @@ package org.apache.hadoop.ozone.om.lock;
 
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.mockito.Mockito;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.Collection;
 
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
  * Test for OzoneLockProvider.
  */
-@RunWith(Parameterized.class)
 public class TestOzoneLockProvider {
 
   private static final Logger LOG =
@@ -46,7 +44,6 @@ public class TestOzoneLockProvider {
   private OzoneManager ozoneManager;
   private OzoneLockStrategy ozoneLockStrategy;
 
-  @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(
         new Object[]{true, true},
@@ -54,30 +51,20 @@ public class TestOzoneLockProvider {
         new Object[]{false, true},
         new Object[]{false, false});
   }
+  private boolean keyPathLockEnabled;
+  private boolean enableFileSystemPaths;
 
-  public TestOzoneLockProvider(boolean setKeyPathLock,
-                               boolean setFileSystemPaths) {
-    // Ignored. Actual init done in initParam().
-    // This empty constructor is still required to avoid argument exception.
-  }
-
-  @Parameterized.BeforeParam
-  public static void initParam(boolean setKeyPathLock,
-                               boolean setFileSystemPaths) {
-    keyPathLockEnabled = setKeyPathLock;
-    enableFileSystemPaths = setFileSystemPaths;
-  }
-
-  private static boolean keyPathLockEnabled;
-  private static boolean enableFileSystemPaths;
-
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
-    ozoneManager = Mockito.mock(OzoneManager.class);
+    ozoneManager = mock(OzoneManager.class);
   }
 
-  @Test
-  public void testOzoneLockProvider() {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testOzoneLockProvider(boolean setKeyPathLock,
+                                    boolean setFileSystemPaths) {
+    this.keyPathLockEnabled = setKeyPathLock;
+    this.enableFileSystemPaths = setFileSystemPaths;
     for (BucketLayout bucketLayout : BucketLayout.values()) {
       testOzoneLockProviderUtil(bucketLayout);
     }
@@ -96,13 +83,13 @@ public class TestOzoneLockProvider {
 
     if (keyPathLockEnabled) {
       if (bucketLayout == BucketLayout.OBJECT_STORE) {
-        Assert.assertTrue(ozoneLockStrategy instanceof OBSKeyPathLockStrategy);
+        assertInstanceOf(OBSKeyPathLockStrategy.class, ozoneLockStrategy);
       } else if (!enableFileSystemPaths &&
           bucketLayout == BucketLayout.LEGACY) {
-        Assert.assertTrue(ozoneLockStrategy instanceof OBSKeyPathLockStrategy);
+        assertInstanceOf(OBSKeyPathLockStrategy.class, ozoneLockStrategy);
       }
     } else {
-      Assert.assertTrue(ozoneLockStrategy instanceof RegularBucketLockStrategy);
+      assertInstanceOf(RegularBucketLockStrategy.class, ozoneLockStrategy);
     }
   }
 }

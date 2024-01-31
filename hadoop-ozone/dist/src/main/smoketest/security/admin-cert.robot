@@ -32,11 +32,11 @@ Setup Test
 *** Test Cases ***
 List valid certificates
     ${output} =      Execute    ozone admin cert list
-                     Should Contain    ${output}    valid certificates
+                     Should Contain    ${output}    Type=VALID
 
 List revoked certificates
     ${output} =      Execute    ozone admin cert list -t revoked
-                     Should Contain    ${output}    Total 0 revoked certificates
+                     Should Contain    ${output}    Certificate list:(Type=REVOKED, BatchSize=20, CertCount=0)
 
 Info of the cert
     ${output} =      Execute   for id in $(ozone admin cert list -c 1|grep UTC|awk '{print $1}'); do ozone admin cert info $id; done

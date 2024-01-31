@@ -19,11 +19,12 @@ package org.apache.hadoop.ozone.container.replication;
 
 import com.google.common.base.Preconditions;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.grpc.stub.CallStreamObserver;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -36,8 +37,11 @@ abstract class GrpcOutputStream<T> extends OutputStream {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(GrpcOutputStream.class);
+  public static final int READY_WAIT_TIME_IN_MS = 10;
+  // retry count 5 * 6000 for wait of 5 minute
+  public static final int READY_RETRY_COUNT = 30000;
 
-  private final StreamObserver<T> streamObserver;
+  private final CallStreamObserver<T> streamObserver;
 
   private final ByteString.Output buffer;
 
@@ -49,7 +53,7 @@ abstract class GrpcOutputStream<T> extends OutputStream {
 
   private long writtenBytes;
 
-  GrpcOutputStream(StreamObserver<T> streamObserver,
+  GrpcOutputStream(CallStreamObserver<T> streamObserver,
       long containerId, int bufferSize) {
     this.streamObserver = streamObserver;
     this.containerId = containerId;
@@ -107,11 +111,14 @@ abstract class GrpcOutputStream<T> extends OutputStream {
   @Override
   public void close() throws IOException {
     if (!closed.getAndSet(true)) {
-      flushBuffer(true);
-      LOG.info("Sent {} bytes for container {}",
-          writtenBytes, containerId);
-      streamObserver.onCompleted();
-      buffer.close();
+      try {
+        flushBuffer(true);
+        LOG.info("Sent {} bytes for container {}",
+            writtenBytes, containerId);
+        streamObserver.onCompleted();
+      } finally {
+        buffer.close();
+      }
     }
   }
 
@@ -127,7 +134,8 @@ abstract class GrpcOutputStream<T> extends OutputStream {
     return streamObserver;
   }
 
-  private void flushBuffer(boolean eof) {
+  private void flushBuffer(boolean eof) throws IOException {
+    waitUntilReady();
     int length = buffer.size();
     if (length > 0) {
       ByteString data = buffer.toByteString();
@@ -136,6 +144,34 @@ abstract class GrpcOutputStream<T> extends OutputStream {
       sendPart(eof, length, data);
       writtenBytes += length;
       buffer.reset();
+    }
+  }
+
+  /**
+   * Handling back pressure of the stream, delay putting more messages to
+   * the stream until it's ready.
+   */
+  private void waitUntilReady() throws IOException {
+    int count = 0;
+    try {
+      while (!streamObserver.isReady() && count < READY_RETRY_COUNT) {
+        LOG.debug("Stream is not ready, backoff");
+        try {
+          Thread.sleep(READY_WAIT_TIME_IN_MS);
+          count++;
+        } catch (InterruptedException e) {
+          LOG.error("InterruptedException while waiting for channel ready", e);
+          Thread.currentThread().interrupt();
+          break;
+        }
+      }
+    } catch (Exception ex) {
+      throw new IOException(ex);
+    }
+
+    if (count >= READY_RETRY_COUNT) {
+      throw new IOException("Channel is not ready after "
+          + (count * READY_WAIT_TIME_IN_MS) + "ms");
     }
   }
 

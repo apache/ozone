@@ -18,18 +18,19 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -37,11 +38,10 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.AfterClass;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,7 +57,11 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.junit.Assert.fail;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Directory deletion service test cases using rooted ozone filesystem
@@ -75,8 +79,9 @@ public class TestRootedDDSWithFSO {
   private static String bucketName;
   private static Path volumePath;
   private static Path bucketPath;
+  private static OzoneClient client;
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 1);
@@ -91,10 +96,11 @@ public class TestRootedDDSWithFSO {
         .setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
 
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(cluster, getFSOBucketLayout());
+        TestDataUtil.createVolumeAndBucket(client, getFSOBucketLayout());
     volumeName = bucket.getVolumeName();
     volumePath = new Path(OZONE_URI_DELIMITER, volumeName);
     bucketName = bucket.getName();
@@ -111,21 +117,22 @@ public class TestRootedDDSWithFSO {
     fs = FileSystem.get(conf);
   }
 
-  @AfterClass
+  @AfterAll
   public static void teardown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
     IOUtils.closeQuietly(fs);
   }
 
-  @After
+  @AfterEach
   public void cleanup() {
     try {
       Path root = new Path("/");
       FileStatus[] fileStatuses = fs.listStatus(root);
       for (FileStatus fileStatus : fileStatuses) {
-        fs.delete(fileStatus.getPath(), true);
+        fs.delete(fileStatus.getPath(), false);
       }
     } catch (IOException ex) {
       fail("Failed to cleanup files.");
@@ -187,9 +194,10 @@ public class TestRootedDDSWithFSO {
 
     OMMetrics omMetrics = cluster.getOzoneManager().getMetrics();
     long prevDeletes = omMetrics.getNumKeyDeletes();
-    Assert.assertTrue(fs.delete(volumePath, true));
+    assertTrue(fs.delete(bucketPath, true));
+    assertTrue(fs.delete(volumePath, false));
     long deletes = omMetrics.getNumKeyDeletes();
-    Assert.assertEquals(prevDeletes + 1, deletes);
+    assertEquals(prevDeletes + 1, deletes);
 
     // After Delete
     checkPath(volumePath);
@@ -206,13 +214,9 @@ public class TestRootedDDSWithFSO {
   }
 
   private void checkPath(Path path) {
-    try {
-      fs.getFileStatus(path);
-      fail("testRecursiveDelete failed");
-    } catch (IOException ex) {
-      Assert.assertTrue(ex instanceof FileNotFoundException);
-      Assert.assertTrue(ex.getMessage().contains("File not found"));
-    }
+    FileNotFoundException ex = assertThrows(FileNotFoundException.class, () ->
+        fs.getFileStatus(path), "testRecursiveDelete failed");
+    assertThat(ex.getMessage()).contains("File not found");
   }
 
   private void assertTableRowCount(Table<String, ?> table, int count)

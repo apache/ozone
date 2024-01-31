@@ -16,10 +16,18 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 
+import java.util.List;
 import java.util.Set;
+
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 
 /**
  * When HDDS-6447 was done to improve the LegacyReplicationManager, work on
@@ -44,6 +52,13 @@ public class LegacyRatisContainerReplicaCount extends
         minHealthyForMaintenance);
   }
 
+  public LegacyRatisContainerReplicaCount(ContainerInfo container,
+      Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
+      int minHealthyForMaintenance, boolean considerUnhealthy) {
+    super(container, replicas, pendingOps, minHealthyForMaintenance,
+        considerUnhealthy);
+  }
+
   @Override
   protected int healthyReplicaCountAdapter() {
     return -getMisMatchedReplicaCount();
@@ -58,5 +73,70 @@ public class LegacyRatisContainerReplicaCount extends
   @Override
   public int getUnhealthyReplicaCountAdapter() {
     return getMisMatchedReplicaCount();
+  }
+
+  /**
+   * Checks if all replicas (except UNHEALTHY) on in-service nodes are in the
+   * same health state as the container. This is similar to what
+   * {@link ContainerReplicaCount#isHealthy()} does. The difference is in how
+   * both methods treat UNHEALTHY replicas.
+   * <p>
+   * This method is the interface between the decommissioning flow and
+   * Replication Manager. Callers can use it to check whether replicas of a
+   * container are in the same state as the container before a datanode is
+   * taken offline.
+   * <p>
+   * Note that this method's purpose is to only compare the replica state with
+   * the container state. It does not check if the container has sufficient
+   * number of replicas - that is the job of {@link ContainerReplicaCount
+   * #isSufficientlyReplicatedForOffline(DatanodeDetails, NodeManager)}.
+   * @return true if the container is healthy enough, which is determined by
+   * various checks
+   */
+  @Override
+  public boolean isHealthyEnoughForOffline() {
+    long countInService = getReplicas().stream()
+        .filter(r -> r.getDatanodeDetails().getPersistedOpState() == IN_SERVICE)
+        .count();
+    if (countInService == 0) {
+      /*
+      Having no in-service nodes is unexpected and SCM shouldn't allow this
+      to happen in the first place. Return false here just to be safe.
+      */
+      return false;
+    }
+
+    LifeCycleState containerState = getContainer().getState();
+    return (containerState == LifeCycleState.CLOSED
+        || containerState == LifeCycleState.QUASI_CLOSED)
+        && getReplicas().stream()
+        .filter(r -> r.getDatanodeDetails().getPersistedOpState() == IN_SERVICE)
+        .filter(r -> r.getState() !=
+            ContainerReplicaProto.State.UNHEALTHY)
+        .allMatch(r -> ReplicationManager.compareState(
+            containerState, r.getState()));
+  }
+
+  /**
+   * For Legacy Replication Manager and Ratis Containers, this method checks
+   * if the container is sufficiently replicated. It also checks whether
+   * there are any UNHEALTHY replicas that need to be replicated.
+   * @param datanode Not used in this implementation
+   * @param nodeManager An instance of NodeManager, used to check the health
+   * status of a node
+   * @return true if the container is sufficiently replicated and there are
+   * no UNHEALTHY replicas that need to be replicated, false otherwise
+   */
+  @Override
+  public boolean isSufficientlyReplicatedForOffline(DatanodeDetails datanode,
+      NodeManager nodeManager) {
+    return super.isSufficientlyReplicated() &&
+        super.getVulnerableUnhealthyReplicas(dn -> {
+          try {
+            return nodeManager.getNodeStatus(dn);
+          } catch (NodeNotFoundException e) {
+            return null;
+          }
+        }).isEmpty();
   }
 }

@@ -17,20 +17,13 @@
 
 package org.apache.hadoop.hdds.server;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.ReconfigurableBase;
-import org.apache.hadoop.conf.ReconfigurationException;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.VersionInfo;
-
-import java.util.Collection;
 
 /**
  * Helper base class to report the standard version and runtime information.
  *
  */
-public class ServiceRuntimeInfoImpl extends ReconfigurableBase
-    implements ServiceRuntimeInfo {
+public class ServiceRuntimeInfoImpl implements ServiceRuntimeInfo {
 
   private long startedTimeInMillis;
   private final VersionInfo versionInfo;
@@ -62,21 +55,5 @@ public class ServiceRuntimeInfoImpl extends ReconfigurableBase
 
   public void setStartTime() {
     startedTimeInMillis = System.currentTimeMillis();
-  }
-
-  @Override
-  protected Configuration getNewConf() {
-    return new OzoneConfiguration();
-  }
-
-  @Override
-  public Collection<String> getReconfigurableProperties() {
-    return null;
-  }
-
-  @Override
-  protected String reconfigurePropertyImpl(String property, String newVal)
-      throws ReconfigurationException {
-    throw new ReconfigurationException();
   }
 }

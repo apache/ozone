@@ -21,7 +21,6 @@ package org.apache.hadoop.hdds.scm.server.upgrade;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
 
 import java.io.IOException;
-import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -64,22 +63,17 @@ public class SCMUpgradeFinalizer extends
   @Override
   public void preFinalizeUpgrade(SCMUpgradeFinalizationContext context)
       throws IOException {
-    try {
-      FinalizationStateManager stateManager =
-          context.getFinalizationStateManager();
-      if (!stateManager.crossedCheckpoint(
-          FinalizationCheckpoint.FINALIZATION_STARTED)) {
-        context.getFinalizationStateManager().addFinalizingMark();
-      }
-      logCheckpointCrossed(FinalizationCheckpoint.FINALIZATION_STARTED);
+    FinalizationStateManager stateManager =
+        context.getFinalizationStateManager();
+    if (!stateManager.crossedCheckpoint(
+        FinalizationCheckpoint.FINALIZATION_STARTED)) {
+      context.getFinalizationStateManager().addFinalizingMark();
+    }
+    logCheckpointCrossed(FinalizationCheckpoint.FINALIZATION_STARTED);
 
-      if (!stateManager.crossedCheckpoint(
-          FinalizationCheckpoint.MLV_EQUALS_SLV)) {
-        closePipelinesBeforeFinalization(context.getPipelineManager());
-      }
-    } catch (TimeoutException ex) {
-      LOG.error("TimeoutException during preFinalizeUpgrade", ex);
-      throw new IOException(ex);
+    if (!stateManager.crossedCheckpoint(
+        FinalizationCheckpoint.MLV_EQUALS_SLV)) {
+      closePipelinesBeforeFinalization(context.getPipelineManager());
     }
   }
 
@@ -91,7 +85,7 @@ public class SCMUpgradeFinalizer extends
     try {
       context.getFinalizationStateManager()
           .finalizeLayoutFeature(lf.layoutVersion());
-    } catch (IOException | TimeoutException ex) {
+    } catch (IOException ex) {
       throw new UpgradeException(ex,
           UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED);
     }
@@ -124,12 +118,7 @@ public class SCMUpgradeFinalizer extends
     if (!stateManager.crossedCheckpoint(
         FinalizationCheckpoint.FINALIZATION_COMPLETE)) {
       createPipelinesAfterFinalization(context);
-      // @Replicate methods are required to throw TimeoutException.
-      try {
-        stateManager.removeFinalizingMark();
-      } catch (TimeoutException ex) {
-        throw new IOException(ex);
-      }
+      stateManager.removeFinalizingMark();
     }
   }
 
@@ -141,7 +130,7 @@ public class SCMUpgradeFinalizer extends
   }
 
   private void closePipelinesBeforeFinalization(PipelineManager pipelineManager)
-      throws IOException, TimeoutException {
+      throws IOException {
     /*
      * Before we can call finalize the feature, we need to make sure that
      * all existing pipelines are closed and pipeline Manger would freeze

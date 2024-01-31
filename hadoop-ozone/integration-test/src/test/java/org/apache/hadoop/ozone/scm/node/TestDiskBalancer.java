@@ -29,35 +29,29 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPla
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.DiskBalancerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.util.List;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class tests disk balancer operations.
  */
+@Timeout(300)
 public class TestDiskBalancer {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
 
   private static ScmClient storageClient;
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration ozoneConf;
   private static DiskBalancerManager diskBalancerManager;
 
-  @BeforeClass
+  @BeforeAll
   public static void setup() throws Exception {
     ozoneConf = new OzoneConfiguration();
     ozoneConf.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
@@ -75,7 +69,7 @@ public class TestDiskBalancer {
     }
   }
 
-  @AfterClass
+  @AfterAll
   public static void cleanup() throws Exception {
     if (cluster != null) {
       cluster.shutdown();
@@ -88,7 +82,7 @@ public class TestDiskBalancer {
         storageClient.getDiskBalancerReport(2);
 
     assertEquals(2, reportProtoList.size());
-    Assert.assertTrue(
+    assertTrue(
         reportProtoList.get(0).getCurrentVolumeDensitySum()
         >= reportProtoList.get(1).getCurrentVolumeDensitySum());
   }

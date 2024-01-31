@@ -78,10 +78,13 @@ message ScmContainerLocationRequest {
   optional GetContainerReplicasRequestProto getContainerReplicasRequest = 39;
   optional ReplicationManagerReportRequestProto replicationManagerReportRequest = 40;
   optional ResetDeletedBlockRetryCountRequestProto resetDeletedBlockRetryCountRequest = 41;
-  optional TransferLeadershipRequestProto  transferScmLeadershipRequest = 42;
+  optional TransferLeadershipRequestProto transferScmLeadershipRequest = 42;
   optional GetFailedDeletedBlocksTxnRequestProto getFailedDeletedBlocksTxnRequest = 43;
-  optional DatanodeDiskBalancerInfoRequestProto datanodeDiskBalancerInfoRequest = 44;
-  optional DatanodeDiskBalancerOpRequestProto datanodeDiskBalancerOpRequest = 45;
+  optional DecommissionScmRequestProto decommissionScmRequest = 44;
+  optional SingleNodeQueryRequestProto singleNodeQueryRequest = 45;
+  optional GetContainersOnDecomNodeRequestProto getContainersOnDecomNodeRequest = 46;
+  optional DatanodeDiskBalancerInfoRequestProto DatanodeDiskBalancerInfoRequest = 47;
+  optional DatanodeDiskBalancerOpRequestProto datanodeDiskBalancerOpRequest = 48;
 }
 
 message ScmContainerLocationResponse {
@@ -131,10 +134,13 @@ message ScmContainerLocationResponse {
   optional GetContainerReplicasResponseProto getContainerReplicasResponse = 39;
   optional ReplicationManagerReportResponseProto getReplicationManagerReportResponse = 40;
   optional ResetDeletedBlockRetryCountResponseProto resetDeletedBlockRetryCountResponse = 41;
-  optional TransferLeadershipResponseProto  transferScmLeadershipResponse = 42;
+  optional TransferLeadershipResponseProto transferScmLeadershipResponse = 42;
   optional GetFailedDeletedBlocksTxnResponseProto getFailedDeletedBlocksTxnResponse = 43;
-  optional DatanodeDiskBalancerInfoResponseProto datanodeDiskBalancerInfoResponse = 44;
-  optional DatanodeDiskBalancerOpResponseProto datanodeDiskBalancerOpResponse = 45;
+  optional DecommissionScmResponseProto decommissionScmResponse = 44;
+  optional SingleNodeQueryResponseProto singleNodeQueryResponse = 45;
+  optional GetContainersOnDecomNodeResponseProto getContainersOnDecomNodeResponse = 46;
+  optional DatanodeDiskBalancerInfoResponseProto DatanodeDiskBalancerInfoResponse = 47;
+  optional DatanodeDiskBalancerOpResponseProto datanodeDiskBalancerOpResponse = 48;
 
   enum Status {
     OK = 1;
@@ -185,8 +191,11 @@ enum Type {
   GetClosedContainerCount = 37;
   TransferLeadership = 38;
   GetFailedDeletedBlocksTransaction = 39;
-  DatanodeDiskBalancerInfo = 40;
-  DatanodeDiskBalancerOp = 41;
+  DecommissionScm = 40;
+  SingleNodeQuery = 41;
+  GetContainersOnDecomNode = 42;
+  DatanodeDiskBalancerInfo = 43;
+  DatanodeDiskBalancerOp = 44;
 }
 
 /**
@@ -305,7 +314,12 @@ message SCMCloseContainerRequestProto {
 }
 
 message SCMCloseContainerResponseProto {
-  // Empty response
+  enum Status {
+    OK = 1;
+    CONTAINER_ALREADY_CLOSED = 2;
+    CONTAINER_ALREADY_CLOSING = 3;
+  }
+  optional Status status = 1;
 }
 
 /*
@@ -322,6 +336,14 @@ message NodeQueryRequestProto {
 
 message NodeQueryResponseProto {
   repeated Node datanodes = 1;
+}
+
+message SingleNodeQueryRequestProto {
+  required UUID uuid = 1;
+}
+
+message SingleNodeQueryResponseProto {
+  optional Node datanode = 1;
 }
 
 /*
@@ -564,7 +586,8 @@ message ContainerTokenSecretProto {
     required string ownerId = 1;
     required ContainerID containerId = 2;
     required uint64 expiryDate = 3;
-    required string certSerialId = 4;
+    optional string certSerialId = 4 [deprecated=true];
+    optional UUID secretKeyId = 5;
 }
 
 message GetContainerTokenRequestProto {
@@ -606,6 +629,28 @@ message ContainerBalancerStatusRequestProto {
 
 message ContainerBalancerStatusResponseProto {
   required bool isRunning = 1;
+}
+
+message DecommissionScmRequestProto {
+  required string scmId = 1;
+}
+
+message DecommissionScmResponseProto {
+  required bool success = 1;
+  optional string errorMsg = 2;
+}
+
+message GetContainersOnDecomNodeRequestProto {
+  required DatanodeDetailsProto datanodeDetails = 1;
+}
+
+message ContainersOnDecomNodeProto {
+  required string name = 1;
+  repeated ContainerID id = 2;
+}
+
+message GetContainersOnDecomNodeResponseProto {
+  repeated ContainersOnDecomNodeProto containersOnDecomNode = 1;
 }
 
 /**

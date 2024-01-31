@@ -31,12 +31,10 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,13 +47,14 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test for Ozone Bucket Owner.
  */
+@Timeout(120)
 public class TestBucketOwner {
-  @Rule public Timeout timeout = Timeout.seconds(120);
 
   private static MiniOzoneCluster cluster;
   private static final Logger LOG =
@@ -68,10 +67,8 @@ public class TestBucketOwner {
       .createUserForTesting("user2", new String[] {"test2"});
   private static UserGroupInformation user3 = UserGroupInformation
       .createUserForTesting("user3", new String[] {"test3"});
-  private static OzoneClient client;
-  private static ObjectStore objectStore;
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     // loginUser is the user running this test.
     UserGroupInformation.setLoginUser(adminUser);
@@ -84,24 +81,26 @@ public class TestBucketOwner {
     cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
             .setScmId(scmId).setOmId(omId).build();
     cluster.waitForClusterToBeReady();
-    client = cluster.getClient();
-    objectStore = client.getObjectStore();
+    try (OzoneClient client = cluster.newClient()) {
+      ObjectStore objectStore = client.getObjectStore();
     /* r = READ, w = WRITE, c = CREATE, d = DELETE
        l = LIST, a = ALL, n = NONE, x = READ_ACL, y = WRITE_ACL */
-    String aclWorldAll = "world::a";
-    createVolumeWithOwnerAndAcl(objectStore, "volume1", "user2", aclWorldAll);
+      String aclWorldAll = "world::a";
+      createVolumeWithOwnerAndAcl(objectStore, "volume1", "user2", aclWorldAll);
+    }
     UserGroupInformation.setLoginUser(user1);
-    client = cluster.getClient();
-    objectStore = client.getObjectStore();
-    OzoneVolume volume = objectStore.getVolume("volume1");
-    BucketArgs omBucketArgs = BucketArgs.newBuilder()
-            .setStorageType(StorageType.DISK).setOwner("user1").build();
-    volume.createBucket("bucket1", omBucketArgs);
-    volume.createBucket("bucket2", omBucketArgs);
-    volume.createBucket("bucket3", omBucketArgs);
+    try (OzoneClient client = cluster.newClient()) {
+      ObjectStore objectStore = client.getObjectStore();
+      OzoneVolume volume = objectStore.getVolume("volume1");
+      BucketArgs omBucketArgs = BucketArgs.newBuilder()
+          .setStorageType(StorageType.DISK).setOwner("user1").build();
+      volume.createBucket("bucket1", omBucketArgs);
+      volume.createBucket("bucket2", omBucketArgs);
+      volume.createBucket("bucket3", omBucketArgs);
+    }
   }
 
-  @AfterClass
+  @AfterAll
   public static void stopCluster() {
     if (cluster != null) {
       cluster.shutdown();
@@ -112,24 +111,26 @@ public class TestBucketOwner {
   public void testBucketOwner() throws Exception {
     // Test Key Operations as Bucket Owner,  Non-Volume Owner
     UserGroupInformation.setLoginUser(user1);
-    OzoneVolume volume = cluster.getClient().getObjectStore()
-            .getVolume("volume1");
-    OzoneBucket ozoneBucket = volume.getBucket("bucket1");
-    //Key Create
-    createKey(ozoneBucket, "key1", 10, new byte[10]);
-    createKey(ozoneBucket, "key2", 10, new byte[10]);
-    //Key Delete
-    ozoneBucket.deleteKey("key1");
-    //Bucket Delete
-    volume.deleteBucket("bucket3");
-    //List Keys
-    ozoneBucket.listKeys("key");
-    //Get Acls
-    ozoneBucket.getAcls();
-    //Add Acls
-    OzoneAcl acl = new OzoneAcl(USER, "testuser",
-        IAccessAuthorizer.ACLType.ALL, DEFAULT);
-    ozoneBucket.addAcl(acl);
+    try (OzoneClient client = cluster.newClient()) {
+      OzoneVolume volume = client.getObjectStore()
+          .getVolume("volume1");
+      OzoneBucket ozoneBucket = volume.getBucket("bucket1");
+      //Key Create
+      createKey(ozoneBucket, "key1", 10, new byte[10]);
+      createKey(ozoneBucket, "key2", 10, new byte[10]);
+      //Key Delete
+      ozoneBucket.deleteKey("key1");
+      //Bucket Delete
+      volume.deleteBucket("bucket3");
+      //List Keys
+      ozoneBucket.listKeys("key");
+      //Get Acls
+      ozoneBucket.getAcls();
+      //Add Acls
+      OzoneAcl acl = new OzoneAcl(USER, "testuser",
+          IAccessAuthorizer.ACLType.ALL, DEFAULT);
+      ozoneBucket.addAcl(acl);
+    }
   }
 
   @Test
@@ -137,61 +138,60 @@ public class TestBucketOwner {
     // Test Key Operations Non-Bucket Owner, Non-Volume Owner
     //Key Create
     UserGroupInformation.setLoginUser(user3);
-    OzoneBucket ozoneBucket;
-    try {
-      OzoneVolume volume = cluster.getClient().getObjectStore()
+    try (OzoneClient client = cluster.newClient()) {
+      OzoneVolume volume = client.getObjectStore()
               .getVolume("volume1");
-      ozoneBucket = volume.getBucket("bucket1");
+      OzoneBucket ozoneBucket = volume.getBucket("bucket1");
       createKey(ozoneBucket, "key3", 10, new byte[10]);
       fail("Create key as non-volume and non-bucket owner should fail");
     } catch (Exception ex) {
       LOG.info(ex.getMessage());
     }
     //Key Delete - should fail
-    try {
-      OzoneVolume volume = cluster.getClient().getObjectStore()
+    try (OzoneClient client = cluster.newClient()) {
+      OzoneVolume volume = client.getObjectStore()
               .getVolume("volume1");
-      ozoneBucket = volume.getBucket("bucket1");
+      OzoneBucket ozoneBucket = volume.getBucket("bucket1");
       ozoneBucket.deleteKey("key2");
       fail("Delete key as non-volume and non-bucket owner should fail");
     } catch (Exception ex) {
       LOG.info(ex.getMessage());
     }
     //Key Rename - should fail
-    try {
-      OzoneVolume volume = cluster.getClient().getObjectStore()
+    try (OzoneClient client = cluster.newClient()) {
+      OzoneVolume volume = client.getObjectStore()
               .getVolume("volume1");
-      ozoneBucket = volume.getBucket("bucket1");
+      OzoneBucket ozoneBucket = volume.getBucket("bucket1");
       ozoneBucket.renameKey("key2", "key4");
       fail("Rename key as non-volume and non-bucket owner should fail");
     } catch (Exception ex) {
       LOG.info(ex.getMessage());
     }
     //List Keys - should fail
-    try {
-      OzoneVolume volume = cluster.getClient().getObjectStore()
+    try (OzoneClient client = cluster.newClient()) {
+      OzoneVolume volume = client.getObjectStore()
               .getVolume("volume1");
-      ozoneBucket = volume.getBucket("bucket1");
+      OzoneBucket ozoneBucket = volume.getBucket("bucket1");
       ozoneBucket.listKeys("key");
       fail("List keys as non-volume and non-bucket owner should fail");
     } catch (Exception ex) {
       LOG.info(ex.getMessage());
     }
     //Get Acls - should fail
-    try {
-      OzoneVolume volume = cluster.getClient().getObjectStore()
+    try (OzoneClient client = cluster.newClient()) {
+      OzoneVolume volume = client.getObjectStore()
               .getVolume("volume1");
-      ozoneBucket = volume.getBucket("bucket1");
+      OzoneBucket ozoneBucket = volume.getBucket("bucket1");
       ozoneBucket.getAcls();
       fail("Get Acls as non-volume and non-bucket owner should fail");
     } catch (Exception ex) {
       LOG.info(ex.getMessage());
     }
     //Add Acls - should fail
-    try {
-      OzoneVolume volume = cluster.getClient().getObjectStore()
+    try (OzoneClient client = cluster.newClient()) {
+      OzoneVolume volume = client.getObjectStore()
               .getVolume("volume1");
-      ozoneBucket = volume.getBucket("bucket1");
+      OzoneBucket ozoneBucket = volume.getBucket("bucket1");
       OzoneAcl acl = new OzoneAcl(USER, "testuser1",
               IAccessAuthorizer.ACLType.ALL, DEFAULT);
       ozoneBucket.addAcl(acl);
@@ -205,23 +205,24 @@ public class TestBucketOwner {
   public void testVolumeOwner() throws Exception {
     //Test Key Operations for Volume Owner
     UserGroupInformation.setLoginUser(user2);
-    OzoneVolume volume = cluster.getClient().getObjectStore()
-            .getVolume("volume1");
-    OzoneBucket ozoneBucket = volume.getBucket("bucket1");
-    //Key Create
-    createKey(ozoneBucket, "key2", 10, new byte[10]);
-    //Key Delete
-    ozoneBucket.deleteKey("key2");
-    //List Keys
-    ozoneBucket.listKeys("key");
-    //Get Acls
-    ozoneBucket.getAcls();
-    //Add Acls
-    OzoneAcl acl = new OzoneAcl(USER, "testuser2",
-            IAccessAuthorizer.ACLType.ALL, DEFAULT);
-    ozoneBucket.addAcl(acl);
-    //Bucket Delete
-    volume.deleteBucket("bucket2");
+    try (OzoneClient client = cluster.newClient()) {
+      OzoneVolume volume = client.getObjectStore().getVolume("volume1");
+      OzoneBucket ozoneBucket = volume.getBucket("bucket1");
+      //Key Create
+      createKey(ozoneBucket, "key2", 10, new byte[10]);
+      //Key Delete
+      ozoneBucket.deleteKey("key2");
+      //List Keys
+      ozoneBucket.listKeys("key");
+      //Get Acls
+      ozoneBucket.getAcls();
+      //Add Acls
+      OzoneAcl acl = new OzoneAcl(USER, "testuser2",
+          IAccessAuthorizer.ACLType.ALL, DEFAULT);
+      ozoneBucket.addAcl(acl);
+      //Bucket Delete
+      volume.deleteBucket("bucket2");
+    }
   }
 
   private static void createVolumeWithOwnerAndAcl(ObjectStore store,
@@ -240,7 +241,7 @@ public class TestBucketOwner {
       String aclString) throws IOException {
     OzoneObj obj = OzoneObjInfo.Builder.newBuilder().setVolumeName(volumeName)
         .setResType(OzoneObj.ResourceType.VOLUME).setStoreType(OZONE).build();
-    Assert.assertTrue(store.setAcl(obj, OzoneAcl.parseAcls(aclString)));
+    assertTrue(store.setAcl(obj, OzoneAcl.parseAcls(aclString)));
   }
 
   private void createKey(OzoneBucket ozoneBucket, String key, int length,

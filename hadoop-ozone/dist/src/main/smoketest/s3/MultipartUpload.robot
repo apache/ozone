@@ -115,6 +115,12 @@ Test Multipart Upload Complete
                                 Execute                    cat /tmp/part1 /tmp/part2 > /tmp/${PREFIX}-multipartKey1
     Compare files               /tmp/${PREFIX}-multipartKey1         /tmp/${PREFIX}-multipartKey1.result
 
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --part-number 1 /tmp/${PREFIX}-multipartKey1-part1.result
+    Compare files               /tmp/part1        /tmp/${PREFIX}-multipartKey1-part1.result
+
+    ${result} =                 Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey1 --part-number 2 /tmp/${PREFIX}-multipartKey1-part2.result
+    Compare files               /tmp/part2        /tmp/${PREFIX}-multipartKey1-part2.result
+
 Test Multipart Upload Complete Entity too small
     ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey2
     ${uploadID} =       Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
@@ -183,6 +189,12 @@ Test Multipart Upload Complete Invalid part errors and complete mpu with few par
                         Execute                    cat /tmp/part1 /tmp/part3 > /tmp/${PREFIX}-multipartKey3
     Compare files       /tmp/${PREFIX}-multipartKey3         /tmp/${PREFIX}-multipartKey3.result
 
+    ${result} =         Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 --part-number 1 /tmp/${PREFIX}-multipartKey3-part1.result
+    Compare files       /tmp/part1         /tmp/${PREFIX}-multipartKey3-part1.result
+
+    ${result} =         Execute AWSS3ApiCli        get-object --bucket ${BUCKET} --key ${PREFIX}/multipartKey3 --part-number 3 /tmp/${PREFIX}-multipartKey3-part3.result
+    Compare files       /tmp/part3         /tmp/${PREFIX}-multipartKey3-part3.result
+
 Test abort Multipart upload
     ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey4 --storage-class REDUCED_REDUNDANCY
     ${uploadID} =       Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
@@ -196,7 +208,7 @@ Test abort Multipart upload with invalid uploadId
     ${result} =         Execute AWSS3APICli and checkrc    abort-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey5 --upload-id "random"    255
 
 Upload part with Incorrect uploadID
-        SKIP    TODO: HDDS-7811
+        ${result} =     Execute AWSS3APICli     create-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/multipartKey
                         Execute                 echo "Multipart upload" > /tmp/testfile
         ${result} =     Execute AWSS3APICli and checkrc     upload-part --bucket ${BUCKET} --key ${PREFIX}/multipartKey --part-number 1 --body /tmp/testfile --upload-id "random"  255
                         Should contain          ${result}    NoSuchUpload

@@ -55,8 +55,9 @@ public class RootEntityHandler extends EntityHandler {
   public NamespaceSummaryResponse getSummaryResponse()
           throws IOException {
 
-    List<OmVolumeArgs> volumes = listVolumes();
-    List<OmBucketInfo> allBuckets = listBucketsUnderVolume(null);
+    List<OmVolumeArgs> volumes = getOmMetadataManager().listVolumes();
+    List<OmBucketInfo> allBuckets = getOmMetadataManager().
+        listBucketsUnderVolume(null);
     int totalNumDir = 0;
     long totalNumKey = 0L;
     for (OmBucketInfo bucket : allBuckets) {
@@ -92,7 +93,7 @@ public class RootEntityHandler extends EntityHandler {
     DUResponse duResponse = new DUResponse();
     duResponse.setPath(getNormalizedPath());
     ReconOMMetadataManager omMetadataManager = getOmMetadataManager();
-    List<OmVolumeArgs> volumes = listVolumes();
+    List<OmVolumeArgs> volumes = getOmMetadataManager().listVolumes();
     duResponse.setCount(volumes.size());
 
     List<DUResponse.DiskUsage> volumeDuData = new ArrayList<>();
@@ -107,7 +108,8 @@ public class RootEntityHandler extends EntityHandler {
       BucketHandler bucketHandler;
       long volumeDU = 0;
       // iterate all buckets per volume to get total data size
-      for (OmBucketInfo bucket: listBucketsUnderVolume(volumeName)) {
+      for (OmBucketInfo bucket: getOmMetadataManager().
+          listBucketsUnderVolume(volumeName)) {
         long bucketObjectID = bucket.getObjectID();
         dataSize += getTotalSize(bucketObjectID);
         // count replicas
@@ -157,15 +159,16 @@ public class RootEntityHandler extends EntityHandler {
           throws IOException {
     FileSizeDistributionResponse distResponse =
         new FileSizeDistributionResponse();
-    List<OmBucketInfo> allBuckets = listBucketsUnderVolume(null);
-    int[] fileSizeDist = new int[ReconConstants.NUM_OF_BINS];
+    List<OmBucketInfo> allBuckets = getOmMetadataManager()
+        .listBucketsUnderVolume(null);
+    int[] fileSizeDist = new int[ReconConstants.NUM_OF_FILE_SIZE_BINS];
 
     // accumulate file size distribution arrays from all buckets
     for (OmBucketInfo bucket : allBuckets) {
       long bucketObjectId = bucket.getObjectID();
       int[] bucketFileSizeDist = getTotalFileSizeDist(bucketObjectId);
       // add on each bin
-      for (int i = 0; i < ReconConstants.NUM_OF_BINS; ++i) {
+      for (int i = 0; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
         fileSizeDist[i] += bucketFileSizeDist[i];
       }
     }

@@ -21,6 +21,7 @@ import java.util.List;
 
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetAllRootCaCertificatesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto.ResponseCode;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertificateRequestProto;
@@ -34,6 +35,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetOMC
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetSCMCertRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMListCertificateResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRemoveExpiredCertificatesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevokeCertificatesRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMRevokeCertificatesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMSecurityRequest;
@@ -52,8 +54,6 @@ import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Type.GetSCMCertificate;
 
 /**
  * This class is the server-side translator that forwards requests received on
@@ -86,14 +86,10 @@ public class SCMSecurityProtocolServerSideTranslatorPB
   @Override
   public SCMSecurityResponse submitRequest(RpcController controller,
       SCMSecurityRequest request) throws ServiceException {
-    // For request type GetSCMCertificate we don't need leader check. As
-    // primary SCM may not be leader SCM.
-    if (!request.getCmdType().equals(GetSCMCertificate)) {
-      if (!scm.checkLeader()) {
-        RatisUtil.checkRatisException(
-            scm.getScmHAManager().getRatisServer().triggerNotLeaderException(),
-            scm.getSecurityProtocolRpcPort(), scm.getScmId());
-      }
+    if (!scm.checkLeader()) {
+      RatisUtil.checkRatisException(
+          scm.getScmHAManager().getRatisServer().triggerNotLeaderException(),
+          scm.getSecurityProtocolRpcPort(), scm.getScmId());
     }
     return dispatcher.processRequest(request, this::processRequest,
         request.getCmdType(), request.getTraceID());
@@ -152,7 +148,16 @@ public class SCMSecurityProtocolServerSideTranslatorPB
             .build();
       case GetCert:
         return scmSecurityResponse.setGetCertResponseProto(
-            getCertificate(request.getGetCertRequest()))
+                getCertificate(request.getGetCertRequest()))
+            .build();
+      case GetAllRootCaCertificates:
+        return scmSecurityResponse
+            .setAllRootCaCertificatesResponseProto(getAllRootCa())
+            .build();
+      case RemoveExpiredCertificates:
+        return scmSecurityResponse
+            .setRemoveExpiredCertificatesResponseProto(
+                removeExpiredCertificates())
             .build();
 
       default:
@@ -250,11 +255,11 @@ public class SCMSecurityProtocolServerSideTranslatorPB
       SCMGetSCMCertRequestProto request)
       throws IOException {
 
-    if (!scm.getScmStorageConfig().checkPrimarySCMIdInitialized()) {
+    if (!scm.getScmStorageConfig().isSCMHAEnabled()) {
       throw createNotHAException();
     }
     String certificate = impl.getSCMCertificate(request.getScmDetails(),
-        request.getCSR());
+        request.getCSR(), request.hasRenew() && request.getRenew());
     SCMGetCertResponseProto.Builder builder =
         SCMGetCertResponseProto
             .newBuilder()
@@ -401,6 +406,13 @@ public class SCMSecurityProtocolServerSideTranslatorPB
         ".scm.ratis.enable config");
   }
 
+  public SCMGetAllRootCaCertificatesResponseProto getAllRootCa()
+      throws IOException {
+    return SCMGetAllRootCaCertificatesResponseProto.newBuilder()
+        .addAllAllX509RootCaCertificates(impl.getAllRootCaCertificates())
+        .build();
+  }
+
   private void setRootCAIfNeeded(SCMGetCertResponseProto.Builder builder)
       throws IOException {
     if (scm.getScmStorageConfig().checkPrimarySCMIdInitialized()) {
@@ -408,4 +420,10 @@ public class SCMSecurityProtocolServerSideTranslatorPB
     }
   }
 
+  public SCMRemoveExpiredCertificatesResponseProto removeExpiredCertificates()
+      throws IOException {
+    return SCMRemoveExpiredCertificatesResponseProto.newBuilder()
+        .addAllRemovedExpiredCertificates(impl.removeExpiredCertificates())
+        .build();
+  }
 }

@@ -53,11 +53,12 @@ public class DatanodeInfo extends DatanodeDetails {
 
   private volatile long lastHeartbeatTime;
   private long lastStatsUpdatedTime;
+  private int failedVolumeCount;
 
   private List<StorageReportProto> storageReports;
   private List<MetadataStorageReportProto> metadataStorageReports;
   private LayoutVersionProto lastKnownLayoutVersion;
-  private Map<SCMCommandProto.Type, Integer> commandCounts;
+  private final Map<SCMCommandProto.Type, Integer> commandCounts;
 
   private NodeStatus nodeStatus;
 
@@ -155,9 +156,14 @@ public class DatanodeInfo extends DatanodeDetails {
    * @param reports list of storage report
    */
   public void updateStorageReports(List<StorageReportProto> reports) {
+    final int failedCount = (int) reports.stream()
+        .filter(e -> e.hasFailed() && e.getFailed())
+        .count();
+
     try {
       lock.writeLock().lock();
       lastStatsUpdatedTime = Time.monotonicNow();
+      failedVolumeCount = failedCount;
       storageReports = reports;
     } finally {
       lock.writeLock().unlock();
@@ -215,7 +221,7 @@ public class DatanodeInfo extends DatanodeDetails {
   public int getHealthyVolumeCount() {
     try {
       lock.readLock().lock();
-      return storageReports.size() - getFailedVolumeCount();
+      return storageReports.size() - failedVolumeCount;
     } finally {
       lock.readLock().unlock();
     }
@@ -232,15 +238,6 @@ public class DatanodeInfo extends DatanodeDetails {
     } finally {
       lock.readLock().unlock();
     }
-  }
-
-  /**
-   * Returns count of failed volumes reported from datanode.
-   * @return count of failed volumes
-   */
-  private int getFailedVolumeCount() {
-    return (int) storageReports.stream().
-            filter(e -> e.hasFailed() ? e.getFailed() : false).count();
   }
 
   /**

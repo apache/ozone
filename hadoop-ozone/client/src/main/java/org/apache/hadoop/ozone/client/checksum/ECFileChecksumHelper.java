@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.util.CrcUtil;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -73,7 +72,7 @@ public class ECFileChecksumHelper extends BaseFileChecksumHelper {
       if (!checksumBlock(keyLocationInfo)) {
         throw new PathIOException(getSrc(),
             "Fail to get block checksum for " + keyLocationInfo
-                + ", checksum combine mode : {}" + getCombineMode());
+                + ", checksum combine mode: " + getCombineMode());
       }
 
       currentLength += keyLocationInfo.getLength();
@@ -173,6 +172,7 @@ public class ECFileChecksumHelper extends BaseFileChecksumHelper {
         nodes.add(dn);
       }
     }
+
     pipeline = Pipeline.newBuilder(pipeline)
         .setReplicationConfig(StandaloneReplicationConfig
             .getInstance(HddsProtos.ReplicationFactor.THREE))

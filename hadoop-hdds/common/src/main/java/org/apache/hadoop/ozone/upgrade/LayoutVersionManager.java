@@ -80,4 +80,6 @@ public interface LayoutVersionManager {
     return null;
   }
 
+  void close();
+
 }

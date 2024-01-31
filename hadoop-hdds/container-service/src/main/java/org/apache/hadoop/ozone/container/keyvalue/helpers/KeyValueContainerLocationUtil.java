@@ -123,7 +123,7 @@ public final class KeyValueContainerLocationUtil {
    * Return containerDB File.
    */
   public static File getContainerDBFile(KeyValueContainerData containerData) {
-    if (containerData.getSchemaVersion().equals(OzoneConsts.SCHEMA_V3)) {
+    if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
       return new File(containerData.getVolume().getDbParentDir(),
           OzoneConsts.CONTAINER_DB_NAME);
     }

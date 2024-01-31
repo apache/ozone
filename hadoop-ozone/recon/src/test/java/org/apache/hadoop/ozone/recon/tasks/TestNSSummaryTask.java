@@ -35,17 +35,15 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.ClassRule;
-import org.junit.Assert;
-import org.junit.experimental.runners.Enclosed;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -53,6 +51,9 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getMockOzoneManagerServiceProvider;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Test for NSSummaryTask. Create one bucket of each layout
@@ -60,11 +61,7 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestRe
  * support for OBS buckets. Check that the NSSummary
  * for the OBS bucket is null.
  */
-@RunWith(Enclosed.class)
 public final class TestNSSummaryTask {
-
-  @ClassRule
-  public static final TemporaryFolder TEMPORARY_FOLDER = new TemporaryFolder();
 
   private static ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private static OMMetadataManager omMetadataManager;
@@ -107,16 +104,16 @@ public final class TestNSSummaryTask {
   private TestNSSummaryTask() {
   }
 
-  @BeforeClass
-  public static void setUp() throws Exception {
-    initializeNewOmMetadataManager(TEMPORARY_FOLDER.newFolder());
+  @BeforeAll
+  public static void setUp(@TempDir File tmpDir) throws Exception {
+    initializeNewOmMetadataManager(new File(tmpDir, "om"));
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         getMockOzoneManagerServiceProvider();
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
-        TEMPORARY_FOLDER.newFolder());
+        new File(tmpDir, "recon"));
 
     ReconTestInjector reconTestInjector =
-        new ReconTestInjector.Builder(TEMPORARY_FOLDER)
+        new ReconTestInjector.Builder(tmpDir)
             .withReconOm(reconOMMetadataManager)
             .withOmServiceProvider(ozoneManagerServiceProvider)
             .withReconSqlDb()
@@ -127,7 +124,7 @@ public final class TestNSSummaryTask {
 
     NSSummary nonExistentSummary =
         reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
-    Assert.assertNull(nonExistentSummary);
+    assertNull(nonExistentSummary);
 
     populateOMDB();
 
@@ -138,14 +135,15 @@ public final class TestNSSummaryTask {
   /**
    * Nested class for testing NSSummaryTaskWithLegacy reprocess.
    */
-  public static class TestReprocess {
+  @Nested
+  public class TestReprocess {
 
-    private static NSSummary nsSummaryForBucket1;
-    private static NSSummary nsSummaryForBucket2;
-    private static NSSummary nsSummaryForBucket3;
+    private NSSummary nsSummaryForBucket1;
+    private NSSummary nsSummaryForBucket2;
+    private NSSummary nsSummaryForBucket3;
 
-    @BeforeClass
-    public static void setUp() throws IOException {
+    @BeforeEach
+    public void setUp() throws Exception {
       // write a NSSummary prior to reprocess
       // verify it got cleaned up after.
       NSSummary staleNSSummary = new NSSummary();
@@ -155,10 +153,10 @@ public final class TestNSSummaryTask {
       reconNamespaceSummaryManager.commitBatchOperation(rdbBatchOperation);
 
       // Verify commit
-      Assert.assertNotNull(reconNamespaceSummaryManager.getNSSummary(-1L));
+      assertNotNull(reconNamespaceSummaryManager.getNSSummary(-1L));
 
       nSSummaryTask.reprocess(reconOMMetadataManager);
-      Assert.assertNull(reconNamespaceSummaryManager.getNSSummary(-1L));
+      assertNull(reconNamespaceSummaryManager.getNSSummary(-1L));
 
       nsSummaryForBucket1 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
@@ -166,42 +164,44 @@ public final class TestNSSummaryTask {
           reconNamespaceSummaryManager.getNSSummary(BUCKET_TWO_OBJECT_ID);
       nsSummaryForBucket3 =
       reconNamespaceSummaryManager.getNSSummary(BUCKET_THREE_OBJECT_ID);
-      Assert.assertNotNull(nsSummaryForBucket1);
-      Assert.assertNotNull(nsSummaryForBucket2);
-      Assert.assertNull(nsSummaryForBucket3);
+      assertNotNull(nsSummaryForBucket1);
+      assertNotNull(nsSummaryForBucket2);
+      assertNull(nsSummaryForBucket3);
     }
 
     @Test
     public void testReprocessNSSummaryNull() throws IOException {
-      Assert.assertNull(reconNamespaceSummaryManager.getNSSummary(-1L));
+      assertNull(reconNamespaceSummaryManager.getNSSummary(-1L));
     }
 
     @Test
     public void testReprocessGetFiles() {
-      Assert.assertEquals(1, nsSummaryForBucket1.getNumOfFiles());
-      Assert.assertEquals(1, nsSummaryForBucket2.getNumOfFiles());
+      assertEquals(1, nsSummaryForBucket1.getNumOfFiles());
+      assertEquals(1, nsSummaryForBucket2.getNumOfFiles());
 
-      Assert.assertEquals(KEY_ONE_SIZE, nsSummaryForBucket1.getSizeOfFiles());
-      Assert.assertEquals(KEY_TWO_SIZE, nsSummaryForBucket2.getSizeOfFiles());
+      assertEquals(KEY_ONE_SIZE, nsSummaryForBucket1.getSizeOfFiles());
+      assertEquals(KEY_TWO_SIZE, nsSummaryForBucket2.getSizeOfFiles());
     }
 
     @Test
     public void testReprocessFileBucketSize() {
       int[] fileDistBucket1 = nsSummaryForBucket1.getFileSizeBucket();
       int[] fileDistBucket2 = nsSummaryForBucket2.getFileSizeBucket();
-      Assert.assertEquals(ReconConstants.NUM_OF_BINS, fileDistBucket1.length);
-      Assert.assertEquals(ReconConstants.NUM_OF_BINS, fileDistBucket2.length);
+      assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
+          fileDistBucket1.length);
+      assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
+          fileDistBucket2.length);
 
-      Assert.assertEquals(1, fileDistBucket1[0]);
-      for (int i = 1; i < ReconConstants.NUM_OF_BINS; ++i) {
-        Assert.assertEquals(0, fileDistBucket1[i]);
+      assertEquals(1, fileDistBucket1[0]);
+      for (int i = 1; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
+        assertEquals(0, fileDistBucket1[i]);
       }
-      Assert.assertEquals(1, fileDistBucket2[1]);
-      for (int i = 0; i < ReconConstants.NUM_OF_BINS; ++i) {
+      assertEquals(1, fileDistBucket2[1]);
+      for (int i = 0; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
         if (i == 1) {
           continue;
         }
-        Assert.assertEquals(0, fileDistBucket2[i]);
+        assertEquals(0, fileDistBucket2[i]);
       }
     }
 
@@ -210,32 +210,33 @@ public final class TestNSSummaryTask {
   /**
    * Nested class for testing NSSummaryTaskWithLegacy process.
    */
-  public static class TestProcess {
+  @Nested
+  public class TestProcess {
 
-    private static NSSummary nsSummaryForBucket1;
-    private static NSSummary nsSummaryForBucket2;
-    private static NSSummary nsSummaryForBucket3;
+    private NSSummary nsSummaryForBucket1;
+    private NSSummary nsSummaryForBucket2;
+    private NSSummary nsSummaryForBucket3;
 
-    private static OMDBUpdateEvent keyEvent1;
-    private static OMDBUpdateEvent keyEvent2;
+    private OMDBUpdateEvent keyEvent1;
+    private OMDBUpdateEvent keyEvent2;
 
-    @BeforeClass
-    public static void setUp() throws IOException {
+    @BeforeEach
+    public void setUp() throws IOException {
       nSSummaryTask.reprocess(reconOMMetadataManager);
       nSSummaryTask.process(processEventBatch());
 
       nsSummaryForBucket1 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_ONE_OBJECT_ID);
-      Assert.assertNotNull(nsSummaryForBucket1);
+      assertNotNull(nsSummaryForBucket1);
       nsSummaryForBucket2 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_TWO_OBJECT_ID);
-      Assert.assertNotNull(nsSummaryForBucket2);
+      assertNotNull(nsSummaryForBucket2);
       nsSummaryForBucket3 =
           reconNamespaceSummaryManager.getNSSummary(BUCKET_THREE_OBJECT_ID);
-      Assert.assertNull(nsSummaryForBucket3);
+      assertNull(nsSummaryForBucket3);
     }
 
-    private static OMUpdateEventBatch processEventBatch() throws IOException {
+    private OMUpdateEventBatch processEventBatch() throws IOException {
       // put file5 under bucket 2
       String omPutKey =
           OM_KEY_PREFIX + VOL +
@@ -266,42 +267,37 @@ public final class TestNSSummaryTask {
           .setAction(OMDBUpdateEvent.OMDBUpdateAction.DELETE)
           .build();
 
-      OMUpdateEventBatch omUpdateEventBatch = new OMUpdateEventBatch(
-          new ArrayList<OMDBUpdateEvent>() {{
-              add(keyEvent1);
-              add(keyEvent2);
-              }});
-
-      return omUpdateEventBatch;
+      return new OMUpdateEventBatch(Arrays.asList(keyEvent1, keyEvent2));
     }
 
     @Test
     public void testProcessUpdateFileSize() throws IOException {
       // file 1 is gone, so bucket 1 is empty now
-      Assert.assertNotNull(nsSummaryForBucket1);
-      Assert.assertEquals(0, nsSummaryForBucket1.getNumOfFiles());
+      assertNotNull(nsSummaryForBucket1);
+      assertEquals(0, nsSummaryForBucket1.getNumOfFiles());
 
       Set<Long> childDirBucket1 = nsSummaryForBucket1.getChildDir();
-      Assert.assertEquals(0, childDirBucket1.size());
+      assertEquals(0, childDirBucket1.size());
     }
 
     @Test
     public void testProcessBucket() throws IOException {
       // file 5 is added under bucket 2, so bucket 2 has 2 keys now
-      Assert.assertNotNull(nsSummaryForBucket2);
-      Assert.assertEquals(2, nsSummaryForBucket2.getNumOfFiles());
+      assertNotNull(nsSummaryForBucket2);
+      assertEquals(2, nsSummaryForBucket2.getNumOfFiles());
       // key 2 + key 5
-      Assert.assertEquals(KEY_TWO_SIZE + KEY_FIVE_SIZE,
+      assertEquals(KEY_TWO_SIZE + KEY_FIVE_SIZE,
           nsSummaryForBucket2.getSizeOfFiles());
 
       int[] fileSizeDist = nsSummaryForBucket2.getFileSizeBucket();
-      Assert.assertEquals(ReconConstants.NUM_OF_BINS, fileSizeDist.length);
+      assertEquals(ReconConstants.NUM_OF_FILE_SIZE_BINS,
+          fileSizeDist.length);
       // 1025L
-      Assert.assertEquals(1, fileSizeDist[0]);
+      assertEquals(1, fileSizeDist[0]);
       // 2050L
-      Assert.assertEquals(1, fileSizeDist[1]);
-      for (int i = 2; i < ReconConstants.NUM_OF_BINS; ++i) {
-        Assert.assertEquals(0, fileSizeDist[i]);
+      assertEquals(1, fileSizeDist[1]);
+      for (int i = 2; i < ReconConstants.NUM_OF_FILE_SIZE_BINS; ++i) {
+        assertEquals(0, fileSizeDist[i]);
       }
     }
   }
@@ -433,7 +429,7 @@ public final class TestNSSummaryTask {
     omConfiguration.set(OMConfigKeys
         .OZONE_OM_ENABLE_FILESYSTEM_PATHS, "true");
     omMetadataManager = new OmMetadataManagerImpl(
-        omConfiguration);
+        omConfiguration, null);
 
     String volumeKey = omMetadataManager.getVolumeKey(VOL);
     OmVolumeArgs args =

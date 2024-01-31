@@ -26,15 +26,22 @@ ${OM_HA_PARAM}       ${EMPTY}
 ${OM_SERVICE_ID}     om
 
 *** Keywords ***
+Get test user principal
+    [arguments]         ${user}
+    ${instance} =       Execute                    hostname | sed 's/scm[0-9].org/scm/;s/scm[0-9]/scm/;s/om[0-9]/om/'
+    [return]            ${user}/${instance}@EXAMPLE.COM
+
 Kinit HTTP user
-    ${hostname} =       Execute                    hostname | sed 's/scm[0-9].org/scm/'
-    Wait Until Keyword Succeeds      2min       10sec      Execute            kinit -k HTTP/${hostname}@EXAMPLE.COM -t /etc/security/keytabs/HTTP.keytab
+    Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skip in unsecure cluster
+    ${principal} =      Get test user principal    HTTP
+    Wait Until Keyword Succeeds      2min       10sec      Execute            kinit -k -t /etc/security/keytabs/HTTP.keytab ${principal}
 
 Kinit test user
+    Pass Execution If   '${SECURITY_ENABLED}' == 'false'    Skip in unsecure cluster
     [arguments]                      ${user}       ${keytab}
-    ${instance} =       Execute                    hostname | sed 's/scm[0-9].org/scm/'
-    Set Suite Variable  ${TEST_USER}               ${user}/${instance}@EXAMPLE.COM
-    Wait Until Keyword Succeeds      2min       10sec      Execute            kinit -k ${user}/${instance}@EXAMPLE.COM -t /etc/security/keytabs/${keytab}
+    ${TEST_USER} =      Get test user principal    ${user}
+    Set Suite Variable  ${TEST_USER}
+    Wait Until Keyword Succeeds      2min       10sec      Execute            kinit -k -t /etc/security/keytabs/${keytab} ${TEST_USER}
 
 Access should be denied
     [arguments]    ${command}

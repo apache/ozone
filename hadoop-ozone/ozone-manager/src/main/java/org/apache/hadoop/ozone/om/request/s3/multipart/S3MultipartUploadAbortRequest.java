@@ -19,14 +19,14 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import java.io.IOException;
-import java.util.Iterator;
+import java.nio.file.InvalidPathException;
 import java.util.Map;
 
-import com.google.common.base.Optional;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
@@ -34,8 +34,7 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,22 +80,27 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    KeyArgs keyArgs =
-        getOmRequest().getAbortMultiPartUploadRequest().getKeyArgs();
+    KeyArgs keyArgs = super.preExecute(ozoneManager)
+        .getAbortMultiPartUploadRequest().getKeyArgs();
     String keyPath = keyArgs.getKeyName();
     keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
         keyPath, getBucketLayout());
 
+    KeyArgs newKeyArgs =
+        keyArgs.toBuilder().setModificationTime(Time.now())
+            .setKeyName(keyPath).build();
+
+    KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs,
+        ozoneManager, ACLType.WRITE);
     return getOmRequest().toBuilder().setAbortMultiPartUploadRequest(
         getOmRequest().getAbortMultiPartUploadRequest().toBuilder().setKeyArgs(
-            keyArgs.toBuilder().setModificationTime(Time.now())
-                .setKeyName(keyPath))).setUserInfo(getUserInfo()).build();
+            resolvedArgs)).setUserInfo(getUserInfo()).build();
 
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long trxnLogIndex = termIndex.getIndex();
 
     MultipartUploadAbortRequest multipartUploadAbortRequest = getOmRequest()
         .getAbortMultiPartUploadRequest();
@@ -113,7 +117,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     ozoneManager.getMetrics().incNumAbortMultipartUploads();
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean acquiredLock = false;
-    IOException exception = null;
+    Exception exception = null;
     OmMultipartKeyInfo multipartKeyInfo = null;
     String multipartKey = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
@@ -122,17 +126,10 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     Result result = null;
     OmBucketInfo omBucketInfo = null;
     try {
-      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
-      volumeName = keyArgs.getVolumeName();
-      bucketName = keyArgs.getBucketName();
-
-      // check acl
-      checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
-          IAccessAuthorizer.ACLType.WRITE, OzoneObj.ResourceType.KEY);
-
-      acquiredLock =
-          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-              volumeName, bucketName);
+      mergeOmLockDetails(
+          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volumeName,
+              bucketName));
+      acquiredLock = getOmLockDetails().isLockAcquired();
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
@@ -170,11 +167,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       // When abort uploaded key, we need to subtract the PartKey length from
       // the volume usedBytes.
       long quotaReleased = 0;
-      Iterator iter =
-          multipartKeyInfo.getPartKeyInfoMap().entrySet().iterator();
-      while (iter.hasNext()) {
-        Map.Entry entry = (Map.Entry)iter.next();
-        PartKeyInfo iterPartKeyInfo = (PartKeyInfo)entry.getValue();
+      for (PartKeyInfo iterPartKeyInfo : multipartKeyInfo.getPartKeyInfoMap()) {
         quotaReleased += QuotaUtil.getReplicatedSize(
             iterPartKeyInfo.getPartKeyInfo().getDataSize(),
             omKeyInfo.getReplicationConfig());
@@ -186,25 +179,26 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       // in delete table are not used by any read/write operations.
       omMetadataManager.getOpenKeyTable(getBucketLayout())
           .addCacheEntry(new CacheKey<>(multipartOpenKey),
-              new CacheValue<>(Optional.absent(), trxnLogIndex));
+              CacheValue.get(trxnLogIndex));
       omMetadataManager.getMultipartInfoTable()
           .addCacheEntry(new CacheKey<>(multipartKey),
-              new CacheValue<>(Optional.absent(), trxnLogIndex));
+              CacheValue.get(trxnLogIndex));
 
       omClientResponse = getOmClientResponse(ozoneManager, multipartKeyInfo,
           multipartKey, multipartOpenKey, omResponse, omBucketInfo);
 
       result = Result.SUCCESS;
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = getOmClientResponse(exception, omResponse);
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK,
-            volumeName, bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 
@@ -233,7 +227,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
-  protected OMClientResponse getOmClientResponse(IOException exception,
+  protected OMClientResponse getOmClientResponse(Exception exception,
       OMResponse.Builder omResponse) {
 
     return new S3MultipartUploadAbortResponse(createErrorOMResponse(omResponse,
@@ -256,10 +250,9 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
   protected String getMultipartOpenKey(String multipartUploadID,
       String volumeName, String bucketName, String keyName,
       OMMetadataManager omMetadataManager) throws IOException {
-
-    String multipartKey = omMetadataManager.getMultipartKey(
-        volumeName, bucketName, keyName, multipartUploadID);
-    return multipartKey;
+    return OMMultipartUploadUtils.getMultipartOpenKey(
+        volumeName, bucketName, keyName, multipartUploadID, omMetadataManager,
+        getBucketLayout());
   }
 
   @RequestFeatureValidator(

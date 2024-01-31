@@ -17,14 +17,29 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantState;
 
 import java.util.Objects;
 
 /**
  * This class is used for storing Ozone tenant state info.
+ * <p>
+ * This class is immutable.
  */
 public final class OmDBTenantState implements Comparable<OmDBTenantState> {
+  private static final Codec<OmDBTenantState> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(TenantState.getDefaultInstance()),
+      OmDBTenantState::getFromProtobuf,
+      OmDBTenantState::getProtobuf,
+      DelegatedCodec.CopyType.SHALLOW);
+
+  public static Codec<OmDBTenantState> getCodec() {
+    return CODEC;
+  }
+
   /**
    * Name of the tenant.
    */
@@ -97,7 +112,7 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
 
   /**
    * Returns the bucket namespace name. a.k.a. volume name.
-   *
+   * <p>
    * Note: This returns an empty string ("") if the tenant is somehow not
    * associated with a volume. Should never return null.
    */
@@ -124,8 +139,8 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
   /**
    * Convert OmDBTenantState to protobuf to be persisted to DB.
    */
-  public OzoneManagerProtocolProtos.TenantState getProtobuf() {
-    return OzoneManagerProtocolProtos.TenantState.newBuilder()
+  public TenantState getProtobuf() {
+    return TenantState.newBuilder()
         .setTenantId(tenantId)
         .setBucketNamespaceName(bucketNamespaceName)
         .setUserRoleName(userRoleName)
@@ -138,8 +153,7 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
   /**
    * Convert protobuf to OmDBTenantState.
    */
-  public static OmDBTenantState getFromProtobuf(
-      OzoneManagerProtocolProtos.TenantState proto) {
+  public static OmDBTenantState getFromProtobuf(TenantState proto) {
     return new Builder()
         .setTenantId(proto.getTenantId())
         .setBucketNamespaceName(proto.getBucketNamespaceName())

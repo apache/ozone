@@ -28,28 +28,27 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_TRANSPORT_CLASS;
 
 /**
  * Tests for GrpcOmTransport.
  */
+@Timeout(3000)
 public class TestGrpcOmTransport {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestGrpcOmTransport.class);
   private static OzoneConfiguration conf;
-  @Rule
-  public Timeout timeout = Timeout.seconds(3000);
 
-  @BeforeClass
+  @BeforeAll
   public static void setUp() {
     conf = new OzoneConfiguration();
     RPC.setProtocolEngine(OzoneConfiguration.of(conf),
@@ -67,7 +66,7 @@ public class TestGrpcOmTransport {
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
     OmTransport omTransport = OmTransportFactory.create(conf, ugi, omServiceId);
     omTransport.close();
-    Assert.assertEquals(GrpcOmTransport.class.getSimpleName(),
+    assertEquals(GrpcOmTransport.class.getSimpleName(),
         omTransport.getClass().getSimpleName());
   }
 
@@ -83,7 +82,7 @@ public class TestGrpcOmTransport {
     // OmTransport should be Hadoop Rpc and
     // fail equality GrpcOmTransport equality test
     omTransport.close();
-    Assert.assertNotEquals(GrpcOmTransport.class.getSimpleName(),
+    assertNotEquals(GrpcOmTransport.class.getSimpleName(),
         omTransport.getClass().getSimpleName());
   }
 

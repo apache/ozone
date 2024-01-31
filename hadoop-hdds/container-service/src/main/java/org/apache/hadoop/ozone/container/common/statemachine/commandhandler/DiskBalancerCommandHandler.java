@@ -130,6 +130,11 @@ public class DiskBalancerCommandHandler implements CommandHandler {
   }
 
   @Override
+  public long getTotalRunTime() {
+    return totalTime;
+  }
+
+  @Override
   public int getQueuedCount() {
     return 0;
   }

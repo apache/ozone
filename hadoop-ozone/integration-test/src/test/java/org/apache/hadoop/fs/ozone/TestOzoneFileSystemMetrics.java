@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -28,30 +29,28 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.junit.Rule;
-import org.junit.BeforeClass;
-import org.junit.AfterClass;
-import org.junit.Test;
-import org.junit.Assert;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test OM Metrics for OzoneFileSystem operations.
  */
+@Timeout(300)
 public class TestOzoneFileSystemMetrics {
-  /**
-   * Set a timeout for each test.
-   */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
   private static MiniOzoneCluster cluster = null;
+  private static OzoneClient client;
   private static FileSystem fs;
   private static OzoneBucket bucket;
 
@@ -67,7 +66,7 @@ public class TestOzoneFileSystemMetrics {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
@@ -81,9 +80,10 @@ public class TestOzoneFileSystemMetrics {
         .setStreamBufferMaxSize(4) // MB
         .build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    bucket = TestDataUtil.createVolumeAndBucket(client);
 
     // Set the fs.defaultFS and start the filesystem
     String uri = String.format("%s://%s.%s/",
@@ -95,8 +95,9 @@ public class TestOzoneFileSystemMetrics {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() throws IOException {
+    IOUtils.closeQuietly(client);
     fs.close();
     cluster.shutdown();
   }
@@ -148,13 +149,13 @@ public class TestOzoneFileSystemMetrics {
 
     long numKeysAfterCommit = cluster
         .getOzoneManager().getMetrics().getNumKeys();
-    Assert.assertTrue(numKeysAfterCommit > 0);
-    Assert.assertEquals(numKeysBeforeCreate + 2, numKeysAfterCommit);
+    assertThat(numKeysAfterCommit).isGreaterThan(0);
+    assertEquals(numKeysBeforeCreate + 2, numKeysAfterCommit);
     fs.delete(parentDir, true);
 
     long numKeysAfterDelete = cluster
         .getOzoneManager().getMetrics().getNumKeys();
-    Assert.assertTrue(numKeysAfterDelete >= 0);
-    Assert.assertEquals(numKeysBeforeCreate, numKeysAfterDelete);
+    assertThat(numKeysAfterDelete).isGreaterThanOrEqualTo(0);
+    assertEquals(numKeysBeforeCreate, numKeysAfterDelete);
   }
 }

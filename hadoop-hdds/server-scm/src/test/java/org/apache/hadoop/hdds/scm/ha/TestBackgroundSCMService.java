@@ -60,7 +60,7 @@ public class TestBackgroundSCMService {
         .setPeriodicalTask(() -> {
           try {
             pipelineManager.scrubPipelines();
-          } catch (IOException | TimeoutException e) {
+          } catch (IOException e) {
             throw new RuntimeException(e);
           }
         }).build();
@@ -99,7 +99,7 @@ public class TestBackgroundSCMService {
   }
 
   @Test
-  public void testRun() throws IOException, TimeoutException {
+  public void testRun() throws IOException {
     assertFalse(backgroundSCMService.shouldRun());
     // kick a run
     synchronized (backgroundSCMService) {

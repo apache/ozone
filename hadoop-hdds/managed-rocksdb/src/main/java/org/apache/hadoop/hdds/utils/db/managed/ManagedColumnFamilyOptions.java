@@ -18,22 +18,25 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.TableFormatConfig;
+
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * Managed ColumnFamilyOptions.
  */
 public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
-  public ManagedColumnFamilyOptions() {
-    super();
-  }
-
   /**
    * Indicate if this ColumnFamilyOptions is intentionally used across RockDB
    * instances.
    */
   private boolean reused = false;
+  private final UncheckedAutoCloseable leakTracker = track(this);
+
+  public ManagedColumnFamilyOptions() {
+  }
 
   public ManagedColumnFamilyOptions(ColumnFamilyOptions columnFamilyOptions) {
     super(columnFamilyOptions);
@@ -75,9 +78,12 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
   }
 
   @Override
-  protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
-    super.finalize();
+  public void close() {
+    try {
+      super.close();
+    } finally {
+      leakTracker.close();
+    }
   }
 
   /**

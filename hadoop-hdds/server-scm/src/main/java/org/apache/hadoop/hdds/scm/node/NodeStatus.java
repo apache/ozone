@@ -18,9 +18,12 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
+import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
+import java.util.EnumSet;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * This class is used to capture the current status of a datanode. This
@@ -29,6 +32,38 @@ import java.util.Objects;
  * for the operational state (used with maintenance mode).
  */
 public class NodeStatus implements Comparable<NodeStatus> {
+
+  private static final Set<HddsProtos.NodeOperationalState>
+      MAINTENANCE_STATES = ImmutableSet.copyOf(EnumSet.of(
+          HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+          HddsProtos.NodeOperationalState.IN_MAINTENANCE
+      ));
+
+  private static final Set<HddsProtos.NodeOperationalState>
+      DECOMMISSION_STATES = ImmutableSet.copyOf(EnumSet.of(
+          HddsProtos.NodeOperationalState.DECOMMISSIONING,
+          HddsProtos.NodeOperationalState.DECOMMISSIONED
+      ));
+
+  private static final Set<HddsProtos.NodeOperationalState>
+      OUT_OF_SERVICE_STATES = ImmutableSet.copyOf(EnumSet.of(
+          HddsProtos.NodeOperationalState.DECOMMISSIONING,
+          HddsProtos.NodeOperationalState.DECOMMISSIONED,
+          HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
+          HddsProtos.NodeOperationalState.IN_MAINTENANCE
+      ));
+
+  public static Set<HddsProtos.NodeOperationalState> maintenanceStates() {
+    return MAINTENANCE_STATES;
+  }
+
+  public static Set<HddsProtos.NodeOperationalState> decommissionStates() {
+    return DECOMMISSION_STATES;
+  }
+
+  public static Set<HddsProtos.NodeOperationalState> outOfServiceStates() {
+    return OUT_OF_SERVICE_STATES;
+  }
 
   private HddsProtos.NodeOperationalState operationalState;
   private HddsProtos.NodeState health;
@@ -104,8 +139,7 @@ public class NodeStatus implements Comparable<NodeStatus> {
    * @return True if the node is in any decommission state, false otherwise
    */
   public boolean isDecommission() {
-    return operationalState == HddsProtos.NodeOperationalState.DECOMMISSIONING
-        || operationalState == HddsProtos.NodeOperationalState.DECOMMISSIONED;
+    return DECOMMISSION_STATES.contains(operationalState);
   }
 
   /**
@@ -132,9 +166,7 @@ public class NodeStatus implements Comparable<NodeStatus> {
    * @return True if the node is in any maintenance state, false otherwise
    */
   public boolean isMaintenance() {
-    return operationalState
-        == HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE
-        || operationalState == HddsProtos.NodeOperationalState.IN_MAINTENANCE;
+    return MAINTENANCE_STATES.contains(operationalState);
   }
 
   /**

@@ -19,11 +19,10 @@ package org.apache.hadoop.hdds.security.token;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.hdds.security.OzoneSecretManager;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.Token;
-import org.slf4j.Logger;
 
 import java.time.Instant;
 
@@ -33,54 +32,21 @@ import java.time.Instant;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
-public abstract class
-    ShortLivedTokenSecretManager<T extends ShortLivedTokenIdentifier>
-    extends OzoneSecretManager<T> {
+public abstract class ShortLivedTokenSecretManager
+    <T extends ShortLivedTokenIdentifier> {
+  private final long tokenMaxLifetime;
+  private SecretKeySignerClient secretKeyClient;
 
-  private static final Text SERVICE = new Text("HDDS_SERVICE");
-
-  protected ShortLivedTokenSecretManager(SecurityConfig conf,
-      long tokenLifetime, Logger logger) {
-    super(conf, tokenLifetime, tokenLifetime, SERVICE, logger);
+  protected ShortLivedTokenSecretManager(
+      long tokenLifetime, SecretKeySignerClient secretKeyClient) {
+    this.tokenMaxLifetime = tokenLifetime;
+    this.secretKeyClient = secretKeyClient;
   }
 
-  @Override
-  public T createIdentifier() {
-    throw new SecurityException("Short-lived token requires additional " +
-        "information (owner, etc.).");
-  }
-
-  @Override
-  public long renewToken(Token<T> token, String renewer) {
-    throw new UnsupportedOperationException("Renew token operation is not " +
-        "supported for short-lived tokens.");
-  }
-
-  @Override
-  public T cancelToken(Token<T> token, String canceller) {
-    throw new UnsupportedOperationException("Cancel token operation is not " +
-        "supported for short-lived tokens.");
-  }
-
-  @Override
-  public byte[] retrievePassword(T identifier) throws InvalidToken {
-    validateToken(identifier);
-    return createPassword(identifier);
-  }
-
-  /**
-   * Find the OzoneBlockTokenInfo for the given token id, and verify that if the
-   * token is not expired.
-   */
-  protected boolean validateToken(T identifier) throws InvalidToken {
-    Instant now = Instant.now();
-    if (identifier.isExpired(now)) {
-      throw new InvalidToken("token " + formatTokenId(identifier) + " is " +
-          "expired, current time: " + now +
-          " expiry time: " + identifier.getExpiry());
-    }
-
-    return true;
+  protected byte[] createPassword(T tokenId) {
+    ManagedSecretKey secretKey = secretKeyClient.getCurrentSecretKey();
+    tokenId.setSecretKeyId(secretKey.getId());
+    return secretKey.sign(tokenId);
   }
 
   /**
@@ -89,12 +55,21 @@ public abstract class
    * @return Expiry time.
    */
   protected Instant getTokenExpiryTime() {
-    return Instant.now().plusMillis(getTokenMaxLifetime());
+    return Instant.now().plusMillis(tokenMaxLifetime);
   }
 
   public Token<T> generateToken(T tokenIdentifier) {
+    byte[] password = createPassword(tokenIdentifier);
     return new Token<>(tokenIdentifier.getBytes(),
-        createPassword(tokenIdentifier), tokenIdentifier.getKind(),
+        password, tokenIdentifier.getKind(),
         new Text(tokenIdentifier.getService()));
+  }
+
+  /**
+   * Allows integration-test to inject a custom implementation of
+   * SecretKeyClient to test without fully setting up a working secure cluster.
+   */
+  public void setSecretKeyClient(SecretKeySignerClient client) {
+    this.secretKeyClient = client;
   }
 }

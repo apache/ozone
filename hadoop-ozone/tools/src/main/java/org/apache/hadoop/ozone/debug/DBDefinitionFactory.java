@@ -35,6 +35,8 @@ import org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition;
 
 import com.amazonaws.services.kms.model.InvalidArnException;
 import com.google.common.base.Preconditions;
+
+import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_CONTAINER_KEY_DB;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
 
@@ -60,6 +62,10 @@ public final class DBDefinitionFactory {
   }
 
   public static DBDefinition getDefinition(String dbName) {
+    // OM snapshot DB name starts with this prefix.
+    if (!dbName.equals(OM_DB_NAME) && dbName.startsWith(OM_DB_NAME)) {
+      dbName = OM_DB_NAME;
+    }
     if (dbMap.containsKey(dbName)) {
       return dbMap.get(dbName);
     }

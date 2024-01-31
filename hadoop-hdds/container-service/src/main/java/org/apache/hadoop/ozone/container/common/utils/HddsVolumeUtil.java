@@ -34,6 +34,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.concurrent.CompletableFuture;
 
 import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
 
@@ -88,16 +89,32 @@ public final class HddsVolumeUtil {
     // between each HddsVolume -> DbVolume.
     mapDbVolumesToDataVolumesIfNeeded(hddsVolumeSet, dbVolumeSet);
 
-    for (HddsVolume volume : StorageVolumeUtil.getHddsVolumesList(
-        hddsVolumeSet.getVolumesList())) {
-      try {
-        volume.loadDbStore(readOnly);
-      } catch (IOException e) {
-        onFailure(volume);
-        if (logger != null) {
-          logger.error("Load db store for HddsVolume {} failed",
-              volume.getStorageDir().getAbsolutePath(), e);
-        }
+    List<CompletableFuture<Void>> futures = new ArrayList<>();
+    List<HddsVolume> hddsVolumes = StorageVolumeUtil.getHddsVolumesList(
+        hddsVolumeSet.getVolumesList());
+    long start = System.currentTimeMillis();
+    for (HddsVolume volume : hddsVolumes) {
+      futures.add(CompletableFuture.runAsync(
+          () -> loadVolume(volume, readOnly, logger)));
+    }
+    for (CompletableFuture<Void> future : futures) {
+      future.join();
+    }
+    if (logger != null) {
+      logger.info("Load {} volumes DbStore cost: {}ms", hddsVolumes.size(),
+          System.currentTimeMillis() - start);
+    }
+  }
+
+  private static void loadVolume(HddsVolume volume, boolean readOnly,
+      Logger logger) {
+    try {
+      volume.loadDbStore(readOnly);
+    } catch (IOException e) {
+      onFailure(volume);
+      if (logger != null) {
+        logger.error("Load db store for HddsVolume {} failed",
+            volume.getStorageDir().getAbsolutePath(), e);
       }
     }
   }

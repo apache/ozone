@@ -17,8 +17,6 @@
  */
 package org.apache.hadoop.ozone;
 
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -40,11 +38,11 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 
+import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.DefaultConfigManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
@@ -52,20 +50,17 @@ import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
-import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultApprover;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultProfile;
@@ -81,13 +76,11 @@ import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyCodec;
 import org.apache.hadoop.hdds.utils.HAUtils;
-import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ipc.Client;
 import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.minikdc.MiniKdc;
-import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.Storage;
@@ -106,27 +99,25 @@ import org.apache.hadoop.ozone.security.OMCertificateClient;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.KerberosAuthException;
 import org.apache.hadoop.security.SaslRpcServer.AuthMethod;
+import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.apache.ozone.test.LambdaTestUtils;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_EXPIRY_TIME;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_MAX_DURATION;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION_DEFAULT;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_GRPC_TLS_ENABLED;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ACK_TIMEOUT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY;
@@ -143,10 +134,12 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVIC
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
 import static org.apache.hadoop.net.ServerSocketUtil.getPort;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY;
@@ -156,7 +149,12 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_TRANSPORT_CLASS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_EXPIRED;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.USER_MISMATCH;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
+
+import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.tag.Flaky;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.util.ExitUtils;
 import org.bouncycastle.asn1.x500.RDN;
@@ -164,27 +162,26 @@ import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.style.BCStyle;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateHolder;
-import org.junit.After;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.mockito.ArgumentMatchers.anyObject;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.slf4j.event.Level.INFO;
@@ -192,19 +189,16 @@ import static org.slf4j.event.Level.INFO;
 /**
  * Test class to for security enabled Ozone cluster.
  */
-@InterfaceAudience.Private
-public final class TestSecureOzoneCluster {
+@Timeout(80)
+final class TestSecureOzoneCluster {
 
   private static final String COMPONENT = "om";
   private static final String OM_CERT_SERIAL_ID = "9879877970576";
   private static final Logger LOG = LoggerFactory
       .getLogger(TestSecureOzoneCluster.class);
 
-  @Rule
-  public Timeout timeout = Timeout.seconds(80);
-
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private File tempDir;
 
   private MiniKdc miniKdc;
   private OzoneConfiguration conf;
@@ -216,6 +210,7 @@ public final class TestSecureOzoneCluster {
   private String testUserPrincipal;
   private StorageContainerManager scm;
   private OzoneManager om;
+  private HddsProtos.OzoneManagerDetailsProto omInfo;
   private String host;
   private String clusterId;
   private String scmId;
@@ -226,8 +221,8 @@ public final class TestSecureOzoneCluster {
   private int certGraceTime = 10 * 1000; // 10s
   private int delegationTokenMaxTime = 9 * 1000; // 9s
 
-  @Before
-  public void init() {
+  @BeforeEach
+  void init() {
     try {
       conf = new OzoneConfiguration();
       conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
@@ -249,17 +244,24 @@ public final class TestSecureOzoneCluster {
 
       DefaultMetricsSystem.setMiniClusterMode(true);
       ExitUtils.disableSystemExit();
-      final String path = folder.newFolder().toString();
+      final String path = tempDir.getAbsolutePath();
       omMetaDirPath = Paths.get(path, "om-meta");
       conf.set(OZONE_METADATA_DIRS, omMetaDirPath.toString());
       conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
       conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.name());
+      conf.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL,
+          Duration.ofMillis(certGraceTime - 1000).toString());
       conf.set(HDDS_X509_RENEW_GRACE_DURATION,
           Duration.ofMillis(certGraceTime).toString());
+      conf.setBoolean(HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED, false);
+      conf.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL,
+          Duration.ofMillis(certGraceTime - 1000).toString());
+      conf.set(HDDS_X509_CA_ROTATION_ACK_TIMEOUT,
+          Duration.ofMillis(certGraceTime - 1000).toString());
       conf.setLong(OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY,
           delegationTokenMaxTime);
 
-      workDir = GenericTestUtils.getTestDir(getClass().getSimpleName());
+      workDir = new File(tempDir, "workdir");
       clusterId = UUID.randomUUID().toString();
       scmId = UUID.randomUUID().toString();
       omId = UUID.randomUUID().toString();
@@ -268,14 +270,14 @@ public final class TestSecureOzoneCluster {
       setSecureConfig();
       createCredentialsInKDC();
       generateKeyPair();
-//      OzoneManager.setTestSecureOmFlag(true);
+      omInfo = OzoneManager.getOmDetailsProto(conf, omId);
     } catch (Exception e) {
       LOG.error("Failed to initialize TestSecureOzoneCluster", e);
     }
   }
 
-  @After
-  public void stop() {
+  @AfterEach
+  void stop() {
     try {
       stopMiniKdc();
       if (scm != null) {
@@ -353,7 +355,7 @@ public final class TestSecureOzoneCluster {
   }
 
   @Test
-  public void testSecureScmStartupSuccess() throws Exception {
+  void testSecureScmStartupSuccess() throws Exception {
 
     initSCM();
     scm = HddsTestUtils.getScmSimple(conf);
@@ -361,10 +363,11 @@ public final class TestSecureOzoneCluster {
     ScmInfo scmInfo = scm.getClientProtocolServer().getScmInfo();
     assertEquals(clusterId, scmInfo.getClusterId());
     assertEquals(scmId, scmInfo.getScmId());
+    assertEquals(2, scm.getScmCertificateClient().getTrustChain().size());
   }
 
   @Test
-  public void testSCMSecurityProtocol() throws Exception {
+  void testSCMSecurityProtocol() throws Exception {
 
     initSCM();
     scm = HddsTestUtils.getScmSimple(conf);
@@ -377,29 +380,35 @@ public final class TestSecureOzoneCluster {
           UserGroupInformation.loginUserFromKeytabAndReturnUGI(
               testUserPrincipal, testUserKeytab.getCanonicalPath());
       ugi.setAuthenticationMethod(KERBEROS);
-      SCMSecurityProtocol scmSecurityProtocolClient =
-          HddsServerUtil.getScmSecurityClient(conf, ugi);
-      assertNotNull(scmSecurityProtocolClient);
-      String caCert = scmSecurityProtocolClient.getCACertificate();
-      assertNotNull(caCert);
-      // Get some random certificate, used serial id 100 which will be
-      // unavailable as our serial id is time stamp. Serial id 1 is root CA,
-      // and it is persisted in DB.
-      LambdaTestUtils.intercept(SCMSecurityException.class,
-          "Certificate not found",
-          () -> scmSecurityProtocolClient.getCertificate("100"));
+      try (SCMSecurityProtocolClientSideTranslatorPB securityClient =
+          getScmSecurityClient(conf, ugi)) {
+        assertNotNull(securityClient);
+        String caCert = securityClient.getCACertificate();
+        assertNotNull(caCert);
+        // Get some random certificate, used serial id 100 which will be
+        // unavailable as our serial id is time stamp. Serial id 1 is root CA,
+        // and it is persisted in DB.
+        SCMSecurityException securityException = assertThrows(
+            SCMSecurityException.class,
+            () -> securityClient.getCertificate("100"));
+        assertThat(securityException)
+            .hasMessageContaining("Certificate not found");
+      }
 
       // Case 2: User without Kerberos credentials should fail.
       ugi = UserGroupInformation.createRemoteUser("test");
       ugi.setAuthenticationMethod(AuthMethod.TOKEN);
-      SCMSecurityProtocol finalScmSecurityProtocolClient =
-          HddsServerUtil.getScmSecurityClient(conf, ugi);
+      try (SCMSecurityProtocolClientSideTranslatorPB securityClient =
+          getScmSecurityClient(conf, ugi)) {
 
-      String cannotAuthMessage = "Client cannot authenticate via:[KERBEROS]";
-      LambdaTestUtils.intercept(IOException.class, cannotAuthMessage,
-          finalScmSecurityProtocolClient::getCACertificate);
-      LambdaTestUtils.intercept(IOException.class, cannotAuthMessage,
-          () -> finalScmSecurityProtocolClient.getCertificate("1"));
+        String cannotAuthMessage = "Client cannot authenticate via:[KERBEROS]";
+        IOException ioException = assertThrows(IOException.class,
+            securityClient::getCACertificate);
+        assertThat(ioException).hasMessageContaining(cannotAuthMessage);
+        ioException = assertThrows(IOException.class,
+            () -> securityClient.getCertificate("1"));
+        assertThat(ioException).hasMessageContaining(cannotAuthMessage);
+      }
     } finally {
       if (scm != null) {
         scm.stop();
@@ -408,7 +417,7 @@ public final class TestSecureOzoneCluster {
   }
 
   @Test
-  public void testAdminAccessControlException() throws Exception {
+  void testAdminAccessControlException() throws Exception {
     initSCM();
     scm = HddsTestUtils.getScmSimple(conf);
     //Reads the SCM Info from SCM instance
@@ -421,9 +430,9 @@ public final class TestSecureOzoneCluster {
           testUserPrincipal, testUserKeytab.getCanonicalPath());
       StorageContainerLocationProtocol scmRpcClient =
           HAUtils.getScmContainerClient(conf, ugi);
-      LambdaTestUtils.intercept(IOException.class, "Access denied",
+      IOException ioException = assertThrows(IOException.class,
           scmRpcClient::forceExitSafeMode);
-
+      assertThat(ioException).hasMessageContaining("Access denied");
 
       // Case 2: User without Kerberos credentials should fail.
       ugi = UserGroupInformation.createRemoteUser("test");
@@ -432,8 +441,31 @@ public final class TestSecureOzoneCluster {
           HAUtils.getScmContainerClient(conf, ugi);
 
       String cannotAuthMessage = "Client cannot authenticate via:[KERBEROS]";
-      LambdaTestUtils.intercept(IOException.class, cannotAuthMessage,
+      ioException = assertThrows(IOException.class,
           scmRpcClient::forceExitSafeMode);
+      assertThat(ioException).hasMessageContaining(cannotAuthMessage);
+    } finally {
+      if (scm != null) {
+        scm.stop();
+      }
+    }
+  }
+
+  @Test
+  void testSecretManagerInitializedNonHASCM() throws Exception {
+    conf.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
+    initSCM();
+    scm = HddsTestUtils.getScmSimple(conf);
+    //Reads the SCM Info from SCM instance
+    try {
+      scm.start();
+
+      SecretKeyManager secretKeyManager = scm.getSecretKeyManager();
+      boolean inSafeMode = scm.getScmSafeModeManager().getInSafeMode();
+      assertFalse(SCMHAUtils.isSCMHAEnabled(conf));
+      assertTrue(inSafeMode);
+      assertNotNull(secretKeyManager);
+      assertTrue(secretKeyManager.isInitialized());
     } finally {
       if (scm != null) {
         scm.stop();
@@ -442,8 +474,7 @@ public final class TestSecureOzoneCluster {
   }
 
   private void initSCM() throws IOException {
-    final String path = folder.newFolder().toString();
-    Path scmPath = Paths.get(path, "scm-meta");
+    Path scmPath = new File(tempDir, "scm-meta").toPath();
     Files.createDirectories(scmPath);
     conf.set(OZONE_METADATA_DIRS, scmPath.toString());
 
@@ -452,8 +483,7 @@ public final class TestSecureOzoneCluster {
     scmStore.setClusterId(clusterId);
     scmStore.setScmId(scmId);
     HASecurityUtils.initializeSecurity(scmStore, conf,
-        NetUtils.createSocketAddr(InetAddress.getLocalHost().getHostName(),
-            OZONE_SCM_CLIENT_PORT_DEFAULT), true);
+        InetAddress.getLocalHost().getHostName(), true);
     scmStore.setPrimaryScmNodeId(scmId);
     // writes the version file properties
     scmStore.initialize();
@@ -462,17 +492,33 @@ public final class TestSecureOzoneCluster {
           SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
                   .getLocalNodeDetails(), conf);
     }
+
+    /*
+     * As all these processes run inside the same JVM, there are issues around
+     * the Hadoop UGI if different processes run with different principals.
+     * In this test, the OM has to contact the SCM to download certs. SCM runs
+     * as scm/host@REALM, but the OM logs in as om/host@REALM, and then the test
+     * fails, and the OM is unable to contact the SCM due to kerberos login
+     * issues. To work around that, have the OM run as the same principal as the
+     * SCM, and then the test passes.
+     *
+     */
+    conf.set(HDDS_SCM_KERBEROS_PRINCIPAL_KEY,
+        "om/" + host + "@" + miniKdc.getRealm());
+    File keyTab = new File(workDir, "om.keytab");
+    conf.set(HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY, keyTab.getAbsolutePath());
   }
 
   @Test
-  public void testSecureScmStartupFailure() throws Exception {
+  void testSecureScmStartupFailure() throws Exception {
     initSCM();
     conf.set(HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY, "");
     conf.set(HADOOP_SECURITY_AUTHENTICATION, "kerberos");
 
-    LambdaTestUtils.intercept(IOException.class,
-        "Running in secure mode, but config doesn't have a keytab",
+    IOException ioException = assertThrows(IOException.class,
         () -> HddsTestUtils.getScmSimple(conf));
+    assertThat(ioException)
+        .hasMessageContaining("Running in secure mode, but config doesn't have a keytab");
 
     conf.set(HDDS_SCM_KERBEROS_PRINCIPAL_KEY,
         "scm/_HOST@EXAMPLE.com");
@@ -484,74 +530,91 @@ public final class TestSecureOzoneCluster {
 
   }
 
-  private void testCommonKerberosFailures(Callable<?> test) throws Exception {
-    LambdaTestUtils.intercept(KerberosAuthException.class,
-        "failure to login: for principal:",
-        test);
+  private void testCommonKerberosFailures(Callable<?> test) {
+    KerberosAuthException kerberosAuthException = assertThrows(
+        KerberosAuthException.class, test::call);
+    assertThat(kerberosAuthException)
+        .hasMessageContaining("failure to login: for principal:");
 
     String invalidValue = "OAuth2";
     conf.set(HADOOP_SECURITY_AUTHENTICATION, invalidValue);
-    LambdaTestUtils.intercept(IllegalArgumentException.class,
-        "Invalid attribute value for " + HADOOP_SECURITY_AUTHENTICATION
-            + " of " + invalidValue,
-        test);
+    IllegalArgumentException argumentException =
+        assertThrows(IllegalArgumentException.class, test::call);
+    assertThat(argumentException)
+        .hasMessageContaining("Invalid attribute value for " + HADOOP_SECURITY_AUTHENTICATION + " of " + invalidValue);
 
     conf.set(HADOOP_SECURITY_AUTHENTICATION, "KERBEROS_SSL");
-    LambdaTestUtils.intercept(AuthenticationException.class,
-        "KERBEROS_SSL authentication method not",
-        test);
+    AuthenticationException authException = assertThrows(
+        AuthenticationException.class,
+        test::call);
+    assertThat(authException)
+        .hasMessageContaining("KERBEROS_SSL authentication method not");
   }
 
   /**
    * Tests the secure om Initialization Failure.
    */
   @Test
-  public void testSecureOMInitializationFailure() throws Exception {
+  void testSecureOMInitializationFailure() throws Exception {
     initSCM();
     // Create a secure SCM instance as om client will connect to it
     scm = HddsTestUtils.getScmSimple(conf);
-    setupOm(conf);
-    conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY,
-        "non-existent-user@EXAMPLE.com");
-    testCommonKerberosFailures(() -> OzoneManager.createOm(conf));
+    try {
+      scm.start();
+      setupOm(conf);
+      conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY,
+          "non-existent-user@EXAMPLE.com");
+      testCommonKerberosFailures(() -> OzoneManager.createOm(conf));
+    } finally {
+      if (scm != null) {
+        scm.stop();
+      }
+    }
   }
 
   /**
    * Tests the secure om Initialization success.
    */
   @Test
-  public void testSecureOmInitializationSuccess() throws Exception {
+  void testSecureOmInitializationSuccess() throws Exception {
     initSCM();
     // Create a secure SCM instance as om client will connect to it
     scm = HddsTestUtils.getScmSimple(conf);
     LogCapturer logs = LogCapturer.captureLogs(OzoneManager.getLogger());
     GenericTestUtils.setLogLevel(OzoneManager.getLogger(), INFO);
 
-    setupOm(conf);
     try {
+      scm.start();
+      setupOm(conf);
       om.start();
     } catch (Exception ex) {
       // Expects timeout failure from scmClient in om but om user login via
       // kerberos should succeed.
-      assertTrue(logs.getOutput().contains("Ozone Manager login successful"));
+      assertThat(logs.getOutput()).contains("Ozone Manager login successful");
+    } finally {
+      if (scm != null) {
+        scm.stop();
+      }
     }
   }
 
   @Test
-  public void testAccessControlExceptionOnClient() throws Exception {
+  void testAccessControlExceptionOnClient() throws Exception {
     initSCM();
-    // Create a secure SCM instance as om client will connect to it
-    scm = HddsTestUtils.getScmSimple(conf);
     LogCapturer logs = LogCapturer.captureLogs(OzoneManager.getLogger());
     GenericTestUtils.setLogLevel(OzoneManager.getLogger(), INFO);
-    setupOm(conf);
     try {
+      // Create a secure SCM instance as om client will connect to it
+      scm = HddsTestUtils.getScmSimple(conf);
+      scm.start();
+
+      setupOm(conf);
       om.setCertClient(new CertificateClientTestImpl(conf));
       om.start();
     } catch (Exception ex) {
       // Expects timeout failure from scmClient in om but om user login via
       // kerberos should succeed.
-      assertTrue(logs.getOutput().contains("Ozone Manager login successful"));
+      assertThat(logs.getOutput()).contains("Ozone Manager login successful");
     }
     UserGroupInformation ugi =
         UserGroupInformation.loginUserFromKeytabAndReturnUGI(
@@ -581,16 +644,18 @@ public final class TestSecureOzoneCluster {
     String exMessage = "org.apache.hadoop.security.AccessControlException: " +
         "Client cannot authenticate via:[TOKEN, KERBEROS]";
     logs = LogCapturer.captureLogs(Client.LOG);
-    LambdaTestUtils.intercept(IOException.class, exMessage,
+    IOException ioException = assertThrows(IOException.class,
         () -> unsecureClient.listAllVolumes(null, null, 0));
-    assertEquals("There should be no retry on AccessControlException", 1,
-        StringUtils.countMatches(logs.getOutput(), exMessage));
+    assertThat(ioException).hasMessageContaining(exMessage);
+    assertEquals(1, StringUtils.countMatches(logs.getOutput(), exMessage),
+        "There should be no retry on AccessControlException");
   }
 
   private void generateKeyPair() throws Exception {
-    HDDSKeyGenerator keyGenerator = new HDDSKeyGenerator(conf);
+    SecurityConfig securityConfig = new SecurityConfig(conf);
+    HDDSKeyGenerator keyGenerator = new HDDSKeyGenerator(securityConfig);
     keyPair = keyGenerator.generateKey();
-    KeyCodec pemWriter = new KeyCodec(new SecurityConfig(conf), COMPONENT);
+    KeyCodec pemWriter = new KeyCodec(securityConfig, COMPONENT);
     pemWriter.writeKey(keyPair, true);
   }
 
@@ -598,20 +663,23 @@ public final class TestSecureOzoneCluster {
    * Tests delegation token renewal.
    */
   @Test
-  public void testDelegationTokenRenewal() throws Exception {
+  void testDelegationTokenRenewal() throws Exception {
     GenericTestUtils
         .setLogLevel(LoggerFactory.getLogger(Server.class.getName()), INFO);
     LogCapturer omLogs = LogCapturer.captureLogs(OzoneManager.getLogger());
 
-    // Setup secure OM for start.
-    OzoneConfiguration newConf = new OzoneConfiguration(conf);
-    int tokenMaxLifetime = 1000;
-    newConf.setLong(DELEGATION_TOKEN_MAX_LIFETIME_KEY, tokenMaxLifetime);
-    setupOm(newConf);
-    OzoneManager.setTestSecureOmFlag(true);
-    // Start OM
-
+    // Setup SCM
+    initSCM();
+    scm = HddsTestUtils.getScmSimple(conf);
     try {
+      // Start SCM
+      scm.start();
+
+      // Setup secure OM for start.
+      int tokenMaxLifetime = 1000;
+      conf.setLong(DELEGATION_TOKEN_MAX_LIFETIME_KEY, tokenMaxLifetime);
+      setupOm(conf);
+      OzoneManager.setTestSecureOmFlag(true);
       om.setCertClient(new CertificateClientTestImpl(conf));
       om.start();
 
@@ -629,19 +697,19 @@ public final class TestSecureOzoneCluster {
       // Check if token is of right kind and renewer is running om instance
       assertNotNull(token);
       assertEquals("OzoneToken", token.getKind().toString());
-      assertEquals(OmUtils.getOmRpcAddress(conf),
+      assertEquals(SecurityUtil.buildTokenService(
+          om.getNodeDetails().getRpcAddress()).toString(),
           token.getService().toString());
 
       // Renew delegation token
       long expiryTime = omClient.renewDelegationToken(token);
-      assertTrue(expiryTime > 0);
+      assertThat(expiryTime).isGreaterThan(0);
       omLogs.clearOutput();
 
       // Test failure of delegation renewal
       // 1. When token maxExpiryTime exceeds
       Thread.sleep(tokenMaxLifetime);
-      OMException ex = LambdaTestUtils.intercept(OMException.class,
-          "TOKEN_EXPIRED",
+      OMException ex = assertThrows(OMException.class,
           () -> omClient.renewDelegationToken(token));
       assertEquals(TOKEN_EXPIRED, ex.getResult());
       omLogs.clearOutput();
@@ -651,11 +719,10 @@ public final class TestSecureOzoneCluster {
       Token<OzoneTokenIdentifier> token2 = omClient.getDelegationToken(
           new Text("randomService"));
       assertNotNull(token2);
-      LambdaTestUtils.intercept(OMException.class,
-          "Delegation token renewal failed",
+      ex = assertThrows(OMException.class,
           () -> omClient.renewDelegationToken(token2));
-      assertTrue(omLogs.getOutput().contains(" with non-matching " +
-          "renewer randomService"));
+      assertThat(ex).hasMessageContaining("Delegation token renewal failed");
+      assertThat(omLogs.getOutput()).contains(" with non-matching renewer randomService");
       omLogs.clearOutput();
 
       // 3. Test tampered token
@@ -666,21 +733,22 @@ public final class TestSecureOzoneCluster {
       Token<OzoneTokenIdentifier> tamperedToken = new Token<>(
           tokenId.getBytes(), token2.getPassword(), token2.getKind(),
           token2.getService());
-      LambdaTestUtils.intercept(OMException.class,
-          "Delegation token renewal failed",
+      ex = assertThrows(OMException.class,
           () -> omClient.renewDelegationToken(tamperedToken));
-      assertTrue(omLogs.getOutput().contains("can't be found in " +
-          "cache"));
+      assertThat(ex).hasMessageContaining("Delegation token renewal failed");
+      assertThat(omLogs.getOutput()).contains("can't be found in cache");
       omLogs.clearOutput();
-
     } finally {
+      if (scm != null) {
+        scm.stop();
+      }
       IOUtils.closeQuietly(om);
     }
   }
 
   private void setupOm(OzoneConfiguration config) throws Exception {
     OMStorage omStore = new OMStorage(config);
-    omStore.setClusterId("testClusterId");
+    omStore.setClusterId(clusterId);
     omStore.setOmCertSerialId(OM_CERT_SERIAL_ID);
     // writes the version file properties
     omStore.initialize();
@@ -689,11 +757,15 @@ public final class TestSecureOzoneCluster {
   }
 
   @Test
-  public void testGetSetRevokeS3Secret() throws Exception {
-
-    // Setup secure OM for start
-    setupOm(conf);
+  @Flaky("HDDS-9349")
+  void testGetSetRevokeS3Secret() throws Exception {
+    initSCM();
     try {
+      scm = HddsTestUtils.getScmSimple(conf);
+      scm.start();
+
+      // Setup secure OM for start
+      setupOm(conf);
       // Start OM
       om.setCertClient(new CertificateClientTestImpl(conf));
       om.start();
@@ -705,17 +777,16 @@ public final class TestSecureOzoneCluster {
           OmTransportFactory.create(conf, ugi, null),
           RandomStringUtils.randomAscii(5));
 
-      //Creates a secret since it does not exist
+      // Creates a secret since it does not exist
       S3SecretValue attempt1 = omClient.getS3Secret(username);
 
-      //Fetches the secret from db since it was created in previous step
-      S3SecretValue attempt2 = omClient.getS3Secret(username);
-
-      //secret fetched on both attempts must be same
-      assertEquals(attempt1.getAwsSecret(), attempt2.getAwsSecret());
-
-      //access key fetched on both attempts must be same
-      assertEquals(attempt1.getAwsAccessKey(), attempt2.getAwsAccessKey());
+      // A second getS3Secret on the same username should throw exception
+      try {
+        omClient.getS3Secret(username);
+      } catch (OMException omEx) {
+        assertEquals(OMException.ResultCodes.S3_SECRET_ALREADY_EXISTS,
+            omEx.getResult());
+      }
 
       // Revoke the existing secret
       omClient.revokeS3Secret(username);
@@ -733,14 +804,23 @@ public final class TestSecureOzoneCluster {
       S3SecretValue attempt3 = omClient.getS3Secret(username);
 
       // secret should differ because it has been revoked previously
-      assertNotEquals(attempt3.getAwsSecret(), attempt2.getAwsSecret());
+      assertNotEquals(attempt3.getAwsSecret(), attempt1.getAwsSecret());
 
       // accessKey is still the same because it is derived from username
-      assertEquals(attempt3.getAwsAccessKey(), attempt2.getAwsAccessKey());
+      assertEquals(attempt3.getAwsAccessKey(), attempt1.getAwsAccessKey());
 
       // Admin can set secret for any user
-      omClient.setS3Secret(username, secretKeySet);
-      assertEquals(secretKeySet, omClient.getS3Secret(username).getAwsSecret());
+      S3SecretValue attempt4 = omClient.setS3Secret(username, secretKeySet);
+      assertEquals(secretKeySet, attempt4.getAwsSecret());
+
+      // A second getS3Secret on the same username should throw exception
+      try {
+        omClient.getS3Secret(username);
+      } catch (OMException omEx) {
+        assertEquals(OMException.ResultCodes.S3_SECRET_ALREADY_EXISTS,
+            omEx.getResult());
+      }
+
       // Clean up
       omClient.revokeS3Secret(username);
 
@@ -758,23 +838,17 @@ public final class TestSecureOzoneCluster {
           OmTransportFactory.create(conf, ugiNonAdmin, null),
           RandomStringUtils.randomAscii(5));
 
-      try {
-        omClientNonAdmin.getS3Secret("HADOOP/JOHN");
-        // Expected to fail because current ugi isn't an admin
-        fail("non-admin getS3Secret didn't fail as intended");
-      } catch (IOException ex) {
-        GenericTestUtils.assertExceptionContains("USER_MISMATCH", ex);
-      }
-
-      try {
-        omClientNonAdmin.revokeS3Secret("HADOOP/DOE");
-        // Expected to fail because current ugi isn't an admin
-        fail("non-admin revokeS3Secret didn't fail as intended");
-      } catch (IOException ex) {
-        GenericTestUtils.assertExceptionContains("USER_MISMATCH", ex);
-      }
+      OMException omException = assertThrows(OMException.class,
+          () -> omClientNonAdmin.getS3Secret("HADOOP/JOHN"));
+      assertSame(USER_MISMATCH, omException.getResult());
+      omException = assertThrows(OMException.class,
+          () -> omClientNonAdmin.revokeS3Secret("HADOOP/DOE"));
+      assertSame(USER_MISMATCH, omException.getResult());
 
     } finally {
+      if (scm != null) {
+        scm.stop();
+      }
       IOUtils.closeQuietly(om);
     }
   }
@@ -783,29 +857,10 @@ public final class TestSecureOzoneCluster {
    * Tests functionality to init secure OM when it is already initialized.
    */
   @Test
-  public void testSecureOmReInit() throws Exception {
+  void testSecureOmReInit() throws Exception {
     LogCapturer omLogs =
-        LogCapturer.captureLogs(OzoneManager.getLogger());
+        LogCapturer.captureLogs(OMCertificateClient.LOG);
     omLogs.clearOutput();
-
-    /*
-     * As all these processes run inside the same JVM, there are issues around
-     * the Hadoop UGI if different processes run with different principals.
-     * In this test, the OM has to contact the SCM to download certs. SCM runs
-     * as scm/host@REALM, but the OM logs in as om/host@REALM, and then the test
-     * fails, and the OM is unable to contact the SCM due to kerberos login
-     * issues. To work around that, have the OM run as the same principal as the
-     * SCM, and then the test passes.
-     *
-     * TODO: Need to look into this further to see if there is a better way to
-     *       address this problem.
-     */
-    String realm = miniKdc.getRealm();
-    conf.set(OZONE_OM_KERBEROS_PRINCIPAL_KEY,
-        "scm/" + host + "@" + realm);
-    omKeyTab = new File(workDir, "scm.keytab");
-    conf.set(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY,
-        omKeyTab.getAbsolutePath());
 
     initSCM();
     try {
@@ -818,9 +873,11 @@ public final class TestSecureOzoneCluster {
       om = OzoneManager.createOm(conf);
 
       assertNull(om.getCertificateClient());
-      assertFalse(omLogs.getOutput().contains("Init response: GETCERT"));
-      assertFalse(omLogs.getOutput().contains("Successfully stored " +
-          "SCM signed certificate"));
+      String logOutput = omLogs.getOutput();
+      assertThat(logOutput)
+          .doesNotContain("Init response: GETCERT");
+      assertThat(logOutput)
+          .doesNotContain("Successfully stored SCM signed certificate");
 
       conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
       conf.setBoolean(OZONE_OM_S3_GPRC_SERVER_ENABLED, true);
@@ -833,9 +890,9 @@ public final class TestSecureOzoneCluster {
       assertNotNull(om.getCertificateClient().getPublicKey());
       assertNotNull(om.getCertificateClient().getPrivateKey());
       assertNotNull(om.getCertificateClient().getCertificate());
-      assertTrue(omLogs.getOutput().contains("Init response: GETCERT"));
-      assertTrue(omLogs.getOutput().contains("Successfully stored " +
-          "SCM signed certificate"));
+      assertThat(omLogs.getOutput())
+          .contains("Init response: GETCERT")
+          .contains("Successfully stored OM signed certificate");
       X509Certificate certificate = om.getCertificateClient().getCertificate();
       validateCertificate(certificate);
 
@@ -851,9 +908,9 @@ public final class TestSecureOzoneCluster {
    * Test functionality to get SCM signed certificate for OM.
    */
   @Test
-  public void testSecureOmInitSuccess() throws Exception {
+  void testSecureOmInitSuccess() throws Exception {
     LogCapturer omLogs =
-        LogCapturer.captureLogs(OzoneManager.getLogger());
+        LogCapturer.captureLogs(OMCertificateClient.LOG);
     omLogs.clearOutput();
     initSCM();
     try {
@@ -869,9 +926,10 @@ public final class TestSecureOzoneCluster {
       assertNotNull(om.getCertificateClient().getPublicKey());
       assertNotNull(om.getCertificateClient().getPrivateKey());
       assertNotNull(om.getCertificateClient().getCertificate());
-      assertTrue(omLogs.getOutput().contains("Init response: GETCERT"));
-      assertTrue(omLogs.getOutput().contains("Successfully stored " +
-          "SCM signed certificate"));
+      assertEquals(3, om.getCertificateClient().getTrustChain().size());
+      assertThat(omLogs.getOutput())
+          .contains("Init response: GETCERT")
+          .contains("Successfully stored OM signed certificate");
       X509Certificate certificate = om.getCertificateClient().getCertificate();
       validateCertificate(certificate);
       String pemEncodedCACert =
@@ -897,7 +955,7 @@ public final class TestSecureOzoneCluster {
    * Test successful certificate rotation.
    */
   @Test
-  public void testCertificateRotation() throws Exception {
+  void testCertificateRotation() throws Exception {
     OMStorage omStorage = new OMStorage(conf);
     omStorage.setClusterId(clusterId);
     omStorage.setOmId(omId);
@@ -905,12 +963,11 @@ public final class TestSecureOzoneCluster {
 
     SecurityConfig securityConfig = new SecurityConfig(conf);
 
-
     // save first cert
     final int certificateLifetime = 20; // seconds
     KeyCodec keyCodec =
         new KeyCodec(securityConfig, securityConfig.getKeyLocation("om"));
-    X509CertificateHolder certHolder = generateX509CertHolder(conf,
+    X509CertificateHolder certHolder = generateX509CertHolder(securityConfig,
         new KeyPair(keyCodec.readPublicKey(), keyCodec.readPrivateKey()),
         null, Duration.ofSeconds(certificateLifetime));
     String certId = certHolder.getSerialNumber().toString();
@@ -918,63 +975,69 @@ public final class TestSecureOzoneCluster {
     omStorage.forceInitialize();
     CertificateCodec certCodec = new CertificateCodec(securityConfig, "om");
     certCodec.writeCertificate(certHolder);
-    OMCertificateClient client =
-        new OMCertificateClient(securityConfig, omStorage, scmId, null, null);
-    client.init();
+    String caCertFileName = CAType.ROOT.getFileNamePrefix()
+        + certHolder.getSerialNumber().toString() + ".crt";
+    certCodec.writeCertificate(certHolder, caCertFileName);
 
     // first renewed cert
-    X509CertificateHolder newCertHolder = generateX509CertHolder(conf,
-        null, LocalDateTime.now().plus(securityConfig.getRenewalGracePeriod()),
-        Duration.ofSeconds(certificateLifetime));
+    X509CertificateHolder newCertHolder =
+        generateX509CertHolder(securityConfig, null,
+            LocalDateTime.now().plus(securityConfig.getRenewalGracePeriod()),
+            Duration.ofSeconds(certificateLifetime));
     String pemCert = CertificateCodec.getPEMEncodedString(newCertHolder);
-    SCMGetCertResponseProto responseProto = SCMGetCertResponseProto.newBuilder()
-        .setResponseCode(SCMSecurityProtocolProtos
-            .SCMGetCertResponseProto.ResponseCode.success)
-        .setX509Certificate(pemCert)
-        .setX509CACertificate(pemCert)
-        .build();
+    SCMGetCertResponseProto responseProto =
+        SCMGetCertResponseProto.newBuilder()
+            .setResponseCode(SCMSecurityProtocolProtos
+                .SCMGetCertResponseProto.ResponseCode.success)
+            .setX509Certificate(pemCert)
+            .setX509CACertificate(pemCert)
+            .build();
     SCMSecurityProtocolClientSideTranslatorPB scmClient =
         mock(SCMSecurityProtocolClientSideTranslatorPB.class);
-    when(scmClient.getOMCertChain(anyObject(), anyString()))
+    when(scmClient.getOMCertChain(any(), anyString()))
         .thenReturn(responseProto);
-    client.setSecureScmClient(scmClient);
 
-    // create Ozone Manager instance, it will start the monitor task
-    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
-    om = OzoneManager.createOm(conf);
-    om.setCertClient(client);
+    try (OMCertificateClient client = new OMCertificateClient(
+        securityConfig, scmClient, omStorage, omInfo, "", scmId, null, null)) {
+      client.init();
 
-    // check after renew, client will have the new cert ID
-    String id1 = newCertHolder.getSerialNumber().toString();
-    GenericTestUtils.waitFor(() ->
-            id1.equals(client.getCertificate().getSerialNumber().toString()),
-        1000, certificateLifetime * 1000);
+      // create Ozone Manager instance, it will start the monitor task
+      conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
+      om = OzoneManager.createOm(conf);
+      om.setCertClient(client);
 
-    // test the second time certificate rotation
-    // second renewed cert
-    newCertHolder = generateX509CertHolder(conf,
-        null, null, Duration.ofSeconds(certificateLifetime));
-    pemCert = CertificateCodec.getPEMEncodedString(newCertHolder);
-    responseProto = SCMGetCertResponseProto.newBuilder()
-        .setResponseCode(SCMSecurityProtocolProtos
-            .SCMGetCertResponseProto.ResponseCode.success)
-        .setX509Certificate(pemCert)
-        .setX509CACertificate(pemCert)
-        .build();
-    when(scmClient.getOMCertChain(anyObject(), anyString()))
-        .thenReturn(responseProto);
-    String id2 = newCertHolder.getSerialNumber().toString();
+      // check after renew, client will have the new cert ID
+      String id1 = newCertHolder.getSerialNumber().toString();
+      GenericTestUtils.waitFor(() ->
+              id1.equals(client.getCertificate().getSerialNumber().toString()),
+          1000, certificateLifetime * 1000);
 
-    // check after renew, client will have the new cert ID
-    GenericTestUtils.waitFor(() ->
-            id2.equals(client.getCertificate().getSerialNumber().toString()),
-        1000, certificateLifetime * 1000);
+      // test the second time certificate rotation
+      // second renewed cert
+      newCertHolder = generateX509CertHolder(securityConfig,
+          null, null, Duration.ofSeconds(certificateLifetime));
+      pemCert = CertificateCodec.getPEMEncodedString(newCertHolder);
+      responseProto = SCMGetCertResponseProto.newBuilder()
+          .setResponseCode(SCMSecurityProtocolProtos
+              .SCMGetCertResponseProto.ResponseCode.success)
+          .setX509Certificate(pemCert)
+          .setX509CACertificate(pemCert)
+          .build();
+      when(scmClient.getOMCertChain(any(), anyString()))
+          .thenReturn(responseProto);
+      String id2 = newCertHolder.getSerialNumber().toString();
+
+      // check after renew, client will have the new cert ID
+      GenericTestUtils.waitFor(() ->
+              id2.equals(client.getCertificate().getSerialNumber().toString()),
+          1000, certificateLifetime * 1000);
+    }
   }
   /**
    * Test unexpected SCMGetCertResponseProto returned from SCM.
    */
   @Test
-  public void testCertificateRotationRecoverableFailure() throws Exception {
+  void testCertificateRotationRecoverableFailure() throws Exception {
     LogCapturer omLogs = LogCapturer.captureLogs(OMCertificateClient.LOG);
     OMStorage omStorage = new OMStorage(conf);
     omStorage.setClusterId(clusterId);
@@ -988,7 +1051,7 @@ public final class TestSecureOzoneCluster {
     final int certificateLifetime = 20; // seconds
     KeyCodec keyCodec =
         new KeyCodec(securityConfig, securityConfig.getKeyLocation("om"));
-    X509CertificateHolder certHolder = generateX509CertHolder(conf,
+    X509CertificateHolder certHolder = generateX509CertHolder(securityConfig,
         new KeyPair(keyCodec.readPublicKey(), keyCodec.readPrivateKey()),
         null, Duration.ofSeconds(certificateLifetime));
     String certId = certHolder.getSerialNumber().toString();
@@ -996,17 +1059,13 @@ public final class TestSecureOzoneCluster {
     omStorage.setOmCertSerialId(certId);
     omStorage.forceInitialize();
 
-    OMCertificateClient client =
-        new OMCertificateClient(securityConfig, omStorage, scmId, null, null);
-    client.init();
-
     // prepare a mocked scmClient to certificate signing
     SCMSecurityProtocolClientSideTranslatorPB scmClient =
         mock(SCMSecurityProtocolClientSideTranslatorPB.class);
-    client.setSecureScmClient(scmClient);
 
     Duration gracePeriod = securityConfig.getRenewalGracePeriod();
-    X509CertificateHolder newCertHolder = generateX509CertHolder(conf, null,
+    X509CertificateHolder newCertHolder = generateX509CertHolder(
+        securityConfig, null,
         LocalDateTime.now().plus(gracePeriod),
         Duration.ofSeconds(certificateLifetime));
     String pemCert = CertificateCodec.getPEMEncodedString(newCertHolder);
@@ -1018,53 +1077,58 @@ public final class TestSecureOzoneCluster {
                 .SCMGetCertResponseProto.ResponseCode.success)
             .setX509Certificate(pemCert)
             .build();
-    when(scmClient.getOMCertChain(anyObject(), anyString()))
+    when(scmClient.getOMCertChain(any(), anyString()))
         .thenReturn(responseProto);
 
-    // check that new cert ID should not equal to current cert ID
-    String certId1 = newCertHolder.getSerialNumber().toString();
-    Assert.assertFalse(certId1.equals(
-        client.getCertificate().getSerialNumber().toString()));
+    try (OMCertificateClient client =
+        new OMCertificateClient(
+            securityConfig, scmClient, omStorage, omInfo, "", scmId, null, null)
+    ) {
+      client.init();
 
-    // certificate failed to renew, client still hold the old expired cert.
-    Thread.sleep(certificateLifetime * 1000);
-    Assert.assertTrue(certId.equals(
-        client.getCertificate().getSerialNumber().toString()));
-    try {
-      client.getCertificate().checkValidity();
-    } catch (Exception e) {
-      Assert.assertTrue(e instanceof CertificateExpiredException);
+
+      // check that new cert ID should not equal to current cert ID
+      String certId1 = newCertHolder.getSerialNumber().toString();
+      assertNotEquals(certId1,
+          client.getCertificate().getSerialNumber().toString());
+
+      // certificate failed to renew, client still hold the old expired cert.
+      Thread.sleep(certificateLifetime * 1000);
+      assertEquals(certId,
+          client.getCertificate().getSerialNumber().toString());
+      assertThrows(CertificateExpiredException.class,
+          () -> client.getCertificate().checkValidity());
+      assertThat(omLogs.getOutput())
+          .contains("Error while signing and storing SCM signed certificate.");
+
+      // provide a new valid SCMGetCertResponseProto
+      newCertHolder = generateX509CertHolder(securityConfig, null, null,
+          Duration.ofSeconds(certificateLifetime));
+      pemCert = CertificateCodec.getPEMEncodedString(newCertHolder);
+      responseProto = SCMSecurityProtocolProtos.SCMGetCertResponseProto
+          .newBuilder().setResponseCode(SCMSecurityProtocolProtos
+              .SCMGetCertResponseProto.ResponseCode.success)
+          .setX509Certificate(pemCert)
+          .setX509CACertificate(pemCert)
+          .build();
+      when(scmClient.getOMCertChain(any(), anyString()))
+          .thenReturn(responseProto);
+      String certId2 = newCertHolder.getSerialNumber().toString();
+
+      // check after renew, client will have the new cert ID
+      GenericTestUtils.waitFor(() -> {
+        String newCertId = client.getCertificate().getSerialNumber().toString();
+        return newCertId.equals(certId2);
+      }, 1000, certificateLifetime * 1000);
     }
-    Assert.assertTrue(omLogs.getOutput().contains(
-        "Error while signing and storing SCM signed certificate."));
-
-    // provide a new valid SCMGetCertResponseProto
-    newCertHolder = generateX509CertHolder(conf, null, null,
-        Duration.ofSeconds(certificateLifetime));
-    pemCert = CertificateCodec.getPEMEncodedString(newCertHolder);
-    responseProto = SCMSecurityProtocolProtos.SCMGetCertResponseProto
-        .newBuilder().setResponseCode(SCMSecurityProtocolProtos
-            .SCMGetCertResponseProto.ResponseCode.success)
-        .setX509Certificate(pemCert)
-        .setX509CACertificate(pemCert)
-        .build();
-    when(scmClient.getOMCertChain(anyObject(), anyString()))
-        .thenReturn(responseProto);
-    String certId2 = newCertHolder.getSerialNumber().toString();
-
-    // check after renew, client will have the new cert ID
-    GenericTestUtils.waitFor(() -> {
-      String newCertId = client.getCertificate().getSerialNumber().toString();
-      return newCertId.equals(certId2);
-    }, 1000, certificateLifetime * 1000);
   }
 
   /**
    * Test the directory rollback failure case.
    */
   @Test
-  @Ignore("Run it locally since it will terminate the process.")
-  public void testCertificateRotationUnRecoverableFailure() throws Exception {
+  @Unhealthy("Run it locally since it will terminate the process.")
+  void testCertificateRotationUnRecoverableFailure() throws Exception {
     LogCapturer omLogs = LogCapturer.captureLogs(OzoneManager.getLogger());
     OMStorage omStorage = new OMStorage(conf);
     omStorage.setClusterId(clusterId);
@@ -1073,49 +1137,57 @@ public final class TestSecureOzoneCluster {
 
     SecurityConfig securityConfig = new SecurityConfig(conf);
     CertificateCodec certCodec = new CertificateCodec(securityConfig, "om");
-    OMCertificateClient client =
-        new OMCertificateClient(securityConfig, omStorage, scmId, null, null);
-    client.init();
+    try (OMCertificateClient client =
+        new OMCertificateClient(
+            securityConfig, null, omStorage, omInfo, "", scmId, null, null)
+    ) {
+      client.init();
 
-    // save first cert
-    final int certificateLifetime = 20; // seconds
-    X509CertificateHolder certHolder = generateX509CertHolder(conf,
-        new KeyPair(client.getPublicKey(), client.getPrivateKey()),
-        null, Duration.ofSeconds(certificateLifetime));
-    String certId = certHolder.getSerialNumber().toString();
-    certCodec.writeCertificate(certHolder);
-    omStorage.setOmCertSerialId(certId);
-    omStorage.forceInitialize();
+      // save first cert
+      final int certificateLifetime = 20; // seconds
+      X509CertificateHolder certHolder = generateX509CertHolder(securityConfig,
+          new KeyPair(client.getPublicKey(), client.getPrivateKey()),
+          null, Duration.ofSeconds(certificateLifetime));
+      String certId = certHolder.getSerialNumber().toString();
+      certCodec.writeCertificate(certHolder);
+      omStorage.setOmCertSerialId(certId);
+      omStorage.forceInitialize();
 
-    // second cert as renew response
-    X509CertificateHolder newCertHolder = generateX509CertHolder(conf, null,
-        null, Duration.ofSeconds(certificateLifetime));
-    DNCertificateClient mockClient = mock(DNCertificateClient.class);
-    when(mockClient.getCertificate()).thenReturn(
-        CertificateCodec.getX509Certificate(newCertHolder));
-    when(mockClient.timeBeforeExpiryGracePeriod(anyObject()))
-        .thenReturn(Duration.ZERO);
-    when(mockClient.renewAndStoreKeyAndCertificate(anyObject())).thenThrow(
-        new CertificateException("renewAndStoreKeyAndCert failed ",
-            CertificateException.ErrorCode.ROLLBACK_ERROR));
+      // second cert as renew response
+      X509CertificateHolder newCertHolder = generateX509CertHolder(
+          securityConfig, null,
+          null, Duration.ofSeconds(certificateLifetime));
+      DNCertificateClient mockClient = mock(DNCertificateClient.class);
+      when(mockClient.getCertificate()).thenReturn(
+          CertificateCodec.getX509Certificate(newCertHolder));
+      when(mockClient.timeBeforeExpiryGracePeriod(any()))
+          .thenReturn(Duration.ZERO);
+      when(mockClient.renewAndStoreKeyAndCertificate(any())).thenThrow(
+          new CertificateException("renewAndStoreKeyAndCert failed ",
+              CertificateException.ErrorCode.ROLLBACK_ERROR));
 
-    // create Ozone Manager instance, it will start the monitor task
-    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
-    om = OzoneManager.createOm(conf);
-    om.setCertClient(mockClient);
+      // create Ozone Manager instance, it will start the monitor task
+      conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
+      om = OzoneManager.createOm(conf);
+      om.setCertClient(mockClient);
 
-    // check error message during renew
-    GenericTestUtils.waitFor(() -> omLogs.getOutput().contains(
-            "OzoneManage shutdown because certificate rollback failure."),
-        1000, certificateLifetime * 1000);
+      // check error message during renew
+      GenericTestUtils.waitFor(() -> omLogs.getOutput().contains(
+              "OzoneManage shutdown because certificate rollback failure."),
+          1000, certificateLifetime * 1000);
+    }
   }
 
   /**
    * Tests delegation token renewal after a certificate renew.
    */
   @Test
-  public void testDelegationTokenRenewCrossCertificateRenew() throws Exception {
+  void testDelegationTokenRenewCrossCertificateRenew() throws Exception {
+    initSCM();
     try {
+      scm = HddsTestUtils.getScmSimple(conf);
+      scm.start();
+
       // Setup secure OM for start.
       final int certLifetime = 40 * 1000; // 40s
       OzoneConfiguration newConf = new OzoneConfiguration(conf);
@@ -1152,112 +1224,38 @@ public final class TestSecureOzoneCluster {
       // Check if token is of right kind and renewer is running om instance
       assertNotNull(token1);
       assertEquals("OzoneToken", token1.getKind().toString());
-      assertEquals(OmUtils.getOmRpcAddress(newConf),
+      assertEquals(SecurityUtil.buildTokenService(
+          om.getNodeDetails().getRpcAddress()).toString(),
           token1.getService().toString());
-      OzoneTokenIdentifier temp = new OzoneTokenIdentifier();
-      ByteArrayInputStream buf = new ByteArrayInputStream(
-          token1.getIdentifier());
-      DataInputStream in = new DataInputStream(buf);
-      temp.readFields(in);
-      assertEquals(omCertId1, temp.getOmCertSerialId());
+      assertEquals(omCertId1, token1.decodeIdentifier().getOmCertSerialId());
 
       // Renew delegation token
       long expiryTime = omClient.renewDelegationToken(token1);
-      assertTrue(expiryTime > 0);
+      assertThat(expiryTime).isGreaterThan(0);
 
       // Wait for OM certificate to renew
-      GenericTestUtils.waitFor(() -> !omCertId1.equals(
-          certClient.getCertificate().getSerialNumber().toString()),
-          100, certLifetime);
+      LambdaTestUtils.await(certLifetime, 100, () ->
+          !StringUtils.equals(token1.decodeIdentifier().getOmCertSerialId(),
+              omClient.getDelegationToken(new Text("om"))
+                  .decodeIdentifier().getOmCertSerialId()));
       String omCertId2 =
           certClient.getCertificate().getSerialNumber().toString();
       assertNotEquals(omCertId1, omCertId2);
       // Get a new delegation token
       Token<OzoneTokenIdentifier> token2 = omClient.getDelegationToken(
           new Text("om"));
-      buf = new ByteArrayInputStream(token2.getIdentifier());
-      in = new DataInputStream(buf);
-      temp.readFields(in);
-      assertEquals(omCertId2, temp.getOmCertSerialId());
+      assertEquals(omCertId2, token2.decodeIdentifier().getOmCertSerialId());
 
       // Because old certificate is still valid, so renew old token will succeed
       expiryTime = omClient.renewDelegationToken(token1);
-      assertTrue(expiryTime > 0);
-      assertTrue(new Date(expiryTime).before(omCert.getNotAfter()));
-    } finally {
-      IOUtils.closeQuietly(om);
-    }
-  }
-
-  /**
-   * Tests container token renewal after a certificate renew.
-   */
-  @Test
-  public void testContainerTokenRenewCrossCertificateRenew() throws Exception {
-    // Setup secure SCM for start.
-    final int certLifetime = 40 * 1000; // 40s
-    conf.set(HDDS_X509_DEFAULT_DURATION,
-        Duration.ofMillis(certLifetime).toString());
-    conf.set(HDDS_X509_MAX_DURATION,
-        Duration.ofMillis(certLifetime).toString());
-    conf.set(HDDS_X509_RENEW_GRACE_DURATION,
-        Duration.ofMillis(certLifetime - 15 * 1000).toString());
-    conf.setBoolean(HDDS_CONTAINER_TOKEN_ENABLED, true);
-    conf.setLong(HDDS_BLOCK_TOKEN_EXPIRY_TIME, certLifetime - 20 * 1000);
-
-    initSCM();
-    scm = HddsTestUtils.getScmSimple(conf);
-    try {
-      CertificateClientTestImpl certClient =
-          new CertificateClientTestImpl(conf, true);
-      X509Certificate scmCert = certClient.getCertificate();
-      String scmCertId1 = scmCert.getSerialNumber().toString();
-      // Start SCM
-      scm.setScmCertificateClient(certClient);
-      scm.start();
-
-      UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
-      // Get SCM client which will authenticate via Kerberos
-      SCMContainerLocationFailoverProxyProvider proxyProvider =
-          new SCMContainerLocationFailoverProxyProvider(conf, ugi);
-      StorageContainerLocationProtocolClientSideTranslatorPB scmClient =
-          new StorageContainerLocationProtocolClientSideTranslatorPB(
-              proxyProvider);
-
-      // Since client is already connected get a delegation token
-      ContainerID containerID = new ContainerID(1);
-      Token<?> token1 = scmClient.getContainerToken(containerID);
-
-      // Check if token is of right kind and renewer is running instance
-      assertNotNull(token1);
-      assertEquals(ContainerTokenIdentifier.KIND, token1.getKind());
-      assertEquals(containerID.toString(), token1.getService().toString());
-      ContainerTokenIdentifier temp = new ContainerTokenIdentifier();
-      ByteArrayInputStream buf = new ByteArrayInputStream(
-          token1.getIdentifier());
-      DataInputStream in = new DataInputStream(buf);
-      temp.readFields(in);
-      assertEquals(scmCertId1, temp.getCertSerialId());
-
-      // Wait for SCM certificate to renew
-      GenericTestUtils.waitFor(() -> !scmCertId1.equals(
-              certClient.getCertificate().getSerialNumber().toString()),
-          100, certLifetime);
-      String scmCertId2 =
-          certClient.getCertificate().getSerialNumber().toString();
-      assertNotEquals(scmCertId1, scmCertId2);
-
-      // Get a new container token
-      containerID = new ContainerID(2);
-      Token<?> token2 = scmClient.getContainerToken(containerID);
-      buf = new ByteArrayInputStream(token2.getIdentifier());
-      in = new DataInputStream(buf);
-      temp.readFields(in);
-      assertEquals(scmCertId2, temp.getCertSerialId());
+      assertThat(expiryTime)
+          .isGreaterThan(0)
+          .isLessThan(omCert.getNotAfter().getTime());
     } finally {
       if (scm != null) {
         scm.stop();
       }
+      IOUtils.closeQuietly(om);
     }
   }
 
@@ -1265,7 +1263,8 @@ public final class TestSecureOzoneCluster {
    * Test functionality to get SCM signed certificate for OM.
    */
   @Test
-  public void testOMGrpcServerCertificateRenew() throws Exception {
+  @Unhealthy("HDDS-8764")
+  void testOMGrpcServerCertificateRenew() throws Exception {
     initSCM();
     try {
       scm = HddsTestUtils.getScmSimple(conf);
@@ -1275,8 +1274,6 @@ public final class TestSecureOzoneCluster {
       int certLifetime = 30; // second
       conf.set(HDDS_X509_DEFAULT_DURATION,
           Duration.ofSeconds(certLifetime).toString());
-      conf.set(HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL, "1s");
-      conf.set(HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL, "1s");
       conf.setInt(OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, 2);
 
       // initialize OmStorage, save om Cert and CA Certs to disk
@@ -1290,11 +1287,11 @@ public final class TestSecureOzoneCluster {
       CertificateCodec certCodec = new CertificateCodec(securityConfig, "om");
       X509Certificate scmCert = scmCertClient.getCertificate();
       X509Certificate rootCert = scmCertClient.getCACertificate();
-      X509CertificateHolder certHolder = generateX509CertHolder(conf, keyPair,
-          new KeyPair(scmCertClient.getPublicKey(),
-              scmCertClient.getPrivateKey()), scmCert,
-          Duration.ofSeconds(certLifetime),
-          InetAddress.getLocalHost().getCanonicalHostName(), clusterId);
+      X509CertificateHolder certHolder =
+          generateX509CertHolder(securityConfig, keyPair,
+              new KeyPair(scmCertClient.getPublicKey(),
+                  scmCertClient.getPrivateKey()),
+              scmCert, "om_cert", clusterId);
       String certId = certHolder.getSerialNumber().toString();
       certCodec.writeCertificate(certHolder);
       certCodec.writeCertificate(CertificateCodec.getCertificateHolder(scmCert),
@@ -1317,7 +1314,6 @@ public final class TestSecureOzoneCluster {
       // In this process, SCM has already login using Kerberos. So pass
       // specific UGI to DefaultCertificateClient and OzoneManager to avoid
       // conflict with SCM procedure.
-      DefaultCertificateClient.setUgi(ugi);
       OzoneManager.setUgi(ugi);
       om = OzoneManager.createOm(conf);
       om.start();
@@ -1335,25 +1331,23 @@ public final class TestSecureOzoneCluster {
       GenericTestUtils.waitFor(() -> om.isLeaderReady(), 500, 10000);
       String transportCls = GrpcOmTransportFactory.class.getName();
       conf.set(OZONE_OM_TRANSPORT_CLASS, transportCls);
-      OzoneClient client = OzoneClientFactory.getRpcClient(conf);
+      try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
 
-      ServiceInfoEx serviceInfoEx = client.getObjectStore()
-          .getClientProxy().getOzoneManagerClient().getServiceInfo();
-      Assert.assertTrue(serviceInfoEx.getCaCertificate().equals(
-          CertificateCodec.getPEMEncodedString(caCert)));
+        ServiceInfoEx serviceInfoEx = client.getObjectStore()
+            .getClientProxy().getOzoneManagerClient().getServiceInfo();
+        assertEquals(CertificateCodec.getPEMEncodedString(caCert), serviceInfoEx.getCaCertificate());
 
-      // Wait for OM certificate to renewed
-      GenericTestUtils.waitFor(() ->
-              !omCert.getSerialNumber().toString().equals(
-                  omCertClient.getCertificate().getSerialNumber().toString()),
-          500, certLifetime * 1000);
+        // Wait for OM certificate to renewed
+        GenericTestUtils.waitFor(() ->
+                !omCert.getSerialNumber().toString().equals(
+                    omCertClient.getCertificate().getSerialNumber().toString()),
+            500, certLifetime * 1000);
 
-      // rerun the command using old client, it should succeed
-      serviceInfoEx = client.getObjectStore()
-          .getClientProxy().getOzoneManagerClient().getServiceInfo();
-      Assert.assertTrue(serviceInfoEx.getCaCertificate().equals(
-          CertificateCodec.getPEMEncodedString(caCert)));
-      client.close();
+        // rerun the command using old client, it should succeed
+        serviceInfoEx = client.getObjectStore()
+            .getClientProxy().getOzoneManagerClient().getServiceInfo();
+        assertEquals(CertificateCodec.getPEMEncodedString(caCert), serviceInfoEx.getCaCertificate());
+      }
 
       // get new client, it should succeed.
       try {
@@ -1370,31 +1364,30 @@ public final class TestSecureOzoneCluster {
           500, certLifetime * 1000);
       // get new client, it should succeed too.
       try {
-        OzoneClientFactory.getRpcClient(conf);
+        OzoneClient client1 = OzoneClientFactory.getRpcClient(conf);
+        client1.close();
       } catch (Exception e) {
         System.out.println("OzoneClientFactory.getRpcClient failed for " +
             e.getMessage());
         fail("Create client should succeed for certificate is renewed");
       }
     } finally {
-      DefaultCertificateClient.setUgi(null);
       OzoneManager.setUgi(null);
       GrpcOmTransport.setCaCerts(null);
     }
   }
 
-  public void validateCertificate(X509Certificate cert) throws Exception {
+  void validateCertificate(X509Certificate cert) throws Exception {
 
     // Assert that we indeed have a self signed certificate.
     X500Name x500Issuer = new JcaX509CertificateHolder(cert).getIssuer();
     RDN cn = x500Issuer.getRDNs(BCStyle.CN)[0];
     String hostName = InetAddress.getLocalHost().getHostName();
-    String scmUser = OzoneConsts.SCM_SUB_CA_PREFIX + hostName;
-    assertEquals(scmUser, cn.getFirst().getValue().toString());
 
     // Subject name should be om login user in real world but in this test
     // UGI has scm user context.
-    assertEquals(scmUser, cn.getFirst().getValue().toString());
+    assertThat(cn.getFirst().getValue().toString()).contains(SCM_SUB_CA);
+    assertThat(cn.getFirst().getValue().toString()).contains(hostName);
 
     LocalDate today = LocalDateTime.now().toLocalDate();
     Date invalidDate;
@@ -1406,12 +1399,13 @@ public final class TestSecureOzoneCluster {
     invalidDate = java.sql.Date.valueOf(today.plus(400, ChronoUnit.DAYS));
     assertTrue(cert.getNotAfter().before(invalidDate));
 
-    assertTrue(cert.getSubjectDN().toString().contains(scmId));
-    assertTrue(cert.getSubjectDN().toString().contains(clusterId));
+    assertThat(cert.getSubjectDN().toString()).contains(scmId);
+    assertThat(cert.getSubjectDN().toString()).contains(clusterId);
 
-    assertTrue(cert.getIssuerDN().toString().contains(scmUser));
-    assertTrue(cert.getIssuerDN().toString().contains(scmId));
-    assertTrue(cert.getIssuerDN().toString().contains(clusterId));
+    assertThat(cn.getFirst().getValue().toString()).contains(SCM_SUB_CA);
+    assertThat(cn.getFirst().getValue().toString()).contains(hostName);
+    assertThat(cert.getIssuerDN().toString()).contains(scmId);
+    assertThat(cert.getIssuerDN().toString()).contains(clusterId);
 
     // Verify that certificate matches the public key.
     assertEquals(cert.getPublicKey(), om.getCertificateClient().getPublicKey());
@@ -1431,7 +1425,7 @@ public final class TestSecureOzoneCluster {
   }
 
   private static X509CertificateHolder generateX509CertHolder(
-      OzoneConfiguration conf, KeyPair keyPair, LocalDateTime startDate,
+      SecurityConfig conf, KeyPair keyPair, LocalDateTime startDate,
       Duration certLifetime) throws Exception {
     if (keyPair == null) {
       keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
@@ -1450,13 +1444,11 @@ public final class TestSecureOzoneCluster {
   }
 
   private static X509CertificateHolder generateX509CertHolder(
-      OzoneConfiguration conf, KeyPair keyPair, KeyPair rootKeyPair,
-      X509Certificate rootCert, Duration certLifetime, String subject,
-      String clusterId) throws Exception {
+      SecurityConfig conf, KeyPair keyPair, KeyPair rootKeyPair,
+      X509Certificate rootCert, String subject, String clusterId
+  ) throws Exception {
     // Generate normal certificate, signed by RootCA certificate
-    SecurityConfig secConfig = new SecurityConfig(conf);
-    DefaultApprover approver = new DefaultApprover(new DefaultProfile(),
-        secConfig);
+    DefaultApprover approver = new DefaultApprover(new DefaultProfile(), conf);
 
     CertificateSignRequest.Builder csrBuilder =
         new CertificateSignRequest.Builder();
@@ -1469,16 +1461,26 @@ public final class TestSecureOzoneCluster {
         .setDigitalSignature(true)
         .setDigitalEncryption(true);
 
+    addIpAndDnsDataToBuilder(csrBuilder);
     LocalDateTime start = LocalDateTime.now();
-    String certDuration = conf.get(HDDS_X509_DEFAULT_DURATION,
-        HDDS_X509_DEFAULT_DURATION_DEFAULT);
+    Duration certDuration = conf.getDefaultCertDuration();
     X509CertificateHolder certificateHolder =
-        approver.sign(secConfig, rootKeyPair.getPrivate(),
+        approver.sign(conf, rootKeyPair.getPrivate(),
             new X509CertificateHolder(rootCert.getEncoded()),
             Date.from(start.atZone(ZoneId.systemDefault()).toInstant()),
-            Date.from(start.plus(Duration.parse(certDuration))
+            Date.from(start.plus(certDuration)
                 .atZone(ZoneId.systemDefault()).toInstant()),
-            csrBuilder.build(), "test", clusterId);
+            csrBuilder.build(), "test", clusterId,
+            String.valueOf(System.nanoTime()));
     return certificateHolder;
+  }
+
+  private static void addIpAndDnsDataToBuilder(
+      CertificateSignRequest.Builder csrBuilder) throws IOException {
+    DomainValidator validator = DomainValidator.getInstance();
+    // Add all valid ips.
+    List<InetAddress> inetAddresses =
+        OzoneSecurityUtil.getValidInetsForCurrentHost();
+    csrBuilder.addInetAddresses(inetAddresses, validator);
   }
 }

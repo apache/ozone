@@ -27,7 +27,7 @@ import org.bouncycastle.asn1.x509.KeyUsage;
 
 import java.net.UnknownHostException;
 import java.util.Map;
-import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
 
 /**
  * Base class for profile rules. Generally profiles are documents that define
@@ -142,8 +142,7 @@ public interface PKIProfile {
 
   /**
    * Return all extensions supported by this profile.
-   * @return
    */
   Map<ASN1ObjectIdentifier,
-        BiFunction< Extension, PKIProfile, Boolean> > getExtensionsMap();
+      BiPredicate<Extension, PKIProfile>> getExtensionsMap();
 }

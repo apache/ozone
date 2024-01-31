@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CL
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.OPEN;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -247,7 +248,7 @@ public class TestReconContainerManager
     // Should still have 1 entry in the replica history map
     assertEquals(1, repHistMap.size());
     // Now last seen time should be larger than first seen time
-    assertTrue(repHist1.getLastSeenTime() > repHist1.getFirstSeenTime());
+    assertThat(repHist1.getLastSeenTime()).isGreaterThan(repHist1.getFirstSeenTime());
     assertEquals(1051L, repHist1.getBcsId());
 
     // Init DN02
@@ -281,4 +282,28 @@ public class TestReconContainerManager
     assertEquals(uuid2,
         repHistMap.get(cIDlong1).keySet().iterator().next());
   }
+
+  @Test
+  public void testAddNewContainerWithMissingPipeline()
+      throws IOException, TimeoutException {
+    // Create a container with a pipeline that Recon does not know about yet
+    Pipeline newPipeline = getRandomPipeline();
+    ContainerInfo containerInfo = newContainerInfo(101L, newPipeline);
+    ContainerWithPipeline containerWithPipeline =
+        new ContainerWithPipeline(containerInfo, newPipeline);
+
+    // Ensure pipeline is not present
+    ReconContainerManager containerManager = getContainerManager();
+    assertFalse(getPipelineManager().containsPipeline(
+        newPipeline.getId()));
+
+    // Add a new container, and it should add the missing pipeline first
+    containerManager.addNewContainer(containerWithPipeline);
+
+    // Pipeline should be added now
+    assertTrue(getPipelineManager().containsPipeline(
+        newPipeline.getId()));
+    assertTrue(containerManager.containerExist(containerInfo.containerID()));
+  }
+
 }

@@ -95,3 +95,6 @@ Cannot close container without admin privilege
 
 Cannot create container without admin privilege
     Requires admin privilege    ozone admin container create
+
+Reset user
+    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user     testuser     testuser.keytab

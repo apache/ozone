@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
-import java.security.cert.X509Certificate;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -35,7 +34,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.function.SupplierWithIOException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
@@ -44,11 +42,11 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBl
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc;
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc.XceiverClientProtocolServiceStub;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.storage.CheckedBiFunction;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
 import org.apache.hadoop.hdds.tracing.GrpcClientInterceptor;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -85,17 +83,18 @@ import static org.apache.hadoop.hdds.HddsUtils.processForDebug;
  * how it works, and how it is integrated with the Ozone client.
  */
 public class XceiverClientGrpc extends XceiverClientSpi {
-  static final Logger LOG = LoggerFactory.getLogger(XceiverClientGrpc.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(XceiverClientGrpc.class);
   private final Pipeline pipeline;
   private final ConfigurationSource config;
   private final Map<UUID, XceiverClientProtocolServiceStub> asyncStubs;
   private final XceiverClientMetrics metrics;
   private final Map<UUID, ManagedChannel> channels;
   private final Semaphore semaphore;
-  private final long timeout;
+  private long timeout;
   private final SecurityConfig secConfig;
   private final boolean topologyAwareRead;
-  private final List<X509Certificate> caCerts;
+  private final ClientTrustManager trustManager;
   // Cache the DN which returned the GetBlock command so that the ReadChunk
   // command can be sent to the same DN.
   private final Map<DatanodeBlockID, DatanodeDetails> getBlockDNcache;
@@ -108,16 +107,16 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    *
    * @param pipeline - Pipeline that defines the machines.
    * @param config   -- Ozone Config
-   * @param caCerts   - SCM ca certificate.
+   * @param trustManager - a {@link ClientTrustManager} with proper CA handling.
    */
   public XceiverClientGrpc(Pipeline pipeline, ConfigurationSource config,
-      List<X509Certificate> caCerts) {
+      ClientTrustManager trustManager) {
     super();
     Preconditions.checkNotNull(pipeline);
     Preconditions.checkNotNull(config);
-    timeout = config.getTimeDuration(OzoneConfigKeys.
+    setTimeout(config.getTimeDuration(OzoneConfigKeys.
         OZONE_CLIENT_READ_TIMEOUT, OzoneConfigKeys
-        .OZONE_CLIENT_READ_TIMEOUT_DEFAULT, TimeUnit.SECONDS);
+        .OZONE_CLIENT_READ_TIMEOUT_DEFAULT, TimeUnit.SECONDS));
     this.pipeline = pipeline;
     this.config = config;
     this.secConfig = new SecurityConfig(config);
@@ -129,7 +128,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     this.topologyAwareRead = config.getBoolean(
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY,
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT);
-    this.caCerts = caCerts;
+    this.trustManager = trustManager;
     this.getBlockDNcache = new ConcurrentHashMap<>();
   }
 
@@ -156,15 +155,6 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         this.pipeline.getFirstNode();
     // just make a connection to the picked datanode at the beginning
     connectToDatanode(dn);
-  }
-
-  /**
-   * Token based auth is not currently supported, so this method works the same
-   * way as {@link #connect()}.
-   */
-  @Override
-  public void connect(String encodedToken) throws Exception {
-    connect();
   }
 
   private synchronized void connectToDatanode(DatanodeDetails dn)
@@ -200,8 +190,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
             .intercept(new GrpcClientInterceptor());
     if (secConfig.isSecurityEnabled() && secConfig.isGrpcTlsEnabled()) {
       SslContextBuilder sslContextBuilder = GrpcSslContexts.forClient();
-      if (caCerts != null) {
-        sslContextBuilder.trustManager(caCerts);
+      if (trustManager != null) {
+        sslContextBuilder.trustManager(trustManager);
       }
       if (secConfig.useTestCert()) {
         channelBuilder.overrideAuthority("localhost");
@@ -235,7 +225,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    * and the method waits to finish all ongoing communication.
    *
    * Note: the method wait 1 hour per channel tops and if that is not enough
-   * to finish ongoing communication, then interrupts the connection anyways.
+   * to finish ongoing communication, then interrupts the connection anyway.
    */
   @Override
   public synchronized void close() {
@@ -293,23 +283,25 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         Thread.currentThread().interrupt();
       }
     }
-    try {
-      for (Map.Entry<DatanodeDetails,
+    for (Map.Entry<DatanodeDetails,
               CompletableFuture<ContainerCommandResponseProto> >
               entry : futureHashMap.entrySet()) {
+      try {
         responseProtoHashMap.put(entry.getKey(), entry.getValue().get());
-      }
-    } catch (InterruptedException e) {
-      LOG.error("Command execution was interrupted.");
-      // Re-interrupt the thread while catching InterruptedException
-      Thread.currentThread().interrupt();
-    } catch (ExecutionException e) {
-      String message = "Failed to execute command {}.";
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(message, processForDebug(request), e);
-      } else {
-        LOG.error(message + " Exception Class: {}, Exception Message: {}",
-                request.getCmdType(), e.getClass().getName(), e.getMessage());
+      } catch (InterruptedException e) {
+        LOG.error("Command execution was interrupted.");
+        // Re-interrupt the thread while catching InterruptedException
+        Thread.currentThread().interrupt();
+      } catch (ExecutionException e) {
+        String message =
+            "Failed to execute command {} on datanode " + entry.getKey()
+                .getHostName();
+        if (LOG.isDebugEnabled()) {
+          LOG.debug(message, processForDebug(request), e);
+        } else {
+          LOG.error(message + " Exception Class: {}, Exception Message: {}",
+              request.getCmdType(), e.getClass().getName(), e.getMessage());
+        }
       }
     }
     return responseProtoHashMap;
@@ -317,7 +309,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
   @Override
   public ContainerCommandResponseProto sendCommand(
-      ContainerCommandRequestProto request, List<CheckedBiFunction> validators)
+      ContainerCommandRequestProto request, List<Validator> validators)
       throws IOException {
     try {
       XceiverClientReply reply;
@@ -335,30 +327,28 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   }
 
   private XceiverClientReply sendCommandWithTraceIDAndRetry(
-      ContainerCommandRequestProto request, List<CheckedBiFunction> validators)
+      ContainerCommandRequestProto request, List<Validator> validators)
       throws IOException {
 
     String spanName = "XceiverClientGrpc." + request.getCmdType().name();
 
     return TracingUtil.executeInNewSpan(spanName,
-        (SupplierWithIOException<XceiverClientReply>) () -> {
-
+        () -> {
           ContainerCommandRequestProto finalPayload =
               ContainerCommandRequestProto.newBuilder(request)
                   .setTraceID(TracingUtil.exportCurrentSpan()).build();
           return sendCommandWithRetry(finalPayload, validators);
-
         });
   }
 
   private XceiverClientReply sendCommandWithRetry(
-      ContainerCommandRequestProto request, List<CheckedBiFunction> validators)
+      ContainerCommandRequestProto request, List<Validator> validators)
       throws IOException {
     ContainerCommandResponseProto responseProto = null;
     IOException ioException = null;
 
     // In case of an exception or an error, we will try to read from the
-    // datanodes in the pipeline in a round robin fashion.
+    // datanodes in the pipeline in a round-robin fashion.
     XceiverClientReply reply = new XceiverClientReply(null);
     List<DatanodeDetails> datanodeList = null;
 
@@ -406,8 +396,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         reply.addDatanode(dn);
         responseProto = sendCommandAsync(request, dn).getResponse().get();
         if (validators != null && !validators.isEmpty()) {
-          for (CheckedBiFunction validator : validators) {
-            validator.apply(request, responseProto);
+          for (Validator validator : validators) {
+            validator.accept(request, responseProto);
           }
         }
         if (request.getCmdType() == ContainerProtos.Type.GetBlock) {
@@ -617,5 +607,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   @VisibleForTesting
   public static Logger getLogger() {
     return LOG;
+  }
+
+  public void setTimeout(long timeout) {
+    this.timeout = timeout;
   }
 }

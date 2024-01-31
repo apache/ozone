@@ -19,17 +19,22 @@ package org.apache.hadoop.hdds.scm.container;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.junit.jupiter.api.Assertions;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests for the ContainerInfo class.
@@ -38,49 +43,79 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.R
 public class TestContainerInfo {
 
   @Test
-  public void getProtobufMessageEC() throws IOException {
-    ContainerInfo container =
-        createContainerInfo(RatisReplicationConfig.getInstance(THREE));
+  void getProtobufRatis() {
+    ContainerInfo container = newBuilderForTest()
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+        .build();
+
     HddsProtos.ContainerInfoProto proto = container.getProtobuf();
 
     // No EC Config
-    Assertions.assertFalse(proto.hasEcReplicationConfig());
-    Assertions.assertEquals(THREE, proto.getReplicationFactor());
-    Assertions.assertEquals(RATIS, proto.getReplicationType());
+    assertFalse(proto.hasEcReplicationConfig());
+    assertEquals(THREE, proto.getReplicationFactor());
+    assertEquals(RATIS, proto.getReplicationType());
 
     // Reconstruct object from Proto
     ContainerInfo recovered = ContainerInfo.fromProtobuf(proto);
-    Assertions.assertEquals(RATIS, recovered.getReplicationType());
-    Assertions.assertTrue(
-        recovered.getReplicationConfig() instanceof RatisReplicationConfig);
-
-    // EC Config
-    container = createContainerInfo(new ECReplicationConfig(3, 2));
-    proto = container.getProtobuf();
-
-    Assertions.assertEquals(3, proto.getEcReplicationConfig().getData());
-    Assertions.assertEquals(2, proto.getEcReplicationConfig().getParity());
-    Assertions.assertFalse(proto.hasReplicationFactor());
-    Assertions.assertEquals(EC, proto.getReplicationType());
-
-    // Reconstruct object from Proto
-    recovered = ContainerInfo.fromProtobuf(proto);
-    Assertions.assertEquals(EC, recovered.getReplicationType());
-    Assertions.assertTrue(
-        recovered.getReplicationConfig() instanceof ECReplicationConfig);
-    ECReplicationConfig config =
-        (ECReplicationConfig)recovered.getReplicationConfig();
-    Assertions.assertEquals(3, config.getData());
-    Assertions.assertEquals(2, config.getParity());
+    assertEquals(RATIS, recovered.getReplicationType());
+    assertEquals(RatisReplicationConfig.class,
+        recovered.getReplicationConfig().getClass());
+    assertEquals(THREE, recovered.getReplicationFactor());
   }
 
-  private ContainerInfo createContainerInfo(ReplicationConfig repConfig) {
-    ContainerInfo.Builder builder = new ContainerInfo.Builder();
-    builder.setContainerID(1234)
-        .setReplicationConfig(repConfig)
+  @Test
+  void getProtobufEC() {
+    // EC Config
+    ContainerInfo container = newBuilderForTest()
+        .setReplicationConfig(new ECReplicationConfig(3, 2))
+        .build();
+
+    HddsProtos.ContainerInfoProto proto = container.getProtobuf();
+
+    assertEquals(3, proto.getEcReplicationConfig().getData());
+    assertEquals(2, proto.getEcReplicationConfig().getParity());
+    assertFalse(proto.hasReplicationFactor());
+    assertEquals(EC, proto.getReplicationType());
+
+    // Reconstruct object from Proto
+    ContainerInfo recovered = ContainerInfo.fromProtobuf(proto);
+    assertEquals(EC, recovered.getReplicationType());
+    assertEquals(ECReplicationConfig.class,
+        recovered.getReplicationConfig().getClass());
+    ECReplicationConfig config =
+        (ECReplicationConfig)recovered.getReplicationConfig();
+    assertEquals(3, config.getData());
+    assertEquals(2, config.getParity());
+  }
+
+  @Test
+  void restoreState() {
+    TestClock clock = TestClock.newInstance();
+    ContainerInfo subject = newBuilderForTest()
+        .setClock(clock)
+        .build();
+
+    final HddsProtos.LifeCycleState initialState = subject.getState();
+    final Instant initialStateEnterTime = subject.getStateEnterTime();
+
+    clock.fastForward(Duration.ofMinutes(1));
+    subject.setState(CLOSING);
+
+    assertEquals(CLOSING, subject.getState());
+    assertEquals(clock.instant(), subject.getStateEnterTime());
+
+    subject.revertState();
+    assertEquals(initialState, subject.getState());
+    assertEquals(initialStateEnterTime, subject.getStateEnterTime());
+
+    assertThrows(IllegalStateException.class, subject::revertState);
+  }
+
+  public static ContainerInfo.Builder newBuilderForTest() {
+    return new ContainerInfo.Builder()
+        .setContainerID(1234)
         .setPipelineID(PipelineID.randomId())
-        .setState(HddsProtos.LifeCycleState.OPEN)
+        .setState(OPEN)
         .setOwner("scm");
-    return builder.build();
   }
 }

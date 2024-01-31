@@ -31,10 +31,10 @@ public class ContainerReplicaOp {
     ADD, DELETE
   }
 
-  private PendingOpType opType;
-  private DatanodeDetails target;
-  private int replicaIndex;
-  private long deadlineEpochMillis;
+  private final PendingOpType opType;
+  private final DatanodeDetails target;
+  private final int replicaIndex;
+  private final long deadlineEpochMillis;
 
   public static ContainerReplicaOp create(PendingOpType opType,
       DatanodeDetails target, int replicaIndex) {

@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.shell;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 
 /**
  * This class tests Ozone sh shell command with FSO.
@@ -31,21 +31,20 @@ public class TestOzoneShellHAWithFSO extends TestOzoneShellHA {
   /**
    * Create a MiniOzoneCluster for testing with using distributed Ozone
    * handler type.
-   *
-   * @throws Exception
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
+    startKMS();
     startCluster(conf);
   }
 
   /**
    * shutdown MiniOzoneCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdownCluster() {
     shutdown();
   }

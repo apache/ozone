@@ -19,22 +19,23 @@
 package org.apache.hadoop.ozone.om.upgrade;
 
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.nio.file.Path;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.reflect.MethodSignature;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Class to test annotation based interceptor that checks whether layout
@@ -42,15 +43,15 @@ import org.junit.rules.TemporaryFolder;
  */
 public class TestOMLayoutFeatureAspect {
 
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
+  @TempDir
+  private Path temporaryFolder;
 
   private OzoneConfiguration configuration = new OzoneConfiguration();
 
-  @Before
+  @BeforeEach
   public void setUp() throws IOException {
     configuration.set("ozone.metadata.dirs",
-        temporaryFolder.newFolder().getAbsolutePath());
+        String.valueOf(temporaryFolder.toAbsolutePath()));
   }
 
   /**
@@ -72,13 +73,14 @@ public class TestOMLayoutFeatureAspect {
     when(methodSignature.toShortString()).thenReturn("ecMethod");
     when(joinPoint.getSignature()).thenReturn(methodSignature);
 
-    LambdaTestUtils.intercept(OMException.class,
-        "cannot be invoked before finalization",
+    OMException omException = assertThrows(OMException.class,
         () -> aspect.checkLayoutFeature(joinPoint));
+    assertThat(omException.getMessage())
+        .contains("cannot be invoked before finalization");
   }
 
   @Test
-  public void testPreExecuteLayoutCheck() throws Exception {
+  public void testPreExecuteLayoutCheck() {
 
     OzoneManager om = mock(OzoneManager.class);
     OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
@@ -93,8 +95,9 @@ public class TestOMLayoutFeatureAspect {
     when(joinPoint.getArgs()).thenReturn(new Object[]{om});
     when(joinPoint.getTarget()).thenReturn(mockOmRequest);
 
-    LambdaTestUtils.intercept(OMException.class,
-        "cannot be invoked before finalization",
+    OMException omException = assertThrows(OMException.class,
         () -> aspect.beforeRequestApplyTxn(joinPoint));
+    assertThat(omException.getMessage())
+        .contains("cannot be invoked before finalization");
   }
 }

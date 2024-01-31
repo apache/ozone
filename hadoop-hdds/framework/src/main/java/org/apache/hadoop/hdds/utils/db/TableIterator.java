@@ -24,9 +24,10 @@ import java.io.IOException;
 import java.util.Iterator;
 
 /**
- * Iterator for MetaDataStore DB.
+ * To iterate a {@link Table}.
  *
- * @param <T>
+ * @param <KEY> The key type to support {@link #seek(Object)}.
+ * @param <T> The type to be iterated.
  */
 public interface TableIterator<KEY, T> extends Iterator<T>, Closeable {
 

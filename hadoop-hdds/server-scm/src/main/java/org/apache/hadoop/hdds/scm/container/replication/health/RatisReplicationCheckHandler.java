@@ -17,6 +17,7 @@
 package org.apache.hadoop.hdds.scm.container.replication.health;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -26,6 +27,9 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.RatisContainerReplicaCount;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManagerUtil;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,6 +46,15 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.R
  * and current replica details, along with replicas pending add and delete,
  * this class will return a ContainerHealthResult indicating if the container
  * is healthy, or under / over replicated etc.
+ * <p>
+ * For example, this class handles:
+ * <ul>
+ *   <li>A CLOSED container with 4 CLOSED replicas.</li>
+ *   <li>A CLOSED container with 1 CLOSED replica.</li>
+ *   <li>A CLOSED container with 3 CLOSED and 1 UNHEALTHY replica. Or 3
+ *   CLOSED and 1 QUASI_CLOSED replica with incorrect sequence ID.</li>
+ *   <li>etc.</li>
+ * </ul>
  */
 public class RatisReplicationCheckHandler extends AbstractCheck {
   public static final Logger LOG =
@@ -52,9 +65,12 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
    * should be replicated.
    */
   private final PlacementPolicy ratisContainerPlacement;
+  private final ReplicationManager replicationManager;
 
-  public RatisReplicationCheckHandler(PlacementPolicy containerPlacement) {
+  public RatisReplicationCheckHandler(PlacementPolicy containerPlacement,
+      ReplicationManager replicationManager) {
     this.ratisContainerPlacement = containerPlacement;
+    this.replicationManager = replicationManager;
   }
 
   @Override
@@ -111,6 +127,13 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
       return true;
     }
 
+    /*
+    If we reach here, it's assumed that under replication without considering
+    UNHEALTHY replicas has been checked first. This means that a CLOSED
+    container with 2 CLOSED and 2 UNHEALTHY replicas is called under
+    replicated and not over replicated because only the 2 CLOSED replicas
+    are 'healthy' and have the expected data.
+    */
     if (health.getHealthState()
         == ContainerHealthResult.HealthState.OVER_REPLICATED) {
       report.incrementAndSample(
@@ -119,13 +142,25 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
       ContainerHealthResult.OverReplicatedHealthResult overHealth
           = ((ContainerHealthResult.OverReplicatedHealthResult) health);
       if (!overHealth.isReplicatedOkAfterPending() &&
-          !overHealth.hasMismatchedReplicas()) {
+          !overHealth.hasMismatchedReplicas() &&
+          overHealth.isSafelyOverReplicated()) {
+        /*
+        A mis matched replica is one whose state does not match the
+        container's state and the state is not UNHEALTHY.
+        For example, a CLOSED container with 1 CLOSED, 2 CLOSING, and 1
+        UNHEALTHY replica has 2 mis matched replicas (the 2 CLOSING ones).
+        We want to CLOSE the mis matched replicas first before queuing the
+        container for over replication.
+         */
         request.getReplicationQueue().enqueue(overHealth);
       }
       LOG.debug("Container {} is Over Replicated. isReplicatedOkAfterPending" +
-              " is [{}]. hasMismatchedReplicas is [{}]", container,
+              " is [{}]. hasMismatchedReplicas is [{}]. " +
+              "isSafelyOverReplicated is [{}].",
+          container,
           overHealth.isReplicatedOkAfterPending(),
-          overHealth.hasMismatchedReplicas());
+          overHealth.hasMismatchedReplicas(),
+          overHealth.isSafelyOverReplicated());
       return true;
     }
 
@@ -139,8 +174,10 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
       if (!misRepHealth.isReplicatedOkAfterPending()) {
         request.getReplicationQueue().enqueue(misRepHealth);
       }
-      LOG.debug("Container {} is Mid Replicated. isReplicatedOkAfterPending" +
-          " is [{}]", container, misRepHealth.isReplicatedOkAfterPending());
+      LOG.debug("Container {} is Mis Replicated. isReplicatedOkAfterPending" +
+              " is [{}]. Reason for mis replication is [{}].", container,
+          misRepHealth.isReplicatedOkAfterPending(),
+          misRepHealth.getMisReplicatedReason());
       return true;
     }
     // Should not get here, but in case it does the container is not healthy,
@@ -157,33 +194,70 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
     // Note that this setting is minReplicasForMaintenance. For EC the variable
     // is defined as remainingRedundancy which is subtly different.
     int minReplicasForMaintenance = request.getMaintenanceRedundancy();
+
+    /*
+    When checking for under replication, don't consider UNHEALTHY replicas.
+    This means that a CLOSED container with 1 CLOSED and 2 UNHEALTHY replicas
+    is under replicated and needs 2 more healthy replicas because we're not
+    counting the UNHEALTHY ones.
+     */
     RatisContainerReplicaCount replicaCount =
         new RatisContainerReplicaCount(container, replicas, replicaPendingOps,
             minReplicasForMaintenance, false);
-
     boolean sufficientlyReplicated
         = replicaCount.isSufficientlyReplicated(false);
     if (!sufficientlyReplicated) {
-      ContainerHealthResult.UnderReplicatedHealthResult result =
-          new ContainerHealthResult.UnderReplicatedHealthResult(
-              container, replicaCount.getRemainingRedundancy(),
-              replicaCount.inSufficientDueToDecommission(false),
-              replicaCount.isSufficientlyReplicated(true),
-              replicaCount.isUnrecoverable());
-      result.setHasHealthyReplicas(replicaCount.getHealthyReplicaCount() > 0);
-      return result;
+      return replicaCount.toUnderHealthResult();
     }
 
-    boolean isOverReplicated = replicaCount.isOverReplicated(false);
-    if (isOverReplicated) {
-      boolean repOkWithPending = !replicaCount.isOverReplicated(true);
-      ContainerHealthResult.OverReplicatedHealthResult result =
-          new ContainerHealthResult.OverReplicatedHealthResult(
-              container, replicaCount.getExcessRedundancy(false),
-              repOkWithPending);
-      result.setHasMismatchedReplicas(
-          replicaCount.getMisMatchedReplicaCount() > 0);
-      return result;
+
+    if (replicaCount.isOverReplicated(false)) {
+      // If the container is over replicated without considering UNHEALTHY
+      // then we know for sure it is over replicated, so mark as such.
+      return replicaCount.toOverHealthResult();
+    }
+    /*
+    When checking for over replication, consider UNHEALTHY replicas. This means
+    that other than checking over replication of healthy replicas (such as 4
+    CLOSED replicas of a CLOSED container), we're also checking for an excess
+    of unhealthy replicas (such as 3 CLOSED and 1 UNHEALTHY replicas of a
+    CLOSED container, or 3 CLOSED and 1 QUASI_CLOSED with incorrect sequence
+    ID for a CLOSED container).
+     */
+    RatisContainerReplicaCount consideringUnhealthy =
+        new RatisContainerReplicaCount(container, replicas, replicaPendingOps,
+            minReplicasForMaintenance, true);
+
+    if (consideringUnhealthy.isOverReplicated(false)) {
+      if (container.getState() == HddsProtos.LifeCycleState.CLOSED) {
+        return consideringUnhealthy.toOverHealthResult();
+      } else if (container.getState()
+          == HddsProtos.LifeCycleState.QUASI_CLOSED) {
+        // If the container is quasi-closed and over replicated, we may have a
+        // case where the excess replica is an unhealthy one, but it has a
+        // unique origin and therefore should not be deleted. In this case,
+        // we should not mark the container as over replicated.
+        // We ignore pending deletes, as a container is still over replicated
+        // until the pending delete completes.
+        ContainerReplica toDelete = ReplicationManagerUtil
+            .selectUnhealthyReplicaForDelete(container, replicas, 0,
+                (dnd) -> {
+                  try {
+                    return replicationManager.getNodeStatus(dnd);
+                  } catch (NodeNotFoundException e) {
+                    return null;
+                  }
+                });
+        if (toDelete != null) {
+          // There is at least one unhealthy replica that can be deleted, so
+          // return as over replicated.
+          return consideringUnhealthy.toOverHealthResult();
+        } else {
+          // Even though we have at least 4 replicas with some unhealthy, we
+          // can't delete any of them, so the container is not over replicated.
+          return new ContainerHealthResult.HealthyResult(container);
+        }
+      }
     }
 
     int requiredNodes = container.getReplicationConfig().getRequiredNodes();
@@ -196,7 +270,8 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
             getPlacementStatus(replicas, requiredNodes, replicaPendingOps);
       }
       return new ContainerHealthResult.MisReplicatedHealthResult(
-          container, placementStatusWithPending.isPolicySatisfied());
+          container, placementStatusWithPending.isPolicySatisfied(),
+          placementStatusWithPending.misReplicatedReason());
     }
 
     if (replicaCount.getUnhealthyReplicaCount() != 0) {
@@ -210,7 +285,7 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
    * Given a set of ContainerReplica, transform it to a list of DatanodeDetails
    * and then check if the list meets the container placement policy.
    * @param replicas List of containerReplica
-   * @param replicationFactor Expected Replication Factor of the containe
+   * @param replicationFactor Expected Replication Factor of the container
    * @return ContainerPlacementStatus indicating if the policy is met or not
    */
   private ContainerPlacementStatus getPlacementStatus(

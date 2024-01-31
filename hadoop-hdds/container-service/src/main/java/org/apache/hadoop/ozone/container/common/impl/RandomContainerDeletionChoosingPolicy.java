@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.common.impl;
 
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDeletionChoosingPolicyTemplate;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 
 import java.util.Collections;
 import java.util.List;
@@ -31,7 +30,7 @@ public class RandomContainerDeletionChoosingPolicy
 
   @Override
   protected void orderByDescendingPriority(
-      List<KeyValueContainerData> candidateContainers) {
+      List<ContainerData> candidateContainers) {
     Collections.shuffle(candidateContainers);
   }
 }

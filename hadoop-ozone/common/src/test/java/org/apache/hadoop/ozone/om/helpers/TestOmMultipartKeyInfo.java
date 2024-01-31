@@ -27,14 +27,14 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.util.Time;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
 import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toList;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 
 /**
  * Class to test OmMultipartKeyInfo.
@@ -105,7 +105,7 @@ public class TestOmMultipartKeyInfo {
     OmMultipartKeyInfo copy = subject.copyObject();
 
     // WHEN
-    subject.addPartKeyInfo(1, createPart(createKeyInfo()).build());
+    subject.addPartKeyInfo(createPart(createKeyInfo()).build());
 
     // THEN
     assertEquals(0, copy.getPartKeyInfoMap().size());

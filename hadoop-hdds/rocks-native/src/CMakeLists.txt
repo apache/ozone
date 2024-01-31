@@ -41,12 +41,12 @@ if(${SST_DUMP_INCLUDE})
     set_target_properties(
             rocksdb
             PROPERTIES
-            IMPORTED_LOCATION ${ROCKSDB_LIB}/librocksdb_debug.a)
+            IMPORTED_LOCATION ${ROCKSDB_LIB}/librocksdb.a)
     ADD_LIBRARY(rocks_tools STATIC IMPORTED)
     set_target_properties(
             rocks_tools
             PROPERTIES
-            IMPORTED_LOCATION ${ROCKSDB_LIB}/librocksdb_tools_debug.a)
+            IMPORTED_LOCATION ${ROCKSDB_LIB}/librocksdb_tools.a)
     ADD_LIBRARY(bz2 STATIC IMPORTED)
     set_target_properties(
             bz2

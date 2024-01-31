@@ -74,7 +74,7 @@ import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVer
  */
 public final class SCMDatanodeHeartbeatDispatcher {
 
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(SCMDatanodeHeartbeatDispatcher.class);
 
   private final NodeManager nodeManager;
@@ -290,6 +290,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
   public interface ContainerReport {
     DatanodeDetails getDatanodeDetails();
     ContainerReportType getType();
+    void mergeReport(ContainerReport val);
   }
 
   /**
@@ -345,6 +346,9 @@ public final class SCMDatanodeHeartbeatDispatcher {
       return getDatanodeDetails().toString() + ", {type: " + getType()
           + ", size: " + getReport().getReportsList().size() + "}";
     }
+
+    @Override
+    public void mergeReport(ContainerReport nextReport) { }
   }
 
   /**
@@ -384,6 +388,15 @@ public final class SCMDatanodeHeartbeatDispatcher {
     public String getEventId() {
       return getDatanodeDetails().toString() + ", {type: " + getType()
           + ", size: " + getReport().getReportList().size() + "}";
+    }
+
+    @Override
+    public void mergeReport(ContainerReport nextReport) {
+      if (nextReport.getType() == ContainerReportType.ICR) {
+        getReport().getReportList().addAll(
+            ((ReportFromDatanode<IncrementalContainerReportProto>) nextReport)
+                .getReport().getReportList());
+      }
     }
   }
 

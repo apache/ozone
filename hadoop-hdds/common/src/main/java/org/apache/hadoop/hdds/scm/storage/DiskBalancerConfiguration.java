@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
+import jakarta.annotation.Nonnull;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -254,8 +255,8 @@ public final class DiskBalancerConfiguration {
   }
 
   public static DiskBalancerConfiguration fromProtobuf(
-      @NotNull HddsProtos.DiskBalancerConfigurationProto proto,
-      @NotNull ConfigurationSource configurationSource) {
+      @NonNull HddsProtos.DiskBalancerConfigurationProto proto,
+      @NonNull ConfigurationSource configurationSource) {
     DiskBalancerConfiguration config =
         configurationSource.getObject(DiskBalancerConfiguration.class);
     if (proto.hasThreshold()) {

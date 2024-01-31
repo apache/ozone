@@ -39,12 +39,16 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.ozone.recon.api.types.ContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeyPrefixContainer;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistoryList;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
@@ -54,6 +58,7 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
+import jakarta.annotation.Nonnull;
 import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,6 +84,9 @@ public class ReconContainerMetadataManagerImpl
 
   @Inject
   private Configuration sqlConfiguration;
+
+  @Inject
+  private ReconOMMetadataManager omMetadataManager;
 
   @Inject
   public ReconContainerMetadataManagerImpl(ReconDBProvider reconDBProvider,
@@ -362,9 +370,9 @@ public class ReconContainerMetadataManagerImpl
       boolean skipPrevKey = false;
       if (StringUtils.isNotBlank(prevKeyPrefix)) {
         skipPrevKey = true;
-        seekKey = new ContainerKeyPrefix(containerId, prevKeyPrefix);
+        seekKey = ContainerKeyPrefix.get(containerId, prevKeyPrefix);
       } else {
-        seekKey = new ContainerKeyPrefix(containerId);
+        seekKey = ContainerKeyPrefix.get(containerId);
       }
       KeyValue<ContainerKeyPrefix, Integer> seekKeyValue =
           containerIterator.seek(seekKey);
@@ -395,10 +403,7 @@ public class ReconContainerMetadataManagerImpl
         // prefix.
         if (containerKeyPrefix.getContainerId() == containerId) {
           if (StringUtils.isNotEmpty(containerKeyPrefix.getKeyPrefix())) {
-            prefixes.put(new ContainerKeyPrefix(containerId,
-                    containerKeyPrefix.getKeyPrefix(),
-                    containerKeyPrefix.getKeyVersion()),
-                keyValue.getValue());
+            prefixes.put(containerKeyPrefix, keyValue.getValue());
           } else {
             LOG.warn("Null key prefix returned for containerId = {} ",
                 containerId);
@@ -435,7 +440,7 @@ public class ReconContainerMetadataManagerImpl
             containerIterator = containerKeyTable.iterator()) {
       ContainerKeyPrefix seekKey;
       if (prevContainer > 0L) {
-        seekKey = new ContainerKeyPrefix(prevContainer);
+        seekKey = ContainerKeyPrefix.get(prevContainer);
         KeyValue<ContainerKeyPrefix,
             Integer> seekKeyValue = containerIterator.seek(seekKey);
         // Check if RocksDB was able to correctly seek to the given
@@ -445,7 +450,7 @@ public class ReconContainerMetadataManagerImpl
           return containers;
         } else {
           // seek to the prevContainer+1 containerID to start scan
-          seekKey = new ContainerKeyPrefix(prevContainer + 1);
+          seekKey = ContainerKeyPrefix.get(prevContainer + 1);
           containerIterator.seek(seekKey);
         }
       }
@@ -455,6 +460,8 @@ public class ReconContainerMetadataManagerImpl
         ContainerKeyPrefix containerKeyPrefix = keyValue.getKey();
         Long containerID = containerKeyPrefix.getContainerId();
         Integer numberOfKeys = keyValue.getValue();
+        List<Pipeline> pipelines =
+            getPipelines(containerKeyPrefix);
 
         // break the loop if limit has been reached
         // and one more new entity needs to be added to the containers map
@@ -469,10 +476,32 @@ public class ReconContainerMetadataManagerImpl
         ContainerMetadata containerMetadata = containers.get(containerID);
         containerMetadata.setNumberOfKeys(containerMetadata.getNumberOfKeys() +
             numberOfKeys);
+        containerMetadata.setPipelines(pipelines);
         containers.put(containerID, containerMetadata);
       }
     }
     return containers;
+  }
+
+  @Nonnull
+  private List<Pipeline> getPipelines(ContainerKeyPrefix containerKeyPrefix)
+      throws IOException {
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(BucketLayout.LEGACY)
+        .getSkipCache(containerKeyPrefix.getKeyPrefix());
+    if (null == omKeyInfo) {
+      omKeyInfo =
+          omMetadataManager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+              .getSkipCache(containerKeyPrefix.getKeyPrefix());
+    }
+    List<Pipeline> pipelines = new ArrayList<>();
+    if (null != omKeyInfo) {
+      omKeyInfo.getKeyLocationVersions().stream().map(
+          omKeyLocationInfoGroup ->
+              omKeyLocationInfoGroup.getLocationList()
+                  .stream().map(omKeyLocationInfo -> pipelines.add(
+                      omKeyLocationInfo.getPipeline())));
+    }
+    return pipelines;
   }
 
   @Override
@@ -489,6 +518,10 @@ public class ReconContainerMetadataManagerImpl
                                           ContainerKeyPrefix containerKeyPrefix)
       throws IOException {
     containerKeyTable.deleteWithBatch(batch, containerKeyPrefix);
+    if (!StringUtils.isEmpty(containerKeyPrefix.getKeyPrefix())) {
+      keyContainerTable.deleteWithBatch(batch,
+          containerKeyPrefix.toKeyPrefixContainer());
+    }
   }
 
   /**
@@ -513,6 +546,11 @@ public class ReconContainerMetadataManagerImpl
   @Override
   public TableIterator getKeyContainerTableIterator() throws IOException {
     return keyContainerTable.iterator();
+  }
+
+  @Override
+  public Table<KeyPrefixContainer, Integer> getKeyContainerTable() {
+    return keyContainerTable;
   }
 
   /**
@@ -566,9 +604,9 @@ public class ReconContainerMetadataManagerImpl
              keyContainerTable.iterator()) {
       KeyPrefixContainer seekKey;
       if (keyVersion != -1) {
-        seekKey = new KeyPrefixContainer(keyPrefix, keyVersion);
+        seekKey = KeyPrefixContainer.get(keyPrefix, keyVersion);
       } else {
-        seekKey = new KeyPrefixContainer(keyPrefix);
+        seekKey = KeyPrefixContainer.get(keyPrefix);
       }
       KeyValue<KeyPrefixContainer, Integer> seekKeyValue =
           keyIterator.seek(seekKey);
@@ -594,10 +632,7 @@ public class ReconContainerMetadataManagerImpl
           if (keyPrefixContainer.getContainerId() != -1 &&
               (keyVersion == -1 ||
                   keyPrefixContainer.getKeyVersion() == keyVersion)) {
-            containers.put(new KeyPrefixContainer(keyPrefix,
-                    keyPrefixContainer.getKeyVersion(),
-                    keyPrefixContainer.getContainerId()),
-                keyValue.getValue());
+            containers.put(keyPrefixContainer, keyValue.getValue());
           } else {
             LOG.warn("Null container returned for keyPrefix = {}," +
                 " keyVersion = {} ", keyPrefix, keyVersion);

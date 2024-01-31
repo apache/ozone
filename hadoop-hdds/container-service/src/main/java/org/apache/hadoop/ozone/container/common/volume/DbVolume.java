@@ -56,16 +56,18 @@ public class DbVolume extends StorageVolume {
     super(b);
 
     this.hddsDbStorePathMap = new HashMap<>();
-    if (!b.getFailedVolume()) {
+    if (!b.getFailedVolume() && getVolumeInfo().isPresent()) {
       LOG.info("Creating DbVolume: {} of storage type : {} capacity : {}",
-          getStorageDir(), b.getStorageType(), getVolumeInfo().getCapacity());
+              getStorageDir(), b.getStorageType(),
+              getVolumeInfo().get().getCapacity());
+
       initialize();
     }
   }
 
   @Override
-  protected void initialize() throws IOException {
-    super.initialize();
+  protected void initializeImpl() throws IOException {
+    super.initializeImpl();
     scanForDbStorePaths();
   }
 

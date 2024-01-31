@@ -22,12 +22,12 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos
     .UpgradeFinalizationStatus;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -43,7 +43,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
-import com.google.common.base.Optional;
 
 /**
  * Handles finalizeUpgrade request.
@@ -57,9 +56,7 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(
-      OzoneManager ozoneManager, long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
     LOG.trace("Request: {}", getOmRequest());
     OMResponse.Builder responseBuilder =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
@@ -68,7 +65,7 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
 
     try {
       if (ozoneManager.getAclsEnabled()) {
-        final UserGroupInformation ugi = createUGI();
+        UserGroupInformation ugi = createUGIForApi();
         if (!ozoneManager.isAdmin(ugi)) {
           throw new OMException("Access denied for user " + ugi + ". "
               + "Superuser privilege is required to finalize upgrade.",
@@ -95,8 +92,7 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
       int lV = ozoneManager.getVersionManager().getMetadataLayoutVersion();
       omMetadataManager.getMetaTable().addCacheEntry(
           new CacheKey<>(LAYOUT_VERSION_KEY),
-          new CacheValue<>(Optional.of(String.valueOf(lV)),
-              transactionLogIndex));
+          CacheValue.get(termIndex.getIndex(), String.valueOf(lV)));
 
       FinalizeUpgradeResponse omResponse =
           FinalizeUpgradeResponse.newBuilder()
@@ -109,10 +105,8 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
     } catch (IOException e) {
       response = new OMFinalizeUpgradeResponse(
           createErrorOMResponse(responseBuilder, e), -1);
-    } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, response,
-          ozoneManagerDoubleBufferHelper);
     }
+
     return response;
   }
 

@@ -23,25 +23,29 @@ package org.apache.ozone.rocksdiff;
 public class CompactionNode {
   // Name of the SST file
   private final String fileName;
-  // The last snapshot created before this node came into existence
-  private final String snapshotId;
   private final long snapshotGeneration;
   private final long totalNumberOfKeys;
   private long cumulativeKeysReverseTraversal;
+  private final String startKey;
+  private final String endKey;
+  private final String columnFamily;
 
   /**
    * CompactionNode constructor.
    * @param file SST file (filename without extension)
-   * @param ssId snapshotId field. Added here for improved debuggability only
    * @param numKeys Number of keys in the SST
    * @param seqNum Snapshot generation (sequence number)
    */
-  public CompactionNode(String file, String ssId, long numKeys, long seqNum) {
+
+  public CompactionNode(String file, long numKeys, long seqNum,
+                        String startKey, String endKey, String columnFamily) {
     fileName = file;
-    snapshotId = ssId;
     totalNumberOfKeys = numKeys;
     snapshotGeneration = seqNum;
     cumulativeKeysReverseTraversal = 0L;
+    this.startKey = startKey;
+    this.endKey = endKey;
+    this.columnFamily = columnFamily;
   }
 
   @Override
@@ -51,10 +55,6 @@ public class CompactionNode {
 
   public String getFileName() {
     return fileName;
-  }
-
-  public String getSnapshotId() {
-    return snapshotId;
   }
 
   public long getSnapshotGeneration() {
@@ -67,6 +67,18 @@ public class CompactionNode {
 
   public long getCumulativeKeysReverseTraversal() {
     return cumulativeKeysReverseTraversal;
+  }
+
+  public String getStartKey() {
+    return startKey;
+  }
+
+  public String getEndKey() {
+    return endKey;
+  }
+
+  public String getColumnFamily() {
+    return columnFamily;
   }
 
   public void setCumulativeKeysReverseTraversal(

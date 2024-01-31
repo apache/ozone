@@ -24,10 +24,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotStatusProto;
 
 import org.apache.hadoop.util.Time;
-import org.junit.Test;
-import org.junit.Assert;
+import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
+
+import static org.apache.hadoop.hdds.HddsUtils.toProtobuf;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests SnapshotInfo metadata data structure holding state info for
@@ -35,7 +37,7 @@ import java.util.UUID;
  */
 public class TestOmSnapshotInfo {
 
-  private static final String SNAPSHOT_ID = UUID.randomUUID().toString();
+  private static final UUID SNAPSHOT_ID = UUID.randomUUID();
   private static final String NAME = "snapshot1";
   private static final String VOLUME_NAME = "vol1";
   private static final String BUCKET_NAME = "bucket1";
@@ -43,9 +45,8 @@ public class TestOmSnapshotInfo {
       SnapshotStatus.SNAPSHOT_ACTIVE;
   private static final long CREATION_TIME = Time.now();
   private static final long DELETION_TIME = -1;
-  private static final String PATH_PREVIOUS_SNAPSHOT_ID =
-      UUID.randomUUID().toString();
-  private static final String GLOBAL_PREVIOUS_SNAPSHOT_ID =
+  private static final UUID PATH_PREVIOUS_SNAPSHOT_ID = UUID.randomUUID();
+  private static final UUID GLOBAL_PREVIOUS_SNAPSHOT_ID =
       PATH_PREVIOUS_SNAPSHOT_ID;
   private static final String SNAPSHOT_PATH = "test/path";
   private static final String CHECKPOINT_DIR = "checkpoint.testdir";
@@ -53,35 +54,49 @@ public class TestOmSnapshotInfo {
 
   private SnapshotInfo createSnapshotInfo() {
     return new SnapshotInfo.Builder()
-        .setSnapshotID(SNAPSHOT_ID)
+        .setSnapshotId(SNAPSHOT_ID)
         .setName(NAME)
         .setVolumeName(VOLUME_NAME)
         .setBucketName(BUCKET_NAME)
         .setSnapshotStatus(SNAPSHOT_STATUS)
         .setCreationTime(CREATION_TIME)
         .setDeletionTime(DELETION_TIME)
-        .setPathPreviousSnapshotID(PATH_PREVIOUS_SNAPSHOT_ID)
-        .setGlobalPreviousSnapshotID(GLOBAL_PREVIOUS_SNAPSHOT_ID)
+        .setPathPreviousSnapshotId(PATH_PREVIOUS_SNAPSHOT_ID)
+        .setGlobalPreviousSnapshotId(GLOBAL_PREVIOUS_SNAPSHOT_ID)
         .setSnapshotPath(SNAPSHOT_PATH)
         .setCheckpointDir(CHECKPOINT_DIR)
         .setDbTxSequenceNumber(DB_TX_SEQUENCE_NUMBER)
+        .setDeepClean(false)
+        .setSstFiltered(false)
+        .setReferencedSize(2000L)
+        .setReferencedReplicatedSize(6000L)
+        .setExclusiveSize(1000L)
+        .setExclusiveReplicatedSize(3000L)
+        .setDeepCleanedDeletedDir(false)
         .build();
   }
 
   private OzoneManagerProtocolProtos.SnapshotInfo createSnapshotInfoProto() {
     return OzoneManagerProtocolProtos.SnapshotInfo.newBuilder()
-        .setSnapshotID(SNAPSHOT_ID)
+        .setSnapshotID(toProtobuf(SNAPSHOT_ID))
         .setName(NAME)
         .setVolumeName(VOLUME_NAME)
         .setBucketName(BUCKET_NAME)
         .setSnapshotStatus(SnapshotStatusProto.SNAPSHOT_ACTIVE)
         .setCreationTime(CREATION_TIME)
         .setDeletionTime(DELETION_TIME)
-        .setPathPreviousSnapshotID(PATH_PREVIOUS_SNAPSHOT_ID)
-        .setGlobalPreviousSnapshotID(GLOBAL_PREVIOUS_SNAPSHOT_ID)
+        .setPathPreviousSnapshotID(toProtobuf(PATH_PREVIOUS_SNAPSHOT_ID))
+        .setGlobalPreviousSnapshotID(toProtobuf(GLOBAL_PREVIOUS_SNAPSHOT_ID))
         .setSnapshotPath(SNAPSHOT_PATH)
         .setCheckpointDir(CHECKPOINT_DIR)
         .setDbTxSequenceNumber(DB_TX_SEQUENCE_NUMBER)
+        .setDeepClean(false)
+        .setSstFiltered(false)
+        .setReferencedSize(2000L)
+        .setReferencedReplicatedSize(6000L)
+        .setExclusiveSize(1000L)
+        .setExclusiveReplicatedSize(3000L)
+        .setDeepCleanedDeletedDir(false)
         .build();
   }
 
@@ -89,7 +104,7 @@ public class TestOmSnapshotInfo {
   public void testSnapshotStatusProtoToObject() {
     OzoneManagerProtocolProtos.SnapshotInfo snapshotInfoEntry =
         createSnapshotInfoProto();
-    Assert.assertEquals(SNAPSHOT_STATUS,
+    assertEquals(SNAPSHOT_STATUS,
         SnapshotStatus.valueOf(snapshotInfoEntry.getSnapshotStatus()));
   }
 
@@ -101,19 +116,37 @@ public class TestOmSnapshotInfo {
 
     OzoneManagerProtocolProtos.SnapshotInfo snapshotInfoEntryActual =
         snapshotInfo.getProtobuf();
-    Assert.assertEquals(snapshotInfoEntryExpected.getSnapshotID(),
+    assertEquals(snapshotInfoEntryExpected.getSnapshotID(),
         snapshotInfoEntryActual.getSnapshotID());
-    Assert.assertEquals(snapshotInfoEntryExpected.getName(),
+    assertEquals(snapshotInfoEntryExpected.getName(),
         snapshotInfoEntryActual.getName());
-    Assert.assertEquals(snapshotInfoEntryExpected.getVolumeName(),
+    assertEquals(snapshotInfoEntryExpected.getVolumeName(),
         snapshotInfoEntryActual.getVolumeName());
-    Assert.assertEquals(snapshotInfoEntryExpected.getBucketName(),
+    assertEquals(snapshotInfoEntryExpected.getBucketName(),
         snapshotInfoEntryActual.getBucketName());
-    Assert.assertEquals(snapshotInfoEntryExpected.getSnapshotStatus(),
+    assertEquals(snapshotInfoEntryExpected.getSnapshotStatus(),
         snapshotInfoEntryActual.getSnapshotStatus());
-    Assert.assertEquals(snapshotInfoEntryExpected.getDbTxSequenceNumber(),
+    assertEquals(snapshotInfoEntryExpected.getDbTxSequenceNumber(),
         snapshotInfoEntryActual.getDbTxSequenceNumber());
-    Assert.assertEquals(snapshotInfoEntryExpected, snapshotInfoEntryActual);
+    assertEquals(snapshotInfoEntryExpected.getDeepClean(),
+        snapshotInfoEntryActual.getDeepClean());
+    assertEquals(snapshotInfoEntryExpected.getSstFiltered(),
+        snapshotInfoEntryActual.getSstFiltered());
+    assertEquals(snapshotInfoEntryExpected.getReferencedSize(),
+        snapshotInfoEntryActual.getReferencedSize());
+    assertEquals(
+        snapshotInfoEntryExpected.getReferencedReplicatedSize(),
+        snapshotInfoEntryActual.getReferencedReplicatedSize());
+    assertEquals(snapshotInfoEntryExpected.getExclusiveSize(),
+        snapshotInfoEntryActual.getExclusiveSize());
+    assertEquals(
+        snapshotInfoEntryExpected.getExclusiveReplicatedSize(),
+        snapshotInfoEntryActual.getExclusiveReplicatedSize());
+    assertEquals(
+        snapshotInfoEntryExpected.getDeepCleanedDeletedDir(),
+        snapshotInfoEntryActual.getDeepCleanedDeletedDir());
+
+    assertEquals(snapshotInfoEntryExpected, snapshotInfoEntryActual);
   }
 
   @Test
@@ -124,17 +157,34 @@ public class TestOmSnapshotInfo {
 
     SnapshotInfo snapshotInfoActual = SnapshotInfo
         .getFromProtobuf(snapshotInfoEntry);
-    Assert.assertEquals(snapshotInfoExpected.getSnapshotID(),
-        snapshotInfoActual.getSnapshotID());
-    Assert.assertEquals(snapshotInfoExpected.getName(),
+    assertEquals(snapshotInfoExpected.getSnapshotId(),
+        snapshotInfoActual.getSnapshotId());
+    assertEquals(snapshotInfoExpected.getName(),
         snapshotInfoActual.getName());
-    Assert.assertEquals(snapshotInfoExpected.getVolumeName(),
+    assertEquals(snapshotInfoExpected.getVolumeName(),
         snapshotInfoActual.getVolumeName());
-    Assert.assertEquals(snapshotInfoExpected.getBucketName(),
+    assertEquals(snapshotInfoExpected.getBucketName(),
         snapshotInfoActual.getBucketName());
-    Assert.assertEquals(snapshotInfoExpected.getSnapshotStatus(),
+    assertEquals(snapshotInfoExpected.getSnapshotStatus(),
         snapshotInfoActual.getSnapshotStatus());
-    Assert.assertEquals(snapshotInfoExpected, snapshotInfoActual);
+    assertEquals(snapshotInfoExpected.getDbTxSequenceNumber(),
+        snapshotInfoActual.getDbTxSequenceNumber());
+    assertEquals(snapshotInfoExpected.getDeepClean(),
+        snapshotInfoActual.getDeepClean());
+    assertEquals(snapshotInfoExpected.isSstFiltered(),
+        snapshotInfoActual.isSstFiltered());
+    assertEquals(snapshotInfoExpected.getReferencedSize(),
+        snapshotInfoActual.getReferencedSize());
+    assertEquals(snapshotInfoExpected.getReferencedReplicatedSize(),
+        snapshotInfoActual.getReferencedReplicatedSize());
+    assertEquals(snapshotInfoExpected.getExclusiveSize(),
+        snapshotInfoActual.getExclusiveSize());
+    assertEquals(snapshotInfoExpected.getExclusiveReplicatedSize(),
+        snapshotInfoActual.getExclusiveReplicatedSize());
+    assertEquals(snapshotInfoExpected.getDeepCleanedDeletedDir(),
+        snapshotInfoActual.getDeepCleanedDeletedDir());
+
+    assertEquals(snapshotInfoExpected, snapshotInfoActual);
   }
 
   @Test
@@ -142,6 +192,6 @@ public class TestOmSnapshotInfo {
     // GMT: Sunday, July 10, 2022 7:56:55.001 PM
     long millis = 1657483015001L;
     String name = SnapshotInfo.generateName(millis);
-    Assert.assertEquals("s20220710-195655.001", name);
+    assertEquals("s20220710-195655.001", name);
   }
 }

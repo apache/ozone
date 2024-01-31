@@ -22,8 +22,6 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.hdds.client.BlockID;
@@ -38,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -45,9 +44,12 @@ import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.junit.Assert;
-import org.junit.Test;
-import org.mockito.Mockito;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * UNIT test for BlockOutputStream.
@@ -93,8 +95,8 @@ public class TestBlockOutputStreamCorrectness {
 
     final Pipeline pipeline = MockPipeline.createRatisPipeline();
 
-    final XceiverClientManager xcm = Mockito.mock(XceiverClientManager.class);
-    Mockito.when(xcm.acquireClient(Mockito.any()))
+    final XceiverClientManager xcm = mock(XceiverClientManager.class);
+    when(xcm.acquireClient(any()))
         .thenReturn(new MockXceiverClientSpi(pipeline));
 
     OzoneClientConfig config = new OzoneClientConfig();
@@ -104,16 +106,17 @@ public class TestBlockOutputStreamCorrectness {
     config.setStreamBufferFlushSize(16 * 1024 * 1024);
     config.setChecksumType(ChecksumType.NONE);
     config.setBytesPerChecksum(256 * 1024);
+    StreamBufferArgs streamBufferArgs =
+        StreamBufferArgs.getDefaultStreamBufferArgs(pipeline.getReplicationConfig(), config);
 
-    BlockOutputStream outputStream = new RatisBlockOutputStream(
+    return new RatisBlockOutputStream(
         new BlockID(1L, 1L),
         xcm,
         pipeline,
         bufferPool,
         config,
         null,
-        ContainerClientMetrics.acquire());
-    return outputStream;
+        ContainerClientMetrics.acquire(), streamBufferArgs);
   }
 
   /**
@@ -123,9 +126,9 @@ public class TestBlockOutputStreamCorrectness {
 
     private final Pipeline pipeline;
 
-    private Random expectedRandomStream = new Random(SEED);
+    private final Random expectedRandomStream = new Random(SEED);
 
-    private AtomicInteger counter = new AtomicInteger();
+    private final AtomicInteger counter = new AtomicInteger();
 
     MockXceiverClientSpi(Pipeline pipeline) {
       super();
@@ -133,12 +136,7 @@ public class TestBlockOutputStreamCorrectness {
     }
 
     @Override
-    public void connect() throws Exception {
-
-    }
-
-    @Override
-    public void connect(String encodedToken) throws Exception {
+    public void connect() {
 
     }
 
@@ -155,9 +153,7 @@ public class TestBlockOutputStreamCorrectness {
     @Override
     public XceiverClientReply sendCommandAsync(
         ContainerCommandRequestProto request
-    )
-        throws IOException, ExecutionException, InterruptedException {
-
+    ) {
       final ContainerCommandResponseProto.Builder builder =
           ContainerCommandResponseProto.newBuilder()
               .setResult(Result.SUCCESS)
@@ -178,10 +174,9 @@ public class TestBlockOutputStreamCorrectness {
       case WriteChunk:
         ByteString data = request.getWriteChunk().getData();
         final byte[] writePayload = data.toByteArray();
-        for (int i = 0; i < writePayload.length; i++) {
+        for (byte b : writePayload) {
           byte expectedByte = (byte) expectedRandomStream.nextInt();
-          Assert.assertEquals(expectedByte,
-              writePayload[i]);
+          assertEquals(expectedByte, b);
         }
         break;
       default:
@@ -200,9 +195,7 @@ public class TestBlockOutputStreamCorrectness {
     }
 
     @Override
-    public XceiverClientReply watchForCommit(long index)
-        throws InterruptedException, ExecutionException, TimeoutException,
-        IOException {
+    public XceiverClientReply watchForCommit(long index) {
       final ContainerCommandResponseProto.Builder builder =
           ContainerCommandResponseProto.newBuilder()
               .setCmdType(Type.WriteChunk)
@@ -220,8 +213,7 @@ public class TestBlockOutputStreamCorrectness {
 
     @Override
     public Map<DatanodeDetails, ContainerCommandResponseProto>
-        sendCommandOnAllNodes(ContainerCommandRequestProto request
-    ) throws IOException, InterruptedException {
+        sendCommandOnAllNodes(ContainerCommandRequestProto request) {
       return null;
     }
   }

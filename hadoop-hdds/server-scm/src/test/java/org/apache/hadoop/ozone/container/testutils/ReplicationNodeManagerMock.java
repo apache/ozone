@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -88,7 +89,7 @@ public class ReplicationNodeManagerMock implements NodeManager {
   }
 
   @Override
-  public Map<String, List<String>> getNodeStatusInfo() {
+  public Map<String, Map<String, String>> getNodeStatusInfo() {
     return null;
   }
 
@@ -489,6 +490,12 @@ public class ReplicationNodeManagerMock implements NodeManager {
   }
 
   @Override
+  public Map<SCMCommandProto.Type, Integer> getTotalDatanodeCommandCounts(
+      DatanodeDetails datanodeDetails, SCMCommandProto.Type... cmdType) {
+    return Collections.emptyMap();
+  }
+
+  @Override
   public void onMessage(CommandForDatanode commandForDatanode,
                         EventPublisher publisher) {
     // do nothing.
@@ -520,6 +527,11 @@ public class ReplicationNodeManagerMock implements NodeManager {
   }
 
   @Override
+  public int totalHealthyVolumeCount() {
+    return 0;
+  }
+
+  @Override
   public int pipelineLimit(DatanodeDetails dn) {
     return 0;
   }
@@ -527,5 +539,10 @@ public class ReplicationNodeManagerMock implements NodeManager {
   @Override
   public int minPipelineLimit(List<DatanodeDetails> dn) {
     return 0;
+  }
+
+  @Override
+  public long getLastHeartbeat(DatanodeDetails datanodeDetails) {
+    return -1;
   }
 }

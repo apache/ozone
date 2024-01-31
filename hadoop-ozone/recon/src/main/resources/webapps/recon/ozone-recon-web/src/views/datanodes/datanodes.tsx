@@ -17,7 +17,6 @@
  */
 
 import React from 'react';
-import axios from 'axios';
 import {Table, Icon, Tooltip} from 'antd';
 import {PaginationConfig} from 'antd/lib/pagination';
 import moment from 'moment';
@@ -37,12 +36,13 @@ import {MultiSelect, IOption} from 'components/multiSelect/multiSelect';
 import {ActionMeta, ValueType} from 'react-select';
 import {showDataFetchError} from 'utils/common';
 import {ColumnSearch} from 'utils/columnSearch';
+import { AxiosGetHelper } from 'utils/axiosRequestHelper';
 
 interface IDatanodeResponse {
   hostname: string;
   state: DatanodeState;
   opState: DatanodeOpState;
-  lastHeartbeat: number;
+  lastHeartbeat: string;
   storageReport: IStorageReport;
   pipelines: IPipeline[];
   containers: number;
@@ -69,6 +69,7 @@ interface IDatanode {
   storageUsed: number;
   storageTotal: number;
   storageRemaining: number;
+  storageCommitted: number;
   pipelines: IPipeline[];
   containers: number;
   openContainers: number;
@@ -173,7 +174,7 @@ const COLUMNS = [
     render: (text: string, record: IDatanode) => (
       <StorageBar
         total={record.storageTotal} used={record.storageUsed}
-        remaining={record.storageRemaining}/>
+        remaining={record.storageRemaining} committed={record.storageCommitted}/>
     )},
   {
     title: 'Last Heartbeat',
@@ -182,7 +183,7 @@ const COLUMNS = [
     isVisible: true,
     sorter: (a: IDatanode, b: IDatanode) => a.lastHeartbeat - b.lastHeartbeat,
     render: (heartbeat: number) => {
-      return heartbeat > 0 ? moment(heartbeat).format('ll LTS') : 'NA';
+      return heartbeat > 0 ? getTimeDiffFromTimestamp(heartbeat) : 'NA';
     }
   },
   {
@@ -303,6 +304,28 @@ const defaultColumns: IOption[] = COLUMNS.map(column => ({
   value: column.key
 }));
 
+const getTimeDiffFromTimestamp = (timestamp: number): string => {
+  const timestampDate = new Date(timestamp);
+  const currentDate = new Date();
+
+  let elapsedTime = "";
+  let duration: moment.Duration = moment.duration(
+    moment(currentDate).diff(moment(timestampDate))
+  )
+
+  const durationKeys = ["seconds", "minutes", "hours", "days", "months", "years"]
+  durationKeys.forEach((k) => {
+    let time = duration["_data"][k]
+    if (time !== 0){
+      elapsedTime = time + `${k.substring(0, 1)} ` + elapsedTime
+    }
+  })
+
+  return elapsedTime.trim().length === 0 ? "Just now" : elapsedTime.trim() + " ago";
+}
+
+let cancelSignal: AbortController;
+
 export class Datanodes extends React.Component<Record<string, object>, IDatanodesState> {
   autoReload: AutoReloadHelper;
 
@@ -320,7 +343,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
   }
 
   _handleColumnChange = (selected: ValueType<IOption>, _action: ActionMeta<IOption>) => {
-    const selectedColumns = (selected as IOption[]);
+    const selectedColumns = (selected == null ? [] : selected as IOption[]);
     this.setState({
       selectedColumns
     });
@@ -339,7 +362,10 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
       loading: true,
       selectedColumns: this._getSelectedColumns(prevState.selectedColumns)
     }));
-    axios.get('/api/v1/datanodes').then(response => {
+    
+    const { request, controller } = AxiosGetHelper('/api/v1/datanodes', cancelSignal);
+    cancelSignal = controller;
+    request.then(response => {
       const datanodesResponse: IDatanodesResponse = response.data;
       const totalCount = datanodesResponse.totalCount;
       const datanodes: IDatanodeResponse[] = datanodesResponse.datanodes;
@@ -353,6 +379,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
           storageUsed: datanode.storageReport.used,
           storageTotal: datanode.storageReport.capacity,
           storageRemaining: datanode.storageReport.remaining,
+          storageCommitted: datanode.storageReport.committed,
           pipelines: datanode.pipelines,
           containers: datanode.containers,
           openContainers: datanode.openContainers,
@@ -387,6 +414,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
 
   componentWillUnmount(): void {
     this.autoReload.stopPolling();
+    cancelSignal && cancelSignal.abort();
   }
 
   onShowSizeChange = (current: number, pageSize: number) => {
@@ -448,6 +476,7 @@ export class Datanodes extends React.Component<Record<string, object>, IDatanode
             pagination={paginationConfig}
             rowKey='hostname'
             scroll={{x: true, y: false, scrollToFirstRowOnChange: true}}
+            locale={{filterTitle: ""}}
           />
         </div>
       </div>

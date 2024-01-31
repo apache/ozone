@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckParams;
 
 import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,11 +50,17 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESE
  * - fsAvail: reported remaining space from local fs.
  * - fsUsed: reported total used space from local fs.
  * - fsCapacity: reported total capacity from local fs.
+ * - minVolumeFreeSpace (mvfs) : determines the free space for closing
+     containers.This is like adding a few reserved bytes to reserved space.
+     Dn's will send close container action to SCM at this limit & it is
+     configurable.
+
  *
- * |----used----|   (avail)   |++++++++reserved++++++++|
- * |<-     capacity         ->|
- *              |     fsAvail      |-------other-------|
- * |<-                   fsCapacity                  ->|
+ *
+ * |----used----|   (avail)   |++mvfs++|++++reserved+++++++|
+ * |<-     capacity                  ->|
+ *              |     fsAvail      |-------other-----------|
+ * |<-                   fsCapacity                      ->|
  *
  * What we could directly get from local fs:
  *     fsCapacity, fsAvail, (fsUsed = fsCapacity - fsAvail)
@@ -231,6 +238,15 @@ public final class VolumeInfo {
   public long getAvailable() {
     long avail = getCapacity() - usage.getUsedSpace();
     return Math.max(Math.min(avail, usage.getAvailable()), 0);
+  }
+
+  public long getAvailable(SpaceUsageSource precomputedValues) {
+    long avail = precomputedValues.getCapacity() - usage.getUsedSpace();
+    return Math.max(Math.min(avail, usage.getAvailable(precomputedValues)), 0);
+  }
+
+  public SpaceUsageSource getCurrentUsage() {
+    return usage.snapshot();
   }
 
   public void incrementUsedSpace(long usedSpace) {

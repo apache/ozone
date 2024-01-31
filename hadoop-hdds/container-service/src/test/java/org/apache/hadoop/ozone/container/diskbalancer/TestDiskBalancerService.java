@@ -44,20 +44,27 @@ import org.junit.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
 import static org.powermock.api.mockito.PowerMockito.mock;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * This is a test class for DiskBalancerService.
  */
-@RunWith(Parameterized.class)
 public class TestDiskBalancerService {
   private File testRoot;
   private String scmId;
@@ -75,12 +82,7 @@ public class TestDiskBalancerService {
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
-    return ContainerTestVersionInfo.versionParameters();
-  }
-
-  @Before
+  @BeforeEach
   public void init() throws IOException {
     testRoot = GenericTestUtils
         .getTestDir(TestBlockDeletingService.class.getSimpleName());
@@ -99,14 +101,14 @@ public class TestDiskBalancerService {
     createDbInstancesForTestIfNeeded(volumeSet, scmId, scmId, conf);
   }
 
-  @After
+  @AfterEach
   public void cleanup() throws IOException {
     BlockUtils.shutdownCache(conf);
     FileUtils.deleteDirectory(testRoot);
   }
 
-  @Test
   @Timeout(30)
+  @ContainerTestVersionInfo.ContainerTest
   public void testUpdateService() throws Exception {
     // Increase volume's usedBytes
     for (StorageVolume volume : volumeSet.getVolumeMap().values()) {
@@ -131,18 +133,18 @@ public class TestDiskBalancerService {
 
     svc.start();
 
-    Assert.assertTrue(svc.getDiskBalancerInfo().isShouldRun());
-    Assert.assertEquals(10, svc.getDiskBalancerInfo().getThreshold(), 0.0);
-    Assert.assertEquals(1, svc.getDiskBalancerInfo().getBandwidthInMB());
-    Assert.assertEquals(5, svc.getDiskBalancerInfo().getParallelThread());
+    assertTrue(svc.getDiskBalancerInfo().isShouldRun());
+    assertEquals(10, svc.getDiskBalancerInfo().getThreshold(), 0.0);
+    assertEquals(1, svc.getDiskBalancerInfo().getBandwidthInMB());
+    assertEquals(5, svc.getDiskBalancerInfo().getParallelThread());
 
     DiskBalancerInfo newInfo = new DiskBalancerInfo(false, 20.0d, 5L, 10);
     svc.refresh(newInfo);
 
-    Assert.assertFalse(svc.getDiskBalancerInfo().isShouldRun());
-    Assert.assertEquals(20, svc.getDiskBalancerInfo().getThreshold(), 0.0);
-    Assert.assertEquals(5, svc.getDiskBalancerInfo().getBandwidthInMB());
-    Assert.assertEquals(10, svc.getDiskBalancerInfo().getParallelThread());
+    assertFalse(svc.getDiskBalancerInfo().isShouldRun());
+    assertEquals(20, svc.getDiskBalancerInfo().getThreshold(), 0.0);
+    assertEquals(5, svc.getDiskBalancerInfo().getBandwidthInMB());
+    assertEquals(10, svc.getDiskBalancerInfo().getParallelThread());
 
     svc.shutdown();
   }
@@ -158,9 +160,9 @@ public class TestDiskBalancerService {
     DiskBalancerServiceTestImpl svc =
         getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
 
-    Assert.assertTrue(svc.getContainerChoosingPolicy()
+    assertTrue(svc.getContainerChoosingPolicy()
         instanceof DefaultContainerChoosingPolicy);
-    Assert.assertTrue(svc.getVolumeChoosingPolicy()
+    assertTrue(svc.getVolumeChoosingPolicy()
         instanceof DefaultVolumeChoosingPolicy);
   }
 

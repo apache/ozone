@@ -16,27 +16,31 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.junit.Assert;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 /**
  * Tests to verify bucket ops with older version client.
  */
+@Timeout(1200)
 public class TestBucketLayoutWithOlderClient {
 
   private static MiniOzoneCluster cluster = null;
@@ -44,9 +48,7 @@ public class TestBucketLayoutWithOlderClient {
   private static String clusterId;
   private static String scmId;
   private static String omId;
-
-  @Rule
-  public Timeout timeout = new Timeout(1200000);
+  private static OzoneClient client;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -54,7 +56,7 @@ public class TestBucketLayoutWithOlderClient {
    *
    * @throws IOException
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     clusterId = UUID.randomUUID().toString();
@@ -65,20 +67,21 @@ public class TestBucketLayoutWithOlderClient {
     cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
         .setScmId(scmId).setOmId(omId).build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
   }
 
   @Test
   public void testCreateBucketWithOlderClient() throws Exception {
     // create a volume and a bucket without bucket layout argument
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster, null);
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, null);
     String volumeName = bucket.getVolumeName();
     // OM defaulted bucket layout
-    Assert.assertEquals(BucketLayout.OBJECT_STORE, bucket.getBucketLayout());
+    assertEquals(BucketLayout.OBJECT_STORE, bucket.getBucketLayout());
 
     // Sets bucket layout explicitly.
     OzoneBucket fsobucket = TestDataUtil
-        .createVolumeAndBucket(cluster, BucketLayout.FILE_SYSTEM_OPTIMIZED);
-    Assert.assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        .createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
         fsobucket.getBucketLayout());
 
     // Create bucket request by an older client.
@@ -105,20 +108,20 @@ public class TestBucketLayoutWithOlderClient {
         omResponse = cluster.getOzoneManager().getOmServerProtocol()
         .submitRequest(null, createBucketReq);
 
-    Assert.assertEquals(omResponse.getStatus(),
-        OzoneManagerProtocolProtos.Status.OK);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, omResponse.getStatus());
 
     OmBucketInfo bucketInfo =
         cluster.getOzoneManager().getBucketInfo(volumeName, buckName);
-    Assert.assertNotNull(bucketInfo);
-    Assert.assertEquals(BucketLayout.LEGACY, bucketInfo.getBucketLayout());
+    assertNotNull(bucketInfo);
+    assertEquals(BucketLayout.LEGACY, bucketInfo.getBucketLayout());
   }
 
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }

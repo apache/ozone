@@ -17,14 +17,14 @@
  */
 
 import React from 'react';
-import axios from 'axios';
 import Plot from 'react-plotly.js';
-import {Row, Col, Icon, Button, Input, Menu, Dropdown} from 'antd';
+import {Row, Col, Icon, Button, Input, Menu, Dropdown, Tooltip} from 'antd';
 import {DetailPanel} from 'components/rightDrawer/rightDrawer';
 import * as Plotly from 'plotly.js';
-import {showDataFetchError} from 'utils/common';
+import {byteToSize, showDataFetchError} from 'utils/common';
 import './diskUsage.less';
 import moment from 'moment';
+import { AxiosGetHelper, cancelRequests } from 'utils/axiosRequestHelper';
 
 const DEFAULT_DISPLAY_LIMIT = 10;
 const OTHER_PATH_NAME = 'Other Objects';
@@ -58,6 +58,11 @@ interface IDUState {
   displayLimit: number;
 }
 
+let cancelPieSignal: AbortController
+let cancelSummarySignal: AbortController
+let cancelQuotaSignal: AbortController;
+let cancelKeyMetadataSignal: AbortController;
+
 export class DiskUsage extends React.Component<Record<string, object>, IDUState> {
   constructor(props = {}) {
     super(props);
@@ -74,26 +79,19 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     };
   }
 
-  byteToSize = (bytes, decimals) => {
-    if (bytes === 0) {
-      return '0 Bytes';
-    }
-
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB'];
-
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-    return `${Number.parseFloat((bytes / (k ** i)).toFixed(dm))} ${sizes[i]}`;
-  };
-
   handleChange = e => {
     this.setState({inputPath: e.target.value, showPanel: false});
   };
 
   handleSubmit = _e => {
     // Avoid empty request trigger 400 response
+    cancelRequests([
+      cancelKeyMetadataSignal,
+      cancelQuotaSignal,
+      cancelSummarySignal,
+      cancelPieSignal
+    ]);
+
     if (!this.state.inputPath) {
       this.updatePieChart('/', DEFAULT_DISPLAY_LIMIT);
       return;
@@ -105,6 +103,13 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
   // The returned path is passed in, which should have been
   // normalized by the backend
   goBack = (e, path) => {
+    cancelRequests([
+      cancelKeyMetadataSignal,
+      cancelQuotaSignal,
+      cancelSummarySignal,
+      cancelPieSignal
+    ]);
+
     if (!path || path === '/') {
       return;
     }
@@ -125,7 +130,9 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       isLoading: true
     });
     const duEndpoint = `/api/v1/namespace/du?path=${path}&files=true`;
-    axios.get(duEndpoint).then(response => {
+    const { request, controller } = AxiosGetHelper(duEndpoint, cancelPieSignal)
+    cancelPieSignal = controller;
+    request.then(response => {
       const duResponse: IDUResponse[] = response.data;
       const status = duResponse.status;
       if (status === 'PATH_NOT_FOUND') {
@@ -161,7 +168,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         pathLabels = [subpathName];
         values = [0.1];
         percentage = [100.00];
-        sizeStr = [this.byteToSize(duResponse.size, 1)];
+        sizeStr = [byteToSize(duResponse.size, 1)];
       }
       else {
         pathLabels = subpaths.map(subpath => {
@@ -182,7 +189,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
         });
 
         sizeStr = subpaths.map(subpath => {
-          return this.byteToSize(subpath.size, 1);
+          return byteToSize(subpath.size, 1);
         });
       }
     
@@ -221,6 +228,15 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     this.updatePieChart('/', DEFAULT_DISPLAY_LIMIT);
   }
 
+  componentWillUnmount(): void {
+    cancelRequests([
+      cancelPieSignal,
+      cancelSummarySignal,
+      cancelQuotaSignal,
+      cancelKeyMetadataSignal
+    ]);
+  }
+
   clickPieSection(e, curPath: string): void {
     const subPath: string = e.points[0].label;
     if (subPath === OTHER_PATH_NAME) {
@@ -234,6 +250,12 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
   }
 
   refreshCurPath(e, path: string): void {
+    cancelRequests([
+      cancelKeyMetadataSignal,
+      cancelQuotaSignal,
+      cancelSummarySignal
+    ]);
+
     if (!path) {
       return;
     }
@@ -257,18 +279,23 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     const summaryEndpoint = `/api/v1/namespace/summary?path=${path}`;
     const keys = [];
     const values = [];
-    axios.get(summaryEndpoint).then(response => {
+
+    const { request: summaryRequest, controller: summaryNewController } = AxiosGetHelper(summaryEndpoint, cancelSummarySignal);
+    cancelSummarySignal = summaryNewController;
+    summaryRequest.then(response => {
       const summaryResponse = response.data;
       keys.push('Entity Type');
       values.push(summaryResponse.type);
 
       if (summaryResponse.countStats.type === 'KEY') {
         const keyEndpoint = `/api/v1/namespace/du?path=${path}&replica=true`;
-        axios.get(keyEndpoint).then(response => {
+        const { request: metadataRequest, controller: metadataNewController } = AxiosGetHelper(keyEndpoint, cancelKeyMetadataSignal);
+        cancelKeyMetadataSignal = metadataNewController;
+        metadataRequest.then(response => {
           keys.push('File Size');
-          values.push(this.byteToSize(response.data.size, 3));
+          values.push(byteToSize(response.data.size, 3));
           keys.push('File Size With Replication');
-          values.push(this.byteToSize(response.data.sizeWithReplica, 3));
+          values.push(byteToSize(response.data.sizeWithReplica, 3));
           console.log(values);
 
           this.setState({
@@ -328,7 +355,7 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
       if (summaryResponse.objectInfo.dataSize && summaryResponse.objectInfo.dataSize !== -1) {
         keys.push('Data Size');
-        values.push(this.byteToSize(summaryResponse.objectInfo.dataSize, 3));
+        values.push(byteToSize(summaryResponse.objectInfo.dataSize, 3));
       }
 
       if (summaryResponse.objectInfo.encInfo && summaryResponse.objectInfo.encInfo !== -1) {
@@ -363,12 +390,12 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
 
       if (summaryResponse.objectInfo.quotaInBytes && summaryResponse.objectInfo.quotaInBytes !== -1) {
         keys.push('Quota In Bytes');
-        values.push(this.byteToSize(summaryResponse.objectInfo.quotaInBytes, 3));
+        values.push(byteToSize(summaryResponse.objectInfo.quotaInBytes, 3));
       }
 
       if (summaryResponse.objectInfo.quotaInNamespace && summaryResponse.objectInfo.quotaInNamespace !== -1) {
         keys.push('Quota In Namespace');
-        values.push(this.byteToSize(summaryResponse.objectInfo.quotaInNamespace, 3));
+        values.push(byteToSize(summaryResponse.objectInfo.quotaInNamespace, 3));
       }
 
       if (summaryResponse.objectInfo.replicationConfig && summaryResponse.objectInfo.replicationConfig.replicationFactor && summaryResponse.objectInfo.replicationConfig.replicationFactor !== -1) {
@@ -436,7 +463,9 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     });
 
     const quotaEndpoint = `/api/v1/namespace/quota?path=${path}`;
-    axios.get(quotaEndpoint).then(response => {
+    const { request: quotaRequest, controller: quotaNewController } = AxiosGetHelper(quotaEndpoint, cancelQuotaSignal);
+    cancelQuotaSignal = quotaNewController;
+    quotaRequest.then(response => {
       const quotaResponse = response.data;
 
       if (quotaResponse.status === 'PATH_NOT_FOUND') {
@@ -453,11 +482,11 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
       // In case the object's quota isn't set
       if (quotaResponse.allowed !== -1) {
         keys.push('Quota Allowed');
-        values.push(this.byteToSize(quotaResponse.allowed, 3));
+        values.push(byteToSize(quotaResponse.allowed, 3));
       }
 
       keys.push('Quota Used');
-      values.push(this.byteToSize(quotaResponse.used, 3));
+      values.push(byteToSize(quotaResponse.used, 3));
       this.setState({
         showPanel: true,
         panelKeys: keys,
@@ -496,7 +525,10 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
     return (
       <div className='du-container'>
         <div className='page-header'>
-          Disk Usage
+          Disk Usage&nbsp;&nbsp;
+          <Tooltip placement="rightTop" title="Shows Disk Usage information only for FSO buckets">
+            <Icon type='info-circle' />
+          </Tooltip>
         </div>
         <div className='content-div'>
           {isLoading ? <span><Icon type='loading'/> Loading...</span> : (
@@ -531,19 +563,23 @@ export class DiskUsage extends React.Component<Record<string, object>, IDUState>
               </Row>
               <Row>
                 {(duResponse.size > 0) ?
-                  <div style={{height: 800}}>
+                  <div style={{height: 1000}}>
                     <Plot
                       data={plotData}
                       layout={
                         {
-                          width: 800,
+                          width: 1200,
                           height: 750,
                           font: {
                             family: 'Roboto, sans-serif',
                             size: 15
                           },
                           showlegend: true,
-                          title: 'Disk Usage for ' + returnPath + ' (Total Size: ' + this.byteToSize(duResponse.size, 1) + ')'
+                          legend: {
+                            "x": 1.2,
+                            "xanchor": "right"
+                          },
+                          title: 'Disk Usage for ' + returnPath + ' (Total Size: ' + byteToSize(duResponse.size, 1) + ')'
                         }
                       }
                       onClick={(duResponse.subPathCount === 0) ? undefined : e => this.clickPieSection(e, returnPath)}/>

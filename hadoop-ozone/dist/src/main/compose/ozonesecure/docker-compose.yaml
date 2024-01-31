@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: "3"
+version: "3.8"
 services:
   kdc:
     image: ${OZONE_TESTKRB5_IMAGE}
@@ -25,6 +25,7 @@ services:
     command: ["krb5kdc","-n"]
   kms:
     image: apache/hadoop:${HADOOP_VERSION}
+    hostname: kms
     ports:
     - 9600:9600
     env_file:
@@ -36,12 +37,13 @@ services:
     command: ["hadoop", "kms"]
   datanode:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
+    hostname: dn
     volumes:
       - ../..:/opt/hadoop
       - ../_keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
     ports:
-      - 9864
+      - 19864
     command: ["/opt/hadoop/bin/ozone","datanode"]
     env_file:
       - docker-config

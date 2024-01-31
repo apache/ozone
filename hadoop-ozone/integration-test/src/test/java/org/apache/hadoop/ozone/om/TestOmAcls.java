@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -23,6 +24,7 @@ import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -31,12 +33,11 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.ozone.audit.AuditLogTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -47,26 +48,22 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.audit.AuditLogTestUtils.verifyAuditLog;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test for Ozone Manager ACLs.
  */
+@Timeout(300)
 public class TestOmAcls {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
 
   private static boolean volumeAclAllow = true;
   private static boolean bucketAclAllow = true;
   private static boolean keyAclAllow = true;
   private static boolean prefixAclAllow = true;
   private static MiniOzoneCluster cluster = null;
+  private static OzoneClient client;
   private static GenericTestUtils.LogCapturer logCapturer;
 
   static {
@@ -78,7 +75,7 @@ public class TestOmAcls {
    * <p>
    * Ozone is made active by setting OZONE_ENABLED = true
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     String clusterId = UUID.randomUUID().toString();
@@ -94,19 +91,21 @@ public class TestOmAcls {
         .setOmId(omId)
         .build();
     cluster.waitForClusterToBeReady();
+    client = cluster.newClient();
     logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(OzoneManager.getLogger());
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
     AuditLogTestUtils.deleteAuditLogFile();
   }
 
-  @Before
+  @BeforeEach
   public void setup() throws IOException {
     logCapturer.clearOutput();
     AuditLogTestUtils.truncateAuditLogFile();
@@ -122,25 +121,25 @@ public class TestOmAcls {
     TestOmAcls.volumeAclAllow = false;
 
     OMException exception = assertThrows(OMException.class,
-            () -> TestDataUtil.createVolumeAndBucket(cluster));
+            () -> TestDataUtil.createVolumeAndBucket(client));
     assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
 
-    assertTrue(logCapturer.getOutput()
-            .contains("doesn't have CREATE permission to access volume"));
+    assertThat(logCapturer.getOutput())
+            .contains("doesn't have CREATE permission to access volume");
     verifyAuditLog(OMAction.CREATE_VOLUME, AuditEventStatus.FAILURE);
   }
 
   @Test
   public void testReadVolumePermissionDenied() throws Exception {
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
     TestOmAcls.volumeAclAllow = false;
-    ObjectStore objectStore = cluster.getClient().getObjectStore();
+    ObjectStore objectStore = client.getObjectStore();
     OMException exception = assertThrows(OMException.class, () ->
             objectStore.getVolume(bucket.getVolumeName()));
     assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
 
-    assertTrue(logCapturer.getOutput()
-            .contains("doesn't have READ permission to access volume"));
+    assertThat(logCapturer.getOutput())
+            .contains("doesn't have READ permission to access volume");
     verifyAuditLog(OMAction.READ_VOLUME, AuditEventStatus.FAILURE);
   }
 
@@ -149,27 +148,27 @@ public class TestOmAcls {
     TestOmAcls.bucketAclAllow = false;
 
     OMException exception = assertThrows(OMException.class,
-            () -> TestDataUtil.createVolumeAndBucket(cluster));
+            () -> TestDataUtil.createVolumeAndBucket(client));
     assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
 
-    assertTrue(logCapturer.getOutput()
-            .contains("doesn't have CREATE permission to access bucket"));
+    assertThat(logCapturer.getOutput())
+            .contains("doesn't have CREATE permission to access bucket");
     verifyAuditLog(OMAction.CREATE_BUCKET, AuditEventStatus.FAILURE);
   }
 
   @Test
   public void testReadBucketPermissionDenied() throws Exception {
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
     TestOmAcls.bucketAclAllow = false;
-    ObjectStore objectStore = cluster.getClient().getObjectStore();
+    ObjectStore objectStore = client.getObjectStore();
     OMException exception = assertThrows(OMException.class,
             () -> objectStore.getVolume(
                     bucket.getVolumeName()).getBucket(bucket.getName())
     );
 
     assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
-    assertTrue(logCapturer.getOutput()
-            .contains("doesn't have READ permission to access bucket"));
+    assertThat(logCapturer.getOutput())
+            .contains("doesn't have READ permission to access bucket");
     verifyAuditLog(OMAction.READ_BUCKET, AuditEventStatus.FAILURE);
   }
 
@@ -177,18 +176,18 @@ public class TestOmAcls {
   public void testCreateKeyPermissionDenied() throws Exception {
     TestOmAcls.keyAclAllow = false;
 
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
 
     OMException exception = assertThrows(OMException.class,
             () -> TestDataUtil.createKey(bucket, "testKey", "testcontent"));
     assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
-    assertTrue(logCapturer.getOutput().contains("doesn't have CREATE " +
-            "permission to access key"));
+    assertThat(logCapturer.getOutput()).contains("doesn't have CREATE " +
+            "permission to access key");
   }
 
   @Test
   public void testReadKeyPermissionDenied() throws Exception {
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
     TestDataUtil.createKey(bucket, "testKey", "testcontent");
 
     TestOmAcls.keyAclAllow = false;
@@ -196,22 +195,22 @@ public class TestOmAcls {
             () -> TestDataUtil.getKey(bucket, "testKey"));
 
     assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
-    assertTrue(logCapturer.getOutput().contains("doesn't have READ " +
-            "permission to access key"));
+    assertThat(logCapturer.getOutput()).contains("doesn't have READ " +
+            "permission to access key");
     verifyAuditLog(OMAction.READ_KEY, AuditEventStatus.FAILURE);
   }
 
   @Test
   public void testSetACLPermissionDenied() throws Exception {
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(cluster);
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
 
     TestOmAcls.bucketAclAllow = false;
 
     OMException exception = assertThrows(OMException.class,
             () -> bucket.setAcl(new ArrayList<>()));
     assertEquals(ResultCodes.PERMISSION_DENIED, exception.getResult());
-    assertTrue(logCapturer.getOutput()
-        .contains("doesn't have WRITE_ACL permission to access bucket"));
+    assertThat(logCapturer.getOutput())
+        .contains("doesn't have WRITE_ACL permission to access bucket");
     verifyAuditLog(OMAction.SET_ACL, AuditEventStatus.FAILURE);
   }
 

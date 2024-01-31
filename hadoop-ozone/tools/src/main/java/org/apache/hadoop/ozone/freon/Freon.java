@@ -32,6 +32,8 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
+import static org.apache.hadoop.hdds.server.http.HttpServer2.setHttpBaseDir;
+
 /**
  * Ozone data generator and performance test tool.
  */
@@ -68,9 +70,10 @@ import picocli.CommandLine.Option;
         OmBucketReadWriteFileOps.class,
         OmBucketReadWriteKeyOps.class,
         OmRPCLoadGenerator.class,
-        OzoneClientKeyReadWriteOps.class,
+        OzoneClientKeyReadWriteListOps.class,
         RangeKeysGenerator.class,
-        DatanodeSimulator.class
+        DatanodeSimulator.class,
+        OmMetadataGenerator.class
     },
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
@@ -113,6 +116,7 @@ public class Freon extends GenericCli {
   public void startHttpServer() {
     if (httpServer) {
       try {
+        setHttpBaseDir(conf);
         freonHttpServer = new FreonHttpServer(conf);
         freonHttpServer.start();
       } catch (IOException e) {

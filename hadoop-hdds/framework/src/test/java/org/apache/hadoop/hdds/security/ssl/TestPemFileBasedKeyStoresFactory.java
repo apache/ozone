@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.security.ssl;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -30,7 +29,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServi
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
@@ -41,9 +40,10 @@ import org.apache.ratis.thirdparty.io.grpc.netty.NettyServerBuilder;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.ClientAuth;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import javax.net.ssl.SSLException;
 import java.util.ArrayList;
@@ -51,62 +51,43 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.SUCCESS;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test PemFileBasedKeyStoresFactory.
  */
 public class TestPemFileBasedKeyStoresFactory {
-  private OzoneConfiguration conf;
   private CertificateClientTestImpl caClient;
   private SecurityConfig secConf;
   private static final int RELOAD_INTERVAL = 2000;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
-    conf = new OzoneConfiguration();
-    conf.setLong(HddsConfigKeys.HDDS_SECURITY_SSL_KEYSTORE_RELOAD_INTERVAL,
-        RELOAD_INTERVAL);
-    conf.setLong(HddsConfigKeys.HDDS_SECURITY_SSL_TRUSTSTORE_RELOAD_INTERVAL,
-        RELOAD_INTERVAL);
+    OzoneConfiguration conf = new OzoneConfiguration();
     caClient = new CertificateClientTestImpl(conf);
     secConf = new SecurityConfig(conf);
   }
-  @Test
-  public void testInit() throws Exception {
-    clientMode(true);
-    clientMode(false);
-    serverMode(true);
-    serverMode(false);
-  }
 
-  private void clientMode(boolean clientAuth) throws Exception {
+  @ValueSource(booleans = {true, false})
+  @ParameterizedTest
+  public void testInit(boolean clientAuth) throws Exception {
     KeyStoresFactory keyStoresFactory = new PemFileBasedKeyStoresFactory(
         secConf, caClient);
     try {
       keyStoresFactory.init(KeyStoresFactory.Mode.CLIENT, clientAuth);
-      if (clientAuth) {
-        Assert.assertTrue(keyStoresFactory.getKeyManagers()[0]
-            instanceof ReloadingX509KeyManager);
-      } else {
-        Assert.assertFalse(keyStoresFactory.getKeyManagers()[0]
-            instanceof ReloadingX509KeyManager);
-      }
-      Assert.assertTrue(keyStoresFactory.getTrustManagers()[0]
-          instanceof ReloadingX509TrustManager);
+      assertEquals(clientAuth, keyStoresFactory.getKeyManagers()[0]
+          instanceof ReloadingX509KeyManager);
+      assertInstanceOf(ReloadingX509TrustManager.class, keyStoresFactory.getTrustManagers()[0]);
     } finally {
       keyStoresFactory.destroy();
     }
-  }
 
-  private void serverMode(boolean clientAuth) throws Exception {
-    KeyStoresFactory keyStoresFactory = new PemFileBasedKeyStoresFactory(
-        secConf, caClient);
     try {
       keyStoresFactory.init(KeyStoresFactory.Mode.SERVER, clientAuth);
-      Assert.assertTrue(keyStoresFactory.getKeyManagers()[0]
-          instanceof ReloadingX509KeyManager);
-      Assert.assertTrue(keyStoresFactory.getTrustManagers()[0]
-          instanceof ReloadingX509TrustManager);
+      assertInstanceOf(ReloadingX509KeyManager.class, keyStoresFactory.getKeyManagers()[0]);
+      assertInstanceOf(ReloadingX509TrustManager.class, keyStoresFactory.getTrustManagers()[0]);
     } finally {
       keyStoresFactory.destroy();
     }
@@ -134,8 +115,7 @@ public class TestPemFileBasedKeyStoresFactory {
 
       // send command
       ContainerCommandResponseProto responseProto = sendRequest(asyncStub);
-      Assert.assertTrue(responseProto.getResult() ==
-          ContainerProtos.Result.SUCCESS);
+      assertEquals(SUCCESS, responseProto.getResult());
 
       // Renew certificate
       caClient.renewKey();
@@ -143,8 +123,7 @@ public class TestPemFileBasedKeyStoresFactory {
 
       // send command again
       responseProto = sendRequest(asyncStub);
-      Assert.assertTrue(responseProto.getResult() ==
-          ContainerProtos.Result.SUCCESS);
+      assertEquals(SUCCESS, responseProto.getResult());
     } finally {
       if (channel != null) {
         channel.shutdownNow();
@@ -165,7 +144,7 @@ public class TestPemFileBasedKeyStoresFactory {
       XceiverClientProtocolServiceStub stub) throws Exception {
     DatanodeDetails dn = DatanodeDetails.newBuilder()
         .setUuid(UUID.randomUUID()).build();
-    List<DatanodeDetails> nodes = new ArrayList();
+    List<DatanodeDetails> nodes = new ArrayList<>();
     nodes.add(dn);
     Pipeline pipeline = Pipeline.newBuilder().setId(PipelineID.randomId())
         .setReplicationConfig(RatisReplicationConfig
@@ -194,6 +173,7 @@ public class TestPemFileBasedKeyStoresFactory {
     requestObserver.onCompleted();
     return replyFuture.get();
   }
+
   private ManagedChannel setupClient(KeyStoresFactory factory, int port)
       throws SSLException {
     NettyChannelBuilder channelBuilder =
@@ -222,9 +202,8 @@ public class TestPemFileBasedKeyStoresFactory {
   /**
    * Test Class to provide a server side service.
    */
-  public class GrpcService extends XceiverClientProtocolServiceImplBase {
-    public GrpcService() {
-    }
+  private static class GrpcService
+      extends XceiverClientProtocolServiceImplBase {
 
     @Override
     public StreamObserver<ContainerCommandRequestProto> send(
@@ -236,7 +215,7 @@ public class TestPemFileBasedKeyStoresFactory {
           ContainerCommandResponseProto resp =
               ContainerCommandResponseProto.newBuilder()
                   .setCmdType(ContainerProtos.Type.CreateContainer)
-                  .setResult(ContainerProtos.Result.SUCCESS)
+                  .setResult(SUCCESS)
                   .build();
           responseObserver.onNext(resp);
         }

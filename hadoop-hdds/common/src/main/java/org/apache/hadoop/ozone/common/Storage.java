@@ -33,7 +33,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Properties;
-import java.util.function.Supplier;
+import java.util.function.IntSupplier;
 
 /**
  * Storage information file. This Class defines the methods to check
@@ -50,15 +50,15 @@ public abstract class Storage {
   private static final Logger LOG = LoggerFactory.getLogger(Storage.class);
 
   public static final String STORAGE_DIR_CURRENT = "current";
-  protected static final String STORAGE_FILE_VERSION = "VERSION";
+  public static final String STORAGE_FILE_VERSION = "VERSION";
   public static final String CONTAINER_DIR = "containerDir";
 
   private final NodeType nodeType;
   private final File root;
   private final File storageDir;
 
-  private StorageState state;
-  private StorageInfo storageInfo;
+  private final StorageState state;
+  private final StorageInfo storageInfo;
 
 
   /**
@@ -220,7 +220,6 @@ public abstract class Storage {
    * Check consistency of the storage directory.
    *
    * @return state {@link StorageState} of the storage directory
-   * @throws IOException
    */
   private StorageState getStorageState() throws IOException {
     assert root != null : "root is null";
@@ -260,7 +259,6 @@ public abstract class Storage {
   /**
    * Creates the Version file if not present,
    * otherwise returns with IOException.
-   * @throws IOException
    */
   public void initialize() throws IOException {
     if (state == StorageState.INITIALIZED) {
@@ -274,7 +272,6 @@ public abstract class Storage {
 
   /**
    * Creates the Version file even if it exists.
-   * @throws IOException
    */
   public void forceInitialize() throws IOException {
     if (state != StorageState.INITIALIZED) {
@@ -286,7 +283,6 @@ public abstract class Storage {
 
   /**
    * Persists current StorageInfo to file system..
-   * @throws IOException
    */
   public void persistCurrentState() throws IOException {
     if (!getCurrentDir().exists()) {
@@ -298,10 +294,10 @@ public abstract class Storage {
 
   protected static int getInitLayoutVersion(OzoneConfiguration conf,
       String configKey,
-      Supplier<Integer> defaultLvSupplier) {
+      IntSupplier defaultLvSupplier) {
     int lV = conf.getInt(configKey, OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT);
     if (lV == OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT) {
-      lV = defaultLvSupplier.get();
+      lV = defaultLvSupplier.getAsInt();
     }
     return lV;
   }

@@ -50,7 +50,7 @@ public class ClosedWithUnhealthyReplicasHandler extends AbstractCheck {
 
   /**
    * Handles a closed EC container with unhealthy replicas. Note that if we
-   * reach here, there is no over, under, or mis replication. This handler
+   * reach here, there is no over or under replication. This handler
    * will just send commands to delete the unhealthy replicas.
    *
    * <p>
@@ -61,8 +61,9 @@ public class ClosedWithUnhealthyReplicasHandler extends AbstractCheck {
    * Replica Index 4: Closed
    * Replica Index 5: Closed
    *
-   * In this case, the unhealthy replica of index 3 should be deleted. This
-   * is not over replication because that unhealthy replica is not available.
+   * In this case, the unhealthy replica of index 3 should be deleted. The
+   * container will be marked over replicated as the unhealthy replicas need
+   * to be removed.
    * </p>
    * @param request ContainerCheckRequest object representing the container
    * @return true if this is a closed EC container with unhealthy replicas,
@@ -101,15 +102,17 @@ public class ClosedWithUnhealthyReplicasHandler extends AbstractCheck {
         }
 
         foundUnhealthy = true;
-        sendDeleteCommand(containerInfo, replica);
+        if (!request.isReadOnly()) {
+          sendDeleteCommand(containerInfo, replica);
+        }
       }
     }
 
-    // some unhealthy replicas were found so mark UNHEALTHY (note that
-    // UNHEALTHY is currently not a LifeCycleState for a Container)
+    // some unhealthy replicas were found so the container must be
+    // over replicated due to unhealthy replicas.
     if (foundUnhealthy) {
       request.getReport().incrementAndSample(
-          ReplicationManagerReport.HealthState.UNHEALTHY,
+          ReplicationManagerReport.HealthState.OVER_REPLICATED,
           containerInfo.containerID());
     }
     LOG.debug("Returning {} for container {}", foundUnhealthy, containerInfo);

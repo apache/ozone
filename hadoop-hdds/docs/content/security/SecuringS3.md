@@ -41,6 +41,13 @@ The user needs to `kinit` first and once they have authenticated via kerberos
 ```bash
 ozone s3 getsecret
 ```
+
+* Or by sending request to /secret S3 REST endpoint.
+
+```bash
+curl -X PUT --negotiate -u : https://localhost:9879/secret
+```
+
 This command will talk to ozone, validate the user via Kerberos and generate
 the AWS credentials. The values will be printed out on the screen. You can
 set these values up in your _.aws_ file for automatic access while working

@@ -21,8 +21,10 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -30,9 +32,8 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
 import java.util.LinkedList;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -42,6 +43,7 @@ import java.io.IOException;
 import java.net.URI;
 
 import static org.apache.ozone.test.GenericTestUtils.getTempPath;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test for HadoopNestedDirGenerator.
@@ -55,7 +57,9 @@ public class TestHadoopNestedDirGenerator {
   private ObjectStore store = null;
   private static final Logger LOG =
           LoggerFactory.getLogger(TestHadoopNestedDirGenerator.class);
-  @Before
+  private OzoneClient client;
+
+  @BeforeEach
     public void setup() {
     path = getTempPath(TestHadoopNestedDirGenerator.class.getSimpleName());
     GenericTestUtils.setLogLevel(RaftLog.LOG, Level.DEBUG);
@@ -69,6 +73,7 @@ public class TestHadoopNestedDirGenerator {
      */
 
   private void shutdown() throws IOException {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
       FileUtils.deleteDirectory(new File(path));
@@ -88,7 +93,8 @@ public class TestHadoopNestedDirGenerator {
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
     cluster.waitForClusterToBeReady();
     cluster.waitTobeOutOfSafeMode();
-    store = OzoneClientFactory.getRpcClient(conf).getObjectStore();
+    client = OzoneClientFactory.getRpcClient(conf);
+    store = client.getObjectStore();
   }
 
   @Test
@@ -136,8 +142,7 @@ public class TestHadoopNestedDirGenerator {
       // verify the num of peer directories and span directories
       p = depthBFS(fileSystem, fileStatuses, span, actualDepth);
       int actualSpan = spanCheck(fileSystem, span, p);
-      Assert.assertEquals("Mismatch span in a path",
-              span, actualSpan);
+      assertEquals(span, actualSpan, "Mismatch span in a path");
     }
   }
 
@@ -177,8 +182,7 @@ public class TestHadoopNestedDirGenerator {
         p = f.getPath().getParent();
       }
     }
-    Assert.assertEquals("Mismatch depth in a path",
-            depth, actualDepth);
+    assertEquals(depth, actualDepth, "Mismatch depth in a path");
     return p;
   }
 

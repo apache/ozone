@@ -19,10 +19,13 @@
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.UUID;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.junit.jupiter.api.Test;
 
 /**
  * Class tests S3 Initiate MPU response.
@@ -52,12 +55,15 @@ public class TestS3InitiateMultipartUploadResponse
     String multipartKey = omMetadataManager.getMultipartKey(volumeName,
         bucketName, keyName, multipartUploadID);
 
-    Assert.assertNotNull(
-        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(multipartKey));
-    Assert.assertNotNull(omMetadataManager.getMultipartInfoTable()
-        .get(multipartKey));
+    OmKeyInfo openMPUKeyInfo = omMetadataManager.getOpenKeyTable(
+        getBucketLayout()).get(multipartKey);
+    assertNotNull(openMPUKeyInfo);
+    assertNotNull(openMPUKeyInfo.getLatestVersionLocations());
+    assertTrue(openMPUKeyInfo.getLatestVersionLocations().isMultipartKey());
 
-    Assert.assertEquals(multipartUploadID,
+    assertNotNull(omMetadataManager.getMultipartInfoTable().get(multipartKey));
+
+    assertEquals(multipartUploadID,
         omMetadataManager.getMultipartInfoTable().get(multipartKey)
             .getUploadID());
   }

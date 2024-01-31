@@ -23,14 +23,16 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OP
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
@@ -56,7 +58,6 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 /**
  * Test Recon ICR handler.
@@ -66,18 +67,28 @@ public class TestReconIncrementalContainerReportHandler
   private HDDSLayoutVersionManager versionManager;
 
   @Test
-  public void testProcessICR() throws IOException, NodeNotFoundException {
+  public void testProcessICR()
+      throws IOException, NodeNotFoundException, TimeoutException {
 
     ContainerID containerID = ContainerID.valueOf(100L);
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
     IncrementalContainerReportFromDatanode reportMock =
         mock(IncrementalContainerReportFromDatanode.class);
     when(reportMock.getDatanodeDetails()).thenReturn(datanodeDetails);
+
+    ContainerWithPipeline containerWithPipeline = getTestContainer(
+        containerID.getId(), OPEN);
+    List<ContainerWithPipeline> containerWithPipelineList = new ArrayList<>();
+    containerWithPipelineList.add(containerWithPipeline);
+    ReconContainerManager containerManager = getContainerManager();
     IncrementalContainerReportProto containerReport =
         getIncrementalContainerReportProto(containerID,
             State.OPEN,
             datanodeDetails.getUuidString());
     when(reportMock.getReport()).thenReturn(containerReport);
+    when(getContainerManager().getScmClient()
+        .getExistContainerWithPipelinesInBatch(any(
+            ArrayList.class))).thenReturn(containerWithPipelineList);
 
     final String path =
         GenericTestUtils.getTempPath(UUID.randomUUID().toString());
@@ -87,11 +98,10 @@ public class TestReconIncrementalContainerReportHandler
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
     SCMStorageConfig storageConfig = new SCMStorageConfig(conf);
-    this.versionManager =
-        Mockito.mock(HDDSLayoutVersionManager.class);
-    Mockito.when(versionManager.getMetadataLayoutVersion())
+    this.versionManager = mock(HDDSLayoutVersionManager.class);
+    when(versionManager.getMetadataLayoutVersion())
         .thenReturn(maxLayoutVersion());
-    Mockito.when(versionManager.getSoftwareLayoutVersion())
+    when(versionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
 
     NodeManager nodeManager = new SCMNodeManager(conf, storageConfig,
@@ -99,7 +109,6 @@ public class TestReconIncrementalContainerReportHandler
 
     nodeManager.register(datanodeDetails, null, null);
 
-    ReconContainerManager containerManager = getContainerManager();
     ReconIncrementalContainerReportHandler reconIcr =
         new ReconIncrementalContainerReportHandler(nodeManager,
             containerManager, SCMContext.emptyContext());
@@ -132,7 +141,8 @@ public class TestReconIncrementalContainerReportHandler
       DatanodeDetails datanodeDetails =
           containerWithPipeline.getPipeline().getFirstNode();
       NodeManager nodeManagerMock = mock(NodeManager.class);
-      when(nodeManagerMock.getNodeByUuid(any())).thenReturn(datanodeDetails);
+      when(nodeManagerMock.getNodeByUuid(any(UUID.class)))
+          .thenReturn(datanodeDetails);
       IncrementalContainerReportFromDatanode reportMock =
           mock(IncrementalContainerReportFromDatanode.class);
       when(reportMock.getDatanodeDetails())

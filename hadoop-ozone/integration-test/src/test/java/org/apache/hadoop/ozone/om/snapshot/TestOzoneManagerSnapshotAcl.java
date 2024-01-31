@@ -22,12 +22,13 @@ package org.apache.hadoop.ozone.om.snapshot;
 import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
+import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -48,10 +49,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -65,10 +63,11 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConsts.ADMIN;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
@@ -94,8 +93,8 @@ public class TestOzoneManagerSnapshotAcl {
       OzoneObj.ResourceType.KEY;
   private static MiniOzoneCluster cluster;
   private static ObjectStore objectStore;
-  private static File metaDir;
   private static OzoneManager ozoneManager;
+  private static OzoneClient client;
   private String volumeName;
   private String bucketName;
   private static final String KEY_PREFIX = "key-";
@@ -109,7 +108,7 @@ public class TestOzoneManagerSnapshotAcl {
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     final String omServiceId = "om-service-test-1"
-        + RandomStringUtils.randomNumeric(5);
+        + RandomStringUtils.randomNumeric(32);
 
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(UUID.randomUUID().toString())
@@ -128,7 +127,7 @@ public class TestOzoneManagerSnapshotAcl {
         new OzoneConfiguration(cluster.getConf());
     clientConf.set(FS_DEFAULT_NAME_KEY, hostPrefix);
 
-    final OzoneClient client = cluster.getClient();
+    client = cluster.newClient();
     objectStore = client.getObjectStore();
 
     final KeyManagerImpl keyManager = (KeyManagerImpl) HddsWhiteboxTestUtils
@@ -136,16 +135,12 @@ public class TestOzoneManagerSnapshotAcl {
 
     // stop the deletion services so that keys can still be read
     keyManager.stop();
-    metaDir = OMStorage.getOmDbDir(ozoneManagerConf);
-  }
-
-  @AfterEach
-  public void cleanup() throws IOException {
-    setDefaultAcls();
+    OMStorage.getOmDbDir(ozoneManagerConf);
   }
 
   @AfterAll
   public static void tearDown() throws Exception {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -160,8 +155,7 @@ public class TestOzoneManagerSnapshotAcl {
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
 
     // WHEN-THEN
-    Assertions.assertDoesNotThrow(
-        () -> ozoneManager.lookupKey(snapshotKeyArgs));
+    assertDoesNotThrow(() -> ozoneManager.lookupKey(snapshotKeyArgs));
   }
 
   @ParameterizedTest
@@ -175,34 +169,34 @@ public class TestOzoneManagerSnapshotAcl {
 
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
-    final OMException ex = Assertions.assertThrows(OMException.class,
+    final OMException ex = assertThrows(OMException.class,
         () -> ozoneManager.lookupKey(snapshotKeyArgs));
 
     // THEN
-    Assertions.assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
         ex.getResult());
     // when same user reads same key from active fs, read allowed.
-    Assertions.assertDoesNotThrow(() -> ozoneManager.lookupKey(keyArgs));
+    assertDoesNotThrow(() -> ozoneManager.lookupKey(keyArgs));
   }
 
   @ParameterizedTest
   @EnumSource(BucketLayout.class)
   public void testGeyKeyInfoWithAllowedUser(BucketLayout bucketLayout)
-      throws IOException, InterruptedException, TimeoutException {
+      throws IOException {
     // GIVEN
     setup(bucketLayout);
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
     final boolean assumeS3Context = false;
 
     // WHEN-THEN
-    Assertions.assertDoesNotThrow(
+    assertDoesNotThrow(
         () -> ozoneManager.getKeyInfo(snapshotKeyArgs, assumeS3Context));
   }
 
   @ParameterizedTest
   @EnumSource(BucketLayout.class)
   public void testGeyKeyInfoWithNotAllowedUser(BucketLayout bucketLayout)
-      throws IOException, InterruptedException, TimeoutException {
+      throws IOException {
     // GIVEN
     setup(bucketLayout);
     final OmKeyArgs snapshotKeyOmKeyArgs = getOmKeyArgs(true);
@@ -212,15 +206,15 @@ public class TestOzoneManagerSnapshotAcl {
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
     final OMException ex =
-        Assertions.assertThrows(OMException.class,
+        assertThrows(OMException.class,
             () -> ozoneManager.getKeyInfo(snapshotKeyOmKeyArgs,
                 assumeS3Context));
 
     // THEN
-    Assertions.assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
         ex.getResult());
     // when same user reads same key from active fs, read allowed.
-    Assertions.assertDoesNotThrow(
+    assertDoesNotThrow(
         () -> ozoneManager.getKeyInfo(omKeyArgs, assumeS3Context));
   }
 
@@ -228,14 +222,14 @@ public class TestOzoneManagerSnapshotAcl {
   @MethodSource("getListStatusArguments")
   public void testListStatusWithAllowedUser(BucketLayout bucketLayout,
       boolean recursive, boolean allowPartialPrefixes)
-      throws IOException, InterruptedException, TimeoutException {
+      throws IOException {
     // GIVEN
     setup(bucketLayout);
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
     final long numEntries = Long.parseLong(RandomStringUtils.randomNumeric(1));
 
     // WHEN-THEN
-    Assertions.assertDoesNotThrow(
+    assertDoesNotThrow(
         () -> ozoneManager.listStatus(snapshotKeyArgs, recursive,
             snapshotKeyArgs.getKeyName(), numEntries,
             allowPartialPrefixes));
@@ -245,7 +239,7 @@ public class TestOzoneManagerSnapshotAcl {
   @MethodSource("getListStatusArguments")
   public void testListStatusWithNotAllowedUser(BucketLayout bucketLayout,
       boolean recursive, boolean allowPartialPrefixes)
-      throws IOException, InterruptedException, TimeoutException {
+      throws IOException {
     // GIVEN
     setup(bucketLayout);
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
@@ -255,16 +249,16 @@ public class TestOzoneManagerSnapshotAcl {
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
     final OMException ex =
-        Assertions.assertThrows(OMException.class,
+        assertThrows(OMException.class,
             () -> ozoneManager.listStatus(snapshotKeyArgs, recursive,
                 snapshotKeyArgs.getKeyName(), numEntries,
                 allowPartialPrefixes));
 
     // THEN
-    Assertions.assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
         ex.getResult());
     // when same user reads same key from active fs, read allowed.
-    Assertions.assertDoesNotThrow(() -> ozoneManager.listStatus(keyArgs,
+    assertDoesNotThrow(() -> ozoneManager.listStatus(keyArgs,
         recursive, keyName, numEntries, allowPartialPrefixes));
   }
 
@@ -277,7 +271,7 @@ public class TestOzoneManagerSnapshotAcl {
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
 
     // WHEN-THEN
-    Assertions.assertDoesNotThrow(
+    assertDoesNotThrow(
         () -> ozoneManager.lookupFile(snapshotKeyArgs));
   }
 
@@ -292,14 +286,14 @@ public class TestOzoneManagerSnapshotAcl {
 
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
-    final OMException ex = Assertions.assertThrows(OMException.class,
+    final OMException ex = assertThrows(OMException.class,
         () -> ozoneManager.lookupFile(snapshotKeyArgs));
 
     // THEN
-    Assertions.assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
         ex.getResult());
     // when same user reads same key from active fs, read allowed.
-    Assertions.assertDoesNotThrow(() -> ozoneManager.lookupFile(keyArgs));
+    assertDoesNotThrow(() -> ozoneManager.lookupFile(keyArgs));
   }
 
   @ParameterizedTest
@@ -312,7 +306,7 @@ public class TestOzoneManagerSnapshotAcl {
     final int maxKeys = Integer.parseInt(RandomStringUtils.randomNumeric(1));
 
     // WHEN-THEN
-    Assertions.assertDoesNotThrow(() -> ozoneManager.listKeys(volumeName,
+    assertDoesNotThrow(() -> ozoneManager.listKeys(volumeName,
         bucketName, snapshotKeyArgs.getKeyName(), snapshotKeyPrefix, maxKeys));
   }
 
@@ -329,10 +323,10 @@ public class TestOzoneManagerSnapshotAcl {
     UserGroupInformation.setLoginUser(UGI2);
 
     // THEN
-    Assertions.assertDoesNotThrow(
+    assertDoesNotThrow(
         () -> ozoneManager.listKeys(volumeName, bucketName,
             snapshotKeyArgs.getKeyName(), snapshotKeyPrefix, maxKeys));
-    Assertions.assertDoesNotThrow(() -> ozoneManager.listKeys(volumeName,
+    assertDoesNotThrow(() -> ozoneManager.listKeys(volumeName,
         bucketName, keyName, KEY_PREFIX, maxKeys));
   }
 
@@ -352,7 +346,7 @@ public class TestOzoneManagerSnapshotAcl {
         .build();
 
     // WHEN-THEN
-    Assertions.assertDoesNotThrow(() -> ozoneManager.getAcl(ozoneObj));
+    assertDoesNotThrow(() -> ozoneManager.getAcl(ozoneObj));
   }
 
   @ParameterizedTest
@@ -378,18 +372,18 @@ public class TestOzoneManagerSnapshotAcl {
 
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
-    final OMException ex = Assertions.assertThrows(OMException.class,
+    final OMException ex = assertThrows(OMException.class,
         () -> ozoneManager.getAcl(snapshotObj));
 
     // THEN
-    Assertions.assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
         ex.getResult());
     // when same user reads same key from active fs, read allowed.
-    Assertions.assertDoesNotThrow(() -> ozoneManager.getAcl(keyObj));
+    assertDoesNotThrow(() -> ozoneManager.getAcl(keyObj));
   }
 
   private void setup(BucketLayout bucketLayout)
-      throws IOException, InterruptedException, TimeoutException {
+      throws IOException {
     UserGroupInformation.setLoginUser(UGI1);
 
     createVolume();
@@ -457,7 +451,7 @@ public class TestOzoneManagerSnapshotAcl {
 
   private void createKey(OzoneBucket bucket)
       throws IOException {
-    keyName = KEY_PREFIX + RandomStringUtils.randomNumeric(5);
+    keyName = KEY_PREFIX + RandomStringUtils.randomNumeric(32);
     byte[] data = RandomStringUtils.randomAscii(1).getBytes(UTF_8);
     final OzoneOutputStream fileKey = bucket.createKey(keyName, data.length);
     fileKey.write(data);
@@ -465,10 +459,10 @@ public class TestOzoneManagerSnapshotAcl {
   }
 
   private void createSnapshot()
-      throws IOException, InterruptedException, TimeoutException {
+      throws IOException {
     final String snapshotPrefix = "snapshot-";
     final String snapshotName =
-        snapshotPrefix + RandomStringUtils.randomNumeric(5);
+        snapshotPrefix + RandomStringUtils.randomNumeric(32);
     objectStore.createSnapshot(volumeName, bucketName, snapshotName);
     snapshotKeyPrefix = OmSnapshotManager
         .getSnapshotPrefix(snapshotName);
@@ -476,11 +470,14 @@ public class TestOzoneManagerSnapshotAcl {
         .getMetadataManager()
         .getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName));
-    final String snapshotDirName = metaDir + OM_KEY_PREFIX +
-        OM_SNAPSHOT_DIR + OM_KEY_PREFIX + OM_DB_NAME +
-        snapshotInfo.getCheckpointDirName() + OM_KEY_PREFIX + "CURRENT";
-    GenericTestUtils.waitFor(() -> new File(snapshotDirName).exists(),
-        1000, 120000);
+    // Allow the snapshot to be written to disk
+    String fileName =
+        getSnapshotPath(ozoneManager.getConfiguration(), snapshotInfo);
+    File snapshotDir = new File(fileName);
+    if (!RDBCheckpointUtils
+        .waitForCheckpointDirectoryExist(snapshotDir)) {
+      throw new IOException("snapshot directory doesn't exist");
+    }
   }
 
   private void setBucketAcl() throws IOException {
@@ -523,7 +520,7 @@ public class TestOzoneManagerSnapshotAcl {
   private void createBucket(BucketLayout bucketLayout,
       OzoneVolume volume) throws IOException {
     final String bucketPrefix = "bucket-";
-    bucketName = bucketPrefix + RandomStringUtils.randomNumeric(5);
+    bucketName = bucketPrefix + RandomStringUtils.randomNumeric(32);
     final BucketArgs bucketArgs = BucketArgs.newBuilder()
         .setOwner(ADMIN)
         .setBucketLayout(bucketLayout).build();
@@ -532,7 +529,7 @@ public class TestOzoneManagerSnapshotAcl {
 
   private void createVolume() throws IOException {
     final String volumePrefix = "volume-";
-    volumeName = volumePrefix + RandomStringUtils.randomNumeric(5);
+    volumeName = volumePrefix + RandomStringUtils.randomNumeric(32);
     final VolumeArgs volumeArgs = new VolumeArgs.Builder()
         .setAdmin(ADMIN)
         .setOwner(ADMIN)

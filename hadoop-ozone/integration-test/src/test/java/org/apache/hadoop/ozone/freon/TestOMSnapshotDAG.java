@@ -17,29 +17,35 @@
  */
 package org.apache.hadoop.ozone.freon;
 
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OMStorage;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -49,17 +55,24 @@ import picocli.CommandLine;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_LOG_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_SST_BACKUP_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DIR;
+import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getColumnFamilyToKeyPrefixMap;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 
 /**
  * Tests Freon, with MiniOzoneCluster.
@@ -71,7 +84,7 @@ public class TestOMSnapshotDAG {
   private static MiniOzoneCluster cluster;
   private static OzoneConfiguration conf;
   private static ObjectStore store;
-  private final File metaDir = OMStorage.getOmDbDir(conf);
+  private static OzoneClient client;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -92,6 +105,8 @@ public class TestOMSnapshotDAG {
     raftClientConfig.setRpcRequestTimeout(Duration.ofSeconds(3));
     raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(3));
     conf.setFromObject(raftClientConfig);
+    // Enable filesystem snapshot feature for the test regardless of the default
+    conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
 
     // Set DB CF write buffer to a much lower value so that flush and compaction
     // happens much more frequently without having to create a lot of keys.
@@ -100,8 +115,8 @@ public class TestOMSnapshotDAG {
 
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
     cluster.waitForClusterToBeReady();
-
-    store = cluster.getClient().getObjectStore();
+    client = cluster.newClient();
+    store = client.getObjectStore();
 
     GenericTestUtils.setLogLevel(RaftLog.LOG, Level.INFO);
     GenericTestUtils.setLogLevel(RaftServer.LOG, Level.INFO);
@@ -112,15 +127,14 @@ public class TestOMSnapshotDAG {
    */
   @AfterAll
   public static void shutdown() {
+    IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
     }
   }
 
   private String getDBCheckpointAbsolutePath(SnapshotInfo snapshotInfo) {
-    return metaDir + OM_KEY_PREFIX +
-        OM_SNAPSHOT_DIR + OM_KEY_PREFIX +
-        OM_DB_NAME + snapshotInfo.getCheckpointDirName();
+    return OmSnapshotManager.getSnapshotPath(conf, snapshotInfo);
   }
 
   private static String getSnapshotDBKey(String volumeName, String bucketName,
@@ -133,7 +147,7 @@ public class TestOMSnapshotDAG {
 
   private DifferSnapshotInfo getDifferSnapshotInfo(
       OMMetadataManager omMetadataManager, String volumeName, String bucketName,
-      String snapshotName) throws IOException {
+      String snapshotName, ManagedRocksDB snapshotDB) throws IOException {
 
     final String dbKey = getSnapshotDBKey(volumeName, bucketName, snapshotName);
     final SnapshotInfo snapshotInfo =
@@ -142,25 +156,11 @@ public class TestOMSnapshotDAG {
 
     // Use RocksDB transaction sequence number in SnapshotInfo, which is
     // persisted at the time of snapshot creation, as the snapshot generation
-    return new DifferSnapshotInfo(checkpointPath, snapshotInfo.getSnapshotID(),
+    return new DifferSnapshotInfo(checkpointPath, snapshotInfo.getSnapshotId(),
         snapshotInfo.getDbTxSequenceNumber(),
-        getTablePrefixes(omMetadataManager, volumeName, bucketName));
-  }
-
-  private Map<String, String> getTablePrefixes(
-      OMMetadataManager omMetadataManager, String volumeName, String bucketName)
-      throws IOException {
-    HashMap<String, String> tablePrefixes = new HashMap<>();
-    String volumeId = String.valueOf(omMetadataManager.getVolumeId(volumeName));
-    String bucketId =
-        String.valueOf(omMetadataManager.getBucketId(volumeName, bucketName));
-    tablePrefixes.put(OmMetadataManagerImpl.KEY_TABLE,
-        OM_KEY_PREFIX + volumeName + OM_KEY_PREFIX + bucketName);
-    tablePrefixes.put(OmMetadataManagerImpl.FILE_TABLE,
-        OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId);
-    tablePrefixes.put(OmMetadataManagerImpl.DIRECTORY_TABLE,
-        OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId);
-    return tablePrefixes;
+        getColumnFamilyToKeyPrefixMap(omMetadataManager, volumeName,
+            bucketName),
+        snapshotDB);
   }
 
   @Test
@@ -175,15 +175,14 @@ public class TestOMSnapshotDAG {
         "--num-of-buckets", "1",
         "--num-of-keys", "500",
         "--num-of-threads", "1",
-        "--key-size", "0",  // zero size keys. since we don't need to test DNs
+        "--key-size", "0",  // zero-byte keys since we don't test DNs here
         "--factor", "THREE",
         "--type", "RATIS",
         "--validate-writes"
     );
 
-    Assertions.assertEquals(500L, randomKeyGenerator.getNumberOfKeysAdded());
-    Assertions.assertEquals(500L,
-        randomKeyGenerator.getSuccessfulValidationCount());
+    assertEquals(500L, randomKeyGenerator.getNumberOfKeysAdded());
+    assertEquals(500L, randomKeyGenerator.getSuccessfulValidationCount());
 
     List<OmVolumeArgs> volList = cluster.getOzoneManager()
         .listAllVolumes("", "", 2);
@@ -192,7 +191,7 @@ public class TestOMSnapshotDAG {
         !e.getVolume().equals(OZONE_S3_VOLUME_NAME_DEFAULT))  // Ignore s3v vol
         .collect(Collectors.toList()).get(0).getVolume();
     List<OmBucketInfo> bucketList =
-        cluster.getOzoneManager().listBuckets(volumeName, "", "", 10);
+        cluster.getOzoneManager().listBuckets(volumeName, "", "", 10, false);
     LOG.debug("List of all buckets under the first volume: {}", bucketList);
     final String bucketName = bucketList.get(0).getBucketName();
 
@@ -216,13 +215,23 @@ public class TestOMSnapshotDAG {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     RDBStore rdbStore = (RDBStore) omMetadataManager.getStore();
     RocksDBCheckpointDiffer differ = rdbStore.getRocksDBCheckpointDiffer();
-
+    ReferenceCounted<IOmMetadataReader, SnapshotCache>
+        snapDB1 = ozoneManager.getOmSnapshotManager()
+        .getSnapshotCache().get(
+            SnapshotInfo.getTableKey(volumeName, bucketName, "snap1"));
+    ReferenceCounted<IOmMetadataReader, SnapshotCache>
+        snapDB2 = ozoneManager.getOmSnapshotManager()
+        .getSnapshotCache().get(
+            SnapshotInfo.getTableKey(volumeName, bucketName, "snap2"));
     DifferSnapshotInfo snap1 = getDifferSnapshotInfo(omMetadataManager,
-        volumeName, bucketName, "snap1");
+        volumeName, bucketName, "snap1",
+        ((RDBStore)((OmSnapshot)snapDB1.get())
+            .getMetadataManager().getStore()).getDb().getManagedRocksDb());
     DifferSnapshotInfo snap2 = getDifferSnapshotInfo(omMetadataManager,
-        volumeName, bucketName, "snap2");
+        volumeName, bucketName, "snap2", ((RDBStore)((OmSnapshot)snapDB2.get())
+            .getMetadataManager().getStore()).getDb().getManagedRocksDb());
 
-    // RocksDB does checkpointing in a separate thread, wait for it
+      // RocksDB does checkpointing in a separate thread, wait for it
     final File checkpointSnap1 = new File(snap1.getDbPath());
     GenericTestUtils.waitFor(checkpointSnap1::exists, 2000, 20000);
     final File checkpointSnap2 = new File(snap2.getDbPath());
@@ -238,9 +247,14 @@ public class TestOMSnapshotDAG {
 
     resp = store.createSnapshot(volumeName, bucketName, "snap3");
     LOG.debug("Snapshot created: {}", resp);
-
+    ReferenceCounted<IOmMetadataReader, SnapshotCache>
+        snapDB3 = ozoneManager.getOmSnapshotManager()
+        .getSnapshotCache().get(
+            SnapshotInfo.getTableKey(volumeName, bucketName, "snap3"));
     DifferSnapshotInfo snap3 = getDifferSnapshotInfo(omMetadataManager,
-        volumeName, bucketName, "snap3");
+        volumeName, bucketName, "snap3",
+        ((RDBStore)((OmSnapshot)snapDB3.get())
+            .getMetadataManager().getStore()).getDb().getManagedRocksDb());
     final File checkpointSnap3 = new File(snap3.getDbPath());
     GenericTestUtils.waitFor(checkpointSnap3::exists, 2000, 20000);
 
@@ -251,19 +265,90 @@ public class TestOMSnapshotDAG {
 
     // Same snapshot. Result should be empty list
     List<String> sstDiffList22 = differ.getSSTDiffList(snap2, snap2);
-    Assertions.assertTrue(sstDiffList22.isEmpty());
-
+    assertThat(sstDiffList22).isEmpty();
+    snapDB1.close();
+    snapDB2.close();
+    snapDB3.close();
     // Test DAG reconstruction by restarting OM. Then do the same diffs again
     cluster.restartOzoneManager();
-
+    ozoneManager = cluster.getOzoneManager();
+    omMetadataManager = ozoneManager.getMetadataManager();
+    snapDB1 = ozoneManager.getOmSnapshotManager()
+        .getSnapshotCache().get(
+            SnapshotInfo.getTableKey(volumeName, bucketName, "snap1"));
+    snapDB2 = ozoneManager.getOmSnapshotManager()
+        .getSnapshotCache().get(
+            SnapshotInfo.getTableKey(volumeName, bucketName, "snap2"));
+    snap1 = getDifferSnapshotInfo(omMetadataManager,
+        volumeName, bucketName, "snap1",
+        ((RDBStore)((OmSnapshot)snapDB1.get())
+            .getMetadataManager().getStore()).getDb().getManagedRocksDb());
+    snap2 = getDifferSnapshotInfo(omMetadataManager,
+        volumeName, bucketName, "snap2", ((RDBStore)((OmSnapshot)snapDB2.get())
+            .getMetadataManager().getStore()).getDb().getManagedRocksDb());
+    snapDB3 = ozoneManager.getOmSnapshotManager()
+        .getSnapshotCache().get(
+            SnapshotInfo.getTableKey(volumeName, bucketName, "snap3"));
+    snap3 = getDifferSnapshotInfo(omMetadataManager,
+        volumeName, bucketName, "snap3",
+        ((RDBStore)((OmSnapshot)snapDB3.get())
+            .getMetadataManager().getStore()).getDb().getManagedRocksDb());
     List<String> sstDiffList21Run2 = differ.getSSTDiffList(snap2, snap1);
-    Assertions.assertEquals(sstDiffList21, sstDiffList21Run2);
+    assertEquals(sstDiffList21, sstDiffList21Run2);
 
     List<String> sstDiffList32Run2 = differ.getSSTDiffList(snap3, snap2);
-    Assertions.assertEquals(sstDiffList32, sstDiffList32Run2);
+    assertEquals(sstDiffList32, sstDiffList32Run2);
 
     List<String> sstDiffList31Run2 = differ.getSSTDiffList(snap3, snap1);
-    Assertions.assertEquals(sstDiffList31, sstDiffList31Run2);
+    assertEquals(sstDiffList31, sstDiffList31Run2);
+    snapDB1.close();
+    snapDB2.close();
+    snapDB3.close();
+  }
+
+  @Test
+  public void testSkipTrackingWithZeroSnapshot() {
+    // Verify that the listener correctly skips compaction tracking
+    // when there is no snapshot in SnapshotInfoTable.
+
+    // Generate keys
+    RandomKeyGenerator randomKeyGenerator =
+        new RandomKeyGenerator(cluster.getConf());
+    CommandLine cmd = new CommandLine(randomKeyGenerator);
+    // 1000 keys are enough to trigger compaction with 256KB DB CF write buffer
+    cmd.execute("--num-of-volumes", "1",
+        "--num-of-buckets", "1",
+        "--num-of-keys", "1000",
+        "--num-of-threads", "1",
+        "--key-size", "0",  // zero-byte keys since we don't test DNs here
+        "--factor", "THREE",
+        "--type", "RATIS",
+        "--validate-writes"
+    );
+
+    assertEquals(1000L, randomKeyGenerator.getNumberOfKeysAdded());
+    assertEquals(1000L, randomKeyGenerator.getSuccessfulValidationCount());
+
+    String omMetadataDir =
+        cluster.getOzoneManager().getConfiguration().get(OZONE_METADATA_DIRS);
+    // Verify that no compaction log entry has been written
+    Path logPath = Paths.get(omMetadataDir, OM_SNAPSHOT_DIFF_DIR,
+        DB_COMPACTION_LOG_DIR);
+    File[] fileList = logPath.toFile().listFiles();
+    // fileList can be null when compaction log directory is not even created
+    if (fileList != null) {
+      for (File file : fileList) {
+        if (file != null && file.isFile() && file.getName().endsWith(".log")) {
+          assertEquals(0L, file.length());
+        }
+      }
+    }
+    // Verify that no SST has been backed up
+    Path sstBackupPath = Paths.get(omMetadataDir, OM_SNAPSHOT_DIFF_DIR,
+        DB_COMPACTION_SST_BACKUP_DIR);
+    fileList = sstBackupPath.toFile().listFiles();
+    assertNotNull(fileList);
+    assertEquals(0L, fileList.length);
   }
 
 }

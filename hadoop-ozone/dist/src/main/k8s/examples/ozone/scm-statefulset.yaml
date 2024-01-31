@@ -42,7 +42,6 @@ spec:
       initContainers:
       - name: init
         image: '@docker.image@'
-        imagePullPolicy: Always
         args:
         - ozone
         - scm
@@ -56,7 +55,6 @@ spec:
       containers:
       - name: scm
         image: '@docker.image@'
-        imagePullPolicy: Always
         args:
         - ozone
         - scm
@@ -78,4 +76,4 @@ spec:
       - ReadWriteOnce
       resources:
         requests:
-          storage: 2Gi
+          storage: 20Gi

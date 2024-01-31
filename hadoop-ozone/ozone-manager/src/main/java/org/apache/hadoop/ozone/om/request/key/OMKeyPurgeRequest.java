@@ -18,9 +18,12 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import java.io.IOException;
 import java.util.ArrayList;
+
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
@@ -28,6 +31,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Deleted
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgeKeysRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,17 +51,19 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
     PurgeKeysRequest purgeKeysRequest = getOmRequest().getPurgeKeysRequest();
     List<DeletedKeys> bucketDeletedKeysList = purgeKeysRequest
         .getDeletedKeysList();
+    List<SnapshotMoveKeyInfos> keysToUpdateList = purgeKeysRequest
+        .getKeysToUpdateList();
+    String fromSnapshot = purgeKeysRequest.hasSnapshotTableKey() ?
+        purgeKeysRequest.getSnapshotTableKey() : null;
     List<String> keysToBePurgedList = new ArrayList<>();
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
     OMClientResponse omClientResponse = null;
-
 
     for (DeletedKeys bucketWithDeleteKeys : bucketDeletedKeysList) {
       for (String deletedKey : bucketWithDeleteKeys.getKeysList()) {
@@ -64,10 +71,18 @@ public class OMKeyPurgeRequest extends OMKeyRequest {
       }
     }
 
-    omClientResponse = new OMKeyPurgeResponse(omResponse.build(),
-          keysToBePurgedList);
-    addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-        omDoubleBufferHelper);
+    try {
+      SnapshotInfo fromSnapshotInfo = null;
+      if (fromSnapshot != null) {
+        fromSnapshotInfo = ozoneManager.getMetadataManager()
+            .getSnapshotInfoTable().get(fromSnapshot);
+      }
+      omClientResponse = new OMKeyPurgeResponse(omResponse.build(),
+          keysToBePurgedList, fromSnapshotInfo, keysToUpdateList);
+    } catch (IOException ex) {
+      omClientResponse = new OMKeyPurgeResponse(
+          createErrorOMResponse(omResponse, ex));
+    }
 
     return omClientResponse;
   }

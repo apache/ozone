@@ -25,6 +25,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.client.checksum.BaseFileChecksumHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -45,7 +46,9 @@ import java.util.Set;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 
 /**
  * Shared Utilities for Ozone FS and related classes.
@@ -69,9 +72,24 @@ public final class OzoneClientUtils {
             DETECTED_LOOP_IN_BUCKET_LINKS);
       }
 
-      OzoneBucket sourceBucket =
-          objectStore.getVolume(bucket.getSourceVolume())
-              .getBucket(bucket.getSourceBucket());
+      OzoneBucket sourceBucket;
+      try {
+        sourceBucket =
+            objectStore.getVolume(bucket.getSourceVolume())
+                .getBucket(bucket.getSourceBucket());
+      } catch (OMException ex) {
+        if (ex.getResult().equals(VOLUME_NOT_FOUND)
+            || ex.getResult().equals(BUCKET_NOT_FOUND)) {
+          // for orphan link bucket, return layout as link bucket
+          bucket.setSourcePathExist(false);
+          LOG.error("Source Bucket is not found, its orphan bucket and " +
+              "used link bucket {} layout {}", bucket.getName(),
+              bucket.getBucketLayout());
+          return bucket.getBucketLayout();
+        }
+        // other case throw exception
+        throw ex;
+      }
 
       /** If the source bucket is again a link, we recursively resolve the
        * link bucket.
@@ -251,4 +269,16 @@ public final class OzoneClientUtils {
     return limitVal;
   }
 
+  public static void deleteSnapshot(ObjectStore objectStore,
+      String snapshot, OFSPath snapPath) {
+    try {
+      objectStore.deleteSnapshot(snapPath.getVolumeName(),
+          snapPath.getBucketName(), snapshot);
+    } catch (IOException exception) {
+      LOG.warn("Failed to delete the temp snapshot with name {} in bucket"
+              + " {} and volume {} after snapDiff op. Exception : {}", snapshot,
+          snapPath.getBucketName(), snapPath.getVolumeName(),
+          exception.getMessage());
+    }
+  }
 }

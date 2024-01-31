@@ -207,13 +207,13 @@ layoutVersion=0
 
 ```shell
 bin/ozone freon randomkeys --numOfVolumes=1 --numOfBuckets=1 --numOfKeys=10000 --keySize=524288 --replicationType=RATIS --numOfThreads=8 --factor=THREE --bufferSize=1048576
- 
- 
-// use debug ldb to check scm db on all the machines
-bin/ozone debug ldb --db=/tmp/metadata/scm.db/ ls
- 
- 
-bin/ozone debug ldb --db=/tmp/metadata/scm.db/ scan --with-keys --column_family=containers
+
+
+# 使用 debug ldb 工具逐一检查各机上的 scm.db
+bin/ozone debug ldb --db=/tmp/metadata/scm.db ls
+
+
+bin/ozone debug ldb --db=/tmp/metadata/scm.db scan --column-family=containers
 ```
 
 ## 从现有的SCM迁移

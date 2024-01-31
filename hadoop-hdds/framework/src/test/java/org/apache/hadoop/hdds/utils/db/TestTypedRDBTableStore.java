@@ -19,6 +19,19 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -28,7 +41,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 
-import com.google.common.base.Optional;
 
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
@@ -40,7 +52,6 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -52,6 +63,7 @@ import org.rocksdb.StatsLevel;
  * Tests for RocksDBTable Store.
  */
 public class TestTypedRDBTableStore {
+  public static final int MAX_DB_UPDATES_SIZE_THRESHOLD = 80;
   private static int count = 0;
   private final List<String> families =
       Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
@@ -65,6 +77,8 @@ public class TestTypedRDBTableStore {
 
   @BeforeEach
   public void setUp(@TempDir File tempDir) throws Exception {
+    CodecBuffer.enableLeakDetection();
+
     options = new ManagedDBOptions();
     options.setCreateIfMissing(true);
     options.setCreateMissingColumnFamilies(true);
@@ -79,9 +93,10 @@ public class TestTypedRDBTableStore {
           new ManagedColumnFamilyOptions());
       configSet.add(newConfig);
     }
-    rdbStore = new RDBStore(tempDir, options, configSet);
+    rdbStore = TestRDBStore.newRDBStore(tempDir, options, configSet,
+        MAX_DB_UPDATES_SIZE_THRESHOLD);
 
-    codecRegistry = new CodecRegistry();
+    codecRegistry = CodecRegistry.newBuilder().build();
 
   }
 
@@ -90,6 +105,7 @@ public class TestTypedRDBTableStore {
     if (rdbStore != null) {
       rdbStore.close();
     }
+    CodecBuffer.assertNoLeaks();
   }
 
   @Test
@@ -100,12 +116,12 @@ public class TestTypedRDBTableStore {
           RandomStringUtils.random(10);
       String value = RandomStringUtils.random(10);
       testTable.put(key, value);
-      Assertions.assertFalse(testTable.isEmpty());
+      assertFalse(testTable.isEmpty());
       String readValue = testTable.get(key);
-      Assertions.assertEquals(value, readValue);
+      assertEquals(value, readValue);
     }
     try (Table secondTable = rdbStore.getTable("Second")) {
-      Assertions.assertTrue(secondTable.isEmpty());
+      assertTrue(secondTable.isEmpty());
     }
   }
 
@@ -147,11 +163,11 @@ public class TestTypedRDBTableStore {
       }
 
       for (int x = 0; x < validKeys.size(); x++) {
-        Assertions.assertNotNull(testTable.get(validKeys.get(0)));
+        assertNotNull(testTable.get(validKeys.get(0)));
       }
 
       for (int x = 0; x < deletedKeys.size(); x++) {
-        Assertions.assertNull(testTable.get(deletedKeys.get(0)));
+        assertNull(testTable.get(deletedKeys.get(0)));
       }
     }
   }
@@ -173,7 +189,7 @@ public class TestTypedRDBTableStore {
       rdbStore.commitBatchOperation(batch);
 
       //then
-      Assertions.assertNotNull(testTable.get(key));
+      assertNotNull(testTable.get(key));
     }
   }
 
@@ -195,16 +211,16 @@ public class TestTypedRDBTableStore {
       rdbStore.commitBatchOperation(batch);
 
       //then
-      Assertions.assertNull(testTable.get(key));
+      assertNull(testTable.get(key));
     }
   }
 
   private static boolean consume(Table.KeyValue keyValue) {
     count++;
     try {
-      Assertions.assertNotNull(keyValue.getKey());
+      assertNotNull(keyValue.getKey());
     } catch (IOException ex) {
-      Assertions.fail(ex.toString());
+      fail(ex.toString());
     }
     return true;
   }
@@ -230,12 +246,23 @@ public class TestTypedRDBTableStore {
           localCount++;
         }
 
-        Assertions.assertEquals(iterCount, localCount);
+        assertEquals(iterCount, localCount);
         iter.seekToFirst();
         iter.forEachRemaining(TestTypedRDBTableStore::consume);
-        Assertions.assertEquals(iterCount, count);
+        assertEquals(iterCount, count);
 
       }
+    }
+  }
+
+  @Test
+  public void testIteratorOnException() throws Exception {
+    RDBTable rdbTable = mock(RDBTable.class);
+    when(rdbTable.iterator((CodecBuffer) null))
+        .thenThrow(new IOException());
+    try (Table<String, String> testTable = new TypedTable<>(rdbTable,
+        codecRegistry, String.class, String.class)) {
+      assertThrows(IOException.class, testTable::iterator);
     }
   }
 
@@ -249,14 +276,13 @@ public class TestTypedRDBTableStore {
         String key = Integer.toString(x);
         String value = Integer.toString(x);
         testTable.addCacheEntry(new CacheKey<>(key),
-            new CacheValue<>(Optional.of(value),
-            x));
+            CacheValue.get(x, value));
       }
 
       // As we have added to cache, so get should return value even if it
       // does not exist in DB.
       for (int x = 0; x < iterCount; x++) {
-        Assertions.assertEquals(Integer.toString(1),
+        assertEquals(Integer.toString(1),
             testTable.get(Integer.toString(1)));
       }
 
@@ -275,11 +301,10 @@ public class TestTypedRDBTableStore {
         String value = Integer.toString(x);
         if (x % 2 == 0) {
           testTable.addCacheEntry(new CacheKey<>(key),
-              new CacheValue<>(Optional.of(value), x));
+              CacheValue.get(x, value));
         } else {
           testTable.addCacheEntry(new CacheKey<>(key),
-              new CacheValue<>(Optional.absent(),
-              x));
+              CacheValue.get(x));
         }
       }
 
@@ -287,10 +312,10 @@ public class TestTypedRDBTableStore {
       // does not exist in DB.
       for (int x = 0; x < iterCount; x++) {
         if (x % 2 == 0) {
-          Assertions.assertEquals(Integer.toString(x),
+          assertEquals(Integer.toString(x),
               testTable.get(Integer.toString(x)));
         } else {
-          Assertions.assertNull(testTable.get(Integer.toString(x)));
+          assertNull(testTable.get(Integer.toString(x)));
         }
       }
 
@@ -308,10 +333,10 @@ public class TestTypedRDBTableStore {
       //Check remaining values
       for (int x = 6; x < iterCount; x++) {
         if (x % 2 == 0) {
-          Assertions.assertEquals(Integer.toString(x),
+          assertEquals(Integer.toString(x),
               testTable.get(Integer.toString(x)));
         } else {
-          Assertions.assertNull(testTable.get(Integer.toString(x)));
+          assertNull(testTable.get(Integer.toString(x)));
         }
       }
 
@@ -327,13 +352,13 @@ public class TestTypedRDBTableStore {
           RandomStringUtils.random(10);
       String value = RandomStringUtils.random(10);
       testTable.put(key, value);
-      Assertions.assertTrue(testTable.isExist(key));
+      assertTrue(testTable.isExist(key));
 
       String invalidKey = key + RandomStringUtils.random(1);
-      Assertions.assertFalse(testTable.isExist(invalidKey));
+      assertFalse(testTable.isExist(invalidKey));
 
       testTable.delete(key);
-      Assertions.assertFalse(testTable.isExist(key));
+      assertFalse(testTable.isExist(key));
     }
   }
 
@@ -345,13 +370,13 @@ public class TestTypedRDBTableStore {
           RandomStringUtils.random(10);
       String value = RandomStringUtils.random(10);
       testTable.put(key, value);
-      Assertions.assertNotNull(testTable.getIfExist(key));
+      assertNotNull(testTable.getIfExist(key));
 
       String invalidKey = key + RandomStringUtils.random(1);
-      Assertions.assertNull(testTable.getIfExist(invalidKey));
+      assertNull(testTable.getIfExist(invalidKey));
 
       testTable.delete(key);
-      Assertions.assertNull(testTable.getIfExist(key));
+      assertNull(testTable.getIfExist(key));
     }
   }
 
@@ -363,12 +388,12 @@ public class TestTypedRDBTableStore {
           RandomStringUtils.random(10);
       String value = RandomStringUtils.random(10);
       testTable.addCacheEntry(new CacheKey<>(key),
-          new CacheValue<>(Optional.of(value), 1L));
-      Assertions.assertTrue(testTable.isExist(key));
+          CacheValue.get(1L, value));
+      assertTrue(testTable.isExist(key));
 
       testTable.addCacheEntry(new CacheKey<>(key),
-          new CacheValue<>(Optional.absent(), 1L));
-      Assertions.assertFalse(testTable.isExist(key));
+          CacheValue.get(1L));
+      assertFalse(testTable.isExist(key));
     }
   }
 
@@ -386,7 +411,7 @@ public class TestTypedRDBTableStore {
       }
       long keyCount = testTable.getEstimatedKeyCount();
       // The result should be larger than zero but not exceed(?) numKeys
-      Assertions.assertTrue(keyCount > 0 && keyCount <= numKeys);
+      assertThat(keyCount).isGreaterThan(0).isLessThanOrEqualTo(numKeys);
     }
   }
 
@@ -400,11 +425,11 @@ public class TestTypedRDBTableStore {
       byte[] value = new byte[] {4, 5, 6};
       testTable.put(key, value);
       byte[] actualValue = testTable.get(key);
-      Assertions.assertArrayEquals(value, testTable.get(key));
-      Assertions.assertNotSame(value, actualValue);
+      assertArrayEquals(value, testTable.get(key));
+      assertNotSame(value, actualValue);
       testTable.addCacheEntry(new CacheKey<>(key),
-              new CacheValue<>(Optional.of(value), 1L));
-      Assertions.assertSame(value, testTable.get(key));
+              CacheValue.get(1L, value));
+      assertSame(value, testTable.get(key));
     }
   }
 }

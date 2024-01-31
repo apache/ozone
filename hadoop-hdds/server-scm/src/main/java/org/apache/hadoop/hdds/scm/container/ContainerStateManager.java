@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
-import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
@@ -142,7 +141,7 @@ public interface ContainerStateManager {
    */
   @Replicate
   void addContainer(ContainerInfoProto containerInfo)
-      throws IOException, TimeoutException;
+      throws IOException;
 
   /**
    *
@@ -150,7 +149,7 @@ public interface ContainerStateManager {
   @Replicate
   void updateContainerState(HddsProtos.ContainerID id,
                             HddsProtos.LifeCycleEvent event)
-      throws IOException, InvalidStateTransitionException, TimeoutException;
+      throws IOException, InvalidStateTransitionException;
 
   /**
    *
@@ -171,7 +170,7 @@ public interface ContainerStateManager {
    */
   @Replicate
   void removeContainer(HddsProtos.ContainerID containerInfo)
-      throws IOException, TimeoutException;
+      throws IOException;
 
   /**
    * Reinitialize the ContainerStateManager with container store.

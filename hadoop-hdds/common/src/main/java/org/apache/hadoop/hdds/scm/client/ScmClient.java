@@ -20,9 +20,12 @@ package org.apache.hadoop.hdds.scm.client;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -38,6 +41,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * The interface to call into underlying container layer.
@@ -178,6 +182,14 @@ public interface ScmClient extends Closeable {
       String owner) throws IOException;
 
   /**
+   * Gets the list of underReplicated and unClosed containers on a decommissioning node.
+   *
+   * @param dn - Datanode detail
+   * @return Lists of underReplicated and Unclosed containers
+   */
+  Map<String, List<ContainerID>> getContainersOnDecomNode(DatanodeDetails dn) throws IOException;
+
+  /**
    * Returns a set of Nodes that meet a query criteria. Passing null for opState
    * or nodeState acts like a wild card, returning all nodes in that state.
    * @param opState - Operational State of the node, eg IN_SERVICE,
@@ -192,6 +204,14 @@ public interface ScmClient extends Closeable {
   List<HddsProtos.Node> queryNode(HddsProtos.NodeOperationalState opState,
       HddsProtos.NodeState nodeState, HddsProtos.QueryScope queryScope,
       String poolName) throws IOException;
+
+  /**
+   * Returns a node with the given UUID.
+   * @param uuid - datanode uuid string
+   * @return A nodes that matches the requested UUID.
+   * @throws IOException
+   */
+  HddsProtos.Node queryNode(UUID uuid) throws IOException;
 
   /**
    * Allows a list of hosts to be decommissioned. The hosts are identified
@@ -362,6 +382,15 @@ public interface ScmClient extends Closeable {
   List<String> getScmRatisRoles() throws IOException;
 
   /**
+   * Force generates new secret keys (rotate).
+   *
+   * @param force boolean flag that forcefully rotates the key on demand
+   * @return
+   * @throws IOException
+   */
+  boolean rotateSecretKeys(boolean force) throws IOException;
+
+  /**
    * Transfer the raft leadership.
    *
    * @param newLeaderId  the newLeaderId of the target expected leader
@@ -390,15 +419,15 @@ public interface ScmClient extends Closeable {
   int resetDeletedBlockRetryCount(List<Long> txIDs) throws IOException;
 
   /**
-   * Get usage information of datanode by ipaddress or uuid.
+   * Get usage information of datanode by address or uuid.
    *
-   * @param ipaddress datanode ipaddress String
+   * @param address datanode address String
    * @param uuid datanode uuid String
    * @return List of DatanodeUsageInfoProto. Each element contains info such as
    * capacity, SCMused, and remaining space.
    * @throws IOException
    */
-  List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(String ipaddress,
+  List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(String address,
                                                                String uuid)
       throws IOException;
 
@@ -420,6 +449,9 @@ public interface ScmClient extends Closeable {
   StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean force, boolean readonly)
       throws IOException;
+
+  DecommissionScmResponseProto decommissionScm(
+      String scmId) throws IOException;
 
   /**
    * Get DiskBalancer report.

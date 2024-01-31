@@ -30,21 +30,27 @@ public class ContainerHistory implements Serializable {
   private String datanodeHost;
   private long firstSeenTime;
   private long lastSeenTime;
-  private long bcsId;
+  private long lastBcsId;
+  private String state;
 
   public ContainerHistory(long containerId, String datanodeUuid,
                           String datanodeHost, long firstSeenTime,
-                          long lastSeenTime, long lastBcsId) {
+                          long lastSeenTime, long lastBcsId, String state) {
     this.containerId = containerId;
     this.datanodeUuid = datanodeUuid;
     this.datanodeHost = datanodeHost;
     this.firstSeenTime = firstSeenTime;
     this.lastSeenTime = lastSeenTime;
-    this.bcsId = lastBcsId;
+    this.lastBcsId = lastBcsId;
+    this.state = state;
+  }
+
+  // Default constructor, used by jackson lib for object deserialization.
+  public ContainerHistory() {
   }
 
   public long getLastBcsId() {
-    return bcsId;
+    return lastBcsId;
   }
 
   public long getContainerId() {
@@ -85,5 +91,13 @@ public class ContainerHistory implements Serializable {
 
   public void setLastSeenTime(long lastSeenTime) {
     this.lastSeenTime = lastSeenTime;
+  }
+
+  public String getState() {
+    return state;
+  }
+
+  public void setState(String state) {
+    this.state = state;
   }
 }

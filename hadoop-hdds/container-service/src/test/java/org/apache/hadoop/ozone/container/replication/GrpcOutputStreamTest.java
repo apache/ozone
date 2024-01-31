@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
+import org.apache.ratis.thirdparty.io.grpc.stub.CallStreamObserver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,9 +36,10 @@ import java.util.Random;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests for {@code GrpcOutputStream}.
@@ -53,7 +54,7 @@ abstract class GrpcOutputStreamTest<T> {
   private final Class<? extends T> clazz;
 
   @Mock
-  private StreamObserver<T> observer;
+  private CallStreamObserver<T> observer;
 
   private OutputStream subject;
 
@@ -64,6 +65,7 @@ abstract class GrpcOutputStreamTest<T> {
   @BeforeEach
   public void setUp() {
     subject = createSubject();
+    when(observer.isReady()).thenReturn(true);
   }
 
   protected abstract OutputStream createSubject();
@@ -228,7 +230,7 @@ abstract class GrpcOutputStreamTest<T> {
     return containerId;
   }
 
-  StreamObserver<T> getObserver() {
+  CallStreamObserver<T> getObserver() {
     return observer;
   }
 

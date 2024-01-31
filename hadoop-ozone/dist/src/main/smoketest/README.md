@@ -16,7 +16,7 @@
 
 This directory contains a [robotframework](http://robotframework.org/) based test suite for Ozone to make it easier to check the current state of the package.
 
-You can run in in any environment after [installing](https://github.com/robotframework/robotframework/blob/master/INSTALL.rst)
+You can run in any environment after [installing](https://github.com/robotframework/robotframework/blob/master/INSTALL.rst)
 
 ```
 cd $DIRECTORY_OF_OZONE

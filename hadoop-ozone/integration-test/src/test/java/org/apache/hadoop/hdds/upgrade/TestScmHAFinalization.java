@@ -35,8 +35,8 @@ import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.Upgra
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.UpgradeTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -55,6 +55,12 @@ import java.util.concurrent.Future;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests upgrade finalization failure scenarios and corner cases specific to SCM
@@ -166,7 +172,7 @@ public class TestScmHAFinalization {
 
     // Make sure the original SCM leader is not the leader anymore.
     StorageContainerManager newLeaderScm  = cluster.getActiveSCM();
-    Assertions.assertNotEquals(newLeaderScm.getSCMNodeId(),
+    assertNotEquals(newLeaderScm.getSCMNodeId(),
         oldLeaderScm.getSCMNodeId());
 
     // Resume finalization from the new leader.
@@ -187,6 +193,7 @@ public class TestScmHAFinalization {
 
   @ParameterizedTest
   @MethodSource(METHOD_SOURCE)
+  @Flaky("HDDS-8714")
   public void testFinalizationWithRestart(
       UpgradeTestInjectionPoints haltingPoint) throws Exception {
     CountDownLatch terminateLatch = new CountDownLatch(1);
@@ -286,8 +293,8 @@ public class TestScmHAFinalization {
         inactiveScm, 0, NUM_DATANODES);
 
     // Use log to verify a snapshot was installed.
-    Assertions.assertTrue(logCapture.getOutput().contains("New SCM snapshot " +
-        "received with metadata layout version"));
+    assertThat(logCapture.getOutput()).contains("New SCM snapshot " +
+        "received with metadata layout version");
   }
 
   private void waitForScmsToFinalize(Collection<StorageContainerManager> scms)
@@ -317,35 +324,31 @@ public class TestScmHAFinalization {
     for (StorageContainerManager scm: scms) {
       switch (haltingPoint) {
       case BEFORE_PRE_FINALIZE_UPGRADE:
-        Assertions.assertFalse(
-            scm.getPipelineManager().isPipelineCreationFrozen());
-        Assertions.assertEquals(
+        assertFalse(scm.getPipelineManager().isPipelineCreationFrozen());
+        assertEquals(
             scm.getScmContext().getFinalizationCheckpoint(),
             FinalizationCheckpoint.FINALIZATION_REQUIRED);
         break;
       case AFTER_PRE_FINALIZE_UPGRADE:
-        Assertions.assertTrue(
-            scm.getPipelineManager().isPipelineCreationFrozen());
-        Assertions.assertEquals(
+        assertTrue(scm.getPipelineManager().isPipelineCreationFrozen());
+        assertEquals(
             scm.getScmContext().getFinalizationCheckpoint(),
             FinalizationCheckpoint.FINALIZATION_STARTED);
         break;
       case AFTER_COMPLETE_FINALIZATION:
-        Assertions.assertFalse(
-            scm.getPipelineManager().isPipelineCreationFrozen());
-        Assertions.assertEquals(
+        assertFalse(scm.getPipelineManager().isPipelineCreationFrozen());
+        assertEquals(
             scm.getScmContext().getFinalizationCheckpoint(),
             FinalizationCheckpoint.MLV_EQUALS_SLV);
         break;
       case AFTER_POST_FINALIZE_UPGRADE:
-        Assertions.assertFalse(
-            scm.getPipelineManager().isPipelineCreationFrozen());
-        Assertions.assertEquals(
+        assertFalse(scm.getPipelineManager().isPipelineCreationFrozen());
+        assertEquals(
             scm.getScmContext().getFinalizationCheckpoint(),
             FinalizationCheckpoint.FINALIZATION_COMPLETE);
         break;
       default:
-        Assertions.fail("Unknown halting point in test: " + haltingPoint);
+        fail("Unknown halting point in test: " + haltingPoint);
       }
     }
   }

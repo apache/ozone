@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: "3"
+version: "3.8"
 services:
   kdc:
     image: ${OZONE_TESTKRB5_IMAGE}
@@ -49,7 +49,7 @@ services:
       - ../_keytabs:/etc/security/keytabs
       - ./krb5.conf:/etc/krb5.conf
     ports:
-      - 9864:9999
+      - 19864:9999
     command: ["/opt/hadoop/bin/ozone","datanode"]
     extra_hosts:
       - "scm1.org: 172.25.0.116"

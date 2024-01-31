@@ -18,13 +18,13 @@
  */
 package org.apache.hadoop.ozone.container.metadata;
 
-import java.io.IOException;
-
-import com.google.common.primitives.Longs;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.LongCodec;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
 
 /**
  * Containers written using schema version 1 wrote unprefixed block ID keys
@@ -34,22 +34,32 @@ import org.slf4j.LoggerFactory;
  * prefixes in the data, and determining which format it should be
  * encoded/decoded to/from.
  */
-public class SchemaOneKeyCodec implements Codec<String> {
+public final class SchemaOneKeyCodec implements Codec<String> {
   private static final Logger LOG = LoggerFactory.getLogger(
       SchemaOneKeyCodec.class);
 
+  private static final Codec<String> INSTANCE = new SchemaOneKeyCodec();
+
+  public static Codec<String> get() {
+    return INSTANCE;
+  }
+
+  private SchemaOneKeyCodec() {
+    // singleton
+  }
+
   @Override
-  public byte[] toPersistedFormat(String stringObject) {
+  public byte[] toPersistedFormat(String stringObject) throws IOException {
     try {
       // If the caller's string has no prefix, it should be stored as a long
       // to be encoded as a long to be consistent with the schema one
       // container format.
       long longObject = Long.parseLong(stringObject);
-      return Longs.toByteArray(longObject);
+      return LongCodec.get().toPersistedFormat(longObject);
     } catch (NumberFormatException ex) {
       // If long parsing fails, the caller used a prefix and the data should
       // be encoded as a String.
-      return StringUtils.string2Bytes(stringObject);
+      return StringCodec.get().toPersistedFormat(stringObject);
     }
   }
 
@@ -71,11 +81,11 @@ public class SchemaOneKeyCodec implements Codec<String> {
    * @param rawData Byte array from the key/value store. Should not be null.
    */
   @Override
-  public String fromPersistedFormat(byte[] rawData) throws IOException {
+  public String fromPersistedFormat(byte[] rawData) {
     final String prefixedBlockRegex = "^#[a-zA-Z]+#[0-9]+$";
     final String metadataRegex = "^#[a-zA-Z]$";
 
-    String stringData = StringUtils.bytes2String(rawData);
+    final String stringData = StringCodec.get().fromPersistedFormat(rawData);
 
     if (stringData.matches(prefixedBlockRegex)
         || stringData.matches(metadataRegex)) {
@@ -84,7 +94,7 @@ public class SchemaOneKeyCodec implements Codec<String> {
           " It will be parsed as the string {}", rawData, stringData);
       return stringData;
     } else if (rawData.length == Long.BYTES) {
-      long longData = Longs.fromByteArray(rawData);
+      final long longData = LongCodec.get().fromPersistedFormat(rawData);
       LOG.trace("Byte array {} did not match the format for a string key " +
               "and has {} bytes. It will be parsed as the long {}",
           rawData, Long.BYTES, longData);
