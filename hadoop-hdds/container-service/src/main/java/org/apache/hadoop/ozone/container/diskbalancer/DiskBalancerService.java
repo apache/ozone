@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -45,7 +44,6 @@ import org.apache.hadoop.ozone.container.diskbalancer.policy.VolumeChoosingPolic
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
-import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.FileUtils;
 import org.slf4j.Logger;
@@ -57,8 +55,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -402,7 +398,7 @@ public class DiskBalancerService extends BackgroundService {
       Path diskBalancerTmpDir = null, diskBalancerDestDir = null;
       long containerSize = containerData.getBytesUsed();
       try {
-        diskBalancerTmpDir = destVolume.getTmpPath()
+        diskBalancerTmpDir = destVolume.getTmpDir().toPath()
             .resolve(DISK_BALANCER_DIR).resolve(String.valueOf(containerId));
 
         // Copy container to new Volume's tmp Dir

@@ -59,7 +59,6 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume.VolumeType;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolumeChecker;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerInfo;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService;
-import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.BlockDeletingService;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
@@ -244,15 +243,6 @@ public class OzoneContainer {
             blockDeletingServiceWorkerSize, config,
             datanodeDetails.threadNamePrefix(),
             context.getParent().getReconfigurationHandler());
-
-    Duration diskBalancerSvcInterval = conf.getObject(
-        DiskBalancerConfiguration.class).getDiskBalancerInterval();
-    Duration diskBalancerSvcTimeout = conf.getObject(
-        DiskBalancerConfiguration.class).getDiskBalancerTimeout();
-    diskBalancerService =
-        new DiskBalancerService(this, diskBalancerSvcInterval.toMillis(),
-            diskBalancerSvcTimeout.toMillis(), TimeUnit.MILLISECONDS, 1,
-            config);
 
     Duration diskBalancerSvcInterval = conf.getObject(
         DiskBalancerConfiguration.class).getDiskBalancerInterval();

@@ -79,17 +79,6 @@ public class TestReportPublisherFactory {
   }
 
   @Test
-  public void testGetDiskBalancerReportPublisher() {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    ReportPublisherFactory factory = new ReportPublisherFactory(conf);
-    ReportPublisher publisher = factory
-        .getPublisherFor(DiskBalancerReportProto.class);
-    Assert.assertEquals(DiskBalancerReportPublisher.class,
-        publisher.getClass());
-    Assert.assertEquals(conf, publisher.getConf());
-  }
-
-  @Test
   public void testInvalidReportPublisher() {
     OzoneConfiguration conf = new OzoneConfiguration();
     ReportPublisherFactory factory = new ReportPublisherFactory(conf);

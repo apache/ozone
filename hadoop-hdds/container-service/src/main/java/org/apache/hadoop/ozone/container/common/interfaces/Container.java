@@ -263,15 +263,13 @@ public interface Container<CONTAINERDATA extends ContainerData> {
    *         false otherwise
    * @throws InterruptedException if the scan is interrupted.
    */
-  boolean scanData(DataTransferThrottler throttler, Canceler canceler);
+  ScanResult scanData(DataTransferThrottler throttler, Canceler canceler)
+      throws InterruptedException;
 
   /**
    * Copy all the data of the container to the destination path.
    */
   void copyContainerData(Path destPath) throws IOException;
-
-  ScanResult scanData(DataTransferThrottler throttler, Canceler canceler)
-      throws InterruptedException;
 
   /** Acquire read lock. */
   void readLock();

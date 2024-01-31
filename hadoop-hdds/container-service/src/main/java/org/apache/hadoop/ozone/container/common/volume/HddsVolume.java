@@ -439,62 +439,6 @@ public class HddsVolume extends StorageVolume {
     }
   }
 
-  private String getIdDir() throws IOException {
-    try {
-      return VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
-          this, getClusterID() == null ? "" : getClusterID());
-    } catch (IOException ex) {
-      String errMsg = "Cannot resolve volume container path " +
-          "ID dir for volume {} " + getStorageID() +
-          " when creating volume tmp dir";
-      LOG.error(errMsg, ex);
-      throw new IOException(errMsg, ex);
-    }
-  }
-
-  public Path getTmpPath() throws IOException {
-
-    // HddsVolume root directory path
-    String hddsRoot = getHddsRootDir().toString();
-
-    // HddsVolume path
-    String vol = HddsVolumeUtil.getHddsRoot(hddsRoot);
-
-    Path volPath = Paths.get(vol);
-    Path idPath = Paths.get(getIdDir());
-
-    return volPath.resolve(idPath).resolve(TMP_DIR);
-  }
-
-  private void createTmpDir() throws IOException {
-    tmpDirPath = getTmpPath();
-
-    if (Files.notExists(tmpDirPath)) {
-      try {
-        Files.createDirectories(tmpDirPath);
-      } catch (IOException ex) {
-        LOG.error("Error creating {}", tmpDirPath.toString(), ex);
-      }
-    }
-  }
-
-  public void createDeleteServiceDir() throws IOException {
-    if (tmpDirPath == null) {
-      createTmpDir();
-    }
-
-    deleteServiceDirPath =
-        tmpDirPath.resolve(TMP_DELETE_SERVICE_DIR);
-
-    if (Files.notExists(deleteServiceDirPath)) {
-      try {
-        Files.createDirectories(deleteServiceDirPath);
-      } catch (IOException ex) {
-        LOG.error("Error creating {}", deleteServiceDirPath.toString(), ex);
-      }
-    }
-  }
-
   private void closeDbStore() {
     if (!dbLoaded.get()) {
       return;
