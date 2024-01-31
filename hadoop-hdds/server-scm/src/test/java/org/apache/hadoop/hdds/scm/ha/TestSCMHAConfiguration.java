@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.ha.ConfUtils;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.util.TimeDuration;
@@ -75,9 +74,11 @@ import static org.mockito.Mockito.when;
  */
 class TestSCMHAConfiguration {
   private OzoneConfiguration conf;
+  @TempDir
+  private File tempDir;
 
   @BeforeEach
-  void setup(@TempDir File tempDir) {
+  void setup() {
     conf = new OzoneConfiguration();
     conf.set(OZONE_METADATA_DIRS, tempDir.getAbsolutePath());
     DefaultConfigManager.clearDefaultConfigs();
@@ -214,8 +215,7 @@ class TestSCMHAConfiguration {
     assertEquals(0, scmRatisConfig.getLogAppenderWaitTimeMin(),
         "getLogAppenderWaitTimeMin");
 
-    final File testDir = GenericTestUtils.getRandomizedTestDir();
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getPath());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempDir.getPath());
 
     final RaftProperties p = RatisUtil.newRaftProperties(conf);
     final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);

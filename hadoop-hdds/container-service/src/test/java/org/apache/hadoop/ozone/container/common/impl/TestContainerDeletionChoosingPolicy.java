@@ -40,8 +40,8 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService.ContainerBlockInfo;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -54,6 +54,8 @@ import static org.mockito.Mockito.when;
  * The class for testing container deletion choosing policy.
  */
 public class TestContainerDeletionChoosingPolicy {
+  @TempDir
+  private File tempFile;
   private String path;
   private OzoneContainer ozoneContainer;
   private ContainerSet containerSet;
@@ -63,23 +65,15 @@ public class TestContainerDeletionChoosingPolicy {
   private static final int SERVICE_TIMEOUT_IN_MILLISECONDS = 0;
   private static final int SERVICE_INTERVAL_IN_MILLISECONDS = 1000;
 
-  private ContainerLayoutVersion layoutVersion;
-
-  public void setLayoutVersion(ContainerLayoutVersion layout) {
-    this.layoutVersion = layout;
-  }
-
   @BeforeEach
   public void init() throws Throwable {
     conf = new OzoneConfiguration();
-    path = GenericTestUtils
-        .getTempPath(TestContainerDeletionChoosingPolicy.class.getSimpleName());
+    path = tempFile.getPath();
   }
 
   @ContainerLayoutTestInfo.ContainerTest
   public void testRandomChoosingPolicy(ContainerLayoutVersion layout)
       throws IOException {
-    setLayoutVersion(layout);
     File containerDir = new File(path);
     if (containerDir.exists()) {
       FileUtils.deleteDirectory(new File(path));
@@ -143,7 +137,6 @@ public class TestContainerDeletionChoosingPolicy {
   @ContainerLayoutTestInfo.ContainerTest
   public void testTopNOrderedChoosingPolicy(ContainerLayoutVersion layout)
       throws IOException {
-    setLayoutVersion(layout);
     File containerDir = new File(path);
     if (containerDir.exists()) {
       FileUtils.deleteDirectory(new File(path));

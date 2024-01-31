@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.fs;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckParams.Builder;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.stubbing.Answer;
 
 import java.io.File;
@@ -30,7 +31,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.hdds.fs.MockSpaceUsageCheckParams.newBuilder;
-import static org.apache.ozone.test.GenericTestUtils.getTestDir;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyLong;
@@ -44,8 +44,8 @@ import static org.mockito.Mockito.when;
  */
 public class TestCachingSpaceUsageSource {
 
-  private static final File DIR =
-      getTestDir(TestCachingSpaceUsageSource.class.getSimpleName());
+  @TempDir
+  private static File dir;
 
   @Test
   public void providesInitialValueUntilStarted() {
@@ -156,7 +156,7 @@ public class TestCachingSpaceUsageSource {
   }
 
   private static Builder paramsBuilder() {
-    return newBuilder(DIR)
+    return newBuilder(dir)
         .withSource(MockSpaceUsageSource.fixed(10000, 1000))
         .withRefresh(Duration.ofMinutes(5));
   }

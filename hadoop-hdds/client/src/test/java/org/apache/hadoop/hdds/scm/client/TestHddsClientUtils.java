@@ -102,7 +102,6 @@ public class TestHddsClientUtils {
     conf.set(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY, "scm1");
 
     int port = 9880;
-    int i = 1;
     for (String nodeId : nodes) {
       conf.setInt(ConfUtils.addKeySuffixes(OZONE_SCM_CLIENT_PORT_KEY,
           scmServiceId, nodeId), port);

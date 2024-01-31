@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -70,10 +69,10 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.test.PathUtils;
 import org.apache.commons.io.IOUtils;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import static java.util.Collections.emptyList;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
@@ -91,6 +90,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY
  * Test for different container placement policy.
  */
 public class TestContainerPlacement {
+  @TempDir
   private File testDir;
   private DBStore dbStore;
   private ContainerManager containerManager;
@@ -103,8 +103,6 @@ public class TestContainerPlacement {
   @BeforeEach
   public void setUp() throws Exception {
     conf = getConf();
-    testDir = GenericTestUtils.getTestDir(
-        TestContainerPlacement.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
@@ -123,8 +121,6 @@ public class TestContainerPlacement {
     if (dbStore != null) {
       dbStore.close();
     }
-
-    FileUtil.fullyDelete(testDir);
   }
 
   /**
@@ -265,7 +261,6 @@ public class TestContainerPlacement {
       if (xceiverClientManager != null) {
         xceiverClientManager.close();
       }
-      FileUtil.fullyDelete(testDir);
     }
   }
 

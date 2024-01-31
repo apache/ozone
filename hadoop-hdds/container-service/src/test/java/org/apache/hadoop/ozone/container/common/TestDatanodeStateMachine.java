@@ -28,7 +28,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -52,6 +51,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,6 +76,7 @@ public class TestDatanodeStateMachine {
   private List<ScmTestMock> mockServers;
   private ExecutorService executorService;
   private OzoneConfiguration conf;
+  @TempDir
   private File testRoot;
 
   @BeforeEach
@@ -105,13 +106,6 @@ public class TestDatanodeStateMachine {
     conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES,
         serverAddresses.toArray(new String[0]));
 
-    String path = GenericTestUtils
-        .getTempPath(TestDatanodeStateMachine.class.getSimpleName());
-    testRoot = new File(path);
-    if (!testRoot.mkdirs()) {
-      LOG.info("Required directories {} already exist.", testRoot);
-    }
-
     File dataDir = new File(testRoot, "data");
     conf.set(HDDS_DATANODE_DIR_KEY, dataDir.getAbsolutePath());
     if (!dataDir.mkdirs()) {
@@ -119,7 +113,7 @@ public class TestDatanodeStateMachine {
     }
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         new File(testRoot, "scm").getAbsolutePath());
-    path = new File(testRoot, "datanodeID").getAbsolutePath();
+    String path = new File(testRoot, "datanodeID").getAbsolutePath();
     conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR, path);
     executorService = HadoopExecutors.newCachedThreadPool(
         new ThreadFactoryBuilder().setDaemon(true)
@@ -149,8 +143,6 @@ public class TestDatanodeStateMachine {
       }
     } catch (Exception e) {
       //ignore all exception from the shutdown
-    } finally {
-      FileUtil.fullyDelete(testRoot);
     }
   }
 
