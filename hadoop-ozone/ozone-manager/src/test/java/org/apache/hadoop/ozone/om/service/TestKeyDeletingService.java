@@ -51,7 +51,6 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.io.TempDir;
@@ -546,7 +545,7 @@ t
 
     keyDeletingService.resume();
 
-    try (ReferenceCounted<OmSnapshot, SnapshotCache> rcOmSnapshot =
+    try (ReferenceCounted<OmSnapshot> rcOmSnapshot =
         om.getOmSnapshotManager().getSnapshot(
             volumeName, bucketName, "snap3")) {
       OmSnapshot snap3 = rcOmSnapshot.get();

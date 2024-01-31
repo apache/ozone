@@ -42,7 +42,7 @@ public class SnapshotCache {
   // Key:   DB snapshot table key
   // Value: OmSnapshot instance, each holds a DB instance handle inside
   // TODO: [SNAPSHOT] Consider wrapping SoftReference<> around IOmMetadataReader
-  private final ConcurrentHashMap<String, ReferenceCounted<OmSnapshot, SnapshotCache>> dbMap;
+  private final ConcurrentHashMap<String, ReferenceCounted<OmSnapshot>> dbMap;
 
   private final CacheLoader<String, OmSnapshot> cacheLoader;
   // Soft-limit of the total number of snapshot DB instances allowed to be
@@ -58,7 +58,7 @@ public class SnapshotCache {
   }
 
   @VisibleForTesting
-  ConcurrentHashMap<String, ReferenceCounted<OmSnapshot, SnapshotCache>> getDbMap() {
+  ConcurrentHashMap<String, ReferenceCounted<OmSnapshot>> getDbMap() {
     return dbMap;
   }
 
@@ -92,11 +92,11 @@ public class SnapshotCache {
    * Immediately invalidate all entries and close their DB instances in cache.
    */
   public void invalidateAll() {
-    Iterator<Map.Entry<String, ReferenceCounted<OmSnapshot, SnapshotCache>>>
+    Iterator<Map.Entry<String, ReferenceCounted<OmSnapshot>>>
         it = dbMap.entrySet().iterator();
 
     while (it.hasNext()) {
-      Map.Entry<String, ReferenceCounted<OmSnapshot, SnapshotCache>> entry = it.next();
+      Map.Entry<String, ReferenceCounted<OmSnapshot>> entry = it.next();
       OmSnapshot omSnapshot = entry.getValue().get();
       try {
         // TODO: If wrapped with SoftReference<>, omSnapshot could be null?
@@ -125,16 +125,16 @@ public class SnapshotCache {
    * @param key snapshot table key
    * @return an OmSnapshot instance, or null on error
    */
-  public ReferenceCounted<OmSnapshot, SnapshotCache> get(String key)
+  public ReferenceCounted<OmSnapshot> get(String key)
       throws IOException {
     // Atomic operation to initialize the OmSnapshot instance (once) if the key
     // does not exist, and increment the reference count on the instance.
-    ReferenceCounted<OmSnapshot, SnapshotCache> rcOmSnapshot =
+    ReferenceCounted<OmSnapshot> rcOmSnapshot =
         dbMap.compute(key, (k, v) -> {
           if (v == null) {
             LOG.info("Loading snapshot. Table key: {}", k);
             try {
-              v = new ReferenceCounted<>(cacheLoader.load(k), false, this);
+              v = new ReferenceCounted<>(cacheLoader.load(k), false);
             } catch (OMException omEx) {
               // Return null if the snapshot is no longer active
               if (!omEx.getResult().equals(FILE_NOT_FOUND)) {
@@ -216,7 +216,7 @@ public class SnapshotCache {
    * TODO: [SNAPSHOT] Add new ozone debug CLI command to trigger this directly.
    */
   private void cleanupInternal() {
-    for (Map.Entry<String, ReferenceCounted<OmSnapshot, SnapshotCache>> entry : dbMap.entrySet()) {
+    for (Map.Entry<String, ReferenceCounted<OmSnapshot>> entry : dbMap.entrySet()) {
       dbMap.compute(entry.getKey(), (k, v) -> {
         if (v == null) {
           throw new IllegalStateException("Key '" + k + "' does not exist in cache. The RocksDB " +

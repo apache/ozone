@@ -41,7 +41,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
@@ -263,7 +262,7 @@ public class TestSnapshotBackgroundServices {
 
     // get snapshot c
     OmSnapshot snapC;
-    try (ReferenceCounted<OmSnapshot, SnapshotCache> rcC = newLeaderOM
+    try (ReferenceCounted<OmSnapshot> rcC = newLeaderOM
         .getOmSnapshotManager()
         .getSnapshot(volumeName, bucketName, snapshotInfoC.getName())) {
       assertNotNull(rcC);
@@ -287,7 +286,7 @@ public class TestSnapshotBackgroundServices {
 
     // get snapshot d
     OmSnapshot snapD;
-    try (ReferenceCounted<OmSnapshot, SnapshotCache> rcD = newLeaderOM
+    try (ReferenceCounted<OmSnapshot> rcD = newLeaderOM
         .getOmSnapshotManager()
         .getSnapshot(volumeName, bucketName, snapshotInfoD.getName())) {
       assertNotNull(rcD);

@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -461,12 +460,11 @@ public class TestSstFilteringService {
                                           String snapshot) throws IOException {
     SnapshotInfo snapshotInfo = om.getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(volume, bucket, snapshot));
-    try (ReferenceCounted<OmSnapshot, SnapshotCache>
-             snapshotMetadataReader = om.getOmSnapshotManager()
-        .getActiveSnapshot(
-            snapshotInfo.getVolumeName(),
-            snapshotInfo.getBucketName(),
-            snapshotInfo.getName())) {
+    try (ReferenceCounted<OmSnapshot> snapshotMetadataReader =
+             om.getOmSnapshotManager().getActiveSnapshot(
+                 snapshotInfo.getVolumeName(),
+                 snapshotInfo.getBucketName(),
+                 snapshotInfo.getName())) {
       OmSnapshot omSnapshot = snapshotMetadataReader.get();
       return getKeysFromDb(omSnapshot.getMetadataManager(), volume, bucket);
     }

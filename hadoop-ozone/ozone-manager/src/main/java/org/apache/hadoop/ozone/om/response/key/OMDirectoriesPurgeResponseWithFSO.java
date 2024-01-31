@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.slf4j.Logger;
@@ -84,7 +83,7 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
           ((OmMetadataManagerImpl) metadataManager)
               .getOzoneManager().getOmSnapshotManager();
 
-      try (ReferenceCounted<OmSnapshot, SnapshotCache>
+      try (ReferenceCounted<OmSnapshot>
           rcFromSnapshotInfo = omSnapshotManager.getSnapshot(
               fromSnapshotInfo.getVolumeName(),
               fromSnapshotInfo.getBucketName(),

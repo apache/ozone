@@ -28,7 +28,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
@@ -79,7 +78,7 @@ public class OMKeyPurgeResponse extends OmKeyResponse {
           ((OmMetadataManagerImpl) omMetadataManager)
               .getOzoneManager().getOmSnapshotManager();
 
-      try (ReferenceCounted<OmSnapshot, SnapshotCache> rcOmFromSnapshot =
+      try (ReferenceCounted<OmSnapshot> rcOmFromSnapshot =
           omSnapshotManager.getSnapshot(
               fromSnapshot.getVolumeName(),
               fromSnapshot.getBucketName(),

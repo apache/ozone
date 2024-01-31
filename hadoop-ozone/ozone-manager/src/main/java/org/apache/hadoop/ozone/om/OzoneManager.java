@@ -100,7 +100,6 @@ import org.apache.hadoop.ozone.om.s3.S3SecretStoreProvider;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.security.acl.OzoneAuthorizerFactory;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
@@ -485,7 +484,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private OmMetadataReader omMetadataReader;
   // Wrap active DB metadata reader in ReferenceCounted once to avoid
   // instance creation every single time.
-  private ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmMetadataReader;
+  private ReferenceCounted<IOmMetadataReader> rcOmMetadataReader;
   private OmSnapshotManager omSnapshotManager;
 
   @SuppressWarnings("methodlength")
@@ -848,7 +847,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         this, LOG, AUDIT, metrics, accessAuthorizer);
     // Active DB's OmMetadataReader instance does not need to be reference
     // counted, but it still needs to be wrapped to be consistent.
-    rcOmMetadataReader = new ReferenceCounted<>(omMetadataReader, true, null);
+    rcOmMetadataReader = new ReferenceCounted<>(omMetadataReader, true);
 
     // Reload snapshot feature config flag
     fsSnapshotEnabled = configuration.getBoolean(
@@ -2581,7 +2580,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   public ReferenceCounted<
-      IOmMetadataReader, SnapshotCache> getOmMetadataReader() {
+      IOmMetadataReader> getOmMetadataReader() {
     return rcOmMetadataReader;
   }
 
@@ -2851,8 +2850,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public OmKeyInfo lookupKey(OmKeyArgs args) throws IOException {
-    try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
-        rcReader = getReader(args)) {
+    try (ReferenceCounted<IOmMetadataReader> rcReader = getReader(args)) {
       return rcReader.get().lookupKey(args);
     }
   }
@@ -2864,8 +2862,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public KeyInfoWithVolumeContext getKeyInfo(final OmKeyArgs args,
                                              boolean assumeS3Context)
       throws IOException {
-    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcReader =
-        getReader(args)) {
+    try (ReferenceCounted<IOmMetadataReader> rcReader = getReader(args)) {
       return rcReader.get().getKeyInfo(args, assumeS3Context);
     }
   }
@@ -2877,7 +2874,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public ListKeysResult listKeys(String volumeName, String bucketName,
                                  String startKey, String keyPrefix, int maxKeys)
       throws IOException {
-    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcReader =
+    try (ReferenceCounted<IOmMetadataReader> rcReader =
              getReader(volumeName, bucketName, keyPrefix)) {
       return rcReader.get().listKeys(
           volumeName, bucketName, startKey, keyPrefix, maxKeys);
@@ -3629,7 +3626,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public OzoneFileStatus getFileStatus(OmKeyArgs args) throws IOException {
-    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcReader =
+    try (ReferenceCounted<IOmMetadataReader> rcReader =
         getReader(args)) {
       return rcReader.get().getFileStatus(args);
     }
@@ -3640,7 +3637,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public OmKeyInfo lookupFile(OmKeyArgs args) throws IOException {
-    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcReader =
+    try (ReferenceCounted<IOmMetadataReader> rcReader =
         getReader(args)) {
       return rcReader.get().lookupFile(args);
     }
@@ -3659,7 +3656,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries, boolean allowPartialPrefixes)
       throws IOException {
-    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcReader =
+    try (ReferenceCounted<IOmMetadataReader> rcReader =
         getReader(args)) {
       return rcReader.get().listStatus(
           args, recursive, startKey, numEntries, allowPartialPrefixes);
@@ -3683,7 +3680,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public List<OzoneAcl> getAcl(OzoneObj obj) throws IOException {
-    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcReader =
+    try (ReferenceCounted<IOmMetadataReader> rcReader =
         getReader(obj)) {
       return rcReader.get().getAcl(obj);
     }
@@ -4706,7 +4703,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @return ReferenceCounted<IOmMetadataReader, SnapshotCache>
    */
   private ReferenceCounted<
-      IOmMetadataReader, SnapshotCache> getReader(OmKeyArgs keyArgs)
+      IOmMetadataReader> getReader(OmKeyArgs keyArgs)
       throws IOException {
     return omSnapshotManager.checkForSnapshot(
         keyArgs.getVolumeName(), keyArgs.getBucketName(), keyArgs.getKeyName());
@@ -4722,7 +4719,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @return ReferenceCounted<IOmMetadataReader, SnapshotCache>
    */
   private ReferenceCounted<
-      IOmMetadataReader, SnapshotCache> getReader(
+      IOmMetadataReader> getReader(
           String volumeName, String bucketName, String key) throws IOException {
     return omSnapshotManager.checkForSnapshot(
         volumeName, bucketName, key);
@@ -4736,7 +4733,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @return ReferenceCounted<IOmMetadataReader, SnapshotCache>
    */
   private ReferenceCounted<
-      IOmMetadataReader, SnapshotCache> getReader(OzoneObj ozoneObj)
+      IOmMetadataReader> getReader(OzoneObj ozoneObj)
       throws IOException {
     return omSnapshotManager.checkForSnapshot(
         ozoneObj.getVolumeName(),

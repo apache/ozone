@@ -45,7 +45,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
@@ -262,7 +261,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             continue;
           }
 
-          try (ReferenceCounted<OmSnapshot, SnapshotCache>
+          try (ReferenceCounted<OmSnapshot>
               rcCurrOmSnapshot = omSnapshotManager.getSnapshot(
                   currSnapInfo.getVolumeName(),
                   currSnapInfo.getBucketName(),
@@ -301,8 +300,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
             Table<String, OmKeyInfo> previousKeyTable = null;
             Table<String, String> prevRenamedTable = null;
-            ReferenceCounted<OmSnapshot, SnapshotCache>
-                rcPrevOmSnapshot = null;
+            ReferenceCounted<OmSnapshot> rcPrevOmSnapshot = null;
 
             // Split RepeatedOmKeyInfo and update current snapshot
             // deletedKeyTable and next snapshot deletedKeyTable.
@@ -320,8 +318,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             }
 
             Table<String, OmKeyInfo> previousToPrevKeyTable = null;
-            ReferenceCounted<OmSnapshot, SnapshotCache>
-                rcPrevToPrevOmSnapshot = null;
+            ReferenceCounted<OmSnapshot> rcPrevToPrevOmSnapshot = null;
             if (previousToPrevSnapshot != null) {
               rcPrevToPrevOmSnapshot = omSnapshotManager.getSnapshot(
                   previousToPrevSnapshot.getVolumeName(),

@@ -827,8 +827,8 @@ public class SnapshotDiffManager implements AutoCloseable {
     // job by RocksDBCheckpointDiffer#pruneOlderSnapshotsWithCompactionHistory.
     Path path = Paths.get(sstBackupDirForSnapDiffJobs + "/" + jobId);
 
-    ReferenceCounted<OmSnapshot, SnapshotCache> rcFromSnapshot = null;
-    ReferenceCounted<OmSnapshot, SnapshotCache> rcToSnapshot = null;
+    ReferenceCounted<OmSnapshot> rcFromSnapshot = null;
+    ReferenceCounted<OmSnapshot> rcToSnapshot = null;
 
     try {
       if (!areDiffJobAndSnapshotsActive(volumeName, bucketName,

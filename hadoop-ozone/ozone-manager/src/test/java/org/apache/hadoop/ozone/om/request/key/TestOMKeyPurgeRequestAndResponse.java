@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.TestOMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotCreateResponse;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.response.key.OMKeyPurgeResponse;
@@ -217,7 +216,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
         .setName("snap1")
         .build();
 
-    ReferenceCounted<OmSnapshot, SnapshotCache> rcOmSnapshot =
+    ReferenceCounted<OmSnapshot> rcOmSnapshot =
         ozoneManager.getOmSnapshotManager().getSnapshot(
             fromSnapshotInfo.getVolumeName(),
             fromSnapshotInfo.getBucketName(),

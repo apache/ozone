@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.test.GenericTestUtils;
@@ -214,11 +213,9 @@ public class TestOMSnapshotDAG {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     RDBStore rdbStore = (RDBStore) omMetadataManager.getStore();
     RocksDBCheckpointDiffer differ = rdbStore.getRocksDBCheckpointDiffer();
-    ReferenceCounted<OmSnapshot, SnapshotCache>
-        snapDB1 = ozoneManager.getOmSnapshotManager()
+    ReferenceCounted<OmSnapshot> snapDB1 = ozoneManager.getOmSnapshotManager()
         .getActiveSnapshot(volumeName, bucketName, "snap1");
-    ReferenceCounted<OmSnapshot, SnapshotCache>
-        snapDB2 = ozoneManager.getOmSnapshotManager()
+    ReferenceCounted<OmSnapshot> snapDB2 = ozoneManager.getOmSnapshotManager()
         .getActiveSnapshot(volumeName, bucketName, "snap2");
     DifferSnapshotInfo snap1 = getDifferSnapshotInfo(omMetadataManager,
         volumeName, bucketName, "snap1",
@@ -244,8 +241,7 @@ public class TestOMSnapshotDAG {
 
     resp = store.createSnapshot(volumeName, bucketName, "snap3");
     LOG.debug("Snapshot created: {}", resp);
-    ReferenceCounted<OmSnapshot, SnapshotCache>
-        snapDB3 = ozoneManager.getOmSnapshotManager()
+    ReferenceCounted<OmSnapshot> snapDB3 = ozoneManager.getOmSnapshotManager()
         .getActiveSnapshot(volumeName, bucketName, "snap3");
     DifferSnapshotInfo snap3 = getDifferSnapshotInfo(omMetadataManager,
         volumeName, bucketName, "snap3",

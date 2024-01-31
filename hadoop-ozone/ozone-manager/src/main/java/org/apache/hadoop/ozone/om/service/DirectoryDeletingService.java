@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePathRequest;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
@@ -237,7 +236,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
           getOzoneManager().getMetadataManager();
 
-      try (ReferenceCounted<OmSnapshot, SnapshotCache> rcLatestSnapshot =
+      try (ReferenceCounted<OmSnapshot> rcLatestSnapshot =
           metadataManager.getLatestActiveSnapshot(
               deletedDirInfo.getVolumeName(),
               deletedDirInfo.getBucketName(),

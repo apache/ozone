@@ -612,7 +612,7 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   // Get OmSnapshot if the keyName has ".snapshot" key indicator
   @SuppressWarnings("unchecked")
-  public ReferenceCounted<IOmMetadataReader, SnapshotCache> checkForSnapshot(
+  public ReferenceCounted<IOmMetadataReader> checkForSnapshot(
       String volumeName,
       String bucketName,
       String keyName) throws IOException {
@@ -625,28 +625,28 @@ public final class OmSnapshotManager implements AutoCloseable {
     if (isSnapshotKey(keyParts)) {
       String snapshotName = keyParts[1];
 
-      return (ReferenceCounted<IOmMetadataReader, SnapshotCache>) (ReferenceCounted<?, ?>)
+      return (ReferenceCounted<IOmMetadataReader>) (ReferenceCounted<?>)
           getActiveSnapshot(volumeName, bucketName, snapshotName);
     } else {
       return ozoneManager.getOmMetadataReader();
     }
   }
 
-  public ReferenceCounted<OmSnapshot, SnapshotCache> getActiveSnapshot(
+  public ReferenceCounted<OmSnapshot> getActiveSnapshot(
       String volumeName,
       String bucketName,
       String snapshotName) throws IOException {
     return getSnapshot(volumeName, bucketName, snapshotName, false);
   }
 
-  public ReferenceCounted<OmSnapshot, SnapshotCache> getSnapshot(
+  public ReferenceCounted<OmSnapshot> getSnapshot(
       String volumeName,
       String bucketName,
       String snapshotName) throws IOException {
     return getSnapshot(volumeName, bucketName, snapshotName, true);
   }
 
-  private ReferenceCounted<OmSnapshot, SnapshotCache> getSnapshot(
+  private ReferenceCounted<OmSnapshot> getSnapshot(
       String volumeName,
       String bucketName,
       String snapshotName,
@@ -663,7 +663,7 @@ public final class OmSnapshotManager implements AutoCloseable {
     return getSnapshot(snapshotTableKey, skipActiveCheck);
   }
 
-  private ReferenceCounted<OmSnapshot, SnapshotCache> getSnapshot(
+  private ReferenceCounted<OmSnapshot> getSnapshot(
       String snapshotTableKey,
       boolean skipActiveCheck) throws IOException {
 

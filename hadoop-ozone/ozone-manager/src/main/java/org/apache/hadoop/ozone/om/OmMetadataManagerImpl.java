@@ -89,7 +89,6 @@ import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTrans
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
@@ -1554,7 +1553,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           OmBucketInfo bucketInfo = getBucketTable().get(bucketKey);
 
           // Get the latest snapshot in snapshot path.
-          try (ReferenceCounted<OmSnapshot, SnapshotCache>
+          try (ReferenceCounted<OmSnapshot>
               rcLatestSnapshot = getLatestActiveSnapshot(
                   keySplit[1], keySplit[2], omSnapshotManager)) {
 
@@ -1663,8 +1662,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   /**
    * Get the latest OmSnapshot for a snapshot path.
    */
-  public ReferenceCounted<
-      OmSnapshot, SnapshotCache> getLatestActiveSnapshot(
+  public ReferenceCounted<OmSnapshot> getLatestActiveSnapshot(
           String volumeName, String bucketName,
           OmSnapshotManager snapshotManager)
       throws IOException {
@@ -1698,7 +1696,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       }
     }
 
-    Optional<ReferenceCounted<OmSnapshot, SnapshotCache>> rcOmSnapshot =
+    Optional<ReferenceCounted<OmSnapshot>> rcOmSnapshot =
         snapshotInfo.isPresent() ?
             Optional.ofNullable(
                 snapshotManager.getSnapshot(volumeName,

@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
@@ -156,10 +155,8 @@ public class SnapshotDirectoryCleaningService
             continue;
           }
 
-          ReferenceCounted<OmSnapshot, SnapshotCache>
-              rcPrevOmSnapshot = null;
-          ReferenceCounted<OmSnapshot, SnapshotCache>
-              rcPrevToPrevOmSnapshot = null;
+          ReferenceCounted<OmSnapshot> rcPrevOmSnapshot = null;
+          ReferenceCounted<OmSnapshot> rcPrevToPrevOmSnapshot = null;
           try {
             long volumeId = metadataManager
                 .getVolumeId(currSnapInfo.getVolumeName());
@@ -216,7 +213,7 @@ public class SnapshotDirectoryCleaningService
 
             String dbBucketKeyForDir = getOzonePathKeyForFso(metadataManager,
                 currSnapInfo.getVolumeName(), currSnapInfo.getBucketName());
-            try (ReferenceCounted<OmSnapshot, SnapshotCache>
+            try (ReferenceCounted<OmSnapshot>
                      rcCurrOmSnapshot = omSnapshotManager.getActiveSnapshot(
                 currSnapInfo.getVolumeName(),
                 currSnapInfo.getBucketName(),

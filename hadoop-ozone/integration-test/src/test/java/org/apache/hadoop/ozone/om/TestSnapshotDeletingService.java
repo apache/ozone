@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
@@ -386,7 +385,7 @@ public class TestSnapshotDeletingService {
     assertTableRowCount(renamedTable, 4);
     assertTableRowCount(deletedDirTable, 3);
 
-    ReferenceCounted<OmSnapshot, SnapshotCache> rcSnap1 =
+    ReferenceCounted<OmSnapshot> rcSnap1 =
         om.getOmSnapshotManager().getSnapshot(
             VOLUME_NAME, BUCKET_NAME_TWO, "snap1");
     OmSnapshot snap1 = rcSnap1.get();

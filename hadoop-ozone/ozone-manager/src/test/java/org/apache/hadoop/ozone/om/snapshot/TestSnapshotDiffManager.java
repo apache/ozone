@@ -447,9 +447,9 @@ public class TestSnapshotDiffManager {
         eq(diffDir))
     ).thenReturn(Lists.newArrayList(randomStrings));
 
-    ReferenceCounted<OmSnapshot, SnapshotCache> rcFromSnapshot =
+    ReferenceCounted<OmSnapshot> rcFromSnapshot =
         omSnapshotManager.getActiveSnapshot(VOLUME_NAME, BUCKET_NAME, snap1.toString());
-    ReferenceCounted<OmSnapshot, SnapshotCache> rcToSnapshot =
+    ReferenceCounted<OmSnapshot> rcToSnapshot =
         omSnapshotManager.getActiveSnapshot(VOLUME_NAME, BUCKET_NAME, snap2.toString());
     OmSnapshot fromSnapshot = rcFromSnapshot.get();
     OmSnapshot toSnapshot = rcToSnapshot.get();
@@ -512,9 +512,9 @@ public class TestSnapshotDiffManager {
             .thenReturn(Collections.emptyList());
       }
 
-      ReferenceCounted<OmSnapshot, SnapshotCache> rcFromSnapshot =
+      ReferenceCounted<OmSnapshot> rcFromSnapshot =
           omSnapshotManager.getActiveSnapshot(VOLUME_NAME, BUCKET_NAME, snap1.toString());
-      ReferenceCounted<OmSnapshot, SnapshotCache> rcToSnapshot =
+      ReferenceCounted<OmSnapshot> rcToSnapshot =
           omSnapshotManager.getActiveSnapshot(VOLUME_NAME, BUCKET_NAME, snap2.toString());
       OmSnapshot fromSnapshot = rcFromSnapshot.get();
       OmSnapshot toSnapshot = rcToSnapshot.get();
@@ -575,9 +575,9 @@ public class TestSnapshotDiffManager {
               any(DifferSnapshotInfo.class),
               anyString());
 
-      ReferenceCounted<OmSnapshot, SnapshotCache> rcFromSnapshot =
+      ReferenceCounted<OmSnapshot> rcFromSnapshot =
           omSnapshotManager.getActiveSnapshot(VOLUME_NAME, BUCKET_NAME, snap1.toString());
-      ReferenceCounted<OmSnapshot, SnapshotCache> rcToSnapshot =
+      ReferenceCounted<OmSnapshot> rcToSnapshot =
           omSnapshotManager.getActiveSnapshot(VOLUME_NAME, BUCKET_NAME, snap2.toString());
       OmSnapshot fromSnapshot = rcFromSnapshot.get();
       OmSnapshot toSnapshot = rcToSnapshot.get();
