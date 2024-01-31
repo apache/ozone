@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone.om.response.s3.multipart;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -37,11 +38,9 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -67,22 +66,22 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 @SuppressWarnings("VisibilityModifier")
 public class TestS3MultipartResponse {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   protected OMMetadataManager omMetadataManager;
   protected BatchOperation batchOperation;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        folder.newFolder().getAbsolutePath());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
+        folder.toAbsolutePath().toString());
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     if (batchOperation != null) {
       batchOperation.close();
@@ -110,7 +109,7 @@ public class TestS3MultipartResponse {
         .setReplicationConfig(RatisReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE))
         .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+            new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
         .build();
 
     OMResponse omResponse = OMResponse.newBuilder()
@@ -144,7 +143,7 @@ public class TestS3MultipartResponse {
 
   public void addPart(int partNumber, PartKeyInfo partKeyInfo,
       OmMultipartKeyInfo omMultipartKeyInfo) {
-    omMultipartKeyInfo.addPartKeyInfo(partNumber, partKeyInfo);
+    omMultipartKeyInfo.addPartKeyInfo(partKeyInfo);
   }
 
   public PartKeyInfo createPartKeyInfo(String volumeName, String bucketName,
@@ -161,6 +160,7 @@ public class TestS3MultipartResponse {
             .setDataSize(100L) // Just set dummy size for testing
             .setCreationTime(Time.now())
             .setModificationTime(Time.now())
+            .setObjectID(UUID.randomUUID().hashCode())
             .setType(HddsProtos.ReplicationType.RATIS)
             .setFactor(HddsProtos.ReplicationFactor.ONE).build()).build();
   }
@@ -183,6 +183,7 @@ public class TestS3MultipartResponse {
             .setDataSize(100L) // Just set dummy size for testing
             .setCreationTime(Time.now())
             .setModificationTime(Time.now())
+            .setObjectID(UUID.randomUUID().hashCode())
             .setParentID(parentID)
             .setType(HddsProtos.ReplicationType.RATIS)
             .setFactor(HddsProtos.ReplicationFactor.ONE).build()).build();
@@ -213,7 +214,7 @@ public class TestS3MultipartResponse {
             .setReplicationConfig(RatisReplicationConfig.getInstance(
                     HddsProtos.ReplicationFactor.ONE))
             .setOmKeyLocationInfos(Collections.singletonList(
-                    new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+                    new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
             .setParentObjectID(parentID)
             .build();
 
@@ -278,7 +279,7 @@ public class TestS3MultipartResponse {
             .setReplicationConfig(RatisReplicationConfig.getInstance(
                     HddsProtos.ReplicationFactor.ONE))
             .setOmKeyLocationInfos(Collections.singletonList(
-                    new OmKeyLocationInfoGroup(0, new ArrayList<>())))
+                    new OmKeyLocationInfoGroup(0, new ArrayList<>(), true)))
             .build();
 
     OMResponse omResponse = OMResponse.newBuilder()
@@ -299,9 +300,8 @@ public class TestS3MultipartResponse {
           String volumeName, String bucketName, long parentID, String keyName,
           String multipartUploadID, OmKeyInfo omKeyInfo,
           OzoneManagerProtocolProtos.Status status,
-          List<OmKeyInfo> unUsedParts,
-          OmBucketInfo omBucketInfo,
-          RepeatedOmKeyInfo keysToDelete) throws IOException {
+          List<OmKeyInfo>  allKeyInfoToRemove,
+          OmBucketInfo omBucketInfo) throws IOException {
 
 
     String multipartKey = omMetadataManager
@@ -323,8 +323,8 @@ public class TestS3MultipartResponse {
                             .setVolume(volumeName).setKey(keyName)).build();
 
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse,
-        multipartKey, multipartOpenKey, omKeyInfo, unUsedParts,
-        getBucketLayout(), omBucketInfo, keysToDelete, volumeId, bucketId);
+        multipartKey, multipartOpenKey, omKeyInfo,  allKeyInfoToRemove,
+        getBucketLayout(), omBucketInfo, volumeId, bucketId);
   }
 
   protected S3InitiateMultipartUploadResponse getS3InitiateMultipartUploadResp(

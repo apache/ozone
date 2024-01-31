@@ -36,6 +36,8 @@ import org.apache.hadoop.ozone.om.request.key.OMAllocateBlockRequest;
 import org.apache.hadoop.ozone.om.request.key.OMAllocateBlockRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequestWithFSO;
+import org.apache.hadoop.ozone.om.request.key.OMKeySetTimesRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeySetTimesRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.OMKeysDeleteRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeysRenameRequest;
 import org.apache.hadoop.ozone.om.request.key.OmKeysDeleteRequestWithFSO;
@@ -49,7 +51,7 @@ import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadAbortReq
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadAbortRequestWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -180,6 +182,15 @@ public final class BucketLayoutAwareOMKeyRequestFactory {
     addRequestClass(Type.CompleteMultiPartUpload,
         S3MultipartUploadCompleteRequestWithFSO.class,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    // SetTimes
+    addRequestClass(Type.SetTimes,
+        OMKeySetTimesRequest.class,
+        BucketLayout.OBJECT_STORE
+    );
+    addRequestClass(Type.SetTimes,
+        OMKeySetTimesRequestWithFSO.class,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
   }
 
   private BucketLayoutAwareOMKeyRequestFactory() {
@@ -193,7 +204,7 @@ public final class BucketLayoutAwareOMKeyRequestFactory {
    * @param volumeName   volume name
    * @param bucketName   bucket name
    * @param omRequest    OMRequest object
-   * @param ozoneManager ozone manager instance
+   * @param omMetadataManager ozone metadata manager instance
    * @return OMKeyRequest object
    * @throws IOException if the request type is not supported.
    */
@@ -283,7 +294,7 @@ public final class BucketLayoutAwareOMKeyRequestFactory {
    * @throws InvocationTargetException if the request class constructor throws
    *                                   an exception.
    */
-  @NotNull
+  @Nonnull
   static OMKeyRequest getRequestInstanceFromMap(OMRequest omRequest,
                                                 String classKey,
                                                 BucketLayout bucketLayout)

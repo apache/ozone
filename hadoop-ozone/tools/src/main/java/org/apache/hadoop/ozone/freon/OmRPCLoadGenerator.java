@@ -68,6 +68,12 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
                           "Max size is 2097151 KB",
           defaultValue = "0")
   private int payloadRespSizeKB = 0;
+
+  @Option(names = {"--ratis"},
+      description = "Write to Ratis log, skip flag for read-only EchoRPC " +
+          "request")
+  private boolean writeToRatis = false;
+
   @Override
   public Void call() throws Exception {
     Preconditions.checkArgument(payloadReqSizeKB >= 0,
@@ -111,7 +117,7 @@ public class OmRPCLoadGenerator extends BaseFreonGenerator
   private void sendRPCReq(long l) throws Exception {
     timer.time(() -> {
       clients[(int) (l % clientsCount)].echoRPCReq(payloadReqBytes,
-              payloadRespSize);
+              payloadRespSize, writeToRatis);
       return null;
     });
   }

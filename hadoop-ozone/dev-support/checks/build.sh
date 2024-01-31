@@ -27,5 +27,6 @@ else
 fi
 
 export MAVEN_OPTS="-Xmx4096m $MAVEN_OPTS"
+echo "${MAVEN_OPTIONS}"
 mvn ${MAVEN_OPTIONS} clean install "$@"
 exit $?

@@ -41,6 +41,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -199,6 +200,16 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   }
 
   /**
+   * Returns the set of failed indexes. This will be empty if no errors were
+   * encountered reading any of the block indexes, and no failed nodes were
+   * added via {@link #addFailedDatanodes(Collection)}.
+   * The returned set is a copy of the internal set, so it can be modified.
+   */
+  public synchronized Set<Integer> getFailedIndexes() {
+    return new HashSet<>(failedDataIndexes);
+  }
+
+  /**
    * Set the EC indexes that should be recovered by
    * {@link #recoverChunks(ByteBuffer[])}.
    */
@@ -277,7 +288,8 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   }
 
   private void assignBuffers(ByteBuffer[] bufs) {
-    Preconditions.assertTrue(bufs.length == getExpectedBufferCount());
+    Preconditions.assertSame(getExpectedBufferCount(), bufs.length,
+        "buffer count");
 
     if (isOfflineRecovery()) {
       decoderOutputBuffers = bufs;
@@ -409,10 +421,11 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
   }
 
   private void validateBuffers(ByteBuffer[] bufs) {
-    Preconditions.assertTrue(bufs.length == getExpectedBufferCount());
+    Preconditions.assertSame(getExpectedBufferCount(), bufs.length,
+        "buffer count");
     int chunkSize = getRepConfig().getEcChunkSize();
     for (ByteBuffer b : bufs) {
-      Preconditions.assertTrue(b.remaining() == chunkSize);
+      Preconditions.assertSame(chunkSize, b.remaining(), "buf.remaining");
     }
   }
 
@@ -442,7 +455,7 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
     for (int i = dataNum; i < dataNum + parityNum; i++) {
       ByteBuffer b = decoderInputBuffers[i];
       if (b != null) {
-        Preconditions.assertTrue(b.position() == paritySize);
+        Preconditions.assertSame(paritySize, b.position(), "buf.position");
       }
     }
     // The output buffers need their limit set to the parity size
@@ -764,8 +777,10 @@ public class ECBlockReconstructedStripeInputStream extends ECBlockInputStream {
 
     if (isOfflineRecovery()) {
       if (!paddingIndexes.isEmpty()) {
-        paddingIndexes.forEach(i ->
-            Preconditions.assertTrue(!recoveryIndexes.contains(i)));
+        paddingIndexes.forEach(i -> Preconditions.assertTrue(
+            !recoveryIndexes.contains(i),
+            () -> "Padding index " + i + " should not be selected for recovery")
+        );
       }
 
       missingIndexes.addAll(recoveryIndexes);

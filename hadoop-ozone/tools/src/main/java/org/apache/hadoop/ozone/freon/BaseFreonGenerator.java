@@ -97,7 +97,7 @@ public class BaseFreonGenerator {
   @Option(names = {"-t", "--threads", "--thread"},
       description = "Number of threads used to execute",
       defaultValue = "10")
-  private int threadNo;
+  private int threadNo = 10;
 
   @Option(names = {"--duration"},
       description = "Duration to run the test. "
@@ -245,7 +245,7 @@ public class BaseFreonGenerator {
   }
 
   private void shutdown() {
-    if (failureCounter.get() > 0) {
+    if (!failAtEnd) {
       progressBar.terminate();
     } else {
       progressBar.shutdown();
@@ -273,6 +273,10 @@ public class BaseFreonGenerator {
    * Initialize internal counters, and variables. Call it before runTests.
    */
   public void init() {
+    // run outside of picocli, e.g. unit tests
+    if (freonCommand == null) {
+      freonCommand = new Freon();
+    }
 
     freonCommand.startHttpServer();
 
@@ -329,7 +333,7 @@ public class BaseFreonGenerator {
           Instant.ofEpochMilli(startTime), Instant.now()).getSeconds();
     } else {
       maxValue = testNo;
-      supplier = successCounter::get;
+      supplier = () -> successCounter.get() + failureCounter.get();
     }
     progressBar = new ProgressBar(System.out, maxValue, supplier,
         freonCommand.isInteractive(), realTimeStatusSupplier());
@@ -557,8 +561,20 @@ public class BaseFreonGenerator {
     void executeNextTask(long step) throws Exception;
   }
 
-  public AtomicLong getAttemptCounter() {
-    return attemptCounter;
+  public long getAttemptCount() {
+    return attemptCounter.get();
+  }
+
+  public long getSuccessCount() {
+    return successCounter.get();
+  }
+
+  public long getFailureCount() {
+    return failureCounter.get();
+  }
+
+  public boolean isCompleted() {
+    return completed.get();
   }
 
   public int getThreadNo() {

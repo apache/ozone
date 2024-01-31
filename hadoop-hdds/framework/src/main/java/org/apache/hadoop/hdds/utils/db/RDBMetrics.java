@@ -53,6 +53,7 @@ public class RDBMetrics {
   private @Metric MutableCounterLong numDBKeyMayExistChecks;
   private @Metric MutableCounterLong numDBKeyMayExistMisses;
 
+  private @Metric MutableCounterLong numDBKeyGets;
   private @Metric MutableCounterLong numDBKeyGetIfExistChecks;
   private @Metric MutableCounterLong numDBKeyGetIfExistMisses;
   private @Metric MutableCounterLong numDBKeyGetIfExistGets;
@@ -60,6 +61,13 @@ public class RDBMetrics {
   private @Metric MutableCounterLong walUpdateDataSize;
   private @Metric MutableCounterLong walUpdateSequenceCount;
 
+  public long getNumDBKeyGets() {
+    return numDBKeyGets.value();
+  }
+
+  public void incNumDBKeyGets() {
+    this.numDBKeyGets.incr();
+  }
 
   public long getNumDBKeyGetIfExistGets() {
     return numDBKeyGetIfExistGets.value();

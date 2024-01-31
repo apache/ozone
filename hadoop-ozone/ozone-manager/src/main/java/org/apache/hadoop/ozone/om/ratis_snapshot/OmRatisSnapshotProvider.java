@@ -18,23 +18,22 @@
 
 package org.apache.hadoop.ozone.om.ratis_snapshot;
 
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
+import org.apache.hadoop.hdds.utils.HAUtils;
+import org.apache.hadoop.hdds.utils.RDBSnapshotProvider;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
-import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 
@@ -42,7 +41,9 @@ import static java.net.HttpURLConnection.HTTP_CREATED;
 import static java.net.HttpURLConnection.HTTP_OK;
 import org.apache.commons.io.FileUtils;
 
+import static org.apache.hadoop.ozone.OzoneConsts.MULTIPART_FORM_DATA_BOUNDARY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER_CONNECTION_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER_CONNECTION_TIMEOUT_KEY;
@@ -71,24 +72,32 @@ import org.slf4j.LoggerFactory;
  * bootstrap.  The follower needs these copies to respond the users
  * snapshot requests when it becomes the leader.
  */
-public class OmRatisSnapshotProvider {
+public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OmRatisSnapshotProvider.class);
 
-  private final File omSnapshotDir;
-  private Map<String, OMNodeDetails> peerNodesMap;
+  private final Map<String, OMNodeDetails> peerNodesMap;
   private final HttpConfig.Policy httpPolicy;
   private final boolean spnegoEnabled;
   private final URLConnectionFactory connectionFactory;
 
+  public OmRatisSnapshotProvider(File snapshotDir,
+      Map<String, OMNodeDetails> peerNodesMap, HttpConfig.Policy httpPolicy,
+      boolean spnegoEnabled, URLConnectionFactory connectionFactory) {
+    super(snapshotDir, OM_DB_NAME);
+    this.peerNodesMap = new ConcurrentHashMap<>(peerNodesMap);
+    this.httpPolicy = httpPolicy;
+    this.spnegoEnabled = spnegoEnabled;
+    this.connectionFactory = connectionFactory;
+  }
+
+
   public OmRatisSnapshotProvider(MutableConfigurationSource conf,
       File omRatisSnapshotDir, Map<String, OMNodeDetails> peerNodeDetails) {
-
+    super(omRatisSnapshotDir, OM_DB_NAME);
     LOG.info("Initializing OM Snapshot Provider");
-    this.omSnapshotDir = omRatisSnapshotDir;
-
-    this.peerNodesMap = new HashMap<>();
+    this.peerNodesMap = new ConcurrentHashMap<>();
     peerNodesMap.putAll(peerNodeDetails);
 
     this.httpPolicy = HttpConfig.getHttpPolicy(conf);
@@ -115,68 +124,6 @@ public class OmRatisSnapshotProvider {
   }
 
   /**
-   * Download the latest checkpoint from OM Leader via HTTP.
-   * @param leaderOMNodeID leader OM Node ID.
-   * @return the DB checkpoint (including the ratis snapshot index)
-   */
-  public DBCheckpoint getOzoneManagerDBSnapshot(String leaderOMNodeID)
-      throws IOException {
-    String snapshotTime = Long.toString(System.currentTimeMillis());
-    String snapshotFileName = OM_DB_NAME + "-" + leaderOMNodeID
-        + "-" + snapshotTime;
-    String snapshotFilePath = Paths.get(omSnapshotDir.getAbsolutePath(),
-        snapshotFileName).toFile().getAbsolutePath();
-    File targetFile = new File(snapshotFilePath + ".tar");
-
-    String omCheckpointUrl = peerNodesMap.get(leaderOMNodeID)
-        .getOMDBCheckpointEnpointUrl(httpPolicy.isHttpEnabled());
-
-    LOG.info("Downloading latest checkpoint from Leader OM {}. Checkpoint " +
-        "URL: {}", leaderOMNodeID, omCheckpointUrl);
-    SecurityUtil.doAsCurrentUser(() -> {
-      HttpURLConnection httpURLConnection = (HttpURLConnection)
-          connectionFactory.openConnection(new URL(omCheckpointUrl),
-              spnegoEnabled);
-      httpURLConnection.connect();
-      int errorCode = httpURLConnection.getResponseCode();
-      if ((errorCode != HTTP_OK) && (errorCode != HTTP_CREATED)) {
-        throw new IOException("Unexpected exception when trying to reach " +
-            "OM to download latest checkpoint. Checkpoint URL: " +
-            omCheckpointUrl + ". ErrorCode: " + errorCode);
-      }
-
-      try (InputStream inputStream = httpURLConnection.getInputStream()) {
-        FileUtils.copyInputStreamToFile(inputStream, targetFile);
-      } catch (IOException ex) {
-        LOG.error("OM snapshot {} cannot be downloaded.", targetFile, ex);
-        boolean deleted = FileUtils.deleteQuietly(targetFile);
-        if (!deleted) {
-          LOG.error("OM snapshot which failed to download {} cannot be deleted",
-              targetFile);
-        }
-      }
-      return null;
-    });
-
-    // Untar the checkpoint file.
-    Path untarredDbDir = Paths.get(snapshotFilePath);
-    FileUtil.unTar(targetFile, untarredDbDir.toFile());
-    FileUtils.deleteQuietly(targetFile);
-
-    LOG.info("Successfully downloaded latest checkpoint from leader OM: {}",
-        leaderOMNodeID);
-
-    RocksDBCheckpoint omCheckpoint = new RocksDBCheckpoint(untarredDbDir);
-    return omCheckpoint;
-  }
-
-  public void stop() {
-    if (connectionFactory != null) {
-      connectionFactory.destroy();
-    }
-  }
-
-  /**
    * When a new OM is bootstrapped, add it to the peerNode map.
    */
   public void addNewPeerNode(OMNodeDetails newOMNode) {
@@ -189,4 +136,97 @@ public class OmRatisSnapshotProvider {
   public void removeDecommissionedPeerNode(String decommNodeId) {
     peerNodesMap.remove(decommNodeId);
   }
+
+  @Override
+  public void downloadSnapshot(String leaderNodeID, File targetFile)
+      throws IOException {
+    OMNodeDetails leader = peerNodesMap.get(leaderNodeID);
+    URL omCheckpointUrl = leader.getOMDBCheckpointEndpointUrl(
+        httpPolicy.isHttpEnabled(), true);
+    LOG.info("Downloading latest checkpoint from Leader OM {}. Checkpoint " +
+        "URL: {}", leaderNodeID, omCheckpointUrl);
+    SecurityUtil.doAsCurrentUser(() -> {
+      HttpURLConnection connection = (HttpURLConnection)
+          connectionFactory.openConnection(omCheckpointUrl, spnegoEnabled);
+
+      connection.setRequestMethod("POST");
+      String contentTypeValue = "multipart/form-data; boundary=" +
+          MULTIPART_FORM_DATA_BOUNDARY;
+      connection.setRequestProperty("Content-Type", contentTypeValue);
+      connection.setDoOutput(true);
+      writeFormData(connection,
+          HAUtils.getExistingSstFiles(getCandidateDir()));
+
+      connection.connect();
+      int errorCode = connection.getResponseCode();
+      if ((errorCode != HTTP_OK) && (errorCode != HTTP_CREATED)) {
+        throw new IOException("Unexpected exception when trying to reach " +
+            "OM to download latest checkpoint. Checkpoint URL: " +
+            omCheckpointUrl + ". ErrorCode: " + errorCode);
+      }
+
+      try (InputStream inputStream = connection.getInputStream()) {
+        FileUtils.copyInputStreamToFile(inputStream, targetFile);
+      } catch (IOException ex) {
+        boolean deleted = FileUtils.deleteQuietly(targetFile);
+        if (!deleted) {
+          LOG.error("OM snapshot which failed to download {} cannot be deleted",
+              targetFile);
+        }
+        throw ex;
+      } finally {
+        connection.disconnect();
+      }
+      return null;
+    });
+  }
+
+  /**
+   * Writes form data to output stream as any HTTP client would for a
+   * multipart/form-data request.
+   * Proper form data includes separator, content disposition and value
+   * separated by a new line.
+   * Example:
+   * <pre>
+   * -----XXX
+   * Content-Disposition: form-data; name="field1"
+   *
+   * value1</pre>
+   * @param connection HTTP URL connection which output stream is used.
+   * @param sstFiles SST files for exclusion.
+   * @throws IOException if an exception occured during writing to output
+   * stream.
+   */
+  public static void writeFormData(HttpURLConnection connection,
+      List<String> sstFiles) throws IOException {
+    try (DataOutputStream out =
+             new DataOutputStream(connection.getOutputStream())) {
+      String toExcludeSstField =
+          "name=\"" + OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST + "[]" + "\"";
+      String crNl = "\r\n";
+      String contentDisposition =
+          "Content-Disposition: form-data; " + toExcludeSstField + crNl + crNl;
+      String separator = "--" + MULTIPART_FORM_DATA_BOUNDARY;
+
+      if (sstFiles.isEmpty()) {
+        out.writeBytes(separator + crNl);
+        out.writeBytes(contentDisposition);
+      }
+
+      for (String sstFile : sstFiles) {
+        out.writeBytes(separator + crNl);
+        out.writeBytes(contentDisposition);
+        out.writeBytes(sstFile + crNl);
+      }
+      out.writeBytes(separator + "--" + crNl);
+    }
+  }
+
+  @Override
+  public void close() throws IOException {
+    if (connectionFactory != null) {
+      connectionFactory.destroy();
+    }
+  }
+
 }

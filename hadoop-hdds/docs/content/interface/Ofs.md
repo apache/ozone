@@ -160,11 +160,17 @@ $ ozone fs -mkdir -p /volume_1
 mkdir: Bucket or Volume name has an unsupported character : _
 ```
 
-## Mounts
+## Mounts and Configuring /tmp
 
 In order to be compatible with legacy Hadoop applications that use /tmp/,
 we have a special temp mount located at the root of the FS.
 This feature may be expanded in the feature to support custom mount paths.
+
+Currently Ozone supports two configurations for /tmp.  The first (default), 
+is a tmp directory for each user comprised of a mount volume with a 
+user specific temp bucket.  The second (configurable through ozone-site.xml), 
+a sticky-bit like tmp directory common to all users comprised of a mount 
+volume and a common temp bucket.
 
 Important: To use it, first, an **admin** needs to create the volume tmp
 (the volume name is hardcoded for now) and set its ACL to world ALL access.
@@ -175,7 +181,9 @@ $ ozone sh volume create tmp
 $ ozone sh volume setacl tmp -al world::a
 ```
 
-These commands only needs to be done **once per cluster**.
+These commands only need to be done **once per cluster**.
+
+### For /tmp directory per user (default)
 
 Then, **each user** needs to mkdir first to initialize their own temp bucket
 once.
@@ -190,6 +198,32 @@ directory. e.g.:
 
 ```bash
 $ ozone fs -touch /tmp/key1
+```
+
+### For a sharable /tmp directory common to all users
+
+To enable the sticky-bit common /tmp directory, update the ozone-site.xml with
+the following property
+
+```xml
+<property>
+  <name>ozone.om.enable.ofs.shared.tmp.dir</name>
+  <value>true</value>
+</property>
+```
+Then after setting up the volume tmp as **admin**, also configure a tmp bucket that 
+serves as the common /tmp directory for all users, for example, 
+```bash
+$ ozone sh bucket create /tmp/tmp
+$ ozone sh volume setacl tmp -a user:anyuser:rwlc \
+  user:adminuser:a,group:anyuser:rwlc,group:adminuser:a tmp/tmp
+```
+where, anyuser is username(s) admin wants to grant access and,
+adminuser is the admin username.
+
+Users then access the tmp directory as,
+```bash
+$ ozone fs -put ./NOTICE.txt ofs://om/tmp/key1
 ```
 
 ## Delete with trash enabled

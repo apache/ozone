@@ -61,4 +61,9 @@ public @interface Config {
   StorageUnit sizeUnit() default StorageUnit.BYTES;
 
   ConfigTag[] tags();
+
+  /**
+   * Indicates whether this property can be dynamically reconfigured at runtime.
+   */
+  boolean reconfigurable() default false;
 }

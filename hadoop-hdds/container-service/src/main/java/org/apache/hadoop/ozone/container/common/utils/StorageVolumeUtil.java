@@ -182,9 +182,9 @@ public final class StorageVolumeUtil {
    * Prior to SCM HA, volumes used the format {@code <volume>/hdds/<scm-id>}.
    * Post SCM HA, new volumes will use the format {@code <volume>/hdds/<cluster
    * -id>}.
-   * Existing volumes using SCM ID would have been reformatted to have {@code
+   * Existing volumes using SCM ID will be reformatted to have {@code
    * <volume>/hdds/<cluster-id>} as a symlink pointing to {@code <volume
-   * >/hdds/<scm-id>}.
+   * >/hdds/<scm-id>} when SCM HA is finalized.
    *
    * @param volume
    * @param scmId
@@ -199,8 +199,9 @@ public final class StorageVolumeUtil {
       MutableVolumeSet dbVolumeSet) {
     File volumeRoot = volume.getStorageDir();
     String volumeRootPath = volumeRoot.getPath();
-    File clusterDir = new File(volumeRoot, clusterId);
+    File clusterIDDir = new File(volumeRoot, clusterId);
 
+    // Create the volume's version file if necessary.
     try {
       volume.format(clusterId);
     } catch (IOException ex) {
@@ -210,44 +211,73 @@ public final class StorageVolumeUtil {
     }
 
     File[] rootFiles = volumeRoot.listFiles();
+    // This will either be cluster ID or SCM ID, depending on if SCM HA is
+    // finalized yet or not.
+    String workingDirName = clusterId;
+    boolean success = true;
 
     if (rootFiles == null) {
       // This is the case for IOException, where listFiles returns null.
       // So, we fail the volume.
-      return false;
+      success = false;
     } else if (rootFiles.length == 1) {
-      // DN started for first time or this is a newly added volume.
       // The one file is the version file.
-      // So we create cluster ID directory, or SCM ID directory if
-      // pre-finalized for SCM HA.
+      // DN started for first time or this is a newly added volume.
       // Either the SCM ID or cluster ID will be used in naming the
-      // volume's subdirectory, depending on the datanode's layout version.
-      String id = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(conf,
-          scmId, clusterId);
+      // volume's working directory, depending on the datanode's layout version.
+      workingDirName = VersionedDatanodeFeatures.ScmHA
+          .chooseContainerPathID(conf, scmId, clusterId);
       try {
-        volume.createWorkingDir(id, dbVolumeSet);
+        volume.createWorkingDir(workingDirName, dbVolumeSet);
       } catch (IOException e) {
         logger.error("Prepare working dir failed for volume {}.",
             volumeRootPath, e);
-        return false;
+        success = false;
       }
-      return true;
     } else if (rootFiles.length == 2) {
-      // If we are finalized for SCM HA and there is no cluster ID directory,
-      // the volume may have been unhealthy during finalization and been
-      // skipped. Create cluster ID symlink now.
-      // Else, We are still pre-finalized.
-      // The existing directory should be left for backwards compatibility.
-      return VersionedDatanodeFeatures.ScmHA.
+      // The two files are the version file and an existing working directory.
+      // If the working directory matches the cluster ID, we do not need to
+      // do extra steps.
+      // If the working directory matches the SCM ID and SCM HA has been
+      // finalized, the volume may have been unhealthy during finalization and
+      // been skipped. In that case create the cluster ID symlink now.
+      // If the working directory matches the SCM ID and SCM HA is not yet
+      // finalized, use that as the working directory.
+      success = VersionedDatanodeFeatures.ScmHA.
           upgradeVolumeIfNeeded(volume, clusterId);
-    } else {
-      if (!clusterDir.exists()) {
-        logger.error("Volume {} is in an inconsistent state. {} files found " +
-            "but cluster ID directory {} does not exist.", volumeRootPath,
-            rootFiles.length, clusterDir);
-        return false;
+      try {
+        workingDirName = VersionedDatanodeFeatures.ScmHA
+            .chooseContainerPathID(volume, clusterId);
+      } catch (IOException ex) {
+        success = false;
       }
-      return true;
+    } else {
+      // If there are more files in this directory, we only care that a
+      // working directory named after our cluster ID is present for us to use.
+      // Any existing SCM ID directory should be left for backwards
+      // compatibility.
+      if (clusterIDDir.exists()) {
+        workingDirName = clusterId;
+      } else {
+        logger.error("Volume {} is in an inconsistent state. {} files found " +
+                "but cluster ID directory {} does not exist.", volumeRootPath,
+            rootFiles.length, clusterIDDir);
+        success = false;
+      }
     }
+
+    // Once the correct working directory name is identified, create the
+    // volume level tmp directories under it.
+    if (success) {
+      try {
+        volume.createTmpDirs(workingDirName);
+      } catch (IOException e) {
+        logger.error("Prepare tmp dir failed for volume {}.",
+            volumeRootPath, e);
+        success = false;
+      }
+    }
+
+    return success;
   }
 }

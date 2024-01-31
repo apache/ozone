@@ -54,6 +54,12 @@ public class DatanodeLayoutStorage extends Storage {
         DATANODE_LAYOUT_VERSION_DIR, dataNodeId, layoutVersion);
   }
 
+  public DatanodeLayoutStorage(ConfigurationSource conf)
+      throws IOException {
+    super(NodeType.DATANODE, ServerUtils.getOzoneMetaDirPath(conf),
+        DATANODE_LAYOUT_VERSION_DIR, getDefaultLayoutVersion(conf));
+  }
+
   @Override
   public File getCurrentDir() {
     return new File(getStorageDir());
@@ -62,6 +68,11 @@ public class DatanodeLayoutStorage extends Storage {
   @Override
   protected Properties getNodeProperties() {
     return new Properties();
+  }
+
+  @Override
+  public void setClusterId(String clusterId) throws IOException {
+    super.getStorageInfo().setClusterId(clusterId);
   }
 
   /**

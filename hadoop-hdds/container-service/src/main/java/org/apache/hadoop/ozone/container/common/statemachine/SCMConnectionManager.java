@@ -132,7 +132,8 @@ public class SCMConnectionManager
    * @param address - Address of the SCM machine to send heartbeat to.
    * @throws IOException
    */
-  public void addSCMServer(InetSocketAddress address) throws IOException {
+  public void addSCMServer(InetSocketAddress address,
+      String threadNamePrefix) throws IOException {
     writeLock();
     try {
       if (scmMachines.containsKey(address)) {
@@ -163,10 +164,10 @@ public class SCMConnectionManager
 
       StorageContainerDatanodeProtocolClientSideTranslatorPB rpcClient =
           new StorageContainerDatanodeProtocolClientSideTranslatorPB(
-          rpcProxy);
+              rpcProxy);
 
-      EndpointStateMachine endPoint =
-          new EndpointStateMachine(address, rpcClient, this.conf);
+      EndpointStateMachine endPoint = new EndpointStateMachine(address,
+          rpcClient, this.conf, threadNamePrefix);
       endPoint.setPassive(false);
       scmMachines.put(address, endPoint);
     } finally {
@@ -176,10 +177,12 @@ public class SCMConnectionManager
 
   /**
    * Adds a new Recon server to the set of endpoints.
+   *
    * @param address Recon address.
    * @throws IOException
    */
-  public void addReconServer(InetSocketAddress address) throws IOException {
+  public void addReconServer(InetSocketAddress address,
+      String threadNamePrefix) throws IOException {
     LOG.info("Adding Recon Server : {}", address.toString());
     writeLock();
     try {
@@ -209,7 +212,7 @@ public class SCMConnectionManager
           new StorageContainerDatanodeProtocolClientSideTranslatorPB(rpcProxy);
 
       EndpointStateMachine endPoint =
-          new EndpointStateMachine(address, rpcClient, conf);
+          new EndpointStateMachine(address, rpcClient, conf, threadNamePrefix);
       endPoint.setPassive(true);
       scmMachines.put(address, endPoint);
     } finally {

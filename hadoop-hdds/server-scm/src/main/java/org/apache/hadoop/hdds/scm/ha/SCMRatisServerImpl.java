@@ -38,7 +38,7 @@ import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.conf.Parameters;
@@ -52,9 +52,11 @@ import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.protocol.SnapshotManagementRequest;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.protocol.SetConfigurationRequest;
 import org.apache.ratis.server.RaftServer;
+import org.apache.ratis.server.storage.RaftStorage;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,6 +79,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
   private final RaftServer.Division division;
   private final GrpcTlsConfig grpcTlsConfig;
   private boolean isStopped;
+  private final long requestTimeout;
 
   // TODO: Refactor and remove ConfigurationSource and use only
   //  SCMHAConfiguration.
@@ -84,6 +87,14 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       final StorageContainerManager scm, final SCMHADBTransactionBuffer buffer)
       throws IOException {
     this.scm = scm;
+    
+    requestTimeout = ozoneConf.getTimeDuration(
+        ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT,
+        ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    Preconditions.checkArgument(requestTimeout > 1000L,
+        "Ratis request timeout cannot be less than 1000ms.");
+    
     final RaftGroupId groupId = buildRaftGroupId(scm.getClusterId());
     LOG.info("starting Raft server for scm:{}", scm.getScmId());
     // During SCM startup, the bootstrapped node will be started just with
@@ -102,6 +113,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
     this.server = newRaftServer(scm.getScmId(), conf)
         .setStateMachineRegistry((gId) -> new SCMStateMachine(scm, buffer))
+        .setOption(RaftStorage.StartupOption.RECOVER)
         .setGroup(RaftGroup.valueOf(groupId))
         .setParameters(parameters).build();
 
@@ -119,6 +131,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     try {
       server = newRaftServer(scmId, conf).setGroup(group)
               .setStateMachineRegistry((groupId -> new SCMStateMachine()))
+              .setOption(RaftStorage.StartupOption.RECOVER)
               .build();
       server.start();
       waitForLeaderToBeReady(server, conf, group);
@@ -214,12 +227,6 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         .setType(RaftClientRequest.writeRequestType())
         .build();
     // any request submitted to
-    final long requestTimeout = ozoneConf.getTimeDuration(
-                ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT,
-                ScmConfigKeys.OZONE_SCM_HA_RATIS_REQUEST_TIMEOUT_DEFAULT,
-                TimeUnit.MILLISECONDS);
-    Preconditions.checkArgument(requestTimeout > 1000L,
-            "Ratis request timeout cannot be less than 1000ms.");
     final RaftClientReply raftClientReply =
         server.submitClientRequestAsync(raftClientRequest)
             .get(requestTimeout, TimeUnit.MILLISECONDS);
@@ -227,6 +234,18 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       LOG.info("request {} Reply {}", raftClientRequest, raftClientReply);
     }
     return SCMRatisResponse.decode(raftClientReply);
+  }
+
+  @Override
+  public boolean triggerSnapshot() throws IOException {
+    final SnapshotManagementRequest req = SnapshotManagementRequest.newCreate(
+        clientId, getDivision().getId(), getDivision().getGroup().getGroupId(),
+        nextCallId(), requestTimeout);
+    final RaftClientReply raftClientReply = server.snapshotManagement(req);
+    if (!raftClientReply.isSuccess()) {
+      LOG.warn("Snapshot request failed", raftClientReply.getException());
+    }
+    return raftClientReply.isSuccess();
   }
 
   private long nextCallId() {
@@ -248,7 +267,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
 
   @Override
-  public List<String> getRatisRoles() throws IOException {
+  public List<String> getRatisRoles() {
     Collection<RaftPeer> peers = division.getGroup().getPeers();
     RaftPeer leader = getLeader();
     List<String> ratisRoles = new ArrayList<>();
@@ -266,7 +285,8 @@ public class SCMRatisServerImpl implements SCMRatisServer {
                   ":".concat(RaftProtos.RaftPeerRole.LEADER.toString()) :
                   ":".concat(RaftProtos.RaftPeerRole.FOLLOWER.toString()))
                   .concat(":".concat(peer.getId().toString()))
-                  .concat(":".concat(peerInetAddress.getHostAddress()))));
+                  .concat(":".concat(peerInetAddress == null ? "" :
+                      peerInetAddress.getHostAddress()))));
     }
     return ratisRoles;
   }

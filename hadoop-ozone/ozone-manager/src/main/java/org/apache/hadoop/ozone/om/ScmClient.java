@@ -27,10 +27,11 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.util.CacheMetrics;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -76,16 +77,16 @@ public class ScmClient {
         .expireAfterWrite(ttl, unit)
         .recordStats()
         .build(new CacheLoader<Long, Pipeline>() {
-          @NotNull
+          @Nonnull
           @Override
-          public Pipeline load(@NotNull Long key) throws Exception {
+          public Pipeline load(@Nonnull Long key) throws Exception {
             return containerClient.getContainerWithPipeline(key).getPipeline();
           }
 
-          @NotNull
+          @Nonnull
           @Override
           public Map<Long, Pipeline> loadAll(
-              @NotNull Iterable<? extends Long> keys) throws Exception {
+              @Nonnull Iterable<? extends Long> keys) throws Exception {
             return containerClient.getContainerWithPipelineBatch(keys)
                 .stream()
                 .collect(Collectors.toMap(
@@ -111,7 +112,14 @@ public class ScmClient {
       containerLocationCache.invalidateAll(containerIds);
     }
     try {
-      return containerLocationCache.getAll(containerIds);
+      Map<Long, Pipeline> result = containerLocationCache.getAll(containerIds);
+      // Don't keep empty pipelines in the cache.
+      List<Long> emptyPipelines = result.entrySet().stream()
+          .filter(e -> e.getValue().isEmpty())
+          .map(Map.Entry::getKey)
+          .collect(Collectors.toList());
+      containerLocationCache.invalidateAll(emptyPipelines);
+      return result;
     } catch (ExecutionException e) {
       return handleCacheExecutionException(e);
     } catch (InvalidCacheLoadException e) {

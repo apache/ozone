@@ -367,6 +367,11 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
+  public int totalHealthyVolumeCount() {
+    return 0;
+  }
+
+  @Override
   public int pipelineLimit(DatanodeDetails dn) {
     return 1;
   }
@@ -374,6 +379,11 @@ public class SimpleMockNodeManager implements NodeManager {
   @Override
   public int minPipelineLimit(List<DatanodeDetails> dn) {
     return 0;
+  }
+
+  @Override
+  public long getLastHeartbeat(DatanodeDetails datanodeDetails) {
+    return -1;
   }
 
   @Override
@@ -392,7 +402,7 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public Map<String, List<String>> getNodeStatusInfo() {
+  public Map<String, Map<String, String>> getNodeStatusInfo() {
     return null;
   }
 

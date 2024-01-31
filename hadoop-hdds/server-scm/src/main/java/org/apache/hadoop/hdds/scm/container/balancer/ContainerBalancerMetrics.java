@@ -81,6 +81,14 @@ public final class ContainerBalancerMetrics {
       "exceptionally in latest iteration of Container Balancer.")
   private MutableCounterLong numContainerMovesFailedInLatestIteration;
 
+  @Metric(about = "Number of container moves that were scheduled in the " +
+      "latest iteration of Container Balancer.")
+  private MutableCounterLong numContainerMovesScheduledInLatestIteration;
+
+  @Metric(about = "Total number of container moves that were scheduled across" +
+      " all iterations of Container Balancer.")
+  private MutableCounterLong numContainerMovesScheduled;
+
   /**
    * Create and register metrics named {@link ContainerBalancerMetrics#NAME}
    * for {@link ContainerBalancer}.
@@ -95,6 +103,32 @@ public final class ContainerBalancerMetrics {
 
   private ContainerBalancerMetrics(MetricsSystem ms) {
     this.ms = ms;
+  }
+
+  /**
+   * Gets the number of container moves scheduled across all iterations of
+   * Container Balancer.
+   * @return number of moves
+   */
+  public long getNumContainerMovesScheduled() {
+    return numContainerMovesScheduled.value();
+  }
+
+  void incrementNumContainerMovesScheduled(long valueToAdd) {
+    this.numContainerMovesScheduled.incr(valueToAdd);
+  }
+
+  /**
+   * Gets the number of container moves scheduled in the latest iteration of
+   * Container Balancer.
+   * @return number of moves
+   */
+  public long getNumContainerMovesScheduledInLatestIteration() {
+    return numContainerMovesScheduledInLatestIteration.value();
+  }
+
+  void incrementNumContainerMovesScheduledInLatestIteration(long valueToAdd) {
+    this.numContainerMovesScheduledInLatestIteration.incr(valueToAdd);
   }
 
   /**
@@ -158,6 +192,8 @@ public final class ContainerBalancerMetrics {
     case REPLICATION_NOT_HEALTHY_AFTER_MOVE:
     case FAIL_CONTAINER_ALREADY_BEING_MOVED:
     case FAIL_UNEXPECTED_ERROR:
+      incrementNumContainerMovesFailedInLatestIteration(valueToAdd);
+      break;
     default:
       break;
     }

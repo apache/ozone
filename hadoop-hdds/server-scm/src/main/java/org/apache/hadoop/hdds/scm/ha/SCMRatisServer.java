@@ -42,6 +42,8 @@ public interface SCMRatisServer {
       throws IOException, ExecutionException, InterruptedException,
       TimeoutException;
 
+  boolean triggerSnapshot() throws IOException;
+
   void stop() throws IOException;
 
   boolean isStopped();
@@ -51,7 +53,7 @@ public interface SCMRatisServer {
   /**
    * Returns roles of ratis peers.
    */
-  List<String> getRatisRoles() throws IOException;
+  List<String> getRatisRoles();
 
   /**
    * Returns NotLeaderException with useful info.

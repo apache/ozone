@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.file.NoSuchFileException;
@@ -32,7 +33,11 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.FileAttribute;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
@@ -42,6 +47,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.util.Time;
@@ -59,6 +65,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
 
+import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -180,18 +187,25 @@ public final class ChunkUtils {
     }
   }
 
-  /**
-   * Reads data from an existing chunk file into a list of ByteBuffers.
-   *
-   * @param file file where data lives
-   * @param buffers
-   * @param offset
-   * @param len
-   * @param volume for statistics and checker
-   */
-  public static void readData(File file, ByteBuffer[] buffers,
-      long offset, long len, HddsVolume volume)
+  public static ChunkBuffer readData(long len, int bufferCapacity,
+      File file, long off, HddsVolume volume, int readMappedBufferThreshold)
       throws StorageContainerException {
+    if (len > readMappedBufferThreshold) {
+      return readData(file, bufferCapacity, off, len, volume);
+    } else if (len == 0) {
+      return ChunkBuffer.wrap(Collections.emptyList());
+    }
+
+    final ByteBuffer[] buffers = BufferUtils.assignByteBuffers(len,
+        bufferCapacity);
+    readData(file, off, len, c -> c.position(off).read(buffers), volume);
+    Arrays.stream(buffers).forEach(ByteBuffer::flip);
+    return ChunkBuffer.wrap(Arrays.asList(buffers));
+  }
+
+  private static void readData(File file, long offset, long len,
+      CheckedFunction<FileChannel, Long, IOException> readMethod,
+      HddsVolume volume) throws StorageContainerException {
 
     final Path path = file.toPath();
     final long startTime = Time.monotonicNow();
@@ -201,8 +215,7 @@ public final class ChunkUtils {
       bytesRead = processFileExclusively(path, () -> {
         try (FileChannel channel = open(path, READ_OPTIONS, NO_ATTRIBUTES);
              FileLock ignored = channel.lock(offset, len, true)) {
-
-          return channel.position(offset).read(buffers);
+          return readMethod.apply(channel);
         } catch (IOException e) {
           onFailure(volume);
           throw new UncheckedIOException(e);
@@ -227,10 +240,37 @@ public final class ChunkUtils {
         bytesRead, offset, file);
 
     validateReadSize(len, bytesRead);
+  }
 
-    for (ByteBuffer buf : buffers) {
-      buf.flip();
-    }
+  /**
+   * Read data from the given file using
+   * {@link FileChannel#map(FileChannel.MapMode, long, long)},
+   * whose javadoc recommends that it is generally only worth mapping
+   * relatively large files (larger than a few tens of kilobytes)
+   * into memory from the standpoint of performance.
+   *
+   * @return a list of {@link MappedByteBuffer} containing the data.
+   */
+  private static ChunkBuffer readData(File file, int chunkSize,
+      long offset, long length, HddsVolume volume)
+      throws StorageContainerException {
+
+    final List<ByteBuffer> buffers = new ArrayList<>(
+        Math.toIntExact((length - 1) / chunkSize) + 1);
+    readData(file, offset, length, channel -> {
+      long readLen = 0;
+      while (readLen < length) {
+        final int n = Math.toIntExact(Math.min(length - readLen, chunkSize));
+        final ByteBuffer mapped = channel.map(
+            FileChannel.MapMode.READ_ONLY, offset + readLen, n);
+        LOG.debug("mapped: offset={}, readLen={}, n={}, {}",
+            offset, readLen, n, mapped.getClass());
+        readLen += mapped.remaining();
+        buffers.add(mapped);
+      }
+      return readLen;
+    }, volume);
+    return ChunkBuffer.wrap(buffers);
   }
 
   /**
@@ -244,6 +284,33 @@ public final class ChunkUtils {
    */
   public static boolean validateChunkForOverwrite(File chunkFile,
       ChunkInfo info) {
+
+    if (isOverWriteRequested(chunkFile, info)) {
+      if (!isOverWritePermitted(info)) {
+        LOG.warn("Duplicate write chunk request. Chunk overwrite " +
+            "without explicit request. {}", info);
+      }
+      return true;
+    }
+
+    // TODO: when overwriting a chunk, we should ensure that the new chunk
+    //  size is same as the old chunk size
+
+    return false;
+  }
+
+
+  /**
+   * Validates chunk data and returns a boolean value that indicates if the
+   * chunk data should be overwritten.
+   *
+   * @param chunkFile - FileChannel of the chunkFile to write data into.
+   * @param info - chunk info.
+   * @return true if the chunkOffset is less than the chunkFile length,
+   *         false otherwise.
+   */
+  public static boolean validateChunkForOverwrite(FileChannel chunkFile,
+                                                  ChunkInfo info) {
 
     if (isOverWriteRequested(chunkFile, info)) {
       if (!isOverWritePermitted(info)) {
@@ -276,6 +343,30 @@ public final class ChunkUtils {
 
     long offset = chunkInfo.getOffset();
     return offset < chunkFile.length();
+  }
+
+  /**
+   * Checks if a request to overwrite an existing range of a chunk has been
+   * received.
+   *
+   * @param channel - FileChannel of the file to check
+   * @param chunkInfo - Chunk information containing the offset
+   * @return true if the offset is less than the file length, indicating
+   *         a request to overwrite an existing range; false otherwise
+   */
+  public static boolean isOverWriteRequested(FileChannel channel, ChunkInfo
+      chunkInfo) {
+    long fileLen;
+    try {
+      fileLen = channel.size();
+    } catch (IOException e) {
+      String msg = "IO error encountered while getting the file size";
+      LOG.error(msg, e.getMessage());
+      throw new UncheckedIOException("IO error encountered while " +
+          "getting the file size for ", e);
+    }
+    long offset = chunkInfo.getOffset();
+    return offset < fileLen;
   }
 
   /**

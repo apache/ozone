@@ -95,7 +95,6 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.collect.Sets;
@@ -116,6 +115,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
 
 import org.apache.ratis.util.ExitUtils;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -125,8 +125,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import org.mockito.Mockito;
-
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -135,7 +134,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -201,7 +203,7 @@ public class TestKeyManagerImpl {
     conf.setLong(OZONE_KEY_PREALLOCATION_BLOCKS_MAX, 10);
 
     mockScmContainerClient =
-        Mockito.mock(StorageContainerLocationProtocol.class);
+        mock(StorageContainerLocationProtocol.class);
     
     OmTestManagers omTestManagers
         = new OmTestManagers(conf, scm.getBlockProtocolServer(),
@@ -214,11 +216,12 @@ public class TestKeyManagerImpl {
 
     mockContainerClient();
 
-    Mockito.when(mockScmBlockLocationProtocol
-        .allocateBlock(Mockito.anyLong(), Mockito.anyInt(),
+    when(mockScmBlockLocationProtocol
+        .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class),
-            Mockito.anyString(),
-            any(ExcludeList.class))).thenThrow(
+            anyString(),
+            any(ExcludeList.class),
+            anyString())).thenThrow(
                 new SCMException("SafeModePrecheck failed for allocateBlock",
             ResultCodes.SAFE_MODE_EXCEPTION));
     createVolume(VOLUME_NAME);
@@ -313,11 +316,11 @@ public class TestKeyManagerImpl {
     metadataManager.getOpenKeyTable(getDefaultBucketLayout()).put(
         metadataManager.getOpenKey(VOLUME_NAME, BUCKET_NAME, KEY_NAME, 1L),
         omKeyInfo);
-    LambdaTestUtils.intercept(OMException.class,
-        "SafeModePrecheck failed for allocateBlock", () -> {
-          writeClient
-              .allocateBlock(keyArgs, 1L, new ExcludeList());
-        });
+    OMException omException = assertThrows(OMException.class,
+         () ->
+             writeClient.allocateBlock(keyArgs, 1L, new ExcludeList()));
+    assertThat(omException.getMessage())
+        .contains("SafeModePrecheck failed for allocateBlock");
   }
 
   @Test
@@ -331,10 +334,10 @@ public class TestKeyManagerImpl {
         .setAcls(OzoneAclUtil.getAclList(ugi.getUserName(), ugi.getGroupNames(),
             ALL, ALL))
         .build();
-    LambdaTestUtils.intercept(OMException.class,
-        "SafeModePrecheck failed for allocateBlock", () -> {
-          writeClient.openKey(keyArgs);
-        });
+    OMException omException = assertThrows(OMException.class,
+        () -> writeClient.openKey(keyArgs));
+    assertThat(omException.getMessage())
+        .contains("SafeModePrecheck failed for allocateBlock");
   }
 
   @Test
@@ -579,13 +582,13 @@ public class TestKeyManagerImpl {
     assertEquals(2, matchEntries);
 
     boolean result = writeClient.removeAcl(ozPrefix1, ozAcl4);
-    assertEquals(true, result);
+    assertTrue(result);
 
     ozAclGet = writeClient.getAcl(ozPrefix1);
     assertEquals(2, ozAclGet.size());
 
     result = writeClient.removeAcl(ozPrefix1, ozAcl3);
-    assertEquals(true, result);
+    assertTrue(result);
     ozAclGet = writeClient.getAcl(ozPrefix1);
     assertEquals(1, ozAclGet.size());
 
@@ -639,7 +642,9 @@ public class TestKeyManagerImpl {
         .build();
 
     // add acl with invalid prefix name
-    writeClient.addAcl(ozInvalidPrefix, ozAcl1);
+    Exception ex = assertThrows(OMException.class,
+        () -> writeClient.addAcl(ozInvalidPrefix, ozAcl1));
+    assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
 
     OzoneObj ozPrefix1 = new OzoneObjInfo.Builder()
         .setVolumeName(volumeName)
@@ -655,17 +660,22 @@ public class TestKeyManagerImpl {
     assertEquals(ozAcl1, ozAclGet.get(0));
 
     // get acl with invalid prefix name
-    Exception ex = assertThrows(OMException.class,
+    ex = assertThrows(OMException.class,
         () -> writeClient.getAcl(ozInvalidPrefix));
     assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
 
     // set acl with invalid prefix name
     List<OzoneAcl> ozoneAcls = new ArrayList<OzoneAcl>();
     ozoneAcls.add(ozAcl1);
-    writeClient.setAcl(ozInvalidPrefix, ozoneAcls);
+
+    ex = assertThrows(OMException.class,
+        () -> writeClient.setAcl(ozInvalidPrefix, ozoneAcls));
+    assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
 
     // remove acl with invalid prefix name
-    writeClient.removeAcl(ozInvalidPrefix, ozAcl1);
+    ex = assertThrows(OMException.class,
+        () -> writeClient.removeAcl(ozInvalidPrefix, ozAcl1));
+    assertTrue(ex.getMessage().startsWith("Invalid prefix name"));
   }
 
   @Test
@@ -715,7 +725,7 @@ public class TestKeyManagerImpl {
     assertEquals(ozAcl1, prefixInfos.get(6).getAcls().get(0));
     // All other nodes don't have acl value associate with it
     for (int i = 0; i < 6; i++) {
-      assertEquals(null, prefixInfos.get(i));
+      assertNull(prefixInfos.get(i));
     }
     // cleanup
     writeClient.removeAcl(ozPrefix1, ozAcl1);
@@ -771,10 +781,9 @@ public class TestKeyManagerImpl {
         .setKeyName(keyName)
         .setSortDatanodesInPipeline(true)
         .build();
-
     // lookup for a non-existent key
     try {
-      keyManager.lookupKey(keyArgs, null);
+      keyManager.lookupKey(keyArgs, resolvedBucket(), null);
       fail("Lookup key should fail for non existent key");
     } catch (OMException ex) {
       if (ex.getResult() != OMException.ResultCodes.KEY_NOT_FOUND) {
@@ -816,39 +825,47 @@ public class TestKeyManagerImpl {
     when(mockScmContainerClient.getContainerWithPipelineBatch(
         Arrays.asList(containerID))).thenReturn(containerWithPipelines);
 
-    OmKeyInfo key = keyManager.lookupKey(keyArgs, null);
+    OmKeyInfo key = keyManager.lookupKey(keyArgs, resolvedBucket(), null);
     assertEquals(key.getKeyName(), keyName);
-    List<OmKeyLocationInfo> keyLocations =
-        key.getLatestVersionLocations().getLocationList();
-    DatanodeDetails leader =
-        keyLocations.get(0).getPipeline().getFirstNode();
-    DatanodeDetails follower1 =
-        keyLocations.get(0).getPipeline().getNodes().get(1);
-    DatanodeDetails follower2 =
-        keyLocations.get(0).getPipeline().getNodes().get(2);
+    Pipeline keyPipeline =
+        key.getLatestVersionLocations().getLocationList().get(0).getPipeline();
+    DatanodeDetails leader = keyPipeline.getFirstNode();
+    DatanodeDetails follower1 = keyPipeline.getNodes().get(1);
+    DatanodeDetails follower2 = keyPipeline.getNodes().get(2);
     assertNotEquals(leader, follower1);
     assertNotEquals(follower1, follower2);
 
     // lookup key, leader as client
-    OmKeyInfo key1 = keyManager.lookupKey(keyArgs, leader.getIpAddress());
+    OmKeyInfo key1 = keyManager.lookupKey(keyArgs, resolvedBucket(),
+        leader.getIpAddress());
     assertEquals(leader, key1.getLatestVersionLocations()
         .getLocationList().get(0).getPipeline().getClosestNode());
 
     // lookup key, follower1 as client
-    OmKeyInfo key2 = keyManager.lookupKey(keyArgs, follower1.getIpAddress());
+    OmKeyInfo key2 = keyManager.lookupKey(keyArgs, resolvedBucket(),
+        follower1.getIpAddress());
     assertEquals(follower1, key2.getLatestVersionLocations()
         .getLocationList().get(0).getPipeline().getClosestNode());
 
     // lookup key, follower2 as client
-    OmKeyInfo key3 = keyManager.lookupKey(keyArgs, follower2.getIpAddress());
+    OmKeyInfo key3 = keyManager.lookupKey(keyArgs, resolvedBucket(),
+        follower2.getIpAddress());
     assertEquals(follower2, key3.getLatestVersionLocations()
         .getLocationList().get(0).getPipeline().getClosestNode());
 
     // lookup key, random node as client
-    OmKeyInfo key4 = keyManager.lookupKey(keyArgs,
+    OmKeyInfo key4 = keyManager.lookupKey(keyArgs, resolvedBucket(),
         "/d=default-drack/127.0.0.1");
-    assertEquals(leader, key4.getLatestVersionLocations()
-        .getLocationList().get(0).getPipeline().getClosestNode());
+    assertThat(keyPipeline.getNodes())
+        .containsAll(key4.getLatestVersionLocations()
+            .getLocationList().get(0).getPipeline().getNodesInOrder());
+  }
+
+  @Nonnull
+  private ResolvedBucket resolvedBucket() {
+    ResolvedBucket bucket = new ResolvedBucket(VOLUME_NAME, BUCKET_NAME,
+        VOLUME_NAME, BUCKET_NAME, "", BucketLayout.DEFAULT);
+    return bucket;
   }
 
   @Test
@@ -861,7 +878,7 @@ public class TestKeyManagerImpl {
 
     // lookup for a non-existent key
     try {
-      keyManager.lookupKey(keyArgs, null);
+      keyManager.lookupKey(keyArgs, resolvedBucket(), null);
       fail("Lookup key should fail for non existent key");
     } catch (OMException ex) {
       if (ex.getResult() != OMException.ResultCodes.KEY_NOT_FOUND) {
@@ -903,14 +920,14 @@ public class TestKeyManagerImpl {
     when(mockScmContainerClient.getContainerWithPipelineBatch(
         Arrays.asList(1L))).thenReturn(containerWithPipelines);
 
-    OmKeyInfo key = keyManager.lookupKey(keyArgs, null);
+    OmKeyInfo key = keyManager.lookupKey(keyArgs, resolvedBucket(), null);
     assertEquals(key.getKeyLocationVersions().size(), 1);
 
     keySession = writeClient.createFile(keyArgs, true, true);
     writeClient.commitKey(keyArgs, keySession.getId());
 
     // Test lookupKey (latestLocationVersion == true)
-    key = keyManager.lookupKey(keyArgs, null);
+    key = keyManager.lookupKey(keyArgs, resolvedBucket(), null);
     assertEquals(key.getKeyLocationVersions().size(), 1);
 
     // Test ListStatus (latestLocationVersion == true)
@@ -935,7 +952,7 @@ public class TestKeyManagerImpl {
         .build();
 
     // Test lookupKey (latestLocationVersion == false)
-    key = keyManager.lookupKey(keyArgs, null);
+    key = keyManager.lookupKey(keyArgs, resolvedBucket(), null);
     assertEquals(key.getKeyLocationVersions().size(), 2);
 
     // Test ListStatus (latestLocationVersion == false)
@@ -954,8 +971,9 @@ public class TestKeyManagerImpl {
     assertEquals(key.getKeyLocationVersions().size(), 2);
 
     // Test ListKeys (latestLocationVersion is always true for ListKeys)
-    List<OmKeyInfo> keyInfos = keyManager.listKeys(keyArgs.getVolumeName(),
-        keyArgs.getBucketName(), "", keyArgs.getKeyName(), 100);
+    List<OmKeyInfo> keyInfos =
+        keyManager.listKeys(keyArgs.getVolumeName(), keyArgs.getBucketName(),
+            "", keyArgs.getKeyName(), 100).getKeys();
     assertEquals(keyInfos.size(), 1);
     assertEquals(keyInfos.get(0).getKeyLocationVersions().size(), 1);
   }
@@ -1513,13 +1531,10 @@ public class TestKeyManagerImpl {
     KeyManagerImpl keyManagerImpl =
         new KeyManagerImpl(ozoneManager, scmClientMock, conf, metrics);
 
-    try {
-      keyManagerImpl.refresh(omKeyInfo);
-      fail();
-    } catch (OMException omEx) {
-      assertEquals(SCM_GET_PIPELINE_EXCEPTION, omEx.getResult());
-      assertTrue(omEx.getMessage().equals(errorMessage));
-    }
+    OMException omEx = assertThrows(OMException.class,
+        () -> keyManagerImpl.refresh(omKeyInfo));
+    assertEquals(SCM_GET_PIPELINE_EXCEPTION, omEx.getResult());
+    assertEquals(errorMessage, omEx.getMessage());
   }
 
   /**
@@ -1583,11 +1598,11 @@ public class TestKeyManagerImpl {
       }
       // verify filestatus is present in directory or file set accordingly
       if (fileStatus.isDirectory()) {
-        assertTrue(directorySet.contains(normalizedKeyName),
-            directorySet + " doesn't contain " + normalizedKeyName);
+        assertThat(directorySet).withFailMessage(directorySet +
+            " doesn't contain " + normalizedKeyName).contains(normalizedKeyName);
       } else {
-        assertTrue(fileSet.contains(normalizedKeyName),
-            fileSet + " doesn't contain " + normalizedKeyName);
+        assertThat(fileSet).withFailMessage(fileSet + " doesn't contain " + normalizedKeyName)
+            .contains(normalizedKeyName);
       }
     }
 

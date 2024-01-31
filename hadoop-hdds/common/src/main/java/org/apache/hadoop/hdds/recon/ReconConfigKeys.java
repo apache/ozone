@@ -32,10 +32,21 @@ public final class ReconConfigKeys {
 
   public static final String RECON_SCM_CONFIG_PREFIX = "ozone.recon.scmconfig";
 
+  public static final String OZONE_RECON_DB_DIR = "ozone.recon.db.dir";
+
+  public static final String OZONE_RECON_DB_DIRS_PERMISSIONS =
+      "ozone.recon.db.dirs.permissions";
+
   public static final String OZONE_RECON_DATANODE_ADDRESS_KEY =
       "ozone.recon.datanode.address";
   public static final String OZONE_RECON_ADDRESS_KEY =
       "ozone.recon.address";
+  // Fully qualified heatmap provider implementation class name key.
+  public static final String OZONE_RECON_HEATMAP_PROVIDER_KEY =
+      "ozone.recon.heatmap.provider";
+  public static final String OZONE_RECON_HEATMAP_ENABLE_KEY =
+      "ozone.recon.heatmap.enable";
+  public static final boolean OZONE_RECON_HEATMAP_ENABLE_DEFAULT = false;
   public static final String OZONE_RECON_ADDRESS_DEFAULT =
       "0.0.0.0:9891";
   public static final String OZONE_RECON_HTTP_ADDRESS_KEY =

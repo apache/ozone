@@ -18,35 +18,22 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import java.io.IOException;
-
-import org.apache.hadoop.hdds.StringUtils;
+import java.nio.charset.StandardCharsets;
 
 /**
- * Codec to convert String to/from byte array.
+ * A {@link Codec} to serialize/deserialize {@link String}
+ * using {@link StandardCharsets#UTF_8},
+ * a variable-length character encoding.
  */
-public class StringCodec implements Codec<String> {
+public final class StringCodec extends StringCodecBase {
+  private static final StringCodec CODEC = new StringCodec();
 
-  @Override
-  public byte[] toPersistedFormat(String object) throws IOException {
-    if (object != null) {
-      return StringUtils.string2Bytes(object);
-    } else {
-      return null;
-    }
+  public static StringCodec get() {
+    return CODEC;
   }
 
-  @Override
-  public String fromPersistedFormat(byte[] rawData) {
-    if (rawData != null) {
-      return StringUtils.bytes2String(rawData);
-    } else {
-      return null;
-    }
-  }
-
-  @Override
-  public String copyObject(String object) {
-    return object;
+  private StringCodec() {
+    // singleton
+    super(StandardCharsets.UTF_8);
   }
 }

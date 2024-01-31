@@ -21,13 +21,14 @@ package org.apache.hadoop.ozone.security;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.token.Token;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 
 import static org.apache.hadoop.ozone.security.OzoneTokenIdentifier.KIND_NAME;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Class to test OzoneDelegationTokenSelector.
@@ -59,7 +60,7 @@ public class TestOzoneDelegationTokenSelector {
             Collections.singletonList(tokenIdentifierToken));
 
 
-    Assert.assertNotNull(selectedToken);
+    assertNotNull(selectedToken);
 
 
     tokenIdentifierToken.setService(new Text("om1:9863"));
@@ -67,14 +68,14 @@ public class TestOzoneDelegationTokenSelector {
         ozoneDelegationTokenSelector.selectToken(service,
             Collections.singletonList(tokenIdentifierToken));
 
-    Assert.assertNull(selectedToken);
+    assertNull(selectedToken);
 
     service = new Text("om1:9863");
     selectedToken =
         ozoneDelegationTokenSelector.selectToken(service,
             Collections.singletonList(tokenIdentifierToken));
 
-    Assert.assertNotNull(selectedToken);
+    assertNotNull(selectedToken);
 
   }
 

@@ -46,20 +46,18 @@ import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.util.DataChecksum;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.jetbrains.annotations.NotNull;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.ArgumentMatchers;
-import org.mockito.Mockito;
+import jakarta.annotation.Nonnull;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -71,10 +69,12 @@ import java.util.concurrent.CompletableFuture;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType.CRC32;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 /**
  * Unit tests for ReplicatedFileChecksumHelper class.
@@ -85,7 +85,7 @@ public class TestReplicatedFileChecksumHelper {
   private OzoneVolume volume;
   private RpcClient rpcClient;
 
-  @Before
+  @BeforeEach
   public void init() throws IOException {
     ConfigurationSource config = new InMemoryConfiguration();
     OzoneClientConfig clientConfig = config.getObject(OzoneClientConfig.class);
@@ -97,16 +97,14 @@ public class TestReplicatedFileChecksumHelper {
 
       @Override
       protected OmTransport createOmTransport(
-          String omServiceId)
-          throws IOException {
+          String omServiceId) {
         return new MockOmTransport();
       }
 
-      @NotNull
+      @Nonnull
       @Override
       protected XceiverClientFactory createXceiverClientFactory(
-          List<X509Certificate> x509Certificates)
-          throws IOException {
+          ServiceInfoEx serviceInfo) {
         return new MockXceiverClientFactory();
       }
     };
@@ -116,7 +114,7 @@ public class TestReplicatedFileChecksumHelper {
     store = client.getObjectStore();
   }
 
-  @After
+  @AfterEach
   public void close() throws IOException {
     client.close();
   }
@@ -125,9 +123,9 @@ public class TestReplicatedFileChecksumHelper {
   @Test
   public void testEmptyBlock() throws IOException {
     // test the file checksum of a file with an empty block.
-    RpcClient mockRpcClient = Mockito.mock(RpcClient.class);
+    RpcClient mockRpcClient = mock(RpcClient.class);
 
-    OzoneManagerProtocol om = Mockito.mock(OzoneManagerProtocol.class);
+    OzoneManagerProtocol om = mock(OzoneManagerProtocol.class);
     when(mockRpcClient.getOzoneManagerClient()).thenReturn(om);
 
     OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()
@@ -145,11 +143,11 @@ public class TestReplicatedFileChecksumHelper {
         .setAcls(null)
         .build();
 
-    when(om.lookupKey(ArgumentMatchers.any())).thenReturn(omKeyInfo);
+    when(om.lookupKey(any())).thenReturn(omKeyInfo);
 
-    OzoneVolume mockVolume = Mockito.mock(OzoneVolume.class);
+    OzoneVolume mockVolume = mock(OzoneVolume.class);
     when(mockVolume.getName()).thenReturn("vol1");
-    OzoneBucket bucket = Mockito.mock(OzoneBucket.class);
+    OzoneBucket bucket = mock(OzoneBucket.class);
     when(bucket.getName()).thenReturn("bucket1");
 
     OzoneClientConfig.ChecksumCombineMode combineMode =
@@ -159,7 +157,7 @@ public class TestReplicatedFileChecksumHelper {
         mockVolume, bucket, "dummy", 10, combineMode, mockRpcClient);
     helper.compute();
     FileChecksum fileChecksum = helper.getFileChecksum();
-    assertTrue(fileChecksum instanceof MD5MD5CRC32GzipFileChecksum);
+    assertInstanceOf(MD5MD5CRC32GzipFileChecksum.class, fileChecksum);
     assertEquals(DataChecksum.Type.CRC32,
         ((MD5MD5CRC32GzipFileChecksum)fileChecksum).getCrcType());
 
@@ -175,7 +173,7 @@ public class TestReplicatedFileChecksumHelper {
     // test the file checksum of a file with one block.
     OzoneConfiguration conf = new OzoneConfiguration();
 
-    RpcClient mockRpcClient = Mockito.mock(RpcClient.class);
+    RpcClient mockRpcClient = mock(RpcClient.class);
 
     List<DatanodeDetails> dns = Arrays.asList(
         DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build());
@@ -198,13 +196,13 @@ public class TestReplicatedFileChecksumHelper {
             return buildValidResponse();
           }
         };
-    XceiverClientFactory factory = Mockito.mock(XceiverClientFactory.class);
-    when(factory.acquireClientForReadData(ArgumentMatchers.any())).
+    XceiverClientFactory factory = mock(XceiverClientFactory.class);
+    when(factory.acquireClientForReadData(any())).
         thenReturn(xceiverClientGrpc);
 
     when(mockRpcClient.getXceiverClientManager()).thenReturn(factory);
 
-    OzoneManagerProtocol om = Mockito.mock(OzoneManagerProtocol.class);
+    OzoneManagerProtocol om = mock(OzoneManagerProtocol.class);
     when(mockRpcClient.getOzoneManagerClient()).thenReturn(om);
 
     BlockID blockID = new BlockID(1, 1);
@@ -231,11 +229,11 @@ public class TestReplicatedFileChecksumHelper {
         .setAcls(null)
         .build();
 
-    when(om.lookupKey(ArgumentMatchers.any())).thenReturn(omKeyInfo);
+    when(om.lookupKey(any())).thenReturn(omKeyInfo);
 
-    OzoneVolume mockVolume = Mockito.mock(OzoneVolume.class);
+    OzoneVolume mockVolume = mock(OzoneVolume.class);
     when(mockVolume.getName()).thenReturn("vol1");
-    OzoneBucket bucket = Mockito.mock(OzoneBucket.class);
+    OzoneBucket bucket = mock(OzoneBucket.class);
     when(bucket.getName()).thenReturn("bucket1");
 
     OzoneClientConfig.ChecksumCombineMode combineMode =
@@ -246,7 +244,7 @@ public class TestReplicatedFileChecksumHelper {
 
     helper.compute();
     FileChecksum fileChecksum = helper.getFileChecksum();
-    assertTrue(fileChecksum instanceof MD5MD5CRC32GzipFileChecksum);
+    assertInstanceOf(MD5MD5CRC32GzipFileChecksum.class, fileChecksum);
     assertEquals(1, helper.getKeyLocationInfoList().size());
 
     FileChecksum cachedChecksum = new MD5MD5CRC32GzipFileChecksum();
@@ -267,7 +265,7 @@ public class TestReplicatedFileChecksumHelper {
         .setAcls(null)
         .setFileChecksum(cachedChecksum)
         .build();
-    when(om.lookupKey(ArgumentMatchers.any())).
+    when(om.lookupKey(any())).
         thenReturn(omKeyInfoWithChecksum);
 
     helper = new ReplicatedFileChecksumHelper(
@@ -276,7 +274,7 @@ public class TestReplicatedFileChecksumHelper {
 
     helper.compute();
     fileChecksum = helper.getFileChecksum();
-    assertTrue(fileChecksum instanceof MD5MD5CRC32GzipFileChecksum);
+    assertInstanceOf(MD5MD5CRC32GzipFileChecksum.class, fileChecksum);
     assertEquals(1, helper.getKeyLocationInfoList().size());
   }
 
@@ -364,7 +362,6 @@ public class TestReplicatedFileChecksumHelper {
 
       helper.compute();
       FileChecksum fileChecksum = helper.getFileChecksum();
-      //assertTrue(fileChecksum instanceof MD5MD5CRC32GzipFileChecksum);
       assertEquals(DataChecksum.Type.CRC32C,
           ((MD5MD5CRC32FileChecksum)fileChecksum).getCrcType());
       assertEquals(1, helper.getKeyLocationInfoList().size());

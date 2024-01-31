@@ -50,7 +50,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -228,7 +227,7 @@ public class ContainerBalancerTask implements Runnable {
           long sleepTime = 3 * nodeReportInterval;
           LOG.info("ContainerBalancer will sleep for {} ms while waiting " +
               "for updated usage information from Datanodes.", sleepTime);
-          Thread.sleep(nodeReportInterval);
+          Thread.sleep(sleepTime);
         } catch (InterruptedException e) {
           LOG.info("Container Balancer was interrupted while waiting for" +
               "datanodes refreshing volume usage info");
@@ -627,6 +626,8 @@ public class ContainerBalancerTask implements Runnable {
         selectedSources.size() + selectedTargets.size();
     metrics.incrementNumDatanodesInvolvedInLatestIteration(
         countDatanodesInvolvedPerIteration);
+    metrics.incrementNumContainerMovesScheduled(
+        metrics.getNumContainerMovesScheduledInLatestIteration());
     metrics.incrementNumContainerMovesCompleted(
         metrics.getNumContainerMovesCompletedInLatestIteration());
     metrics.incrementNumContainerMovesTimeout(
@@ -690,11 +691,10 @@ public class ContainerBalancerTask implements Runnable {
    * @return ContainerMoveSelection containing the selected target and container
    */
   private ContainerMoveSelection matchSourceWithTarget(DatanodeDetails source) {
-    NavigableSet<ContainerID> candidateContainers =
-        selectionCriteria.getCandidateContainers(source,
-            sizeScheduledForMoveInLatestIteration);
+    Set<ContainerID> sourceContainerIDSet =
+        selectionCriteria.getContainerIDSet(source);
 
-    if (candidateContainers.isEmpty()) {
+    if (sourceContainerIDSet.isEmpty()) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("ContainerBalancer could not find any candidate containers " +
             "for datanode {}", source.getUuidString());
@@ -706,9 +706,23 @@ public class ContainerBalancerTask implements Runnable {
       LOG.debug("ContainerBalancer is finding suitable target for source " +
           "datanode {}", source.getUuidString());
     }
-    ContainerMoveSelection moveSelection =
-        findTargetStrategy.findTargetForContainerMove(
-            source, candidateContainers);
+
+    ContainerMoveSelection moveSelection = null;
+    Set<ContainerID> toRemoveContainerIds = new HashSet<>();
+    for (ContainerID containerId: sourceContainerIDSet) {
+      if (selectionCriteria.shouldBeExcluded(containerId, source,
+          sizeScheduledForMoveInLatestIteration)) {
+        toRemoveContainerIds.add(containerId);
+        continue;
+      }
+      moveSelection = findTargetStrategy.findTargetForContainerMove(source,
+          containerId);
+      if (moveSelection != null) {
+        break;
+      }
+    }
+    // Update cached containerIDSet in setMap
+    sourceContainerIDSet.removeAll(toRemoveContainerIds);
 
     if (moveSelection == null) {
       if (LOG.isDebugEnabled()) {
@@ -817,6 +831,7 @@ public class ContainerBalancerTask implements Runnable {
         future = moveManager.move(containerID, source,
             moveSelection.getTargetNode());
       }
+      metrics.incrementNumContainerMovesScheduledInLatestIteration(1);
 
       future = future.whenComplete((result, ex) -> {
         metrics.incrementCurrentIterationContainerMoveMetric(result, 1);
@@ -929,7 +944,7 @@ public class ContainerBalancerTask implements Runnable {
       return 0;
     }
     SCMNodeStat aggregatedStats = new SCMNodeStat(
-        0, 0, 0);
+        0, 0, 0, 0, 0);
     for (DatanodeUsageInfo node : nodes) {
       aggregatedStats.add(node.getScmNodeStat());
     }

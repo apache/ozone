@@ -70,6 +70,12 @@ public class DeletingContainerHandler extends AbstractCheck {
     LOG.debug("Checking container {} in DeletingContainerHandler",
         containerInfo);
 
+    if (request.isReadOnly()) {
+      // The reset of this method modifies state, so we just return true if
+      // the request is read only
+      return true;
+    }
+
     if (request.getContainerReplicas().size() == 0) {
       LOG.debug("Deleting Container {} has no replicas so marking for cleanup" +
           " and returning true", containerInfo);
@@ -80,7 +86,7 @@ public class DeletingContainerHandler extends AbstractCheck {
 
     Set<DatanodeDetails> pendingDelete = request.getPendingOps().stream()
         .filter(o -> o.getOpType() == ContainerReplicaOp.PendingOpType.DELETE)
-        .map(o -> o.getTarget()).collect(Collectors.toSet());
+        .map(ContainerReplicaOp::getTarget).collect(Collectors.toSet());
     //resend deleteCommand if needed
     request.getContainerReplicas().stream()
         .filter(r -> !pendingDelete.contains(r.getDatanodeDetails()))

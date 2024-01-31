@@ -20,10 +20,12 @@ package org.apache.hadoop.hdds.scm.net;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -39,15 +41,26 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.REGION_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -58,23 +71,36 @@ import org.slf4j.LoggerFactory;
 
 /** Test the network topology functions. */
 @Timeout(30)
-public class TestNetworkTopologyImpl {
+class TestNetworkTopologyImpl {
   private static final Logger LOG = LoggerFactory.getLogger(
       TestNetworkTopologyImpl.class);
   private NetworkTopology cluster;
   private Node[] dataNodes;
-  private Random random = new Random();
+  private final Random random = new Random();
+  private Consumer<List<? extends Node>> mockedShuffleOperation;
 
-  public void initNetworkTopology(NodeSchema[] schemas, Node[] nodeArray) {
+  @BeforeEach
+  void beforeAll() {
+    mockedShuffleOperation = mock(Consumer.class);
+    doAnswer(args -> {
+          List<? extends Node> collection = args.getArgument(0);
+          Collections.shuffle(collection);
+          return null;
+        }
+    ).when(mockedShuffleOperation).accept(any());
+  }
+
+  void initNetworkTopology(NodeSchema[] schemas, Node[] nodeArray) {
     NodeSchemaManager.getInstance().init(schemas, true);
-    cluster = new NetworkTopologyImpl(NodeSchemaManager.getInstance());
+    cluster = new NetworkTopologyImpl(NodeSchemaManager.getInstance(),
+        mockedShuffleOperation);
     dataNodes = nodeArray.clone();
     for (int i = 0; i < dataNodes.length; i++) {
       cluster.add(dataNodes[i]);
     }
   }
 
-  public static Stream<Arguments> topologies() {
+  static Stream<Arguments> topologies() {
     return Stream.of(
         arguments(new NodeSchema[] {ROOT_SCHEMA, LEAF_SCHEMA},
             new Node[]{
@@ -168,7 +194,7 @@ public class TestNetworkTopologyImpl {
 
   @ParameterizedTest
   @MethodSource("topologies")
-  public void testContains(NodeSchema[] schemas, Node[] nodeArray) {
+  void testContains(NodeSchema[] schemas, Node[] nodeArray) {
     initNetworkTopology(schemas, nodeArray);
     Node nodeNotInMap = createDatanode("8.8.8.8", "/d2/r4");
     for (int i = 0; i < dataNodes.length; i++) {
@@ -179,7 +205,7 @@ public class TestNetworkTopologyImpl {
 
   @ParameterizedTest
   @MethodSource("topologies")
-  public void testNumOfChildren(NodeSchema[] schemas, Node[] nodeArray) {
+  void testNumOfChildren(NodeSchema[] schemas, Node[] nodeArray) {
     initNetworkTopology(schemas, nodeArray);
     assertEquals(dataNodes.length, cluster.getNumOfLeafNode(null));
     assertEquals(0, cluster.getNumOfLeafNode("/switch1/node1"));
@@ -187,7 +213,7 @@ public class TestNetworkTopologyImpl {
 
   @ParameterizedTest
   @MethodSource("topologies")
-  public void testGetNode(NodeSchema[] schemas, Node[] nodeArray) {
+  void testGetNode(NodeSchema[] schemas, Node[] nodeArray) {
     initNetworkTopology(schemas, nodeArray);
     assertEquals(cluster.getNode(""), cluster.getNode(null));
     assertEquals(cluster.getNode(""), cluster.getNode("/"));
@@ -203,12 +229,12 @@ public class TestNetworkTopologyImpl {
   }
 
   @Test
-  public void testCreateInvalidTopology() {
+  void testCreateInvalidTopology() {
     NodeSchema[] schemas =
         new NodeSchema[]{ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
     NodeSchemaManager.getInstance().init(schemas, true);
     NetworkTopology newCluster = new NetworkTopologyImpl(
-        NodeSchemaManager.getInstance());
+        NodeSchemaManager.getInstance(), mockedShuffleOperation);
     Node[] invalidDataNodes = new Node[] {
         createDatanode("1.1.1.1", "/r1"),
         createDatanode("2.2.2.2", "/r2"),
@@ -216,34 +242,29 @@ public class TestNetworkTopologyImpl {
     };
     newCluster.add(invalidDataNodes[0]);
     newCluster.add(invalidDataNodes[1]);
-    try {
-      newCluster.add(invalidDataNodes[2]);
-      fail("expected InvalidTopologyException");
-    } catch (NetworkTopology.InvalidTopologyException e) {
-      assertTrue(e.getMessage().contains("Failed to add"));
-      assertTrue(e.getMessage().contains("Its path depth is not " +
-          newCluster.getMaxLevel()));
-    }
+    Exception e = assertThrows(NetworkTopology.InvalidTopologyException.class,
+        () -> newCluster.add(invalidDataNodes[2]));
+    assertThat(e)
+        .hasMessageContaining("Failed to add")
+        .hasMessageContaining("Its path depth is not " + newCluster.getMaxLevel());
   }
 
   @Test
-  public void testInitWithConfigFile() {
+  void testInitWithConfigFile() {
     ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
     OzoneConfiguration conf = new OzoneConfiguration();
-    try {
-      String filePath = classLoader.getResource(
-          "./networkTopologyTestFiles/good.xml").getPath();
-      conf.set(ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE, filePath);
-      NetworkTopology newCluster = new NetworkTopologyImpl(conf);
-      LOG.info("network topology max level = {}", newCluster.getMaxLevel());
-    } catch (Throwable e) {
-      fail("should succeed");
-    }
+    String filePath = classLoader
+        .getResource("./networkTopologyTestFiles/good.xml")
+        .getPath();
+    conf.set(ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE, filePath);
+    NetworkTopology newCluster = new NetworkTopologyImpl(conf);
+    LOG.info("network topology max level = {}", newCluster.getMaxLevel());
+    assertEquals(4, newCluster.getMaxLevel());
   }
 
   @ParameterizedTest
   @MethodSource("topologies")
-  public void testAncestor(NodeSchema[] schemas, Node[] nodeArray) {
+  void testAncestor(NodeSchema[] schemas, Node[] nodeArray) {
     initNetworkTopology(schemas, nodeArray);
     assumeTrue(cluster.getMaxLevel() > 2);
     int maxLevel = cluster.getMaxLevel();
@@ -272,7 +293,7 @@ public class TestNetworkTopologyImpl {
 
   @ParameterizedTest
   @MethodSource("topologies")
-  public void testAddRemove(NodeSchema[] schemas, Node[] nodeArray) {
+  void testAddRemove(NodeSchema[] schemas, Node[] nodeArray) {
     initNetworkTopology(schemas, nodeArray);
     for (int i = 0; i < dataNodes.length; i++) {
       cluster.remove(dataNodes[i]);
@@ -288,95 +309,60 @@ public class TestNetworkTopologyImpl {
       cluster.add(dataNodes[i]);
     }
     // Inner nodes are created automatically
-    assertTrue(cluster.getNumOfNodes(2) > 0);
+    assertThat(cluster.getNumOfNodes(2)).isPositive();
 
-    try {
-      cluster.add(cluster.chooseRandom(null).getParent());
-      fail("Inner node can not be added manually");
-    } catch (Exception e) {
-      assertTrue(e.getMessage().startsWith(
-          "Not allowed to add an inner node"));
-    }
+    Exception e = assertThrows(IllegalArgumentException.class,
+        () -> cluster.add(cluster.chooseRandom(null).getParent()));
+    assertThat(e).hasMessageStartingWith("Not allowed to add an inner node");
 
-    try {
-      cluster.remove(cluster.chooseRandom(null).getParent());
-      fail("Inner node can not be removed manually");
-    } catch (Exception e) {
-      assertTrue(e.getMessage().startsWith(
-          "Not allowed to remove an inner node"));
-    }
+    Exception e2 = assertThrows(IllegalArgumentException.class,
+        () -> cluster.remove(cluster.chooseRandom(null).getParent()));
+    assertThat(e2).hasMessageStartingWith("Not allowed to remove an inner node");
   }
 
   @ParameterizedTest
   @MethodSource("topologies")
-  public void testGetNumOfNodesWithLevel(NodeSchema[] schemas,
-      Node[] nodeArray) {
+  void testGetNumOfNodesWithLevel(NodeSchema[] schemas, Node[] nodeArray) {
     initNetworkTopology(schemas, nodeArray);
     int maxLevel = cluster.getMaxLevel();
-    try {
-      assertEquals(1, cluster.getNumOfNodes(0));
-      fail("level 0 is not supported");
-    } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().startsWith("Invalid level"));
-    }
 
-    try {
-      assertEquals(1, cluster.getNumOfNodes(0));
-      fail("level 0 is not supported");
-    } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().startsWith("Invalid level"));
-    }
+    Exception e = assertThrows(IllegalArgumentException.class,
+        () -> cluster.getNumOfNodes(0));
+    assertThat(e).hasMessageStartingWith("Invalid level");
 
-    try {
-      assertEquals(1, cluster.getNumOfNodes(maxLevel + 1));
-      fail("level out of scope");
-    } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().startsWith("Invalid level"));
-    }
+    Exception e2 = assertThrows(IllegalArgumentException.class,
+        () -> cluster.getNumOfNodes(maxLevel + 1));
+    assertThat(e2).hasMessageStartingWith("Invalid level");
 
-    try {
-      assertEquals(1, cluster.getNumOfNodes(maxLevel + 1));
-      fail("level out of scope");
-    } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().startsWith("Invalid level"));
-    }
     // root node
-    assertEquals(1, cluster.getNumOfNodes(1));
     assertEquals(1, cluster.getNumOfNodes(1));
     // leaf nodes
     assertEquals(dataNodes.length, cluster.getNumOfNodes(maxLevel));
-    assertEquals(dataNodes.length, cluster.getNumOfNodes(maxLevel));
   }
 
   @ParameterizedTest
   @MethodSource("topologies")
-  public void testGetNodesWithLevel(NodeSchema[] schemas, Node[] nodeArray) {
+  void testGetNodesWithLevel(NodeSchema[] schemas, Node[] nodeArray) {
     initNetworkTopology(schemas, nodeArray);
     int maxLevel = cluster.getMaxLevel();
-    try {
-      assertNotNull(cluster.getNodes(0));
-      fail("level 0 is not supported");
-    } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().startsWith("Invalid level"));
-    }
 
-    try {
-      assertNotNull(cluster.getNodes(maxLevel + 1));
-      fail("level out of scope");
-    } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().startsWith("Invalid level"));
-    }
+    Exception e = assertThrows(IllegalArgumentException.class,
+        () -> cluster.getNodes(0));
+    assertThat(e).hasMessageStartingWith("Invalid level");
+
+    Exception e2 = assertThrows(IllegalArgumentException.class,
+        () -> cluster.getNodes(maxLevel + 1));
+    assertThat(e2).hasMessageStartingWith("Invalid level");
 
     // root node
     assertEquals(1, cluster.getNodes(1).size());
     // leaf nodes
     assertEquals(dataNodes.length, cluster.getNodes(maxLevel).size());
-    assertEquals(dataNodes.length, cluster.getNodes(maxLevel).size());
   }
 
   @ParameterizedTest
   @MethodSource("topologies")
-  public void testChooseRandomSimple(NodeSchema[] schemas, Node[] nodeArray) {
+  void testChooseRandomSimple(NodeSchema[] schemas, Node[] nodeArray) {
     initNetworkTopology(schemas, nodeArray);
     String path =
         dataNodes[random.nextInt(dataNodes.length)].getNetworkFullPath();
@@ -384,11 +370,11 @@ public class TestNetworkTopologyImpl {
     path = path.substring(0, path.lastIndexOf(PATH_SEPARATOR_STR));
     // test chooseRandom(String scope)
     while (!path.equals(ROOT)) {
-      assertTrue(cluster.chooseRandom(path).getNetworkLocation()
-          .startsWith(path));
+      assertThat(cluster.chooseRandom(path).getNetworkLocation())
+          .startsWith(path);
       Node node = cluster.chooseRandom("~" + path);
-      assertFalse(node.getNetworkLocation()
-          .startsWith(path));
+      assertThat(node.getNetworkLocation())
+          .doesNotStartWith(path);
       path = path.substring(0,
           path.lastIndexOf(PATH_SEPARATOR_STR));
     }
@@ -419,7 +405,7 @@ public class TestNetworkTopologyImpl {
    */
   @ParameterizedTest
   @MethodSource("topologies")
-  public void testChooseRandomExcludedScope(NodeSchema[] schemas,
+  void testChooseRandomExcludedScope(NodeSchema[] schemas,
       Node[] nodeArray) {
     initNetworkTopology(schemas, nodeArray);
     int[] excludedNodeIndexs = {0, dataNodes.length - 1,
@@ -443,7 +429,7 @@ public class TestNetworkTopologyImpl {
     // null excludedScope, every node should be chosen
     frequency = pickNodes(100, null, null, null, 0);
     for (Node key : dataNodes) {
-      assertTrue(frequency.get(key) != 0);
+      assertNotEquals(0, frequency.get(key));
     }
 
     // "" excludedScope,  no node will ever be chosen
@@ -466,7 +452,7 @@ public class TestNetworkTopologyImpl {
     frequency = pickNodes(
         cluster.getNumOfLeafNode(null), pathList, null, null, 0);
     for (Node key : dataNodes) {
-      assertTrue(frequency.get(key) != 0);
+      assertNotEquals(0, frequency.get(key));
     }
   }
 
@@ -475,7 +461,7 @@ public class TestNetworkTopologyImpl {
    */
   @ParameterizedTest
   @MethodSource("topologies")
-  public void testChooseRandomExcludedNode(NodeSchema[] schemas,
+  void testChooseRandomExcludedNode(NodeSchema[] schemas,
       Node[] nodeArray) {
     initNetworkTopology(schemas, nodeArray);
     Node[][] excludedNodeLists = {
@@ -527,7 +513,7 @@ public class TestNetworkTopologyImpl {
     while (ancestorGen < cluster.getMaxLevel()) {
       frequency = pickNodes(leafNum, null, excludedList, null, ancestorGen);
       for (Node key : dataNodes) {
-        assertTrue(frequency.get(key) != 0);
+        assertNotEquals(0, frequency.get(key));
       }
       ancestorGen++;
     }
@@ -538,7 +524,7 @@ public class TestNetworkTopologyImpl {
    */
   @ParameterizedTest
   @MethodSource("topologies")
-  public void testChooseRandomExcludedNodeAndScope(NodeSchema[] schemas,
+  void testChooseRandomExcludedNodeAndScope(NodeSchema[] schemas,
       Node[] nodeArray) {
     initNetworkTopology(schemas, nodeArray);
     int[] excludedNodeIndexs = {0, dataNodes.length - 1,
@@ -609,7 +595,7 @@ public class TestNetworkTopologyImpl {
     while (ancestorGen < cluster.getMaxLevel()) {
       frequency = pickNodes(leafNum, null, null, null, ancestorGen);
       for (Node key : dataNodes) {
-        assertTrue(frequency.get(key) != 0);
+        assertNotEquals(0, frequency.get(key));
       }
       ancestorGen++;
     }
@@ -621,7 +607,7 @@ public class TestNetworkTopologyImpl {
    */
   @ParameterizedTest
   @MethodSource("topologies")
-  public void testChooseRandomWithAffinityNode(NodeSchema[] schemas,
+  void testChooseRandomWithAffinityNode(NodeSchema[] schemas,
       Node[] nodeArray) {
     initNetworkTopology(schemas, nodeArray);
     int[] excludedNodeIndexs = {0, dataNodes.length - 1,
@@ -741,20 +727,17 @@ public class TestNetworkTopologyImpl {
         ancestorGen--;
       }
     }
+
     // check invalid ancestor generation
-    try {
-      cluster.chooseRandom(null, null, null, dataNodes[0],
-          cluster.getMaxLevel());
-      fail("ancestor generation exceeds max level, should fail");
-    } catch (Exception e) {
-      assertTrue(e.getMessage().startsWith("ancestorGen " +
-          cluster.getMaxLevel() +
-          " exceeds this network topology acceptable level"));
-    }
+    Exception e = assertThrows(IllegalArgumentException.class,
+        () -> cluster.chooseRandom(null, null, null, dataNodes[0],
+            cluster.getMaxLevel()));
+    assertThat(e.getMessage()).startsWith("ancestorGen " + cluster.getMaxLevel() +
+        " exceeds this network topology acceptable level");
   }
 
   @Test
-  public void testCost() {
+  void testCost() {
     // network topology with default cost
     List<NodeSchema> schemas = new ArrayList<>();
     schemas.add(ROOT_SCHEMA);
@@ -765,7 +748,7 @@ public class TestNetworkTopologyImpl {
     NodeSchemaManager manager = NodeSchemaManager.getInstance();
     manager.init(schemas.toArray(new NodeSchema[0]), true);
     NetworkTopology newCluster =
-        new NetworkTopologyImpl(manager);
+        new NetworkTopologyImpl(manager, mockedShuffleOperation);
     Node[] nodeList = new Node[] {
         createDatanode("1.1.1.1", "/r1/ng1"),
         createDatanode("2.2.2.2", "/r1/ng1"),
@@ -806,7 +789,7 @@ public class TestNetworkTopologyImpl {
         .setType(NodeSchema.LayerType.LEAF_NODE).build());
     manager = NodeSchemaManager.getInstance();
     manager.init(schemas.toArray(new NodeSchema[0]), true);
-    newCluster = new NetworkTopologyImpl(manager);
+    newCluster = new NetworkTopologyImpl(manager, mockedShuffleOperation);
     for (Node node: nodeList) {
       newCluster.add(node);
     }
@@ -830,7 +813,7 @@ public class TestNetworkTopologyImpl {
 
   @ParameterizedTest
   @MethodSource("topologies")
-  public void testSortByDistanceCost(NodeSchema[] schemas, Node[] nodeArray) {
+  void testSortByDistanceCost(NodeSchema[] schemas, Node[] nodeArray) {
     initNetworkTopology(schemas, nodeArray);
     Node[][] nodes = {
         {},
@@ -866,6 +849,7 @@ public class TestNetworkTopologyImpl {
         while (length > 0) {
           List<? extends Node> ret = cluster.sortByDistanceCost(reader,
               Arrays.asList(nodeList), length);
+          assertEquals(length, ret.size());
           for (int i = 0; i < ret.size(); i++) {
             if ((i + 1) < ret.size()) {
               int cost1 = cluster.getDistanceCost(reader, ret.get(i));
@@ -890,6 +874,7 @@ public class TestNetworkTopologyImpl {
       while (length >= 0) {
         List<? extends Node> sortedNodeList =
             cluster.sortByDistanceCost(reader, nodeList, length);
+        assertEquals(length, sortedNodeList.size());
         for (int i = 0; i < sortedNodeList.size(); i++) {
           if ((i + 1) < sortedNodeList.size()) {
             int cost1 = cluster.getDistanceCost(reader, sortedNodeList.get(i));
@@ -909,8 +894,35 @@ public class TestNetworkTopologyImpl {
     }
   }
 
+  @ParameterizedTest
+  @MethodSource("topologies")
+  void testSortByDistanceCostNullReader(NodeSchema[] schemas,
+      Node[] nodeArray) {
+    // GIVEN
+    // various cluster topologies with null reader
+    initNetworkTopology(schemas, nodeArray);
+    List<Node> nodeList = Arrays.asList(dataNodes.clone());
+    final Node reader = null;
+    NetworkTopology spyCluster = spy(cluster);
+    int length = nodeList.size();
+    while (length > 0) {
+      // WHEN
+      List<? extends Node> ret = spyCluster.sortByDistanceCost(reader,
+          nodeList, length);
+      // THEN
+      // no actual distance cost calculated
+      // only shuffle input node list with given length limit
+      verify(mockedShuffleOperation).accept(any());
+      verify(spyCluster, never()).getDistanceCost(any(), any());
+      assertEquals(length, ret.size());
+      assertThat(nodeList).containsAll(ret);
+      reset(mockedShuffleOperation);
+      length--;
+    }
+  }
+
   @Test
-  public void testSingleNodeRackWithAffinityNode() {
+  void testSingleNodeRackWithAffinityNode() {
     // network topology with default cost
     List<NodeSchema> schemas = new ArrayList<>();
     schemas.add(ROOT_SCHEMA);
@@ -920,7 +932,7 @@ public class TestNetworkTopologyImpl {
     NodeSchemaManager manager = NodeSchemaManager.getInstance();
     manager.init(schemas.toArray(new NodeSchema[0]), true);
     NetworkTopology newCluster =
-        new NetworkTopologyImpl(manager);
+        new NetworkTopologyImpl(manager, mockedShuffleOperation);
     Node node = createDatanode("1.1.1.1", "/r1");
     newCluster.add(node);
     Node chosenNode =
@@ -935,7 +947,7 @@ public class TestNetworkTopologyImpl {
   }
 
   @Test
-  public void testUpdateNode() {
+  void testUpdateNode() {
     List<NodeSchema> schemas = new ArrayList<>();
     schemas.add(ROOT_SCHEMA);
     schemas.add(DATACENTER_SCHEMA);
@@ -945,7 +957,7 @@ public class TestNetworkTopologyImpl {
     NodeSchemaManager manager = NodeSchemaManager.getInstance();
     manager.init(schemas.toArray(new NodeSchema[0]), true);
     NetworkTopology newCluster =
-            new NetworkTopologyImpl(manager);
+            new NetworkTopologyImpl(manager, mockedShuffleOperation);
     Node node = createDatanode("1.1.1.1", "/d1/r1");
     newCluster.add(node);
     assertTrue(newCluster.contains(node));
@@ -973,7 +985,9 @@ public class TestNetworkTopologyImpl {
     newCluster.update(null, newNode3);
     assertTrue(newCluster.contains(newNode3));
   }
-  public void testIsAncestor() {
+
+  @Test
+  void testIsAncestor() {
     NodeImpl r1 = new NodeImpl("r1", "/", NODE_COST_DEFAULT);
     NodeImpl r12 = new NodeImpl("r12", "/", NODE_COST_DEFAULT);
     NodeImpl dc = new NodeImpl("dc", "/r12", NODE_COST_DEFAULT);
@@ -989,7 +1003,7 @@ public class TestNetworkTopologyImpl {
   }
 
   @Test
-  public void testGetLeafOnLeafParent() {
+  void testGetLeafOnLeafParent() {
     InnerNodeImpl root = new InnerNodeImpl("", "", null, 0, 0);
     InnerNodeImpl r12 = new InnerNodeImpl("r12", "/", root, 1, 0);
     InnerNodeImpl dc = new InnerNodeImpl("dc", "/r12", r12, 2, 0);

@@ -17,14 +17,17 @@
  */
 package org.apache.hadoop.ozone.om.helpers;
 
+import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.CopyObject;
+import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DirectoryInfo;
 
 import java.util.BitSet;
 import java.util.HashMap;
 import java.util.LinkedList;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -34,14 +37,24 @@ import java.util.Objects;
  * in the user given path and a pointer to its parent directory element in the
  * path. Also, it stores directory node related metdata details.
  */
-public class OmDirectoryInfo extends WithParentObjectId implements Cloneable {
-  private String name; // directory name
+public class OmDirectoryInfo extends WithParentObjectId
+    implements CopyObject<OmDirectoryInfo> {
+  private static final Codec<OmDirectoryInfo> CODEC = new DelegatedCodec<>(
+      Proto2Codec.get(DirectoryInfo.getDefaultInstance()),
+      OmDirectoryInfo::getFromProtobuf,
+      OmDirectoryInfo::getProtobuf);
+
+  public static Codec<OmDirectoryInfo> getCodec() {
+    return CODEC;
+  }
+
+  private final String name; // directory name
   private String owner;
 
-  private long creationTime;
-  private long modificationTime;
+  private final long creationTime;
+  private final long modificationTime;
 
-  private List<OzoneAcl> acls;
+  private final List<OzoneAcl> acls;
 
   public OmDirectoryInfo(Builder builder) {
     this.name = builder.name;
@@ -79,8 +92,8 @@ public class OmDirectoryInfo extends WithParentObjectId implements Cloneable {
     private long creationTime;
     private long modificationTime;
 
-    private List<OzoneAcl> acls;
-    private Map<String, String> metadata;
+    private final List<OzoneAcl> acls;
+    private final Map<String, String> metadata;
 
     public Builder() {
       //Default values
@@ -190,9 +203,9 @@ public class OmDirectoryInfo extends WithParentObjectId implements Cloneable {
   /**
    * Creates DirectoryInfo protobuf from OmDirectoryInfo.
    */
-  public OzoneManagerProtocolProtos.DirectoryInfo getProtobuf() {
-    OzoneManagerProtocolProtos.DirectoryInfo.Builder pib =
-            OzoneManagerProtocolProtos.DirectoryInfo.newBuilder().setName(name)
+  public DirectoryInfo getProtobuf() {
+    final DirectoryInfo.Builder pib =
+            DirectoryInfo.newBuilder().setName(name)
                     .setCreationTime(creationTime)
                     .setModificationTime(modificationTime)
                     .addAllMetadata(KeyValueUtil.toProtobuf(metadata))
@@ -213,8 +226,7 @@ public class OmDirectoryInfo extends WithParentObjectId implements Cloneable {
    * @param dirInfo
    * @return instance of OmDirectoryInfo
    */
-  public static OmDirectoryInfo getFromProtobuf(
-          OzoneManagerProtocolProtos.DirectoryInfo dirInfo) {
+  public static OmDirectoryInfo getFromProtobuf(DirectoryInfo dirInfo) {
     OmDirectoryInfo.Builder opib = OmDirectoryInfo.newBuilder()
             .setName(dirInfo.getName())
             .setCreationTime(dirInfo.getCreationTime())
@@ -267,6 +279,7 @@ public class OmDirectoryInfo extends WithParentObjectId implements Cloneable {
   /**
    * Return a new copy of the object.
    */
+  @Override
   public OmDirectoryInfo copyObject() {
     OmDirectoryInfo.Builder builder = new Builder()
             .setName(name)
@@ -282,31 +295,9 @@ public class OmDirectoryInfo extends WithParentObjectId implements Cloneable {
             acl.getAclScope())));
 
     if (metadata != null) {
-      metadata.forEach((k, v) -> builder.addMetadata(k, v));
+      builder.addAllMetadata(metadata);
     }
 
     return builder.build();
-  }
-
-  /**
-   * Return a new copy of the object.
-   */
-  @Override
-  public Object clone() throws CloneNotSupportedException {
-    OmDirectoryInfo omDirectoryInfo = (OmDirectoryInfo) super.clone();
-
-    omDirectoryInfo.metadata = new HashMap<>();
-    omDirectoryInfo.acls = new ArrayList<>();
-
-    acls.stream().filter(acl -> acl != null).forEach(acl ->
-            omDirectoryInfo.acls.add(new OzoneAcl(acl.getType(),
-                    acl.getName(), (BitSet) acl.getAclBitSet().clone(),
-                    acl.getAclScope())));
-
-    if (metadata != null) {
-      metadata.forEach((k, v) -> omDirectoryInfo.metadata.put(k, v));
-    }
-
-    return omDirectoryInfo;
   }
 }

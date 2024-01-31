@@ -17,8 +17,9 @@
  */
 package org.apache.hadoop.ozone.insight;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Testing utility methods of the log subcommand test.
@@ -36,6 +37,6 @@ public class TestLogSubcommand {
             + "storageLocation: \"/tmp/hadoop-neo/dfs/data\"\\n  capacity: "
             + "250438021120\\n  scmUsed: 16384\\n  remaining: 212041244672\\n  "
             + "storageType: DISK\\n  failed: false\\n}\\n</json>");
-    Assert.assertEquals(10, result.split("\n").length);
+    assertEquals(10, result.split("\n").length);
   }
 }

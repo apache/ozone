@@ -25,7 +25,6 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
-import org.apache.hadoop.hdds.utils.db.IntegerCodec;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
@@ -95,8 +94,7 @@ public class TestRocksDbPersistentList {
   public void testRocksDBPersistentList() throws IOException, RocksDBException {
     ColumnFamilyHandle columnFamily = null;
     try {
-      CodecRegistry codecRegistry = new CodecRegistry();
-      codecRegistry.addCodec(Integer.class, new IntegerCodec());
+      final CodecRegistry codecRegistry = CodecRegistry.newBuilder().build();
 
       columnFamily = db.get().createColumnFamily(new ColumnFamilyDescriptor(
           codecRegistry.asRawData("testSet"), columnFamilyOptions));

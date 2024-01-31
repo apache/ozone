@@ -40,13 +40,15 @@ public class ContainerReplicaHistory {
   private Long lastSeenTime;
 
   private long bcsId;
+  private String state;
 
   public ContainerReplicaHistory(UUID id, Long firstSeenTime,
-      Long lastSeenTime, long bcsId) {
+      Long lastSeenTime, long bcsId, String state) {
     this.uuid = id;
     this.firstSeenTime = firstSeenTime;
     this.lastSeenTime = lastSeenTime;
     this.bcsId = bcsId;
+    this.state = state;
   }
 
   public long getBcsId() {
@@ -73,15 +75,24 @@ public class ContainerReplicaHistory {
     this.lastSeenTime = lastSeenTime;
   }
 
+  public String getState() {
+    return state;
+  }
+
+  public void setState(String state) {
+    this.state = state;
+  }
+
   public static ContainerReplicaHistory fromProto(
       ContainerReplicaHistoryProto proto) {
     return new ContainerReplicaHistory(UUID.fromString(proto.getUuid()),
-        proto.getFirstSeenTime(), proto.getLastSeenTime(), proto.getBcsId());
+        proto.getFirstSeenTime(), proto.getLastSeenTime(), proto.getBcsId(),
+        proto.getState());
   }
 
   public ContainerReplicaHistoryProto toProto() {
     return ContainerReplicaHistoryProto.newBuilder().setUuid(uuid.toString())
         .setFirstSeenTime(firstSeenTime).setLastSeenTime(lastSeenTime)
-        .setBcsId(bcsId).build();
+        .setBcsId(bcsId).setState(state).build();
   }
 }

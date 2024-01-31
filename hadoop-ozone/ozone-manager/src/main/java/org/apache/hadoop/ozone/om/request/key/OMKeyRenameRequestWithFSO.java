@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -34,7 +35,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -53,10 +53,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Map;
 
 import static org.apache.hadoop.ozone.OmUtils.normalizeKey;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.RENAME_OPEN_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
@@ -74,8 +76,8 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long trxnLogIndex = termIndex.getIndex();
 
     RenameKeyRequest renameKeyRequest = getOmRequest().getRenameKeyRequest();
     KeyArgs keyArgs = renameKeyRequest.getKeyArgs();
@@ -97,7 +99,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean acquiredLock = false;
     OMClientResponse omClientResponse = null;
-    IOException exception = null;
+    Exception exception = null;
     OmKeyInfo fromKeyValue;
     Result result;
     try {
@@ -106,41 +108,28 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
                 OMException.ResultCodes.INVALID_KEY_NAME);
       }
 
-      keyArgs = resolveBucketLink(ozoneManager, keyArgs, auditMap);
-      volumeName = keyArgs.getVolumeName();
-      bucketName = keyArgs.getBucketName();
-
-      // check Acls to see if user has access to perform delete operation on
-      // old key and create operation on new key
-
-      // check Acl fromKeyName
-      checkACLsWithFSO(ozoneManager, volumeName, bucketName, fromKeyName,
-          IAccessAuthorizer.ACLType.DELETE);
-
-      // check Acl toKeyName
-      if (toKeyName.isEmpty()) {
-        // if the toKeyName is empty we are checking the ACLs of the bucket
-        checkBucketAcls(ozoneManager, volumeName, bucketName, toKeyName,
-            IAccessAuthorizer.ACLType.CREATE);
-      } else {
-        checkKeyAcls(ozoneManager, volumeName, bucketName, toKeyName,
-            IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
-      }
-
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-              volumeName, bucketName);
+      mergeOmLockDetails(omMetadataManager.getLock()
+          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      acquiredLock = getOmLockDetails().isLockAcquired();
 
       // Validate bucket and volume exists or not.
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
       // Check if fromKey exists
-      OzoneFileStatus fromKeyFileStatus =
-              OMFileRequest.getOMKeyInfoIfExists(omMetadataManager, volumeName,
-                      bucketName, fromKeyName, 0);
+      OzoneFileStatus fromKeyFileStatus = OMFileRequest.getOMKeyInfoIfExists(
+          omMetadataManager, volumeName, bucketName, fromKeyName, 0,
+          ozoneManager.getDefaultReplicationConfig());
+
       // case-1) fromKeyName should exist, otw throws exception
       if (fromKeyFileStatus == null) {
         // TODO: Add support for renaming open key
         throw new OMException("Key not found " + fromKeyName, KEY_NOT_FOUND);
+      }
+
+      if (fromKeyFileStatus.getKeyInfo().isHsync()) {
+        throw new OMException("Open file cannot be renamed since it is " +
+            "hsync'ed: volumeName=" + volumeName + ", bucketName=" +
+            bucketName + ", key=" + fromKeyName, RENAME_OPEN_FILE);
       }
 
       // source existed
@@ -151,9 +140,9 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       OMFileRequest.verifyToDirIsASubDirOfFromDirectory(fromKeyName,
               toKeyName, fromKeyFileStatus.isDirectory());
 
-      OzoneFileStatus toKeyFileStatus =
-              OMFileRequest.getOMKeyInfoIfExists(omMetadataManager,
-                      volumeName, bucketName, toKeyName, 0);
+      OzoneFileStatus toKeyFileStatus = OMFileRequest.getOMKeyInfoIfExists(
+          omMetadataManager, volumeName, bucketName, toKeyName, 0,
+          ozoneManager.getDefaultReplicationConfig());
 
       // Check if toKey exists.
       if (toKeyFileStatus != null) {
@@ -178,8 +167,9 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
           String newToKeyName = OzoneFSUtils.appendFileNameToKeyPath(toKeyName,
                   fromFileName);
           OzoneFileStatus newToOzoneFileStatus =
-                  OMFileRequest.getOMKeyInfoIfExists(omMetadataManager,
-                          volumeName, bucketName, newToKeyName, 0);
+              OMFileRequest.getOMKeyInfoIfExists(omMetadataManager,
+                  volumeName, bucketName, newToKeyName, 0,
+                  ozoneManager.getDefaultReplicationConfig());
 
           if (newToOzoneFileStatus != null) {
             // case-5) If new destin '/dst/source' exists then throws exception
@@ -205,7 +195,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
         // doesn't exist then throw exception, otw the source can be renamed to
         // destination path.
         OmKeyInfo toKeyParent = OMFileRequest.getKeyParentDir(volumeName,
-                bucketName, toKeyName, omMetadataManager);
+                bucketName, toKeyName, ozoneManager, omMetadataManager);
 
         omClientResponse = renameKey(toKeyParent, toKeyName, fromKeyValue,
             fromKeyName, isRenameDirectory, keyArgs.getModificationTime(),
@@ -213,17 +203,18 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
 
         result = Result.SUCCESS;
       }
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
       omClientResponse = new OMKeyRenameResponseWithFSO(createErrorOMResponse(
               omResponse, exception), getBucketLayout());
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-              omDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-                bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 
@@ -239,14 +230,42 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     case FAILURE:
       ozoneManager.getMetrics().incNumKeyRenameFails();
       LOG.error("Rename key failed for volume:{} bucket:{} fromKey:{} " +
-                      "toKey:{}. Key: {} not found.", volumeName, bucketName,
-              fromKeyName, toKeyName, fromKeyName);
+                      "toKey:{}. Exception: {}.", volumeName, bucketName,
+              fromKeyName, toKeyName, exception.getMessage());
       break;
     default:
       LOG.error("Unrecognized Result for OMKeyRenameRequest: {}",
               renameKeyRequest);
     }
     return omClientResponse;
+  }
+
+  @Override
+  protected KeyArgs resolveBucketAndCheckAcls(KeyArgs keyArgs,
+      OzoneManager ozoneManager, String fromKeyName, String toKeyName)
+      throws IOException {
+    KeyArgs resolvedArgs = resolveBucketLink(ozoneManager, keyArgs);
+    // check Acl
+    String volumeName = resolvedArgs.getVolumeName();
+    String bucketName = resolvedArgs.getBucketName();
+    // check Acls to see if user has access to perform delete operation on
+    // old key and create operation on new key
+
+    // check Acl fromKeyName
+    checkACLsWithFSO(ozoneManager, volumeName, bucketName, fromKeyName,
+        IAccessAuthorizer.ACLType.DELETE);
+
+    // check Acl toKeyName
+    if (toKeyName.isEmpty()) {
+      // if the toKeyName is empty we are checking the ACLs of the bucket
+      checkBucketAcls(ozoneManager, volumeName, bucketName, toKeyName,
+          IAccessAuthorizer.ACLType.CREATE);
+    } else {
+      checkKeyAcls(ozoneManager, volumeName, bucketName, toKeyName,
+          IAccessAuthorizer.ACLType.CREATE, OzoneObj.ResourceType.KEY);
+    }
+
+    return resolvedArgs;
   }
 
   @SuppressWarnings("parameternumber")
@@ -289,7 +308,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     setModificationTime(ommm, omBucketInfo, toKeyParent, volumeId, bucketId,
         modificationTime, dirTable, trxnLogIndex);
     fromKeyParent = OMFileRequest.getKeyParentDir(fromKeyValue.getVolumeName(),
-        fromKeyValue.getBucketName(), fromKeyName, metadataMgr);
+        fromKeyValue.getBucketName(), fromKeyName, ozoneManager, metadataMgr);
     if (fromKeyParent == null && omBucketInfo == null) {
       // Get omBucketInfo only when needed to reduce unnecessary DB IO
       omBucketInfo = metadataMgr.getBucketTable().get(bucketKey);
@@ -329,6 +348,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
         omBucketInfo, isRenameDirectory, getBucketLayout());
     return omClientResponse;
   }
+
   @SuppressWarnings("checkstyle:ParameterNumber")
   private void setModificationTime(OMMetadataManager omMetadataManager,
       OmBucketInfo bucketInfo, OmKeyInfo keyParent,

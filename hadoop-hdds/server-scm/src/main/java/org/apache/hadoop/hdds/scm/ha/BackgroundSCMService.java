@@ -45,17 +45,14 @@ public final class BackgroundSCMService implements SCMService {
   private final Runnable periodicalTask;
   private volatile boolean runImmediately = false;
 
-  private BackgroundSCMService(
-      final Clock clock, final SCMContext scmContext,
-      final String serviceName, final long intervalInMillis,
-      final long waitTimeInMillis, final Runnable task) {
-    this.scmContext = scmContext;
-    this.clock = clock;
-    this.periodicalTask = task;
-    this.serviceName = serviceName;
-    this.log = LoggerFactory.getLogger(serviceName);
-    this.intervalInMillis = intervalInMillis;
-    this.waitTimeInMillis = waitTimeInMillis;
+  private BackgroundSCMService(Builder b) {
+    scmContext = b.scmContext;
+    clock = b.clock;
+    periodicalTask = b.periodicalTask;
+    serviceName = b.serviceName;
+    log = LoggerFactory.getLogger(serviceName);
+    intervalInMillis = b.intervalInMillis;
+    waitTimeInMillis = b.waitTimeInMillis;
     start();
   }
 
@@ -68,7 +65,7 @@ public final class BackgroundSCMService implements SCMService {
     log.info("Starting {} Service.", getServiceName());
 
     backgroundThread = new Thread(this::run);
-    backgroundThread.setName(serviceName + "Thread");
+    backgroundThread.setName(scmContext.threadNamePrefix() + serviceName);
     backgroundThread.setDaemon(true);
     backgroundThread.start();
   }
@@ -206,8 +203,7 @@ public final class BackgroundSCMService implements SCMService {
       Preconditions.assertNotNull(clock, "clock is null");
       Preconditions.assertNotNull(serviceName, "serviceName is null");
 
-      return new BackgroundSCMService(clock, scmContext, serviceName,
-          intervalInMillis, waitTimeInMillis, periodicalTask);
+      return new BackgroundSCMService(this);
     }
   }
 }

@@ -41,35 +41,11 @@ execute_robot_test s3g -v SCHEME:o3fs -v BUCKET_TYPE:link -N ozonefs-o3fs-link o
 
 execute_robot_test s3g basic/links.robot
 
-exclude=""
+## Exclude virtual-host tests. This is tested separately as it requires additional config.
+exclude="--exclude virtual-host"
 for bucket in encrypted link; do
   execute_robot_test s3g -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
   # some tests are independent of the bucket type, only need to be run once
-  exclude="--exclude no-bucket-type"
+  ## Exclude virtual-host.robot
+  exclude="--exclude virtual-host --exclude no-bucket-type"
 done
-
-execute_robot_test s3g admincli
-
-execute_robot_test s3g omha/om-leader-transfer.robot
-execute_robot_test s3g scmha/scm-leader-transfer.robot
-
-execute_robot_test s3g httpfs
-
-export SCM=scm2.org
-execute_robot_test s3g admincli
-
-# bootstrap new SCM4
-docker-compose up -d scm4.org
-wait_for_port scm4.org 9894 120
-execute_robot_test scm4.org kinit.robot
-wait_for_execute_command scm4.org 120 "ozone admin scm roles | grep scm4.org"
-execute_robot_test scm4.org scmha/primordial-scm.robot
-
-# add new datanode4
-docker-compose up -d datanode4
-wait_for_port datanode4 9856 60
-wait_for_execute_command scm4.org 60 "ozone admin datanode list | grep datanode4"
-
-stop_docker_env
-
-generate_report

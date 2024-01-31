@@ -35,6 +35,13 @@ icon: cloud
 ```bash
 ozone s3 getsecret
 ```
+
+* 或者通过向 /secret S3 REST 端点发送请求。
+
+```bash
+curl -X PUT --negotiate -u : https://localhost:9879/secret
+```
+
 这条命令会与 Ozone 进行通信，对用户进行 Kerberos 认证并生成 AWS 凭据，结果会直接打印在屏幕上，你可以将其配置在 _.aws._ 文件中，这样可以在操作 Ozone S3 桶时自动进行认证。
 
 <div class="alert alert-danger" role="alert">

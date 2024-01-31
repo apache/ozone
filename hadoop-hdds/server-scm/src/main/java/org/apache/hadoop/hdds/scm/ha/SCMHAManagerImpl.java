@@ -18,14 +18,19 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Preconditions;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocolPB.SecretKeyProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBTransactionBufferImpl;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
+import org.apache.hadoop.hdds.scm.security.SecretKeyManagerService;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.utils.HAUtils;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -36,6 +41,7 @@ import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.hdds.ExitManager;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.FileUtils;
 import org.slf4j.Logger;
@@ -44,6 +50,12 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
+
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getSecretKeyClientForScm;
+
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT;
 
 /**
  * SCMHAManagerImpl uses Apache Ratis for HA implementation. We will have 2N+1
@@ -60,6 +72,7 @@ public class SCMHAManagerImpl implements SCMHAManager {
 
   private final SCMRatisServer ratisServer;
   private final ConfigurationSource conf;
+  private final SecurityConfig securityConfig;
   private final DBTransactionBuffer transactionBuffer;
   private final SCMSnapshotProvider scmSnapshotProvider;
   private final StorageContainerManager scm;
@@ -67,13 +80,16 @@ public class SCMHAManagerImpl implements SCMHAManager {
 
   // this should ideally be started only in a ratis leader
   private final InterSCMGrpcProtocolService grpcServer;
+  private BackgroundSCMService trxBufferMonitorService = null;
 
   /**
    * Creates SCMHAManager instance.
    */
   public SCMHAManagerImpl(final ConfigurationSource conf,
+      final SecurityConfig securityConfig,
       final StorageContainerManager scm) throws IOException {
     this.conf = conf;
+    this.securityConfig = securityConfig;
     this.scm = scm;
     this.exitManager = new ExitManager();
     if (SCMHAUtils.isSCMHAEnabled(conf)) {
@@ -125,6 +141,26 @@ public class SCMHAManagerImpl implements SCMHAManager {
           ratisServer.getDivision().getGroup().getPeers());
     }
     grpcServer.start();
+    createStartTransactionBufferMonitor();
+  }
+
+  private void createStartTransactionBufferMonitor() {
+    long interval = conf.getTimeDuration(
+        OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL,
+        OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    SCMHATransactionBufferMonitorTask monitorTask
+        = new SCMHATransactionBufferMonitorTask(
+        (SCMHADBTransactionBuffer) transactionBuffer, ratisServer, interval);
+    trxBufferMonitorService =
+        new BackgroundSCMService.Builder().setClock(scm.getSystemClock())
+            .setScmContext(scm.getScmContext())
+            .setServiceName("SCMHATransactionMonitor")
+            .setIntervalInMillis(interval)
+            .setWaitTimeInMillis(interval)
+            .setPeriodicalTask(monitorTask).build();
+    scm.getSCMServiceManager().register(trxBufferMonitorService);
+    trxBufferMonitorService.start();
   }
 
   public SCMRatisServer getRatisServer() {
@@ -161,6 +197,21 @@ public class SCMHAManagerImpl implements SCMHAManager {
     LOG.info("Downloaded checkpoint from Leader {} to the location {}",
         leaderId, dBCheckpoint.getCheckpointLocation());
     return dBCheckpoint;
+  }
+
+  @Override
+  public List<ManagedSecretKey> getSecretKeysFromLeader(String leaderID)
+      throws IOException {
+    if (!SecretKeyManagerService.isSecretKeyEnable(securityConfig)) {
+      return null;
+    }
+
+    LOG.info("Getting secret keys from leader {}.", leaderID);
+    try (SecretKeyProtocolClientSideTranslatorPB secretKeyProtocol =
+             getSecretKeyClientForScm(conf, leaderID,
+                 UserGroupInformation.getLoginUser())) {
+      return secretKeyProtocol.getAllSecretKeys();
+    }
   }
 
   @Override
@@ -342,6 +393,9 @@ public class SCMHAManagerImpl implements SCMHAManager {
       grpcServer.stop();
       close();
     }
+    if (trxBufferMonitorService != null) {
+      trxBufferMonitorService.stop();
+    }
   }
 
   /**
@@ -371,8 +425,6 @@ public class SCMHAManagerImpl implements SCMHAManager {
    */
   @Override
   public boolean removeSCM(RemoveSCMRequest request) throws IOException {
-    // Currently we don't support decommission of Primordial SCM
-    // The caller should make sure that the requested node is not Primordial SCM
 
     String clusterId = scm.getClusterId();
     if (!request.getClusterId().equals(scm.getClusterId())) {

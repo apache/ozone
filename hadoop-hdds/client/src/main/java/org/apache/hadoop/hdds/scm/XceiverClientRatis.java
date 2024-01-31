@@ -19,9 +19,7 @@
 package org.apache.hadoop.hdds.scm;
 
 import java.io.IOException;
-import java.security.cert.X509Certificate;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -33,7 +31,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.HddsUtils;
@@ -45,9 +42,10 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.security.x509.SecurityConfig;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -83,13 +81,13 @@ public final class XceiverClientRatis extends XceiverClientSpi {
 
   public static XceiverClientRatis newXceiverClientRatis(
       org.apache.hadoop.hdds.scm.pipeline.Pipeline pipeline,
-      ConfigurationSource ozoneConf, List<X509Certificate> caCerts) {
+      ConfigurationSource ozoneConf, ClientTrustManager trustManager) {
     final String rpcType = ozoneConf
         .get(ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY,
             ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT);
     final RetryPolicy retryPolicy = RatisHelper.createRetryPolicy(ozoneConf);
     final GrpcTlsConfig tlsConfig = RatisHelper.createTlsClientConfig(new
-        SecurityConfig(ozoneConf), caCerts);
+        SecurityConfig(ozoneConf), trustManager);
     return new XceiverClientRatis(pipeline,
         SupportedRpcType.valueOfIgnoreCase(rpcType),
         retryPolicy, tlsConfig, ozoneConf);
@@ -180,8 +178,10 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   @Override
   public void connect() throws Exception {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Connecting to pipeline:{} datanode:{}", getPipeline().getId(),
-          RatisHelper.toRaftPeerId(pipeline.getFirstNode()));
+      LOG.debug("Connecting to pipeline:{} leaderDatanode:{}, " +
+          "primaryDatanode:{}", getPipeline().getId(),
+          RatisHelper.toRaftPeerId(pipeline.getLeaderNode()),
+          RatisHelper.toRaftPeerId(pipeline.getClosestNode()));
     }
 
     if (!client.compareAndSet(null,
@@ -189,12 +189,6 @@ public final class XceiverClientRatis extends XceiverClientSpi {
             tlsConfig, ozoneConfiguration))) {
       throw new IllegalStateException("Client is already connected.");
     }
-  }
-
-  @Override
-  public void connect(String encodedToken) throws Exception {
-    throw new UnsupportedOperationException("Block tokens are not " +
-        "implemented for Ratis clients.");
   }
 
   @Override
@@ -227,7 +221,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       ContainerCommandRequestProto request) {
     return TracingUtil.executeInNewSpan(
         "XceiverClientRatis." + request.getCmdType().name(),
-        (Supplier<CompletableFuture<RaftClientReply>>) () -> {
+        () -> {
           final ContainerCommandRequestMessage message
               = ContainerCommandRequestMessage.toMessage(
               request, TracingUtil.exportCurrentSpan());
@@ -287,9 +281,10 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       Preconditions.checkState(updated >= index);
       return newWatchReply(index, ReplicationLevel.ALL_COMMITTED, updated);
     } catch (Exception e) {
-      Throwable t = HddsClientUtils.checkForException(e);
       LOG.warn("3 way commit failed on pipeline {}", pipeline, e);
-      if (t instanceof GroupMismatchException) {
+      Throwable t =
+          HddsClientUtils.containsException(e, GroupMismatchException.class);
+      if (t != null) {
         throw e;
       }
       final RaftClientReply reply = getClient().async()

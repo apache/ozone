@@ -45,29 +45,24 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Test to behaviour of the datanode when receive close container command.
  */
+@Timeout(300)
 public class TestCloseContainerHandler {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     //setup a cluster (1G free space is enough for a unit test)
     conf = new OzoneConfiguration();
@@ -81,7 +76,7 @@ public class TestCloseContainerHandler {
     cluster.waitForPipelineTobeReady(ONE, 30000);
   }
 
-  @After
+  @AfterEach
   public void teardown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -123,7 +118,7 @@ public class TestCloseContainerHandler {
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipeline(container.getPipelineID());
 
-    Assert.assertFalse(isContainerClosed(cluster, containerId.getId()));
+    assertFalse(isContainerClosed(cluster, containerId.getId()));
 
     DatanodeDetails datanodeDetails =
         cluster.getHddsDatanodes().get(0).getDatanodeDetails();
@@ -141,7 +136,7 @@ public class TestCloseContainerHandler {
             5 * 1000);
 
     //double check if it's really closed (waitFor also throws an exception)
-    Assert.assertTrue(isContainerClosed(cluster, containerId.getId()));
+    assertTrue(isContainerClosed(cluster, containerId.getId()));
   }
 
   private static Boolean isContainerClosed(MiniOzoneCluster cluster,

@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
@@ -81,11 +82,14 @@ public class BlockOutputStream extends OutputStream {
       "Unexpected Storage Container Exception: ";
 
   private AtomicReference<BlockID> blockID;
+  private final AtomicReference<ChunkInfo> previousChunkInfo
+      = new AtomicReference<>();
 
   private final BlockData.Builder containerBlockData;
   private XceiverClientFactory xceiverClientFactory;
   private XceiverClientSpi xceiverClient;
   private OzoneClientConfig config;
+  private StreamBufferArgs streamBufferArgs;
 
   private int chunkIndex;
   private final AtomicLong chunkOffset = new AtomicLong();
@@ -120,6 +124,7 @@ public class BlockOutputStream extends OutputStream {
   //current buffer allocated to write
   private ChunkBuffer currentBuffer;
   private final Token<? extends TokenIdentifier> token;
+  private final String tokenString;
   private int replicationIndex;
   private Pipeline pipeline;
   private final ContainerClientMetrics clientMetrics;
@@ -132,6 +137,7 @@ public class BlockOutputStream extends OutputStream {
    * @param pipeline             pipeline where block will be written
    * @param bufferPool           pool of buffers
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public BlockOutputStream(
       BlockID blockID,
       XceiverClientFactory xceiverClientManager,
@@ -139,7 +145,7 @@ public class BlockOutputStream extends OutputStream {
       BufferPool bufferPool,
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
-      ContainerClientMetrics clientMetrics
+      ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs
   ) throws IOException {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
@@ -161,15 +167,17 @@ public class BlockOutputStream extends OutputStream {
     this.xceiverClient = xceiverClientManager.acquireClient(pipeline);
     this.bufferPool = bufferPool;
     this.token = token;
+    this.tokenString = (this.token == null) ? null :
+        this.token.encodeToUrlString();
 
     //number of buffers used before doing a flush
     refreshCurrentBuffer();
-    flushPeriod = (int) (config.getStreamBufferFlushSize() / config
+    flushPeriod = (int) (streamBufferArgs.getStreamBufferFlushSize() / streamBufferArgs
         .getStreamBufferSize());
 
     Preconditions
         .checkArgument(
-            (long) flushPeriod * config.getStreamBufferSize() == config
+            (long) flushPeriod * streamBufferArgs.getStreamBufferSize() == streamBufferArgs
                 .getStreamBufferFlushSize());
 
     // A single thread executor handle the responses of async requests
@@ -183,6 +191,7 @@ public class BlockOutputStream extends OutputStream {
         config.getBytesPerChecksum());
     this.clientMetrics = clientMetrics;
     this.pipeline = pipeline;
+    this.streamBufferArgs = streamBufferArgs;
   }
 
   void refreshCurrentBuffer() {
@@ -238,8 +247,8 @@ public class BlockOutputStream extends OutputStream {
     return this.pipeline;
   }
 
-  Token<? extends TokenIdentifier> getToken() {
-    return this.token;
+  protected String getTokenString() {
+    return this.tokenString;
   }
 
   ExecutorService getResponseExecutor() {
@@ -319,7 +328,7 @@ public class BlockOutputStream extends OutputStream {
   }
 
   private boolean isBufferPoolFull() {
-    return bufferPool.computeBufferData() == config.getStreamBufferMaxSize();
+    return bufferPool.computeBufferData() == streamBufferArgs.getStreamBufferMaxSize();
   }
 
   /**
@@ -337,7 +346,7 @@ public class BlockOutputStream extends OutputStream {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Retrying write length {} for blockID {}", len, blockID);
     }
-    Preconditions.checkArgument(len <= config.getStreamBufferMaxSize());
+    Preconditions.checkArgument(len <= streamBufferArgs.getStreamBufferMaxSize());
     int count = 0;
     while (len > 0) {
       ChunkBuffer buffer = bufferPool.getBuffer(count);
@@ -353,13 +362,13 @@ public class BlockOutputStream extends OutputStream {
       // the buffer. We should just validate
       // if we wrote data of size streamBufferMaxSize/streamBufferFlushSize to
       // call for handling full buffer/flush buffer condition.
-      if (writtenDataLength % config.getStreamBufferFlushSize() == 0) {
+      if (writtenDataLength % streamBufferArgs.getStreamBufferFlushSize() == 0) {
         // reset the position to zero as now we will be reading the
         // next buffer in the list
         updateFlushLength();
         executePutBlock(false, false);
       }
-      if (writtenDataLength == config.getStreamBufferMaxSize()) {
+      if (writtenDataLength == streamBufferArgs.getStreamBufferMaxSize()) {
         handleFullBuffer();
       }
     }
@@ -460,7 +469,7 @@ public class BlockOutputStream extends OutputStream {
     try {
       BlockData blockData = containerBlockData.build();
       XceiverClientReply asyncReply =
-          putBlockAsync(xceiverClient, blockData, close, token);
+          putBlockAsync(xceiverClient, blockData, close, tokenString);
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
           asyncReply.getResponse();
       flushFuture = future.thenApplyAsync(e -> {
@@ -516,9 +525,9 @@ public class BlockOutputStream extends OutputStream {
   public void flush() throws IOException {
     if (xceiverClientFactory != null && xceiverClient != null
         && bufferPool != null && bufferPool.getSize() > 0
-        && (!config.isStreamBufferFlushDelay() ||
+        && (!streamBufferArgs.isStreamBufferFlushDelay() ||
             writtenDataLength - totalDataFlushedLength
-                >= config.getStreamBufferSize())) {
+                >= streamBufferArgs.getStreamBufferSize())) {
       handleFlush(false);
     }
   }
@@ -703,9 +712,22 @@ public class BlockOutputStream extends OutputStream {
       LOG.debug("Writing chunk {} length {} at offset {}",
           chunkInfo.getChunkName(), effectiveChunkSize, offset);
     }
+
+    final ChunkInfo previous = previousChunkInfo.getAndSet(chunkInfo);
+    final long expectedOffset = previous == null ? 0
+        : chunkInfo.getChunkName().equals(previous.getChunkName()) ?
+        previous.getOffset() : previous.getOffset() + previous.getLen();
+    if (chunkInfo.getOffset() != expectedOffset) {
+      throw new IOException("Unexpected offset: "
+          + chunkInfo.getOffset() + "(actual) != "
+          + expectedOffset + "(expected), "
+          + blockID + ", chunkInfo = " + chunkInfo
+          + ", previous = " + previous);
+    }
+
     try {
       XceiverClientReply asyncReply = writeChunkAsync(xceiverClient, chunkInfo,
-          blockID.get(), data, token, replicationIndex);
+          blockID.get(), data, tokenString, replicationIndex);
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
           respFuture = asyncReply.getResponse();
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto>

@@ -21,12 +21,17 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.util.ArrayList;
 import java.util.List;
 
-import static java.util.stream.Collectors.toList;
-import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_VERSIONS;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 
 /**
  * Class to hold version info for container data and metadata.
@@ -34,6 +39,25 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_VERSIONS;
  * - ChunkLayOutVersion: data layout version
  */
 public class ContainerTestVersionInfo {
+
+  /**
+   * Composite annotation for tests parameterized with {@link ContainerTestVersionInfo}.
+   */
+  @Target(ElementType.METHOD)
+  @Retention(RetentionPolicy.RUNTIME)
+  @ParameterizedTest
+  @MethodSource("org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo#getLayoutList")
+  public @interface ContainerTest {
+    // composite annotation
+  }
+
+  private static final String[] SCHEMA_VERSIONS = new String[] {
+      null,
+      OzoneConsts.SCHEMA_V1,
+      OzoneConsts.SCHEMA_V2,
+      OzoneConsts.SCHEMA_V3,
+  };
+
   private final String schemaVersion;
   private final ContainerLayoutVersion layout;
 
@@ -60,11 +84,6 @@ public class ContainerTestVersionInfo {
     return this.layout;
   }
 
-  public static Iterable<Object[]> versionParameters() {
-    return layoutList.stream().map(each -> new Object[] {each})
-        .collect(toList());
-  }
-
   @Override
   public String toString() {
     return "schema=" + schemaVersion + ", layout=" + layout;
@@ -75,7 +94,7 @@ public class ContainerTestVersionInfo {
   }
   public static void setTestSchemaVersion(String schemaVersion,
       OzoneConfiguration conf) {
-    if (schemaVersion.equals(OzoneConsts.SCHEMA_V3)) {
+    if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
       ContainerTestUtils.enableSchemaV3(conf);
     } else {
       ContainerTestUtils.disableSchemaV3(conf);

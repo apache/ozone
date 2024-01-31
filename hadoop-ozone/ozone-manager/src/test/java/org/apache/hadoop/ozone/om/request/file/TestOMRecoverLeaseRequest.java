@@ -33,16 +33,25 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .RecoverLeaseRequest;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
-import org.jetbrains.annotations.NotNull;
-import org.junit.Assert;
-import org.junit.Test;
+import jakarta.annotation.Nonnull;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests OMRecoverLeaseRequest.
@@ -63,11 +72,19 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
    */
   @Test
   public void testRecoverHsyncFile() throws Exception {
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
+    when(ozoneManager.getVolumeOwner(
+        anyString(),
+        any(IAccessAuthorizer.ACLType.class), any(
+        OzoneObj.ResourceType.class)))
+        .thenReturn("user");
+    InetSocketAddress address = new InetSocketAddress("localhost", 10000);
+    when(ozoneManager.getOmRpcServerAddr()).thenReturn(address);
     populateNamespace(true, true);
 
     OMClientResponse omClientResponse = validateAndUpdateCache();
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
 
     verifyTables(true, true);
@@ -82,7 +99,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
 
     OMClientResponse omClientResponse = validateAndUpdateCache();
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
 
     verifyTables(true, false);
@@ -97,7 +114,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
 
     OMClientResponse omClientResponse = validateAndUpdateCache();
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND,
+    assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
 
     verifyTables(false, true);
@@ -113,7 +130,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
 
     OMClientResponse omClientResponse = validateAndUpdateCache();
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND,
+    assertEquals(OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
 
     verifyTables(false, false);
@@ -138,7 +155,7 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
       String ozoneKey = addToFileTable(allocatedLocationList);
       omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
           .get(ozoneKey);
-      Assert.assertNotNull(omKeyInfo);
+      assertNotNull(omKeyInfo);
     }
 
     if (addOpenKeyTable) {
@@ -146,11 +163,11 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
 
       omKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
           .get(openKey);
-      Assert.assertNotNull(omKeyInfo);
+      assertNotNull(omKeyInfo);
     }
   }
 
-  @NotNull
+  @Nonnull
   protected OMRequest createRecoverLeaseRequest(
       String volumeName, String bucketName, String keyName) {
 
@@ -169,13 +186,13 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
   private OMClientResponse validateAndUpdateCache() throws Exception {
     OMRequest modifiedOmRequest = doPreExecute(createRecoverLeaseRequest(
         volumeName, bucketName, keyName));
+    assertNotNull(modifiedOmRequest.getUserInfo());
 
     OMRecoverLeaseRequest omRecoverLeaseRequest = getOmRecoverLeaseRequest(
         modifiedOmRequest);
 
     OMClientResponse omClientResponse =
-        omRecoverLeaseRequest.validateAndUpdateCache(ozoneManager,
-            100L, ozoneManagerDoubleBufferHelper);
+        omRecoverLeaseRequest.validateAndUpdateCache(ozoneManager, 100L);
     return omClientResponse;
   }
 
@@ -186,18 +203,18 @@ public class TestOMRecoverLeaseRequest extends TestOMKeyRequest {
     OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
         .get(ozoneKey);
     if (hasKey) {
-      Assert.assertNotNull(omKeyInfo);
+      assertNotNull(omKeyInfo);
     } else {
-      Assert.assertNull(omKeyInfo);
+      assertNull(omKeyInfo);
     }
     // Entry should be deleted from openKey Table.
     String openKey = getOpenFileName();
     omKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
         .get(openKey);
     if (hasOpenKey) {
-      Assert.assertNotNull(omKeyInfo);
+      assertNotNull(omKeyInfo);
     } else {
-      Assert.assertNull(omKeyInfo);
+      assertNull(omKeyInfo);
     }
   }
 

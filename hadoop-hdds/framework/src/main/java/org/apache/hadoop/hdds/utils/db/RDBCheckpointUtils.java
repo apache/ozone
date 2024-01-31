@@ -18,16 +18,13 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import org.awaitility.core.ConditionTimeoutException;
+import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
-import java.time.Instant;
-
-import static org.awaitility.Awaitility.with;
 
 /**
  * RocksDB Checkpoint Utilities.
@@ -35,11 +32,27 @@ import static org.awaitility.Awaitility.with;
 public final class RDBCheckpointUtils {
   static final Logger LOG =
       LoggerFactory.getLogger(RDBCheckpointUtils.class);
-  private static final Duration POLL_DELAY_DURATION = Duration.ZERO;
   private static final Duration POLL_INTERVAL_DURATION = Duration.ofMillis(100);
-  private static final Duration POLL_MAX_DURATION = Duration.ofSeconds(5);
+  private static final Duration POLL_MAX_DURATION = Duration.ofSeconds(20);
 
   private RDBCheckpointUtils() { }
+
+  /**
+   * Wait for checkpoint directory to be created for the given duration with
+   * 100 millis poll interval.
+   * @param file Checkpoint directory.
+   * @param maxWaitTimeout wait at most before request timeout.
+   * @return true if found within given timeout else false.
+   */
+  public static boolean waitForCheckpointDirectoryExist(File file,
+      Duration maxWaitTimeout) {
+    final boolean success = RatisHelper.attemptUntilTrue(file::exists, POLL_INTERVAL_DURATION, maxWaitTimeout);
+    if (!success) {
+      LOG.info("Checkpoint directory: {} didn't get created in {} secs.",
+          maxWaitTimeout.getSeconds(), file.getAbsolutePath());
+    }
+    return success;
+  }
 
   /**
    * Wait for checkpoint directory to be created for 5 secs with 100 millis
@@ -49,22 +62,6 @@ public final class RDBCheckpointUtils {
    */
   public static boolean waitForCheckpointDirectoryExist(File file)
       throws IOException {
-    Instant start = Instant.now();
-    try {
-      with().atMost(POLL_MAX_DURATION)
-          .pollDelay(POLL_DELAY_DURATION)
-          .pollInterval(POLL_INTERVAL_DURATION)
-          .await()
-          .until(file::exists);
-      LOG.info("Waited for {} milliseconds for checkpoint directory {}" +
-              " availability.",
-          Duration.between(start, Instant.now()).toMillis(),
-          file.getAbsoluteFile());
-      return true;
-    } catch (ConditionTimeoutException exception) {
-      LOG.info("Checkpoint directory: {} didn't get created in 5 secs.",
-          file.getAbsolutePath());
-      return false;
-    }
+    return waitForCheckpointDirectoryExist(file, POLL_MAX_DURATION);
   }
 }

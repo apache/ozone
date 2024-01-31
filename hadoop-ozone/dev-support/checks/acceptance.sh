@@ -44,4 +44,7 @@ RES=$?
 cp -rv result/* "$REPORT_DIR/"
 cp "$REPORT_DIR/log.html" "$REPORT_DIR/summary.html"
 find "$REPORT_DIR" -type f -empty -print0 | xargs -0 rm -v
+
+grep -A1 FAIL "${REPORT_DIR}/output.log" | grep -v '^Output' > "${REPORT_DIR}/summary.txt"
+
 exit $RES

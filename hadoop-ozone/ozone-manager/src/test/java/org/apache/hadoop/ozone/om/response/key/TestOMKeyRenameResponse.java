@@ -25,13 +25,15 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 import static  org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests OMKeyRenameResponse.
@@ -59,17 +61,18 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
     OMKeyRenameResponse omKeyRenameResponse =
         getOMKeyRenameResponse(omResponse, fromKeyInfo, toKeyInfo);
 
-    Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
+    assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
         .isExist(dbFromKey));
-    Assert.assertFalse(omMetadataManager.getKeyTable(getBucketLayout())
+    assertFalse(omMetadataManager.getKeyTable(getBucketLayout())
         .isExist(dbToKey));
-    Assert.assertTrue(omMetadataManager.getSnapshotRenamedKeyTable().isEmpty());
+    assertTrue(omMetadataManager.getSnapshotRenamedTable()
+        .isEmpty());
     if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-      Assert.assertFalse(omMetadataManager.getDirectoryTable()
+      assertFalse(omMetadataManager.getDirectoryTable()
           .isExist(getDBKeyName(fromKeyParent)));
-      Assert.assertFalse(omMetadataManager.getDirectoryTable()
+      assertFalse(omMetadataManager.getDirectoryTable()
           .isExist(getDBKeyName(toKeyParent)));
-      Assert.assertFalse(
+      assertFalse(
           omMetadataManager.getBucketTable().iterator().hasNext());
     }
 
@@ -78,27 +81,27 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assert.assertFalse(omMetadataManager.getKeyTable(getBucketLayout())
+    assertFalse(omMetadataManager.getKeyTable(getBucketLayout())
         .isExist(dbFromKey));
-    Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
+    assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
         .isExist(dbToKey));
 
     String renameDbKey = omMetadataManager.getRenameKey(
         fromKeyInfo.getVolumeName(), fromKeyInfo.getBucketName(),
         fromKeyInfo.getObjectID());
-    // snapshotRenamedKeyTable shouldn't contain those keys which
+    // snapshotRenamedTable shouldn't contain those keys which
     // is not part of snapshot bucket.
-    Assert.assertFalse(omMetadataManager.getSnapshotRenamedKeyTable()
+    assertFalse(omMetadataManager.getSnapshotRenamedTable()
         .isExist(renameDbKey));
 
     if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-      Assert.assertTrue(omMetadataManager.getDirectoryTable()
+      assertTrue(omMetadataManager.getDirectoryTable()
           .isExist(getDBKeyName(fromKeyParent)));
-      Assert.assertTrue(omMetadataManager.getDirectoryTable()
+      assertTrue(omMetadataManager.getDirectoryTable()
           .isExist(getDBKeyName(toKeyParent)));
       Table.KeyValue<String, OmBucketInfo> keyValue =
           omMetadataManager.getBucketTable().iterator().next();
-      Assert.assertEquals(omMetadataManager.getBucketKey(
+      assertEquals(omMetadataManager.getBucketKey(
           bucketInfo.getVolumeName(), bucketInfo.getBucketName()),
           keyValue.getKey());
     }
@@ -121,14 +124,14 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
     OMKeyRenameResponse omKeyRenameResponse = getOMKeyRenameResponse(
         omResponse, fromKeyInfo, toKeyInfo);
 
-    Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
+    assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
         .isExist(dbFromKey));
-    Assert.assertFalse(omMetadataManager.getKeyTable(getBucketLayout())
+    assertFalse(omMetadataManager.getKeyTable(getBucketLayout())
         .isExist(dbToKey));
     if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-      Assert.assertFalse(omMetadataManager.getDirectoryTable()
+      assertFalse(omMetadataManager.getDirectoryTable()
           .isExist(getDBKeyName(fromKeyParent)));
-      Assert.assertFalse(omMetadataManager.getDirectoryTable()
+      assertFalse(omMetadataManager.getDirectoryTable()
           .isExist(getDBKeyName(toKeyParent)));
     }
 
@@ -138,14 +141,14 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     // As omResponse has error, it is a no-op. So, no changes should happen.
-    Assert.assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
+    assertTrue(omMetadataManager.getKeyTable(getBucketLayout())
         .isExist(dbFromKey));
-    Assert.assertFalse(omMetadataManager.getKeyTable(getBucketLayout())
+    assertFalse(omMetadataManager.getKeyTable(getBucketLayout())
         .isExist(dbToKey));
     if (getBucketLayout() == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-      Assert.assertFalse(omMetadataManager.getDirectoryTable()
+      assertFalse(omMetadataManager.getDirectoryTable()
           .isExist(getDBKeyName(fromKeyParent)));
-      Assert.assertFalse(omMetadataManager.getDirectoryTable()
+      assertFalse(omMetadataManager.getDirectoryTable()
           .isExist(getDBKeyName(toKeyParent)));
     }
   }

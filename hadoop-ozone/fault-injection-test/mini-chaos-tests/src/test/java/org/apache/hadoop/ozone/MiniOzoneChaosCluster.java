@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.Repli
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.failure.FailureManager;
 import org.apache.hadoop.ozone.failure.Failures;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -295,8 +296,9 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
     @Override
     public MiniOzoneChaosCluster build() throws IOException {
-
       DefaultMetricsSystem.setMiniClusterMode(true);
+      DatanodeStoreCache.setMiniClusterMode();
+
       initializeConfiguration();
       if (numOfOMs > 1) {
         initOMRatisConf();

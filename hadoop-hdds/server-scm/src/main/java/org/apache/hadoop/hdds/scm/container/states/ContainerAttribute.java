@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.states;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSortedSet;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.slf4j.Logger;
@@ -189,7 +190,7 @@ public class ContainerAttribute<T> {
     Preconditions.checkNotNull(key);
 
     if (this.attributeMap.containsKey(key)) {
-      return Collections.unmodifiableNavigableSet(this.attributeMap.get(key));
+      return ImmutableSortedSet.copyOf(this.attributeMap.get(key));
     }
     if (LOG.isDebugEnabled()) {
       LOG.debug("No such Key. Key {}", key);

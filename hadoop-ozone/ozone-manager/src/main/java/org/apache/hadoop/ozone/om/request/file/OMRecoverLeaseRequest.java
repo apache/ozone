@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.file;
 
 import com.google.common.base.Preconditions;
 
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -28,8 +29,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.helpers.OmFSOFile;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -51,9 +51,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Iterator;
+import java.nio.file.InvalidPathException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -90,15 +88,22 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    RecoverLeaseRequest recoverLeaseRequest = getOmRequest()
-        .getRecoverLeaseRequest();
+    OMRequest request = super.preExecute(ozoneManager);
+    RecoverLeaseRequest recoverLeaseRequest = request.getRecoverLeaseRequest();
 
     String keyPath = recoverLeaseRequest.getKeyName();
     String normalizedKeyPath =
         validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
             keyPath, getBucketLayout());
 
-    return getOmRequest().toBuilder()
+    // check ACL
+    checkKeyAcls(ozoneManager,
+        recoverLeaseRequest.getVolumeName(),
+        recoverLeaseRequest.getBucketName(),
+        recoverLeaseRequest.getKeyName(),
+        IAccessAuthorizer.ACLType.WRITE, OzoneObj.ResourceType.KEY);
+
+    return request.toBuilder()
         .setRecoverLeaseRequest(
             recoverLeaseRequest.toBuilder()
                 .setKeyName(normalizedKeyPath))
@@ -106,9 +111,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
     RecoverLeaseRequest recoverLeaseRequest = getOmRequest()
         .getRecoverLeaseRequest();
     Preconditions.checkNotNull(recoverLeaseRequest);
@@ -123,23 +126,20 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
 
     omMetadataManager = ozoneManager.getMetadataManager();
     OMClientResponse omClientResponse = null;
-    IOException exception = null;
+    Exception exception = null;
     // increment metric
     OMMetrics omMetrics = ozoneManager.getMetrics();
 
     boolean acquiredLock = false;
     try {
-      // check ACL
-      checkKeyAcls(ozoneManager, volumeName, bucketName, keyName,
-          IAccessAuthorizer.ACLType.WRITE, OzoneObj.ResourceType.KEY);
-
       // acquire lock
-      acquiredLock = omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
-          volumeName, bucketName);
-
+      mergeOmLockDetails(
+          omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK,
+              volumeName, bucketName));
+      acquiredLock = getOmLockDetails().isLockAcquired();
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
-      String openKeyEntryName = doWork(ozoneManager, transactionLogIndex);
+      String openKeyEntryName = doWork(ozoneManager, termIndex.getIndex());
 
       // Prepare response
       boolean responseCode = true;
@@ -155,20 +155,22 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       omMetrics.incNumRecoverLease();
       LOG.debug("Key recovered. Volume:{}, Bucket:{}, Key:{}", volumeName,
           bucketName, keyName);
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       LOG.error("Fail for recovering lease. Volume:{}, Bucket:{}, Key:{}",
           volumeName, bucketName, keyName, ex);
       exception = ex;
       omMetrics.incNumRecoverLeaseFails();
       omResponse.setCmdType(RecoverLease);
       omClientResponse = new OMRecoverLeaseResponse(
-          createErrorOMResponse(omResponse, ex), getBucketLayout());
+          createErrorOMResponse(omResponse, exception), getBucketLayout());
     } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
       if (acquiredLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(
+            omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK,
+                volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 
@@ -182,18 +184,20 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
 
   private String doWork(OzoneManager ozoneManager, long transactionLogIndex)
       throws IOException {
+    
+    String errMsg = "Cannot recover file : " + keyName 
+        + " as parent directory doesn't exist";
 
-    final long volumeId = omMetadataManager.getVolumeId(volumeName);
-    final long bucketId = omMetadataManager.getBucketId(
-        volumeName, bucketName);
-    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
-    long parentID = OMFileRequest.getParentID(volumeId, bucketId,
-        pathComponents, keyName, omMetadataManager,
-        "Cannot recover file : " + keyName
-            + " as parent directory doesn't exist");
-    String fileName = OzoneFSUtils.getFileName(keyName);
-    dbFileKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
-        parentID, fileName);
+    OmFSOFile fsoFile =  new OmFSOFile.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setOmMetadataManager(omMetadataManager)
+        .setErrMsg(errMsg)
+        .build();
+  
+    String fileName = fsoFile.getFileName();
+    dbFileKey = fsoFile.getOzonePathKey();
 
     keyInfo = getKey(dbFileKey);
     if (keyInfo == null) {
@@ -206,8 +210,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       LOG.warn("Key:" + keyName + " is already closed");
       return null;
     }
-    String openFileDBKey = omMetadataManager.getOpenFileName(
-            volumeId, bucketId, parentID, fileName, Long.parseLong(clientId));
+    String openFileDBKey = fsoFile.getOpenFileName(Long.parseLong(clientId));
     if (openFileDBKey != null) {
       commitKey(dbFileKey, keyInfo, fileName, ozoneManager,
           transactionLogIndex);

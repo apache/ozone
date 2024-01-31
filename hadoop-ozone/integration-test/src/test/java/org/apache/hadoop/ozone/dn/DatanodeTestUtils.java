@@ -19,7 +19,6 @@
  */
 package org.apache.hadoop.ozone.dn;
 
-import com.google.common.base.Supplier;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -230,12 +229,9 @@ public final class DatanodeTestUtils {
    */
   public static void waitForCheckVolume(MutableVolumeSet volSet,
                                         long numOfChecks) throws Exception {
-    GenericTestUtils.waitFor(new Supplier<Boolean>() {
-      @Override
-      public Boolean get() {
-        return numOfChecks == volSet.getVolumeChecker().getNumVolumeChecks();
-      }
-    }, 100, 10000);
+    GenericTestUtils.waitFor(
+        () -> numOfChecks == volSet.getVolumeChecker().getNumVolumeChecks(),
+        100, 10000);
   }
 
   /**
@@ -246,12 +242,9 @@ public final class DatanodeTestUtils {
    */
   public static void waitForHandleFailedVolume(
       MutableVolumeSet volSet, int numOfFailedVolumes) throws Exception {
-    GenericTestUtils.waitFor(new Supplier<Boolean>() {
-      @Override
-      public Boolean get() {
-        return numOfFailedVolumes == volSet.getFailedVolumesList().size();
-      }
-    }, 100, 10000);
+    GenericTestUtils.waitFor(
+        () -> numOfFailedVolumes == volSet.getFailedVolumesList().size(),
+        100, 10000);
   }
 
   public static File getHddsVolumeClusterDir(HddsVolume vol) {

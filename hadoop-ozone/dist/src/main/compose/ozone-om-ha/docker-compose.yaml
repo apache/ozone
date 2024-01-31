@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: "3"
+version: "3.8"
 services:
    datanode:
       build:
@@ -27,7 +27,7 @@ services:
       volumes:
         - ../..:/opt/hadoop
       ports:
-        - 9864
+        - 19864
       command: sh -c "sudo /usr/sbin/sshd -E /tmp/sshd.log && /opt/hadoop/bin/ozone datanode"
       env_file:
         - ./docker-config

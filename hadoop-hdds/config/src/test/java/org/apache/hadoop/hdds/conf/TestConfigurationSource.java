@@ -18,10 +18,11 @@
 
 package org.apache.hadoop.hdds.conf;
 
-import org.junit.Assert;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import org.junit.jupiter.api.Test;
 
-import java.util.Map;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class TestConfigurationSource {
 
@@ -29,22 +30,44 @@ class TestConfigurationSource {
   void getPropsMatchPrefixAndTrimPrefix() {
     MutableConfigurationSource c = new InMemoryConfiguration();
     c.set("somePrefix.key", "value");
-    ConfigurationSource config = c;
-    Map<String, String> entry =
-        config.getPropsMatchPrefixAndTrimPrefix("somePrefix.");
-    Assert.assertEquals("key", entry.keySet().toArray()[0]);
-    Assert.assertEquals("value", entry.values().toArray()[0]);
+
+    assertEquals(ImmutableMap.of("key", "value"),
+        c.getPropsMatchPrefixAndTrimPrefix("somePrefix."));
   }
 
   @Test
   void getPropsMatchPrefix() {
     MutableConfigurationSource c = new InMemoryConfiguration();
     c.set("somePrefix.key", "value");
-    ConfigurationSource config = c;
-    Map<String, String> entry =
-        config.getPropsMatchPrefix("somePrefix.");
-    Assert.assertEquals("somePrefix.key",
-        entry.keySet().toArray()[0]);
-    Assert.assertEquals("value", entry.values().toArray()[0]);
+
+    assertEquals(ImmutableMap.of("somePrefix.key", "value"),
+        c.getPropsMatchPrefix("somePrefix."));
+  }
+  @Test
+  void reconfigurableProperties() {
+    String prefix = "ozone.scm.client";
+    ImmutableSet<String> expected = ImmutableSet.of(
+        prefix + ".dynamic",
+        prefix + ".grandpa.dyna"
+    );
+
+    ConfigurationExample obj = new InMemoryConfiguration().getObject(
+        ConfigurationExample.class);
+
+    assertEquals(expected, obj.reconfigurableProperties());
+  }
+
+  @Test
+  void reconfiguration() {
+    MutableConfigurationSource subject = new InMemoryConfiguration();
+    ConfigurationExample orig = subject.getObject(ConfigurationExample.class);
+    ConfigurationExample obj = subject.getObject(ConfigurationExample.class);
+
+    subject.set("ozone.scm.client.dynamic", "updated");
+    subject.setLong("ozone.scm.client.wait", orig.getWaitTime() + 42);
+    subject.reconfigure(ConfigurationExample.class, obj);
+
+    assertEquals("updated", obj.getDynamic());
+    assertEquals(orig.getWaitTime(), obj.getWaitTime());
   }
 }

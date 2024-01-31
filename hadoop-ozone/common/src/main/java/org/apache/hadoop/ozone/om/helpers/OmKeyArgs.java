@@ -22,7 +22,8 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
-import org.jetbrains.annotations.NotNull;
+import org.apache.hadoop.ozone.security.GDPRSymmetricKey;
+import jakarta.annotation.Nonnull;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -203,7 +204,7 @@ public final class OmKeyArgs implements Auditable {
         .setForceUpdateContainerCacheFromSCM(forceUpdateContainerCacheFromSCM);
   }
 
-  @NotNull
+  @Nonnull
   public KeyArgs toProtobuf() {
     return KeyArgs.newBuilder()
         .setVolumeName(getVolumeName())
@@ -302,6 +303,14 @@ public final class OmKeyArgs implements Auditable {
 
     public Builder addAllMetadata(Map<String, String> metadatamap) {
       this.metadata.putAll(metadatamap);
+      return this;
+    }
+
+    public Builder addAllMetadataGdpr(Map<String, String> metadatamap) {
+      addAllMetadata(metadatamap);
+      if (Boolean.parseBoolean(metadata.get(OzoneConsts.GDPR_FLAG))) {
+        GDPRSymmetricKey.newDefaultInstance().acceptKeyDetails(metadata::put);
+      }
       return this;
     }
 

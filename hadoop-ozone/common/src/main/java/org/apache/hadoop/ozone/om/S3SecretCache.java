@@ -18,6 +18,8 @@ package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 
+import java.util.List;
+
 /**
  * Cache layer of S3 secrets.
  */
@@ -26,14 +28,25 @@ public interface S3SecretCache {
    * Put secret value to cache.
    * @param id secret value identifier.
    * @param secretValue secret value.
-   * @param txId lifetime identifier.
    */
-  void put(String id, S3SecretValue secretValue, long txId);
+  void put(String id, S3SecretValue secretValue);
 
   /**
    * Invalidate secret value with provided secret identifier.
    * @param id secret identifier.
-   * @param txId lifetime identifier.
    */
-  void invalidate(String id, long txId);
+  void invalidate(String id);
+
+  /**
+   * Clears the cache, removing all entries, this is called when the
+   * doubleBuffer is flushed to the DB.
+   */
+  void clearCache(List<Long> transactionIds);
+
+  /**
+   * Get value from cache.
+   * @param id cache secrect identifier.
+   * @return Secret value or {@code null} if value doesn't exist.
+   */
+  S3SecretValue get(String id);
 }

@@ -24,10 +24,10 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -37,7 +37,13 @@ import java.util.Set;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OPEN;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.any;
 
 /**
  * Tests for the OpenContainerHandler class.
@@ -54,7 +60,8 @@ public class TestOpenContainerHandler {
     ecReplicationConfig = new ECReplicationConfig(3, 2);
     ratisReplicationConfig = RatisReplicationConfig.getInstance(
         HddsProtos.ReplicationFactor.THREE);
-    replicationManager = Mockito.mock(ReplicationManager.class);
+    replicationManager = mock(ReplicationManager.class);
+    Mockito.when(replicationManager.hasHealthyPipeline(any())).thenReturn(true);
     openContainerHandler = new OpenContainerHandler(replicationManager);
   }
 
@@ -66,14 +73,13 @@ public class TestOpenContainerHandler {
         .createReplicas(containerInfo.containerID(),
             ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .setPendingOps(Collections.EMPTY_LIST)
+        .setPendingOps(Collections.emptyList())
         .setReport(new ReplicationManagerReport())
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
-    Assertions.assertFalse(openContainerHandler.handle(request));
-    Mockito.verify(replicationManager, times(0))
-        .sendCloseContainerEvent(Mockito.any());
+    assertFalse(openContainerHandler.handle(request));
+    verify(replicationManager, times(0)).sendCloseContainerEvent(any());
   }
 
   @Test
@@ -84,14 +90,13 @@ public class TestOpenContainerHandler {
         .createReplicas(containerInfo.containerID(),
             ContainerReplicaProto.State.OPEN, 1, 2, 3, 4, 5);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .setPendingOps(Collections.EMPTY_LIST)
+        .setPendingOps(Collections.emptyList())
         .setReport(new ReplicationManagerReport())
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
-    Assertions.assertTrue(openContainerHandler.handle(request));
-    Mockito.verify(replicationManager, times(0))
-        .sendCloseContainerEvent(Mockito.any());
+    assertTrue(openContainerHandler.handle(request));
+    verify(replicationManager, times(0)).sendCloseContainerEvent(any());
   }
 
   @Test
@@ -102,16 +107,52 @@ public class TestOpenContainerHandler {
         .createReplicas(containerInfo.containerID(),
             ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .setPendingOps(Collections.EMPTY_LIST)
+        .setPendingOps(Collections.emptyList())
         .setReport(new ReplicationManagerReport())
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
-    Assertions.assertTrue(openContainerHandler.handle(request));
-    Mockito.verify(replicationManager, times(1))
+    ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .setReadOnly(true)
+        .build();
+    assertTrue(openContainerHandler.handle(request));
+    assertTrue(openContainerHandler.handle(readRequest));
+    verify(replicationManager, times(1))
         .sendCloseContainerEvent(containerInfo.containerID());
+    assertEquals(1, request.getReport().getStat(HealthState.OPEN_UNHEALTHY));
   }
 
+  @Test
+  public void testOpenContainerWithoutPipelineIsClosed() {
+    Mockito.when(replicationManager.hasHealthyPipeline(any())).thenReturn(false);
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        ecReplicationConfig, 1, OPEN);
+    Set<ContainerReplica> containerReplicas = ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            ContainerReplicaProto.State.OPEN, 1, 2, 3, 4);
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .build();
+    ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .setReadOnly(true)
+        .build();
+    assertTrue(openContainerHandler.handle(request));
+    assertTrue(openContainerHandler.handle(readRequest));
+    verify(replicationManager, times(1))
+        .sendCloseContainerEvent(containerInfo.containerID());
+    assertEquals(1, request.getReport().getStat(HealthState.OPEN_WITHOUT_PIPELINE));
+  }
   @Test
   public void testClosedRatisContainerReturnsFalse() {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
@@ -120,14 +161,13 @@ public class TestOpenContainerHandler {
         .createReplicas(containerInfo.containerID(),
             ContainerReplicaProto.State.CLOSED, 0, 0, 0);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .setPendingOps(Collections.EMPTY_LIST)
+        .setPendingOps(Collections.emptyList())
         .setReport(new ReplicationManagerReport())
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
-    Assertions.assertFalse(openContainerHandler.handle(request));
-    Mockito.verify(replicationManager, times(0))
-        .sendCloseContainerEvent(Mockito.any());
+    assertFalse(openContainerHandler.handle(request));
+    verify(replicationManager, times(0)).sendCloseContainerEvent(any());
   }
 
   @Test
@@ -138,14 +178,13 @@ public class TestOpenContainerHandler {
         .createReplicas(containerInfo.containerID(),
             ContainerReplicaProto.State.OPEN, 0, 0, 0);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .setPendingOps(Collections.EMPTY_LIST)
+        .setPendingOps(Collections.emptyList())
         .setReport(new ReplicationManagerReport())
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
-    Assertions.assertTrue(openContainerHandler.handle(request));
-    Mockito.verify(replicationManager, times(0))
-        .sendCloseContainerEvent(Mockito.any());
+    assertTrue(openContainerHandler.handle(request));
+    verify(replicationManager, times(0)).sendCloseContainerEvent(any());
   }
 
   @Test
@@ -156,13 +195,48 @@ public class TestOpenContainerHandler {
         .createReplicas(containerInfo.containerID(),
             ContainerReplicaProto.State.CLOSED, 0, 0, 0);
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
-        .setPendingOps(Collections.EMPTY_LIST)
+        .setPendingOps(Collections.emptyList())
         .setReport(new ReplicationManagerReport())
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
-    Assertions.assertTrue(openContainerHandler.handle(request));
-    Mockito.verify(replicationManager, times(1))
-        .sendCloseContainerEvent(Mockito.any());
+    ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .setReadOnly(true)
+        .build();
+    assertTrue(openContainerHandler.handle(request));
+    assertTrue(openContainerHandler.handle(readRequest));
+    verify(replicationManager, times(1)).sendCloseContainerEvent(any());
+    assertEquals(1, request.getReport().getStat(HealthState.OPEN_UNHEALTHY));
+  }
+
+  @Test
+  public void testOpenRatisContainerWithoutPipelineIsClosed() {
+    Mockito.when(replicationManager.hasHealthyPipeline(any())).thenReturn(false);
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        ratisReplicationConfig, 1, OPEN);
+    Set<ContainerReplica> containerReplicas = ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            ContainerReplicaProto.State.OPEN, 0, 0, 0);
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .build();
+    ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .setReadOnly(true)
+        .build();
+    assertTrue(openContainerHandler.handle(request));
+    assertTrue(openContainerHandler.handle(readRequest));
+    verify(replicationManager, times(1)).sendCloseContainerEvent(any());
+    assertEquals(1, request.getReport().getStat(HealthState.OPEN_WITHOUT_PIPELINE));
   }
 }

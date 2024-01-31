@@ -19,21 +19,24 @@
 package org.apache.hadoop.ozone.om.request.bucket.acl;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiPredicate;
 
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.response.bucket.acl.OMBucketAclResponse;
-import org.apache.hadoop.ozone.util.BooleanBiFunction;
 import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.ObjectType;
@@ -43,8 +46,6 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -53,32 +54,28 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
  */
 public abstract class OMBucketAclRequest extends OMClientRequest {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OMBucketAclRequest.class);
-
-  private BooleanBiFunction<List<OzoneAcl>, OmBucketInfo> omBucketAclOp;
+  private final BiPredicate<List<OzoneAcl>, OmBucketInfo> omBucketAclOp;
 
   public OMBucketAclRequest(OMRequest omRequest,
-      BooleanBiFunction<List<OzoneAcl>, OmBucketInfo> aclOp) {
+      BiPredicate<List<OzoneAcl>, OmBucketInfo> aclOp) {
     super(omRequest);
     omBucketAclOp = aclOp;
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long transactionLogIndex = termIndex.getIndex();
 
     // protobuf guarantees acls are non-null.
     List<OzoneAcl> ozoneAcls = getAcls();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumBucketUpdates();
-    OmBucketInfo omBucketInfo = null;
+    OmBucketInfo omBucketInfo;
 
     OMResponse.Builder omResponse = onInit();
     OMClientResponse omClientResponse = null;
-    IOException exception = null;
+    Exception exception = null;
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean lockAcquired = false;
@@ -88,9 +85,10 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
     try {
       ObjectParser objectParser = new ObjectParser(getPath(),
           ObjectType.BUCKET);
-
-      volume = objectParser.getVolume();
-      bucket = objectParser.getBucket();
+      ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(
+          Pair.of(objectParser.getVolume(), objectParser.getBucket()));
+      volume = resolvedBucket.realVolume();
+      bucket = resolvedBucket.realBucket();
 
       // check Acl
       if (ozoneManager.getAclsEnabled()) {
@@ -98,9 +96,10 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
             volume, bucket, null);
       }
-      lockAcquired =
+      mergeOmLockDetails(
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume,
-              bucket);
+              bucket));
+      lockAcquired = getOmLockDetails().isLockAcquired();
 
       String dbBucketKey = omMetadataManager.getBucketKey(volume, bucket);
       omBucketInfo = omMetadataManager.getBucketTable().get(dbBucketKey);
@@ -108,7 +107,7 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
         throw new OMException(OMException.ResultCodes.BUCKET_NOT_FOUND);
       }
 
-      operationResult = omBucketAclOp.apply(ozoneAcls, omBucketInfo);
+      operationResult = omBucketAclOp.test(ozoneAcls, omBucketInfo);
       omBucketInfo.setUpdateID(transactionLogIndex,
           ozoneManager.isRatisEnabled());
 
@@ -136,15 +135,17 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
 
       omClientResponse = onSuccess(omResponse, omBucketInfo, operationResult);
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
-      omClientResponse = onFailure(omResponse, ex);
+      omClientResponse = onFailure(omResponse, exception);
     } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
       if (lockAcquired) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volume,
-            bucket);
+        mergeOmLockDetails(
+            omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volume,
+                bucket));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 
@@ -189,10 +190,6 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
 
   /**
    * Get the om client response on success case with lock.
-   * @param omResponse
-   * @param omBucketInfo
-   * @param operationResult
-   * @return OMClientResponse
    */
   abstract OMClientResponse onSuccess(
       OMResponse.Builder omResponse, OmBucketInfo omBucketInfo,
@@ -200,12 +197,9 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
 
   /**
    * Get the om client response on failure case with lock.
-   * @param omResponse
-   * @param exception
-   * @return OMClientResponse
    */
   OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException exception) {
+      Exception exception) {
     return new OMBucketAclResponse(
         createErrorOMResponse(omResponse, exception));
   }
@@ -213,13 +207,8 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
   /**
    * Completion hook for final processing before return without lock.
    * Usually used for logging without lock and metric update.
-   * @param operationResult
-   * @param exception
-   * @param omMetrics
-   * @param auditLogger
-   * @param auditMap
    */
-  abstract void onComplete(boolean operationResult, IOException exception,
+  abstract void onComplete(boolean operationResult, Exception exception,
       OMMetrics omMetrics, AuditLogger auditLogger,
       Map<String, String> auditMap);
 }

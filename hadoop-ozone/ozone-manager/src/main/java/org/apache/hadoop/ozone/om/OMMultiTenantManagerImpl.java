@@ -37,10 +37,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
-
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -80,6 +77,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
 /**
@@ -833,7 +831,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     OmDBAccessIdInfo omDBAccessIdInfo =
         omMetadataManager.getTenantAccessIdTable().get(accessID);
     if (omDBAccessIdInfo == null) {
-      return Optional.absent();
+      return Optional.empty();
     }
     return Optional.of(omDBAccessIdInfo.getTenantId());
   }

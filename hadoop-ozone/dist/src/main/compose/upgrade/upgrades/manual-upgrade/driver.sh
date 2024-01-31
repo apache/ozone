@@ -52,5 +52,3 @@ callback setup_this_version
 echo "--- RUNNING WITH NEW VERSION $OZONE_UPGRADE_TO ---"
 OZONE_KEEP_RESULTS=true start_docker_env
 callback with_this_version
-
-stop_docker_env

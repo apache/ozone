@@ -49,10 +49,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -68,13 +65,15 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConsts.ADMIN;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
  * Test for Snapshot feature with ACL.
  */
 @Timeout(value = 300)
-@Flaky("HDDS-8433")
 public class TestOzoneManagerSnapshotAcl {
 
   private static final String ADMIN_USER = "om";
@@ -109,7 +108,7 @@ public class TestOzoneManagerSnapshotAcl {
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     final String omServiceId = "om-service-test-1"
-        + RandomStringUtils.randomNumeric(5);
+        + RandomStringUtils.randomNumeric(32);
 
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
         .setClusterId(UUID.randomUUID().toString())
@@ -139,11 +138,6 @@ public class TestOzoneManagerSnapshotAcl {
     OMStorage.getOmDbDir(ozoneManagerConf);
   }
 
-  @AfterEach
-  public void cleanup() throws IOException {
-    setDefaultAcls();
-  }
-
   @AfterAll
   public static void tearDown() throws Exception {
     IOUtils.closeQuietly(client);
@@ -161,8 +155,7 @@ public class TestOzoneManagerSnapshotAcl {
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
 
     // WHEN-THEN
-    Assertions.assertDoesNotThrow(
-        () -> ozoneManager.lookupKey(snapshotKeyArgs));
+    assertDoesNotThrow(() -> ozoneManager.lookupKey(snapshotKeyArgs));
   }
 
   @ParameterizedTest
@@ -176,14 +169,14 @@ public class TestOzoneManagerSnapshotAcl {
 
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
-    final OMException ex = Assertions.assertThrows(OMException.class,
+    final OMException ex = assertThrows(OMException.class,
         () -> ozoneManager.lookupKey(snapshotKeyArgs));
 
     // THEN
-    Assertions.assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
         ex.getResult());
     // when same user reads same key from active fs, read allowed.
-    Assertions.assertDoesNotThrow(() -> ozoneManager.lookupKey(keyArgs));
+    assertDoesNotThrow(() -> ozoneManager.lookupKey(keyArgs));
   }
 
   @ParameterizedTest
@@ -196,7 +189,7 @@ public class TestOzoneManagerSnapshotAcl {
     final boolean assumeS3Context = false;
 
     // WHEN-THEN
-    Assertions.assertDoesNotThrow(
+    assertDoesNotThrow(
         () -> ozoneManager.getKeyInfo(snapshotKeyArgs, assumeS3Context));
   }
 
@@ -213,15 +206,15 @@ public class TestOzoneManagerSnapshotAcl {
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
     final OMException ex =
-        Assertions.assertThrows(OMException.class,
+        assertThrows(OMException.class,
             () -> ozoneManager.getKeyInfo(snapshotKeyOmKeyArgs,
                 assumeS3Context));
 
     // THEN
-    Assertions.assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
         ex.getResult());
     // when same user reads same key from active fs, read allowed.
-    Assertions.assertDoesNotThrow(
+    assertDoesNotThrow(
         () -> ozoneManager.getKeyInfo(omKeyArgs, assumeS3Context));
   }
 
@@ -236,7 +229,7 @@ public class TestOzoneManagerSnapshotAcl {
     final long numEntries = Long.parseLong(RandomStringUtils.randomNumeric(1));
 
     // WHEN-THEN
-    Assertions.assertDoesNotThrow(
+    assertDoesNotThrow(
         () -> ozoneManager.listStatus(snapshotKeyArgs, recursive,
             snapshotKeyArgs.getKeyName(), numEntries,
             allowPartialPrefixes));
@@ -256,16 +249,16 @@ public class TestOzoneManagerSnapshotAcl {
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
     final OMException ex =
-        Assertions.assertThrows(OMException.class,
+        assertThrows(OMException.class,
             () -> ozoneManager.listStatus(snapshotKeyArgs, recursive,
                 snapshotKeyArgs.getKeyName(), numEntries,
                 allowPartialPrefixes));
 
     // THEN
-    Assertions.assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
         ex.getResult());
     // when same user reads same key from active fs, read allowed.
-    Assertions.assertDoesNotThrow(() -> ozoneManager.listStatus(keyArgs,
+    assertDoesNotThrow(() -> ozoneManager.listStatus(keyArgs,
         recursive, keyName, numEntries, allowPartialPrefixes));
   }
 
@@ -278,7 +271,7 @@ public class TestOzoneManagerSnapshotAcl {
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
 
     // WHEN-THEN
-    Assertions.assertDoesNotThrow(
+    assertDoesNotThrow(
         () -> ozoneManager.lookupFile(snapshotKeyArgs));
   }
 
@@ -293,14 +286,14 @@ public class TestOzoneManagerSnapshotAcl {
 
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
-    final OMException ex = Assertions.assertThrows(OMException.class,
+    final OMException ex = assertThrows(OMException.class,
         () -> ozoneManager.lookupFile(snapshotKeyArgs));
 
     // THEN
-    Assertions.assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
         ex.getResult());
     // when same user reads same key from active fs, read allowed.
-    Assertions.assertDoesNotThrow(() -> ozoneManager.lookupFile(keyArgs));
+    assertDoesNotThrow(() -> ozoneManager.lookupFile(keyArgs));
   }
 
   @ParameterizedTest
@@ -313,7 +306,7 @@ public class TestOzoneManagerSnapshotAcl {
     final int maxKeys = Integer.parseInt(RandomStringUtils.randomNumeric(1));
 
     // WHEN-THEN
-    Assertions.assertDoesNotThrow(() -> ozoneManager.listKeys(volumeName,
+    assertDoesNotThrow(() -> ozoneManager.listKeys(volumeName,
         bucketName, snapshotKeyArgs.getKeyName(), snapshotKeyPrefix, maxKeys));
   }
 
@@ -330,10 +323,10 @@ public class TestOzoneManagerSnapshotAcl {
     UserGroupInformation.setLoginUser(UGI2);
 
     // THEN
-    Assertions.assertDoesNotThrow(
+    assertDoesNotThrow(
         () -> ozoneManager.listKeys(volumeName, bucketName,
             snapshotKeyArgs.getKeyName(), snapshotKeyPrefix, maxKeys));
-    Assertions.assertDoesNotThrow(() -> ozoneManager.listKeys(volumeName,
+    assertDoesNotThrow(() -> ozoneManager.listKeys(volumeName,
         bucketName, keyName, KEY_PREFIX, maxKeys));
   }
 
@@ -353,7 +346,7 @@ public class TestOzoneManagerSnapshotAcl {
         .build();
 
     // WHEN-THEN
-    Assertions.assertDoesNotThrow(() -> ozoneManager.getAcl(ozoneObj));
+    assertDoesNotThrow(() -> ozoneManager.getAcl(ozoneObj));
   }
 
   @ParameterizedTest
@@ -379,14 +372,14 @@ public class TestOzoneManagerSnapshotAcl {
 
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
-    final OMException ex = Assertions.assertThrows(OMException.class,
+    final OMException ex = assertThrows(OMException.class,
         () -> ozoneManager.getAcl(snapshotObj));
 
     // THEN
-    Assertions.assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
         ex.getResult());
     // when same user reads same key from active fs, read allowed.
-    Assertions.assertDoesNotThrow(() -> ozoneManager.getAcl(keyObj));
+    assertDoesNotThrow(() -> ozoneManager.getAcl(keyObj));
   }
 
   private void setup(BucketLayout bucketLayout)
@@ -458,7 +451,7 @@ public class TestOzoneManagerSnapshotAcl {
 
   private void createKey(OzoneBucket bucket)
       throws IOException {
-    keyName = KEY_PREFIX + RandomStringUtils.randomNumeric(5);
+    keyName = KEY_PREFIX + RandomStringUtils.randomNumeric(32);
     byte[] data = RandomStringUtils.randomAscii(1).getBytes(UTF_8);
     final OzoneOutputStream fileKey = bucket.createKey(keyName, data.length);
     fileKey.write(data);
@@ -469,7 +462,7 @@ public class TestOzoneManagerSnapshotAcl {
       throws IOException {
     final String snapshotPrefix = "snapshot-";
     final String snapshotName =
-        snapshotPrefix + RandomStringUtils.randomNumeric(5);
+        snapshotPrefix + RandomStringUtils.randomNumeric(32);
     objectStore.createSnapshot(volumeName, bucketName, snapshotName);
     snapshotKeyPrefix = OmSnapshotManager
         .getSnapshotPrefix(snapshotName);
@@ -527,7 +520,7 @@ public class TestOzoneManagerSnapshotAcl {
   private void createBucket(BucketLayout bucketLayout,
       OzoneVolume volume) throws IOException {
     final String bucketPrefix = "bucket-";
-    bucketName = bucketPrefix + RandomStringUtils.randomNumeric(5);
+    bucketName = bucketPrefix + RandomStringUtils.randomNumeric(32);
     final BucketArgs bucketArgs = BucketArgs.newBuilder()
         .setOwner(ADMIN)
         .setBucketLayout(bucketLayout).build();
@@ -536,7 +529,7 @@ public class TestOzoneManagerSnapshotAcl {
 
   private void createVolume() throws IOException {
     final String volumePrefix = "volume-";
-    volumeName = volumePrefix + RandomStringUtils.randomNumeric(5);
+    volumeName = volumePrefix + RandomStringUtils.randomNumeric(32);
     final VolumeArgs volumeArgs = new VolumeArgs.Builder()
         .setAdmin(ADMIN)
         .setOwner(ADMIN)

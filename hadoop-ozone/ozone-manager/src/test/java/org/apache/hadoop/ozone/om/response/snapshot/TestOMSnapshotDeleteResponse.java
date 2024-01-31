@@ -34,43 +34,44 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteS
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.apache.hadoop.util.Time;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.util.UUID;
+import java.nio.file.Path;
 
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED;
-
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class tests OMSnapshotDeleteResponse.
  */
 public class TestOMSnapshotDeleteResponse {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
   
   private OMMetadataManager omMetadataManager;
   private BatchOperation batchOperation;
   private OzoneConfiguration ozoneConfiguration;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     ozoneConfiguration = new OzoneConfiguration();
-    String fsPath = folder.newFolder().getAbsolutePath();
+    String fsPath = folder.toAbsolutePath().toString();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         fsPath);
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     if (batchOperation != null) {
       batchOperation.close();
@@ -82,18 +83,21 @@ public class TestOMSnapshotDeleteResponse {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String snapshotName = UUID.randomUUID().toString();
-    String snapshotId = UUID.randomUUID().toString();
+    UUID snapshotId = UUID.randomUUID();
     SnapshotInfo snapshotInfo = SnapshotInfo.newInstance(volumeName,
         bucketName,
         snapshotName,
-        snapshotId);
+        snapshotId,
+        Time.now());
 
     // confirm table is empty
-    Assert.assertEquals(0,
+    assertEquals(0,
         omMetadataManager
         .countRowsInTable(omMetadataManager.getSnapshotInfoTable()));
 
     // Prepare the table, write an entry with SnapshotCreate
+    OMSnapshotResponseTestUtil.addVolumeBucketInfoToTable(
+        omMetadataManager, volumeName, bucketName);
     OMSnapshotCreateResponse omSnapshotCreateResponse =
         new OMSnapshotCreateResponse(OMResponse.newBuilder()
             .setCmdType(Type.CreateSnapshot)
@@ -109,10 +113,10 @@ public class TestOMSnapshotDeleteResponse {
     // Confirm snapshot directory was created
     String snapshotDir = OmSnapshotManager.getSnapshotPath(ozoneConfiguration,
         snapshotInfo);
-    Assert.assertTrue((new File(snapshotDir)).exists());
+    assertTrue((new File(snapshotDir)).exists());
 
     // Confirm table has 1 entry
-    Assert.assertEquals(1, omMetadataManager
+    assertEquals(1, omMetadataManager
         .countRowsInTable(omMetadataManager.getSnapshotInfoTable()));
 
     try (TableIterator<String, ? extends KeyValue<String, SnapshotInfo>> iter =
@@ -120,9 +124,10 @@ public class TestOMSnapshotDeleteResponse {
       // Check snapshotInfo entry content
       Table.KeyValue<String, SnapshotInfo> keyValue = iter.next();
       SnapshotInfo storedInfo = keyValue.getValue();
-      Assert.assertEquals(snapshotInfo.getTableKey(), keyValue.getKey());
-      Assert.assertEquals(snapshotInfo, storedInfo);
-      Assert.assertEquals(SNAPSHOT_ACTIVE, snapshotInfo.getSnapshotStatus());
+      assertEquals(snapshotInfo.getTableKey(), keyValue.getKey());
+      assertEquals(snapshotInfo, storedInfo);
+      assertEquals(SNAPSHOT_ACTIVE,
+          snapshotInfo.getSnapshotStatus());
     }
 
     // Update snapshot status to DELETED
@@ -141,7 +146,7 @@ public class TestOMSnapshotDeleteResponse {
 
     // Confirm addToDBBatch result
     // 1. The table still has 1 entry
-    Assert.assertEquals(1, omMetadataManager
+    assertEquals(1, omMetadataManager
         .countRowsInTable(omMetadataManager.getSnapshotInfoTable()));
 
     try (TableIterator<String, ? extends KeyValue<String, SnapshotInfo>> iter =
@@ -149,9 +154,10 @@ public class TestOMSnapshotDeleteResponse {
       // 2. snapshot status should now be DELETED
       Table.KeyValue<String, SnapshotInfo> keyValue = iter.next();
       SnapshotInfo storedInfo = keyValue.getValue();
-      Assert.assertEquals(snapshotInfo.getTableKey(), keyValue.getKey());
-      Assert.assertEquals(snapshotInfo, storedInfo);
-      Assert.assertEquals(SNAPSHOT_DELETED, snapshotInfo.getSnapshotStatus());
+      assertEquals(snapshotInfo.getTableKey(), keyValue.getKey());
+      assertEquals(snapshotInfo, storedInfo);
+      assertEquals(SNAPSHOT_DELETED,
+          snapshotInfo.getSnapshotStatus());
     }
   }
 

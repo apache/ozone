@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.Auditor;
@@ -57,7 +58,9 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
+import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,15 +74,21 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PR
  */
 public abstract class EndpointBase implements Auditor {
 
+  protected static final String ETAG = "ETag";
+
+  protected static final String ETAG_CUSTOM = "etag-custom";
+
   @Inject
   private OzoneClient client;
   @Inject
+  private SignatureInfo signatureInfo;
+
   private S3Auth s3Auth;
   @Context
   private ContainerRequestContext context;
 
   private Set<String> excludeMetadataFields =
-          new HashSet<>(Arrays.asList(OzoneConsts.GDPR_FLAG));
+      new HashSet<>(Arrays.asList(OzoneConsts.GDPR_FLAG));
   private static final Logger LOG =
       LoggerFactory.getLogger(EndpointBase.class);
 
@@ -113,10 +122,16 @@ public abstract class EndpointBase implements Auditor {
    */
   @PostConstruct
   public void initialization() {
+    // Note: userPrincipal is initialized to be the same value as accessId,
+    //  could be updated later in RpcClient#getS3Volume
+    s3Auth = new S3Auth(signatureInfo.getStringToSign(),
+        signatureInfo.getSignature(),
+        signatureInfo.getAwsAccessId(), signatureInfo.getAwsAccessId());
     LOG.debug("S3 access id: {}", s3Auth.getAccessID());
-    getClient().getObjectStore()
-        .getClientProxy()
-        .setThreadLocalS3Auth(s3Auth);
+    ClientProtocol clientProtocol =
+        getClient().getObjectStore().getClientProxy();
+    clientProtocol.setThreadLocalS3Auth(s3Auth);
+    clientProtocol.setIsS3Request(true);
     init();
   }
 
@@ -159,10 +174,11 @@ public abstract class EndpointBase implements Auditor {
    */
   protected String createS3Bucket(String bucketName) throws
       IOException, OS3Exception {
+    long startNanos = Time.monotonicNowNanos();
     try {
       client.getObjectStore().createS3Bucket(bucketName);
     } catch (OMException ex) {
-      getMetrics().incCreateBucketFailure();
+      getMetrics().updateCreateBucketFailureStats(startNanos);
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
       } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
@@ -171,9 +187,9 @@ public abstract class EndpointBase implements Auditor {
       } else if (ex.getResult() == ResultCodes.TIMEOUT ||
           ex.getResult() == ResultCodes.INTERNAL_ERROR) {
         throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
-      } else if (ex.getResult() != ResultCodes.BUCKET_ALREADY_EXISTS) {
-        // S3 does not return error for bucket already exists, it just
-        // returns the location.
+      } else if (ex.getResult() == ResultCodes.BUCKET_ALREADY_EXISTS) {
+        throw newError(S3ErrorTable.BUCKET_ALREADY_EXISTS, bucketName, ex);
+      } else {
         throw ex;
       }
     }
@@ -288,8 +304,7 @@ public abstract class EndpointBase implements Auditor {
 
         if (sizeInBytes >
                 OzoneConsts.S3_REQUEST_HEADER_METADATA_SIZE_LIMIT_KB * KB) {
-          throw new IllegalArgumentException("Illegal user defined metadata." +
-              " Combined size cannot exceed 2KB.");
+          throw newError(S3ErrorTable.METADATA_TOO_LARGE, key);
         }
         customMetadata.put(mapKey, value);
       }
@@ -302,8 +317,15 @@ public abstract class EndpointBase implements Auditor {
 
     Map<String, String> metadata = key.getMetadata();
     for (Map.Entry<String, String> entry : metadata.entrySet()) {
+      if (entry.getKey().equals(ETAG)) {
+        continue;
+      }
+      String metadataKey = entry.getKey();
+      if (metadataKey.equals(ETAG_CUSTOM)) {
+        metadataKey = ETAG.toLowerCase();
+      }
       responseBuilder
-          .header(CUSTOM_METADATA_HEADER_PREFIX + entry.getKey(),
+          .header(CUSTOM_METADATA_HEADER_PREFIX + metadataKey,
               entry.getValue());
     }
   }
@@ -332,6 +354,14 @@ public abstract class EndpointBase implements Auditor {
     return builder.build();
   }
 
+  public AuditMessage buildAuditMessageForSuccess(AuditAction op,
+      Map<String, String> auditMap, PerformanceStringBuilder performance) {
+    AuditMessage.Builder builder = auditMessageBaseBuilder(op, auditMap)
+        .withResult(AuditEventStatus.SUCCESS);
+    builder.setPerformance(performance);
+    return builder.build();
+  }
+
   @Override
   public AuditMessage buildAuditMessageForFailure(AuditAction op,
       Map<String, String> auditMap, Throwable throwable) {
@@ -357,7 +387,7 @@ public abstract class EndpointBase implements Auditor {
 
   @VisibleForTesting
   public S3GatewayMetrics getMetrics() {
-    return S3GatewayMetrics.create();
+    return S3GatewayMetrics.getMetrics();
   }
 
   protected Map<String, String> getAuditParameters() {

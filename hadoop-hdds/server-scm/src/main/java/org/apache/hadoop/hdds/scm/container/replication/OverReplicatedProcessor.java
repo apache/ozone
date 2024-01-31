@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.util.function.Supplier;
 
 /**
  * Class used to pick messages from the ReplicationManager over replicated
@@ -28,23 +30,30 @@ public class OverReplicatedProcessor extends UnhealthyReplicationProcessor
         <ContainerHealthResult.OverReplicatedHealthResult> {
 
   public OverReplicatedProcessor(ReplicationManager replicationManager,
-      long intervalInMillis) {
-    super(replicationManager, intervalInMillis);
+      Supplier<Duration> interval) {
+    super(replicationManager, interval);
 
   }
 
   @Override
   protected ContainerHealthResult.OverReplicatedHealthResult
-      dequeueHealthResultFromQueue(ReplicationManager replicationManager) {
-    return replicationManager.dequeueOverReplicatedContainer();
+      dequeueHealthResultFromQueue(ReplicationQueue queue) {
+    return queue.dequeueOverReplicatedContainer();
   }
 
   @Override
-  protected void requeueHealthResultFromQueue(
-          ReplicationManager replicationManager,
-          ContainerHealthResult.OverReplicatedHealthResult healthResult) {
-    replicationManager.requeueOverReplicatedContainer(healthResult);
+  protected void requeueHealthResult(ReplicationQueue queue,
+      ContainerHealthResult.OverReplicatedHealthResult healthResult) {
+    queue.enqueue(healthResult);
   }
+
+  @Override
+  protected boolean inflightOperationLimitReached(ReplicationManager rm,
+      long pendingOpLimit) {
+    // No limit for delete operations
+    return false;
+  }
+
   @Override
   protected int sendDatanodeCommands(
       ReplicationManager replicationManager,

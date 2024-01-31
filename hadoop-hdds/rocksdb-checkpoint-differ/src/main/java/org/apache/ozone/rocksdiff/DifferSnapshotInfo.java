@@ -17,32 +17,39 @@
  */
 package org.apache.ozone.rocksdiff;
 
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Snapshot information node class for the differ.
  */
 public class DifferSnapshotInfo {
   private final String dbPath;
-  private final String snapshotID;
+  private final UUID snapshotId;
   private final long snapshotGeneration;
 
   private final Map<String, String> tablePrefixes;
 
-  public DifferSnapshotInfo(String db, String id, long gen,
-                            Map<String, String> prefixes) {
+  private final ManagedRocksDB rocksDB;
+
+  public DifferSnapshotInfo(String db, UUID id, long gen,
+                            Map<String, String> prefixes,
+                            ManagedRocksDB rocksDB) {
     dbPath = db;
-    snapshotID = id;
+    snapshotId = id;
     snapshotGeneration = gen;
     tablePrefixes = prefixes;
+    this.rocksDB = rocksDB;
   }
 
   public String getDbPath() {
     return dbPath;
   }
 
-  public String getSnapshotID() {
-    return snapshotID;
+  public UUID getSnapshotId() {
+    return snapshotId;
   }
 
   public long getSnapshotGeneration() {
@@ -56,8 +63,11 @@ public class DifferSnapshotInfo {
   @Override
   public String toString() {
     return String.format("DifferSnapshotInfo{dbPath='%s', snapshotID='%s', " +
-                    "snapshotGeneration=%d, tablePrefixes size=%s}",
-            dbPath, snapshotID, snapshotGeneration, tablePrefixes.size());
+            "snapshotGeneration=%d, tablePrefixes size=%s}",
+        dbPath, snapshotId, snapshotGeneration, tablePrefixes.size());
   }
 
+  public ManagedRocksDB getRocksDB() {
+    return rocksDB;
+  }
 }

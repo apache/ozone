@@ -21,15 +21,14 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
-import javax.net.ssl.TrustManager;
 import java.security.cert.X509Certificate;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /**
  * Test ReloadingX509TrustManager.
@@ -37,33 +36,30 @@ import static org.junit.Assert.assertTrue;
 public class TestReloadingX509TrustManager {
   private final LogCapturer reloaderLog =
       LogCapturer.captureLogs(ReloadingX509TrustManager.LOG);
-  private static OzoneConfiguration conf;
   private static CertificateClientTestImpl caClient;
 
-  @BeforeClass
+  @BeforeAll
   public static void setUp() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     caClient = new CertificateClientTestImpl(conf);
   }
 
   @Test
   public void testReload() throws Exception {
-    TrustManager tm =
-        caClient.getServerKeyStoresFactory().getTrustManagers()[0];
+    ReloadingX509TrustManager tm =
+        (ReloadingX509TrustManager) caClient.getServerKeyStoresFactory()
+            .getTrustManagers()[0];
     X509Certificate cert1 = caClient.getRootCACertificate();
-    assertEquals(cert1,
-        ((ReloadingX509TrustManager)tm).getAcceptedIssuers()[0]);
+    assertThat(tm.getAcceptedIssuers()).containsOnly(cert1);
 
     caClient.renewRootCA();
     caClient.renewKey();
     X509Certificate cert2 = caClient.getRootCACertificate();
     assertNotEquals(cert1, cert2);
 
-    assertEquals(cert2,
-        ((ReloadingX509TrustManager)tm).getAcceptedIssuers()[0]);
-
-    assertTrue(reloaderLog.getOutput().contains(
-        "ReloadingX509TrustManager is reloaded"));
+    assertThat(tm.getAcceptedIssuers()).contains(cert1, cert2);
+    assertThat(reloaderLog.getOutput())
+        .contains("ReloadingX509TrustManager is reloaded");
 
     // Make sure there are two reload happened, one for server, one for client
     assertEquals(2, StringUtils.countMatches(reloaderLog.getOutput(),

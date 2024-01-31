@@ -40,6 +40,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
  */
 public final class OmSnapshotUtils {
 
+  public static final String DATA_PREFIX = "data";
+  public static final String DATA_SUFFIX = "txt";
+
   private OmSnapshotUtils() { }
 
   /**
@@ -80,7 +83,7 @@ public final class OmSnapshotUtils {
   public static Path createHardLinkList(int truncateLength,
                                         Map<Path, Path> hardLinkFiles)
       throws IOException {
-    Path data = Files.createTempFile("data", "txt");
+    Path data = Files.createTempFile(DATA_PREFIX, DATA_SUFFIX);
     StringBuilder sb = new StringBuilder();
     for (Map.Entry<Path, Path> entry : hardLinkFiles.entrySet()) {
       String fixedFile = truncateFileName(truncateLength, entry.getValue());
@@ -115,8 +118,16 @@ public final class OmSnapshotUtils {
         for (String l : lines) {
           String from = l.split("\t")[1];
           String to = l.split("\t")[0];
-          Path fullFromPath = getFullPath(dbPath, from);
-          Path fullToPath = getFullPath(dbPath, to);
+          Path fullFromPath = Paths.get(dbPath.toString(), from);
+          Path fullToPath = Paths.get(dbPath.toString(), to);
+          // Make parent dir if it doesn't exist.
+          Path parent = fullToPath.getParent();
+          if ((parent != null) && (!parent.toFile().exists())) {
+            if (!parent.toFile().mkdirs()) {
+              throw new IOException(
+                  "Failed to create directory: " + parent.toString());
+            }
+          }
           Files.createLink(fullToPath, fullFromPath);
         }
         if (!hardLinkFile.delete()) {
@@ -126,19 +137,40 @@ public final class OmSnapshotUtils {
     }
   }
 
-  // Prepend the full path to the hard link entry entry.
-  private static Path getFullPath(Path dbPath, String fileName)
-      throws IOException {
-    File file = new File(fileName);
-    // If there is no directory then this file belongs in the db.
-    if (file.getName().equals(fileName)) {
-      return Paths.get(dbPath.toString(), fileName);
+  /**
+   * Link each of the files in oldDir to newDir.
+   *
+   * @param oldDir The dir to create links from.
+   * @param newDir The dir to create links to.
+   */
+  public static void linkFiles(File oldDir, File newDir) throws IOException {
+    int truncateLength = oldDir.toString().length() + 1;
+    List<String> oldDirList;
+    try (Stream<Path> files = Files.walk(oldDir.toPath())) {
+      oldDirList = files.map(Path::toString).
+          // Don't copy the directory itself
+          filter(s -> !s.equals(oldDir.toString())).
+          // Remove the old path
+          map(s -> s.substring(truncateLength)).
+          sorted().
+          collect(Collectors.toList());
     }
-    // Else this file belong in a directory parallel to the db.
-    Path parent = dbPath.getParent();
-    if (parent == null) {
-      throw new IOException("Invalid database " + dbPath);
+    for (String s: oldDirList) {
+      File oldFile = new File(oldDir, s);
+      File newFile = new File(newDir, s);
+      File newParent = newFile.getParentFile();
+      if (!newParent.exists()) {
+        if (!newParent.mkdirs()) {
+          throw new IOException("Directory create fails: " + newParent);
+        }
+      }
+      if (oldFile.isDirectory()) {
+        if (!newFile.mkdirs()) {
+          throw new IOException("Directory create fails: " + newFile);
+        }
+      } else {
+        Files.createLink(newFile.toPath(), oldFile.toPath());
+      }
     }
-    return Paths.get(parent.toString(), fileName);
   }
 }

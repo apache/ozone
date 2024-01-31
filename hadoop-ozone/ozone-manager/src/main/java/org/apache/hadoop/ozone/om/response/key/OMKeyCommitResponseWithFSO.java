@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -28,7 +29,7 @@ import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 
 import java.io.IOException;
 
@@ -47,14 +48,15 @@ public class OMKeyCommitResponseWithFSO extends OMKeyCommitResponse {
   private long volumeId;
 
   @SuppressWarnings("parameternumber")
-  public OMKeyCommitResponseWithFSO(@Nonnull OMResponse omResponse,
-                               @Nonnull OmKeyInfo omKeyInfo,
-                               String ozoneKeyName, String openKeyName,
-                               @Nonnull OmBucketInfo omBucketInfo,
-                               RepeatedOmKeyInfo deleteKeys, long volumeId,
-                                    boolean isHSync) {
+  public OMKeyCommitResponseWithFSO(
+      @Nonnull OMResponse omResponse,
+      @Nonnull OmKeyInfo omKeyInfo,
+      String ozoneKeyName, String openKeyName,
+      @Nonnull OmBucketInfo omBucketInfo,
+      Map<String, RepeatedOmKeyInfo> deleteKeyMap, long volumeId,
+      boolean isHSync) {
     super(omResponse, omKeyInfo, ozoneKeyName, openKeyName,
-            omBucketInfo, deleteKeys, isHSync);
+            omBucketInfo, deleteKeyMap, isHSync);
     this.volumeId = volumeId;
   }
 

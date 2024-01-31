@@ -25,7 +25,7 @@ import java.util.function.Predicate;
  * Filter for selecting volumes with enough space for a new container.
  * Keeps track of ineligible volumes for logging/debug purposes.
  */
-class AvailableSpaceFilter implements Predicate<HddsVolume> {
+public class AvailableSpaceFilter implements Predicate<HddsVolume> {
 
   private final long requiredSpace;
   private final Map<HddsVolume, AvailableSpace> fullVolumes =
@@ -38,10 +38,14 @@ class AvailableSpaceFilter implements Predicate<HddsVolume> {
 
   @Override
   public boolean test(HddsVolume vol) {
+    long volumeCapacity = vol.getCapacity();
     long free = vol.getAvailable();
     long committed = vol.getCommittedBytes();
     long available = free - committed;
-    boolean hasEnoughSpace = available > requiredSpace;
+    long volumeFreeSpaceToSpare =
+        VolumeUsage.getMinVolumeFreeSpace(vol.getConf(), volumeCapacity);
+    boolean hasEnoughSpace = VolumeUsage.hasVolumeEnoughSpace(free, committed,
+        requiredSpace, volumeFreeSpaceToSpare);
 
     mostAvailableSpace = Math.max(available, mostAvailableSpace);
 

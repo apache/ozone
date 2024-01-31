@@ -18,15 +18,18 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.WriteBatch;
+
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * Managed WriteBatch.
  */
 public class ManagedWriteBatch extends WriteBatch {
+  private final UncheckedAutoCloseable leakTracker = track(this);
 
   public ManagedWriteBatch() {
-    super();
   }
 
   public ManagedWriteBatch(byte[] data) {
@@ -34,8 +37,11 @@ public class ManagedWriteBatch extends WriteBatch {
   }
 
   @Override
-  protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
-    super.finalize();
+  public void close() {
+    try {
+      super.close();
+    } finally {
+      leakTracker.close();
+    }
   }
 }

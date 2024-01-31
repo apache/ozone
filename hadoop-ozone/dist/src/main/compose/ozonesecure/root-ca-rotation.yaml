@@ -1,0 +1,52 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+version: "3.8"
+
+x-root-cert-rotation-config:
+  &root-cert-rotation-config
+  environment:
+    - OZONE-SITE.XML_hdds.x509.grace.duration.token.checks.enabled=false
+    - OZONE-SITE.XML_hdds.x509.max.duration=PT180S
+    - OZONE-SITE.XML_hdds.x509.default.duration=PT60S
+    - OZONE-SITE.XML_hdds.x509.renew.grace.duration=PT45S
+    - OZONE-SITE.XML_hdds.x509.ca.rotation.check.interval=PT1S
+    - OZONE-SITE.XML_hdds.x509.ca.rotation.ack.timeout=PT20S
+    - OZONE-SITE.XML_hdds.x509.rootca.certificate.polling.interval=PT2s
+    - OZONE-SITE.XML_hdds.block.token.expiry.time=15s
+    - OZONE-SITE.XML_ozone.manager.delegation.token.max-lifetime=15s
+    - OZONE-SITE.XML_ozone.manager.delegation.token.renew-interval=15s
+    - OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=60s
+    - OZONE-SITE.XML_hdds.scmclient.failover.retry.interval=1s
+    - OZONE-SITE.XML_hdds.scmclient.failover.max.retry=60
+    - OZONE-SITE.XML_ozone.scm.info.wait.duration=60s
+    - OZONE-SITE.XML_ozone.scm.ha.ratis.request.timeout=2s
+    - OZONE-SITE.XML_ozone.http.filter.initializers=org.apache.hadoop.security.HttpCrossOriginFilterInitializer
+    - OZONE-SITE.XML_hdds.x509.ca.rotation.enabled=true
+    - OZONE-SITE.XML_hdds.x509.expired.certificate.check.interval=PT30s
+services:
+  datanode:
+    <<: *root-cert-rotation-config
+  om:
+    <<: *root-cert-rotation-config
+  scm:
+    <<: *root-cert-rotation-config
+  s3g:
+    <<: *root-cert-rotation-config
+  httpfs:
+    <<: *root-cert-rotation-config
+  recon:
+    <<: *root-cert-rotation-config

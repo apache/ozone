@@ -18,11 +18,11 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.ozone.client.io.ByteBufferOutputStream;
 import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
 import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
 
@@ -35,7 +35,7 @@ import java.util.Objects;
  * This class is used for error handling methods.
  */
 public abstract class AbstractDataStreamOutput
-    implements ByteBufferStreamOutput {
+    extends ByteBufferOutputStream {
 
   private final Map<Class<? extends Throwable>, RetryPolicy> retryPolicyMap;
   private int retryCount;
@@ -46,11 +46,6 @@ public abstract class AbstractDataStreamOutput
     this.retryPolicyMap = retryPolicyMap;
     this.isException = false;
     this.retryCount = 0;
-  }
-
-  @VisibleForTesting
-  public int getRetryCount() {
-    return retryCount;
   }
 
   protected void resetRetryCount() {

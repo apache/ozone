@@ -18,11 +18,9 @@
 
 package org.apache.hadoop.ozone.om.request.bucket;
 
-import org.apache.hadoop.crypto.CipherSuite;
-import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -31,6 +29,8 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.common.BekInfoUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
@@ -51,14 +50,12 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketEncryptionInfoProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
@@ -66,6 +63,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -73,7 +71,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCK
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CryptoProtocolVersionProto.ENCRYPTION_ZONES;
 
 /**
  * Handles CreateBucket Request.
@@ -93,7 +90,10 @@ public class OMBucketCreateRequest extends OMClientRequest {
         getOmRequest().getCreateBucketRequest();
     BucketInfo bucketInfo = createBucketRequest.getBucketInfo();
     // Verify resource name
-    OmUtils.validateBucketName(bucketInfo.getBucketName());
+    OmUtils.validateBucketName(bucketInfo.getBucketName(),
+        ozoneManager.isStrictS3());
+
+    validateMaxBucket(ozoneManager);
 
     // Get KMS provider.
     KeyProviderCryptoExtension kmsProvider =
@@ -111,7 +111,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
         .setModificationTime(initialTime);
 
     if (bucketInfo.hasBeinfo()) {
-      newBucketInfo.setBeinfo(getBeinfo(kmsProvider, bucketInfo));
+      newBucketInfo.setBeinfo(
+          BekInfoUtils.getBekInfo(kmsProvider, bucketInfo.getBeinfo()));
     }
 
     boolean hasSourceVolume = bucketInfo.hasSourceVolume();
@@ -140,10 +141,26 @@ public class OMBucketCreateRequest extends OMClientRequest {
         .setCreateBucketRequest(newCreateBucketRequest.build()).build();
   }
 
+  private static void validateMaxBucket(OzoneManager ozoneManager)
+      throws IOException {
+    int maxBucket = ozoneManager.getConfiguration().getInt(
+        OMConfigKeys.OZONE_OM_MAX_BUCKET,
+        OMConfigKeys.OZONE_OM_MAX_BUCKET_DEFAULT);
+    if (maxBucket <= 0) {
+      maxBucket = OMConfigKeys.OZONE_OM_MAX_BUCKET_DEFAULT;
+    }
+    long nrOfBuckets = ozoneManager.getMetadataManager().getBucketTable()
+        .getEstimatedKeyCount();
+    if (nrOfBuckets >= maxBucket) {
+      throw new OMException("Cannot create more than " + maxBucket
+          + " buckets",
+          ResultCodes.TOO_MANY_BUCKETS);
+    }
+  }
+
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long transactionLogIndex = termIndex.getIndex();
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumBucketCreates();
 
@@ -181,7 +198,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
     String volumeKey = metadataManager.getVolumeKey(volumeName);
     String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
-    IOException exception = null;
+    Exception exception = null;
     boolean acquiredBucketLock = false;
     boolean acquiredVolumeLock = false;
     OMClientResponse omClientResponse = null;
@@ -194,10 +211,13 @@ public class OMBucketCreateRequest extends OMClientRequest {
             volumeName, bucketName, null);
       }
 
-      acquiredVolumeLock =
-          metadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName);
-      acquiredBucketLock = metadataManager.getLock().acquireWriteLock(
-          BUCKET_LOCK, volumeName, bucketName);
+      mergeOmLockDetails(
+          metadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName));
+      acquiredVolumeLock = getOmLockDetails().isLockAcquired();
+
+      mergeOmLockDetails(metadataManager.getLock().acquireWriteLock(
+          BUCKET_LOCK, volumeName, bucketName));
+      acquiredBucketLock = getOmLockDetails().isLockAcquired();
 
       OmVolumeArgs omVolumeArgs =
           metadataManager.getVolumeTable().getReadCopy(volumeKey);
@@ -244,19 +264,22 @@ public class OMBucketCreateRequest extends OMClientRequest {
           CreateBucketResponse.newBuilder().build());
       omClientResponse = new OMBucketCreateResponse(omResponse.build(),
           omBucketInfo, omVolumeArgs.copyObject());
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new OMBucketCreateResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
-        metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(
+            metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
+                bucketName));
       }
       if (acquiredVolumeLock) {
-        metadataManager.getLock().releaseReadLock(VOLUME_LOCK, volumeName);
+        mergeOmLockDetails(
+            metadataManager.getLock().releaseReadLock(VOLUME_LOCK, volumeName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 
@@ -311,38 +334,6 @@ public class OMBucketCreateRequest extends OMClientRequest {
     omBucketInfo.setAcls(acls);
   }
 
-  private BucketEncryptionInfoProto getBeinfo(
-      KeyProviderCryptoExtension kmsProvider, BucketInfo bucketInfo)
-      throws IOException {
-    BucketEncryptionInfoProto bek = bucketInfo.getBeinfo();
-    BucketEncryptionInfoProto.Builder bekb = null;
-    if (kmsProvider == null) {
-      throw new OMException("Invalid KMS provider, check configuration " +
-          CommonConfigurationKeys.HADOOP_SECURITY_KEY_PROVIDER_PATH,
-          OMException.ResultCodes.INVALID_KMS_PROVIDER);
-    }
-    if (bek.getKeyName() == null) {
-      throw new OMException("Bucket encryption key needed.", OMException
-          .ResultCodes.BUCKET_ENCRYPTION_KEY_NOT_FOUND);
-    }
-    // Talk to KMS to retrieve the bucket encryption key info.
-    KeyProvider.Metadata metadata = kmsProvider.getMetadata(
-        bek.getKeyName());
-    if (metadata == null) {
-      throw new OMException("Bucket encryption key " + bek.getKeyName()
-          + " doesn't exist.",
-          OMException.ResultCodes.BUCKET_ENCRYPTION_KEY_NOT_FOUND);
-    }
-    // If the provider supports pool for EDEKs, this will fill in the pool
-    kmsProvider.warmUpEncryptedKeys(bek.getKeyName());
-    bekb = BucketEncryptionInfoProto.newBuilder()
-        .setKeyName(bek.getKeyName())
-        .setCryptoProtocolVersion(ENCRYPTION_ZONES)
-        .setSuite(OMPBHelper.convert(
-            CipherSuite.convert(metadata.getCipher())));
-    return bekb.build();
-  }
-
   /**
    * Check namespace quota.
    */
@@ -385,7 +376,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
     }
 
     List<OmBucketInfo>  bucketList = metadataManager.listBuckets(
-        omVolumeArgs.getVolume(), null, null, Integer.MAX_VALUE);
+        omVolumeArgs.getVolume(), null, null, Integer.MAX_VALUE, false);
     for (OmBucketInfo bucketInfo : bucketList) {
       long nextQuotaInBytes = bucketInfo.getQuotaInBytes();
       if (nextQuotaInBytes > OzoneConsts.QUOTA_RESET) {

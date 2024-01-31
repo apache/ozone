@@ -27,8 +27,12 @@ import org.apache.hadoop.ozone.client.OzoneClientException;
 import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
-import org.junit.Assert;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.Test;
 
 /**
  * Test ozone client creation.
@@ -40,7 +44,7 @@ public class TestOzoneAddressClientCreation {
     TestableOzoneAddress address =
         new TestableOzoneAddress("/vol1/bucket1/key1");
     address.createClient(new InMemoryConfiguration());
-    Assert.assertTrue(address.simpleCreation);
+    assertTrue(address.simpleCreation);
   }
 
   @Test
@@ -50,18 +54,30 @@ public class TestOzoneAddressClientCreation {
         new TestableOzoneAddress("/vol1/bucket1/key1");
     address.createClient(
         new InMemoryConfiguration(OZONE_OM_SERVICE_IDS_KEY, "service1"));
-    Assert.assertFalse(address.simpleCreation);
-    Assert.assertEquals("service1", address.serviceId);
+    assertFalse(address.simpleCreation);
+    assertEquals("service1", address.serviceId);
   }
 
-  @Test(expected = OzoneClientException.class)
+  @Test
   public void implicitHaMultipleServiceId()
       throws OzoneClientException, IOException {
     TestableOzoneAddress address =
         new TestableOzoneAddress("/vol1/bucket1/key1");
+    assertThrows(OzoneClientException.class, () ->
+        address.createClient(new InMemoryConfiguration(OZONE_OM_SERVICE_IDS_KEY,
+            "service1,service2")));
+  }
+
+  @Test
+  public void explicitHaMultipleServiceId()
+      throws OzoneClientException, IOException {
+    TestableOzoneAddress address =
+        new TestableOzoneAddress("o3://service1/vol1/bucket1/key1");
     address.createClient(
         new InMemoryConfiguration(OZONE_OM_SERVICE_IDS_KEY,
             "service1,service2"));
+    assertFalse(address.simpleCreation);
+    assertEquals("service1", address.serviceId);
   }
 
   @Test
@@ -69,9 +85,9 @@ public class TestOzoneAddressClientCreation {
     TestableOzoneAddress address =
         new TestableOzoneAddress("o3://om:9862/vol1/bucket1/key1");
     address.createClient(new InMemoryConfiguration());
-    Assert.assertFalse(address.simpleCreation);
-    Assert.assertEquals("om", address.host);
-    Assert.assertEquals(9862, address.port);
+    assertFalse(address.simpleCreation);
+    assertEquals("om", address.host);
+    assertEquals(9862, address.port);
   }
 
   @Test
@@ -81,9 +97,9 @@ public class TestOzoneAddressClientCreation {
         new TestableOzoneAddress("o3://om:9862/vol1/bucket1/key1");
     address.createClient(
         new InMemoryConfiguration(OZONE_OM_SERVICE_IDS_KEY, "service1"));
-    Assert.assertFalse(address.simpleCreation);
-    Assert.assertEquals("om", address.host);
-    Assert.assertEquals(9862, address.port);
+    assertFalse(address.simpleCreation);
+    assertEquals("om", address.host);
+    assertEquals(9862, address.port);
   }
 
   @Test
@@ -94,9 +110,9 @@ public class TestOzoneAddressClientCreation {
     address.createClient(
         new InMemoryConfiguration(OZONE_OM_SERVICE_IDS_KEY,
             "service1,service2"));
-    Assert.assertFalse(address.simpleCreation);
-    Assert.assertEquals("om", address.host);
-    Assert.assertEquals(9862, address.port);
+    assertFalse(address.simpleCreation);
+    assertEquals("om", address.host);
+    assertEquals(9862, address.port);
   }
 
   @Test
@@ -105,8 +121,8 @@ public class TestOzoneAddressClientCreation {
         new TestableOzoneAddress("o3://om/vol1/bucket1/key1");
     address.createClient(
         new InMemoryConfiguration(OZONE_OM_SERVICE_IDS_KEY, "service1"));
-    Assert.assertFalse(address.simpleCreation);
-    Assert.assertEquals("om", address.host);
+    assertFalse(address.simpleCreation);
+    assertEquals("om", address.host);
   }
 
   @Test
@@ -114,16 +130,17 @@ public class TestOzoneAddressClientCreation {
     TestableOzoneAddress address =
         new TestableOzoneAddress("o3://om:1234/vol1/bucket1/key1");
     address.createClient(new InMemoryConfiguration());
-    Assert.assertFalse(address.simpleCreation);
-    Assert.assertEquals("om", address.host);
-    Assert.assertEquals(1234, address.port);
+    assertFalse(address.simpleCreation);
+    assertEquals("om", address.host);
+    assertEquals(1234, address.port);
   }
 
-  @Test(expected = OzoneClientException.class)
+  @Test
   public void explicitWrongScheme() throws OzoneClientException, IOException {
     TestableOzoneAddress address =
         new TestableOzoneAddress("ssh://host/vol1/bucket1/key1");
-    address.createClient(new InMemoryConfiguration());
+    assertThrows(OzoneClientException.class, () ->
+        address.createClient(new InMemoryConfiguration()));
   }
 
   /**

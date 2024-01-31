@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.RemoveSCMRequest;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -149,6 +150,11 @@ public final class SCMHAManagerStub implements SCMHAManager {
   }
 
   @Override
+  public List<ManagedSecretKey> getSecretKeysFromLeader(String leaderID) {
+    return null;
+  }
+
+  @Override
   public TermIndex verifyCheckpointFromLeader(String leaderId,
                                               DBCheckpoint checkpoint) {
     return null;
@@ -203,6 +209,11 @@ public final class SCMHAManagerStub implements SCMHAManager {
       return SCMRatisResponse.decode(reply);
     }
 
+    @Override
+    public boolean triggerSnapshot() throws IOException {
+      throw new IOException("submitSnapshotRequest is called.");
+    }
+
     private Message process(final SCMRatisRequest request) throws Exception {
       try {
         final Object handler = handlers.get(request.getType());
@@ -221,8 +232,8 @@ public final class SCMHAManagerStub implements SCMHAManager {
       } catch (NoSuchMethodException | SecurityException ex) {
         throw new InvalidProtocolBufferException(ex.getMessage());
       } catch (InvocationTargetException e) {
-        final Exception targetEx = (Exception) e.getTargetException();
-        throw targetEx != null ? targetEx : e;
+        final Throwable target = e.getTargetException();
+        throw target instanceof Exception ? (Exception) target : e;
       }
     }
 

@@ -18,7 +18,10 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.RocksObject;
+
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * General template for a managed RocksObject.
@@ -26,16 +29,10 @@ import org.rocksdb.RocksObject;
  */
 class ManagedObject<T extends RocksObject> implements AutoCloseable {
   private final T original;
-
-  private final StackTraceElement[] elements;
+  private final UncheckedAutoCloseable leakTracker = track(this);
 
   ManagedObject(T original) {
     this.original = original;
-    if (ManagedRocksObjectUtils.LOG.isDebugEnabled()) {
-      this.elements = Thread.currentThread().getStackTrace();
-    } else {
-      this.elements = null;
-    }
   }
 
   public T get() {
@@ -44,25 +41,10 @@ class ManagedObject<T extends RocksObject> implements AutoCloseable {
 
   @Override
   public void close() {
-    original.close();
-  }
-
-  @Override
-  protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
-    super.finalize();
-  }
-
-  public String getStackTrace() {
-    if (elements != null && elements.length > 0) {
-      StringBuilder sb = new StringBuilder();
-      for (int line = 1; line < elements.length; line++) {
-        sb.append(elements[line]);
-        sb.append("\n");
-      }
-      return sb.toString();
+    try {
+      original.close();
+    } finally {
+      leakTracker.close();
     }
-    return "";
   }
-
 }

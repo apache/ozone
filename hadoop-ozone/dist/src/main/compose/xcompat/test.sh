@@ -21,8 +21,8 @@ COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 basename=$(basename ${COMPOSE_DIR})
 
-current_version=1.3.0
-old_versions="1.0.0 1.1.0 1.2.1" # container is needed for each version in clients.yaml
+current_version=1.5.0
+old_versions="1.0.0 1.1.0 1.2.1 1.3.0 1.4.0" # container is needed for each version in clients.yaml
 
 # shellcheck source=hadoop-ozone/dist/src/main/compose/testlib.sh
 source "${COMPOSE_DIR}/../testlib.sh"
@@ -77,7 +77,7 @@ test_cross_compatibility() {
 
 test_ec_cross_compatibility() {
   echo "Running Erasure Coded storage backward compatibility tests."
-  local cluster_versions_with_ec="1.3.0"
+  local cluster_versions_with_ec="1.3.0 1.4.0"
   local non_ec_client_versions="1.0.0 1.1.0 1.2.1"
 
   for cluster_version in ${cluster_versions_with_ec}; do
@@ -126,5 +126,3 @@ for cluster_version in ${old_versions}; do
 done
 
 test_ec_cross_compatibility
-
-generate_report

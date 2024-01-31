@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
@@ -56,7 +57,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.LongSupplier;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
@@ -170,11 +173,13 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
     assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
 
-    assertTrue(dirTable.iterator().hasNext());
-    assertEquals(root.getName(),
-        dirTable.iterator().next().getValue().getName());
+    try (TableIterator<?, ? extends Table.KeyValue<?, OmDirectoryInfo>>
+        iterator = dirTable.iterator()) {
+      assertTrue(iterator.hasNext());
+      assertEquals(root.getName(), iterator.next().getValue().getName());
+    }
 
-    assertTrue(dirDeletingService.getRunCount().get() > 1);
+    assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(1);
   }
 
   /**
@@ -241,9 +246,9 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 19);
 
     long elapsedRunCount = dirDeletingService.getRunCount().get() - preRunCount;
-    assertTrue(dirDeletingService.getRunCount().get() > 1);
+    assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(1);
     // Ensure dir deleting speed, here provide a backup value for safe CI
-    assertTrue(elapsedRunCount >= 7);
+    assertThat(elapsedRunCount).isGreaterThanOrEqualTo(7);
   }
 
   @Test
@@ -292,7 +297,7 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 2);
     assertSubPathsCount(dirDeletingService::getDeletedDirsCount, 5);
 
-    assertTrue(dirDeletingService.getRunCount().get() > 1);
+    assertThat(dirDeletingService.getRunCount().get()).isGreaterThan(1);
   }
 
   @Test
@@ -445,6 +450,13 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(keyTable, 5);
     assertTableRowCount(dirTable, 5);
 
+    long prevKdsRunCount = keyDeletingService.getRunCount().get();
+
+    // wait for at least 1 iteration of KeyDeletingService
+    GenericTestUtils.waitFor(
+        () -> (keyDeletingService.getRunCount().get() > prevKdsRunCount), 100,
+        10000);
+
     // KeyDeletingService and DirectoryDeletingService will not
     // clean up because the paths are part of a snapshot.
     assertTableRowCount(deletedDirTable, 0);
@@ -466,8 +478,14 @@ public class TestDirectoryDeletingServiceWithFSO {
     // clean up because the paths are part of a snapshot.
     // As a result on 1 deleted dir and 3 deleted files will
     // remain in dirTable and keyTable respectively.
+    long prevDDSRunCount = dirDeletingService.getRunCount().get();
+    long prevKDSRunCount = keyDeletingService.getRunCount().get();
     assertTableRowCount(deletedDirTable, 1);
     assertTableRowCount(deletedKeyTable, 3);
+    GenericTestUtils.waitFor(() -> dirDeletingService.getRunCount().get() >
+        prevDDSRunCount, 100, 10000);
+    GenericTestUtils.waitFor(() -> keyDeletingService.getRunCount().get() >
+        prevKDSRunCount, 100, 10000);
 
     assertSubPathsCount(dirDeletingService::getMovedFilesCount, 0);
     assertSubPathsCount(dirDeletingService::getMovedDirsCount, 0);
@@ -478,23 +496,27 @@ public class TestDirectoryDeletingServiceWithFSO {
   }
 
   private void cleanupTables() throws IOException {
-    cluster.getOzoneManager().getMetadataManager()
-        .getDeletedDirTable().iterator().removeFromDB();
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-             iterator = cluster.getOzoneManager().getMetadataManager()
-        .getFileTable().iterator()) {
-      while (iterator.hasNext()) {
-        iterator.next();
-        iterator.removeFromDB();
-      }
+    OMMetadataManager metadataManager =
+        cluster.getOzoneManager().getMetadataManager();
+
+    try (TableIterator<?, ?> it = metadataManager.getDeletedDirTable()
+        .iterator()) {
+      removeAllFromDB(it);
     }
-    try (TableIterator<String, ? extends Table.KeyValue<String,
-        OmDirectoryInfo>> deletedItr = cluster.getOzoneManager()
-        .getMetadataManager().getDirectoryTable().iterator()) {
-      while (deletedItr.hasNext()) {
-        deletedItr.next();
-        deletedItr.removeFromDB();
-      }
+    try (TableIterator<?, ?> it = metadataManager.getFileTable().iterator()) {
+      removeAllFromDB(it);
+    }
+    try (TableIterator<?, ?> it = metadataManager.getDirectoryTable()
+        .iterator()) {
+      removeAllFromDB(it);
+    }
+  }
+
+  private static void removeAllFromDB(TableIterator<?, ?> iterator)
+      throws IOException {
+    while (iterator.hasNext()) {
+      iterator.next();
+      iterator.removeFromDB();
     }
   }
 
@@ -529,8 +551,8 @@ public class TestDirectoryDeletingServiceWithFSO {
       fs.getFileStatus(path);
       fail("testRecursiveDelete failed");
     } catch (IOException ex) {
-      assertTrue(ex instanceof FileNotFoundException);
-      assertTrue(ex.getMessage().contains("No such file or directory"));
+      assertInstanceOf(FileNotFoundException.class, ex);
+      assertThat(ex.getMessage()).contains("No such file or directory");
     }
   }
 

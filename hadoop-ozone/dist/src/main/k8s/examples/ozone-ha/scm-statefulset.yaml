@@ -26,7 +26,7 @@ spec:
       app: ozone
       component: scm
   serviceName: scm
-  replicas: 1
+  replicas: 3
   template:
     metadata:
       labels:
@@ -46,6 +46,18 @@ spec:
         - ozone
         - scm
         - --init
+        envFrom:
+        - configMapRef:
+            name: config
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      - name: bootstrap
+        image: '@docker.image@'
+        args:
+        - ozone
+        - scm
+        - --bootstrap
         envFrom:
         - configMapRef:
             name: config
@@ -76,4 +88,4 @@ spec:
       - ReadWriteOnce
       resources:
         requests:
-          storage: 2Gi
+          storage: 20Gi

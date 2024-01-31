@@ -18,84 +18,32 @@
 
 package org.apache.hadoop.ozone.recon.api.types;
 
-import java.util.Objects;
-
 /**
  * Class to encapsulate the Key information needed for the Recon container DB.
  * Currently, it is the whole key + key version and the containerId.
+ * <p>
+ * The implementations of this interface MUST be immutable.
  */
-public class KeyPrefixContainer {
+public interface KeyPrefixContainer {
 
-  private String keyPrefix;
-  private long keyVersion = -1;
-  private long containerId = -1;
-
-  public KeyPrefixContainer(String keyPrefix, long keyVersion) {
-    this.keyPrefix = keyPrefix;
-    this.keyVersion = keyVersion;
-  }
-
-  public KeyPrefixContainer(String keyPrefix, long keyVersion,
+  static KeyPrefixContainer get(String keyPrefix, long keyVersion,
       long containerId) {
-    this.keyPrefix = keyPrefix;
-    this.keyVersion = keyVersion;
-    this.containerId = containerId;
+    return ContainerKeyPrefixImpl.get(containerId, keyPrefix, keyVersion);
   }
 
-  public KeyPrefixContainer(ContainerKeyPrefix containerKeyPrefix) {
-    this.keyPrefix = containerKeyPrefix.getKeyPrefix();
-    this.keyVersion = containerKeyPrefix.getKeyVersion();
-    this.containerId = containerKeyPrefix.getContainerId();
+  static KeyPrefixContainer get(String keyPrefix, long keyVersion) {
+    return get(keyPrefix, keyVersion, -1);
   }
 
-  public KeyPrefixContainer(String keyPrefix) {
-    this.keyPrefix = keyPrefix;
+  static KeyPrefixContainer get(String keyPrefix) {
+    return get(keyPrefix, -1, -1);
   }
 
-  public String getKeyPrefix() {
-    return keyPrefix;
-  }
+  long getContainerId();
 
-  public void setKeyPrefix(String keyPrefix) {
-    this.keyPrefix = keyPrefix;
-  }
+  String getKeyPrefix();
 
-  public long getKeyVersion() {
-    return keyVersion;
-  }
+  long getKeyVersion();
 
-  public void setKeyVersion(long keyVersion) {
-    this.keyVersion = keyVersion;
-  }
-
-  public long getContainerId() {
-    return containerId;
-  }
-
-  public void setContainerId(long containerId) {
-    this.containerId = containerId;
-  }
-
-  public ContainerKeyPrefix toContainerKeyPrefix() {
-    return new ContainerKeyPrefix(this.containerId,
-        this.keyPrefix, this.keyVersion);
-  }
-
-  @Override
-  public boolean equals(Object o) {
-
-    if (!(o instanceof KeyPrefixContainer)) {
-      return false;
-    }
-    KeyPrefixContainer that = (KeyPrefixContainer) o;
-    return (this.containerId == that.containerId) &&
-        this.keyPrefix.equals(that.keyPrefix) &&
-        this.keyVersion == that.keyVersion;
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(containerId, keyPrefix, keyPrefix);
-  }
-
+  ContainerKeyPrefix toContainerKeyPrefix();
 }

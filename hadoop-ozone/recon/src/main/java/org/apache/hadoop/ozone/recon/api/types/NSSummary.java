@@ -38,7 +38,7 @@ public class NSSummary {
   private String dirName;
 
   public NSSummary() {
-    this(0, 0L, new int[ReconConstants.NUM_OF_BINS],
+    this(0, 0L, new int[ReconConstants.NUM_OF_FILE_SIZE_BINS],
          new HashSet<>(), "");
   }
 
@@ -63,7 +63,7 @@ public class NSSummary {
   }
 
   public int[] getFileSizeBucket() {
-    return Arrays.copyOf(fileSizeBucket, ReconConstants.NUM_OF_BINS);
+    return Arrays.copyOf(fileSizeBucket, ReconConstants.NUM_OF_FILE_SIZE_BINS);
   }
 
   public Set<Long> getChildDir() {
@@ -84,7 +84,7 @@ public class NSSummary {
 
   public void setFileSizeBucket(int[] fileSizeBucket) {
     this.fileSizeBucket = Arrays.copyOf(fileSizeBucket,
-            ReconConstants.NUM_OF_BINS);
+            ReconConstants.NUM_OF_FILE_SIZE_BINS);
   }
 
   public void setChildDir(Set<Long> childDir) {

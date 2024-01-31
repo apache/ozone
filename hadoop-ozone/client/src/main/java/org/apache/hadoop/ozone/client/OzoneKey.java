@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 
@@ -65,20 +64,11 @@ public class OzoneKey {
   private ReplicationConfig replicationConfig;
 
   private Map<String, String> metadata = new HashMap<>();
+
   /**
-   * Constructs OzoneKey from OmKeyInfo.
-   *
+   * Indicator if key is a file.
    */
-  @SuppressWarnings("parameternumber")
-  @Deprecated
-  public OzoneKey(String volumeName, String bucketName,
-                  String keyName, long size, long creationTime,
-                  long modificationTime, ReplicationType type,
-                  int replicationFactor, String owner) {
-    this(volumeName, bucketName, keyName, size, creationTime, modificationTime,
-            ReplicationConfig.fromTypeAndFactor(type,
-                    ReplicationFactor.valueOf(replicationFactor)), owner);
-  }
+  private final boolean isFile;
 
   /**
    * Constructs OzoneKey from OmKeyInfo.
@@ -86,9 +76,9 @@ public class OzoneKey {
    */
   @SuppressWarnings("parameternumber")
   public OzoneKey(String volumeName, String bucketName,
-                  String keyName, long size, long creationTime,
-                  long modificationTime, ReplicationConfig replicationConfig,
-                  String owner) {
+      String keyName, long size, long creationTime,
+      long modificationTime, ReplicationConfig replicationConfig,
+      boolean isFile, String owner) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.name = keyName;
@@ -96,6 +86,7 @@ public class OzoneKey {
     this.creationTime = Instant.ofEpochMilli(creationTime);
     this.modificationTime = Instant.ofEpochMilli(modificationTime);
     this.replicationConfig = replicationConfig;
+    this.isFile = isFile;
     this.owner = owner;
   }
 
@@ -103,9 +94,9 @@ public class OzoneKey {
   public OzoneKey(String volumeName, String bucketName,
                   String keyName, long size, long creationTime,
                   long modificationTime, ReplicationConfig replicationConfig,
-                  Map<String, String> metadata, String owner) {
+                  Map<String, String> metadata, boolean isFile, String owner) {
     this(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, replicationConfig, owner);
+        modificationTime, replicationConfig, isFile, owner);
     this.metadata.putAll(metadata);
   }
 
@@ -202,11 +193,19 @@ public class OzoneKey {
     return replicationConfig;
   }
 
+  /**
+   * Returns indicator if key is a file.
+   * @return file
+   */
+  public boolean isFile() {
+    return isFile;
+  }
+
   public static OzoneKey fromKeyInfo(OmKeyInfo keyInfo) {
     return new OzoneKey(keyInfo.getVolumeName(), keyInfo.getBucketName(),
         keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
         keyInfo.getModificationTime(), keyInfo.getReplicationConfig(),
-        keyInfo.getMetadata(), keyInfo.getOwnerName());
+        keyInfo.getMetadata(), keyInfo.isFile(), keyInfo.getOwnerName());
   }
 
 }

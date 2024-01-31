@@ -24,52 +24,49 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.UnderReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicLong;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.any;
 
 /**
  * Tests for the UnderReplicatedProcessor class.
  */
 public class TestUnderReplicatedProcessor {
 
-  private ConfigurationSource conf;
   private ReplicationManager replicationManager;
   private ECReplicationConfig repConfig;
   private UnderReplicatedProcessor underReplicatedProcessor;
   private ReplicationQueue queue;
+  private ReplicationManagerMetrics rmMetrics;
 
-  @Before
+  @BeforeEach
   public void setup() {
-    conf = new OzoneConfiguration();
+    ConfigurationSource conf = new OzoneConfiguration();
     ReplicationManagerConfiguration rmConf =
         conf.getObject(ReplicationManagerConfiguration.class);
-    replicationManager = Mockito.mock(ReplicationManager.class);
+    replicationManager = mock(ReplicationManager.class);
 
     // use real queue
     queue = new ReplicationQueue();
-    Mockito.when(replicationManager.dequeueUnderReplicatedContainer())
-        .thenAnswer(inv -> queue.dequeueUnderReplicatedContainer());
-    ArgumentCaptor<UnderReplicatedHealthResult> captor =
-        ArgumentCaptor.forClass(UnderReplicatedHealthResult.class);
-    Mockito.doAnswer(inv -> {
-      queue.enqueue(captor.getValue());
-      return null;
-    })
-        .when(replicationManager)
-        .requeueUnderReplicatedContainer(captor.capture());
-
     repConfig = new ECReplicationConfig(3, 2);
+    when(replicationManager.shouldRun()).thenReturn(true);
+    when(replicationManager.getConfig()).thenReturn(rmConf);
+    rmMetrics = ReplicationManagerMetrics.create(replicationManager);
+    when(replicationManager.getMetrics()).thenReturn(rmMetrics);
+    when(replicationManager.getReplicationInFlightLimit()).thenReturn(0L);
     underReplicatedProcessor = new UnderReplicatedProcessor(
-        replicationManager, rmConf.getUnderReplicatedInterval());
-    Mockito.when(replicationManager.shouldRun()).thenReturn(true);
-    Mockito.when(replicationManager.getMetrics())
-        .thenReturn(ReplicationManagerMetrics.create(replicationManager));
+        replicationManager, rmConf::getUnderReplicatedInterval);
   }
 
   @Test
@@ -78,29 +75,61 @@ public class TestUnderReplicatedProcessor {
         .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
     queue.enqueue(new UnderReplicatedHealthResult(
         container, 3, true, false, false));
-    Mockito.when(replicationManager
+    when(replicationManager
             .processUnderReplicatedContainer(any()))
         .thenReturn(1);
-    underReplicatedProcessor.processAll();
+    underReplicatedProcessor.processAll(queue);
 
-    Mockito.verify(replicationManager, Mockito.times(0))
-        .requeueUnderReplicatedContainer(any());
+    assertEquals(0, queue.underReplicatedQueueSize());
   }
 
   @Test
   public void testMessageRequeuedOnException() throws IOException {
     ContainerInfo container = ReplicationTestUtil
         .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
-    queue.enqueue(new UnderReplicatedHealthResult(
-            container, 3, false, false, false));
+    UnderReplicatedHealthResult result = new UnderReplicatedHealthResult(
+        container, 3, false, false, false);
+    queue.enqueue(result);
 
-    Mockito.when(replicationManager
+    when(replicationManager
             .processUnderReplicatedContainer(any()))
         .thenThrow(new IOException("Test Exception"))
         .thenThrow(new AssertionError("Should process only one item"));
-    underReplicatedProcessor.processAll();
+    underReplicatedProcessor.processAll(queue);
 
-    Mockito.verify(replicationManager, Mockito.times(1))
-        .requeueUnderReplicatedContainer(any());
+    assertEquals(1, queue.underReplicatedQueueSize());
+    assertSame(result, queue.dequeueUnderReplicatedContainer());
   }
+
+  @Test
+  public void testMessageNotProcessedIfGlobalLimitReached() throws IOException {
+    AtomicLong inFlightReplications = new AtomicLong(11);
+    when(replicationManager.getReplicationInFlightLimit()).thenReturn(10L);
+    doAnswer(invocation -> inFlightReplications.get())
+        .when(replicationManager).getInflightReplicationCount();
+    when(replicationManager.processUnderReplicatedContainer(any())).thenReturn(1);
+
+    ContainerInfo container = ReplicationTestUtil
+        .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
+    UnderReplicatedHealthResult result = new UnderReplicatedHealthResult(
+        container, 3, false, false, false);
+    queue.enqueue(result);
+
+    underReplicatedProcessor.processAll(queue);
+
+    // The message should not be processed and still be on the queue (re-queued)
+    assertEquals(1, queue.underReplicatedQueueSize());
+    // We should not have processed anything in RM
+    verify(replicationManager, times(0)).processUnderReplicatedContainer(any());
+
+    // Change the inflight replications to a value below the limit
+    inFlightReplications.set(8);
+    underReplicatedProcessor.processAll(queue);
+
+    assertEquals(0, queue.underReplicatedQueueSize());
+    // We should have processed the message now
+    verify(replicationManager, times(1)).processUnderReplicatedContainer(any());
+    assertEquals(1, rmMetrics.getPendingReplicationLimitReachedTotal());
+  }
+
 }

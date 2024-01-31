@@ -24,21 +24,22 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.TestContainerInfo;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 
 import java.util.ArrayList;
@@ -47,13 +48,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyList;
+import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.doAnswer;
 
 /**
@@ -159,6 +162,7 @@ public final class ReplicationTestUtil {
     builder.setDatanodeDetails(datanodeDetails);
     builder.setSequenceId(0);
     builder.setOriginNodeId(originNodeId);
+    builder.setEmpty(keyCount == 0);
     return builder.build();
   }
 
@@ -188,34 +192,42 @@ public final class ReplicationTestUtil {
   public static ContainerInfo createContainerInfo(
       ReplicationConfig replicationConfig, long containerID,
       HddsProtos.LifeCycleState containerState) {
-    ContainerInfo.Builder builder = new ContainerInfo.Builder();
-    builder.setContainerID(containerID);
-    builder.setOwner("Ozone");
-    builder.setPipelineID(PipelineID.randomId());
-    builder.setReplicationConfig(replicationConfig);
-    builder.setState(containerState);
-    return builder.build();
+    return TestContainerInfo.newBuilderForTest()
+        .setContainerID(containerID)
+        .setReplicationConfig(replicationConfig)
+        .setState(containerState)
+        .build();
+  }
+
+  public static ContainerInfo createContainerInfo(
+      ReplicationConfig replicationConfig, long containerID,
+      HddsProtos.LifeCycleState containerState, long sequenceID) {
+    return TestContainerInfo.newBuilderForTest()
+        .setContainerID(containerID)
+        .setReplicationConfig(replicationConfig)
+        .setState(containerState)
+        .setSequenceId(sequenceID)
+        .build();
   }
 
   public static ContainerInfo createContainerInfo(
       ReplicationConfig replicationConfig, long containerID,
       HddsProtos.LifeCycleState containerState, long keyCount, long bytesUsed) {
-    ContainerInfo.Builder builder = new ContainerInfo.Builder();
-    builder.setContainerID(containerID);
-    builder.setOwner("Ozone");
-    builder.setPipelineID(PipelineID.randomId());
-    builder.setReplicationConfig(replicationConfig);
-    builder.setState(containerState);
-    builder.setNumberOfKeys(keyCount);
-    builder.setUsedBytes(bytesUsed);
-    return builder.build();
+    return TestContainerInfo.newBuilderForTest()
+        .setContainerID(containerID)
+        .setReplicationConfig(replicationConfig)
+        .setState(containerState)
+        .setNumberOfKeys(keyCount)
+        .setUsedBytes(bytesUsed)
+        .build();
   }
 
   public static ContainerInfo createContainer(HddsProtos.LifeCycleState state,
       ReplicationConfig replicationConfig) {
-    return new ContainerInfo.Builder()
-        .setContainerID(1).setState(state)
-        .setReplicationConfig(replicationConfig).build();
+    return TestContainerInfo.newBuilderForTest()
+        .setState(state)
+        .setReplicationConfig(replicationConfig)
+        .build();
   }
 
   @SafeVarargs
@@ -266,6 +278,12 @@ public final class ReplicationTestUtil {
         // Make it look like a single rack cluster
         return rackNode;
       }
+
+      @Override
+      public ContainerPlacementStatus
+          validateContainerPlacement(List<DatanodeDetails> dns, int replicas) {
+        return new ContainerPlacementStatusDefault(2, 2, 3);
+      }
     };
   }
 
@@ -283,7 +301,8 @@ public final class ReplicationTestUtil {
         if (nodesRequiredToChoose > 1) {
           throw new IllegalArgumentException("Only one node is allowed");
         }
-        if (excludedNodes.contains(nodeToReturn)) {
+        if (excludedNodes.contains(nodeToReturn)
+            || usedNodes.contains(nodeToReturn)) {
           throw new SCMException("Insufficient Nodes available to choose",
               SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES);
         }
@@ -355,13 +374,19 @@ public final class ReplicationTestUtil {
    * to the commandsSent set.
    * @param mock Mock of ReplicationManager
    * @param commandsSent Set to add the command to rather than sending it.
-   * @throws NotLeaderException
-   * @throws CommandTargetOverloadedException
+   * @param throwOverloaded If the atomic boolean is true, throw a
+   *                        CommandTargetOverloadedException and set the boolean
+   *                        to false, instead of creating the replicate command.
    */
   public static void mockRMSendThrottleReplicateCommand(ReplicationManager mock,
-      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
+      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent,
+      AtomicBoolean throwOverloaded)
       throws NotLeaderException, CommandTargetOverloadedException {
     doAnswer((Answer<Void>) invocationOnMock -> {
+      if (throwOverloaded.get()) {
+        throwOverloaded.set(false);
+        throw new CommandTargetOverloadedException("Overloaded");
+      }
       List<DatanodeDetails> sources = invocationOnMock.getArgument(1);
       ContainerInfo containerInfo = invocationOnMock.getArgument(0);
       ReplicateContainerCommand command = ReplicateContainerCommand
@@ -371,8 +396,7 @@ public final class ReplicationTestUtil {
       commandsSent.add(Pair.of(sources.get(0), command));
       return null;
     }).when(mock).sendThrottledReplicationCommand(
-        Mockito.any(ContainerInfo.class), Mockito.anyList(),
-        Mockito.any(DatanodeDetails.class), anyInt());
+        any(ContainerInfo.class), anyList(), any(DatanodeDetails.class), anyInt());
   }
 
   /**
@@ -381,19 +405,24 @@ public final class ReplicationTestUtil {
    * created to the commandsSent set.
    * @param mock Mock of ReplicationManager
    * @param commandsSent Set to add the command to rather than sending it.
-   * @throws NotLeaderException
-   * @throws CommandTargetOverloadedException
+   * @param throwOverloaded If the atomic boolean is true, throw a
+   *                        CommandTargetOverloadedException and set the boolean
+   *                        to false, instead of creating the replicate command.
    */
   public static void mockSendThrottledReconstructionCommand(
       ReplicationManager mock,
-      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
+      Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent,
+      AtomicBoolean throwOverloaded)
       throws NotLeaderException, CommandTargetOverloadedException {
     doAnswer((Answer<Void>) invocationOnMock -> {
+      if (throwOverloaded.get()) {
+        throwOverloaded.set(false);
+        throw new CommandTargetOverloadedException("Overloaded");
+      }
       ReconstructECContainersCommand cmd = invocationOnMock.getArgument(1);
       commandsSent.add(Pair.of(cmd.getTargetDatanodes().get(0), cmd));
       return null;
-    }).when(mock).sendThrottledReconstructionCommand(
-        Mockito.any(ContainerInfo.class), Mockito.any());
+    }).when(mock).sendThrottledReconstructionCommand(any(ContainerInfo.class), any());
   }
 
   /**
@@ -402,7 +431,6 @@ public final class ReplicationTestUtil {
    * commandsSent set.
    * @param mock Mock of ReplicationManager
    * @param commandsSent Set to add the command to rather than sending it.
-   * @throws NotLeaderException
    */
   public static void mockRMSendDatanodeCommand(ReplicationManager mock,
       Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
@@ -421,7 +449,6 @@ public final class ReplicationTestUtil {
    * commandsSent set.
    * @param mock Mock of ReplicationManager
    * @param commandsSent Set to add the command to rather than sending it.
-   * @throws NotLeaderException
    */
   public static void mockRMSendDeleteCommand(ReplicationManager mock,
       Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)
@@ -445,7 +472,6 @@ public final class ReplicationTestUtil {
    * the commandsSent set.
    * @param mock Mock of ReplicationManager
    * @param commandsSent Set to add the command to rather than sending it.
-   * @throws NotLeaderException
    */
   public static void mockRMSendThrottledDeleteCommand(ReplicationManager mock,
       Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent)

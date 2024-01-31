@@ -39,7 +39,9 @@ public enum HDDSLayoutFeature implements LayoutFeature {
   RATIS_DATASTREAM_PORT_IN_DATANODEDETAILS(5, "Adding the RATIS_DATASTREAM " +
       "port to the DatanodeDetails."),
   WEBUI_PORTS_IN_DATANODEDETAILS(6, "Adding HTTP and HTTPS ports " +
-      "to DatanodeDetails.");
+      "to DatanodeDetails."),
+  HADOOP_PRC_PORTS_IN_DATANODEDETAILS(7, "Adding Hadoop RPC ports " +
+                                     "to DatanodeDetails.");
 
   //////////////////////////////  //////////////////////////////
 

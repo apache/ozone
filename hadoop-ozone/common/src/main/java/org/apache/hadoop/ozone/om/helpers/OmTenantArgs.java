@@ -36,6 +36,11 @@ public class OmTenantArgs {
    */
   private final String volumeName;
 
+  /**
+   * Force tenant creation when volume exists.
+   */
+  private boolean forceCreationWhenVolumeExists;
+
   public OmTenantArgs(String tenantId) {
     this.tenantId = tenantId;
     this.volumeName = this.tenantId;
@@ -46,12 +51,23 @@ public class OmTenantArgs {
     this.volumeName = volumeName;
   }
 
+  public OmTenantArgs(String tenantId, String volumeName,
+      boolean forceCreationWhenVolumeExists) {
+    this.tenantId = tenantId;
+    this.volumeName = volumeName;
+    this.forceCreationWhenVolumeExists = forceCreationWhenVolumeExists;
+  }
+
   public String getTenantId() {
     return tenantId;
   }
 
   public String getVolumeName() {
     return volumeName;
+  }
+
+  public boolean getForceCreationWhenVolumeExists() {
+    return forceCreationWhenVolumeExists;
   }
 
   public static OmTenantArgs.Builder newBuilder() {
@@ -65,6 +81,7 @@ public class OmTenantArgs {
   public static class Builder {
     private String tenantId;
     private String volumeName;
+    private boolean forceCreationWhenVolumeExists;
 
     /**
      * Constructs a builder.
@@ -82,10 +99,17 @@ public class OmTenantArgs {
       return this;
     }
 
+    public Builder setForceCreationWhenVolumeExists(
+        boolean forceCreationWhenVolumeExists) {
+      this.forceCreationWhenVolumeExists = forceCreationWhenVolumeExists;
+      return this;
+    }
+
     public OmTenantArgs build() {
       Preconditions.checkNotNull(tenantId);
       Preconditions.checkNotNull(volumeName);
-      return new OmTenantArgs(tenantId, volumeName);
+      return new OmTenantArgs(tenantId, volumeName,
+          forceCreationWhenVolumeExists);
     }
   }
 

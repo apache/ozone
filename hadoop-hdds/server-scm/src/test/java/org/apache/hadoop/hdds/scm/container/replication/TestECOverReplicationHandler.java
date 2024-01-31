@@ -39,11 +39,8 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.junit.Assert;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 
 import java.io.IOException;
@@ -63,20 +60,23 @@ import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaO
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyInt;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doAnswer;
 
 /**
  * Tests the ECOverReplicationHandling functionality.
  */
 public class TestECOverReplicationHandler {
-  private ECReplicationConfig repConfig;
   private ContainerInfo container;
-  private NodeManager nodeManager;
   private ReplicationManager replicationManager;
-  private OzoneConfiguration conf;
   private PlacementPolicy policy;
   private DatanodeDetails staleNode;
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
@@ -86,8 +86,8 @@ public class TestECOverReplicationHandler {
       CommandTargetOverloadedException {
     staleNode = null;
 
-    replicationManager = Mockito.mock(ReplicationManager.class);
-    Mockito.when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
+    replicationManager = mock(ReplicationManager.class);
+    when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
         .thenAnswer(invocation -> {
           DatanodeDetails dd = invocation.getArgument(0);
           if (staleNode != null && staleNode.equals(dd)) {
@@ -102,9 +102,9 @@ public class TestECOverReplicationHandler {
     ReplicationTestUtil.mockRMSendThrottledDeleteCommand(replicationManager,
         commandsSent);
 
-    nodeManager = new MockNodeManager(true, 10);
-    conf = SCMTestUtils.getConf();
-    repConfig = new ECReplicationConfig(3, 2);
+    NodeManager nodeManager = new MockNodeManager(true, 10);
+    OzoneConfiguration conf = SCMTestUtils.getConf();
+    ECReplicationConfig repConfig = new ECReplicationConfig(3, 2);
     container = ReplicationTestUtil
         .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
     policy = ReplicationTestUtil
@@ -136,7 +136,7 @@ public class TestECOverReplicationHandler {
         container.containerID(), 5, IN_SERVICE,
         ContainerReplicaProto.State.CLOSED);
     availableReplicas.add(excess);
-    List<ContainerReplicaOp> pendingOps = new ArrayList();
+    List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     pendingOps.add(ContainerReplicaOp.create(DELETE,
         excess.getDatanodeDetails(), 5));
     testOverReplicationWithIndexes(availableReplicas, Collections.emptyMap(),
@@ -203,9 +203,8 @@ public class TestECOverReplicationHandler {
     ContainerReplica toReturn = ReplicationTestUtil.createContainerReplica(
         container.containerID(), 1, IN_SERVICE,
         ContainerReplicaProto.State.CLOSED);
-    policy = Mockito.mock(PlacementPolicy.class);
-    Mockito.when(policy.replicasToRemoveToFixOverreplication(
-        Mockito.any(), Mockito.anyInt()))
+    policy = mock(PlacementPolicy.class);
+    when(policy.replicasToRemoveToFixOverreplication(any(), anyInt()))
         .thenReturn(ImmutableSet.of(toReturn));
     testOverReplicationWithIndexes(availableReplicas, Collections.emptyMap(),
         ImmutableList.of());
@@ -270,9 +269,9 @@ public class TestECOverReplicationHandler {
     ecORH.processAndSendCommands(availableReplicas, ImmutableList.of(),
         health, 1);
 
-    Assert.assertEquals(1, commandsSent.size());
+    assertEquals(1, commandsSent.size());
     SCMCommand<?> cmd = commandsSent.iterator().next().getValue();
-    Assert.assertEquals(1, ((DeleteContainerCommand)cmd).getReplicaIndex());
+    assertEquals(1, ((DeleteContainerCommand)cmd).getReplicaIndex());
   }
 
   @Test
@@ -315,11 +314,11 @@ public class TestECOverReplicationHandler {
     try {
       ecORH.processAndSendCommands(availableReplicas, ImmutableList.of(),
           health, 1);
-      Assertions.fail("Expected CommandTargetOverloadedException");
+      fail("Expected CommandTargetOverloadedException");
     } catch (CommandTargetOverloadedException e) {
       // This is expected.
     }
-    Assert.assertEquals(1, commandsSent.size());
+    assertEquals(1, commandsSent.size());
   }
 
   private void testOverReplicationWithIndexes(
@@ -330,8 +329,8 @@ public class TestECOverReplicationHandler {
     ECOverReplicationHandler ecORH =
         new ECOverReplicationHandler(policy, replicationManager);
     ContainerHealthResult.OverReplicatedHealthResult result =
-        Mockito.mock(ContainerHealthResult.OverReplicatedHealthResult.class);
-    Mockito.when(result.getContainerInfo()).thenReturn(container);
+        mock(ContainerHealthResult.OverReplicatedHealthResult.class);
+    when(result.getContainerInfo()).thenReturn(container);
 
     ecORH.processAndSendCommands(availableReplicas, pendingOps,
             result, 1);
@@ -340,10 +339,10 @@ public class TestECOverReplicationHandler {
     // the excess nums
     int totalDeleteCommandNum =
         index2excessNum.values().stream().reduce(0, Integer::sum);
-    Assert.assertEquals(totalDeleteCommandNum, commandsSent.size());
+    assertEquals(totalDeleteCommandNum, commandsSent.size());
 
     // Each command should have a non-zero replica index
-    commandsSent.forEach(pair -> Assert.assertNotEquals(0,
+    commandsSent.forEach(pair -> assertNotEquals(0,
         ((DeleteContainerCommand) pair.getValue()).getReplicaIndex()));
 
     // command num of each index should be equal to the excess num
@@ -358,8 +357,8 @@ public class TestECOverReplicationHandler {
     );
 
     index2commandNum.keySet().forEach(i -> {
-      Assert.assertTrue(index2excessNum.containsKey(i));
-      Assert.assertEquals(index2commandNum.get(i), index2excessNum.get(i));
+      assertThat(index2excessNum).containsKey(i);
+      assertEquals(index2commandNum.get(i), index2excessNum.get(i));
     });
   }
 }
