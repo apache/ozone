@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.ozone.security.acl;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -45,11 +44,10 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Unhealthy;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
@@ -92,6 +90,7 @@ public class TestParentAcl {
   private static UserGroupInformation adminUgi;
   private static UserGroupInformation testUgi, testUgi1;
   private static OzoneManagerProtocol writeClient;
+  @TempDir
   private static File testDir;
 
   @BeforeAll
@@ -99,7 +98,6 @@ public class TestParentAcl {
     ozConfig = new OzoneConfiguration();
     ozConfig.set(OZONE_ACL_AUTHORIZER_CLASS,
         OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
-    testDir = GenericTestUtils.getRandomizedTestDir();
     ozConfig.set(OZONE_METADATA_DIRS, testDir.toString());
     ozConfig.set(OZONE_ADMINISTRATORS, "om");
 
@@ -120,11 +118,6 @@ public class TestParentAcl {
         new String[]{"test"});
     testUgi1 = UserGroupInformation.createUserForTesting("testuser1",
         new String[]{"test1"});
-  }
-
-  @AfterAll
-  public static void cleanup() throws IOException {
-    FileUtils.deleteDirectory(testDir);
   }
 
   @Test
