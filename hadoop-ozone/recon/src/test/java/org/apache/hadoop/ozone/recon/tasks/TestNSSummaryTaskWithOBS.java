@@ -46,6 +46,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -326,17 +327,8 @@ public final class TestNSSummaryTaskWithOBS implements Serializable {
           .setAction(OMDBUpdateEvent.OMDBUpdateAction.UPDATE)
           .build();
 
-      OMUpdateEventBatch omUpdateEventBatch =
-          new OMUpdateEventBatch(new ArrayList<OMDBUpdateEvent>() {
-            {
-              add(keyEvent1);
-              add(keyEvent2);
-              add(keyEvent3);
-              add(keyEvent4);
-            }
-          });
-
-      return omUpdateEventBatch;
+      return new OMUpdateEventBatch(
+          Arrays.asList(keyEvent1, keyEvent2, keyEvent3, keyEvent4));
     }
 
     @Test
