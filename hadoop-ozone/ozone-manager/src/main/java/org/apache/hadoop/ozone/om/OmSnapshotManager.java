@@ -923,4 +923,12 @@ public final class OmSnapshotManager implements AutoCloseable {
   public long getDiffCleanupServiceInterval() {
     return diffCleanupServiceInterval;
   }
+
+  /**
+   * Updates the SnapshotCache size jmx metric.
+   * @param cacheSize SnapshotCache size
+   */
+  public void updateSnapshotCacheSizeMetric(int cacheSize) {
+    this.ozoneManager.getMetrics().setNumSnapshotCacheSize(cacheSize);
+  }
 }
