@@ -47,26 +47,21 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.jetbrains.annotations.NotNull;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -84,44 +79,31 @@ import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersi
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
  * Tests FinalizeBlock.
  */
-@RunWith(Parameterized.class)
+@Timeout(300)
 public class TestFinalizeBlock {
 
   private OzoneClient client;
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
   private ObjectStore objectStore;
   private static String volumeName = UUID.randomUUID().toString();
   private static String bucketName = UUID.randomUUID().toString();
-  private boolean schemaV3;
-  private ContainerLayoutVersion layoutVersion;
 
-  public TestFinalizeBlock(boolean enableSchemaV3, ContainerLayoutVersion version) {
-    this.schemaV3 = enableSchemaV3;
-    this.layoutVersion = version;
+  public static Stream<Arguments> dnLayoutParams() {
+    return Stream.of(
+        arguments(false, FILE_PER_CHUNK),
+        arguments(true, FILE_PER_CHUNK),
+        arguments(false, FILE_PER_BLOCK),
+        arguments(true, FILE_PER_BLOCK)
+    );
   }
 
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
-    return Arrays.asList(new Object[][]{
-        {false, FILE_PER_CHUNK},
-        {true, FILE_PER_CHUNK},
-        {false, FILE_PER_BLOCK},
-        {true, FILE_PER_BLOCK},
-    });
-  }
-
-  @Before
-  public void setup() throws Exception {
+  private void setup(boolean enableSchemaV3, ContainerLayoutVersion version) throws Exception {
     conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CONTAINER_SIZE, "1GB");
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
@@ -133,8 +115,8 @@ public class TestFinalizeBlock {
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 1, SECONDS);
     conf.setTimeDuration(HDDS_NODE_REPORT_INTERVAL, 1, SECONDS);
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, TimeUnit.SECONDS);
-    conf.setBoolean(CONTAINER_SCHEMA_V3_ENABLED, schemaV3);
-    conf.setEnum(ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY, layoutVersion);
+    conf.setBoolean(CONTAINER_SCHEMA_V3_ENABLED, enableSchemaV3);
+    conf.setEnum(ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY, version);
 
     DatanodeConfiguration datanodeConfiguration = conf.getObject(
         DatanodeConfiguration.class);
@@ -155,7 +137,7 @@ public class TestFinalizeBlock {
     objectStore.getVolume(volumeName).createBucket(bucketName);
   }
 
-  @After
+  @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -167,8 +149,11 @@ public class TestFinalizeBlock {
     }
   }
 
-  @Test
-  public void testFinalizeBlock() throws IOException, InterruptedException, TimeoutException {
+  @ParameterizedTest
+  @MethodSource("dnLayoutParams")
+  public void testFinalizeBlock(boolean enableSchemaV3, ContainerLayoutVersion version)
+      throws Exception {
+    setup(enableSchemaV3, version);
     String keyName = UUID.randomUUID().toString();
     // create key
     createKey(keyName);
@@ -207,12 +192,12 @@ public class TestFinalizeBlock {
     ContainerProtos.ContainerCommandResponseProto response =
         xceiverClient.sendCommand(request);
 
-    Assert.assertTrue(response.getFinalizeBlock()
+    assertTrue(response.getFinalizeBlock()
         .getBlockData().getBlockID().getLocalID()
         == omKeyLocationInfoGroupList.get(0)
         .getLocationList().get(0).getLocalID());
 
-    Assert.assertTrue(((KeyValueContainerData)getContainerfromDN(
+    assertTrue(((KeyValueContainerData)getContainerfromDN(
         cluster.getHddsDatanodes().get(0),
         containerId.getId()).getContainerData())
         .getFinalizedBlockSet().size() == 1);
@@ -230,7 +215,7 @@ public class TestFinalizeBlock {
     }
 
     // After restart DN, finalizeBlock should be loaded into memory
-    Assert.assertTrue(((KeyValueContainerData)
+    assertTrue(((KeyValueContainerData)
         getContainerfromDN(cluster.getHddsDatanodes().get(0),
             containerId.getId()).getContainerData())
         .getFinalizedBlockSet().size() == 1);
@@ -254,7 +239,7 @@ public class TestFinalizeBlock {
     }
 
     // After DN restart also there should not be any finalizeBlock
-    Assert.assertTrue(((KeyValueContainerData)getContainerfromDN(
+    assertTrue(((KeyValueContainerData)getContainerfromDN(
         cluster.getHddsDatanodes().get(0),
         containerId.getId()).getContainerData())
         .getFinalizedBlockSet().size() == 0);
