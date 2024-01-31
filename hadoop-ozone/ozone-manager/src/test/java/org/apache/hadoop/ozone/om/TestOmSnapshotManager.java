@@ -19,7 +19,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
@@ -34,6 +33,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
@@ -95,9 +95,9 @@ public class TestOmSnapshotManager {
   private File f1File;
 
   @BeforeEach
-  public void init() throws Exception {
+  public void init(@TempDir Path pathTestDir) throws Exception {
     OzoneConfiguration configuration = new OzoneConfiguration();
-    testDir = GenericTestUtils.getRandomizedTestDir();
+    testDir = pathTestDir.toFile();
     configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         testDir.toString());
     // Enable filesystem snapshot feature for the test regardless of the default
@@ -116,7 +116,6 @@ public class TestOmSnapshotManager {
   @AfterEach
   public void cleanup() throws Exception {
     om.stop();
-    FileUtils.deleteDirectory(testDir);
   }
 
   @Test

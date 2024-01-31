@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -76,6 +77,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -105,7 +107,6 @@ public class TestKeyManagerUnit {
   private KeyManagerImpl keyManager;
 
   private Instant startDate;
-  private File testDir;
   private ScmBlockLocationProtocol blockClient;
 
   private OzoneManagerProtocol writeClient;
@@ -117,11 +118,9 @@ public class TestKeyManagerUnit {
   }
   
   @BeforeEach
-  public void init() throws Exception {
+  public void init(@TempDir Path testDir) throws Exception {
     configuration = new OzoneConfiguration();
-    testDir = GenericTestUtils.getRandomizedTestDir();
-    configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        testDir.toString());
+    configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.toString());
     containerClient = mock(StorageContainerLocationProtocol.class);
     blockClient = mock(ScmBlockLocationProtocol.class);
 
@@ -137,7 +136,6 @@ public class TestKeyManagerUnit {
   @AfterEach
   public void cleanup() throws Exception {
     om.stop();
-    FileUtils.deleteDirectory(testDir);
   }
 
   @Test
