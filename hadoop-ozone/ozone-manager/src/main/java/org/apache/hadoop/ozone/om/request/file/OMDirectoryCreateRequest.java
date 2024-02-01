@@ -297,10 +297,6 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       objectCount++;
 
       missingParentInfos.add(parentKeyInfo);
-      omMetadataManager.getKeyTable(BucketLayout.DEFAULT).addCacheEntry(
-          omMetadataManager.getOzoneKey(
-              volumeName, bucketName, parentKeyInfo.getKeyName()),
-          parentKeyInfo, trxnLogIndex);
     }
 
     return missingParentInfos;
