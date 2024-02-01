@@ -47,11 +47,11 @@ ${BUCKET_OBJ}       bucket-obj
                        Should contain   ${result}   Successful executions: ${n}
 
 [List] File Status in FILE_SYSTEM_OPTIMIZED Bucket
-    ${result} =        Execute          ozone freon ommg --operation LIST_STATUS -n 1 --volume ${VOLUME} --bucket ${BUCKET_FSO} --batch-size ${n}
+    ${result} =        Execute          ozone freon ommg --operation LIST_STATUS -n 1 -t 1 --volume ${VOLUME} --bucket ${BUCKET_FSO} --batch-size ${n}
                        Should contain   ${result}   Successful executions: 1
 
 [List] light File status in FILE_SYSTEM_OPTIMIZED Bucket
-    ${result} =        Execute          ozone freon ommg --operation LIST_STATUS_LIGHT -n 1 --volume ${VOLUME} --bucket ${BUCKET_FSO} --batch-size ${n}
+    ${result} =        Execute          ozone freon ommg --operation LIST_STATUS_LIGHT -n 1 -t 1 --volume ${VOLUME} --bucket ${BUCKET_FSO} --batch-size ${n}
                        Should contain   ${result}   Successful executions: 1
 
 [Create] Key in OBJECT_STORE Bucket
@@ -63,11 +63,11 @@ ${BUCKET_OBJ}       bucket-obj
                        Should contain   ${result}   Successful executions: ${n}
 
 [List] Keys in OBJECT_STORE Bucket
-    ${result} =        Execute          ozone freon ommg --operation LIST_KEYS -n 1 --volume ${VOLUME} --bucket ${BUCKET_OBJ} --batch-size ${n}
+    ${result} =        Execute          ozone freon ommg --operation LIST_KEYS -n 1 -t 1 --volume ${VOLUME} --bucket ${BUCKET_OBJ} --batch-size ${n}
                        Should contain   ${result}   Successful executions: 1
 
 [List] Light Keys in OBJECT_STORE Bucket
-    ${result} =        Execute          ozone freon ommg --operation LIST_KEYS_LIGHT -n 1 --volume ${VOLUME} --bucket ${BUCKET_OBJ} --batch-size ${n}
+    ${result} =        Execute          ozone freon ommg --operation LIST_KEYS_LIGHT -n 1 -t 1 --volume ${VOLUME} --bucket ${BUCKET_OBJ} --batch-size ${n}
                        Should contain   ${result}   Successful executions: 1
 
 [Get] Key Information in OBJECT_STORE Bucket
