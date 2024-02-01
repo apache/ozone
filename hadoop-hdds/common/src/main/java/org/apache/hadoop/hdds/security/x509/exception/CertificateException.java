@@ -88,7 +88,6 @@ public class CertificateException extends SCMSecurityException {
     BOOTSTRAP_ERROR,
     CSR_ERROR,
     CRYPTO_SIGNATURE_VERIFICATION_ERROR,
-    CERTIFICATE_NOT_FOUND_ERROR,
     RENEW_ERROR,
     ROLLBACK_ERROR
   }

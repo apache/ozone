@@ -222,18 +222,4 @@ public class TestChunkBuffer {
     assertArrayEquals(expected, output.toByteArray());
     assertFalse(impl.hasRemaining());
   }
-
-  private static String toString(byte[] arr) {
-    if (arr == null || arr.length == 0) {
-      return "";
-    }
-
-    StringBuilder sb = new StringBuilder();
-    for (byte b : arr) {
-      sb.append(Character.forDigit((b >> 4) & 0xF, 16))
-          .append(Character.forDigit((b & 0xF), 16))
-          .append(" ");
-    }
-    return sb.deleteCharAt(sb.length() - 1).toString();
-  }
 }

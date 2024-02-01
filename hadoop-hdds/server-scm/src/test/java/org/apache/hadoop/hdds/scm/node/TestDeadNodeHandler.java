@@ -33,11 +33,9 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -73,11 +71,11 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test DeadNodeHandler.
@@ -92,7 +90,8 @@ public class TestDeadNodeHandler {
   private HealthyReadOnlyNodeHandler healthyReadOnlyNodeHandler;
   private EventPublisher publisher;
   private EventQueue eventQueue;
-  private String storageDir;
+  @TempDir
+  private File storageDir;
   private SCMContext scmContext;
   private DeletedBlockLog deletedBlockLog;
 
@@ -104,9 +103,7 @@ public class TestDeadNodeHandler {
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 2);
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         10, StorageUnit.MB);
-    storageDir = GenericTestUtils.getTempPath(
-        TestDeadNodeHandler.class.getSimpleName() + UUID.randomUUID());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir.getPath());
     eventQueue = new EventQueue();
     scm = HddsTestUtils.getScm(conf);
     nodeManager = (SCMNodeManager) scm.getScmNodeManager();
@@ -136,20 +133,19 @@ public class TestDeadNodeHandler {
   public void teardown() {
     scm.stop();
     scm.join();
-    FileUtil.fullyDelete(new File(storageDir));
   }
 
   @Test
   @SuppressWarnings("checkstyle:MethodLength")
-  public void testOnMessage() throws Exception {
+  public void testOnMessage(@TempDir File tempDir) throws Exception {
     //GIVEN
     DatanodeDetails datanode1 = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails datanode2 = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails datanode3 = MockDatanodeDetails.randomDatanodeDetails();
 
-    String storagePath = GenericTestUtils.getRandomizedTempPath()
+    String storagePath = tempDir.getPath()
         .concat("/data-" + datanode1.getUuidString());
-    String metaStoragePath = GenericTestUtils.getRandomizedTempPath()
+    String metaStoragePath = tempDir.getPath()
         .concat("/metadata-" + datanode1.getUuidString());
 
     StorageReportProto storageOne = HddsTestUtils.createStorageReport(

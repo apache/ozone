@@ -101,16 +101,6 @@ public class OzoneConfiguration extends Configuration
     return conf.getObject(configurationClass);
   }
 
-  /**
-   * @return a new {@code OzoneConfiguration} instance set from the given
-   * {@code configObject}
-   */
-  public static <T> OzoneConfiguration fromObject(T configObject) {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setFromObject(configObject);
-    return conf;
-  }
-
   public OzoneConfiguration() {
     OzoneConfiguration.activate();
     loadDefaults();

@@ -73,7 +73,6 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
-import org.apache.ozone.test.GenericTestUtils;
 
 import com.google.common.collect.Maps;
 import org.apache.commons.io.FileUtils;
@@ -82,6 +81,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -113,6 +113,8 @@ public class TestContainerPersistence {
   private static final String SCM_ID = UUID.randomUUID().toString();
   private static final Logger LOGGER =
       LoggerFactory.getLogger(TestContainerPersistence.class);
+  @TempDir
+  private static File hddsFile;
   private static String hddsPath;
   private static OzoneConfiguration conf;
   private static VolumeChoosingPolicy volumeChoosingPolicy;
@@ -138,8 +140,7 @@ public class TestContainerPersistence {
   @BeforeAll
   public static void init() {
     conf = new OzoneConfiguration();
-    hddsPath = GenericTestUtils
-        .getTempPath(TestContainerPersistence.class.getSimpleName());
+    hddsPath = hddsFile.getPath();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, hddsPath);
     conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, hddsPath);
     volumeChoosingPolicy = new RoundRobinVolumeChoosingPolicy();

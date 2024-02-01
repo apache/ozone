@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.container;
 
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -55,10 +54,10 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
@@ -70,7 +69,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -106,6 +104,7 @@ public class TestIncrementalContainerReportHandler {
   private HDDSLayoutVersionManager versionManager;
   private SCMContext scmContext = SCMContext.emptyContext();
   private PipelineManager pipelineManager;
+  @TempDir
   private File testDir;
   private DBStore dbStore;
   private SCMHAManager scmhaManager;
@@ -114,9 +113,7 @@ public class TestIncrementalContainerReportHandler {
   public void setup() throws IOException, InvalidStateTransitionException,
       TimeoutException {
     final OzoneConfiguration conf = new OzoneConfiguration();
-    final String path =
-        GenericTestUtils.getTempPath(UUID.randomUUID().toString());
-    Path scmPath = Paths.get(path, "scm-meta");
+    Path scmPath = Paths.get(testDir.getPath(), "scm-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
     this.containerManager = mock(ContainerManager.class);
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
@@ -129,9 +126,6 @@ public class TestIncrementalContainerReportHandler {
         new SCMNodeManager(conf, storageConfig, eventQueue, clusterMap,
             scmContext, versionManager);
     scmhaManager = SCMHAManagerStub.getInstance(true);
-    testDir = GenericTestUtils.getTestDir(
-        TestIncrementalContainerReportHandler.class.getSimpleName()
-            + UUID.randomUUID());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
 
@@ -200,8 +194,6 @@ public class TestIncrementalContainerReportHandler {
     if (dbStore != null) {
       dbStore.close();
     }
-
-    FileUtil.fullyDelete(testDir);
   }
 
 

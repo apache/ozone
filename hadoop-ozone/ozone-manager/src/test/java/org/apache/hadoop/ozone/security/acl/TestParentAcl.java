@@ -94,7 +94,7 @@ public class TestParentAcl {
   private static File testDir;
 
   @BeforeAll
-  public static void setup() throws IOException, AuthenticationException {
+  static void setup() throws Exception {
     ozConfig = new OzoneConfiguration();
     ozConfig.set(OZONE_ACL_AUTHORIZER_CLASS,
         OZONE_ACL_AUTHORIZER_CLASS_NATIVE);

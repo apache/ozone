@@ -169,7 +169,7 @@ public class TestECBlockInputStreamProxy {
     BlockLocationInfo blockInfo =
         ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
 
-    try (ECBlockInputStreamProxy bis = createBISProxy(repConfig, blockInfo)) {
+    try (ECBlockInputStreamProxy ignored = createBISProxy(repConfig, blockInfo)) {
       // Not all locations present, so we expect on;y the "missing=true" stream
       // to be present.
       assertThat(streamFactory.getStreams()).containsKey(false);
@@ -181,7 +181,7 @@ public class TestECBlockInputStreamProxy {
     dnMap = ECStreamTestUtil.createIndexMap(2, 3, 4, 5);
     blockInfo = ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
 
-    try (ECBlockInputStreamProxy bis = createBISProxy(repConfig, blockInfo)) {
+    try (ECBlockInputStreamProxy ignored = createBISProxy(repConfig, blockInfo)) {
       // Not all locations present, so we expect on;y the "missing=true" stream
       // to be present.
       assertThat(streamFactory.getStreams()).doesNotContainKey(false);

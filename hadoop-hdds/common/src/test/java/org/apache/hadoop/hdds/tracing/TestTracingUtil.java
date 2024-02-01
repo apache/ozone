@@ -51,8 +51,7 @@ public class TestTracingUtil {
     Configuration config = Configuration.fromEnv("testInitTracing");
     JaegerTracer tracer = config.getTracerBuilder().build();
     GlobalTracer.registerIfAbsent(tracer);
-    try (AutoCloseable scope = TracingUtil
-        .createActivatedSpan("initTracing")) {
+    try (AutoCloseable ignored = TracingUtil.createActivatedSpan("initTracing")) {
       exportCurrentSpan();
     } catch (Exception e) {
       fail("Should not get exception");
