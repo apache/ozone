@@ -270,7 +270,6 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       KeyArgs keyArgs, List<String> missingParents, OmBucketInfo bucketInfo,
       OMFileRequest.OMPathInfo omPathInfo, long trxnLogIndex)
       throws IOException {
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     List<OmKeyInfo> missingParentInfos = new ArrayList<>();
 
     // The base id is left shifted by 8 bits for creating space to
@@ -303,10 +302,6 @@ public class OMDirectoryCreateRequest extends OMKeyRequest {
       objectCount++;
 
       missingParentInfos.add(parentKeyInfo);
-      omMetadataManager.getKeyTable(BucketLayout.DEFAULT).addCacheEntry(
-          omMetadataManager.getOzoneKey(
-              volumeName, bucketName, parentKeyInfo.getKeyName()),
-          parentKeyInfo, trxnLogIndex);
     }
 
     return missingParentInfos;
