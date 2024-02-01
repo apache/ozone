@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Map;
 
@@ -202,6 +203,11 @@ public interface Container<CONTAINERDATA extends ContainerData> {
       ContainerPacker<CONTAINERDATA> packer) throws IOException;
 
   /**
+   * Import the container from a container path.
+   */
+  void importContainerData(Path containerPath) throws IOException;
+
+  /**
    * Export all the data of the container to one output archive with the help
    * of the packer.
    *
@@ -259,6 +265,11 @@ public interface Container<CONTAINERDATA extends ContainerData> {
    */
   ScanResult scanData(DataTransferThrottler throttler, Canceler canceler)
       throws InterruptedException;
+
+  /**
+   * Copy all the data of the container to the destination path.
+   */
+  void copyContainerData(Path destPath) throws IOException;
 
   /** Acquire read lock. */
   void readLock();

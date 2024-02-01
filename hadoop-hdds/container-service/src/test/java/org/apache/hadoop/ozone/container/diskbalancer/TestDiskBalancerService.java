@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.ozone.container.common.TestBlockDeletingService;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -37,10 +36,9 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 import java.io.File;
 import java.io.IOException;
@@ -57,28 +55,21 @@ import static org.mockito.Mockito.when;
 /**
  * This is a test class for DiskBalancerService.
  */
+@Timeout(30)
 public class TestDiskBalancerService {
   private File testRoot;
   private String scmId;
   private String datanodeUuid;
-  private OzoneConfiguration conf;
+  private OzoneConfiguration conf = new OzoneConfiguration();
 
-  private final ContainerLayoutVersion layout;
-  private final String schemaVersion;
+  private ContainerLayoutVersion layout;
+  private String schemaVersion;
   private MutableVolumeSet volumeSet;
-
-  public TestDiskBalancerService(ContainerTestVersionInfo versionInfo) {
-    this.layout = versionInfo.getLayout();
-    this.schemaVersion = versionInfo.getSchemaVersion();
-    conf = new OzoneConfiguration();
-    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
-  }
-
 
   @BeforeEach
   public void init() throws IOException {
     testRoot = GenericTestUtils
-        .getTestDir(TestBlockDeletingService.class.getSimpleName());
+        .getTestDir(TestDiskBalancerService.class.getSimpleName());
     if (testRoot.exists()) {
       FileUtils.cleanDirectory(testRoot);
     }
@@ -100,9 +91,9 @@ public class TestDiskBalancerService {
     FileUtils.deleteDirectory(testRoot);
   }
 
-  @Timeout(30)
   @ContainerTestVersionInfo.ContainerTest
-  public void testUpdateService() throws Exception {
+  public void testUpdateService(ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
     // Increase volume's usedBytes
     for (StorageVolume volume : volumeSet.getVolumeMap().values()) {
       volume.incrementUsedSpace(volume.getCapacity() / 2);
@@ -142,8 +133,9 @@ public class TestDiskBalancerService {
     svc.shutdown();
   }
 
-  @Test
-  public void testPolicyClassInitialization() throws IOException {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testPolicyClassInitialization(ContainerTestVersionInfo versionInfo) throws IOException {
+    setLayoutAndSchemaForTest(versionInfo);
     ContainerSet containerSet = new ContainerSet(1000);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
@@ -189,5 +181,11 @@ public class TestDiskBalancerService {
     when(ozoneContainer.getVolumeSet()).thenReturn(volumeSet);
     when(ozoneContainer.getController()).thenReturn(controller);
     return ozoneContainer;
+  }
+
+  private void setLayoutAndSchemaForTest(ContainerTestVersionInfo versionInfo) {
+    this.layout = versionInfo.getLayout();
+    this.schemaVersion = versionInfo.getSchemaVersion();
+    ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 }
