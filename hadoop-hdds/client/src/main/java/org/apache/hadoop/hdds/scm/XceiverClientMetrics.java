@@ -53,7 +53,7 @@ public class XceiverClientMetrics implements MetricsSource {
   private MetricsRegistry registry;
   private OzoneConfiguration conf = new OzoneConfiguration();
   private int[] intervals = conf.getInts(OzoneConfigKeys
-      .OZONE_XCEIVER_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY);
+      .OZONE_XCEIVER_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY);
 
   public XceiverClientMetrics() {
     init();

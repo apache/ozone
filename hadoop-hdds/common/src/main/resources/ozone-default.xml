@@ -1885,7 +1885,7 @@
     </description>
   </property>
   <property>
-    <name>ozone.xceiver.metrics.percentiles.intervals.seconds</name>
+    <name>ozone.xceiver.client.metrics.percentiles.intervals.seconds</name>
     <value>60</value>
     <tag>XCEIVER, PERFORMANCE</tag>
     <description>Specifies the interval in seconds for the rollover of XceiverClient MutableQuantiles metrics.
