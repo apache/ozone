@@ -54,7 +54,6 @@ import java.util.concurrent.TimeoutException;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -318,14 +317,13 @@ public class TestPipelineStateManagerImpl {
 
     finalizePipeline(pipelineProto);
     removePipeline(pipelineProto);
-    try {
-      stateManager.addContainerToPipeline(pipeline.getId(),
-          ContainerID.valueOf(++containerID));
-      fail("Container should not have been added");
-    } catch (IOException e) {
-      // Can not add a container to removed pipeline
-      assertThat(e.getMessage()).contains("not found");
-    }
+    Pipeline finalPipeline = pipeline;
+    ContainerID cid = ContainerID.valueOf(++containerID);
+    IOException e =
+        assertThrows(IOException.class,
+            () -> stateManager.addContainerToPipeline(finalPipeline.getId(), cid));
+    // Can not add a container to removed pipeline
+    assertThat(e.getMessage()).contains("not found");
   }
 
   @Test
@@ -339,13 +337,9 @@ public class TestPipelineStateManagerImpl {
     stateManager
         .addContainerToPipeline(pipeline.getId(), ContainerID.valueOf(1));
 
-    try {
-      removePipeline(pipelineProto);
-      fail("Pipeline should not have been removed");
-    } catch (IOException e) {
-      // can not remove a pipeline which already has containers
-      assertThat(e.getMessage()).contains("not yet closed");
-    }
+    IOException e = assertThrows(IOException.class, () -> removePipeline(pipelineProto));
+    // can not remove a pipeline which already has containers
+    assertThat(e.getMessage()).contains("not yet closed");
 
     // close the pipeline
     finalizePipeline(pipelineProto);

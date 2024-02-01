@@ -393,15 +393,14 @@ public class TestKeyValueContainer {
           containerData.getBytesUsed());
 
       //Can't overwrite existing container
-      try {
+      KeyValueContainer finalContainer = container;
+      assertThrows(IOException.class, () -> {
         try (FileInputStream fis = new FileInputStream(folderToExport)) {
-          container.importContainerData(fis, packer);
+          finalContainer.importContainerData(fis, packer);
         }
-        fail("Container is imported twice. Previous files are overwritten");
-      } catch (IOException ex) {
-        //all good
-        assertTrue(container.getContainerFile().exists());
-      }
+      }, "Container is imported twice. Previous files are overwritten");
+      //all good
+      assertTrue(container.getContainerFile().exists());
 
       //Import failure should cleanup the container directory
       containerData =
@@ -415,18 +414,18 @@ public class TestKeyValueContainer {
       containerVolume = volumeChoosingPolicy.chooseVolume(
           StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
       container.populatePathFields(scmId, containerVolume);
-      try {
-        FileInputStream fis = new FileInputStream(folderToExport);
-        fis.close();
-        container.importContainerData(fis, packer);
-        fail("Container import should fail");
-      } catch (Exception ex) {
-        assertInstanceOf(IOException.class, ex);
-      } finally {
-        File directory =
-            new File(container.getContainerData().getContainerPath());
-        assertFalse(directory.exists());
-      }
+      KeyValueContainer finalContainer1 = container;
+      assertThrows(IOException.class, () -> {
+        try {
+          FileInputStream fis = new FileInputStream(folderToExport);
+          fis.close();
+          finalContainer1.importContainerData(fis, packer);
+        } finally {
+          File directory =
+              new File(finalContainer1.getContainerData().getContainerPath());
+          assertFalse(directory.exists());
+        }
+      });
     }
   }
 

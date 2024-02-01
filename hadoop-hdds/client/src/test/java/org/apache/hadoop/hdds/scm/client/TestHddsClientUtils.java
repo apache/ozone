@@ -228,12 +228,8 @@ public class TestHddsClientUtils {
     invalidNames.add(tooShort);
 
     for (String name : invalidNames) {
-      try {
-        HddsClientUtils.verifyResourceName(name);
-        fail("Did not reject invalid string [" + name + "] as a name");
-      } catch (IllegalArgumentException e) {
-        // throwing up on an invalid name. we're good
-      }
+      assertThrows(IllegalArgumentException.class, () -> HddsClientUtils.verifyResourceName(name),
+          "Did not reject invalid string [" + name + "] as a name");
     }
   }
 
@@ -257,12 +253,8 @@ public class TestHddsClientUtils {
 
 
     for (String name : invalidNames) {
-      try {
-        HddsClientUtils.verifyKeyName(name);
-        fail("Did not reject invalid string [" + name + "] as a name");
-      } catch (IllegalArgumentException e) {
-        // throwing up on an invalid name. it's working.
-      }
+      assertThrows(IllegalArgumentException.class, () -> HddsClientUtils.verifyKeyName(name),
+          "Did not reject invalid string [" + name + "] as a name");
     }
 
     List<String> validNames = new ArrayList<>();

@@ -54,6 +54,7 @@ import static org.apache.hadoop.hdds.security.x509.certificate.utils.Certificate
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getPkcs9Extensions;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -206,29 +207,23 @@ public class TestCertificateSignRequest {
     }
 
     // Now try with blank/null Subject.
-    try {
+    assertThrows(IllegalArgumentException.class, () -> {
       builder.setSubject(null);
       builder.build();
-      fail("Null/Blank Subject should have thrown.");
-    } catch (IllegalArgumentException e) {
-      builder.setSubject(subject);
-    }
+    });
+    builder.setSubject(subject);
 
-    try {
+    assertThrows(IllegalArgumentException.class, () -> {
       builder.setSubject("");
       builder.build();
-      fail("Null/Blank Subject should have thrown.");
-    } catch (IllegalArgumentException e) {
-      builder.setSubject(subject);
-    }
+    });
+    builder.setSubject(subject);
 
     // Now try with invalid IP address
-    try {
+    assertThrows(IllegalArgumentException.class, () -> {
       builder.addIpAddress("255.255.255.*");
       builder.build();
-      fail("Invalid ip address");
-    } catch (IllegalArgumentException e) {
-    }
+    });
 
     PKCS10CertificationRequest csr = builder.build();
 

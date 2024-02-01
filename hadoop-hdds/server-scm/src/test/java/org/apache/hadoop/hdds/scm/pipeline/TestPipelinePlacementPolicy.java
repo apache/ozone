@@ -82,7 +82,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test for PipelinePlacementPolicy.
@@ -247,25 +246,19 @@ public class TestPipelinePlacementPolicy {
 
     String expectedMessageSubstring = "Unable to find enough nodes that meet " +
         "the space requirement";
-    try {
-      // A huge container size
-      localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
-          new ArrayList<>(datanodes.size()), nodesRequired,
-          0, 10 * OzoneConsts.TB);
-      fail("SCMException should have been thrown.");
-    } catch (SCMException ex) {
-      assertThat(ex.getMessage()).contains(expectedMessageSubstring);
-    }
 
-    try {
-      // a huge free space min configured
-      localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
-          new ArrayList<>(datanodes.size()), nodesRequired, 10 * OzoneConsts.TB,
-          0);
-      fail("SCMException should have been thrown.");
-    } catch (SCMException ex) {
-      assertThat(ex.getMessage()).contains(expectedMessageSubstring);
-    }
+    // A huge container size
+    SCMException ex =
+        assertThrows(SCMException.class,
+            () -> localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
+                new ArrayList<>(datanodes.size()), nodesRequired, 0, 10 * OzoneConsts.TB));
+    assertThat(ex.getMessage()).contains(expectedMessageSubstring);
+
+    // a huge free space min configured
+    ex = assertThrows(SCMException.class,
+        () -> localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
+            new ArrayList<>(datanodes.size()), nodesRequired, 10 * OzoneConsts.TB, 0));
+    assertThat(ex.getMessage()).contains(expectedMessageSubstring);
   }
 
   @Test

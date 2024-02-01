@@ -459,17 +459,15 @@ public class TestSCMNodeManager {
 
   private void assertPipelineCreationFailsWithNotEnoughNodes(
       int actualNodeCount) throws Exception {
-    try {
+    SCMException ex = assertThrows(SCMException.class, () -> {
       ReplicationConfig ratisThree =
           ReplicationConfig.fromProtoTypeAndFactor(
               HddsProtos.ReplicationType.RATIS,
               HddsProtos.ReplicationFactor.THREE);
       scm.getPipelineManager().createPipeline(ratisThree);
-      fail("3 nodes should not have been found for a pipeline.");
-    } catch (SCMException ex) {
-      assertThat(ex.getMessage()).contains("Required 3. Found " +
-          actualNodeCount);
-    }
+    }, "3 nodes should not have been found for a pipeline.");
+    assertThat(ex.getMessage()).contains("Required 3. Found " +
+        actualNodeCount);
   }
 
   private void assertPipelines(HddsProtos.ReplicationFactor factor,
