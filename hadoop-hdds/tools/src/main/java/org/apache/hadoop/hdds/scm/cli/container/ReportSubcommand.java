@@ -54,7 +54,7 @@ public class ReportSubcommand extends ScmSubcommand {
     ReplicationManagerReport report = scmClient.getReplicationManagerReport();
     if (report.getReportTimeStamp() == 0) {
       System.err.println("The Container Report is not available until Replication Manager completes" +
-          " its first run after startup or failover. All values will be zero until that time.\n");
+          " its first run after startup or fail over. All values will be zero until that time.\n");
     }
 
     if (json) {
