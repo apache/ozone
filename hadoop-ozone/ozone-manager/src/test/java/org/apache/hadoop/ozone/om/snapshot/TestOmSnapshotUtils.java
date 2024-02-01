@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -82,7 +81,6 @@ public class TestOmSnapshotUtils {
         map(Path::toString).collect(Collectors.toSet());
 
     assertEquals(tree1Files, tree2Files);
-    GenericTestUtils.deleteDirectory(tempDir);
   }
 
 

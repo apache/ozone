@@ -19,8 +19,8 @@
 
 package org.apache.hadoop.ozone.om;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,7 +33,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -69,7 +68,6 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.OzoneTestBase;
@@ -78,6 +76,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -112,20 +111,16 @@ class TestKeyManagerUnit extends OzoneTestBase {
   private KeyManagerImpl keyManager;
 
   private Instant startDate;
-  private File testDir;
   private ScmBlockLocationProtocol blockClient;
 
   private OzoneManagerProtocol writeClient;
   private OzoneManager om;
 
   @BeforeAll
-  void setup() throws Exception {
+  void setup(@TempDir Path testDir) throws Exception {
     ExitUtils.disableSystemExit();
-
     configuration = new OzoneConfiguration();
-    testDir = GenericTestUtils.getRandomizedTestDir();
-    configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        testDir.toString());
+    configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.toString());
     containerClient = mock(StorageContainerLocationProtocol.class);
     blockClient = mock(ScmBlockLocationProtocol.class);
 
@@ -146,7 +141,6 @@ class TestKeyManagerUnit extends OzoneTestBase {
   @AfterAll
   public void cleanup() throws Exception {
     om.stop();
-    FileUtils.deleteDirectory(testDir);
   }
 
   @Test

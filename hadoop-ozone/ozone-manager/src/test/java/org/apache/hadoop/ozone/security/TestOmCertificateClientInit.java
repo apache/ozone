@@ -29,10 +29,10 @@ import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
-import org.apache.ozone.test.GenericTestUtils;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -66,7 +66,6 @@ public class TestOmCertificateClientInit {
   private String certSerialId = "3284792342234";
   private OMCertificateClient omCertificateClient;
   private HDDSKeyGenerator keyGenerator;
-  private Path metaDirPath;
   private SecurityConfig securityConfig;
   private KeyCodec omKeyCodec;
   private X509Certificate x509Certificate;
@@ -86,11 +85,8 @@ public class TestOmCertificateClientInit {
   }
 
   @BeforeEach
-  public void setUp() throws Exception {
+  public void setUp(@TempDir Path metaDirPath) throws Exception {
     OzoneConfiguration config = new OzoneConfiguration();
-    final String path = GenericTestUtils
-        .getTempPath(UUID.randomUUID().toString());
-    metaDirPath = Paths.get(path, "test");
     config.set(HDDS_METADATA_DIR_NAME, metaDirPath.toString());
     securityConfig = new SecurityConfig(config);
     keyGenerator = new HDDSKeyGenerator(securityConfig);
@@ -115,7 +111,6 @@ public class TestOmCertificateClientInit {
   public void tearDown() throws IOException {
     omCertificateClient.close();
     omCertificateClient = null;
-    FileUtils.deleteQuietly(metaDirPath.toFile());
   }
 
   @ParameterizedTest
