@@ -48,8 +48,6 @@ import org.junit.jupiter.params.provider.MethodSource;
  * Test http server of OM with various HTTP option.
  */
 public class TestOzoneManagerHttpServer {
-  @TempDir
-  private static File baseDir;
   private static String keystoresDir;
   private static String sslConfDir;
   private static OzoneConfiguration conf;
@@ -63,7 +61,7 @@ public class TestOzoneManagerHttpServer {
     return Arrays.asList(params);
   }
 
-  @BeforeAll public static void setUp() throws Exception {
+  @BeforeAll public static void setUp(@TempDir File baseDir) throws Exception {
 
     // Create metadata directory
     ozoneMetadataDirectory = new File(baseDir.getPath(), "metadata");

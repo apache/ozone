@@ -82,7 +82,8 @@ import static org.mockito.Mockito.when;
 public class TestOmSnapshotManager {
 
   private OzoneManager om;
-  private File testDir;
+  @TempDir
+  private static File testDir;
   private static final String CANDIDATE_DIR_NAME = OM_DB_NAME +
       SNAPSHOT_CANDIDATE_DIR;
   private File leaderDir;
@@ -95,9 +96,8 @@ public class TestOmSnapshotManager {
   private File f1File;
 
   @BeforeEach
-  public void init(@TempDir Path pathTestDir) throws Exception {
+  public void init() throws Exception {
     OzoneConfiguration configuration = new OzoneConfiguration();
-    testDir = pathTestDir.toFile();
     configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         testDir.toString());
     // Enable filesystem snapshot feature for the test regardless of the default

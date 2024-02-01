@@ -250,7 +250,7 @@ public class TestOzoneTokenIdentifier {
   @Test
   public void testReadWriteInProtobuf(@TempDir Path baseDir) throws IOException {
     OzoneTokenIdentifier id = getIdentifierInst();
-    File idFile = baseDir.resolve("/tokenFile").toFile();
+    File idFile = baseDir.resolve("tokenFile").toFile();
 
     FileOutputStream fop = new FileOutputStream(idFile);
     DataOutputStream dataOutputStream = new DataOutputStream(fop);
