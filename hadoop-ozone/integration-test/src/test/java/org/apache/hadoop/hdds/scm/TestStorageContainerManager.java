@@ -217,19 +217,14 @@ public class TestStorageContainerManager {
         cluster.getStorageContainerManager().getClientProtocolServer());
 
     mockRemoteUser(UserGroupInformation.createRemoteUser(fakeRemoteUsername));
-
-    try {
-      mockClientServer.deleteContainer(
-          ContainerTestHelper.getTestContainerID());
-      fail("Operation should fail, expecting an IOException here.");
-    } catch (Exception e) {
-      if (expectPermissionDenied) {
-        verifyPermissionDeniedException(e, fakeRemoteUsername);
-      } else {
-        // If passes permission check, it should fail with
-        // container not exist exception.
-        assertInstanceOf(ContainerNotFoundException.class, e);
-      }
+    Exception ex = assertThrows(Exception.class, () -> mockClientServer.deleteContainer(
+        ContainerTestHelper.getTestContainerID()));
+    if (expectPermissionDenied) {
+      verifyPermissionDeniedException(ex, fakeRemoteUsername);
+    } else {
+      // If passes permission check, it should fail with
+      // container not exist exception.
+      assertInstanceOf(ContainerNotFoundException.class, ex);
     }
 
     try {
@@ -245,18 +240,14 @@ public class TestStorageContainerManager {
       verifyPermissionDeniedException(e, fakeRemoteUsername);
     }
 
-    try {
-      mockClientServer.getContainer(
-          ContainerTestHelper.getTestContainerID());
-      fail("Operation should fail, expecting an IOException here.");
-    } catch (Exception e) {
-      if (expectPermissionDenied) {
-        verifyPermissionDeniedException(e, fakeRemoteUsername);
-      } else {
-        // If passes permission check, it should fail with
-        // key not exist exception.
-        assertInstanceOf(ContainerNotFoundException.class, e);
-      }
+    Exception e = assertThrows(Exception.class, () -> mockClientServer.getContainer(
+        ContainerTestHelper.getTestContainerID()));
+    if (expectPermissionDenied) {
+      verifyPermissionDeniedException(e, fakeRemoteUsername);
+    } else {
+      // If passes permission check, it should fail with
+      // key not exist exception.
+      assertInstanceOf(ContainerNotFoundException.class, e);
     }
   }
 
@@ -723,12 +714,7 @@ public class TestStorageContainerManager {
       final String clusterId =
           cluster.getStorageContainerManager().getClusterId();
       // validate there is no ratis group pre existing
-      try {
-        validateRatisGroupExists(conf, clusterId);
-        fail();
-      } catch (IOException ioe) {
-        // Exception is expected here
-      }
+      assertThrows(IOException.class, () -> validateRatisGroupExists(conf, clusterId));
 
       conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
       // This will re-initialize SCM

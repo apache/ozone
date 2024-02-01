@@ -40,7 +40,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Class tests OzoneManagerLock.
@@ -77,14 +76,11 @@ class TestOzoneManagerLock {
         resource == Resource.S3_SECRET_LOCK ||
         resource == Resource.PREFIX_LOCK) {
       lock.acquireWriteLock(resource, resourceName);
-      try {
-        lock.acquireWriteLock(resource, resourceName);
-        fail("reacquireResourceLock failed");
-      } catch (RuntimeException ex) {
-        String message = "cannot acquire " + resource.getName() + " lock " +
-            "while holding [" + resource.getName() + "] lock(s).";
-        assertThat(ex).hasMessageContaining(message);
-      }
+      RuntimeException ex =
+          assertThrows(RuntimeException.class, () -> lock.acquireWriteLock(resource, resourceName));
+      String message = "cannot acquire " + resource.getName() + " lock " +
+          "while holding [" + resource.getName() + "] lock(s).";
+      assertThat(ex).hasMessageContaining(message);
       assertDoesNotThrow(() -> lock.releaseWriteLock(resource, resourceName));
     } else {
       lock.acquireWriteLock(resource, resourceName);
@@ -162,15 +158,13 @@ class TestOzoneManagerLock {
           stack.push(new ResourceInfo(resourceName, higherResource));
           currentLocks.add(higherResource.getName());
           // try to acquire lower level lock
-          try {
-            resourceName = generateResourceName(resource);
-            lock.acquireWriteLock(resource, resourceName);
-            fail("testLockViolations failed");
-          } catch (RuntimeException ex) {
-            String message = "cannot acquire " + resource.getName() + " lock " +
-                "while holding " + currentLocks + " lock(s).";
-            assertThat(ex).hasMessageContaining(message);
-          }
+          RuntimeException ex = assertThrows(RuntimeException.class, () -> {
+            String[] resourceName1 = generateResourceName(resource);
+            lock.acquireWriteLock(resource, resourceName1);
+          });
+          String message = "cannot acquire " + resource.getName() + " lock " +
+              "while holding " + currentLocks + " lock(s).";
+          assertThat(ex).hasMessageContaining(message);
         }
       }
 

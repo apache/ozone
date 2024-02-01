@@ -95,6 +95,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -459,10 +460,7 @@ public class TestContainerStateMachineFailures {
     // a pipeline close action
 
     try {
-      xceiverClient.sendCommand(request.build());
-      fail("Expected exception not thrown");
-    } catch (IOException e) {
-      // Exception should be thrown
+      assertThrows(IOException.class, () -> xceiverClient.sendCommand(request.build()));
     } finally {
       xceiverClientManager.releaseClient(xceiverClient, false);
     }

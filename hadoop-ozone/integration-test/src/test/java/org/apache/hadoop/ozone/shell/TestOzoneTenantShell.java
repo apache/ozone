@@ -68,7 +68,7 @@ import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENAN
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Integration test for Ozone tenant shell command. HA enabled.
@@ -254,17 +254,13 @@ public class TestOzoneTenantShell {
     if (Strings.isNullOrEmpty(expectedError)) {
       execute(shell, args);
     } else {
-      try {
-        execute(shell, args);
-        fail("Exception is expected from command execution " + Arrays.asList(args));
-      } catch (Exception ex) {
-        if (!Strings.isNullOrEmpty(expectedError)) {
-          Throwable exceptionToCheck = ex;
-          if (exceptionToCheck.getCause() != null) {
-            exceptionToCheck = exceptionToCheck.getCause();
-          }
-          assertThat(exceptionToCheck.getMessage()).contains(expectedError);
+      Exception ex = assertThrows(Exception.class, () -> execute(shell, args));
+      if (!Strings.isNullOrEmpty(expectedError)) {
+        Throwable exceptionToCheck = ex;
+        if (exceptionToCheck.getCause() != null) {
+          exceptionToCheck = exceptionToCheck.getCause();
         }
+        assertThat(exceptionToCheck.getMessage()).contains(expectedError);
       }
     }
   }

@@ -82,13 +82,11 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_S
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * This test verifies all the S3 multipart client apis - prefix layout.
@@ -489,15 +487,9 @@ public class TestOzoneClientMultipartUploadWithFSO {
     String part1 = new String(data, UTF_8);
     sb.append(part1);
     assertEquals(sb.toString(), new String(fileContent, UTF_8));
-
-    try {
-      ozoneOutputStream.close();
-      fail("testCommitPartAfterCompleteUpload failed");
-    } catch (IOException ex) {
-      assertInstanceOf(OMException.class, ex);
-      assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR,
-          ((OMException) ex).getResult());
-    }
+    OzoneOutputStream finalOzoneOutputStream = ozoneOutputStream;
+    OMException ex = assertThrows(OMException.class, () -> finalOzoneOutputStream.close());
+    assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, ex.getResult());
   }
 
   @Test
@@ -522,15 +514,8 @@ public class TestOzoneClientMultipartUploadWithFSO {
 
     // Abort before completing part upload.
     bucket.abortMultipartUpload(keyName, uploadID);
-
-    try {
-      ozoneOutputStream.close();
-      fail("testAbortUploadFailWithInProgressPartUpload failed");
-    } catch (IOException ex) {
-      assertInstanceOf(OMException.class, ex);
-      assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR,
-          ((OMException) ex).getResult());
-    }
+    OMException ome = assertThrows(OMException.class, () -> ozoneOutputStream.close());
+    assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, ome.getResult());
   }
 
   @Test
