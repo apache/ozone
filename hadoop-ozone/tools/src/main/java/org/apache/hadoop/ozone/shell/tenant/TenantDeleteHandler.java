@@ -17,9 +17,9 @@
  */
 package org.apache.hadoop.ozone.shell.tenant;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonObject;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
@@ -60,13 +60,14 @@ public class TenantDeleteHandler extends TenantHandler {
     }
 
     if (isVerbose()) {
-      final JsonObject obj = new JsonObject();
-      obj.addProperty("tenantId", tenantId);
-      obj.addProperty("volumeName", resp.getVolumeName());
-      obj.addProperty("volumeRefCount", resp.getVolRefCount());
-      final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+      ObjectMapper objectMapper = new ObjectMapper();
+      objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
+      ObjectNode obj = objectMapper.createObjectNode();
+      obj.put("tenantId", tenantId);
+      obj.put("volumeName", resp.getVolumeName());
+      obj.put("volumeRefCount", resp.getVolRefCount());
       // Print raw response to stderr if verbose
-      out().println(gson.toJson(obj));
+      out().println(objectMapper.writeValueAsString(obj));
     }
 
   }

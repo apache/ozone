@@ -26,8 +26,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
-import com.google.gson.Gson;
 import org.apache.hadoop.hdds.server.http.HttpServer2;
 import org.apache.hadoop.util.XMLUtils;
 import org.eclipse.jetty.util.ajax.JSON;
@@ -109,8 +109,10 @@ public class TestHddsConfServlet {
     conf.getObject(OzoneTestConfig.class);
     // test cmd is getOzoneTags
     String result = getResultWithCmd(conf, "getOzoneTags");
-    Gson gson = new Gson();
-    String tags = gson.toJson(OzoneConfiguration.TAGS);
+
+    ObjectMapper objectMapper = new ObjectMapper();
+    String tags = objectMapper.writeValueAsString(OzoneConfiguration.TAGS);
+
     assertEquals(result, tags);
     // cmd is getPropertyByTag
     result = getResultWithCmd(conf, "getPropertyByTag");

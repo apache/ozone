@@ -26,8 +26,11 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import com.google.gson.ExclusionStrategy;
-import com.google.gson.FieldAttributes;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
@@ -61,9 +64,10 @@ public class EventQueue implements EventPublisher, AutoCloseable {
 
   private boolean isRunning = true;
 
-  private static final Gson TRACING_SERIALIZER = new GsonBuilder()
-          .setExclusionStrategies(new DatanodeDetailsGsonExclusionStrategy())
-          .create();
+  // Replace TRACING_SERIALIZER with ObjectMapper
+  private static final ObjectMapper MAPPER = new ObjectMapper()
+      .configure(SerializationFeature.FAIL_ON_SELF_REFERENCES, false);
+
 
   private boolean isSilent = false;
   private final String threadNamePrefix;
@@ -79,18 +83,9 @@ public class EventQueue implements EventPublisher, AutoCloseable {
   // The field parent in DatanodeDetails class has the circular reference
   // which will result in Gson infinite recursive parsing. We need to exclude
   // this field when generating json string for DatanodeDetails object
-  static class DatanodeDetailsGsonExclusionStrategy
-          implements ExclusionStrategy {
-    @Override
-    public boolean shouldSkipField(FieldAttributes f) {
-      return f.getDeclaringClass() == NodeImpl.class
-              && f.getName().equals("parent");
-    }
-
-    @Override
-    public boolean shouldSkipClass(Class<?> aClass) {
-      return false;
-    }
+  static class NodeImpl {
+    @JsonIgnore
+    private DatanodeDetails parent;
   }
 
   /**
@@ -204,12 +199,19 @@ public class EventQueue implements EventPublisher, AutoCloseable {
 
         for (EventHandler handler : executorAndHandlers.getValue()) {
           queuedCount.incrementAndGet();
-          if (LOG.isTraceEnabled()) {
-            LOG.trace(
-                "Delivering [event={}] to executor/handler {}: <json>{}</json>",
-                event.getName(),
-                executorAndHandlers.getKey().getName(),
-                TRACING_SERIALIZER.toJson(payload).replaceAll("\n", "\\\\n"));
+          if (!LOG.isTraceEnabled()) {
+            try {
+              // Use ObjectMapper to serialize payload to JSON
+              String payloadJson = MAPPER.writeValueAsString(payload);
+              LOG.trace(
+                  "Delivering [event={}] to executor/handler {}: <json>{}</json>",
+                  event.getName(),
+                  executorAndHandlers.getKey().getName(),
+                  payloadJson.replaceAll("\n", "\\\\n"));
+            } catch (JsonProcessingException e) {
+              LOG.warn("Failed to serialize payload to JSON: {}",
+                  e.getMessage());
+            }
           } else if (LOG.isDebugEnabled()) {
             LOG.debug("Delivering [event={}] to executor/handler {}: {}",
                 event.getName(),
@@ -227,8 +229,8 @@ public class EventQueue implements EventPublisher, AutoCloseable {
         LOG.warn("No event handler registered for event {}", event);
       }
     }
-
   }
+
 
   /**
    * This is just for unit testing, don't use it for production code.

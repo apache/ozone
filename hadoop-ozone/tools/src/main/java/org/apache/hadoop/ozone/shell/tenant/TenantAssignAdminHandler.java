@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.ozone.shell.tenant;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
@@ -55,14 +58,17 @@ public class TenantAssignAdminHandler extends TenantHandler {
     client.getObjectStore().tenantAssignAdmin(accessId, tenantId, delegated);
 
     if (isVerbose()) {
-      final JsonObject obj = new JsonObject();
-      obj.addProperty("accessId", accessId);
-      obj.addProperty("tenantId", tenantId);
-      obj.addProperty("isAdmin", true);
-      obj.addProperty("isDelegatedAdmin", delegated);
-      final Gson gson = new GsonBuilder().setPrettyPrinting().create();
-      out().println(gson.toJson(obj));
-    }
+      ObjectMapper objectMapper = new ObjectMapper();
+      ObjectNode obj = objectMapper.createObjectNode();
+      obj.put("accessId", accessId);
+      obj.put("tenantId", tenantId);
+      obj.put("isAdmin", true);
+      obj.put("isDelegatedAdmin", delegated);
 
+      // Enable pretty printing
+      objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
+      String jsonString = objectMapper.writeValueAsString(obj);
+      out().println(jsonString);
+    }
   }
 }

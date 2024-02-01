@@ -17,12 +17,14 @@
  */
 package org.apache.hadoop.ozone.container.keyvalue;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonPrimitive;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.BooleanNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -165,7 +167,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
   }
 
   public String process(ContainerData containerData, DatanodeStore store,
-      Logger log) {
+                        Logger log) {
     // If the system property to process container metadata was not
     // specified, or the inspector is unloaded, this method is a no-op.
     if (mode == Mode.OFF) {
@@ -181,55 +183,62 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       return null;
     }
 
-    JsonObject containerJson = inspectContainer(kvData, store);
+    ObjectNode containerJson = inspectContainer(kvData, store);
     boolean correct = checkAndRepair(containerJson, kvData, store);
 
-    Gson gson = new GsonBuilder()
-        .setPrettyPrinting()
-        .serializeNulls()
-        .create();
-    String jsonReport = gson.toJson(containerJson);
-    if (log != null) {
-      if (correct) {
-        log.trace(jsonReport);
-      } else {
-        log.error(jsonReport);
+    try {
+      ObjectMapper mapper = new ObjectMapper();
+      // For pretty-printing
+      mapper.enable(SerializationFeature.INDENT_OUTPUT);
+      // To serialize null values
+      mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+      String jsonReport = mapper.writeValueAsString(containerJson);
+      if (log != null) {
+        if (correct) {
+          log.trace(jsonReport);
+        } else {
+          log.error(jsonReport);
+        }
       }
+      return jsonReport;
+    } catch (JsonProcessingException e) {
+      LOG.error("Error processing JSON", e);
+      return null;
     }
-    return jsonReport;
   }
 
-  static JsonObject inspectContainer(KeyValueContainerData containerData,
-      DatanodeStore store) {
+  static ObjectNode inspectContainer(KeyValueContainerData containerData,
+                                     DatanodeStore store) {
 
-    JsonObject containerJson = new JsonObject();
+    ObjectMapper mapper = new ObjectMapper();
+    ObjectNode containerJson = mapper.createObjectNode(); // Create ObjectNode
 
     try {
       // Build top level container properties.
-      containerJson.addProperty("containerID", containerData.getContainerID());
+      containerJson.put("containerID", containerData.getContainerID());
       String schemaVersion = containerData.getSchemaVersion();
-      containerJson.addProperty("schemaVersion", schemaVersion);
-      containerJson.addProperty("containerState",
+      containerJson.put("schemaVersion", schemaVersion);
+      containerJson.put("containerState",
           containerData.getState().toString());
-      containerJson.addProperty("currentDatanodeID",
+      containerJson.put("currentDatanodeID",
           containerData.getVolume().getDatanodeUuid());
-      containerJson.addProperty("originDatanodeID",
+      containerJson.put("originDatanodeID",
           containerData.getOriginNodeId());
 
       // Build DB metadata values.
       Table<String, Long> metadataTable = store.getMetadataTable();
-      JsonObject dBMetadata = getDBMetadataJson(metadataTable, containerData);
-      containerJson.add("dBMetadata", dBMetadata);
+      ObjectNode dBMetadata = getDBMetadataJson(metadataTable, containerData);
+      containerJson.set("dBMetadata", dBMetadata);
 
       // Build aggregate values.
-      JsonObject aggregates = getAggregateValues(store,
+      ObjectNode aggregates = getAggregateValues(store,
           containerData, schemaVersion);
-      containerJson.add("aggregates", aggregates);
+      containerJson.set("aggregates", aggregates);
 
       // Build info about chunks directory.
-      JsonObject chunksDirectory =
+      ObjectNode chunksDirectory =
           getChunksDirectoryJson(new File(containerData.getChunksPath()));
-      containerJson.add("chunksDirectory", chunksDirectory);
+      containerJson.set("chunksDirectory", chunksDirectory);
     } catch (IOException ex) {
       LOG.error("Inspecting container {} failed",
           containerData.getContainerID(), ex);
@@ -238,28 +247,32 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     return containerJson;
   }
 
-  static JsonObject getDBMetadataJson(Table<String, Long> metadataTable,
-      KeyValueContainerData containerData) throws IOException {
-    JsonObject dBMetadata = new JsonObject();
+  static ObjectNode getDBMetadataJson(Table<String, Long> metadataTable,
+                                      KeyValueContainerData containerData)
+      throws IOException {
+    ObjectMapper mapper = new ObjectMapper();
+    ObjectNode dBMetadata = mapper.createObjectNode(); // Create ObjectNode
 
-    dBMetadata.addProperty(OzoneConsts.BLOCK_COUNT,
+    dBMetadata.put(OzoneConsts.BLOCK_COUNT,
         metadataTable.get(containerData.getBlockCountKey()));
-    dBMetadata.addProperty(OzoneConsts.CONTAINER_BYTES_USED,
+    dBMetadata.put(OzoneConsts.CONTAINER_BYTES_USED,
         metadataTable.get(containerData.getBytesUsedKey()));
-    dBMetadata.addProperty(OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
+    dBMetadata.put(OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
         metadataTable.get(containerData.getPendingDeleteBlockCountKey()));
-    dBMetadata.addProperty(OzoneConsts.DELETE_TRANSACTION_KEY,
+    dBMetadata.put(OzoneConsts.DELETE_TRANSACTION_KEY,
         metadataTable.get(containerData.getLatestDeleteTxnKey()));
-    dBMetadata.addProperty(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID,
+    dBMetadata.put(OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID,
         metadataTable.get(containerData.getBcsIdKey()));
 
     return dBMetadata;
   }
 
-  static JsonObject getAggregateValues(DatanodeStore store,
-      KeyValueContainerData containerData, String schemaVersion)
+  static ObjectNode getAggregateValues(DatanodeStore store,
+                                       KeyValueContainerData containerData,
+                                       String schemaVersion)
       throws IOException {
-    JsonObject aggregates = new JsonObject();
+    ObjectMapper mapper = new ObjectMapper();
+    ObjectNode aggregates = mapper.createObjectNode(); // Create ObjectNode
 
     long usedBytesTotal = 0;
     long blockCountTotal = 0;
@@ -305,22 +318,23 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
           countPendingDeletesSchemaV3(schemaThreeStore, containerData);
     } else {
       throw new IOException("Failed to process deleted blocks for unknown " +
-              "container schema " + schemaVersion);
+          "container schema " + schemaVersion);
     }
 
-    aggregates.addProperty("blockCount", blockCountTotal);
-    aggregates.addProperty("usedBytes", usedBytesTotal);
+    aggregates.put("blockCount", blockCountTotal);
+    aggregates.put("usedBytes", usedBytesTotal);
     pendingDelete.addToJson(aggregates);
 
     return aggregates;
   }
 
-  static JsonObject getChunksDirectoryJson(File chunksDir) throws IOException {
-    JsonObject chunksDirectory = new JsonObject();
+  static ObjectNode getChunksDirectoryJson(File chunksDir) throws IOException {
+    ObjectMapper mapper = new ObjectMapper();
+    ObjectNode chunksDirectory = mapper.createObjectNode();
 
-    chunksDirectory.addProperty("path", chunksDir.getAbsolutePath());
+    chunksDirectory.put("path", chunksDir.getAbsolutePath());
     boolean chunksDirPresent = FileUtils.isDirectory(chunksDir);
-    chunksDirectory.addProperty("present", chunksDirPresent);
+    chunksDirectory.put("present", chunksDirPresent);
 
     long fileCount = 0;
     if (chunksDirPresent) {
@@ -328,43 +342,44 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
         fileCount = stream.count();
       }
     }
-    chunksDirectory.addProperty("fileCount", fileCount);
+    chunksDirectory.put("fileCount", fileCount);
 
     return chunksDirectory;
   }
 
-  private boolean checkAndRepair(JsonObject parent,
-      KeyValueContainerData containerData, DatanodeStore store) {
-    JsonArray errors = new JsonArray();
+  private boolean checkAndRepair(JsonNode parent,
+                                 KeyValueContainerData containerData,
+                                 DatanodeStore store) {
+    ObjectMapper objectMapper = new ObjectMapper();
+    ArrayNode errors = objectMapper.createArrayNode();
     boolean passed = true;
 
     Table<String, Long> metadataTable = store.getMetadataTable();
 
-    final JsonObject dBMetadata = parent.getAsJsonObject("dBMetadata");
-    final JsonObject aggregates = parent.getAsJsonObject("aggregates");
+    final JsonNode dBMetadata = parent.get("dBMetadata");
+    final JsonNode aggregates = parent.get("aggregates");
 
     // Check and repair block count.
-    JsonElement blockCountDB = parent.getAsJsonObject("dBMetadata")
-        .get(OzoneConsts.BLOCK_COUNT);
+    JsonNode blockCountDB = dBMetadata.get(OzoneConsts.BLOCK_COUNT);
 
-    JsonElement blockCountAggregate = parent.getAsJsonObject("aggregates")
-        .get("blockCount");
+    JsonNode blockCountAggregate = aggregates.get("blockCount");
+
 
     // If block count is absent from the DB, it is only an error if there are
     // a non-zero amount of block keys in the DB.
     long blockCountDBLong = 0;
-    if (!blockCountDB.isJsonNull()) {
-      blockCountDBLong = blockCountDB.getAsLong();
+    if (blockCountDB != null && !blockCountDB.isNull()) {
+      blockCountDBLong = blockCountDB.asLong();
     }
 
-    if (blockCountDBLong != blockCountAggregate.getAsLong()) {
+    if (blockCountDBLong != blockCountAggregate.asLong()) {
       passed = false;
 
       BooleanSupplier keyRepairAction = () -> {
         boolean repaired = false;
         try {
           metadataTable.put(containerData.getBlockCountKey(),
-              blockCountAggregate.getAsLong());
+              blockCountAggregate.asLong());
           repaired = true;
         } catch (IOException ex) {
           LOG.error("Error repairing block count for container {}.",
@@ -373,33 +388,33 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
         return repaired;
       };
 
-      JsonObject blockCountError = buildErrorAndRepair("dBMetadata." +
+      ObjectNode blockCountError = buildErrorAndRepair("dBMetadata." +
               OzoneConsts.BLOCK_COUNT, blockCountAggregate, blockCountDB,
           keyRepairAction);
       errors.add(blockCountError);
     }
 
     // Check and repair used bytes.
-    JsonElement usedBytesDB = parent.getAsJsonObject("dBMetadata")
-        .get(OzoneConsts.CONTAINER_BYTES_USED);
-    JsonElement usedBytesAggregate = parent.getAsJsonObject("aggregates")
-        .get("usedBytes");
+    JsonNode usedBytesDB =
+        dBMetadata.get(OzoneConsts.CONTAINER_BYTES_USED);
+    JsonNode usedBytesAggregate =
+        aggregates.get("usedBytes");
 
     // If used bytes is absent from the DB, it is only an error if there is
     // a non-zero aggregate of used bytes among the block keys.
     long usedBytesDBLong = 0;
-    if (!usedBytesDB.isJsonNull()) {
-      usedBytesDBLong = usedBytesDB.getAsLong();
+    if (usedBytesDB != null && !usedBytesDB.isNull()) {
+      usedBytesDBLong = usedBytesDB.asLong();
     }
 
-    if (usedBytesDBLong != usedBytesAggregate.getAsLong()) {
+    if (usedBytesDBLong != usedBytesAggregate.asLong()) {
       passed = false;
 
       BooleanSupplier keyRepairAction = () -> {
         boolean repaired = false;
         try {
           metadataTable.put(containerData.getBytesUsedKey(),
-              usedBytesAggregate.getAsLong());
+              usedBytesAggregate.asLong());
           repaired = true;
         } catch (IOException ex) {
           LOG.error("Error repairing used bytes for container {}.",
@@ -408,17 +423,17 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
         return repaired;
       };
 
-      JsonObject usedBytesError = buildErrorAndRepair("dBMetadata." +
+      ObjectNode usedBytesError = buildErrorAndRepair("dBMetadata." +
               OzoneConsts.CONTAINER_BYTES_USED, usedBytesAggregate, usedBytesDB,
           keyRepairAction);
       errors.add(usedBytesError);
     }
 
     // check and repair if db delete count mismatches delete transaction count.
-    final JsonElement pendingDeleteCountDB = dBMetadata.get(
+    final JsonNode pendingDeleteCountDB = dBMetadata.get(
         OzoneConsts.PENDING_DELETE_BLOCK_COUNT);
     final long dbDeleteCount = jsonToLong(pendingDeleteCountDB);
-    final JsonElement pendingDeleteCountAggregate
+    final JsonNode pendingDeleteCountAggregate
         = aggregates.get(PendingDelete.COUNT);
     final long deleteTransactionCount = jsonToLong(pendingDeleteCountAggregate);
     if (dbDeleteCount != deleteTransactionCount) {
@@ -437,7 +452,7 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
         return false;
       };
 
-      final JsonObject deleteCountError = buildErrorAndRepair(
+      final JsonNode deleteCountError = buildErrorAndRepair(
           "dBMetadata." + OzoneConsts.PENDING_DELETE_BLOCK_COUNT,
           pendingDeleteCountAggregate, pendingDeleteCountDB,
           deleteCountRepairAction);
@@ -445,9 +460,8 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
     }
 
     // check and repair chunks dir.
-    JsonElement chunksDirPresent = parent.getAsJsonObject("chunksDirectory")
-        .get("present");
-    if (!chunksDirPresent.getAsBoolean()) {
+    JsonNode chunksDirPresent = parent.get("chunksDirectory").get("present");
+    if (!chunksDirPresent.asBoolean()) {
       passed = false;
 
       BooleanSupplier dirRepairAction = () -> {
@@ -463,32 +477,34 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
         return repaired;
       };
 
-      JsonObject chunksDirError = buildErrorAndRepair("chunksDirectory.present",
-          new JsonPrimitive(true), chunksDirPresent, dirRepairAction);
+      ObjectNode chunksDirError = buildErrorAndRepair("chunksDirectory.present",
+          BooleanNode.getTrue(), chunksDirPresent, dirRepairAction);
       errors.add(chunksDirError);
     }
 
-    parent.addProperty("correct", passed);
-    parent.add("errors", errors);
+    ((ObjectNode) parent).put("correct", passed);
+    ((ObjectNode) parent).set("errors", errors);
     return passed;
   }
 
-  static long jsonToLong(JsonElement e) {
-    return e == null || e.isJsonNull() ? 0 : e.getAsLong();
+  static long jsonToLong(JsonNode node) {
+    return (node == null || node.isNull()) ? 0 : node.asLong();
   }
 
-  private JsonObject buildErrorAndRepair(String property, JsonElement expected,
-      JsonElement actual, BooleanSupplier repairAction) {
-    JsonObject error = new JsonObject();
-    error.addProperty("property", property);
-    error.add("expected", expected);
-    error.add("actual", actual);
+  private ObjectNode buildErrorAndRepair(String property, JsonNode expected,
+                                         JsonNode actual, BooleanSupplier repairAction) {
+    ObjectMapper mapper = new ObjectMapper();
+    ObjectNode error = mapper.createObjectNode();
+
+    error.put("property", property);
+    error.set("expected", expected);
+    error.set("actual", actual);
 
     boolean repaired = false;
     if (mode == Mode.REPAIR) {
       repaired = repairAction.getAsBoolean();
     }
-    error.addProperty("repaired", repaired);
+    error.put("repaired", repaired);
 
     return error;
   }
@@ -505,9 +521,9 @@ public class KeyValueContainerMetadataInspector implements ContainerInspector {
       this.bytes = bytes;
     }
 
-    void addToJson(JsonObject json) {
-      json.addProperty(COUNT, count);
-      json.addProperty(BYTES, bytes);
+    void addToJson(ObjectNode json) {
+      json.put(COUNT, count); // Use Jackson's put method to add properties
+      json.put(BYTES, bytes);
     }
   }
 

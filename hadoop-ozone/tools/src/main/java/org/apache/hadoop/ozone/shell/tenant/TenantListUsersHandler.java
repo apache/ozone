@@ -20,10 +20,9 @@ package org.apache.hadoop.ozone.shell.tenant;
 
 import java.io.IOException;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
@@ -66,16 +65,15 @@ public class TenantListUsersHandler extends S3Handler {
             "' with accessId '" + accessIdInfo.getAccessId() + "'");
       });
     } else {
-      final JsonArray resArray = new JsonArray();
+      final ArrayNode resArray = new ObjectMapper().createArrayNode();
       usersInTenant.getUserAccessIds().forEach(accessIdInfo -> {
-        final JsonObject obj = new JsonObject();
-        obj.addProperty("user", accessIdInfo.getUserPrincipal());
-        obj.addProperty("accessId", accessIdInfo.getAccessId());
+        final ObjectNode obj = new ObjectMapper().createObjectNode();
+        obj.put("user", accessIdInfo.getUserPrincipal());
+        obj.put("accessId", accessIdInfo.getAccessId());
         resArray.add(obj);
       });
-      final Gson gson = new GsonBuilder().setPrettyPrinting().create();
-      out().println(gson.toJson(resArray));
+      out().println(new ObjectMapper().writerWithDefaultPrettyPrinter()
+          .writeValueAsString(resArray));
     }
-
   }
 }

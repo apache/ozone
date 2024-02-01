@@ -28,7 +28,11 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
+import java.util.LinkedHashMap;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.kms.KMSClientProvider;
 import org.apache.hadoop.crypto.key.kms.server.MiniKMS;
@@ -68,8 +72,6 @@ import org.apache.hadoop.util.ToolRunner;
 import org.apache.hadoop.ozone.om.TrashPolicyOzone;
 
 import com.google.common.base.Strings;
-import com.google.gson.Gson;
-import com.google.gson.internal.LinkedTreeMap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_INTERVAL_KEY;
@@ -416,9 +418,17 @@ public class TestOzoneShellHA {
    * Parse output into ArrayList with Gson.
    * @return ArrayList
    */
-  private ArrayList<LinkedTreeMap<String, String>> parseOutputIntoArrayList()
+  private ArrayList<LinkedHashMap<String, String>> parseOutputIntoArrayList()
       throws UnsupportedEncodingException {
-    return new Gson().fromJson(out.toString(DEFAULT_ENCODING), ArrayList.class);
+    ObjectMapper objectMapper = new ObjectMapper();
+    String jsonOutput = out.toString(DEFAULT_ENCODING);
+    try {
+      return objectMapper.readValue(jsonOutput,
+          new TypeReference<ArrayList<LinkedHashMap<String, String>>>() {
+          });
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Test
@@ -1672,8 +1682,9 @@ public class TestOzoneShellHA {
     execute(ozoneShell, new String[] {"volume", "list"});
 
     // Expect valid JSON array
-    final ArrayList<LinkedTreeMap<String, String>> volumeListOut =
+    final ArrayList<LinkedHashMap<String, String>> volumeListOut =
         parseOutputIntoArrayList();
+
     // Can include s3v and volumes from other test cases that aren't cleaned up,
     //  hence >= instead of equals.
     assertThat(volumeListOut.size()).isGreaterThanOrEqualTo(testVolumes.size());
@@ -1687,7 +1698,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, new String[] {"bucket", "list", firstVolumePrefix});
 
     // Expect valid JSON array as well
-    final ArrayList<LinkedTreeMap<String, String>> bucketListOut =
+    final ArrayList<LinkedHashMap<String, String>> bucketListOut =
         parseOutputIntoArrayList();
     assertEquals(testBuckets.size(), bucketListOut.size());
     final HashSet<String> bucketSet = new HashSet<>(testBuckets);
@@ -1700,7 +1711,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, new String[] {"key", "list", keyPathPrefix});
 
     // Expect valid JSON array as well
-    final ArrayList<LinkedTreeMap<String, String>> keyListOut =
+    final ArrayList<LinkedHashMap<String, String>> keyListOut =
         parseOutputIntoArrayList();
     assertEquals(testKeys.size(), keyListOut.size());
     final HashSet<String> keySet = new HashSet<>(testKeys);
@@ -1952,7 +1963,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, new String[] {"bucket", "list", "/volume1"});
 
     // Expect valid JSON array
-    final ArrayList<LinkedTreeMap<String, String>> bucketListOut =
+    final ArrayList<LinkedHashMap<String, String>> bucketListOut =
         parseOutputIntoArrayList();
 
     assertEquals(1, bucketListOut.size());
@@ -1971,7 +1982,7 @@ public class TestOzoneShellHA {
     execute(ozoneShell, new String[] {"bucket", "list", "/volume1"});
 
     // Expect valid JSON array
-    final ArrayList<LinkedTreeMap<String, String>> bucketListLinked =
+    final ArrayList<LinkedHashMap<String, String>> bucketListLinked =
         parseOutputIntoArrayList();
 
     assertEquals(2, bucketListLinked.size());

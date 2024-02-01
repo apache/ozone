@@ -18,7 +18,8 @@
 
 package org.apache.hadoop.ozone.admin.nssummary;
 
-import com.google.gson.Gson;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -26,6 +27,7 @@ import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import picocli.CommandLine.Help.Ansi;
 
 import javax.security.sasl.AuthenticationException;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.ConnectException;
 import java.net.HttpURLConnection;
@@ -107,8 +109,12 @@ public final class NSSummaryCLIUtils {
     }
   }
 
-  public static HashMap<String, Object> getResponseMap(String response) {
-    return new Gson().fromJson(response, HashMap.class);
+  public static HashMap<String, Object> getResponseMap(String response)
+      throws IOException {
+    ObjectMapper objectMapper = new ObjectMapper();
+    return objectMapper.readValue(response,
+        new TypeReference<HashMap<String, Object>>() {
+        });
   }
 
   public static void printNewLines(int cnt) {

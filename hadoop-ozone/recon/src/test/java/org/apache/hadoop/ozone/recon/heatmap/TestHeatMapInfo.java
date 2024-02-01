@@ -18,10 +18,8 @@
 
 package org.apache.hadoop.ozone.recon.heatmap;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.EntityMetaData;
@@ -744,23 +742,26 @@ public class TestHeatMapInfo {
   @Test
   public void testHeatMapGeneratedInfo() throws IOException {
     // Setup
-    // Run the test
-    JsonElement jsonElement = JsonParser.parseString(auditRespStr);
-    JsonObject jsonObject = jsonElement.getAsJsonObject();
-    JsonElement facets = jsonObject.get("facets");
-    JsonObject facetsBucketsObject =
-        facets.getAsJsonObject().get("resources")
-            .getAsJsonObject();
+    // Initialize ObjectMapper
     ObjectMapper objectMapper = new ObjectMapper();
 
+    // Parse the JSON string to a JsonNode
+    JsonNode rootNode = objectMapper.readTree(auditRespStr);
+    JsonNode facets = rootNode.path("facets");
+    JsonNode facetsBucketsObject = facets.path("resources");
+
+    // Directly deserialize the specific part of the JSON structure to your Java object
     HeatMapProviderDataResource auditLogFacetsResources =
-        objectMapper.readValue(
-            facetsBucketsObject.toString(), HeatMapProviderDataResource.class);
+        objectMapper.treeToValue(facetsBucketsObject, HeatMapProviderDataResource.class);
+
     EntityMetaData[] entities = auditLogFacetsResources.getMetaDataList();
     List<EntityMetaData> entityMetaDataList =
         Arrays.stream(entities).collect(Collectors.toList());
+
     EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse =
         heatMapUtil.generateHeatMap(entityMetaDataList);
+
+    // Assertions remain unchanged
     assertThat(entityReadAccessHeatMapResponse.getChildren().size()).isGreaterThan(0);
     assertEquals(12, entityReadAccessHeatMapResponse.getChildren().size());
     assertEquals(25600, entityReadAccessHeatMapResponse.getSize());
@@ -831,20 +832,22 @@ public class TestHeatMapInfo {
         "    }\n" +
         "  }\n" +
         "}";
-    JsonElement jsonElement =
-        JsonParser.parseString(auditRespStrWithVolumeEntityType);
-    JsonObject jsonObject = jsonElement.getAsJsonObject();
-    JsonElement facets = jsonObject.get("facets");
-    JsonElement resources = facets.getAsJsonObject().get("resources");
-    JsonObject facetsBucketsObject = new JsonObject();
-    if (null != resources) {
-      facetsBucketsObject = resources.getAsJsonObject();
-    }
     ObjectMapper objectMapper = new ObjectMapper();
 
+    // Parse the JSON string to a JsonNode
+    JsonNode rootNode = objectMapper.readTree(auditRespStrWithVolumeEntityType);
+    JsonNode facets = rootNode.path("facets");
+    JsonNode resources = facets.path("resources");
+    JsonNode facetsBucketsObject = resources;
+
+    // Check if resources is not null or missing
+    if (!resources.isMissingNode()) {
+      facetsBucketsObject = resources;
+    }
+
     HeatMapProviderDataResource auditLogFacetsResources =
-        objectMapper.readValue(
-            facetsBucketsObject.toString(), HeatMapProviderDataResource.class);
+        objectMapper.treeToValue(
+            facetsBucketsObject, HeatMapProviderDataResource.class);
     EntityMetaData[] entities = auditLogFacetsResources.getMetaDataList();
     if (null != entities && entities.length > 0) {
       List<EntityMetaData> entityMetaDataList =
@@ -965,20 +968,22 @@ public class TestHeatMapInfo {
         "    }\n" +
         "  }\n" +
         "}";
-    JsonElement jsonElement =
-        JsonParser.parseString(auditRespStrWithPathAndBucketEntityType);
-    JsonObject jsonObject = jsonElement.getAsJsonObject();
-    JsonElement facets = jsonObject.get("facets");
-    JsonElement resources = facets.getAsJsonObject().get("resources");
-    JsonObject facetsBucketsObject = new JsonObject();
-    if (null != resources) {
-      facetsBucketsObject = resources.getAsJsonObject();
-    }
     ObjectMapper objectMapper = new ObjectMapper();
 
+    JsonNode rootNode =
+        objectMapper.readTree(auditRespStrWithPathAndBucketEntityType);
+    JsonNode facets = rootNode.path("facets");
+    JsonNode resources = facets.path("resources");
+    JsonNode facetsBucketsObject =
+        objectMapper.createObjectNode(); // Create an empty node as default
+
+    if (!resources.isMissingNode()) {
+      facetsBucketsObject = resources;
+    }
+
     HeatMapProviderDataResource auditLogFacetsResources =
-        objectMapper.readValue(
-            facetsBucketsObject.toString(), HeatMapProviderDataResource.class);
+        objectMapper.treeToValue(
+            facetsBucketsObject, HeatMapProviderDataResource.class);
     EntityMetaData[] entities = auditLogFacetsResources.getMetaDataList();
     if (null != entities && entities.length > 0) {
       List<EntityMetaData> entityMetaDataList =
