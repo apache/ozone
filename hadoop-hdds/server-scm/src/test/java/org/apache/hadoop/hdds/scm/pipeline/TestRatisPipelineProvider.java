@@ -66,7 +66,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test for {@link RatisPipelineProvider}.
@@ -345,13 +344,10 @@ public class TestRatisPipelineProvider {
       if (factor == ReplicationFactor.ZERO) {
         continue;
       }
-      try {
-        provider.create(RatisReplicationConfig.getInstance(factor));
-        fail("Expected SCMException for large container size with " +
-            "replication factor " + factor.toString());
-      } catch (SCMException ex) {
-        assertThat(ex.getMessage()).contains(expectedErrorSubstring);
-      }
+      SCMException ex =
+          assertThrows(SCMException.class, () -> provider.create(RatisReplicationConfig.getInstance(factor)),
+              "Expected SCMException for large container size with replication factor " + factor.toString());
+      assertThat(ex.getMessage()).contains(expectedErrorSubstring);
     }
 
     OzoneConfiguration largeMetadataConf = new OzoneConfiguration();
@@ -361,13 +357,10 @@ public class TestRatisPipelineProvider {
       if (factor == ReplicationFactor.ZERO) {
         continue;
       }
-      try {
-        provider.create(RatisReplicationConfig.getInstance(factor));
-        fail("Expected SCMException for large metadata size with " +
-            "replication factor " + factor.toString());
-      } catch (SCMException ex) {
-        assertThat(ex.getMessage()).contains(expectedErrorSubstring);
-      }
+      SCMException ex =
+          assertThrows(SCMException.class, () -> provider.create(RatisReplicationConfig.getInstance(factor)),
+              "Expected SCMException for large metadata size with replication factor " + factor.toString());
+      assertThat(ex.getMessage()).contains(expectedErrorSubstring);
     }
   }
 

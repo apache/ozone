@@ -199,7 +199,7 @@ public class TestOzoneContainer {
       response = client.sendCommand(request);
       int chunksCount = putBlockRequest.getPutBlock().getBlockData().
           getChunksCount();
-      ContainerTestHelper.verifyGetBlock(request, response, chunksCount);
+      ContainerTestHelper.verifyGetBlock(response, chunksCount);
 
       // Delete Block and Delete Chunk are handled by BlockDeletingService
       // ContainerCommandRequestProto DeleteBlock and DeleteChunk requests
@@ -367,7 +367,7 @@ public class TestOzoneContainer {
       response = client.sendCommand(request);
       int chunksCount = putBlockRequest.getPutBlock().getBlockData()
           .getChunksCount();
-      ContainerTestHelper.verifyGetBlock(request, response, chunksCount);
+      ContainerTestHelper.verifyGetBlock(response, chunksCount);
     } finally {
       if (client != null) {
         client.close();

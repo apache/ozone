@@ -56,7 +56,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ACK_TIMEOUT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_CHECK_INTERNAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_CA_ROTATION_ENABLED;
@@ -66,7 +66,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOK
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -151,33 +151,19 @@ public class TestRootCARotationManager {
   public void testProperties() {
     // invalid check interval
     ozoneConfig.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL, "P28");
-    try {
-      rootCARotationManager = new RootCARotationManager(scm);
-      fail("Should fail");
-    } catch (Exception e) {
-      assertInstanceOf(DateTimeParseException.class, e);
-    }
+    assertThrows(DateTimeParseException.class, () -> rootCARotationManager = new RootCARotationManager(scm));
 
     // check interval should be less than grace period
     ozoneConfig.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL, "P28D");
-    try {
-      rootCARotationManager = new RootCARotationManager(scm);
-      fail("Should fail");
-    } catch (Exception e) {
-      assertInstanceOf(IllegalArgumentException.class, e);
-      assertThat(e.getMessage()).contains("should be smaller than");
-    }
+    IllegalArgumentException ex =
+        assertThrows(IllegalArgumentException.class, () -> rootCARotationManager = new RootCARotationManager(scm));
+    assertThat(ex.getMessage()).contains("should be smaller than");
 
     // invalid time of day format
     ozoneConfig.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL, "P1D");
     ozoneConfig.set(HDDS_X509_CA_ROTATION_TIME_OF_DAY, "01:00");
-    try {
-      rootCARotationManager = new RootCARotationManager(scm);
-      fail("Should fail");
-    } catch (Exception e) {
-      assertInstanceOf(IllegalArgumentException.class, e);
-      assertThat(e.getMessage()).contains("should follow the hh:mm:ss format");
-    }
+    ex = assertThrows(IllegalArgumentException.class, () -> rootCARotationManager = new RootCARotationManager(scm));
+    assertThat(ex.getMessage()).contains("should follow the hh:mm:ss format");
 
     // valid properties
     ozoneConfig.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL, "P1D");
