@@ -450,7 +450,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     moveManager = new MoveManager(replicationManager, containerManager);
     containerReplicaPendingOps.registerSubscriber(moveManager);
     containerBalancer = new ContainerBalancer(this);
-    LOG.info(containerBalancer.toString());
 
     // Emit initial safe mode status, as now handlers are registered.
     scmSafeModeManager.emitSafeModeStatus();
