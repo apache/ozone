@@ -50,7 +50,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -295,34 +294,34 @@ public class TestPipelineStateManagerImpl {
 
   @Test
   public void testAddAndGetContainer() throws IOException, TimeoutException {
-    AtomicLong containerID = new AtomicLong();
+    long containerID = 0;
     Pipeline pipeline = createDummyPipeline(1);
     HddsProtos.Pipeline pipelineProto = pipeline
         .getProtobufMessage(ClientVersion.CURRENT_VERSION);
     stateManager.addPipeline(pipelineProto);
     pipeline = stateManager.getPipeline(pipeline.getId());
     stateManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueOf(containerID.incrementAndGet()));
+        ContainerID.valueOf(++containerID));
 
     // move pipeline to open state
     openPipeline(pipelineProto);
     stateManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueOf(containerID.incrementAndGet()));
+        ContainerID.valueOf(++containerID));
     stateManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueOf(containerID.incrementAndGet()));
+        ContainerID.valueOf(++containerID));
 
     //verify the number of containers returned
     Set<ContainerID> containerIDs =
         stateManager.getContainers(pipeline.getId());
-    assertEquals(containerIDs.size(), containerID.get());
+    assertEquals(containerIDs.size(), containerID);
 
     finalizePipeline(pipelineProto);
     removePipeline(pipelineProto);
     Pipeline finalPipeline = pipeline;
+    ContainerID cid = ContainerID.valueOf(++containerID);
     IOException e =
         assertThrows(IOException.class,
-            () -> stateManager.addContainerToPipeline(finalPipeline.getId(),
-                ContainerID.valueOf(containerID.incrementAndGet())));
+            () -> stateManager.addContainerToPipeline(finalPipeline.getId(), cid));
     // Can not add a container to removed pipeline
     assertThat(e.getMessage()).contains("not found");
   }
