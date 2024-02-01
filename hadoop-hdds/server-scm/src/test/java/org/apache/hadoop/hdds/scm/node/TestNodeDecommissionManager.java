@@ -52,6 +52,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.node.NodeUtils.HostDefinition;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -110,21 +111,19 @@ public class TestNodeDecommissionManager {
   @Test
   public void testHostStringsParseCorrectly()
       throws InvalidHostStringException {
-    NodeDecommissionManager.HostDefinition def =
-        new NodeDecommissionManager.HostDefinition("foobar");
+    HostDefinition def = new HostDefinition("foobar");
     assertEquals("foobar", def.getHostname());
     assertEquals(-1, def.getPort());
 
-    def = new NodeDecommissionManager.HostDefinition(" foobar ");
+    def = new HostDefinition(" foobar ");
     assertEquals("foobar", def.getHostname());
     assertEquals(-1, def.getPort());
 
-    def = new NodeDecommissionManager.HostDefinition("foobar:1234");
+    def = new HostDefinition("foobar:1234");
     assertEquals("foobar", def.getHostname());
     assertEquals(1234, def.getPort());
 
-    def = new NodeDecommissionManager.HostDefinition(
-        "foobar.mycompany.com:1234");
+    def = new HostDefinition("foobar.mycompany.com:1234");
     assertEquals("foobar.mycompany.com", def.getHostname());
     assertEquals(1234, def.getPort());
 

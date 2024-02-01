@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.diskbalancer;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -31,13 +32,18 @@ import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.FileUtils;
 import org.slf4j.Logger;
@@ -45,8 +51,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -327,7 +335,25 @@ public class DiskBalancerService extends BackgroundService {
       return queue;
     }
 
-    // TODO: Implementation for choose tasks
+    for (int i = 0; i < availableTaskCount; i++) {
+      Pair<HddsVolume, HddsVolume> pair = volumeChoosingPolicy
+          .chooseVolume(volumeSet, threshold, deltaSizes);
+      if (pair == null) {
+        continue;
+      }
+      HddsVolume sourceVolume = pair.getLeft(), destVolume = pair.getRight();
+      ContainerData toBalanceContainer = containerChoosingPolicy
+          .chooseContainer(ozoneContainer, sourceVolume, inProgressContainers);
+      if (toBalanceContainer != null) {
+        queue.add(new DiskBalancerTask(toBalanceContainer, sourceVolume,
+            destVolume));
+        inProgressContainers.add(toBalanceContainer.getContainerID());
+        deltaSizes.put(sourceVolume, deltaSizes.getOrDefault(sourceVolume, 0L)
+            - toBalanceContainer.getBytesUsed());
+        deltaSizes.put(destVolume, deltaSizes.getOrDefault(destVolume, 0L)
+            + toBalanceContainer.getBytesUsed());
+      }
+    }
 
     if (queue.isEmpty()) {
       metrics.incrIdleLoopNoAvailableVolumePairCount();
@@ -367,7 +393,88 @@ public class DiskBalancerService extends BackgroundService {
 
     @Override
     public BackgroundTaskResult call() {
-      // TODO: Details of handling tasks
+      long containerId = containerData.getContainerID();
+      boolean destVolumeIncreased = false;
+      Path diskBalancerTmpDir = null, diskBalancerDestDir = null;
+      long containerSize = containerData.getBytesUsed();
+      try {
+        diskBalancerTmpDir = destVolume.getTmpDir().toPath()
+            .resolve(DISK_BALANCER_DIR).resolve(String.valueOf(containerId));
+
+        // Copy container to new Volume's tmp Dir
+        ozoneContainer.getController().copyContainer(containerData,
+            diskBalancerTmpDir);
+
+        // Move container directory to final place on new volume
+        String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
+            destVolume, destVolume.getClusterID());
+        diskBalancerDestDir =
+            Paths.get(KeyValueContainerLocationUtil.getBaseContainerLocation(
+                destVolume.getHddsRootDir().toString(), idDir,
+                containerData.getContainerID()));
+        Path destDirParent = diskBalancerDestDir.getParent();
+        if (destDirParent != null) {
+          Files.createDirectories(destDirParent);
+        }
+        Files.move(diskBalancerTmpDir, diskBalancerDestDir,
+            StandardCopyOption.ATOMIC_MOVE,
+            StandardCopyOption.REPLACE_EXISTING);
+
+        // Generate a new Container based on destDir
+        File containerFile = ContainerUtils.getContainerFile(
+            diskBalancerDestDir.toFile());
+        if (!containerFile.exists()) {
+          throw new IOException("ContainerFile for container " + containerId
+          + " doesn't exists.");
+        }
+        ContainerData originalContainerData = ContainerDataYaml
+            .readContainerFile(containerFile);
+        Container newContainer = ozoneContainer.getController()
+            .importContainer(originalContainerData, diskBalancerDestDir);
+        newContainer.getContainerData().getVolume()
+            .incrementUsedSpace(containerSize);
+        destVolumeIncreased = true;
+
+        // Update container for containerID
+        Container oldContainer = ozoneContainer.getContainerSet()
+            .getContainer(containerId);
+        oldContainer.writeLock();
+        try {
+          ozoneContainer.getContainerSet().updateContainer(newContainer);
+          oldContainer.delete();
+        } finally {
+          oldContainer.writeUnlock();
+        }
+        oldContainer.getContainerData().getVolume()
+            .decrementUsedSpace(containerSize);
+        metrics.incrSuccessCount(1);
+        metrics.incrSuccessBytes(containerSize);
+      } catch (IOException e) {
+        if (diskBalancerTmpDir != null) {
+          try {
+            Files.deleteIfExists(diskBalancerTmpDir);
+          } catch (IOException ex) {
+            LOG.warn("Failed to delete tmp directory {}", diskBalancerTmpDir,
+                ex);
+          }
+        }
+        if (diskBalancerDestDir != null) {
+          try {
+            Files.deleteIfExists(diskBalancerDestDir);
+          } catch (IOException ex) {
+            LOG.warn("Failed to delete dest directory {}: {}.",
+                diskBalancerDestDir, ex.getMessage());
+          }
+        }
+        // Only need to check for destVolume, sourceVolume's usedSpace is
+        // updated at last, if it reaches there, there is no exception.
+        if (destVolumeIncreased) {
+          destVolume.decrementUsedSpace(containerSize);
+        }
+        metrics.incrFailureCount();
+      } finally {
+        postCall();
+      }
       return BackgroundTaskResult.EmptyTaskResult.newResult();
     }
 
