@@ -50,11 +50,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -295,37 +295,36 @@ public class TestPipelineStateManagerImpl {
 
   @Test
   public void testAddAndGetContainer() throws IOException, TimeoutException {
-    long containerID = 0;
+    AtomicLong containerID = new AtomicLong();
     Pipeline pipeline = createDummyPipeline(1);
     HddsProtos.Pipeline pipelineProto = pipeline
         .getProtobufMessage(ClientVersion.CURRENT_VERSION);
     stateManager.addPipeline(pipelineProto);
     pipeline = stateManager.getPipeline(pipeline.getId());
     stateManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueOf(++containerID));
+        ContainerID.valueOf(containerID.incrementAndGet()));
 
     // move pipeline to open state
     openPipeline(pipelineProto);
     stateManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueOf(++containerID));
+        ContainerID.valueOf(containerID.incrementAndGet()));
     stateManager.addContainerToPipeline(pipeline.getId(),
-        ContainerID.valueOf(++containerID));
+        ContainerID.valueOf(containerID.incrementAndGet()));
 
     //verify the number of containers returned
     Set<ContainerID> containerIDs =
         stateManager.getContainers(pipeline.getId());
-    assertEquals(containerIDs.size(), containerID);
+    assertEquals(containerIDs.size(), containerID.get());
 
     finalizePipeline(pipelineProto);
     removePipeline(pipelineProto);
-    try {
-      stateManager.addContainerToPipeline(pipeline.getId(),
-          ContainerID.valueOf(++containerID));
-      fail("Container should not have been added");
-    } catch (IOException e) {
-      // Can not add a container to removed pipeline
-      assertThat(e.getMessage()).contains("not found");
-    }
+    Pipeline finalPipeline = pipeline;
+    IOException e =
+        assertThrows(IOException.class,
+            () -> stateManager.addContainerToPipeline(finalPipeline.getId(),
+                ContainerID.valueOf(containerID.incrementAndGet())));
+    // Can not add a container to removed pipeline
+    assertThat(e.getMessage()).contains("not found");
   }
 
   @Test
@@ -339,13 +338,9 @@ public class TestPipelineStateManagerImpl {
     stateManager
         .addContainerToPipeline(pipeline.getId(), ContainerID.valueOf(1));
 
-    try {
-      removePipeline(pipelineProto);
-      fail("Pipeline should not have been removed");
-    } catch (IOException e) {
-      // can not remove a pipeline which already has containers
-      assertThat(e.getMessage()).contains("not yet closed");
-    }
+    IOException e = assertThrows(IOException.class, () -> removePipeline(pipelineProto));
+    // can not remove a pipeline which already has containers
+    assertThat(e.getMessage()).contains("not yet closed");
 
     // close the pipeline
     finalizePipeline(pipelineProto);
