@@ -85,8 +85,6 @@ import static org.mockito.Mockito.when;
 class TestOmSnapshotManager {
 
   private OzoneManager om;
-  @TempDir
-  private static File testDir;
   private static final String CANDIDATE_DIR_NAME = OM_DB_NAME +
       SNAPSHOT_CANDIDATE_DIR;
   private File leaderDir;
