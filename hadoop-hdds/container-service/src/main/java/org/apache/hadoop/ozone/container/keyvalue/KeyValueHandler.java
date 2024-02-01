@@ -782,6 +782,7 @@ public class KeyValueHandler extends Handler {
       WriteChunkRequestProto writeChunk = request.getWriteChunk();
       BlockID blockID = BlockID.getFromProtobuf(writeChunk.getBlockID());
       ContainerProtos.ChunkInfo chunkInfoProto = writeChunk.getChunkData();
+
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
       Preconditions.checkNotNull(chunkInfo);
 
