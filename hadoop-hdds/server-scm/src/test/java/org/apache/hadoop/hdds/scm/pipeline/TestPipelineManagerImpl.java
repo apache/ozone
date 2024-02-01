@@ -332,7 +332,7 @@ public class TestPipelineManagerImpl {
           .getPipelines(RatisReplicationConfig
                   .getInstance(ReplicationFactor.THREE),
               Pipeline.PipelineState.OPEN).contains(pipeline));
-      IOException ioe = assertThrows(IOException.class, () -> pipelineManager.removePipeline(pipeline));
+      assertThrows(IOException.class, () -> pipelineManager.removePipeline(pipeline));
       // Should not be able to remove the OPEN pipeline.
       assertEquals(1, pipelineManager.getPipelines().size());
 
@@ -618,10 +618,9 @@ public class TestPipelineManagerImpl {
         new SCMSafeModeManager.SafeModeStatus(true, false));
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
-    IOException e =
-        assertThrows(IOException.class,
-            () -> pipelineManager.createPipeline(RatisReplicationConfig.getInstance(ReplicationFactor.THREE)),
-            "Pipelines should not have been created");
+    assertThrows(IOException.class,
+        () -> pipelineManager.createPipeline(RatisReplicationConfig.getInstance(ReplicationFactor.THREE)),
+        "Pipelines should not have been created");
     // No pipeline is created.
     assertTrue(pipelineManager.getPipelines().isEmpty());
 
