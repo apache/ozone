@@ -143,11 +143,11 @@ jobs:
           if [ "$TEST_METHOD" = "ALL" ]; then
             echo "Running all tests from $TEST_CLASS"
             set -x
-            hadoop-ozone/dev-support/checks/junit.sh $args -Dtest=$TEST_CLASS
+            hadoop-ozone/dev-support/checks/junit.sh $args -Dtest="$TEST_CLASS,Abstract*Test\$*"
           else
             echo "Running test: $TEST_METHOD from $TEST_CLASS"
             set -x
-            hadoop-ozone/dev-support/checks/junit.sh $args -Dtest=$TEST_CLASS#$TEST_METHOD
+            hadoop-ozone/dev-support/checks/junit.sh $args -Dtest="$TEST_CLASS#$TEST_METHOD,Abstract*Test\$*"
           fi
         continue-on-error: true
         env:
