@@ -49,7 +49,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -180,19 +180,15 @@ public class TestOzoneManagerStateMachine {
         prepareState.getState().getStatus());
 
     // Submitting a write request should now fail.
-    try {
-      ozoneManagerStateMachine.preAppendTransaction(
-          mockTransactionContext(createKeyRequest));
-      fail("Expected StateMachineException to be thrown when " +
-          "submitting write request while prepared.");
-    } catch (StateMachineException smEx) {
-      assertFalse(smEx.leaderShouldStepDown());
+    StateMachineException smEx =
+        assertThrows(StateMachineException.class,
+            () -> ozoneManagerStateMachine.preAppendTransaction(mockTransactionContext(createKeyRequest)),
+            "Expected StateMachineException to be thrown when submitting write request while prepared.");
+    assertFalse(smEx.leaderShouldStepDown());
 
-      Throwable cause = smEx.getCause();
-      assertInstanceOf(OMException.class, cause);
-      assertEquals(((OMException) cause).getResult(),
-          OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED);
-    }
+    Throwable cause = smEx.getCause();
+    OMException omException = assertInstanceOf(OMException.class, cause);
+    assertEquals(omException.getResult(), OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED);
 
     // Should be able to prepare again without issue.
     submittedTrx = mockTransactionContext(prepareRequest);

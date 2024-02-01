@@ -26,8 +26,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -38,7 +36,6 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -98,16 +95,8 @@ public class TestSCMNodeMetrics {
   @Test
   public void testHBProcessing() throws InterruptedException {
     long hbProcessed = getCounter("NumHBProcessed");
-
     createNodeReport();
-
-    LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
-    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-        .build();
-    nodeManager.processHeartbeat(registeredDatanode, layoutInfo);
-
+    nodeManager.processHeartbeat(registeredDatanode);
     assertEquals(hbProcessed + 1, getCounter("NumHBProcessed"),
         "NumHBProcessed");
   }
@@ -117,17 +106,8 @@ public class TestSCMNodeMetrics {
    */
   @Test
   public void testHBProcessingFailure() {
-
     long hbProcessedFailed = getCounter("NumHBProcessingFailed");
-
-    LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
-    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-        .build();
-    nodeManager.processHeartbeat(MockDatanodeDetails
-        .randomDatanodeDetails(), layoutInfo);
-
+    nodeManager.processHeartbeat(MockDatanodeDetails.randomDatanodeDetails());
     assertEquals(hbProcessedFailed + 1, getCounter("NumHBProcessingFailed"),
         "NumHBProcessingFailed");
   }
@@ -252,13 +232,7 @@ public class TestSCMNodeMetrics {
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
     assertGauge("TotalUsed", 10L,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
-
-    LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
-    LayoutVersionProto layoutInfo = LayoutVersionProto.newBuilder()
-        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-        .build();
-    nodeManager.processHeartbeat(registeredDatanode, layoutInfo);
+    nodeManager.processHeartbeat(registeredDatanode);
     sleep(4000);
     metricsSource = getMetrics(SCMNodeMetrics.SOURCE_NAME);
     assertGauge("InServiceHealthyReadonlyNodes", 0, metricsSource);

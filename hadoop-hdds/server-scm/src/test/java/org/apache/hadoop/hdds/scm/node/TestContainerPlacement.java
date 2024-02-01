@@ -25,7 +25,6 @@ import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -34,7 +33,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
@@ -66,7 +64,6 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.test.PathUtils;
 import org.apache.commons.io.IOUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -78,7 +75,6 @@ import static java.util.Collections.emptyList;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -178,7 +174,7 @@ public class TestContainerPlacement {
    */
   @Test
   public void testContainerPlacementCapacity() throws IOException,
-      InterruptedException, TimeoutException {
+      InterruptedException {
     final int nodeCount = 4;
     final long capacity = 10L * OzoneConsts.GB;
     final long used = 2L * OzoneConsts.GB;
@@ -197,11 +193,6 @@ public class TestContainerPlacement {
     List<DatanodeDetails> datanodes = HddsTestUtils
         .getListOfRegisteredDatanodeDetails(scmNodeManager, nodeCount);
     XceiverClientManager xceiverClientManager = null;
-    LayoutVersionManager versionManager =
-        scmNodeManager.getLayoutVersionManager();
-    LayoutVersionProto layoutInfo =
-        toLayoutVersionProto(versionManager.getMetadataLayoutVersion(),
-            versionManager.getSoftwareLayoutVersion());
     try {
       for (DatanodeDetails datanodeDetails : datanodes) {
         UUID dnId = datanodeDetails.getUuid();
@@ -217,7 +208,7 @@ public class TestContainerPlacement {
                 Arrays.asList(report), emptyList());
         datanodeInfo.updateStorageReports(
             nodeReportProto.getStorageReportList());
-        scmNodeManager.processHeartbeat(datanodeDetails, layoutInfo);
+        scmNodeManager.processHeartbeat(datanodeDetails);
       }
 
       //TODO: wait for heartbeat to be processed

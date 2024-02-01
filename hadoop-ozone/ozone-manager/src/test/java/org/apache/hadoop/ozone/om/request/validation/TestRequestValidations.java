@@ -158,11 +158,8 @@ public class TestRequestValidations {
   public void testPreProcessorExceptionHandling() throws Exception {
     ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadValidations(ctx);
-
-    try {
-      validations.validateRequest(aDeleteKeysRequest(olderClientVersion()));
-      fail("ServiceException was expected but was not thrown.");
-    } catch (Exception ignored) { }
+    assertThrows(Exception.class,
+        () -> validations.validateRequest(aDeleteKeysRequest(olderClientVersion())));
 
     validationListener.assertNumOfEvents(1);
     validationListener.assertExactListOfValidatorsCalled(
@@ -173,12 +170,8 @@ public class TestRequestValidations {
   public void testPostProcessorExceptionHandling() {
     ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadValidations(ctx);
-
-    try {
-      validations.validateResponse(
-          aDeleteKeysRequest(olderClientVersion()), aDeleteKeysResponse());
-      fail("ServiceException was expected but was not thrown.");
-    } catch (Exception ignored) { }
+    assertThrows(Exception.class,
+        () -> validations.validateResponse(aDeleteKeysRequest(olderClientVersion()), aDeleteKeysResponse()));
 
     validationListener.assertNumOfEvents(1);
     validationListener.assertExactListOfValidatorsCalled(
