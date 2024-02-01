@@ -162,8 +162,10 @@ public class BasicOmKeyInfo {
         .setDataSize(dataSize)
         .setCreationTime(creationTime)
         .setModificationTime(modificationTime)
-        .setType(replicationConfig.getReplicationType())
-        .setOwnerName(ownerName);
+        .setType(replicationConfig.getReplicationType());
+    if (ownerName != null) {
+      builder.setOwnerName(ownerName);
+    }
     if (replicationConfig instanceof ECReplicationConfig) {
       builder.setEcReplicationConfig(
           ((ECReplicationConfig) replicationConfig).toProto());
