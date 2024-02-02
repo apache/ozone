@@ -23,6 +23,7 @@ import java.nio.file.InvalidPathException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -33,7 +34,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.key.OMKeySetTimesResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -171,8 +171,8 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long trxnLogIndex = termIndex.getIndex();
     ozoneManager.getMetrics().incNumSetTime();
     OmKeyInfo omKeyInfo;
 
@@ -230,8 +230,6 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
       exception = ex;
       omClientResponse = onFailure(omResponse, exception);
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
       if (lockAcquired) {
         mergeOmLockDetails(
             omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volume,

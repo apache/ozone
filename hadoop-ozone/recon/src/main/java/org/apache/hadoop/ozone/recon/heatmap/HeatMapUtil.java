@@ -30,7 +30,7 @@ import org.apache.hadoop.ozone.recon.api.types.EntityReadAccessHeatMapResponse;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -233,7 +233,7 @@ public class HeatMapUtil {
     });
   }
 
-  @NotNull
+  @Nonnull
   private static List<EntityReadAccessHeatMapResponse>
       initializeEntityMinMaxCount(
       EntityReadAccessHeatMapResponse entity) {

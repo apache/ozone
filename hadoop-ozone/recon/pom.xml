@@ -25,7 +25,6 @@
   <artifactId>ozone-recon</artifactId>
   <properties>
     <pnpm.version>7.33.6</pnpm.version>
-    <allow.junit4>false</allow.junit4>
   </properties>
   <build>
     <resources>
@@ -235,11 +234,6 @@
         </exclusion>
       </exclusions>
     </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-test-utils</artifactId>
-      <scope>test</scope>
-    </dependency>
     <!-- visible only for ContainerOperationClient -->
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -296,58 +290,16 @@
       <artifactId>jersey-hk2</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-common</artifactId>
-      <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter-params</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.mockito</groupId>
-      <artifactId>mockito-core</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-hadoop-dependency-test</artifactId>
-      <scope>test</scope>
-      <exclusions>
-        <exclusion>
-          <artifactId>jersey-server</artifactId>
-          <groupId>com.sun.jersey</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>jersey-core</artifactId>
-          <groupId>com.sun.jersey</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>jersey-servlet</artifactId>
-          <groupId>com.sun.jersey</groupId>
-        </exclusion>
-        <exclusion>
-          <artifactId>jersey-json</artifactId>
-          <groupId>com.sun.jersey</groupId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
       <groupId>org.jooq</groupId>
       <artifactId>jooq</artifactId>
-      <version>${jooq.version}</version>
     </dependency>
     <dependency>
       <groupId>org.jooq</groupId>
       <artifactId>jooq-meta</artifactId>
-      <version>${jooq.version}</version>
     </dependency>
     <dependency>
       <groupId>org.jooq</groupId>
       <artifactId>jooq-codegen</artifactId>
-      <version>${jooq.version}</version>
     </dependency>
     <dependency>
       <groupId>com.jolbox</groupId>
@@ -364,30 +316,31 @@
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-jdbc</artifactId>
-      <version>${spring.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>org.springframework</groupId>
-          <artifactId>spring-jcl</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
     <dependency>
-      <groupId>javax.activation</groupId>
-      <artifactId>activation</artifactId>
+      <groupId>jakarta.activation</groupId>
+      <artifactId>jakarta.activation-api</artifactId>
     </dependency>
     <dependency>
       <groupId>org.javassist</groupId>
       <artifactId>javassist</artifactId>
     </dependency>
+
+    <!-- Test dependencies -->
     <dependency>
-      <groupId>org.powermock</groupId>
-      <artifactId>powermock-module-junit4</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-common</artifactId>
+      <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>org.powermock</groupId>
-      <artifactId>powermock-api-mockito2</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-hadoop-dependency-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-test-utils</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>

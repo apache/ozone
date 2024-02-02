@@ -21,17 +21,21 @@ package org.apache.hadoop.hdds.scm.node;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -47,6 +51,7 @@ import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
@@ -65,15 +70,12 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
-import org.apache.hadoop.security.authentication.client
-    .AuthenticationException;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test DeadNodeHandler.
@@ -88,8 +90,10 @@ public class TestDeadNodeHandler {
   private HealthyReadOnlyNodeHandler healthyReadOnlyNodeHandler;
   private EventPublisher publisher;
   private EventQueue eventQueue;
-  private String storageDir;
+  @TempDir
+  private File storageDir;
   private SCMContext scmContext;
+  private DeletedBlockLog deletedBlockLog;
 
   @BeforeEach
   public void setup() throws IOException, AuthenticationException {
@@ -99,9 +103,7 @@ public class TestDeadNodeHandler {
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 2);
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         10, StorageUnit.MB);
-    storageDir = GenericTestUtils.getTempPath(
-        TestDeadNodeHandler.class.getSimpleName() + UUID.randomUUID());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir);
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir.getPath());
     eventQueue = new EventQueue();
     scm = HddsTestUtils.getScm(conf);
     nodeManager = (SCMNodeManager) scm.getScmNodeManager();
@@ -117,32 +119,33 @@ public class TestDeadNodeHandler {
     pipelineManager.setPipelineProvider(RATIS,
         mockRatisProvider);
     containerManager = scm.getContainerManager();
+    deletedBlockLog = mock(DeletedBlockLog.class);
     deadNodeHandler = new DeadNodeHandler(nodeManager,
-        Mockito.mock(PipelineManager.class), containerManager);
+        mock(PipelineManager.class), containerManager, deletedBlockLog);
     healthyReadOnlyNodeHandler =
         new HealthyReadOnlyNodeHandler(nodeManager,
             pipelineManager);
     eventQueue.addHandler(SCMEvents.DEAD_NODE, deadNodeHandler);
-    publisher = Mockito.mock(EventPublisher.class);
+    publisher = mock(EventPublisher.class);
   }
 
   @AfterEach
   public void teardown() {
     scm.stop();
     scm.join();
-    FileUtil.fullyDelete(new File(storageDir));
   }
 
   @Test
-  public void testOnMessage() throws Exception {
+  @SuppressWarnings("checkstyle:MethodLength")
+  public void testOnMessage(@TempDir File tempDir) throws Exception {
     //GIVEN
     DatanodeDetails datanode1 = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails datanode2 = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails datanode3 = MockDatanodeDetails.randomDatanodeDetails();
 
-    String storagePath = GenericTestUtils.getRandomizedTempPath()
+    String storagePath = tempDir.getPath()
         .concat("/data-" + datanode1.getUuidString());
-    String metaStoragePath = GenericTestUtils.getRandomizedTempPath()
+    String metaStoragePath = tempDir.getPath()
         .concat("/metadata-" + datanode1.getUuidString());
 
     StorageReportProto storageOne = HddsTestUtils.createStorageReport(
@@ -223,28 +226,31 @@ public class TestDeadNodeHandler {
     // First set the node to IN_MAINTENANCE and ensure the container replicas
     // are not removed on the dead event
     datanode1 = nodeManager.getNodeByUuid(datanode1.getUuidString());
-    Assertions.assertTrue(
+    assertTrue(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
     nodeManager.setNodeOperationalState(datanode1,
         HddsProtos.NodeOperationalState.IN_MAINTENANCE);
     deadNodeHandler.onMessage(datanode1, publisher);
     // make sure the node is removed from
     // ClusterNetworkTopology when it is considered as dead
-    Assertions.assertFalse(
+    assertFalse(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
+
+    verify(deletedBlockLog, times(0))
+        .onDatanodeDead(datanode1.getUuid());
 
     Set<ContainerReplica> container1Replicas = containerManager
         .getContainerReplicas(ContainerID.valueOf(container1.getContainerID()));
-    Assertions.assertEquals(2, container1Replicas.size());
+    assertEquals(2, container1Replicas.size());
 
     Set<ContainerReplica> container2Replicas = containerManager
         .getContainerReplicas(ContainerID.valueOf(container2.getContainerID()));
-    Assertions.assertEquals(2, container2Replicas.size());
+    assertEquals(2, container2Replicas.size());
 
     Set<ContainerReplica> container3Replicas = containerManager
             .getContainerReplicas(
                 ContainerID.valueOf(container3.getContainerID()));
-    Assertions.assertEquals(1, container3Replicas.size());
+    assertEquals(1, container3Replicas.size());
 
     // Now set the node to anything other than IN_MAINTENANCE and the relevant
     // replicas should be removed
@@ -255,32 +261,31 @@ public class TestDeadNodeHandler {
     deadNodeHandler.onMessage(datanode1, publisher);
     //datanode1 has been removed from ClusterNetworkTopology, another
     //deadNodeHandler.onMessage call will not change this
-    Assertions.assertFalse(
+    assertFalse(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
-    Assertions.assertEquals(0, 
-        nodeManager.getCommandQueueCount(datanode1.getUuid(), cmd.getType()));
+    assertEquals(0, nodeManager.getCommandQueueCount(datanode1.getUuid(), cmd.getType()));
+
+    verify(deletedBlockLog, times(1))
+        .onDatanodeDead(datanode1.getUuid());
 
     container1Replicas = containerManager
         .getContainerReplicas(ContainerID.valueOf(container1.getContainerID()));
-    Assertions.assertEquals(1, container1Replicas.size());
-    Assertions.assertEquals(datanode2,
-        container1Replicas.iterator().next().getDatanodeDetails());
+    assertEquals(1, container1Replicas.size());
+    assertEquals(datanode2, container1Replicas.iterator().next().getDatanodeDetails());
 
     container2Replicas = containerManager
         .getContainerReplicas(ContainerID.valueOf(container2.getContainerID()));
-    Assertions.assertEquals(1, container2Replicas.size());
-    Assertions.assertEquals(datanode2,
-        container2Replicas.iterator().next().getDatanodeDetails());
+    assertEquals(1, container2Replicas.size());
+    assertEquals(datanode2, container2Replicas.iterator().next().getDatanodeDetails());
 
     container3Replicas = containerManager
         .getContainerReplicas(ContainerID.valueOf(container3.getContainerID()));
-    Assertions.assertEquals(1, container3Replicas.size());
-    Assertions.assertEquals(datanode3,
-        container3Replicas.iterator().next().getDatanodeDetails());
+    assertEquals(1, container3Replicas.size());
+    assertEquals(datanode3, container3Replicas.iterator().next().getDatanodeDetails());
 
     //datanode will be added back to ClusterNetworkTopology if it resurrects
     healthyReadOnlyNodeHandler.onMessage(datanode1, publisher);
-    Assertions.assertTrue(
+    assertTrue(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
 
   }

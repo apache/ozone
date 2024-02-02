@@ -32,9 +32,8 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
 import java.util.LinkedList;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -44,6 +43,7 @@ import java.io.IOException;
 import java.net.URI;
 
 import static org.apache.ozone.test.GenericTestUtils.getTempPath;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test for HadoopNestedDirGenerator.
@@ -59,7 +59,7 @@ public class TestHadoopNestedDirGenerator {
           LoggerFactory.getLogger(TestHadoopNestedDirGenerator.class);
   private OzoneClient client;
 
-  @Before
+  @BeforeEach
     public void setup() {
     path = getTempPath(TestHadoopNestedDirGenerator.class.getSimpleName());
     GenericTestUtils.setLogLevel(RaftLog.LOG, Level.DEBUG);
@@ -142,8 +142,7 @@ public class TestHadoopNestedDirGenerator {
       // verify the num of peer directories and span directories
       p = depthBFS(fileSystem, fileStatuses, span, actualDepth);
       int actualSpan = spanCheck(fileSystem, span, p);
-      Assert.assertEquals("Mismatch span in a path",
-              span, actualSpan);
+      assertEquals(span, actualSpan, "Mismatch span in a path");
     }
   }
 
@@ -183,8 +182,7 @@ public class TestHadoopNestedDirGenerator {
         p = f.getPath().getParent();
       }
     }
-    Assert.assertEquals("Mismatch depth in a path",
-            depth, actualDepth);
+    assertEquals(depth, actualDepth, "Mismatch depth in a path");
     return p;
   }
 

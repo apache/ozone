@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -52,6 +51,7 @@ import java.util.concurrent.TimeoutException;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -73,6 +73,10 @@ public class TestContainerStateCounts extends AbstractReconSqlDBTest {
   private static final int NUM_OPEN_CONTAINERS = 3;
   private static final int NUM_DELETED_CONTAINERS = 4;
   private static final int NUM_CLOSED_CONTAINERS = 3;
+
+  public TestContainerStateCounts() {
+    super();
+  }
 
 
   @BeforeEach
@@ -134,12 +138,9 @@ public class TestContainerStateCounts extends AbstractReconSqlDBTest {
     int expectedDeletedContainers = NUM_DELETED_CONTAINERS;
 
     // Verify counts using assertions
-    Assertions.assertEquals(expectedTotalContainers,
-        clusterStateResponse1.getContainers());
-    Assertions.assertEquals(expectedOpenContainers,
-        clusterStateResponse1.getOpenContainers());
-    Assertions.assertEquals(expectedDeletedContainers,
-        clusterStateResponse1.getDeletedContainers());
+    assertEquals(expectedTotalContainers, clusterStateResponse1.getContainers());
+    assertEquals(expectedOpenContainers, clusterStateResponse1.getOpenContainers());
+    assertEquals(expectedDeletedContainers, clusterStateResponse1.getDeletedContainers());
   }
 
 

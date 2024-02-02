@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -69,6 +70,7 @@ import com.google.protobuf.BlockingService;
 import com.google.protobuf.ProtocolMessageEnum;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.IO_EXCEPTION;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.NODE_COST_DEFAULT;
 import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpcServer;
@@ -105,9 +107,9 @@ public class SCMBlockProtocolServer implements
       StorageContainerManager scm) throws IOException {
     this.scm = scm;
     this.conf = conf;
-    final int handlerCount =
-        conf.getInt(OZONE_SCM_HANDLER_COUNT_KEY,
-            OZONE_SCM_HANDLER_COUNT_DEFAULT);
+    final int handlerCount = conf.getInt(OZONE_SCM_BLOCK_HANDLER_COUNT_KEY,
+        OZONE_SCM_HANDLER_COUNT_KEY, OZONE_SCM_HANDLER_COUNT_DEFAULT,
+            LOG::info);
 
     RPC.setProtocolEngine(conf, ScmBlockLocationProtocolPB.class,
         ProtobufRpcEngine.class);
@@ -383,6 +385,9 @@ public class SCMBlockProtocolServer implements
   }
 
   private Node getClientNode(String clientMachine) {
+    if (StringUtils.isEmpty(clientMachine)) {
+      return null;
+    }
     List<DatanodeDetails> datanodes = scm.getScmNodeManager()
         .getNodesByAddress(clientMachine);
     return !datanodes.isEmpty() ? datanodes.get(0) :

@@ -18,11 +18,9 @@
 
 package org.apache.hadoop.ozone.om.request.bucket;
 
-import org.apache.hadoop.crypto.CipherSuite;
-import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
-import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -32,6 +30,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.common.BekInfoUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -41,7 +40,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
@@ -52,14 +50,12 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketEncryptionInfoProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
@@ -75,7 +71,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCK
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CryptoProtocolVersionProto.ENCRYPTION_ZONES;
 
 /**
  * Handles CreateBucket Request.
@@ -116,7 +111,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
         .setModificationTime(initialTime);
 
     if (bucketInfo.hasBeinfo()) {
-      newBucketInfo.setBeinfo(getBeinfo(kmsProvider, bucketInfo));
+      newBucketInfo.setBeinfo(
+          BekInfoUtils.getBekInfo(kmsProvider, bucketInfo.getBeinfo()));
     }
 
     boolean hasSourceVolume = bucketInfo.hasSourceVolume();
@@ -163,9 +159,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long transactionLogIndex = termIndex.getIndex();
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumBucketCreates();
 
@@ -274,8 +269,6 @@ public class OMBucketCreateRequest extends OMClientRequest {
       omClientResponse = new OMBucketCreateResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
         mergeOmLockDetails(
             metadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
@@ -339,38 +332,6 @@ public class OMBucketCreateRequest extends OMClientRequest {
     List<OzoneAcl> defaultVolumeAcls = omVolumeArgs.getDefaultAcls();
     OzoneAclUtil.inheritDefaultAcls(acls, defaultVolumeAcls);
     omBucketInfo.setAcls(acls);
-  }
-
-  private BucketEncryptionInfoProto getBeinfo(
-      KeyProviderCryptoExtension kmsProvider, BucketInfo bucketInfo)
-      throws IOException {
-    BucketEncryptionInfoProto bek = bucketInfo.getBeinfo();
-    BucketEncryptionInfoProto.Builder bekb = null;
-    if (kmsProvider == null) {
-      throw new OMException("Invalid KMS provider, check configuration " +
-          CommonConfigurationKeys.HADOOP_SECURITY_KEY_PROVIDER_PATH,
-          OMException.ResultCodes.INVALID_KMS_PROVIDER);
-    }
-    if (bek.getKeyName() == null) {
-      throw new OMException("Bucket encryption key needed.", OMException
-          .ResultCodes.BUCKET_ENCRYPTION_KEY_NOT_FOUND);
-    }
-    // Talk to KMS to retrieve the bucket encryption key info.
-    KeyProvider.Metadata metadata = kmsProvider.getMetadata(
-        bek.getKeyName());
-    if (metadata == null) {
-      throw new OMException("Bucket encryption key " + bek.getKeyName()
-          + " doesn't exist.",
-          OMException.ResultCodes.BUCKET_ENCRYPTION_KEY_NOT_FOUND);
-    }
-    // If the provider supports pool for EDEKs, this will fill in the pool
-    kmsProvider.warmUpEncryptedKeys(bek.getKeyName());
-    bekb = BucketEncryptionInfoProto.newBuilder()
-        .setKeyName(bek.getKeyName())
-        .setCryptoProtocolVersion(ENCRYPTION_ZONES)
-        .setSuite(OMPBHelper.convert(
-            CipherSuite.convert(metadata.getCipher())));
-    return bekb.build();
   }
 
   /**

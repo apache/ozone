@@ -41,8 +41,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ratis.util.LifeCycle;
-import org.hamcrest.MatcherAssert;
-import org.hamcrest.core.StringContains;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,9 +55,9 @@ import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostPort;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test client-side URI handling with Ozone Manager HA.
@@ -253,11 +251,9 @@ public class TestOzoneFsHAURLs {
           new GenericTestUtils.SystemErrCapturer()) {
         res = ToolRunner.run(shell, new String[] {"-ls", unqualifiedPath1});
         // Check stderr, inspired by testDFSWithInvalidCommmand
-        MatcherAssert.assertThat("Command did not print the error message " +
-                "correctly for test case: ozone fs -ls o3fs://bucket.volume/",
-            capture.getOutput(), StringContains.containsString(
-                "-ls: Service ID or host name must not"
-                    + " be omitted when ozone.om.service.ids is defined."));
+        assertThat(capture.getOutput())
+            .as("ozone fs -ls o3fs://bucket.volume/")
+            .contains("-ls: Service ID or host name must not be omitted when ozone.om.service.ids is defined.");
       }
       // Check return value, should be -1 (failure)
       assertEquals(-1, res);
@@ -297,11 +293,9 @@ public class TestOzoneFsHAURLs {
           new GenericTestUtils.SystemErrCapturer()) {
         res = ToolRunner.run(shell, new String[] {"-ls", unqualifiedPath2});
         // Check stderr
-        MatcherAssert.assertThat("Command did not print the error message " +
-                "correctly for test case: "
-                + "ozone fs -ls o3fs://bucket.volume.id1:port/",
-            capture.getOutput(), StringContains.containsString(
-                "does not use port information"));
+        assertThat(capture.getOutput())
+            .as("ozone fs -ls o3fs://bucket.volume.id1:port/")
+            .contains("does not use port information");
       }
       // Check return value, should be -1 (failure)
       assertEquals(-1, res);
@@ -390,8 +384,7 @@ public class TestOzoneFsHAURLs {
         res = ToolRunner.run(shell,
             new String[] {"-ls", ofsPathWithIncorrectSvcId });
         assertEquals(1, res);
-        assertTrue(
-            capture.getOutput().contains("Cannot resolve OM host"));
+        assertThat(capture.getOutput()).contains("Cannot resolve OM host");
       }
 
       try (GenericTestUtils.SystemErrCapturer capture = new
@@ -399,8 +392,7 @@ public class TestOzoneFsHAURLs {
         res = ToolRunner.run(shell,
             new String[] {"-ls", o3fsPathWithInCorrectSvcId });
         assertEquals(1, res);
-        assertTrue(
-            capture.getOutput().contains("Cannot resolve OM host"));
+        assertThat(capture.getOutput()).contains("Cannot resolve OM host");
       }
     } finally {
       shell.close();

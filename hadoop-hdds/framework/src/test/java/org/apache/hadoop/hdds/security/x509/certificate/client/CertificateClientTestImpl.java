@@ -48,7 +48,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultApprover;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
@@ -59,7 +58,6 @@ import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.SecurityUtil;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
-import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_DEFAULT_DURATION_DEFAULT;
@@ -155,9 +153,9 @@ public class CertificateClientTestImpl implements CertificateClient {
 
     notificationReceivers = new HashSet<>();
     serverKeyStoresFactory = SecurityUtil.getServerKeyStoresFactory(
-        securityConfig, this, true);
+        this, true);
     clientKeyStoresFactory = SecurityUtil.getClientKeyStoresFactory(
-        securityConfig, this, true);
+        this, true);
 
     if (autoRenew) {
       Duration gracePeriod = securityConfig.getRenewalGracePeriod();
@@ -222,11 +220,6 @@ public class CertificateClientTestImpl implements CertificateClient {
   }
 
   @Override
-  public byte[] signData(byte[] data) throws CertificateException {
-    return new byte[0];
-  }
-
-  @Override
   public boolean verifySignature(byte[] data, byte[] signature,
       X509Certificate cert) throws CertificateException {
     try {
@@ -246,17 +239,6 @@ public class CertificateClientTestImpl implements CertificateClient {
   @Override
   public CertificateSignRequest.Builder getCSRBuilder() {
     return new CertificateSignRequest.Builder();
-  }
-
-  @Override
-  public String signAndStoreCertificate(PKCS10CertificationRequest request)
-      throws CertificateException {
-    return null;
-  }
-
-  @Override
-  public void storeCertificate(String cert, CAType caType)
-      throws CertificateException {
   }
 
   @Override
@@ -285,11 +267,6 @@ public class CertificateClientTestImpl implements CertificateClient {
 
   @Override
   public List<String> getCAList() {
-    return null;
-  }
-
-  @Override
-  public List<String> listCA() throws IOException {
     return null;
   }
 

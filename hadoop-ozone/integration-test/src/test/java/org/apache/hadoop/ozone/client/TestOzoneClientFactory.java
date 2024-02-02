@@ -16,12 +16,13 @@
  */
 package org.apache.hadoop.ozone.client;
 
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
@@ -39,8 +40,7 @@ public class TestOzoneClientFactory {
   public void testRemoteException() {
 
     OzoneConfiguration conf = new OzoneConfiguration();
-
-    try {
+    Exception e = assertThrows(Exception.class, () -> {
       MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
           .setNumDatanodes(3)
           .setTotalPipelineNumLimit(10)
@@ -59,17 +59,14 @@ public class TestOzoneClientFactory {
         public Void run() throws IOException {
           conf.set("ozone.security.enabled", "true");
           try (OzoneClient ozoneClient =
-              OzoneClientFactory.getRpcClient("localhost",
-                  Integer.parseInt(omPort), conf)) {
+                   OzoneClientFactory.getRpcClient("localhost", Integer.parseInt(omPort), conf)) {
             ozoneClient.getObjectStore().listVolumes("/");
           }
           return null;
         }
       });
-      Assert.fail("Should throw exception here");
-    } catch (IOException | InterruptedException e) {
-      assert e instanceof AccessControlException;
-    }
+    });
+    assertInstanceOf(AccessControlException.class, e);
   }
 
 }

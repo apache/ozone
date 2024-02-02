@@ -19,8 +19,9 @@ package org.apache.ozone.erasurecode.rawcoder;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.ozone.erasurecode.rawcoder.util.CodecUtil;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 /**
  * Test the codec to raw coder mapping.
@@ -40,11 +41,11 @@ public class TestCodecRawCoderMapping {
     RawErasureDecoder decoder =
         CodecUtil.createRawDecoderWithFallback(coderOptions);
     if (ErasureCodeNative.isNativeCodeLoaded()) {
-      Assertions.assertTrue(encoder instanceof NativeRSRawEncoder);
-      Assertions.assertTrue(decoder instanceof NativeRSRawDecoder);
+      assertInstanceOf(NativeRSRawEncoder.class, encoder);
+      assertInstanceOf(NativeRSRawDecoder.class, decoder);
     } else {
-      Assertions.assertTrue(encoder instanceof RSRawEncoder);
-      Assertions.assertTrue(decoder instanceof RSRawDecoder);
+      assertInstanceOf(RSRawEncoder.class, encoder);
+      assertInstanceOf(RSRawDecoder.class, decoder);
     }
   }
 
@@ -58,11 +59,11 @@ public class TestCodecRawCoderMapping {
     RawErasureDecoder decoder =
         CodecUtil.createRawDecoderWithFallback(coderOptions);
     if (ErasureCodeNative.isNativeCodeLoaded()) {
-      Assertions.assertTrue(encoder instanceof NativeXORRawEncoder);
-      Assertions.assertTrue(decoder instanceof NativeXORRawDecoder);
+      assertInstanceOf(NativeXORRawEncoder.class, encoder);
+      assertInstanceOf(NativeXORRawDecoder.class, decoder);
     } else {
-      Assertions.assertTrue(encoder instanceof XORRawEncoder);
-      Assertions.assertTrue(decoder instanceof XORRawDecoder);
+      assertInstanceOf(XORRawEncoder.class, encoder);
+      assertInstanceOf(XORRawDecoder.class, decoder);
     }
   }
 }

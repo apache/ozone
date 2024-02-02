@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import static org.mockito.Mockito.framework;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Random;
@@ -32,11 +33,10 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -109,26 +109,26 @@ public class TestOMKeyResponse {
             CacheValue.get(1, omBucketInfo));
   }
 
-  @NotNull
+  @Nonnull
   protected String getOpenKeyName()  throws IOException {
     return omMetadataManager.getOpenKey(volumeName, bucketName, keyName,
             clientID);
   }
 
-  @NotNull
+  @Nonnull
   protected OmKeyInfo getOmKeyInfo() {
     return OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
             replicationType, replicationFactor);
   }
 
-  @NotNull
+  @Nonnull
   protected OzoneConfiguration getOzoneConfiguration() {
     return new OzoneConfiguration();
   }
 
   @AfterEach
   public void stop() {
-    Mockito.framework().clearInlineMocks();
+    framework().clearInlineMocks();
     if (batchOperation != null) {
       batchOperation.close();
     }

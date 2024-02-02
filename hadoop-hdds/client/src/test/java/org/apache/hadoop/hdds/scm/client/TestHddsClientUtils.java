@@ -36,6 +36,8 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 
 import org.apache.commons.lang3.StringUtils;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT;
@@ -43,17 +45,12 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * This test class verifies the parsing of SCM endpoint config settings. The
@@ -105,7 +102,6 @@ public class TestHddsClientUtils {
     conf.set(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY, "scm1");
 
     int port = 9880;
-    int i = 1;
     for (String nodeId : nodes) {
       conf.setInt(ConfUtils.addKeySuffixes(OZONE_SCM_CLIENT_PORT_KEY,
           scmServiceId, nodeId), port);
@@ -130,8 +126,8 @@ public class TestHddsClientUtils {
         HddsUtils.getScmAddressForClients(conf).iterator();
     assertTrue(scmAddrIterator.hasNext());
     InetSocketAddress scmAddr = scmAddrIterator.next();
-    assertThat(scmAddr.getHostString(), is(address));
-    assertThat(scmAddr.getPort(), is(port));
+    assertEquals(address, scmAddr.getHostString());
+    assertEquals(port, scmAddr.getPort());
   }
 
   @Test
@@ -232,12 +228,8 @@ public class TestHddsClientUtils {
     invalidNames.add(tooShort);
 
     for (String name : invalidNames) {
-      try {
-        HddsClientUtils.verifyResourceName(name);
-        fail("Did not reject invalid string [" + name + "] as a name");
-      } catch (IllegalArgumentException e) {
-        // throwing up on an invalid name. we're good
-      }
+      assertThrows(IllegalArgumentException.class, () -> HddsClientUtils.verifyResourceName(name),
+          "Did not reject invalid string [" + name + "] as a name");
     }
   }
 
@@ -261,12 +253,8 @@ public class TestHddsClientUtils {
 
 
     for (String name : invalidNames) {
-      try {
-        HddsClientUtils.verifyKeyName(name);
-        fail("Did not reject invalid string [" + name + "] as a name");
-      } catch (IllegalArgumentException e) {
-        // throwing up on an invalid name. it's working.
-      }
+      assertThrows(IllegalArgumentException.class, () -> HddsClientUtils.verifyKeyName(name),
+          "Did not reject invalid string [" + name + "] as a name");
     }
 
     List<String> validNames = new ArrayList<>();

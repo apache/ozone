@@ -28,6 +28,7 @@ import java.util.Map;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -40,7 +41,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
@@ -49,7 +49,7 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -120,15 +120,19 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         keyArgs.toBuilder().setModificationTime(Time.now())
             .setKeyName(keyPath);
 
+    KeyArgs resolvedKeyArgs =
+        resolveBucketAndCheckOpenKeyAcls(newKeyArgs.build(), ozoneManager,
+            IAccessAuthorizer.ACLType.WRITE, commitKeyRequest.getClientID());
+
     return request.toBuilder()
         .setCommitKeyRequest(commitKeyRequest.toBuilder()
-            .setKeyArgs(newKeyArgs)).build();
+            .setKeyArgs(resolvedKeyArgs)).build();
   }
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long trxnLogIndex = termIndex.getIndex();
 
     CommitKeyRequest commitKeyRequest = getOmRequest().getCommitKeyRequest();
 
@@ -169,15 +173,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         isHSync, volumeName, bucketName, keyName);
 
     try {
-      commitKeyArgs = resolveBucketLink(ozoneManager, commitKeyArgs, auditMap);
-      volumeName = commitKeyArgs.getVolumeName();
-      bucketName = commitKeyArgs.getBucketName();
-
-      // check Acl
-      checkKeyAclsInOpenKeyTable(ozoneManager, volumeName, bucketName,
-          keyName, IAccessAuthorizer.ACLType.WRITE,
-          commitKeyRequest.getClientID());
-
       String dbOzoneKey =
           omMetadataManager.getOzoneKey(volumeName, bucketName,
               keyName);
@@ -337,9 +332,6 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       omClientResponse = new OMKeyCommitResponse(createErrorOMResponse(
           omResponse, exception), getBucketLayout());
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
-
       if (bucketLockAcquired) {
         mergeOmLockDetails(omMetadataManager.getLock()
             .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
@@ -363,7 +355,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
-  @NotNull
+  @Nonnull
   protected List<OmKeyLocationInfo> getOmKeyLocationInfos(
       OzoneManager ozoneManager, KeyArgs commitKeyArgs) {
     List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();

@@ -61,7 +61,6 @@ public class SecretKeyManagerService implements SCMService, Runnable {
 
   private final ScheduledExecutorService scheduler;
 
-  @SuppressWarnings("parameternumber")
   public SecretKeyManagerService(SCMContext scmContext,
                                  ConfigurationSource conf,
                                  SCMRatisServer ratisServer) {

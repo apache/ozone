@@ -31,7 +31,7 @@ if [[ ${ITERATIONS} -le 0 ]]; then
 fi
 
 export MAVEN_OPTS="-Xmx4096m $MAVEN_OPTS"
-MAVEN_OPTIONS='-B -Dskip.npx -Dskip.installnpx -Dnative.lib.tmp.dir=/tmp --no-transfer-progress'
+MAVEN_OPTIONS="-B -V -Dskip.npx -Dskip.installnpx -Dnative.lib.tmp.dir=/tmp --no-transfer-progress"
 
 if [[ "${OZONE_WITH_COVERAGE}" != "true" ]]; then
   MAVEN_OPTIONS="${MAVEN_OPTIONS} -Djacoco.skip"
@@ -43,6 +43,13 @@ else
   MAVEN_OPTIONS="${MAVEN_OPTIONS} --fail-at-end"
 fi
 
+# apply module access args (for Java 9+)
+OZONE_MODULE_ACCESS_ARGS=""
+if [[ -f hadoop-ozone/dist/src/shell/ozone/ozone-functions.sh ]]; then
+  source hadoop-ozone/dist/src/shell/ozone/ozone-functions.sh
+  ozone_java_setup
+fi
+
 if [[ "${CHECK}" == "integration" ]] || [[ ${ITERATIONS} -gt 1 ]]; then
   if [[ ${OZONE_REPO_CACHED} == "false" ]]; then
     mvn ${MAVEN_OPTIONS} -DskipTests clean install
@@ -50,6 +57,7 @@ if [[ "${CHECK}" == "integration" ]] || [[ ${ITERATIONS} -gt 1 ]]; then
 fi
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/${CHECK}"}
+REPORT_FILE="${REPORT_DIR}/summary.txt"
 mkdir -p "$REPORT_DIR"
 
 rc=0
@@ -60,7 +68,7 @@ for i in $(seq 1 ${ITERATIONS}); do
     mkdir -p "${REPORT_DIR}"
   fi
 
-  mvn ${MAVEN_OPTIONS} "$@" test \
+  mvn ${MAVEN_OPTIONS} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" "$@" test \
     | tee "${REPORT_DIR}/output.log"
   irc=$?
 
@@ -71,8 +79,14 @@ for i in $(seq 1 ${ITERATIONS}); do
   fi
 
   if [[ ${ITERATIONS} -gt 1 ]]; then
+    if ! grep -q "Tests run: [^0]" "${REPORT_DIR}/output.log"; then
+      echo "No tests were run" >> "${REPORT_DIR}/summary.txt"
+      irc=1
+      FAIL_FAST=true
+    fi
+
     REPORT_DIR="${original_report_dir}"
-    echo "Iteration ${i} exit code: ${irc}" | tee -a "${REPORT_DIR}/summary.txt"
+    echo "Iteration ${i} exit code: ${irc}" | tee -a "${REPORT_FILE}"
   fi
 
   if [[ ${rc} == 0 ]]; then
@@ -83,6 +97,11 @@ for i in $(seq 1 ${ITERATIONS}); do
     break
   fi
 done
+
+# check if Maven failed due to some error other than test failure
+if [[ ${rc} -ne 0 ]] && [[ ! -s "${REPORT_FILE}" ]]; then
+  grep -m1 -F '[ERROR]' "${REPORT_DIR}/output.log" > "${REPORT_FILE}"
+fi
 
 if [[ "${OZONE_WITH_COVERAGE}" == "true" ]]; then
   #Archive combined jacoco records

@@ -46,10 +46,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -93,10 +90,6 @@ public class TestOzoneContainer {
     setup();
   }
 
-  private static Iterable<Object[]> getVersionInfo() {
-    return ContainerTestVersionInfo.versionParameters();
-  }
-
   private void setup() throws Exception {
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, folder.toString());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
@@ -118,8 +111,7 @@ public class TestOzoneContainer {
     }
   }
 
-  @ParameterizedTest
-  @MethodSource("getVersionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testBuildContainerMap(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initTest(versionInfo);
@@ -161,14 +153,14 @@ public class TestOzoneContainer {
     OzoneContainer ozoneContainer = ContainerTestUtils
         .getOzoneContainer(datanodeDetails, conf);
 
+    ozoneContainer.buildContainerSet();
     ContainerSet containerset = ozoneContainer.getContainerSet();
     assertEquals(numTestContainers, containerset.containerCount());
 
     verifyCommittedSpace(ozoneContainer);
   }
 
-  @ParameterizedTest
-  @MethodSource("getVersionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testBuildNodeReport(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initTest(versionInfo);
@@ -189,32 +181,29 @@ public class TestOzoneContainer {
     ContainerTestUtils.enableSchemaV3(conf);
     OzoneContainer ozoneContainer = ContainerTestUtils
         .getOzoneContainer(datanodeDetails, conf);
-    Assertions.assertEquals(volumeSet.getVolumesList().size(),
+    assertEquals(volumeSet.getVolumesList().size(),
         ozoneContainer.getNodeReport().getStorageReportList().size());
-    Assertions.assertEquals(3,
+    assertEquals(3,
         ozoneContainer.getNodeReport().getMetadataStorageReportList()
             .size());
-    Assertions.assertEquals(3,
+    assertEquals(3,
         ozoneContainer.getNodeReport().getDbStorageReportList().size());
   }
 
-  @ParameterizedTest
-  @MethodSource("getVersionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testBuildNodeReportWithDefaultRatisLogDir(
       ContainerTestVersionInfo versionInfo) throws Exception {
     initTest(versionInfo);
     OzoneContainer ozoneContainer = ContainerTestUtils
         .getOzoneContainer(datanodeDetails, conf);
-    Assertions.assertEquals(volumeSet.getVolumesList().size(),
+    assertEquals(volumeSet.getVolumesList().size(),
         ozoneContainer.getNodeReport().getStorageReportList().size());
-    Assertions.assertEquals(1,
+    assertEquals(1,
         ozoneContainer.getNodeReport().getMetadataStorageReportList()
             .size());
   }
 
-
-  @ParameterizedTest
-  @MethodSource("getVersionInfo")
+  @ContainerTestVersionInfo.ContainerTest
   public void testContainerCreateDiskFull(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initTest(versionInfo);

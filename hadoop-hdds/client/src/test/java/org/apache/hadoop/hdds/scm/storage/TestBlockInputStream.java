@@ -19,9 +19,9 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.primitives.Bytes;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -35,24 +35,20 @@ import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.StatusException;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 import org.mockito.stubbing.OngoingStubbing;
 
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -65,8 +61,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
@@ -92,7 +88,7 @@ public class TestBlockInputStream {
   @BeforeEach
   @SuppressWarnings("unchecked")
   public void setup() throws Exception {
-    refreshFunction = Mockito.mock(Function.class);
+    refreshFunction = mock(Function.class);
     BlockID blockID = new BlockID(new ContainerBlockID(1, 1));
     checksum = new Checksum(ChecksumType.NONE, CHUNK_SIZE);
     createChunkList(5);
@@ -188,9 +184,8 @@ public class TestBlockInputStream {
     assertThrows(EOFException.class, () -> seekAndVerify(finalPos));
 
     // Seek to random positions between 0 and the block size.
-    Random random = new Random();
     for (int i = 0; i < 10; i++) {
-      pos = random.nextInt(blockSize);
+      pos = RandomUtils.nextInt(0, blockSize);
       seekAndVerify(pos);
     }
   }
@@ -376,18 +371,12 @@ public class TestBlockInputStream {
       subject.initialize();
 
       // WHEN
-      Assertions.assertThrows(ex.getClass(),
+      assertThrows(ex.getClass(),
           () -> subject.read(new byte[len], 0, len));
 
       // THEN
       verify(refreshFunction, never()).apply(blockID);
     }
-  }
-
-  private Pipeline samePipelineWithNewId(Pipeline pipeline) {
-    List<DatanodeDetails> reverseOrder = new ArrayList<>(pipeline.getNodes());
-    Collections.reverse(reverseOrder);
-    return MockPipeline.createPipeline(reverseOrder);
   }
 
   @ParameterizedTest

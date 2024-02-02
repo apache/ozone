@@ -22,7 +22,7 @@ package org.apache.hadoop.hdds.scm;
  * The information of the request of pipeline.
  */
 public final class PipelineRequestInformation {
-  private long size;
+  private final long size;
 
   /**
    * Builder for PipelineRequestInformation.

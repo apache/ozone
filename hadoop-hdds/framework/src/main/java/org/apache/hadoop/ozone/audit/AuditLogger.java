@@ -49,6 +49,7 @@ public class AuditLogger {
   private static final Marker WRITE_MARKER = AuditMarker.WRITE.getMarker();
   private static final Marker READ_MARKER = AuditMarker.READ.getMarker();
   private static final Marker AUTH_MARKER = AuditMarker.AUTH.getMarker();
+  private static final Marker PERFORMANCE = AuditMarker.PERFORMANCE.getMarker();
   private final AtomicReference<Set<String>> debugCmdSetRef =
       new AtomicReference<>(new HashSet<>());
   public static final String AUDIT_LOG_DEBUG_CMD_LIST_PREFIX =
@@ -118,6 +119,10 @@ public class AuditLogger {
     }
   }
 
+  public void logPerformance(AuditMessage msg) {
+    this.logger.logIfEnabled(FQCN, Level.INFO, PERFORMANCE, msg, null);
+  }
+
   public void refreshDebugCmdSet() {
     OzoneConfiguration conf = new OzoneConfiguration();
     refreshDebugCmdSet(conf);
@@ -159,6 +164,22 @@ public class AuditLogger {
      */
     public void appendOpLatencyNanos(long nanos) {
       append("opLatencyMs", TimeUnit.NANOSECONDS.toMillis(nanos));
+    }
+
+    /**
+     * Appends pre-operation operation latency in milliseconds.
+     * @param millis Latency in nanoseconds.
+     */
+    public void appendPreOpLatencyMs(long millis) {
+      append("preOpLatencyMs", millis);
+    }
+
+    /**
+     * Appends whole operation latency in milliseconds.
+     * @param millis Latency in milliseconds.
+     */
+    public void appendOpLatencyMs(long millis) {
+      append("opLatencyMs", millis);
     }
 
     /**

@@ -29,6 +29,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <name>Apache Ozone HDDS Hadoop Client dependencies</name>
   <packaging>jar</packaging>
 
+  <properties>
+    <maven.test.skip>true</maven.test.skip> <!-- no tests in this module -->
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
@@ -130,10 +134,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <exclusion>
           <groupId>org.apache.commons</groupId>
           <artifactId>commons-lang3</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.commons</groupId>
-          <artifactId>commons-text</artifactId>
         </exclusion>
         <exclusion>
           <groupId>org.slf4j</groupId>

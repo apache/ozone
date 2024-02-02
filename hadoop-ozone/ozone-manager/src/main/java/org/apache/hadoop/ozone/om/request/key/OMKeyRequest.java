@@ -18,8 +18,8 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import jakarta.annotation.Nonnull;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
@@ -30,10 +30,10 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
@@ -131,6 +131,46 @@ public abstract class OMKeyRequest extends OMClientRequest {
     keyArgs = bucket.update(keyArgs);
     bucket.audit(auditMap);
     return keyArgs;
+  }
+
+  protected KeyArgs resolveBucketLink(
+      OzoneManager ozoneManager, KeyArgs keyArgs) throws IOException {
+    ResolvedBucket bucket = ozoneManager.resolveBucketLink(keyArgs, this);
+    keyArgs = bucket.update(keyArgs);
+    return keyArgs;
+  }
+
+  protected KeyArgs resolveBucketAndCheckKeyAcls(KeyArgs keyArgs,
+      OzoneManager ozoneManager, IAccessAuthorizer.ACLType aclType)
+      throws IOException {
+    KeyArgs resolvedArgs = resolveBucketLink(ozoneManager, keyArgs);
+    // check Acl
+    checkKeyAcls(ozoneManager, resolvedArgs.getVolumeName(),
+        resolvedArgs.getBucketName(), keyArgs.getKeyName(),
+        aclType, OzoneObj.ResourceType.KEY);
+    return resolvedArgs;
+  }
+
+  protected KeyArgs resolveBucketAndCheckKeyAclsWithFSO(KeyArgs keyArgs,
+      OzoneManager ozoneManager, IAccessAuthorizer.ACLType aclType)
+      throws IOException {
+    KeyArgs resolvedArgs = resolveBucketLink(ozoneManager, keyArgs);
+    // check Acl
+    checkACLsWithFSO(ozoneManager, resolvedArgs.getVolumeName(),
+        resolvedArgs.getBucketName(), keyArgs.getKeyName(), aclType);
+    return resolvedArgs;
+  }
+
+  protected KeyArgs resolveBucketAndCheckOpenKeyAcls(KeyArgs keyArgs,
+      OzoneManager ozoneManager, IAccessAuthorizer.ACLType aclType,
+      long clientId)
+      throws IOException {
+    KeyArgs resolvedArgs = resolveBucketLink(ozoneManager, keyArgs);
+    // check Acl
+    checkKeyAclsInOpenKeyTable(ozoneManager, resolvedArgs.getVolumeName(),
+        resolvedArgs.getBucketName(), keyArgs.getKeyName(),
+        aclType, clientId);
+    return resolvedArgs;
   }
 
   /**
@@ -244,7 +284,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
   protected static Optional<FileEncryptionInfo> getFileEncryptionInfo(
       OzoneManager ozoneManager, OmBucketInfo bucketInfo) throws IOException {
-    Optional<FileEncryptionInfo> encInfo = Optional.absent();
+    Optional<FileEncryptionInfo> encInfo = Optional.empty();
     BucketEncryptionKeyInfo ezInfo = bucketInfo.getEncryptionKeyInfo();
     if (ezInfo != null) {
       final String ezKeyName = ezInfo.getKeyName();

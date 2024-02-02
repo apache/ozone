@@ -73,6 +73,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.OM;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_CERT_STORAGE_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_PATH;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -123,15 +124,11 @@ public class TestDefaultCAServer {
         ((DefaultCAServer) testCA).processVerificationStatus(
             DefaultCAServer.VerificationStatus.MISSING_CERTIFICATE,
             CAType.ROOT);
-    try {
-
-      caInitializer.accept(securityConfig);
-      fail("code should not reach here, exception should have been thrown.");
-    } catch (IllegalStateException e) {
-      // This also is a runtime exception. Hence not caught by junit expected
-      // exception.
-      assertTrue(e.toString().contains("Missing Root Certs"));
-    }
+    IllegalStateException e =
+        assertThrows(IllegalStateException.class, () -> caInitializer.accept(securityConfig));
+    // This also is a runtime exception. Hence not caught by junit expected
+    // exception.
+    assertThat(e.toString()).contains("Missing Root Certs");
   }
 
   @Test
@@ -144,15 +141,11 @@ public class TestDefaultCAServer {
     Consumer<SecurityConfig> caInitializer =
         ((DefaultCAServer) testCA).processVerificationStatus(
             DefaultCAServer.VerificationStatus.MISSING_KEYS, CAType.ROOT);
-    try {
-
-      caInitializer.accept(securityConfig);
-      fail("code should not reach here, exception should have been thrown.");
-    } catch (IllegalStateException e) {
-      // This also is a runtime exception. Hence not caught by junit expected
-      // exception.
-      assertTrue(e.toString().contains("Missing Keys"));
-    }
+    IllegalStateException e =
+        assertThrows(IllegalStateException.class, () -> caInitializer.accept(securityConfig));
+    // This also is a runtime exception. Hence not caught by junit expected
+    // exception.
+    assertThat(e.toString()).contains("Missing Keys");
   }
 
   /**
@@ -296,8 +289,8 @@ public class TestDefaultCAServer {
               CRLReason.lookup(CRLReason.keyCompromise), now);
           result.get();
         });
-    assertTrue(execution.getCause().getMessage()
-        .contains("Certificates cannot be null"));
+    assertThat(execution.getCause().getMessage())
+        .contains("Certificates cannot be null");
   }
 
   @Test
@@ -331,8 +324,8 @@ public class TestDefaultCAServer {
                   String.valueOf(System.nanoTime()));
           holder.get();
         });
-    assertTrue(execution.getCause().getMessage()
-        .contains("ScmId and ClusterId in CSR subject are incorrect"));
+    assertThat(execution.getCause().getMessage())
+        .contains("ScmId and ClusterId in CSR subject are incorrect");
   }
 
   @Test

@@ -29,6 +29,10 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <name>Apache Ozone HDDS Server Interface</name>
   <packaging>jar</packaging>
 
+  <properties>
+    <maven.test.skip>true</maven.test.skip> <!-- no testable code in this module -->
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>com.google.protobuf</groupId>

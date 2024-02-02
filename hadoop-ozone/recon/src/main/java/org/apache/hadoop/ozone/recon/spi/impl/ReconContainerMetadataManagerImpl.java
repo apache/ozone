@@ -58,7 +58,7 @@ import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.jooq.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -483,7 +483,7 @@ public class ReconContainerMetadataManagerImpl
     return containers;
   }
 
-  @NotNull
+  @Nonnull
   private List<Pipeline> getPipelines(ContainerKeyPrefix containerKeyPrefix)
       throws IOException {
     OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(BucketLayout.LEGACY)

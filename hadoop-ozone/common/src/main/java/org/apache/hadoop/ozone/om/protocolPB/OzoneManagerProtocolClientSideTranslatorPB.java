@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -1892,7 +1892,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       resp =
           handleError(submitRequest(omRequest)).getGetDelegationTokenResponse();
       return resp.getResponse().hasToken() ?
-          OMPBHelper.convertToDelegationToken(resp.getResponse().getToken())
+          OMPBHelper.tokenFromProto(resp.getResponse().getToken())
           : null;
     } catch (IOException e) {
       if (e instanceof OMException) {
@@ -1914,7 +1914,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       throws OMException {
     RenewDelegationTokenRequestProto req =
         RenewDelegationTokenRequestProto.newBuilder().
-            setToken(OMPBHelper.convertToTokenProto(token)).
+            setToken(OMPBHelper.protoFromToken(token)).
             build();
 
     OMRequest omRequest = createOMRequest(Type.RenewDelegationToken)
@@ -1945,7 +1945,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       throws OMException {
     CancelDelegationTokenRequestProto req = CancelDelegationTokenRequestProto
         .newBuilder()
-        .setToken(OMPBHelper.convertToTokenProto(token))
+        .setToken(OMPBHelper.protoFromToken(token))
         .build();
 
     OMRequest omRequest = createOMRequest(Type.CancelDelegationToken)

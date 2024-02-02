@@ -23,8 +23,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos;
-import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto
     .StorageContainerDatanodeProtocolProtos.NodeReportProto;
@@ -40,19 +38,18 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
-import org.apache.hadoop.security.authentication.client
-    .AuthenticationException;
-import org.junit.jupiter.api.Assertions;
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+
+import static org.mockito.Mockito.mock;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Verifies the statics in NodeManager.
@@ -74,7 +71,7 @@ public class TestStatisticsUpdate {
     final StorageContainerManager scm = HddsTestUtils.getScm(conf);
     nodeManager = scm.getScmNodeManager();
     final DeadNodeHandler deadNodeHandler = new DeadNodeHandler(
-        nodeManager, Mockito.mock(PipelineManager.class),
+        nodeManager, mock(PipelineManager.class),
         scm.getContainerManager());
     eventQueue.addHandler(SCMEvents.DEAD_NODE, deadNodeHandler);
     nodeReportHandler = new NodeReportHandler(nodeManager);
@@ -105,42 +102,35 @@ public class TestStatisticsUpdate {
 
     nodeReportHandler.onMessage(
         new NodeReportFromDatanode(datanode1, nodeReportProto1),
-        Mockito.mock(EventPublisher.class));
+        mock(EventPublisher.class));
     nodeReportHandler.onMessage(
         new NodeReportFromDatanode(datanode2, nodeReportProto2),
-        Mockito.mock(EventPublisher.class));
+        mock(EventPublisher.class));
 
     SCMNodeStat stat = nodeManager.getStats();
-    Assertions.assertEquals(300L, stat.getCapacity().get());
-    Assertions.assertEquals(270L, stat.getRemaining().get());
-    Assertions.assertEquals(30L, stat.getScmUsed().get());
+    assertEquals(300L, stat.getCapacity().get());
+    assertEquals(270L, stat.getRemaining().get());
+    assertEquals(30L, stat.getScmUsed().get());
 
     SCMNodeMetric nodeStat = nodeManager.getNodeStat(datanode1);
-    Assertions.assertEquals(100L, nodeStat.get().getCapacity().get());
-    Assertions.assertEquals(90L, nodeStat.get().getRemaining().get());
-    Assertions.assertEquals(10L, nodeStat.get().getScmUsed().get());
+    assertEquals(100L, nodeStat.get().getCapacity().get());
+    assertEquals(90L, nodeStat.get().getRemaining().get());
+    assertEquals(10L, nodeStat.get().getScmUsed().get());
 
     //TODO: Support logic to mark a node as dead in NodeManager.
 
-    LayoutVersionManager versionManager = nodeManager.getLayoutVersionManager();
-    StorageContainerDatanodeProtocolProtos.LayoutVersionProto layoutInfo =
-        StorageContainerDatanodeProtocolProtos.LayoutVersionProto.newBuilder()
-        .setSoftwareLayoutVersion(versionManager.getSoftwareLayoutVersion())
-        .setMetadataLayoutVersion(versionManager.getMetadataLayoutVersion())
-        .build();
-    nodeManager.processHeartbeat(datanode2, layoutInfo);
+    nodeManager.processHeartbeat(datanode2);
     Thread.sleep(1000);
-    nodeManager.processHeartbeat(datanode2, layoutInfo);
+    nodeManager.processHeartbeat(datanode2);
     Thread.sleep(1000);
-    nodeManager.processHeartbeat(datanode2, layoutInfo);
+    nodeManager.processHeartbeat(datanode2);
     Thread.sleep(1000);
-    nodeManager.processHeartbeat(datanode2, layoutInfo);
+    nodeManager.processHeartbeat(datanode2);
     //THEN statistics in SCM should changed.
     stat = nodeManager.getStats();
-    Assertions.assertEquals(200L, stat.getCapacity().get());
-    Assertions.assertEquals(180L,
-        stat.getRemaining().get());
-    Assertions.assertEquals(20L, stat.getScmUsed().get());
+    assertEquals(200L, stat.getCapacity().get());
+    assertEquals(180L, stat.getRemaining().get());
+    assertEquals(20L, stat.getScmUsed().get());
   }
 
 }

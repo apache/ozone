@@ -23,7 +23,8 @@ import com.google.common.base.Preconditions;
 /**
  * SCM Node Metric that is used in the placement classes.
  */
-public class SCMNodeMetric  implements DatanodeMetric<SCMNodeStat, Long> {
+public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
+    Comparable<SCMNodeMetric> {
   private SCMNodeStat stat;
 
   /**
@@ -36,16 +37,19 @@ public class SCMNodeMetric  implements DatanodeMetric<SCMNodeStat, Long> {
   }
 
   /**
-   * Set the capacity, used and remaining space on a datanode.
+   * Set the capacity, used, remaining and committed space on a datanode.
    *
-   * @param capacity in bytes
-   * @param used in bytes
+   * @param capacity  in bytes
+   * @param used      in bytes
    * @param remaining in bytes
+   * @param committed
+   * @paaram committed in bytes
    */
   @VisibleForTesting
-  public SCMNodeMetric(long capacity, long used, long remaining) {
+  public SCMNodeMetric(long capacity, long used, long remaining,
+                       long committed, long freeSpaceToSpare) {
     this.stat = new SCMNodeStat();
-    this.stat.set(capacity, used, remaining);
+    this.stat.set(capacity, used, remaining, committed, freeSpaceToSpare);
   }
 
   /**
@@ -156,7 +160,8 @@ public class SCMNodeMetric  implements DatanodeMetric<SCMNodeStat, Long> {
   @Override
   public void set(SCMNodeStat value) {
     stat.set(value.getCapacity().get(), value.getScmUsed().get(),
-        value.getRemaining().get());
+        value.getRemaining().get(), value.getCommitted().get(),
+        value.getFreeSpaceToSpare().get());
   }
 
   /**
@@ -191,12 +196,12 @@ public class SCMNodeMetric  implements DatanodeMetric<SCMNodeStat, Long> {
    * @throws ClassCastException   if the specified object's type prevents it
    *                              from being compared to this object.
    */
-  //@Override
-  public int compareTo(SCMNodeStat o) {
-    if (isEqual(o)) {
+  @Override
+  public int compareTo(SCMNodeMetric o) {
+    if (isEqual(o.get())) {
       return 0;
     }
-    if (isGreater(o)) {
+    if (isGreater(o.get())) {
       return 1;
     } else {
       return -1;
@@ -220,5 +225,10 @@ public class SCMNodeMetric  implements DatanodeMetric<SCMNodeStat, Long> {
   @Override
   public int hashCode() {
     return stat != null ? stat.hashCode() : 0;
+  }
+
+  @Override
+  public String toString() {
+    return "SCMNodeMetric{" + stat.toString() + '}';
   }
 }

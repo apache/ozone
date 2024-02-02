@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
+import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -54,14 +55,13 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.assertj.core.api.Fail;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.event.Level;
 
@@ -74,7 +74,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -94,6 +93,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERI
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithStoppedNodes.createKey;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -198,11 +198,12 @@ public class TestOMRatisSnapshots {
     }
   }
 
-  @ParameterizedTest
-  @ValueSource(ints = {100})
   // tried up to 1000 snapshots and this test works, but some of the
   //  timeouts have to be increased.
-  public void testInstallSnapshot(int numSnapshotsToCreate) throws Exception {
+  private static final int SNAPSHOTS_TO_CREATE = 100;
+
+  @Test
+  public void testInstallSnapshot(@TempDir Path tempDir) throws Exception {
     // Get the leader OM
     String leaderOMNodeId = OmFailoverProxyUtil
         .getFailoverProxyProvider(objectStore.getClientProxy())
@@ -221,7 +222,7 @@ public class TestOMRatisSnapshots {
     FaultInjector faultInjector =
         new SnapshotMaxSizeInjector(leaderOM,
             followerOM.getOmSnapshotProvider().getSnapshotDir(),
-            sstSetList);
+            sstSetList, tempDir);
     followerOM.getOmSnapshotProvider().setInjector(faultInjector);
 
     // Create some snapshots, each with new keys
@@ -230,8 +231,7 @@ public class TestOMRatisSnapshots {
     String snapshotName = "";
     List<String> keys = new ArrayList<>();
     SnapshotInfo snapshotInfo = null;
-    for (int snapshotCount = 0; snapshotCount < numSnapshotsToCreate;
-        snapshotCount++) {
+    for (int snapshotCount = 0; snapshotCount < SNAPSHOTS_TO_CREATE; snapshotCount++) {
       snapshotName = snapshotNamePrefix + snapshotCount;
       keys = writeKeys(keyIncrement);
       snapshotInfo = createOzoneSnapshot(leaderOM, snapshotName);
@@ -262,17 +262,16 @@ public class TestOMRatisSnapshots {
 
     long followerOMLastAppliedIndex =
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
-    assertTrue(
-        followerOMLastAppliedIndex >= leaderOMSnapshotIndex - 1);
+    assertThat(followerOMLastAppliedIndex).isGreaterThanOrEqualTo(leaderOMSnapshotIndex - 1);
 
     // After the new checkpoint is installed, the follower OM
     // lastAppliedIndex must >= the snapshot index of the checkpoint. It
     // could be great than snapshot index if there is any conf entry from ratis.
     followerOMLastAppliedIndex = followerOM.getOmRatisServer()
         .getLastAppliedTermIndex().getIndex();
-    assertTrue(followerOMLastAppliedIndex >= leaderOMSnapshotIndex);
-    assertTrue(followerOM.getOmRatisServer().getLastAppliedTermIndex()
-        .getTerm() >= leaderOMSnapshotTermIndex);
+    assertThat(followerOMLastAppliedIndex).isGreaterThanOrEqualTo(leaderOMSnapshotIndex);
+    assertThat(followerOM.getOmRatisServer().getLastAppliedTermIndex()
+        .getTerm()).isGreaterThanOrEqualTo(leaderOMSnapshotTermIndex);
 
     // Verify checkpoint installation was happened.
     String msg = "Reloaded OM state";
@@ -317,7 +316,7 @@ public class TestOMRatisSnapshots {
       sstFileUnion.addAll(sstFiles);
     }
     // Confirm that there were multiple tarballs.
-    assertTrue(sstSetList.size() > 1);
+    assertThat(sstSetList.size()).isGreaterThan(1);
     // Confirm that there was no overlap of sst files
     // between the individual tarballs.
     assertEquals(sstFileUnion.size(), sstFileCount);
@@ -326,7 +325,7 @@ public class TestOMRatisSnapshots {
   private void checkSnapshot(OzoneManager leaderOM, OzoneManager followerOM,
                              String snapshotName,
                              List<String> keys, SnapshotInfo snapshotInfo)
-      throws IOException {
+      throws IOException, RocksDBException {
     // Read back data from snapshot.
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -335,8 +334,8 @@ public class TestOMRatisSnapshots {
             keys.get(keys.size() - 1)).build();
     OmKeyInfo omKeyInfo;
     omKeyInfo = followerOM.lookupKey(omKeyArgs);
-    Assertions.assertNotNull(omKeyInfo);
-    Assertions.assertEquals(omKeyInfo.getKeyName(), omKeyArgs.getKeyName());
+    assertNotNull(omKeyInfo);
+    assertEquals(omKeyInfo.getKeyName(), omKeyArgs.getKeyName());
 
     // Confirm followers snapshot hard links are as expected
     File followerMetaDir = OMStorage.getOmDbDir(followerOM.getConfiguration());
@@ -347,10 +346,19 @@ public class TestOMRatisSnapshots {
     Path leaderActiveDir = Paths.get(leaderMetaDir.toString(), OM_DB_NAME);
     Path leaderSnapshotDir =
         Paths.get(getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo));
+
+    // Get list of live files on the leader.
+    RocksDB activeRocksDB = ((RDBStore) leaderOM.getMetadataManager().getStore())
+        .getDb().getManagedRocksDb().get();
+    // strip the leading "/".
+    Set<String> liveSstFiles = activeRocksDB.getLiveFiles().files.stream()
+        .map(s -> s.substring(1))
+        .collect(Collectors.toSet());
+
     // Get the list of hardlinks from the leader.  Then confirm those links
     //  are on the follower
     int hardLinkCount = 0;
-    try (Stream<Path>list = Files.list(leaderSnapshotDir)) {
+    try (Stream<Path> list = Files.list(leaderSnapshotDir)) {
       for (Path leaderSnapshotSST: list.collect(Collectors.toList())) {
         String fileName = leaderSnapshotSST.getFileName().toString();
         if (fileName.toLowerCase().endsWith(".sst")) {
@@ -358,7 +366,8 @@ public class TestOMRatisSnapshots {
           Path leaderActiveSST =
               Paths.get(leaderActiveDir.toString(), fileName);
           // Skip if not hard link on the leader
-          if (!leaderActiveSST.toFile().exists()) {
+          // First confirm it is live
+          if (!liveSstFiles.contains(fileName)) {
             continue;
           }
           // If it is a hard link on the leader, it should be a hard
@@ -369,7 +378,7 @@ public class TestOMRatisSnapshots {
                 Paths.get(followerSnapshotDir.toString(), fileName);
             Path followerActiveSST =
                 Paths.get(followerActiveDir.toString(), fileName);
-            Assertions.assertEquals(
+            assertEquals(
                 OmSnapshotUtils.getINode(followerActiveSST),
                 OmSnapshotUtils.getINode(followerSnapshotSST),
                 "Snapshot sst file is supposed to be a hard link");
@@ -378,7 +387,8 @@ public class TestOMRatisSnapshots {
         }
       }
     }
-    Assertions.assertTrue(hardLinkCount > 0, "No hard links were found");
+    assertThat(hardLinkCount).withFailMessage("No hard links were found")
+        .isGreaterThan(0);
   }
 
   @Test
@@ -471,8 +481,7 @@ public class TestOMRatisSnapshots {
     // Verify the metrics recording the incremental checkpoint at leader side
     DBCheckpointMetrics dbMetrics = leaderOM.getMetrics().
         getDBCheckpointMetrics();
-    Assertions.assertTrue(
-        dbMetrics.getLastCheckpointStreamingNumSSTExcluded() > 0);
+    assertThat(dbMetrics.getLastCheckpointStreamingNumSSTExcluded()).isGreaterThan(0);
     assertEquals(2, dbMetrics.getNumIncrementalCheckpoints());
 
     // Verify RPC server is running
@@ -504,7 +513,7 @@ public class TestOMRatisSnapshots {
         firstIncrement.getSnapshotInfo());
     checkSnapshot(leaderOM, followerOM, "snap240", secondIncrement.getKeys(),
         secondIncrement.getSnapshotInfo());
-    Assertions.assertEquals(
+    assertEquals(
         followerOM.getOmSnapshotProvider().getInitCount(), 2,
         "Only initialized twice");
   }
@@ -552,9 +561,8 @@ public class TestOMRatisSnapshots {
         followerOM.getOmSnapshotProvider().getNumDownloaded() ==
         expectedNumDownloads, 1000, 30_000);
 
-    assertTrue(followerOM.getOmRatisServer().
-        getLastAppliedTermIndex().getIndex()
-        >= leaderOMSnapshotIndex - 1);
+    assertThat(followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex())
+        .isGreaterThanOrEqualTo(leaderOMSnapshotIndex - 1);
 
     // Now confirm tarball is just incremental and contains no unexpected
     //  files/links.
@@ -567,7 +575,7 @@ public class TestOMRatisSnapshots {
 
     // Confirm that none of the files in the tarball match one in the
     // candidate dir.
-    assertTrue(sstFiles.size() > 0);
+    assertThat(sstFiles.size()).isGreaterThan(0);
     for (String s: sstFiles) {
       File sstFile = Paths.get(followerCandidatePath.toString(), s).toFile();
       assertFalse(sstFile.exists(),
@@ -588,7 +596,7 @@ public class TestOMRatisSnapshots {
             "Incremental checkpoint should not " +
                 "duplicate existing links");
       }
-      assertTrue(lineCount > 0);
+      assertThat(lineCount).isGreaterThan(0);
     }
     return id;
   }
@@ -648,12 +656,10 @@ public class TestOMRatisSnapshots {
     File followerCandidateDir = followerOM.getOmSnapshotProvider().
         getCandidateDir();
     List<String> sstList = HAUtils.getExistingSstFiles(followerCandidateDir);
-    Assertions.assertTrue(sstList.size() > 0);
-    Collections.shuffle(sstList);
-    List<String> victimSstList = sstList.subList(0, sstList.size() / 3);
-    for (String sst: victimSstList) {
-      File victimSst = new File(followerCandidateDir, sst);
-      Assertions.assertTrue(victimSst.delete());
+    assertThat(sstList.size()).isGreaterThan(0);
+    for (int i = 0; i < sstList.size(); i += 2) {
+      File victimSst = new File(followerCandidateDir, sstList.get(i));
+      assertTrue(victimSst.delete());
     }
 
     // Resume the follower thread, it would download the full snapshot again
@@ -695,7 +701,6 @@ public class TestOMRatisSnapshots {
     }
 
     // Verify the metrics
-    /* HDDS-8876
     GenericTestUtils.waitFor(() -> {
       DBCheckpointMetrics dbMetrics =
           leaderOM.getMetrics().getDBCheckpointMetrics();
@@ -713,7 +718,6 @@ public class TestOMRatisSnapshots {
           leaderOM.getMetrics().getDBCheckpointMetrics();
       return dbMetrics.getNumCheckpoints() >= 3;
     }, 100, 30_000);
-    */
 
     // Verify RPC server is running
     GenericTestUtils.waitFor(() -> {
@@ -799,17 +803,16 @@ public class TestOMRatisSnapshots {
 
     long followerOMLastAppliedIndex =
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
-    assertTrue(
-        followerOMLastAppliedIndex >= leaderOMSnapshotIndex - 1);
+    assertThat(followerOMLastAppliedIndex).isGreaterThanOrEqualTo(leaderOMSnapshotIndex - 1);
 
     // After the new checkpoint is installed, the follower OM
     // lastAppliedIndex must >= the snapshot index of the checkpoint. It
     // could be great than snapshot index if there is any conf entry from ratis.
     followerOMLastAppliedIndex = followerOM.getOmRatisServer()
         .getLastAppliedTermIndex().getIndex();
-    assertTrue(followerOMLastAppliedIndex >= leaderOMSnapshotIndex);
-    assertTrue(followerOM.getOmRatisServer().getLastAppliedTermIndex()
-        .getTerm() >= leaderOMSnapshotTermIndex);
+    assertThat(followerOMLastAppliedIndex).isGreaterThanOrEqualTo(leaderOMSnapshotIndex);
+    assertThat(followerOM.getOmRatisServer().getLastAppliedTermIndex()
+        .getTerm()).isGreaterThanOrEqualTo(leaderOMSnapshotTermIndex);
 
     // Verify that the follower OM's DB contains the transactions which were
     // made while it was inactive.
@@ -898,17 +901,16 @@ public class TestOMRatisSnapshots {
 
     long followerOMLastAppliedIndex =
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
-    assertTrue(
-        followerOMLastAppliedIndex >= leaderOMSnapshotIndex - 1);
+    assertThat(followerOMLastAppliedIndex).isGreaterThanOrEqualTo(leaderOMSnapshotIndex - 1);
 
     // After the new checkpoint is installed, the follower OM
     // lastAppliedIndex must >= the snapshot index of the checkpoint. It
     // could be great than snapshot index if there is any conf entry from ratis.
     followerOMLastAppliedIndex = followerOM.getOmRatisServer()
         .getLastAppliedTermIndex().getIndex();
-    assertTrue(followerOMLastAppliedIndex >= leaderOMSnapshotIndex);
-    assertTrue(followerOM.getOmRatisServer().getLastAppliedTermIndex()
-        .getTerm() >= leaderOMSnapshotTermIndex);
+    assertThat(followerOMLastAppliedIndex).isGreaterThanOrEqualTo(leaderOMSnapshotIndex);
+    assertThat(followerOM.getOmRatisServer().getLastAppliedTermIndex()
+        .getTerm()).isGreaterThanOrEqualTo(leaderOMSnapshotTermIndex);
 
     // Verify that the follower OM's DB contains the transactions which were
     // made while it was inactive.
@@ -1186,11 +1188,11 @@ public class TestOMRatisSnapshots {
     private final List<Set<String>> sstSetList;
     private final Path tempDir;
     SnapshotMaxSizeInjector(OzoneManager om, File snapshotDir,
-                            List<Set<String>> sstSetList) throws IOException {
+                            List<Set<String>> sstSetList, Path tempDir) {
       this.om = om;
       this.snapshotDir = snapshotDir;
       this.sstSetList = sstSetList;
-      this.tempDir = Files.createTempDirectory("tmpDirPrefix");
+      this.tempDir = tempDir;
       init();
     }
 
