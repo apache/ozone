@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -338,10 +339,12 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected Optional<StorageUnit> streamBufferSizeUnit = Optional.empty();
     protected boolean includeRecon = false;
 
-
     protected Optional<Integer> omLayoutVersion = Optional.empty();
     protected Optional<Integer> scmLayoutVersion = Optional.empty();
     protected Optional<Integer> dnLayoutVersion = Optional.empty();
+
+    protected Optional<int[]> dnInitialVersion = Optional.empty();
+    protected Optional<int[]> dnCurrentVersion = Optional.empty();
 
     // Use relative smaller number of handlers for testing
     protected int numOfOmHandlers = 20;
@@ -452,6 +455,60 @@ public interface MiniOzoneCluster extends AutoCloseable {
      */
     public Builder setNumDatanodes(int val) {
       numOfDatanodes = val;
+      return this;
+    }
+
+    /**
+     * Set the (same) initialVersion for all datanodes.
+     * Caution: Call setNumDatanodes() before this if you need to.
+     *
+     * @param val initialVersion value to be set for all datanodes.
+     *
+     * @return MiniOzoneCluster.Builder
+     */
+    public Builder setDatanodeInitialVersion(int val) {
+      int[] arr = new int[numDataVolumes];
+      Arrays.fill(arr, val);
+      dnInitialVersion = Optional.of(arr);
+      return this;
+    }
+
+    /**
+     * Set the (same) currentVersion for all datanodes.
+     * Caution: Call setNumDatanodes() before this if you need to.
+     *
+     * @param val currentVersion value to be set for all datanodes.
+     *
+     * @return MiniOzoneCluster.Builder
+     */
+    public Builder setDatanodeCurrentVersion(int val) {
+      int[] arr = new int[numDataVolumes];
+      Arrays.fill(arr, val);
+      dnCurrentVersion = Optional.of(arr);
+      return this;
+    }
+
+    /**
+     * Set initialVersion for each datanode separately.
+     *
+     * @param varArray an array of initialVersion for each datanode
+     *
+     * @return MiniOzoneCluster.Builder
+     */
+    public Builder setDatanodeInitialVersion(int[] varArray) {
+      dnInitialVersion = Optional.of(varArray);
+      return this;
+    }
+
+    /**
+     * Set currentVersion for each datanode separately.
+     *
+     * @param varArray an array of currentVersion for each datanode
+     *
+     * @return MiniOzoneCluster.Builder
+     */
+    public Builder setDatanodeCurrentVersion(int[] varArray) {
+      dnCurrentVersion = Optional.of(varArray);
       return this;
     }
 

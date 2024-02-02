@@ -125,6 +125,9 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
   private HddsDatanodeClientProtocolServer clientProtocolServer;
   private OzoneAdmins admins;
   private ReconfigurationHandler reconfigurationHandler;
+  // Default datanode initial and current version to be used when datanode.id file doesn't exist
+  // Note: Currently this is only used in tests.
+  private int defaultInitialVersion = -1, defaultCurrentVersion = -1;
 
   //Constructor for DataNode PluginService
   public HddsDatanodeService() { }
@@ -232,7 +235,6 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
       datanodeDetails.setRevision(
           HddsVersionInfo.HDDS_VERSION_INFO.getRevision());
       datanodeDetails.setBuildDate(HddsVersionInfo.HDDS_VERSION_INFO.getDate());
-      datanodeDetails.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
       TracingUtil.initTracing(
           "HddsDatanodeService." + datanodeDetails.getUuidString()
               .substring(0, 8), conf);
@@ -422,14 +424,15 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     Preconditions.checkNotNull(idFilePath);
     File idFile = new File(idFilePath);
     if (idFile.exists()) {
-      return ContainerUtils.readDatanodeDetailsFrom(idFile);
+      DatanodeDetails details = ContainerUtils.readDatanodeDetailsFrom(idFile);
+      details.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
+      return details;
     } else {
       // There is no datanode.id file, this might be the first time datanode
       // is started.
-      DatanodeDetails details = DatanodeDetails.newBuilder()
-          .setUuid(UUID.randomUUID()).build();
-      details.setInitialVersion(DatanodeVersion.CURRENT_VERSION);
-      details.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
+      DatanodeDetails details = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build();
+      details.setInitialVersion(defaultInitialVersion >= 0 ? defaultInitialVersion : DatanodeVersion.CURRENT_VERSION);
+      details.setCurrentVersion(defaultCurrentVersion >= 0 ? defaultCurrentVersion : DatanodeVersion.CURRENT_VERSION);
       return details;
     }
   }
@@ -666,5 +669,21 @@ public class HddsDatanodeService extends GenericCli implements ServicePlugin {
     getDatanodeStateMachine().getContainer().getBlockDeletingService()
         .setPoolSize(Integer.parseInt(value));
     return value;
+  }
+
+  public int getDefaultInitialVersion() {
+    return defaultInitialVersion;
+  }
+
+  public void setDefaultInitialVersion(int defaultInitialVersion) {
+    this.defaultInitialVersion = defaultInitialVersion;
+  }
+
+  public int getDefaultCurrentVersion() {
+    return defaultCurrentVersion;
+  }
+
+  public void setDefaultCurrentVersion(int defaultCurrentVersion) {
+    this.defaultCurrentVersion = defaultCurrentVersion;
   }
 }

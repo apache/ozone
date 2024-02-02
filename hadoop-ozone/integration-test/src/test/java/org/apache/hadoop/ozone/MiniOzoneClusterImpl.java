@@ -138,23 +138,32 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private final Set<AutoCloseable> clients = ConcurrentHashMap.newKeySet();
   private SecretKeyClient secretKeyClient;
 
+  // TODO: Get rid of Optional, just use null
+  private Optional<int[]> dnInitialVersion = Optional.empty();
+  private Optional<int[]> dnCurrentVersion = Optional.empty();
+
   /**
    * Creates a new MiniOzoneCluster with Recon.
    *
    * @throws IOException if there is an I/O error
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   MiniOzoneClusterImpl(OzoneConfiguration conf,
                        SCMConfigurator scmConfigurator,
                        OzoneManager ozoneManager,
                        StorageContainerManager scm,
                        List<HddsDatanodeService> hddsDatanodes,
-                       ReconServer reconServer) {
+                       ReconServer reconServer,
+                       Optional<int[]> dnInitialVersion,
+                       Optional<int[]> dnCurrentVersion) {
     this.conf = conf;
     this.ozoneManager = ozoneManager;
     this.scm = scm;
     this.hddsDatanodes = hddsDatanodes;
     this.reconServer = reconServer;
     this.scmConfigurator = scmConfigurator;
+    this.dnInitialVersion = dnInitialVersion;
+    this.dnCurrentVersion = dnCurrentVersion;
   }
 
   /**
@@ -327,6 +336,14 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         "Not able to find datanode with datanode Id " + dn.getUuid());
   }
 
+  public int getDatanodeInitialVersion(int dnIdx) {
+    return dnInitialVersion.map(v -> v[dnIdx]).orElse(-1);
+  }
+
+  public int getDatanodeCurrentVersion(int dnIdx) {
+    return dnCurrentVersion.map(v -> v[dnIdx]).orElse(-1);
+  }
+
   @Override
   public OzoneClient newClient() throws IOException {
     OzoneClient client = createClient();
@@ -416,7 +433,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     HddsDatanodeService service = new HddsDatanodeService(args);
     service.setConfiguration(config);
     hddsDatanodes.add(i, service);
-    startHddsDatanode(service);
+    startHddsDatanode(service, i);
     if (waitForDatanode) {
       // wait for the node to be identified as a healthy node again.
       waitForClusterToBeReady();
@@ -477,13 +494,19 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     scm.start();
   }
 
-  public void startHddsDatanode(HddsDatanodeService datanode) {
+  public void startHddsDatanode(HddsDatanodeService datanode, int dnIdx) {
     try {
       datanode.setCertificateClient(getCAClient());
     } catch (IOException e) {
       LOG.error("Exception while setting certificate client to DataNode.", e);
     }
     datanode.setSecretKeyClient(secretKeyClient);
+    if (dnInitialVersion.isPresent()) {
+      datanode.setDefaultInitialVersion(getDatanodeInitialVersion(dnIdx));
+    }
+    if (dnCurrentVersion.isPresent()) {
+      datanode.setDefaultCurrentVersion(getDatanodeCurrentVersion(dnIdx));
+    }
     datanode.start();
   }
 
@@ -492,7 +515,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
    */
   @Override
   public void startHddsDatanodes() {
-    hddsDatanodes.forEach(this::startHddsDatanode);
+    for (int i = 0; i < hddsDatanodes.size(); i++) {
+      startHddsDatanode(hddsDatanodes.get(i), i);
+    }
   }
 
   @Override
@@ -617,7 +642,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
         MiniOzoneClusterImpl cluster = new MiniOzoneClusterImpl(conf,
             scmConfigurator, om, scm,
-            hddsDatanodes, reconServer);
+            hddsDatanodes, reconServer,
+            dnInitialVersion, dnCurrentVersion);
 
         cluster.setCAClient(certClient);
         cluster.setSecretKeyClient(secretKeyClient);
@@ -843,10 +869,19 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       String[] args = new String[] {};
       conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, scmAddress);
       List<HddsDatanodeService> hddsDatanodes = new ArrayList<>();
+
+      // Sanity check
+      if (dnInitialVersion.isPresent() && dnInitialVersion.get().length != numOfDatanodes) {
+        throw new IllegalArgumentException("Number of initial versions should be equal to number of datanodes");
+      }
+      if (dnCurrentVersion.isPresent() && dnCurrentVersion.get().length != numOfDatanodes) {
+        throw new IllegalArgumentException("Number of current versions should be equal to number of datanodes");
+      }
+
       for (int i = 0; i < numOfDatanodes; i++) {
         OzoneConfiguration dnConf = new OzoneConfiguration(conf);
         configureDatanodePorts(dnConf);
-        String datanodeBaseDir = path + "/datanode-" + Integer.toString(i);
+        String datanodeBaseDir = path + "/datanode-" + i;
         Path metaDir = Paths.get(datanodeBaseDir, "meta");
         List<String> dataDirs = new ArrayList<>();
         List<String> reservedSpaceList = new ArrayList<>();
