@@ -163,6 +163,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -2521,7 +2522,7 @@ public class RpcClient implements ClientProtocol {
         localRef = writeExecutor;
         if (localRef == null) {
           localRef = createThreadPoolExecutor(WRITE_POOL_MIN_SIZE,
-              clientConfig.getClientWritePoolLimit(),
+              Integer.MAX_VALUE,
               "client-write-TID-%d");
           writeExecutor = localRef;
         }
