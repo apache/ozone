@@ -41,8 +41,10 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.stubbing.Answer;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -82,7 +84,7 @@ public class TestECOverReplicationHandler {
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
 
   @BeforeEach
-  public void setup() throws NodeNotFoundException, NotLeaderException,
+  void setup(@TempDir File testDir) throws NodeNotFoundException, NotLeaderException,
       CommandTargetOverloadedException {
     staleNode = null;
 
@@ -103,7 +105,7 @@ public class TestECOverReplicationHandler {
         commandsSent);
 
     NodeManager nodeManager = new MockNodeManager(true, 10);
-    OzoneConfiguration conf = SCMTestUtils.getConf();
+    OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     ECReplicationConfig repConfig = new ECReplicationConfig(3, 2);
     container = ReplicationTestUtil
         .createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);

@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -60,8 +59,7 @@ public class TestSimplePipelineProvider {
   @BeforeEach
   public void init() throws Exception {
     nodeManager = new MockNodeManager(true, 10);
-    final OzoneConfiguration conf = SCMTestUtils.getConf();
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);

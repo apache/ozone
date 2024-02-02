@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.hdds.scm.container;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -94,12 +93,10 @@ public class TestContainerReportHandler {
   private PipelineManager pipelineManager;
 
   @BeforeEach
-  public void setup() throws IOException, InvalidStateTransitionException,
-      TimeoutException {
-    final OzoneConfiguration conf = SCMTestUtils.getConf();
+  void setup() throws IOException, InvalidStateTransitionException {
+    final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     nodeManager = new MockNodeManager(true, 10);
     containerManager = mock(ContainerManager.class);
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
     scmhaManager = SCMHAManagerStub.getInstance(true);

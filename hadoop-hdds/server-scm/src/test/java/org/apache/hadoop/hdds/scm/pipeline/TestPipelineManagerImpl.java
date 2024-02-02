@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -128,11 +127,11 @@ public class TestPipelineManagerImpl {
   private TestClock testClock;
 
   @BeforeEach
-  void init(@TempDir File testDir) throws Exception {
+  void init(@TempDir File testDir, @TempDir File dbDir) throws Exception {
     testClock = new TestClock(Instant.now(), ZoneOffset.UTC);
-    conf = SCMTestUtils.getConf();
-    scm = HddsTestUtils.getScm(conf);
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    conf = SCMTestUtils.getConf(dbDir);
+    scm = HddsTestUtils.getScm(SCMTestUtils.getConf(testDir));
+
     // Mock Node Manager is not able to correctly set up things for the EC
     // placement policy (Rack Scatter), so just use the random one.
     conf.set(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_KEY,

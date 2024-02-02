@@ -77,10 +77,12 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.io.File;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
@@ -155,6 +157,10 @@ public class TestLegacyReplicationManager {
   private DBStore dbStore;
   private ContainerReplicaPendingOps containerReplicaPendingOps;
 
+  @TempDir
+  private File testDir;
+  private OzoneConfiguration config;
+
   int getInflightCount(InflightType type) {
     return replicationManager.getLegacyReplicationManager()
         .getInflightCount(type);
@@ -163,8 +169,8 @@ public class TestLegacyReplicationManager {
   @BeforeEach
   void setup() throws IOException, InterruptedException,
       NodeNotFoundException, InvalidStateTransitionException {
-    OzoneConfiguration conf = SCMTestUtils.getConf();
-    conf.setTimeDuration(
+    config = SCMTestUtils.getConf(testDir);
+    config.setTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         0, TimeUnit.SECONDS);
 
@@ -175,12 +181,12 @@ public class TestLegacyReplicationManager {
     eventQueue = new EventQueue();
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     dbStore = DBStoreBuilder.createDBStore(
-        conf, new SCMDBDefinition());
+        config, new SCMDBDefinition());
     PipelineManager pipelineManager = mock(PipelineManager.class);
     when(pipelineManager.containsPipeline(any(PipelineID.class)))
         .thenReturn(true);
     containerStateManager = ContainerStateManagerImpl.newBuilder()
-        .setConfiguration(conf)
+        .setConfiguration(config)
         .setPipelineManager(pipelineManager)
         .setRatisServer(scmhaManager.getRatisServer())
         .setContainerStore(SCMDBDefinition.CONTAINERS.getTable(dbStore))
@@ -263,7 +269,6 @@ public class TestLegacyReplicationManager {
   void createReplicationManager(ReplicationManagerConfiguration rmConf,
       LegacyReplicationManagerConfiguration lrmConf)
       throws InterruptedException, IOException {
-    OzoneConfiguration config = SCMTestUtils.getConf();
     config.setTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         0, TimeUnit.SECONDS);

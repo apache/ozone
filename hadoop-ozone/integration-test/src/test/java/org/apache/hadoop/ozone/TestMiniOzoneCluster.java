@@ -109,8 +109,8 @@ public class TestMiniOzoneCluster {
   }
 
   @Test
-  public void testContainerRandomPort() throws IOException {
-    OzoneConfiguration ozoneConf = SCMTestUtils.getConf();
+  void testContainerRandomPort(@TempDir File tempDir) throws IOException {
+    OzoneConfiguration ozoneConf = SCMTestUtils.getConf(tempDir);
 
     // Each instance of SM will create an ozone container
     // that bounds to a random port.
