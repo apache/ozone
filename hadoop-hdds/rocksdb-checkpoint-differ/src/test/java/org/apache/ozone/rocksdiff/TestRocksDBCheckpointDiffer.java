@@ -1947,4 +1947,54 @@ public class TestRocksDBCheckpointDiffer {
     assertEquals(expectedResult, rocksDBCheckpointDiffer
         .shouldSkipCompaction(columnFamilyBytes, inputFiles, outputFiles));
   }
+
+  /**
+   * Test to verify that no compaction log entry is added to compactionLogTable and DAG.
+   */
+  @Test
+  void testCompactionLogsAreNotAppendedIfTarballCreationIsInProgress() throws Exception {
+    rocksDBCheckpointDiffer.setSnapshotInfoTableCFHandle(keyTableCFHandle);
+
+    // Increment tarball request count twice to mimic that two tarball requests are in progress,
+    // so the compaction thread waits.
+    rocksDBCheckpointDiffer.incrementTarballRequestCount();
+    rocksDBCheckpointDiffer.incrementTarballRequestCount();
+    assertEquals(2, rocksDBCheckpointDiffer.getTarballRequestCount());
+
+    writeKeysAndCheckpointing();
+    Thread.sleep(1000);
+
+    // Verify that no log entry gets added to compactionLogTable and DAG when tarball request count is not zero.
+    assertCompactionTableAndDagEntries(0, 0, 0);
+
+    // Release one tarball request by decrementing tarball request count.
+    rocksDBCheckpointDiffer.decrementTarballRequestCountAndNotify();
+    assertEquals(1, rocksDBCheckpointDiffer.getTarballRequestCount());
+
+    Thread.sleep(1000);
+
+    // Verify again that no log entry gets added to compactionLogTable and DAG after decrementing tarball request count,
+    // but it is still non-zero.
+    assertCompactionTableAndDagEntries(0, 0, 0);
+
+    // Release the second tarball request by decrementing tarball request count again,
+    // so the compaction thread can continue.
+    rocksDBCheckpointDiffer.decrementTarballRequestCountAndNotify();
+
+    assertEquals(0, rocksDBCheckpointDiffer.getTarballRequestCount());
+    GenericTestUtils.waitFor(() -> countEntriesInCompactionLogTable() == 1, 100, 1000);
+
+    // Verify that log entries get added to compactionLogTable and DAG after only tarball request count reaches zero.
+    assertCompactionTableAndDagEntries(1, 5, 4);
+    cleanUpSnapshots();
+  }
+
+  private void assertCompactionTableAndDagEntries(int expectedEntriesInCompactionLogTable,
+                                                  int expectedNodesInCompactionDag,
+                                                  int expectedArcsInCompactionDag) {
+
+    assertEquals(expectedEntriesInCompactionLogTable, countEntriesInCompactionLogTable());
+    assertEquals(expectedNodesInCompactionDag, rocksDBCheckpointDiffer.getForwardCompactionDAG().nodes().size());
+    assertEquals(expectedArcsInCompactionDag, rocksDBCheckpointDiffer.getForwardCompactionDAG().edges().size());
+  }
 }

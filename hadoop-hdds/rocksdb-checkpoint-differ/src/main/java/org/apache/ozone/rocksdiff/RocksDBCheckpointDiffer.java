@@ -587,7 +587,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
    * Check if there is any in_progress tarball creation request and wait till
    * all tarball creation finish, and it gets notified.
    */
-  private void waitForTarballCreation() {
+  private synchronized void waitForTarballCreation() {
     while (tarballRequestCount.get() != 0) {
       try {
         wait(Integer.MAX_VALUE);
