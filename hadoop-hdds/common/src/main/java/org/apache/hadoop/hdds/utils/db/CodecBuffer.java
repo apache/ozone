@@ -340,6 +340,12 @@ public class CodecBuffer implements AutoCloseable {
     return buf.readableBytes();
   }
 
+  /** @return a writable {@link ByteBuffer}. */
+  public ByteBuffer asWritableByteBuffer() {
+    assertRefCnt(1);
+    return buf.nioBuffer(0, buf.maxCapacity());
+  }
+
   /** @return a readonly {@link ByteBuffer} view of this buffer. */
   public ByteBuffer asReadOnlyByteBuffer() {
     assertRefCnt(1);

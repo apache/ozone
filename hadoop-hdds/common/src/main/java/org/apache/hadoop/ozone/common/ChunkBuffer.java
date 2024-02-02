@@ -28,9 +28,10 @@ import java.util.function.Supplier;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /** Buffer for a block chunk. */
-public interface ChunkBuffer {
+public interface ChunkBuffer extends UncheckedAutoCloseable {
 
   /** Similar to {@link ByteBuffer#allocate(int)}. */
   static ChunkBuffer allocate(int capacity) {
@@ -85,6 +86,9 @@ public interface ChunkBuffer {
 
   /** Similar to {@link ByteBuffer#clear()}. */
   ChunkBuffer clear();
+
+  default void close() {
+  }
 
   /** Similar to {@link ByteBuffer#put(ByteBuffer)}. */
   ChunkBuffer put(ByteBuffer b);
