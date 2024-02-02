@@ -72,9 +72,11 @@ public class ReportSubcommand extends ScmSubcommand {
   }
 
   private void outputHeader(long epochMs) {
+    if (epochMs == 0) {
+      epochMs = Instant.now().toEpochMilli();
+    }
     Instant reportTime = Instant.ofEpochSecond(epochMs / 1000);
     outputHeading("Container Summary Report generated at " + reportTime);
-
   }
 
   private void outputContainerStats(ReplicationManagerReport report) {
