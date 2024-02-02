@@ -207,14 +207,5 @@ public final class TimeDurationUtil {
       }
       return null;
     }
-
-    static ParsedTimeDuration unitFor(TemporalUnit unit) {
-      for (ParsedTimeDuration ptd : values()) {
-        if (ptd.temporalUnit() == unit) {
-          return ptd;
-        }
-      }
-      return null;
-    }
   }
 }
