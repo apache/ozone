@@ -158,8 +158,7 @@ public class TestLegacyReplicationManager {
   private ContainerReplicaPendingOps containerReplicaPendingOps;
 
   @TempDir
-  private File testDir;
-  private OzoneConfiguration config;
+  private File tempDir;
 
   int getInflightCount(InflightType type) {
     return replicationManager.getLegacyReplicationManager()
@@ -167,10 +166,10 @@ public class TestLegacyReplicationManager {
   }
 
   @BeforeEach
-  void setup() throws IOException, InterruptedException,
+  void setup(@TempDir File testDir) throws IOException, InterruptedException,
       NodeNotFoundException, InvalidStateTransitionException {
-    config = SCMTestUtils.getConf(testDir);
-    config.setTimeDuration(
+    OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
+    conf.setTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         0, TimeUnit.SECONDS);
 
@@ -181,12 +180,12 @@ public class TestLegacyReplicationManager {
     eventQueue = new EventQueue();
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     dbStore = DBStoreBuilder.createDBStore(
-        config, new SCMDBDefinition());
+        conf, new SCMDBDefinition());
     PipelineManager pipelineManager = mock(PipelineManager.class);
     when(pipelineManager.containsPipeline(any(PipelineID.class)))
         .thenReturn(true);
     containerStateManager = ContainerStateManagerImpl.newBuilder()
-        .setConfiguration(config)
+        .setConfiguration(conf)
         .setPipelineManager(pipelineManager)
         .setRatisServer(scmhaManager.getRatisServer())
         .setContainerStore(SCMDBDefinition.CONTAINERS.getTable(dbStore))
@@ -266,9 +265,10 @@ public class TestLegacyReplicationManager {
     createReplicationManager(rmConf, null);
   }
 
-  void createReplicationManager(ReplicationManagerConfiguration rmConf,
+  private void createReplicationManager(ReplicationManagerConfiguration rmConf,
       LegacyReplicationManagerConfiguration lrmConf)
       throws InterruptedException, IOException {
+    OzoneConfiguration config = SCMTestUtils.getConf(tempDir);
     config.setTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         0, TimeUnit.SECONDS);
