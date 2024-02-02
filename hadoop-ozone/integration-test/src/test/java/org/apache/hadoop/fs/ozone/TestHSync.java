@@ -21,6 +21,8 @@ package org.apache.hadoop.fs.ozone;
 import java.io.Closeable;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.PrivilegedExceptionAction;
 import java.util.HashMap;
@@ -28,12 +30,18 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.conf.StorageUnit;
@@ -59,8 +67,10 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
+import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -83,6 +93,10 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -98,11 +112,13 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOU
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -122,12 +138,13 @@ public class TestHSync {
   private static OzoneClient client;
   private static final BucketLayout BUCKET_LAYOUT = BucketLayout.FILE_SYSTEM_OPTIMIZED;
 
+  private static final int chunkSize = 4 << 12;
+  private static final int flushSize = 2 * chunkSize;
+  private static final int maxFlushSize = 2 * flushSize;
+  private static final int blockSize = 2 * maxFlushSize;
+
   @BeforeAll
   public static void init() throws Exception {
-    final int chunkSize = 4 << 10;
-    final int flushSize = 2 * chunkSize;
-    final int maxFlushSize = 2 * flushSize;
-    final int blockSize = 2 * maxFlushSize;
     final BucketLayout layout = BUCKET_LAYOUT;
 
     CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
@@ -160,6 +177,7 @@ public class TestHSync {
     GenericTestUtils.setLogLevel(OMKeyCommitRequest.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(OMKeyCommitRequestWithFSO.LOG, Level.DEBUG);
     GenericTestUtils.setLogLevel(BlockOutputStream.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(BlockInputStream.LOG, Level.DEBUG);
   }
 
   @AfterAll
@@ -292,13 +310,15 @@ public class TestHSync {
     }
   }
 
-  @Test
-  public void testO3fsHSync() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testO3fsHSync(boolean incrementalChunkList) throws Exception {
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s.%s/",
         OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
     CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
 
+    init(incrementalChunkList);
     try (FileSystem fs = FileSystem.get(CONF)) {
       for (int i = 0; i < 10; i++) {
         final Path file = new Path("/file" + i);
@@ -307,8 +327,10 @@ public class TestHSync {
     }
   }
 
-  @Test
-  public void testOfsHSync() throws Exception {
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testOfsHSync(boolean incrementalChunkList) throws Exception {
     // Set the fs.defaultFS
     final String rootPath = String.format("%s://%s/",
         OZONE_OFS_URI_SCHEME, CONF.get(OZONE_OM_ADDRESS_KEY));
@@ -317,6 +339,7 @@ public class TestHSync {
     final String dir = OZONE_ROOT + bucket.getVolumeName()
         + OZONE_URI_DELIMITER + bucket.getName();
 
+    init(incrementalChunkList);
     try (FileSystem fs = FileSystem.get(CONF)) {
       for (int i = 0; i < 10; i++) {
         final Path file = new Path(dir, "file" + i);
@@ -434,9 +457,7 @@ public class TestHSync {
     ThreadLocalRandom.current().nextBytes(data);
 
     final Path file = new Path(dir, "file-hsync-then-close");
-    long blockSize;
     try (FileSystem fs = FileSystem.get(CONF)) {
-      blockSize = fs.getDefaultBlockSize(file);
       long fileSize = 0;
       try (FSDataOutputStream outputStream = fs.create(file, true)) {
         // make sure at least writing 2 blocks data
@@ -737,5 +758,117 @@ public class TestHSync {
         new CapableOzoneFSOutputStream(ofso, false)) {
       assertFalse(cofsos.hasCapability(StreamCapabilities.HFLUSH));
     }
+  }
+
+  public void init(boolean incrementalChunkList) throws IOException {
+    OzoneClientConfig clientConfig = CONF.getObject(OzoneClientConfig.class);
+    clientConfig.setIncrementalChunkList(incrementalChunkList);
+    clientConfig.setChecksumType(ContainerProtos.ChecksumType.CRC32C);
+    CONF.setFromObject(clientConfig);
+  }
+
+  public static Stream<Arguments> parameters1() {
+    return Stream.of(
+        arguments(true, 512),
+        arguments(true, 511),
+        arguments(true, 513),
+        arguments(false, 512),
+        arguments(false, 511),
+        arguments(false, 513)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("parameters1")
+  public void writeWithSmallBuffer(boolean incrementalChunkList, int bufferSize)
+      throws IOException {
+    init(incrementalChunkList);
+
+    final String keyName = UUID.randomUUID().toString();
+    int fileSize = 16 << 11 ;
+    String s = RandomStringUtils.randomAlphabetic(bufferSize);
+    ByteBuffer byteBuffer = ByteBuffer.wrap(s.getBytes(StandardCharsets.UTF_8));
+
+    int writtenSize = 0;
+    try (OzoneOutputStream out = bucket.createKey(keyName, fileSize,
+        ReplicationConfig.getDefault(CONF), new HashMap<>())) {
+      while (writtenSize < fileSize) {
+        int len = Math.min(bufferSize, fileSize - writtenSize);
+        out.write(byteBuffer, 0, len);
+        out.hsync();
+        writtenSize += bufferSize;
+      }
+    }
+
+    OzoneKeyDetails keyInfo = bucket.getKey(keyName);
+    assertEquals(fileSize, keyInfo.getDataSize());
+
+    int readSize = 0;
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
+      while (readSize < fileSize) {
+        int len = Math.min(bufferSize, fileSize - readSize);
+        ByteBuffer readBuffer = ByteBuffer.allocate(len);
+        int readLen = is.read(readBuffer);
+        assertEquals(len, readLen);
+        if (len < bufferSize) {
+          for (int i = 0; i < len; i++) {
+            assertEquals(readBuffer.array()[i], byteBuffer.array()[i]);
+          }
+        } else {
+          assertArrayEquals(readBuffer.array(), byteBuffer.array());
+        }
+        readSize += readLen;
+      }
+    }
+    bucket.deleteKey(keyName);
+  }
+
+  public static Stream<Arguments> parameters2() {
+    return Stream.of(
+        arguments(true, 1024 * 1024 + 1),
+        arguments(true, 1024 * 1024 + 1 + chunkSize),
+        arguments(true, 1024 * 1024 - 1 + chunkSize),
+        arguments(false, 1024 * 1024 + 1),
+        arguments(false, 1024 * 1024 + 1 + chunkSize),
+        arguments(false, 1024 * 1024 - 1 + chunkSize)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("parameters2")
+  public void writeWithBigBuffer(boolean incrementalChunkList, int bufferSize)
+      throws IOException {
+    init(incrementalChunkList);
+
+    final String keyName = UUID.randomUUID().toString();
+    int count = 2;
+    int fileSize = bufferSize * count;
+    ByteBuffer byteBuffer = ByteBuffer.allocate(bufferSize);
+
+    try (OzoneOutputStream out = bucket.createKey(keyName, fileSize,
+        ReplicationConfig.getDefault(CONF), new HashMap<>())) {
+      for (int i = 0; i < count; i++) {
+        out.write(byteBuffer);
+        out.hsync();
+      }
+    }
+
+    OzoneKeyDetails keyInfo = bucket.getKey(keyName);
+    assertEquals(fileSize, keyInfo.getDataSize());
+    int totalReadLen = 0;
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
+
+      for (int i = 0; i < count; i++) {
+        ByteBuffer readBuffer = ByteBuffer.allocate(bufferSize);
+        int readLen = is.read(readBuffer);
+        if (bufferSize != readLen) {
+          throw new IOException("failed to read " + bufferSize + " from offset " + totalReadLen +
+              ", actually read " + readLen + ", block " + totalReadLen/blockSize);
+        }
+        assertArrayEquals(byteBuffer.array(), readBuffer.array());
+        totalReadLen += readLen;
+      }
+    }
+    bucket.deleteKey(keyName);
   }
 }

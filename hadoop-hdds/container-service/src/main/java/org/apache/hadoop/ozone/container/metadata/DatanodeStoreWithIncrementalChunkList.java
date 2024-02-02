@@ -94,12 +94,14 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
     LOG.debug("blockData={}, lastChunk={}",
         blockData.getChunks(), lastChunk.getChunks());
     Preconditions.checkState(lastChunk.getChunks().size() == 1);
-    ContainerProtos.ChunkInfo lastChunkInBlockData =
-        blockData.getChunks().get(blockData.getChunks().size() - 1);
-    Preconditions.checkState(
-        lastChunkInBlockData.getOffset() + lastChunkInBlockData.getLen()
-            == lastChunk.getChunks().get(0).getOffset(),
-        "chunk offset does not match");
+    ContainerProtos.ChunkInfo lastChunkInBlockData = blockData.getChunks().size() > 0 ?
+        blockData.getChunks().get(blockData.getChunks().size() - 1) : null;
+    if (lastChunkInBlockData != null) {
+      Preconditions.checkState(
+          lastChunkInBlockData.getOffset() + lastChunkInBlockData.getLen()
+              == lastChunk.getChunks().get(0).getOffset(),
+          "chunk offset does not match");
+    }
 
     // append last partial chunk to the block data
     List<ContainerProtos.ChunkInfo> chunkInfos =
@@ -136,7 +138,7 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
   public void putBlockByID(BatchOperation batch, boolean incremental,
       long localID, BlockData data, KeyValueContainerData containerData,
       boolean endOfBlock) throws IOException {
-    if (!incremental && !isPartialChunkList(data)) {
+    if (!incremental || !isPartialChunkList(data)) {
       // Case (1) old client: override chunk list.
       getBlockDataTable().putWithBatch(
           batch, containerData.getBlockKey(localID), data);
@@ -151,14 +153,21 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
 
   private void moveLastChunkToBlockData(BatchOperation batch, long localID,
       BlockData data, KeyValueContainerData containerData) throws IOException {
+    // if data has no chunks, fetch the last chunk info from lastChunkInfoTable
+    if (data.getChunks().isEmpty()) {
+      BlockData lastChunk = getLastChunkInfoTable().get(containerData.getBlockKey(localID));
+      if(lastChunk != null ) {
+        reconcilePartialChunks(lastChunk, data);
+      }
+    }
     // if eob or if the last chunk is full,
     // the 'data' is full so append it to the block table's chunk info
     // and then remove from lastChunkInfo
     BlockData blockData = getBlockDataTable().get(
         containerData.getBlockKey(localID));
     if (blockData == null) {
-      // Case 2.1 if the block did not have full chunks before,
-      // the block's chunk is what received from client this time.
+      // Case 2.1 if the block did not have full chunks before
+      // the block's chunk is what received from client this time, plus the chunks in lastChunkInfoTable
       blockData = data;
     } else {
       // case 2.2 the block already has some full chunks

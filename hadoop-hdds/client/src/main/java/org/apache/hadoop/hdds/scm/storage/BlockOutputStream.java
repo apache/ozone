@@ -179,6 +179,9 @@ public class BlockOutputStream extends OutputStream {
     // tell DataNode I will send incremental chunk list
     if (config.getIncrementalChunkList()) {
       this.containerBlockData.addMetadata(INCREMENTAL_CHUNK_LIST_KV);
+      this.lastChunkBuffer =
+          ByteBuffer.allocate(config.getStreamBufferSize());
+      this.lastChunkOffset = 0;
     }
     this.xceiverClient = xceiverClientManager.acquireClient(pipeline);
     this.bufferPool = bufferPool;
@@ -208,9 +211,6 @@ public class BlockOutputStream extends OutputStream {
     this.clientMetrics = clientMetrics;
     this.pipeline = pipeline;
     this.streamBufferArgs = streamBufferArgs;
-    this.lastChunkBuffer =
-        ByteBuffer.allocate(config.getStreamBufferSize());
-    this.lastChunkOffset = 0;
   }
 
   void refreshCurrentBuffer() {
