@@ -45,7 +45,7 @@ import org.apache.hadoop.io.ElasticByteBufferPool;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
-import org.apache.hadoop.ozone.client.io.BlockOutPutStreamResourceProvider;
+import org.apache.hadoop.ozone.client.io.BlockOutputStreamResourceProvider;
 import org.apache.hadoop.ozone.client.io.ECBlockInputStreamProxy;
 import org.apache.hadoop.ozone.client.io.ECBlockReconstructedStripeInputStream;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -112,7 +112,8 @@ public class ECReconstructionCoordinator implements Closeable {
   private final TokenHelper tokenHelper;
   private final ECReconstructionMetrics metrics;
   private final StateContext context;
-  private final BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider;
+  private final BlockOutputStreamResourceProvider
+      blockOutputStreamResourceProvider;
 
   public ECReconstructionCoordinator(
       ConfigurationSource conf, CertificateClient certificateClient,
@@ -147,7 +148,7 @@ public class ECReconstructionCoordinator implements Closeable {
             new ThreadPoolExecutor.CallerRunsPolicy());
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, () -> ecReconstructReadExecutor);
-    blockOutPutStreamResourceProvider = BlockOutPutStreamResourceProvider.create(
+    blockOutputStreamResourceProvider = BlockOutputStreamResourceProvider.create(
         () -> ecReconstructWriteExecutor, ContainerClientMetrics.acquire());
     tokenHelper = new TokenHelper(new SecurityConfig(conf), secretKeyClient);
     this.metrics = metrics;
@@ -245,7 +246,7 @@ public class ECReconstructionCoordinator implements Closeable {
             repConfig, replicaIndex),
         BufferPool.empty(), configuration,
         blockLocationInfo.getToken(), streamBufferArgs,
-        blockOutPutStreamResourceProvider
+        blockOutputStreamResourceProvider
     );
   }
 

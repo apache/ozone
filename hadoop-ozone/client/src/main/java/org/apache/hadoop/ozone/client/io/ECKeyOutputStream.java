@@ -27,7 +27,6 @@ import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -73,7 +72,6 @@ public final class ECKeyOutputStream extends KeyOutputStream
   private final int numParityBlks;
   private final ByteBufferPool bufferPool;
   private final RawErasureEncoder encoder;
-  private final ExecutorService flushExecutor;
   private final Future<Boolean> flushFuture;
   private final AtomicLong flushCheckpoint;
 
@@ -128,7 +126,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
 
   private ECKeyOutputStream(Builder builder) {
     super(builder.getReplicationConfig(), builder.getStreamBufferArgs(),
-        builder.getClientConfig(), builder.getBlockOutPutStreamResourceProvider()
+        builder.getClientConfig(), builder.getblockOutputStreamResourceProvider()
     );
     this.config = builder.getClientConfig();
     this.bufferPool = builder.getByteBufferPool();
@@ -150,7 +148,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
             info, builder.isUnsafeByteBufferConversionEnabled(),
             builder.getXceiverManager(), builder.getOpenHandler().getId(),
             builder.getStreamBufferArgs(),
-            builder.getBlockOutPutStreamResourceProvider());
+            builder.getblockOutputStreamResourceProvider());
 
     this.writeOffset = 0;
     this.encoder = CodecUtil.createRawEncoderWithFallback(
@@ -158,11 +156,12 @@ public final class ECKeyOutputStream extends KeyOutputStream
     S3Auth s3Auth = builder.getS3CredentialsProvider().get();
     ThreadLocal<S3Auth> s3CredentialsProvider =
         builder.getS3CredentialsProvider();
-    this.flushExecutor = builder.getBlockOutPutStreamResourceProvider().getThreadFactory();
-    this.flushFuture = flushExecutor.submit(() -> {
-      s3CredentialsProvider.set(s3Auth);
-      return flushStripeFromQueue();
-    });
+    this.flushFuture =
+        builder.getblockOutputStreamResourceProvider().getExecutorService()
+            .submit(() -> {
+              s3CredentialsProvider.set(s3Auth);
+              return flushStripeFromQueue();
+            });
     this.flushCheckpoint = new AtomicLong(0);
     this.atomicKeyCreation = builder.getAtomicKeyCreation();
   }

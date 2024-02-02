@@ -83,7 +83,8 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
   private final long openID;
   private final ExcludeList excludeList;
   private final StreamBufferArgs streamBufferArgs;
-  private final BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider;
+  private final BlockOutputStreamResourceProvider
+      blockOutputStreamResourceProvider;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public BlockOutputStreamEntryPool(
@@ -95,7 +96,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
       boolean unsafeByteBufferConversion,
       XceiverClientFactory xceiverClientFactory, long openID,
       StreamBufferArgs streamBufferArgs,
-      BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider
+      BlockOutputStreamResourceProvider blockOutputStreamResourceProvider
   ) {
     this.config = config;
     this.xceiverClientFactory = xceiverClientFactory;
@@ -118,7 +119,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
             ByteStringConversion
                 .createByteBufferConversion(unsafeByteBufferConversion));
     this.streamBufferArgs = streamBufferArgs;
-    this.blockOutPutStreamResourceProvider = blockOutPutStreamResourceProvider;
+    this.blockOutputStreamResourceProvider = blockOutputStreamResourceProvider;
   }
 
   ExcludeList createExcludeList() {
@@ -128,7 +129,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
 
   BlockOutputStreamEntryPool(
       StreamBufferArgs streamBufferArgs, OzoneClientConfig clientConfig,
-      BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider) {
+      BlockOutputStreamResourceProvider blockOutputStreamResourceProvider) {
     streamEntries = new ArrayList<>();
     omClient = null;
     keyArgs = null;
@@ -143,7 +144,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     openID = -1;
     excludeList = createExcludeList();
     this.streamBufferArgs = null;
-    this.blockOutPutStreamResourceProvider = blockOutPutStreamResourceProvider;
+    this.blockOutputStreamResourceProvider = blockOutputStreamResourceProvider;
   }
 
   /**
@@ -190,7 +191,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
             .setBufferPool(bufferPool)
             .setToken(subKeyInfo.getToken())
             .setStreamBufferArgs(streamBufferArgs)
-            .setBlockOutPutStreamResourceProvider(blockOutPutStreamResourceProvider)
+            .setblockOutputStreamResourceProvider(blockOutputStreamResourceProvider)
             .build();
   }
 
@@ -253,8 +254,8 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     return config;
   }
 
-  BlockOutPutStreamResourceProvider getBlockOutPutStreamResourceProvider() {
-    return blockOutPutStreamResourceProvider;
+  BlockOutputStreamResourceProvider getblockOutputStreamResourceProvider() {
+    return blockOutputStreamResourceProvider;
   }
 
   StreamBufferArgs getStreamBufferArgs() {

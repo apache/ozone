@@ -79,7 +79,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
       XceiverClientFactory xceiverClientManager, Pipeline pipeline, long length,
       BufferPool bufferPool, Token<OzoneBlockTokenIdentifier> token,
       OzoneClientConfig config, StreamBufferArgs streamBufferArgs,
-      BlockOutPutStreamResourceProvider provider) {
+      BlockOutputStreamResourceProvider provider) {
     super(blockID, key, xceiverClientManager, pipeline, length, bufferPool,
         token, config, streamBufferArgs, provider);
     assertInstanceOf(
@@ -101,7 +101,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
             new ECBlockOutputStream(getBlockID(), getXceiverClientManager(),
                 createSingleECBlockPipeline(getPipeline(), nodes.get(i), i + 1),
                 getBufferPool(), getConf(), getToken(), getStreamBufferArgs(),
-                getBlockOutPutStreamResourceProvider());
+                getblockOutputStreamResourceProvider());
       }
       blockOutputStreams = streams;
     }
@@ -443,7 +443,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
     private Token<OzoneBlockTokenIdentifier> token;
     private OzoneClientConfig config;
     private StreamBufferArgs streamBufferArgs;
-    private BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider;
+    private BlockOutputStreamResourceProvider blockOutputStreamResourceProvider;
 
     public ECBlockOutputStreamEntry.Builder setBlockID(BlockID bID) {
       this.blockID = bID;
@@ -488,9 +488,9 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
       this.token = bToken;
       return this;
     }
-    public ECBlockOutputStreamEntry.Builder setBlockOutPutStreamResourceProvider(
-        BlockOutPutStreamResourceProvider provider) {
-      this.blockOutPutStreamResourceProvider = provider;
+    public ECBlockOutputStreamEntry.Builder setblockOutputStreamResourceProvider(
+        BlockOutputStreamResourceProvider provider) {
+      this.blockOutputStreamResourceProvider = provider;
       return this;
     }
 
@@ -508,7 +508,7 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
           length,
           bufferPool,
           token, config, streamBufferArgs,
-          blockOutPutStreamResourceProvider
+          blockOutputStreamResourceProvider
       );
     }
   }

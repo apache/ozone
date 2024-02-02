@@ -23,32 +23,32 @@ import java.util.function.Supplier;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 
 /**
- * Provides resources for BlockOutputStream, including byte buffer pool,
- * executor service, and client metrics.
+ * Provides resources for BlockOutputStream, including executor service,
+ * and client metrics.
  */
-public final class BlockOutPutStreamResourceProvider {
-  private final Supplier<ExecutorService> threadFactorySupplier;
+public final class BlockOutputStreamResourceProvider {
+  private final Supplier<ExecutorService> executorServiceSupplier;
   private final ContainerClientMetrics clientMetrics;
 
   /**
-   * Creates an instance of BlockOutPutStreamResourceProvider.
+   * Creates an instance of blockOutputStreamResourceProvider.
    */
-  public static BlockOutPutStreamResourceProvider create(
-      Supplier<ExecutorService> threadFactorySupplier, ContainerClientMetrics clientMetrics) {
-    return new BlockOutPutStreamResourceProvider(threadFactorySupplier, clientMetrics);
+  public static BlockOutputStreamResourceProvider create(
+      Supplier<ExecutorService> executorServiceSupplier, ContainerClientMetrics clientMetrics) {
+    return new BlockOutputStreamResourceProvider(executorServiceSupplier, clientMetrics);
   }
 
-  private BlockOutPutStreamResourceProvider(Supplier<ExecutorService> threadFactorySupplier,
+  private BlockOutputStreamResourceProvider(Supplier<ExecutorService> executorServiceSupplier,
       ContainerClientMetrics clientMetrics) {
-    this.threadFactorySupplier = threadFactorySupplier;
+    this.executorServiceSupplier = executorServiceSupplier;
     this.clientMetrics = clientMetrics;
   }
 
   /**
    * Provides an ExecutorService, lazily initialized upon first request.
    */
-  public ExecutorService getThreadFactory() {
-    return threadFactorySupplier.get();
+  public ExecutorService getExecutorService() {
+    return executorServiceSupplier.get();
   }
 
   /**

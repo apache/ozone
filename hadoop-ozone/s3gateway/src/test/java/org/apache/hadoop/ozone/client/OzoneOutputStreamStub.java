@@ -22,7 +22,7 @@ package org.apache.hadoop.ozone.client;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.client.io.BlockOutPutStreamResourceProvider;
+import org.apache.hadoop.ozone.client.io.BlockOutputStreamResourceProvider;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
@@ -86,7 +86,7 @@ public class OzoneOutputStreamStub extends OzoneOutputStream {
         StreamBufferArgs.getDefaultStreamBufferArgs(replicationConfig, ozoneClientConfig);
     return new KeyOutputStream(replicationConfig,
         streamBufferArgs, ozoneClientConfig,
-        BlockOutPutStreamResourceProvider.create(Executors::newSingleThreadExecutor, null)
+        BlockOutputStreamResourceProvider.create(Executors::newSingleThreadExecutor, null)
     ) {
       @Override
       public synchronized OmMultipartCommitUploadPartInfo

@@ -106,7 +106,7 @@ public class KeyOutputStream extends OutputStream
 
   public KeyOutputStream(ReplicationConfig replicationConfig,
       StreamBufferArgs streamBufferArgs, OzoneClientConfig clientConfig,
-      BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider) {
+      BlockOutputStreamResourceProvider blockOutputStreamResourceProvider) {
     this.replication = replicationConfig;
     this.config = clientConfig;
     closed = false;
@@ -117,7 +117,7 @@ public class KeyOutputStream extends OutputStream
     retryCount = 0;
     offset = 0;
     blockOutputStreamEntryPool = new BlockOutputStreamEntryPool(
-        streamBufferArgs, clientConfig, blockOutPutStreamResourceProvider);
+        streamBufferArgs, clientConfig, blockOutputStreamResourceProvider);
   }
 
   @VisibleForTesting
@@ -156,7 +156,7 @@ public class KeyOutputStream extends OutputStream
       boolean unsafeByteBufferConversion,
       boolean atomicKeyCreation,
       StreamBufferArgs streamBufferArgs,
-      BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider) {
+      BlockOutputStreamResourceProvider blockOutputStreamResourceProvider) {
     this.config = config;
     this.replication = replicationConfig;
     blockOutputStreamEntryPool =
@@ -170,7 +170,7 @@ public class KeyOutputStream extends OutputStream
             xceiverClientManager,
             handler.getId(),
             streamBufferArgs,
-            blockOutPutStreamResourceProvider
+            blockOutputStreamResourceProvider
         );
     this.retryPolicyMap = HddsClientUtils.getRetryPolicyByException(
         config.getMaxRetryCount(), config.getRetryInterval());
@@ -615,7 +615,7 @@ public class KeyOutputStream extends OutputStream
     private ReplicationConfig replicationConfig;
     private boolean atomicKeyCreation = false;
     private StreamBufferArgs streamBufferArgs;
-    private BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider;
+    private BlockOutputStreamResourceProvider blockOutputStreamResourceProvider;
 
     public String getMultipartUploadID() {
       return multipartUploadID;
@@ -716,14 +716,14 @@ public class KeyOutputStream extends OutputStream
       return this;
     }
 
-    public Builder setBlockOutPutStreamResourceProvider(
-        BlockOutPutStreamResourceProvider provider) {
-      this.blockOutPutStreamResourceProvider = provider;
+    public Builder setblockOutputStreamResourceProvider(
+        BlockOutputStreamResourceProvider provider) {
+      this.blockOutputStreamResourceProvider = provider;
       return this;
     }
 
-    public BlockOutPutStreamResourceProvider getBlockOutPutStreamResourceProvider() {
-      return blockOutPutStreamResourceProvider;
+    public BlockOutputStreamResourceProvider getblockOutputStreamResourceProvider() {
+      return blockOutputStreamResourceProvider;
     }
 
     public boolean getAtomicKeyCreation() {
@@ -744,7 +744,7 @@ public class KeyOutputStream extends OutputStream
           unsafeByteBufferConversion,
           atomicKeyCreation,
           streamBufferArgs,
-          blockOutPutStreamResourceProvider
+          blockOutputStreamResourceProvider
       );
     }
 

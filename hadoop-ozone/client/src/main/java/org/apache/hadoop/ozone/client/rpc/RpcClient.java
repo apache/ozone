@@ -80,7 +80,7 @@ import org.apache.hadoop.ozone.client.TenantArgs;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
-import org.apache.hadoop.ozone.client.io.BlockOutPutStreamResourceProvider;
+import org.apache.hadoop.ozone.client.io.BlockOutputStreamResourceProvider;
 import org.apache.hadoop.ozone.client.io.CipherOutputStreamOzone;
 import org.apache.hadoop.ozone.client.io.ECKeyOutputStream;
 import org.apache.hadoop.ozone.client.io.KeyDataStreamOutput;
@@ -163,7 +163,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -220,7 +219,8 @@ public class RpcClient implements ClientProtocol {
   private volatile ExecutorService ecReconstructExecutor;
   private volatile ExecutorService writeExecutor;
   private final AtomicBoolean isS3GRequest = new AtomicBoolean(false);
-  private final BlockOutPutStreamResourceProvider blockOutPutStreamResourceProvider;
+  private final BlockOutputStreamResourceProvider
+      blockOutputStreamResourceProvider;
 
   /**
    * Creates RpcClient instance with the given configuration.
@@ -317,7 +317,7 @@ public class RpcClient implements ClientProtocol {
     this.byteBufferPool = new ElasticByteBufferPool();
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, this::getECReconstructExecutor);
-    this.blockOutPutStreamResourceProvider = BlockOutPutStreamResourceProvider
+    this.blockOutputStreamResourceProvider = BlockOutputStreamResourceProvider
         .create(this::getWriteThreadPool, ContainerClientMetrics.acquire());
   }
 
@@ -2367,7 +2367,7 @@ public class RpcClient implements ClientProtocol {
         .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
         .setConfig(clientConfig)
         .setAtomicKeyCreation(isS3GRequest.get())
-        .setBlockOutPutStreamResourceProvider(blockOutPutStreamResourceProvider)
+        .setblockOutputStreamResourceProvider(blockOutputStreamResourceProvider)
         .setStreamBufferArgs(streamBufferArgs);
   }
 
