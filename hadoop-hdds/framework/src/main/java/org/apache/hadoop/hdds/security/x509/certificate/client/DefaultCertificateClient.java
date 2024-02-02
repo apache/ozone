@@ -245,8 +245,11 @@ public abstract class DefaultCertificateClient implements CertificateClient {
       updateCachedData(fileName, CAType.SUBORDINATE, this::updateCachedSubCAId);
       updateCachedData(fileName, CAType.ROOT, this::updateCachedRootCAId);
 
-      getLogger().info("Added certificate {} from file: {}.", cert,
+      getLogger().info("Added certificate {} from file: {}.", readCertSerialId,
           filePath.toAbsolutePath());
+      if (getLogger().isDebugEnabled()) {
+        getLogger().debug("Certificate: {}", cert);
+      }
     } catch (java.security.cert.CertificateException
              | IOException | IndexOutOfBoundsException e) {
       getLogger().error("Error reading certificate from file: {}.",
