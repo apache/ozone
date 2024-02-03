@@ -27,6 +27,7 @@ import java.util.function.Supplier;
 
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 
@@ -50,7 +51,8 @@ public interface ChunkBuffer extends UncheckedAutoCloseable {
     if (increment > 0 && increment < capacity) {
       return new IncrementalChunkBuffer(capacity, increment, false);
     }
-    return new ChunkBufferImplWithByteBuffer(ByteBuffer.allocate(capacity));
+    CodecBuffer codecBuffer = CodecBuffer.allocateDirect(capacity);
+    return new ChunkBufferImplWithByteBuffer(codecBuffer.asWritableByteBuffer(), codecBuffer);
   }
 
   /** Wrap the given {@link ByteBuffer} as a {@link ChunkBuffer}. */

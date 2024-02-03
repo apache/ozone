@@ -29,7 +29,11 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import org.apache.hadoop.hdds.utils.MockGatheringChannel;
 
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.CodecTestUtil;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -47,6 +51,16 @@ public class TestChunkBuffer {
     return ThreadLocalRandom.current().nextInt(n);
   }
 
+  @BeforeAll
+  public static void beforeAll() {
+    CodecBuffer.enableLeakDetection();
+  }
+
+  @AfterEach
+  public void after() throws Exception {
+    CodecTestUtil.gc();
+  }
+
   @Test
   @Timeout(1)
   public void testImplWithByteBuffer() {
@@ -60,7 +74,9 @@ public class TestChunkBuffer {
   private static void runTestImplWithByteBuffer(int n) {
     final byte[] expected = new byte[n];
     ThreadLocalRandom.current().nextBytes(expected);
-    runTestImpl(expected, 0, ChunkBuffer.allocate(n));
+    try (ChunkBuffer c = ChunkBuffer.allocate(n)) {
+      runTestImpl(expected, 0, c);
+    }
   }
 
   @Test
