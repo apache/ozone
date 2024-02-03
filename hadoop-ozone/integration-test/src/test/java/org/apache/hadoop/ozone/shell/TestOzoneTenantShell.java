@@ -65,10 +65,10 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Integration test for Ozone tenant shell command. HA enabled.
@@ -254,19 +254,13 @@ public class TestOzoneTenantShell {
     if (Strings.isNullOrEmpty(expectedError)) {
       execute(shell, args);
     } else {
-      try {
-        execute(shell, args);
-        fail("Exception is expected from command execution " + Arrays.asList(args));
-      } catch (Exception ex) {
-        if (!Strings.isNullOrEmpty(expectedError)) {
-          Throwable exceptionToCheck = ex;
-          if (exceptionToCheck.getCause() != null) {
-            exceptionToCheck = exceptionToCheck.getCause();
-          }
-          assertTrue(exceptionToCheck.getMessage().contains(expectedError),
-              String.format("Error of OzoneShell code doesn't contain the exception [%s] in [%s]", expectedError,
-                  exceptionToCheck.getMessage()));
+      Exception ex = assertThrows(Exception.class, () -> execute(shell, args));
+      if (!Strings.isNullOrEmpty(expectedError)) {
+        Throwable exceptionToCheck = ex;
+        if (exceptionToCheck.getCause() != null) {
+          exceptionToCheck = exceptionToCheck.getCause();
         }
+        assertThat(exceptionToCheck.getMessage()).contains(expectedError);
       }
     }
   }
@@ -358,7 +352,7 @@ public class TestOzoneTenantShell {
     if (exactMatch) {
       assertEquals(stringToMatch, str);
     } else {
-      assertTrue(str.contains(stringToMatch), str);
+      assertThat(str).contains(stringToMatch);
     }
   }
 
@@ -447,7 +441,7 @@ public class TestOzoneTenantShell {
     checkOutput(err, "", true);
 
     lines = FileUtils.readLines(AUDIT_LOG_FILE, (String)null);
-    assertTrue(lines.size() > 0);
+    assertThat(lines.size()).isGreaterThan(0);
     checkOutput(lines.get(lines.size() - 1), "ret=SUCCESS", false);
 
     // Check volume creation

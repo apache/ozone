@@ -22,7 +22,7 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.META_TABLE;
 
 import java.io.IOException;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;

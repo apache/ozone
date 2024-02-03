@@ -55,7 +55,8 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.ozone.test.MetricsAsserts.assertCounter;
 import static org.apache.ozone.test.MetricsAsserts.assertQuantileGauges;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
-import org.junit.jupiter.api.Assertions;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -121,7 +122,7 @@ public class TestContainerMetrics {
               pipeline, blockID, 1024);
       ContainerCommandResponseProto response =
               client.sendCommand(writeChunkRequest);
-      Assertions.assertEquals(ContainerProtos.Result.SUCCESS,
+      assertEquals(ContainerProtos.Result.SUCCESS,
           response.getResult());
 
       //Read Chunk
@@ -129,7 +130,7 @@ public class TestContainerMetrics {
           ContainerTestHelper.getReadChunkRequest(pipeline, writeChunkRequest
               .getWriteChunk());
       response = client.sendCommand(readChunkRequest);
-      Assertions.assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
 
       MetricsRecordBuilder containerMetrics = getMetrics(
           "StorageContainerMetrics");

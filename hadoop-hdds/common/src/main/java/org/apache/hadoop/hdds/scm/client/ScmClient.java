@@ -20,10 +20,12 @@ package org.apache.hadoop.hdds.scm.client;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -39,6 +41,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * The interface to call into underlying container layer.
@@ -179,6 +182,14 @@ public interface ScmClient extends Closeable {
       String owner) throws IOException;
 
   /**
+   * Gets the list of underReplicated and unClosed containers on a decommissioning node.
+   *
+   * @param dn - Datanode detail
+   * @return Lists of underReplicated and Unclosed containers
+   */
+  Map<String, List<ContainerID>> getContainersOnDecomNode(DatanodeDetails dn) throws IOException;
+
+  /**
    * Returns a set of Nodes that meet a query criteria. Passing null for opState
    * or nodeState acts like a wild card, returning all nodes in that state.
    * @param opState - Operational State of the node, eg IN_SERVICE,
@@ -193,6 +204,14 @@ public interface ScmClient extends Closeable {
   List<HddsProtos.Node> queryNode(HddsProtos.NodeOperationalState opState,
       HddsProtos.NodeState nodeState, HddsProtos.QueryScope queryScope,
       String poolName) throws IOException;
+
+  /**
+   * Returns a node with the given UUID.
+   * @param uuid - datanode uuid string
+   * @return A nodes that matches the requested UUID.
+   * @throws IOException
+   */
+  HddsProtos.Node queryNode(UUID uuid) throws IOException;
 
   /**
    * Allows a list of hosts to be decommissioned. The hosts are identified

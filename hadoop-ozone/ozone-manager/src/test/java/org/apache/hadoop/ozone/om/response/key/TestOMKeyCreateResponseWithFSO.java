@@ -25,7 +25,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Time;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -35,7 +35,7 @@ import java.util.ArrayList;
  */
 public class TestOMKeyCreateResponseWithFSO extends TestOMKeyCreateResponse {
 
-  @NotNull
+  @Nonnull
   @Override
   protected String getOpenKeyName() throws IOException {
     assertNotNull(omBucketInfo);
@@ -46,7 +46,7 @@ public class TestOMKeyCreateResponseWithFSO extends TestOMKeyCreateResponse {
             omBucketInfo.getObjectID(), keyName, clientID);
   }
 
-  @NotNull
+  @Nonnull
   @Override
   protected OmKeyInfo getOmKeyInfo() {
     assertNotNull(omBucketInfo);
@@ -57,7 +57,7 @@ public class TestOMKeyCreateResponseWithFSO extends TestOMKeyCreateResponse {
             omBucketInfo.getObjectID(), 100, Time.now());
   }
 
-  @NotNull
+  @Nonnull
   @Override
   protected OMKeyCreateResponse getOmKeyCreateResponse(OmKeyInfo keyInfo,
       OmBucketInfo bucketInfo, OMResponse response) throws IOException {

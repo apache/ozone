@@ -41,7 +41,10 @@ class ManagedObject<T extends RocksObject> implements AutoCloseable {
 
   @Override
   public void close() {
-    original.close();
-    leakTracker.close();
+    try {
+      original.close();
+    } finally {
+      leakTracker.close();
+    }
   }
 }

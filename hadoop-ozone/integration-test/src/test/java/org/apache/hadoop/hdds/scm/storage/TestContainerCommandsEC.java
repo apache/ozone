@@ -112,10 +112,11 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.newWriteChunkRequestBuilder;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class tests container commands on EC containers.
@@ -423,17 +424,17 @@ public class TestContainerCommandsEC {
       ListBlockResponseProto response = ContainerProtocolCalls
           .listBlock(clients.get(i), containerID, null, Integer.MAX_VALUE,
               containerToken);
-      assertTrue(
-          minNumExpectedBlocks <= response.getBlockDataList().stream().filter(
+      assertThat(minNumExpectedBlocks)
+          .withFailMessage("blocks count should be same or more than min expected" +
+               " blocks count on DN " + i)
+          .isLessThanOrEqualTo(response.getBlockDataList().stream().filter(
               k -> k.getChunksCount() > 0 && k.getChunks(0).getLen() > 0)
-              .collect(Collectors.toList()).size(),
-          "blocks count should be same or more than min expected" +
-              " blocks count on DN " + i);
-      assertTrue(
-          minNumExpectedChunks <= response.getBlockDataList().stream()
-              .mapToInt(BlockData::getChunksCount).sum(),
-          "chunks count should be same or more than min expected" +
-              " chunks count on DN " + i);
+              .collect(Collectors.toList()).size());
+      assertThat(minNumExpectedChunks)
+          .withFailMessage("chunks count should be same or more than min expected" +
+              " chunks count on DN " + i)
+          .isLessThanOrEqualTo(response.getBlockDataList().stream()
+              .mapToInt(BlockData::getChunksCount).sum());
     }
   }
 
@@ -797,7 +798,7 @@ public class TestContainerCommandsEC {
     try (OzoneOutputStream out = bucket.createKey(keyString, 4096,
         new ECReplicationConfig(3, 2, EcCodec.RS, EC_CHUNK_SIZE),
         new HashMap<>())) {
-      assertTrue(out.getOutputStream() instanceof KeyOutputStream);
+      assertInstanceOf(KeyOutputStream.class, out.getOutputStream());
       for (int i = 0; i < numChunks; i++) {
         out.write(inputChunks[i]);
       }

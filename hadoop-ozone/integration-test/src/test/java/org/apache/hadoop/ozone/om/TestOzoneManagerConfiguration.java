@@ -377,15 +377,10 @@ public class TestOzoneManagerConfiguration {
     String omServiceId = "service1";
     conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, omServiceId);
     // Deliberately skip OZONE_OM_NODES_KEY and OZONE_OM_ADDRESS_KEY config
-
-    try {
-      startCluster();
-      fail("Should have failed to start the cluster!");
-    } catch (OzoneIllegalArgumentException e) {
-      // Expect error message
-      assertTrue(e.getMessage().contains(
-          "List of OM Node ID's should be specified"));
-    }
+    OzoneIllegalArgumentException e =
+        assertThrows(OzoneIllegalArgumentException.class, () -> startCluster());
+    // Expect error message
+    assertTrue(e.getMessage().contains("List of OM Node ID's should be specified"));
   }
 
   /**
@@ -407,15 +402,9 @@ public class TestOzoneManagerConfiguration {
     conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, omServiceId);
     conf.set(omNodesKey, omNodesKeyValue);
     // Deliberately skip OZONE_OM_ADDRESS_KEY config
-
-    try {
-      startCluster();
-      fail("Should have failed to start the cluster!");
-    } catch (OzoneIllegalArgumentException e) {
-      // Expect error message
-      assertTrue(e.getMessage().contains(
-          "OM RPC Address should be set for all node"));
-    }
+    OzoneIllegalArgumentException e = assertThrows(OzoneIllegalArgumentException.class, () -> startCluster());
+    // Expect error message
+    assertTrue(e.getMessage().contains("OM RPC Address should be set for all node"));
   }
 
   /**

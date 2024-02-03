@@ -3419,6 +3419,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.slow.op.warning.threshold</name>
+    <tag>OZONE, DATANODE, PERFORMANCE</tag>
+    <value>500ms</value>
+    <description>
+      Thresholds for printing slow-operation audit logs.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.keyname.character.check.enabled</name>
     <tag>OZONE, OM</tag>
     <value>false</value>

@@ -233,7 +233,6 @@ public class TestMiniOzoneCluster {
             EndpointStateMachine.EndPointStates.GETVERSION,
             endpoint.getState());
       }
-      Thread.sleep(1000);
     }
 
     // DN should successfully register with the SCM after SCM is restarted.

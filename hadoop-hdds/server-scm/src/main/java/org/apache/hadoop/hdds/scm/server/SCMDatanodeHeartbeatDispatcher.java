@@ -130,8 +130,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
         commandQueueReport = heartbeat.getCommandQueueReport();
       }
       // should we dispatch heartbeat through eventPublisher?
-      commands = nodeManager.processHeartbeat(datanodeDetails,
-          layoutVersion, commandQueueReport);
+      commands = nodeManager.processHeartbeat(datanodeDetails, commandQueueReport);
       if (heartbeat.hasNodeReport()) {
         LOG.debug("Dispatching Node Report.");
         eventPublisher.fireEvent(

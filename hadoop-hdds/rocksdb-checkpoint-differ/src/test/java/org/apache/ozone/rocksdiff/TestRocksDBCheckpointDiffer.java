@@ -96,6 +96,7 @@ import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COMPACTION_LOG_
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_DAG_LIVE_NODES;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.DEBUG_READ_ALL_DB_KEYS;
 import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.SST_FILE_EXTENSION;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -1349,10 +1350,10 @@ public class TestRocksDBCheckpointDiffer {
           });
       // Confirm that the consumer doesn't finish with lock taken.
       assertThrows(TimeoutException.class,
-          () -> future.get(5000, TimeUnit.MILLISECONDS));
+          () -> future.get(1000, TimeUnit.MILLISECONDS));
     }
     // Confirm consumer finishes when unlocked.
-    assertTrue(future.get(1000, TimeUnit.MILLISECONDS));
+    assertTrue(future.get(100, TimeUnit.MILLISECONDS));
   }
 
   private static Stream<Arguments> sstFilePruningScenarios() {
@@ -1867,7 +1868,7 @@ public class TestRocksDBCheckpointDiffer {
     createKeys(compactionLogTableCFHandle, "logName-", "logValue-", 100);
 
     // Make sures that some compaction happened.
-    assertFalse(rocksDBCheckpointDiffer.getCompactionNodeMap().isEmpty());
+    assertThat(rocksDBCheckpointDiffer.getCompactionNodeMap()).isNotEmpty();
 
     List<CompactionNode> compactionNodes = rocksDBCheckpointDiffer.
         getCompactionNodeMap().values().stream()
@@ -1877,7 +1878,7 @@ public class TestRocksDBCheckpointDiffer {
 
     // CompactionNodeMap should not contain any node other than 'keyTable',
     // 'directoryTable' and 'fileTable' column families nodes.
-    assertTrue(compactionNodes.isEmpty());
+    assertThat(compactionNodes).isEmpty();
 
     // Assert that only 'keyTable', 'directoryTable' and 'fileTable'
     // column families SST files are backed-up.
@@ -1889,7 +1890,7 @@ public class TestRocksDBCheckpointDiffer {
           fileReader.open(path.toAbsolutePath().toString());
           String columnFamily = StringUtils.bytes2String(
               fileReader.getTableProperties().getColumnFamilyName());
-          assertTrue(COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(columnFamily));
+          assertThat(COLUMN_FAMILIES_TO_TRACK_IN_DAG).contains(columnFamily);
         } catch (RocksDBException rocksDBException) {
           fail("Failed to read file: " + path.toAbsolutePath());
         }

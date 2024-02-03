@@ -47,8 +47,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_VOLUME_LISTALL_ALLOWED;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -237,20 +237,17 @@ public class TestOzoneManagerListVolumes {
       }
       assertEquals(5, count);
     } else {
-      try {
-        objectStore.listVolumes("volume");
-        fail("listAllVolumes should fail for " + user.getUserName());
-      } catch (RuntimeException ex) {
-        // Current listAllVolumes throws RuntimeException
-        if (ex.getCause() instanceof OMException) {
-          // Expect PERMISSION_DENIED
-          if (((OMException) ex.getCause()).getResult() !=
-              OMException.ResultCodes.PERMISSION_DENIED) {
-            throw ex;
-          }
-        } else {
+      RuntimeException ex =
+          assertThrows(RuntimeException.class, () -> objectStore.listVolumes("volume"));
+      // Current listAllVolumes throws RuntimeException
+      if (ex.getCause() instanceof OMException) {
+        // Expect PERMISSION_DENIED
+        if (((OMException) ex.getCause()).getResult() !=
+            OMException.ResultCodes.PERMISSION_DENIED) {
           throw ex;
         }
+      } else {
+        throw ex;
       }
     }
   }
