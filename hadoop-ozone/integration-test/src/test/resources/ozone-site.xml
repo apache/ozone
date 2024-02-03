@@ -57,6 +57,11 @@
   </property>
 
   <property>
+    <name>ozone.scm.ratis.pipeline.limit</name>
+    <value>3</value>
+  </property>
+
+  <property>
     <name>ozone.scm.close.container.wait.duration</name>
     <value>1s</value>
   </property>
