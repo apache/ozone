@@ -144,7 +144,6 @@ public class TestCommitWatcher {
         StorageUnit.MB);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(5)
-        .setTotalPipelineNumLimit(3)
         .build();
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
