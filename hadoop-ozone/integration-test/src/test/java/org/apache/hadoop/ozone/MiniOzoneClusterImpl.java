@@ -108,7 +108,6 @@ import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWith
 import org.hadoop.ozone.recon.codegen.ReconSqlDbConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.event.Level;
 
 /**
  * MiniOzoneCluster creates a complete in-process Ozone cluster suitable for
@@ -722,7 +721,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       // pipeline.
       conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
           numOfDatanodes >= 3 ? 3 : 1);
-      configureTrace();
     }
 
     void removeConfiguration() {
@@ -965,15 +963,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       conf.setInt(DFS_CONTAINER_RATIS_SERVER_PORT, getFreePort());
       conf.setInt(DFS_CONTAINER_RATIS_DATASTREAM_PORT, getFreePort());
       conf.setFromObject(new ReplicationConfig().setPort(getFreePort()));
-    }
-
-    private void configureTrace() {
-      if (enableTrace.isPresent()) {
-        conf.setBoolean(OzoneConfigKeys.OZONE_TRACE_ENABLED_KEY,
-            enableTrace.get());
-        GenericTestUtils.setRootLogLevel(Level.TRACE);
-      }
-      GenericTestUtils.setRootLogLevel(Level.INFO);
     }
 
     protected void configureRecon() throws IOException {

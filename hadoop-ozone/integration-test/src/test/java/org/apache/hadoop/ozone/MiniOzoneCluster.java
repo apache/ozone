@@ -319,7 +319,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected int numOfActiveSCMs = ACTIVE_SCMS_NOT_SET;
     protected SCMConfigurator scmConfigurator;
 
-    protected Optional<Boolean> enableTrace = Optional.of(false);
     protected Optional<Integer> hbInterval = Optional.empty();
     protected Optional<Integer> hbProcessorInterval = Optional.empty();
     protected Optional<String> scmId = Optional.empty();
@@ -500,18 +499,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
      */
     public Builder setHbProcessorInterval(int val) {
       hbProcessorInterval = Optional.of(val);
-      return this;
-    }
-
-    /**
-     * When set to true, enables trace level logging.
-     *
-     * @param trace true or false
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setTrace(Boolean trace) {
-      enableTrace = Optional.of(trace);
       return this;
     }
 
