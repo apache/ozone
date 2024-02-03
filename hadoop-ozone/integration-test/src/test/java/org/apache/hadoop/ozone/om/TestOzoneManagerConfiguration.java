@@ -44,8 +44,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -335,10 +338,9 @@ public class TestOzoneManagerConfiguration {
   /**
    * Test a wrong configuration for OM HA. A configuration with none of the
    * OM addresses matching the local address should throw an error.
-   * @throws Exception
    */
   @Test
-  public void testWrongConfiguration() throws Exception {
+  public void testWrongConfiguration() {
     String omServiceId = "om-service-test1";
 
     String omNode1Id = "omNode1";
@@ -360,14 +362,9 @@ public class TestOzoneManagerConfiguration {
     conf.set(omNode2RpcAddrKey, "125.0.0.2:9862");
     conf.set(omNode3RpcAddrKey, "124.0.0.124:9862");
 
-    try {
-      startCluster();
-      fail("Wrong Configuration. OM initialization should have failed.");
-    } catch (OzoneIllegalArgumentException e) {
-      GenericTestUtils.assertExceptionContains("Configuration has no " +
-          OMConfigKeys.OZONE_OM_ADDRESS_KEY + " address that matches local " +
-          "node's address.", e);
-    }
+    OzoneIllegalArgumentException exception = assertThrows(OzoneIllegalArgumentException.class, this::startCluster);
+    assertThat(exception).hasMessage(
+        "Configuration has no " + OZONE_OM_ADDRESS_KEY + " address that matches local node's address.");
   }
 
   /**
@@ -380,15 +377,10 @@ public class TestOzoneManagerConfiguration {
     String omServiceId = "service1";
     conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, omServiceId);
     // Deliberately skip OZONE_OM_NODES_KEY and OZONE_OM_ADDRESS_KEY config
-
-    try {
-      startCluster();
-      fail("Should have failed to start the cluster!");
-    } catch (OzoneIllegalArgumentException e) {
-      // Expect error message
-      assertTrue(e.getMessage().contains(
-          "List of OM Node ID's should be specified"));
-    }
+    OzoneIllegalArgumentException e =
+        assertThrows(OzoneIllegalArgumentException.class, () -> startCluster());
+    // Expect error message
+    assertTrue(e.getMessage().contains("List of OM Node ID's should be specified"));
   }
 
   /**
@@ -410,15 +402,9 @@ public class TestOzoneManagerConfiguration {
     conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, omServiceId);
     conf.set(omNodesKey, omNodesKeyValue);
     // Deliberately skip OZONE_OM_ADDRESS_KEY config
-
-    try {
-      startCluster();
-      fail("Should have failed to start the cluster!");
-    } catch (OzoneIllegalArgumentException e) {
-      // Expect error message
-      assertTrue(e.getMessage().contains(
-          "OM RPC Address should be set for all node"));
-    }
+    OzoneIllegalArgumentException e = assertThrows(OzoneIllegalArgumentException.class, () -> startCluster());
+    // Expect error message
+    assertTrue(e.getMessage().contains("OM RPC Address should be set for all node"));
   }
 
   /**
@@ -479,7 +465,7 @@ public class TestOzoneManagerConfiguration {
   }
 
   private String getOMAddrKeyWithSuffix(String serviceId, String nodeId) {
-    return ConfUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_ADDRESS_KEY,
+    return ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
         serviceId, nodeId);
   }
 }

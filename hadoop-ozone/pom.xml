@@ -26,8 +26,6 @@
 
   <properties>
     <docker.image>apache/ozone:${project.version}</docker.image>
-    <spring.version>5.3.27</spring.version>
-    <jooq.version>3.11.10</jooq.version>
   </properties>
   <modules>
     <module>interface-client</module>
@@ -274,11 +272,6 @@
         <artifactId>hdds-server-scm</artifactId>
         <type>test-jar</type>
         <version>${hdds.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.bouncycastle</groupId>
-        <artifactId>bcprov-jdk15on</artifactId>
-        <version>${bouncycastle.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>

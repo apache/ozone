@@ -67,13 +67,12 @@ import java.util.Arrays;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -201,7 +200,7 @@ public class TestSchemaOneBackwardsCompatibility {
                   cData.containerPrefix());
 
       for (Table.KeyValue<String, ChunkInfoList> kv: deletedBlocks) {
-        assertFalse(kv.getKey().contains(prefix));
+        assertThat(kv.getKey()).doesNotContain(prefix);
       }
 
       // Test sequentialRangeKVs.
@@ -209,7 +208,7 @@ public class TestSchemaOneBackwardsCompatibility {
           100, cData.containerPrefix());
 
       for (Table.KeyValue<String, ChunkInfoList> kv: deletedBlocks) {
-        assertFalse(kv.getKey().contains(prefix));
+        assertThat(kv.getKey()).doesNotContain(prefix);
       }
     }
 
@@ -370,13 +369,8 @@ public class TestSchemaOneBackwardsCompatibility {
 
       for (Table.KeyValue<String, ChunkInfoList> chunkListKV: deletedBlocks) {
         preUpgradeBlocks.add(chunkListKV.getKey());
-        try {
-          chunkListKV.getValue();
-          fail("No exception thrown when trying to retrieve old " +
-              "deleted blocks values as chunk lists.");
-        } catch (IOException ex) {
-          // Exception thrown as expected.
-        }
+        assertThrows(IOException.class, () -> chunkListKV.getValue(),
+            "No exception thrown when trying to retrieve old deleted blocks values as chunk lists.");
       }
 
       assertEquals(TestDB.NUM_DELETED_BLOCKS, preUpgradeBlocks.size());

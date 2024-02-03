@@ -17,34 +17,32 @@
 
 package org.apache.hadoop.ozone.container.metrics;
 
-import org.apache.commons.text.WordUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeQueueMetrics;
-import org.junit.Rule;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.UUID;
 
+import static org.apache.commons.text.WordUtils.capitalize;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeQueueMetrics.COMMAND_DISPATCHER_QUEUE_PREFIX;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeQueueMetrics.STATE_CONTEXT_COMMAND_QUEUE_PREFIX;
-import static org.apache.hadoop.test.MetricsAsserts.getLongGauge;
-import static org.apache.hadoop.test.MetricsAsserts.getMetrics;
+import static org.apache.ozone.test.MetricsAsserts.getLongGauge;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Test for queue metrics of datanodes.
  */
+@Timeout(300)
 public class TestDatanodeQueueMetrics {
 
   private MiniOzoneHAClusterImpl cluster = null;
@@ -58,9 +56,6 @@ public class TestDatanodeQueueMetrics {
 
   private static final Logger LOG = LoggerFactory
       .getLogger(TestDatanodeQueueMetrics.class);
-
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(new Timeout(300_000));
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -94,14 +89,12 @@ public class TestDatanodeQueueMetrics {
 
   @Test
   public void testQueueMetrics() {
-
     for (SCMCommandProto.Type type: SCMCommandProto.Type.values()) {
-      Assertions.assertTrue(
-          getGauge(STATE_CONTEXT_COMMAND_QUEUE_PREFIX +
-              WordUtils.capitalize(String.valueOf(type)) + "Size") >= 0);
-      Assertions.assertTrue(
-          getGauge(COMMAND_DISPATCHER_QUEUE_PREFIX +
-              WordUtils.capitalize(String.valueOf(type)) + "Size") >= 0);
+      String typeSize = capitalize(String.valueOf(type)) + "Size";
+      assertThat(getGauge(STATE_CONTEXT_COMMAND_QUEUE_PREFIX + typeSize))
+          .isGreaterThanOrEqualTo(0);
+      assertThat(getGauge(COMMAND_DISPATCHER_QUEUE_PREFIX + typeSize))
+          .isGreaterThanOrEqualTo(0);
     }
 
   }

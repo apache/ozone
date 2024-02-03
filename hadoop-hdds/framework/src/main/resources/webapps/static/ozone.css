@@ -80,7 +80,7 @@ body {
      display: block;
      font-family: 'Glyphicons Halflings';
  }
-.nodeStausInfo {
+.nodeStatusInfo {
     position: relative;
  }
 .wrap-table{

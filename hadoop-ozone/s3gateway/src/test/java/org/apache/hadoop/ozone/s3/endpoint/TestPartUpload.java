@@ -28,7 +28,6 @@ import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
@@ -44,7 +43,8 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -62,7 +62,7 @@ public class TestPartUpload {
     client.getObjectStore().createS3Bucket(OzoneConsts.S3_BUCKET);
 
 
-    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
 
@@ -128,23 +128,21 @@ public class TestPartUpload {
 
   @Test
   public void testPartUploadWithIncorrectUploadID() throws Exception {
-    try {
+    OS3Exception ex = assertThrows(OS3Exception.class, () -> {
       String content = "Multipart Upload With Incorrect uploadID";
       ByteArrayInputStream body =
           new ByteArrayInputStream(content.getBytes(UTF_8));
       REST.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, content.length(), 1,
           "random", body);
-      fail("testPartUploadWithIncorrectUploadID failed");
-    } catch (OS3Exception ex) {
-      assertEquals("NoSuchUpload", ex.getCode());
-      assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
-    }
+    });
+    assertEquals("NoSuchUpload", ex.getCode());
+    assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
   }
 
   @Test
   public void testPartUploadStreamContentLength()
       throws IOException, OS3Exception {
-    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    HttpHeaders headers = mock(HttpHeaders.class);
     ObjectEndpoint objectEndpoint = new ObjectEndpoint();
     objectEndpoint.setHeaders(headers);
     objectEndpoint.setClient(client);

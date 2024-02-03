@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -53,6 +54,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT;
+import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.TOTAL_KEYS;
 import static org.apache.hadoop.ozone.recon.ReconConstants.TOTAL_USED_BYTES;
 
@@ -65,18 +67,22 @@ public class ContainerHealthTask extends ReconScmTask {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerHealthTask.class);
+  public static final int FETCH_COUNT = Integer.parseInt(DEFAULT_FETCH_COUNT);
 
-  private ReadWriteLock lock = new ReentrantReadWriteLock(true);
+  private final ReadWriteLock lock = new ReentrantReadWriteLock(true);
 
-  private StorageContainerServiceProvider scmClient;
-  private ContainerManager containerManager;
-  private ContainerHealthSchemaManager containerHealthSchemaManager;
-  private ReconContainerMetadataManager reconContainerMetadataManager;
-  private PlacementPolicy placementPolicy;
+  private final StorageContainerServiceProvider scmClient;
+  private final ContainerManager containerManager;
+  private final ContainerHealthSchemaManager containerHealthSchemaManager;
+  private final ReconContainerMetadataManager reconContainerMetadataManager;
+  private final PlacementPolicy placementPolicy;
   private final long interval;
 
-  private Set<ContainerInfo> processedContainers = new HashSet<>();
+  private final Set<ContainerInfo> processedContainers = new HashSet<>();
 
+  private final OzoneConfiguration conf;
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public ContainerHealthTask(
       ContainerManager containerManager,
       StorageContainerServiceProvider scmClient,
@@ -84,13 +90,15 @@ public class ContainerHealthTask extends ReconScmTask {
       ContainerHealthSchemaManager containerHealthSchemaManager,
       PlacementPolicy placementPolicy,
       ReconTaskConfig reconTaskConfig,
-      ReconContainerMetadataManager reconContainerMetadataManager) {
+      ReconContainerMetadataManager reconContainerMetadataManager,
+      OzoneConfiguration conf) {
     super(reconTaskStatusDao);
     this.scmClient = scmClient;
     this.containerHealthSchemaManager = containerHealthSchemaManager;
     this.reconContainerMetadataManager = reconContainerMetadataManager;
     this.placementPolicy = placementPolicy;
     this.containerManager = containerManager;
+    this.conf = conf;
     interval = reconTaskConfig.getMissingContainerTaskInterval().toMillis();
   }
 
@@ -131,8 +139,24 @@ public class ContainerHealthTask extends ReconScmTask {
       LOG.info("Container Health task thread took {} milliseconds to" +
               " process {} existing database records.",
           Time.monotonicNow() - start, existingCount);
+
+      checkAndProcessContainers(unhealthyContainerStateStatsMap, currentTime);
+      processedContainers.clear();
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  private void checkAndProcessContainers(
+      Map<UnHealthyContainerStates, Map<String, Long>>
+          unhealthyContainerStateStatsMap, long currentTime) {
+    ContainerID startID = ContainerID.valueOf(1);
+    List<ContainerInfo> containers = containerManager.getContainers(startID,
+        FETCH_COUNT);
+    long start;
+    long iterationCount = 0;
+    while (!containers.isEmpty()) {
       start = Time.monotonicNow();
-      final List<ContainerInfo> containers = containerManager.getContainers();
       containers.stream()
           .filter(c -> !processedContainers.contains(c))
           .forEach(c -> processContainer(c, currentTime,
@@ -142,10 +166,19 @@ public class ContainerHealthTask extends ReconScmTask {
               " processing {} containers.", Time.monotonicNow() - start,
           containers.size());
       logUnhealthyContainerStats(unhealthyContainerStateStatsMap);
-      processedContainers.clear();
-    } finally {
-      lock.writeLock().unlock();
+      if (containers.size() >= FETCH_COUNT) {
+        startID = ContainerID.valueOf(
+            containers.get(containers.size() - 1).getContainerID() + 1);
+        containers = containerManager.getContainers(startID, FETCH_COUNT);
+      } else {
+        containers.clear();
+      }
+      iterationCount++;
     }
+    LOG.info(
+        "Container Health task thread took {} iterations to fetch all " +
+            "containers using batched approach with batch size of {}",
+        iterationCount, FETCH_COUNT);
   }
 
   private void logUnhealthyContainerStats(
@@ -193,7 +226,7 @@ public class ContainerHealthTask extends ReconScmTask {
     Set<ContainerReplica> replicas =
         containerManager.getContainerReplicas(container.containerID());
     return new ContainerHealthStatus(container, replicas, placementPolicy,
-        reconContainerMetadataManager);
+        reconContainerMetadataManager, conf);
   }
 
   private void completeProcessingContainer(
@@ -285,8 +318,9 @@ public class ContainerHealthTask extends ReconScmTask {
       Set<ContainerReplica> containerReplicas =
           containerManager.getContainerReplicas(container.containerID());
       ContainerHealthStatus h = new ContainerHealthStatus(container,
-          containerReplicas, placementPolicy, reconContainerMetadataManager);
-      if (h.isHealthy() || h.isDeleted()) {
+          containerReplicas, placementPolicy,
+          reconContainerMetadataManager, conf);
+      if (h.isHealthilyReplicated() || h.isDeleted()) {
         return;
       }
       // For containers deleted in SCM, we sync the container state here.
@@ -399,7 +433,7 @@ public class ContainerHealthTask extends ReconScmTask {
         Map<UnHealthyContainerStates, Map<String, Long>>
             unhealthyContainerStateStatsMap) {
       List<UnhealthyContainers> records = new ArrayList<>();
-      if (container.isHealthy() || container.isDeleted()) {
+      if (container.isHealthilyReplicated() || container.isDeleted()) {
         return records;
       }
 

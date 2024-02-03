@@ -48,7 +48,7 @@ the key to the Ozone Manager. Ozone manager returns the list of Ozone blocks
 that make up that key.
 
 An Ozone block contains the container ID and a local ID. The figure below
-shows the logical layout out of Ozone block.
+shows the logical layout of the Ozone block.
 
 ![Ozone Block](OzoneBlock.png)
 

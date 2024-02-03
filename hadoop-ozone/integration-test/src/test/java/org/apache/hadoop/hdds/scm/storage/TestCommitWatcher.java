@@ -56,33 +56,27 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
 import org.apache.ratis.protocol.exceptions.NotReplicatedException;
 import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
 import org.apache.ratis.protocol.exceptions.TimeoutIOException;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
-import org.apache.ozone.test.JUnit5AwareTimeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Class to test CommitWatcher functionality.
  */
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
 public class TestCommitWatcher {
 
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public TestRule timeout = new JUnit5AwareTimeout(Timeout.seconds(300));
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
   private OzoneClient client;
@@ -104,7 +98,7 @@ public class TestCommitWatcher {
    *
    * @throws IOException
    */
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     chunkSize = (int)(1 * OzoneConsts.MB);
     flushSize = (long) 2 * chunkSize;
@@ -165,7 +159,7 @@ public class TestCommitWatcher {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -185,8 +179,7 @@ public class TestCommitWatcher {
       long containerId = container.getContainerInfo().getContainerID();
       try (XceiverClientSpi xceiverClient = mgr.acquireClient(pipeline)) {
         assertEquals(1, xceiverClient.getRefcount());
-        assertTrue(xceiverClient instanceof XceiverClientRatis);
-        XceiverClientRatis ratisClient = (XceiverClientRatis) xceiverClient;
+        XceiverClientRatis ratisClient = assertInstanceOf(XceiverClientRatis.class, xceiverClient);
         CommitWatcher watcher = new CommitWatcher(bufferPool, ratisClient);
         BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
         List<XceiverClientReply> replies = new ArrayList<>();
@@ -232,17 +225,15 @@ public class TestCommitWatcher {
         assertEquals(2, watcher.
             getCommitIndexMap().size());
         watcher.watchOnFirstIndex();
-        assertFalse(watcher.getCommitIndexMap()
-            .containsKey(replies.get(0).getLogIndex()));
-        assertFalse(watcher.getFutureMap().containsKey((long) chunkSize));
-        assertTrue(watcher.getTotalAckDataLength() >= chunkSize);
+        assertThat(watcher.getCommitIndexMap()).doesNotContainKey(replies.get(0).getLogIndex());
+        assertThat(watcher.getFutureMap()).doesNotContainKey((long) chunkSize);
+        assertThat(watcher.getTotalAckDataLength()).isGreaterThanOrEqualTo(chunkSize);
         watcher.watchOnLastIndex();
-        assertFalse(watcher.getCommitIndexMap()
-            .containsKey(replies.get(1).getLogIndex()));
-        assertFalse(watcher.getFutureMap().containsKey((long) 2 * chunkSize));
+        assertThat(watcher.getCommitIndexMap()).doesNotContainKey(replies.get(1).getLogIndex());
+        assertThat(watcher.getFutureMap()).doesNotContainKey((long) 2 * chunkSize);
         assertEquals(2 * chunkSize, watcher.getTotalAckDataLength());
-        assertTrue(watcher.getFutureMap().isEmpty());
-        assertTrue(watcher.getCommitIndexMap().isEmpty());
+        assertThat(watcher.getFutureMap()).isEmpty();
+        assertThat(watcher.getCommitIndexMap()).isEmpty();
       }
     }
   }
@@ -259,8 +250,7 @@ public class TestCommitWatcher {
       long containerId = container.getContainerInfo().getContainerID();
       try (XceiverClientSpi xceiverClient = mgr.acquireClient(pipeline)) {
         assertEquals(1, xceiverClient.getRefcount());
-        assertTrue(xceiverClient instanceof XceiverClientRatis);
-        XceiverClientRatis ratisClient = (XceiverClientRatis) xceiverClient;
+        XceiverClientRatis ratisClient = assertInstanceOf(XceiverClientRatis.class, xceiverClient);
         CommitWatcher watcher = new CommitWatcher(bufferPool, ratisClient);
         BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
         List<XceiverClientReply> replies = new ArrayList<>();
@@ -305,31 +295,28 @@ public class TestCommitWatcher {
         assertEquals(future2, watcher.getFutureMap().get((long) 2 * chunkSize));
         assertEquals(2, watcher.getCommitIndexMap().size());
         watcher.watchOnFirstIndex();
-        assertFalse(watcher.getCommitIndexMap()
-            .containsKey(replies.get(0).getLogIndex()));
-        assertFalse(watcher.getFutureMap().containsKey((long) chunkSize));
-        assertTrue(watcher.getTotalAckDataLength() >= chunkSize);
+        assertThat(watcher.getCommitIndexMap()).doesNotContainKey(replies.get(0).getLogIndex());
+        assertThat(watcher.getFutureMap()).doesNotContainKey((long) chunkSize);
+        assertThat(watcher.getTotalAckDataLength()).isGreaterThanOrEqualTo(chunkSize);
         cluster.shutdownHddsDatanode(pipeline.getNodes().get(0));
         cluster.shutdownHddsDatanode(pipeline.getNodes().get(1));
-        try {
-          // just watch for a higher index so as to ensure, it does an actual
-          // call to Ratis. Otherwise, it may just return in case the
-          // commitInfoMap is updated to the latest index in putBlock response.
-          watcher.watchForCommit(replies.get(1).getLogIndex() + 100);
-          fail("Expected exception not thrown");
-        } catch (IOException ioe) {
-          // with retry count set to noRetry and a lower watch request
-          // timeout, watch request will eventually
-          // fail with TimeoutIOException from ratis client or the client
-          // can itself get AlreadyClosedException from the Ratis Server
-          // and the write may fail with RaftRetryFailureException
-          Throwable t = HddsClientUtils.checkForException(ioe);
-          assertTrue("Unexpected exception: " + t.getClass(),
-              t instanceof RaftRetryFailureException ||
-                  t instanceof TimeoutIOException ||
-                  t instanceof AlreadyClosedException ||
-                  t instanceof NotReplicatedException);
-        }
+        // just watch for a higher index so as to ensure, it does an actual
+        // call to Ratis. Otherwise, it may just return in case the
+        // commitInfoMap is updated to the latest index in putBlock response.
+        IOException ioe =
+            assertThrows(IOException.class, () -> watcher.watchForCommit(replies.get(1).getLogIndex() + 100));
+        Throwable t = HddsClientUtils.checkForException(ioe);
+        // with retry count set to noRetry and a lower watch request
+        // timeout, watch request will eventually
+        // fail with TimeoutIOException from ratis client or the client
+        // can itself get AlreadyClosedException from the Ratis Server
+        // and the write may fail with RaftRetryFailureException
+        assertTrue(
+            t instanceof RaftRetryFailureException ||
+                t instanceof TimeoutIOException ||
+                t instanceof AlreadyClosedException ||
+                t instanceof NotReplicatedException,
+            "Unexpected exception: " + t.getClass());
         if (ratisClient.getReplicatedMinCommitIndex() < replies.get(1)
             .getLogIndex()) {
           assertEquals(chunkSize, watcher.getTotalAckDataLength());
@@ -337,8 +324,8 @@ public class TestCommitWatcher {
           assertEquals(1, watcher.getFutureMap().size());
         } else {
           assertEquals(2 * chunkSize, watcher.getTotalAckDataLength());
-          assertTrue(watcher.getFutureMap().isEmpty());
-          assertTrue(watcher.getCommitIndexMap().isEmpty());
+          assertThat(watcher.getFutureMap()).isEmpty();
+          assertThat(watcher.getCommitIndexMap()).isEmpty();
         }
       }
     }

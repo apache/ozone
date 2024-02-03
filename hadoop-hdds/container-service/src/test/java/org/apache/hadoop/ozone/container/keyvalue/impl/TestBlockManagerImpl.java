@@ -37,9 +37,6 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -48,10 +45,10 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.anyList;
+import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * This class is used to test key related operations on the container.
@@ -84,10 +81,6 @@ public class TestBlockManagerImpl {
     initilaze();
   }
 
-  private static Iterable<Object[]> getVersionParameters() {
-    return ContainerTestVersionInfo.versionParameters();
-  }
-
   private void initilaze() throws Exception {
     UUID datanodeId = UUID.randomUUID();
     HddsVolume hddsVolume = new HddsVolume.Builder(folder.toString())
@@ -100,7 +93,7 @@ public class TestBlockManagerImpl {
     volumeSet = mock(MutableVolumeSet.class);
 
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
-    Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenReturn(hddsVolume);
 
     keyValueContainerData = new KeyValueContainerData(1L,
@@ -148,8 +141,7 @@ public class TestBlockManagerImpl {
     BlockUtils.shutdownCache(config);
   }
 
-  @ParameterizedTest
-  @MethodSource("getVersionParameters")
+  @ContainerTestVersionInfo.ContainerTest
   public void testPutBlock(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initTest(versionInfo);
@@ -179,8 +171,7 @@ public class TestBlockManagerImpl {
 
   }
 
-  @ParameterizedTest
-  @MethodSource("getVersionParameters")
+  @ContainerTestVersionInfo.ContainerTest
   public void testPutAndGetBlock(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initTest(versionInfo);
@@ -202,8 +193,7 @@ public class TestBlockManagerImpl {
 
   }
 
-  @ParameterizedTest
-  @MethodSource("getVersionParameters")
+  @ContainerTestVersionInfo.ContainerTest
   public void testListBlock(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initTest(versionInfo);
@@ -211,7 +201,7 @@ public class TestBlockManagerImpl {
     List<BlockData> listBlockData = blockManager.listBlock(
         keyValueContainer, 1, 10);
     assertNotNull(listBlockData);
-    assertTrue(listBlockData.size() == 1);
+    assertEquals(1, listBlockData.size());
 
     for (long i = 2; i <= 10; i++) {
       blockID = new BlockID(1L, i);
@@ -230,6 +220,6 @@ public class TestBlockManagerImpl {
     listBlockData = blockManager.listBlock(
         keyValueContainer, 1, 10);
     assertNotNull(listBlockData);
-    assertTrue(listBlockData.size() == 10);
+    assertEquals(10, listBlockData.size());
   }
 }

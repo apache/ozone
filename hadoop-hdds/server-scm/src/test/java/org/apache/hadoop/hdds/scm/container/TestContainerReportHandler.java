@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.hdds.scm.container;
 
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -48,12 +47,10 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
@@ -65,12 +62,17 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
@@ -85,6 +87,7 @@ public class TestContainerReportHandler {
   private ContainerManager containerManager;
   private ContainerStateManager containerStateManager;
   private EventPublisher publisher;
+  @TempDir
   private File testDir;
   private DBStore dbStore;
   private SCMHAManager scmhaManager;
@@ -95,9 +98,7 @@ public class TestContainerReportHandler {
       TimeoutException {
     final OzoneConfiguration conf = SCMTestUtils.getConf();
     nodeManager = new MockNodeManager(true, 10);
-    containerManager = Mockito.mock(ContainerManager.class);
-    testDir = GenericTestUtils.getTestDir(
-        TestContainerReportHandler.class.getSimpleName() + UUID.randomUUID());
+    containerManager = mock(ContainerManager.class);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
@@ -114,44 +115,44 @@ public class TestContainerReportHandler {
         .setContainerReplicaPendingOps(new ContainerReplicaPendingOps(
             Clock.system(ZoneId.systemDefault())))
         .build();
-    publisher = Mockito.mock(EventPublisher.class);
+    publisher = mock(EventPublisher.class);
 
-    Mockito.when(containerManager.getContainer(Mockito.any(ContainerID.class)))
+    when(containerManager.getContainer(any(ContainerID.class)))
         .thenAnswer(invocation -> containerStateManager
             .getContainer(((ContainerID)invocation
                 .getArguments()[0])));
 
-    Mockito.when(containerManager.getContainerReplicas(
-        Mockito.any(ContainerID.class)))
+    when(containerManager.getContainerReplicas(
+        any(ContainerID.class)))
         .thenAnswer(invocation -> containerStateManager
             .getContainerReplicas(((ContainerID)invocation
                 .getArguments()[0])));
 
-    Mockito.doAnswer(invocation -> {
+    doAnswer(invocation -> {
       containerStateManager
           .updateContainerState(((ContainerID)invocation
                   .getArguments()[0]).getProtobuf(),
               (HddsProtos.LifeCycleEvent)invocation.getArguments()[1]);
       return null;
     }).when(containerManager).updateContainerState(
-        Mockito.any(ContainerID.class),
-        Mockito.any(HddsProtos.LifeCycleEvent.class));
+        any(ContainerID.class),
+        any(HddsProtos.LifeCycleEvent.class));
 
-    Mockito.doAnswer(invocation -> {
+    doAnswer(invocation -> {
       containerStateManager.updateContainerReplica(
           ((ContainerID)invocation.getArguments()[0]),
           (ContainerReplica) invocation.getArguments()[1]);
       return null;
     }).when(containerManager).updateContainerReplica(
-        Mockito.any(ContainerID.class), Mockito.any(ContainerReplica.class));
+        any(ContainerID.class), any(ContainerReplica.class));
 
-    Mockito.doAnswer(invocation -> {
+    doAnswer(invocation -> {
       containerStateManager.removeContainerReplica(
           ((ContainerID)invocation.getArguments()[0]),
           (ContainerReplica) invocation.getArguments()[1]);
       return null;
     }).when(containerManager).removeContainerReplica(
-        Mockito.any(ContainerID.class), Mockito.any(ContainerReplica.class));
+        any(ContainerID.class), any(ContainerReplica.class));
 
   }
 
@@ -161,8 +162,6 @@ public class TestContainerReportHandler {
     if (dbStore != null) {
       dbStore.close();
     }
-
-    FileUtil.fullyDelete(testDir);
   }
 
   private void testReplicaIndexUpdate(ContainerInfo container,
@@ -271,7 +270,7 @@ public class TestContainerReportHandler {
     final ContainerReportFromDatanode containerReportFromDatanode =
         new ContainerReportFromDatanode(datanodeOne, containerReport);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
-    Assertions.assertEquals(2, containerManager.getContainerReplicas(
+    assertEquals(2, containerManager.getContainerReplicas(
         containerOne.containerID()).size());
 
   }
@@ -331,7 +330,7 @@ public class TestContainerReportHandler {
         new ContainerReportFromDatanode(datanodeFour, containerReport);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
 
-    Assertions.assertEquals(4, containerManager.getContainerReplicas(
+    assertEquals(4, containerManager.getContainerReplicas(
         containerOne.containerID()).size());
   }
 
@@ -402,7 +401,7 @@ public class TestContainerReportHandler {
         new ContainerReportFromDatanode(datanodeOne, containerReport);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
 
-    Assertions.assertEquals(LifeCycleState.CLOSED,
+    assertEquals(LifeCycleState.CLOSED,
         containerManager.getContainer(containerOne.containerID()).getState());
   }
 
@@ -417,20 +416,17 @@ public class TestContainerReportHandler {
     createAndHandleContainerReport(container.containerID(),
         ContainerReplicaProto.State.CLOSED, dns.get(1), 2);
     // index is 2; container shouldn't transition to CLOSED
-    Assertions.assertEquals(LifeCycleState.CLOSING,
-        containerManager.getContainer(container.containerID()).getState());
+    assertEquals(LifeCycleState.CLOSING, containerManager.getContainer(container.containerID()).getState());
 
     createAndHandleContainerReport(container.containerID(),
         ContainerReplicaProto.State.CLOSED, dns.get(2), 3);
     // index is 3; container shouldn't transition to CLOSED
-    Assertions.assertEquals(LifeCycleState.CLOSING,
-        containerManager.getContainer(container.containerID()).getState());
+    assertEquals(LifeCycleState.CLOSING, containerManager.getContainer(container.containerID()).getState());
 
     createAndHandleContainerReport(container.containerID(),
         ContainerReplicaProto.State.CLOSED, dns.get(0), 1);
     // index is 1; container should transition to CLOSED
-    Assertions.assertEquals(LifeCycleState.CLOSED,
-        containerManager.getContainer(container.containerID()).getState());
+    assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(container.containerID()).getState());
 
     // Test with an EC 6-3 container
     replicationConfig = new ECReplicationConfig(6, 3);
@@ -441,14 +437,12 @@ public class TestContainerReportHandler {
     createAndHandleContainerReport(container2.containerID(),
         ContainerReplicaProto.State.CLOSED, dns.get(5), 6);
     // index is 6, container shouldn't transition to CLOSED
-    Assertions.assertEquals(LifeCycleState.CLOSING,
-        containerManager.getContainer(container2.containerID()).getState());
+    assertEquals(LifeCycleState.CLOSING, containerManager.getContainer(container2.containerID()).getState());
 
     createAndHandleContainerReport(container2.containerID(),
         ContainerReplicaProto.State.CLOSED, dns.get(8), 9);
     // index is 9, container should transition to CLOSED
-    Assertions.assertEquals(LifeCycleState.CLOSED,
-        containerManager.getContainer(container2.containerID()).getState());
+    assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(container2.containerID()).getState());
   }
 
   /**
@@ -462,7 +456,7 @@ public class TestContainerReportHandler {
   private List<DatanodeDetails> setupECContainerForTesting(
       ContainerInfo container)
       throws IOException, TimeoutException, NodeNotFoundException {
-    Assertions.assertEquals(HddsProtos.ReplicationType.EC,
+    assertEquals(HddsProtos.ReplicationType.EC,
         container.getReplicationType());
     final int numDatanodes =
         container.getReplicationConfig().getRequiredNodes();
@@ -571,8 +565,7 @@ public class TestContainerReportHandler {
         new ContainerReportFromDatanode(datanodeOne, containerReport);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
 
-    Assertions.assertEquals(LifeCycleState.QUASI_CLOSED,
-        containerManager.getContainer(containerOne.containerID()).getState());
+    assertEquals(LifeCycleState.QUASI_CLOSED, containerManager.getContainer(containerOne.containerID()).getState());
   }
 
   @Test
@@ -643,8 +636,7 @@ public class TestContainerReportHandler {
         new ContainerReportFromDatanode(datanodeOne, containerReport);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
 
-    Assertions.assertEquals(LifeCycleState.CLOSED,
-        containerManager.getContainer(containerOne.containerID()).getState());
+    assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(containerOne.containerID()).getState());
   }
 
   @Test
@@ -984,10 +976,9 @@ public class TestContainerReportHandler {
         new ContainerReportFromDatanode(datanodeOne, containerReport);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
 
-    Mockito.verify(publisher, Mockito.times(1))
-        .fireEvent(Mockito.any(), Mockito.any(CommandForDatanode.class));
+    verify(publisher, times(1)).fireEvent(any(), any(CommandForDatanode.class));
 
-    Assertions.assertEquals(0, containerManager.getContainerReplicas(
+    assertEquals(0, containerManager.getContainerReplicas(
         containerOne.containerID()).size());
   }
 

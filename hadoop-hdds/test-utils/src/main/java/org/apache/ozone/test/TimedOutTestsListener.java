@@ -17,8 +17,6 @@
  */
 package org.apache.ozone.test;
 
-import java.io.BufferedWriter;
-import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.management.LockInfo;
@@ -31,43 +29,35 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 
-import org.junit.runner.notification.Failure;
-import org.junit.runner.notification.RunListener;
+import org.junit.platform.engine.TestExecutionResult;
+import org.junit.platform.launcher.TestExecutionListener;
+import org.junit.platform.launcher.TestIdentifier;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
+import jakarta.annotation.Nullable;
 
 /**
- * JUnit run listener which prints full thread dump into System.err
- * in case a test is failed due to timeout.
+ * JUnit test execution listener which prints full thread dump to System.err
+ * in case a test fails due to timeout.
  */
-public class TimedOutTestsListener extends RunListener {
-
-  private static final String TEST_TIMED_OUT_PREFIX = "test timed out after";
+public class TimedOutTestsListener implements TestExecutionListener {
 
   private static final String INDENT = "    ";
 
-  private final PrintWriter output;
-  
-  public TimedOutTestsListener() {
-    this(new PrintWriter(new BufferedWriter(new OutputStreamWriter(
-        System.err, UTF_8))));
-  }
-  
-  public TimedOutTestsListener(PrintWriter output) {
-    this.output = output;
-  }
-
   @Override
-  public void testFailure(Failure failure) throws Exception {
-    if (failure != null && failure.getMessage() != null
-        && failure.getMessage().startsWith(TEST_TIMED_OUT_PREFIX)) {
-      output.println("====> TEST TIMED OUT. PRINTING THREAD DUMP. <====");
-      output.println();
-      output.print(buildThreadDiagnosticString());
+  public void executionFinished(TestIdentifier identifier, TestExecutionResult result) {
+    if (result.getStatus() == TestExecutionResult.Status.FAILED) {
+      result.getThrowable().ifPresent(t -> {
+        if (t instanceof TimeoutException) {
+          System.err.println("====> " + identifier.getDisplayName() + " TIMED OUT. PRINTING THREAD DUMP. <====");
+          System.err.println();
+          System.err.print(buildThreadDiagnosticString());
+        }
+      });
     }
   }
-  
+
   public static String buildThreadDiagnosticString() {
     StringWriter sw = new StringWriter();
     PrintWriter output = new PrintWriter(sw);
@@ -88,7 +78,7 @@ public class TimedOutTestsListener extends RunListener {
     return sw.toString();
   }
 
-  static String buildThreadDump() {
+  private static String buildThreadDump() {
     StringBuilder dump = new StringBuilder();
     Map<Thread, StackTraceElement[]> stackTraces = Thread.getAllStackTraces();
     for (Map.Entry<Thread, StackTraceElement[]> e : stackTraces.entrySet()) {
@@ -112,8 +102,9 @@ public class TimedOutTestsListener extends RunListener {
     }
     return dump.toString();
   }
-  
-  static String buildDeadlockInfo() {
+
+  @Nullable
+  private static String buildDeadlockInfo() {
     ThreadMXBean threadBean = ManagementFactory.getThreadMXBean();
     long[] threadIds = threadBean.findMonitorDeadlockedThreads();
     if (threadIds != null && threadIds.length > 0) {

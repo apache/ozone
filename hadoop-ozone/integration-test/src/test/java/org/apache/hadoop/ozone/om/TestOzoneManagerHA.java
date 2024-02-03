@@ -40,7 +40,6 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Timeout;
@@ -51,7 +50,6 @@ import java.time.Duration;
 import java.util.Iterator;
 import java.util.UUID;
 import java.util.HashMap;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -65,7 +63,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -216,13 +214,16 @@ public abstract class TestOzoneManagerHA {
    */
   public static String createKey(OzoneBucket ozoneBucket) throws IOException {
     String keyName = "key" + RandomStringUtils.randomNumeric(5);
+    createKey(ozoneBucket, keyName);
+    return keyName;
+  }
+
+  public static void createKey(OzoneBucket ozoneBucket, String keyName) throws IOException {
     String data = "data" + RandomStringUtils.randomNumeric(5);
-    OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(keyName,
-        data.length(), ReplicationType.RATIS,
+    OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(keyName, data.length(), ReplicationType.RATIS,
         ReplicationFactor.ONE, new HashMap<>());
     ozoneOutputStream.write(data.getBytes(UTF_8), 0, data.length());
     ozoneOutputStream.close();
-    return keyName;
   }
 
   protected OzoneBucket setupBucket() throws Exception {
@@ -336,12 +337,11 @@ public abstract class TestOzoneManagerHA {
         // ConnectException. Otherwise, we would get a RemoteException from the
         // last running OM as it would fail to get a quorum.
         if (e instanceof RemoteException) {
-          GenericTestUtils.assertExceptionContains("OMNotLeaderException", e);
+          assertThat(e).hasMessageContaining("is not the leader");
         } else if (e instanceof ConnectException) {
-          GenericTestUtils.assertExceptionContains("Connection refused", e);
+          assertThat(e).hasMessageContaining("Connection refused");
         } else {
-          GenericTestUtils.assertExceptionContains(
-              "Could not determine or connect to OM Leader", e);
+          assertThat(e).hasMessageContaining("Could not determine or connect to OM Leader");
         }
       } else {
         throw e;
@@ -445,12 +445,11 @@ public abstract class TestOzoneManagerHA {
         // ConnectException. Otherwise, we would get a RemoteException from the
         // last running OM as it would fail to get a quorum.
         if (e instanceof RemoteException) {
-          GenericTestUtils.assertExceptionContains("OMNotLeaderException", e);
+          assertThat(e).hasMessageContaining("is not the leader");
         } else if (e instanceof ConnectException) {
-          GenericTestUtils.assertExceptionContains("Connection refused", e);
+          assertThat(e).hasMessageContaining("Connection refused");
         } else {
-          GenericTestUtils.assertExceptionContains(
-              "Could not determine or connect to OM Leader", e);
+          assertThat(e).hasMessageContaining("Could not determine or connect to OM Leader");
         }
       } else {
         throw e;
@@ -461,9 +460,6 @@ public abstract class TestOzoneManagerHA {
   protected void waitForLeaderToBeReady()
       throws InterruptedException, TimeoutException {
     // Wait for Leader Election timeout
-    int timeout = OZONE_OM_RATIS_SERVER_FAILURE_TIMEOUT_DURATION_DEFAULT
-        .toIntExact(TimeUnit.MILLISECONDS);
-    GenericTestUtils.waitFor(() ->
-        getCluster().getOMLeader() != null, 500, timeout);
+    cluster.waitForLeaderOM();
   }
 }

@@ -35,7 +35,7 @@ import java.io.IOException;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests to verify Object store without prefix enabled.
@@ -220,14 +220,12 @@ public class TestObjectStore {
     createLinkBucket(volume, linkBucket2Name, linkBucket3Name);
     createLinkBucket(volume, linkBucket3Name, linkBucket1Name);
 
-    try {
-      volume.getBucket(linkBucket1Name);
-      fail("Should throw Exception due to loop in Link Buckets");
-    } catch (OMException oe) {
-      // Expected exception
-      assertEquals(OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS,
-          oe.getResult());
-    }
+    OMException oe =
+        assertThrows(OMException.class, () -> volume.getBucket(linkBucket1Name),
+            "Should throw Exception due to loop in Link Buckets");
+    // Expected exception
+    assertEquals(OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS,
+        oe.getResult());
   }
 
   /**
