@@ -24,9 +24,11 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVA
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
+import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
+import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_COMPLETE_FINALIZATION;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_POST_FINALIZE_UPGRADE;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_PRE_FINALIZE_UPGRADE;
@@ -152,6 +154,8 @@ public class TestHDDSUpgrade {
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 1);
     // allow only one FACTOR THREE pipeline.
     conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, NUM_DATA_NODES + 1);
+    conf.setInt(HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION, HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
+    conf.setInt(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION, OMLayoutFeature.INITIAL_VERSION.layoutVersion());
 
     scmFinalizationExecutor = new InjectedUpgradeFinalizationExecutor<>();
     SCMConfigurator scmConfigurator = new SCMConfigurator();
@@ -164,8 +168,6 @@ public class TestHDDSUpgrade {
         .setSCMConfigurator(scmConfigurator)
         .setHbInterval(500)
         .setHbProcessorInterval(500)
-        .setOmLayoutVersion(OMLayoutFeature.INITIAL_VERSION.layoutVersion())
-        .setScmLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion())
         .setDnLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
 
     // Setting the provider to a max of 100 clusters. Some of the tests here

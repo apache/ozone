@@ -324,9 +324,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected Optional<String> datanodeReservedSpace = Optional.empty();
     protected boolean includeRecon = false;
 
-
-    protected Optional<Integer> omLayoutVersion = Optional.empty();
-    protected Optional<Integer> scmLayoutVersion = Optional.empty();
     protected Optional<Integer> dnLayoutVersion = Optional.empty();
 
     protected int numOfDatanodes = 3;
@@ -498,16 +495,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
 
     public Builder setSCMServiceId(String serviceId) {
       this.scmServiceId = serviceId;
-      return this;
-    }
-
-    public Builder setScmLayoutVersion(int layoutVersion) {
-      scmLayoutVersion = Optional.of(layoutVersion);
-      return this;
-    }
-
-    public Builder setOmLayoutVersion(int layoutVersion) {
-      omLayoutVersion = Optional.of(layoutVersion);
       return this;
     }
 
