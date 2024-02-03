@@ -81,7 +81,6 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.commons.io.FileUtils;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
@@ -835,21 +834,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           localhostWithFreePort());
       conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
           "3s");
-      configureSCMheartbeat();
-    }
-
-    private void configureSCMheartbeat() {
-      if (hbInterval.isPresent()) {
-        conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL,
-            hbInterval.get(), TimeUnit.MILLISECONDS);
-      }
-
-      if (hbProcessorInterval.isPresent()) {
-        conf.setTimeDuration(
-            ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
-            hbProcessorInterval.get(),
-            TimeUnit.MILLISECONDS);
-      }
     }
 
     private void configureOM() {

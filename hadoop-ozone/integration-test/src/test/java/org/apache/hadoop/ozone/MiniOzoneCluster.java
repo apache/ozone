@@ -314,8 +314,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected int numOfActiveSCMs = ACTIVE_SCMS_NOT_SET;
     protected SCMConfigurator scmConfigurator;
 
-    protected Optional<Integer> hbInterval = Optional.empty();
-    protected Optional<Integer> hbProcessorInterval = Optional.empty();
     protected String scmId = UUID.randomUUID().toString();
     protected String omId = UUID.randomUUID().toString();
     
@@ -414,32 +412,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
      */
     public Builder setNumDataVolumes(int val) {
       numDataVolumes = val;
-      return this;
-    }
-
-    /**
-     * Sets the number of HeartBeat Interval of Datanodes, the value should be
-     * in MilliSeconds.
-     *
-     * @param val HeartBeat interval in milliseconds
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setHbInterval(int val) {
-      hbInterval = Optional.of(val);
-      return this;
-    }
-
-    /**
-     * Sets the number of HeartBeat Processor Interval of Datanodes,
-     * the value should be in MilliSeconds.
-     *
-     * @param val HeartBeat Processor interval in milliseconds
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setHbProcessorInterval(int val) {
-      hbProcessorInterval = Optional.of(val);
       return this;
     }
 
