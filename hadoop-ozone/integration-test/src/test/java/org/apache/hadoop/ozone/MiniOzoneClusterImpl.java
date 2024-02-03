@@ -654,8 +654,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
       // MiniOzoneCluster should have global pipeline upper limit.
       conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT,
-          pipelineNumLimit >= DEFAULT_PIPELINE_LIMIT ?
-              pipelineNumLimit : DEFAULT_PIPELINE_LIMIT);
+          Math.max(pipelineNumLimit, DEFAULT_PIPELINE_LIMIT));
       conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
           DEFAULT_RATIS_RPC_TIMEOUT_SEC, TimeUnit.SECONDS);
       SCMClientConfig scmClientConfig = conf.getObject(SCMClientConfig.class);
