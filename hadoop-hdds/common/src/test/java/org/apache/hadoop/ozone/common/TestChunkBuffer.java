@@ -95,8 +95,9 @@ public class TestChunkBuffer {
   private static void runTestIncrementalChunkBuffer(int increment, int n) {
     final byte[] expected = new byte[n];
     ThreadLocalRandom.current().nextBytes(expected);
-    runTestImpl(expected, increment,
-        new IncrementalChunkBuffer(n, increment, false));
+    try (IncrementalChunkBuffer c = new IncrementalChunkBuffer(n, increment, false)) {
+      runTestImpl(expected, increment, c);
+    }
   }
 
   @Test
