@@ -64,7 +64,7 @@ public class TestBlockOutputStreamIncrementalPutBlock {
     return Arrays.asList(true, false);
   }
 
-  public void init(boolean incrementalChunkList) throws IOException {
+  private void init(boolean incrementalChunkList) throws IOException {
     OzoneClientConfig clientConfig = config.getObject(OzoneClientConfig.class);
 
     clientConfig.setIncrementalChunkList(incrementalChunkList);
@@ -75,7 +75,7 @@ public class TestBlockOutputStreamIncrementalPutBlock {
     ((InMemoryConfiguration) config).setBoolean(
         OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     ((InMemoryConfiguration) config).setBoolean(
-        OZONE_CHUNK_LIST_INCREMENTAL, true);
+        OZONE_CHUNK_LIST_INCREMENTAL, incrementalChunkList);
 
     RpcClient rpcClient = new RpcClient(config, null) {
 

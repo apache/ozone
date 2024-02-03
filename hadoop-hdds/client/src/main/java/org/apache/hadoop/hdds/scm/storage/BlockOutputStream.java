@@ -857,7 +857,7 @@ public class BlockOutputStream extends OutputStream {
     int pos = 0;
     int uncopied = length;
     for (ByteBuffer bb : chunkBuffer.asByteBufferList()) {
-      if (pos + bb.remaining() > offset) {
+      if (pos + bb.remaining() >= offset) {
         int copyStart = offset < pos ? 0 : offset - pos;
         int copyLen = Math.min(uncopied, bb.remaining());
         try {
@@ -877,7 +877,7 @@ public class BlockOutputStream extends OutputStream {
       }
 
       pos += bb.remaining();
-      if (pos > offset + length) {
+      if (pos >= offset + length) {
         return;
       }
       if (uncopied == 0) {

@@ -138,10 +138,10 @@ public class TestHSync {
   private static OzoneClient client;
   private static final BucketLayout BUCKET_LAYOUT = BucketLayout.FILE_SYSTEM_OPTIMIZED;
 
-  private static final int chunkSize = 4 << 12;
-  private static final int flushSize = 2 * chunkSize;
-  private static final int maxFlushSize = 2 * flushSize;
-  private static final int blockSize = 2 * maxFlushSize;
+  private static final int CHUNK_SIZE = 4 << 12;
+  private static final int FLUSH_SIZE = 2 * CHUNK_SIZE;
+  private static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;
+  private static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;
 
   @BeforeAll
   public static void init() throws Exception {
@@ -157,14 +157,14 @@ public class TestHSync {
     cluster = MiniOzoneCluster.newBuilder(CONF)
         .setNumDatanodes(5)
         .setTotalPipelineNumLimit(10)
-        .setBlockSize(blockSize)
-        .setChunkSize(chunkSize)
-        .setStreamBufferFlushSize(flushSize)
-        .setStreamBufferMaxSize(maxFlushSize)
-        .setDataStreamBufferFlushize(maxFlushSize)
+        .setBlockSize(BLOCK_SIZE)
+        .setChunkSize(CHUNK_SIZE)
+        .setStreamBufferFlushSize(FLUSH_SIZE)
+        .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
+        .setDataStreamBufferFlushize(MAX_FLUSH_SIZE)
         .setStreamBufferSizeUnit(StorageUnit.BYTES)
-        .setDataStreamMinPacketSize(chunkSize)
-        .setDataStreamStreamWindowSize(5 * chunkSize)
+        .setDataStreamMinPacketSize(CHUNK_SIZE)
+        .setDataStreamStreamWindowSize(5 * CHUNK_SIZE)
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
@@ -318,7 +318,7 @@ public class TestHSync {
         OZONE_URI_SCHEME, bucket.getName(), bucket.getVolumeName());
     CONF.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
 
-    init(incrementalChunkList);
+    initClientConfig(incrementalChunkList);
     try (FileSystem fs = FileSystem.get(CONF)) {
       for (int i = 0; i < 10; i++) {
         final Path file = new Path("/file" + i);
@@ -339,7 +339,7 @@ public class TestHSync {
     final String dir = OZONE_ROOT + bucket.getVolumeName()
         + OZONE_URI_DELIMITER + bucket.getName();
 
-    init(incrementalChunkList);
+    initClientConfig(incrementalChunkList);
     try (FileSystem fs = FileSystem.get(CONF)) {
       for (int i = 0; i < 10; i++) {
         final Path file = new Path(dir, "file" + i);
@@ -461,7 +461,7 @@ public class TestHSync {
       long fileSize = 0;
       try (FSDataOutputStream outputStream = fs.create(file, true)) {
         // make sure at least writing 2 blocks data
-        while (fileSize <= blockSize) {
+        while (fileSize <= BLOCK_SIZE) {
           outputStream.write(data, 0, data.length);
           outputStream.hsync();
           fileSize += data.length;
@@ -474,9 +474,9 @@ public class TestHSync {
     omMetrics.resetNumKeyHSyncs();
     long writtenSize = 0;
     try (OzoneOutputStream outputStream = bucket.createKey("key-" + RandomStringUtils.randomNumeric(5),
-        blockSize * 2, ReplicationType.RATIS, ReplicationFactor.THREE, new HashMap<>())) {
+        BLOCK_SIZE * 2, ReplicationType.RATIS, ReplicationFactor.THREE, new HashMap<>())) {
       // make sure at least writing 2 blocks data
-      while (writtenSize <= blockSize) {
+      while (writtenSize <= BLOCK_SIZE) {
         outputStream.write(data, 0, data.length);
         outputStream.hsync();
         writtenSize += data.length;
@@ -760,7 +760,7 @@ public class TestHSync {
     }
   }
 
-  public void init(boolean incrementalChunkList) throws IOException {
+  public void initClientConfig(boolean incrementalChunkList) {
     OzoneClientConfig clientConfig = CONF.getObject(OzoneClientConfig.class);
     clientConfig.setIncrementalChunkList(incrementalChunkList);
     clientConfig.setChecksumType(ContainerProtos.ChecksumType.CRC32C);
@@ -782,10 +782,10 @@ public class TestHSync {
   @MethodSource("parameters1")
   public void writeWithSmallBuffer(boolean incrementalChunkList, int bufferSize)
       throws IOException {
-    init(incrementalChunkList);
+    initClientConfig(incrementalChunkList);
 
     final String keyName = UUID.randomUUID().toString();
-    int fileSize = 16 << 11 ;
+    int fileSize = 16 << 11;
     String s = RandomStringUtils.randomAlphabetic(bufferSize);
     ByteBuffer byteBuffer = ByteBuffer.wrap(s.getBytes(StandardCharsets.UTF_8));
 
@@ -826,11 +826,11 @@ public class TestHSync {
   public static Stream<Arguments> parameters2() {
     return Stream.of(
         arguments(true, 1024 * 1024 + 1),
-        arguments(true, 1024 * 1024 + 1 + chunkSize),
-        arguments(true, 1024 * 1024 - 1 + chunkSize),
+        arguments(true, 1024 * 1024 + 1 + CHUNK_SIZE),
+        arguments(true, 1024 * 1024 - 1 + CHUNK_SIZE),
         arguments(false, 1024 * 1024 + 1),
-        arguments(false, 1024 * 1024 + 1 + chunkSize),
-        arguments(false, 1024 * 1024 - 1 + chunkSize)
+        arguments(false, 1024 * 1024 + 1 + CHUNK_SIZE),
+        arguments(false, 1024 * 1024 - 1 + CHUNK_SIZE)
     );
   }
 
@@ -838,7 +838,7 @@ public class TestHSync {
   @MethodSource("parameters2")
   public void writeWithBigBuffer(boolean incrementalChunkList, int bufferSize)
       throws IOException {
-    init(incrementalChunkList);
+    initClientConfig(incrementalChunkList);
 
     final String keyName = UUID.randomUUID().toString();
     int count = 2;
@@ -863,7 +863,8 @@ public class TestHSync {
         int readLen = is.read(readBuffer);
         if (bufferSize != readLen) {
           throw new IOException("failed to read " + bufferSize + " from offset " + totalReadLen +
-              ", actually read " + readLen + ", block " + totalReadLen/blockSize);
+              ", actually read " + readLen + ", block " + totalReadLen /
+              BLOCK_SIZE);
         }
         assertArrayEquals(byteBuffer.array(), readBuffer.array());
         totalReadLen += readLen;

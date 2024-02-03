@@ -94,13 +94,15 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
     LOG.debug("blockData={}, lastChunk={}",
         blockData.getChunks(), lastChunk.getChunks());
     Preconditions.checkState(lastChunk.getChunks().size() == 1);
-    ContainerProtos.ChunkInfo lastChunkInBlockData = blockData.getChunks().size() > 0 ?
-        blockData.getChunks().get(blockData.getChunks().size() - 1) : null;
-    if (lastChunkInBlockData != null) {
-      Preconditions.checkState(
-          lastChunkInBlockData.getOffset() + lastChunkInBlockData.getLen()
-              == lastChunk.getChunks().get(0).getOffset(),
-          "chunk offset does not match");
+    if (!blockData.getChunks().isEmpty()) {
+      ContainerProtos.ChunkInfo lastChunkInBlockData =
+              blockData.getChunks().get(blockData.getChunks().size() - 1);
+      if (lastChunkInBlockData != null) {
+        Preconditions.checkState(
+            lastChunkInBlockData.getOffset() + lastChunkInBlockData.getLen()
+                == lastChunk.getChunks().get(0).getOffset(),
+            "chunk offset does not match");
+      }
     }
 
     // append last partial chunk to the block data
@@ -156,7 +158,7 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
     // if data has no chunks, fetch the last chunk info from lastChunkInfoTable
     if (data.getChunks().isEmpty()) {
       BlockData lastChunk = getLastChunkInfoTable().get(containerData.getBlockKey(localID));
-      if(lastChunk != null ) {
+      if (lastChunk != null) {
         reconcilePartialChunks(lastChunk, data);
       }
     }
