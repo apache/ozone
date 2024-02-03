@@ -297,8 +297,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
   @SuppressWarnings("visibilitymodifier")
   abstract class Builder {
 
-    protected static final int DEFAULT_HB_INTERVAL_MS = 1000;
-    protected static final int DEFAULT_HB_PROCESSOR_INTERVAL_MS = 100;
     protected static final int ACTIVE_OMS_NOT_SET = -1;
     protected static final int ACTIVE_SCMS_NOT_SET = -1;
     protected static final int DEFAULT_RATIS_RPC_TIMEOUT_SEC = 1;

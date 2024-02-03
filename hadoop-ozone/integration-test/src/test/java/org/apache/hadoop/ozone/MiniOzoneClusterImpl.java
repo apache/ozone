@@ -842,21 +842,12 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       if (hbInterval.isPresent()) {
         conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL,
             hbInterval.get(), TimeUnit.MILLISECONDS);
-      } else {
-        conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL,
-            DEFAULT_HB_INTERVAL_MS,
-            TimeUnit.MILLISECONDS);
       }
 
       if (hbProcessorInterval.isPresent()) {
         conf.setTimeDuration(
             ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
             hbProcessorInterval.get(),
-            TimeUnit.MILLISECONDS);
-      } else {
-        conf.setTimeDuration(
-            ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
-            DEFAULT_HB_PROCESSOR_INTERVAL_MS,
             TimeUnit.MILLISECONDS);
       }
     }

@@ -56,6 +56,16 @@
     <value>true</value>
   </property>
 
+
+  <property>
+    <name>hdds.heartbeat.interval</name>
+    <value>1000</value>
+  </property>
+  <property>
+    <name>ozone.scm.heartbeat.thread.interval</name>
+    <value>100</value>
+  </property>
+
   <property>
     <name>ozone.scm.ratis.pipeline.limit</name>
     <value>3</value>
