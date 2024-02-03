@@ -115,11 +115,12 @@ public class TestContainerReplicationEndToEnd {
     replicationConf.setInterval(Duration.ofMillis(containerReportInterval));
     conf.setFromObject(replicationConf);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 2);
+    conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, 6);
 
     conf.setQuietMode(false);
     cluster =
         MiniOzoneCluster.newBuilder(conf).setNumDatanodes(4)
-            .setTotalPipelineNumLimit(6).setHbInterval(200)
+            .setHbInterval(200)
             .build();
     cluster.waitForClusterToBeReady();
     cluster.getStorageContainerManager().getReplicationManager().start();

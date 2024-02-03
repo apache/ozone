@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_COMPLETE_FINALIZATION;
 import static org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints.AFTER_POST_FINALIZE_UPGRADE;
@@ -148,7 +149,9 @@ public class TestHDDSUpgrade {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 1000,
         TimeUnit.MILLISECONDS);
-    conf.set(OZONE_DATANODE_PIPELINE_LIMIT, "1");
+    conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 1);
+    // allow only one FACTOR THREE pipeline.
+    conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, NUM_DATA_NODES + 1);
 
     scmFinalizationExecutor = new InjectedUpgradeFinalizationExecutor<>();
     SCMConfigurator scmConfigurator = new SCMConfigurator();
@@ -159,8 +162,6 @@ public class TestHDDSUpgrade {
         .setNumDatanodes(NUM_DATA_NODES)
         .setNumOfStorageContainerManagers(NUM_SCMS)
         .setSCMConfigurator(scmConfigurator)
-        // allow only one FACTOR THREE pipeline.
-        .setTotalPipelineNumLimit(NUM_DATA_NODES + 1)
         .setHbInterval(500)
         .setHbProcessorInterval(500)
         .setOmLayoutVersion(OMLayoutFeature.INITIAL_VERSION.layoutVersion())

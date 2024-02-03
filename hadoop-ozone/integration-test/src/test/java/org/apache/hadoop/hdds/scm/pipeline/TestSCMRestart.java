@@ -60,15 +60,15 @@ public class TestSCMRestart {
    */
   @BeforeAll
   public static void init() throws Exception {
+    final int numOfNodes = 4;
     conf = new OzoneConfiguration();
     conf.setTimeDuration(HDDS_PIPELINE_REPORT_INTERVAL, 1000,
             TimeUnit.MILLISECONDS);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
-    int numOfNodes = 4;
+    // allow only one FACTOR THREE pipeline.
+    conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, numOfNodes + 1);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(numOfNodes)
-        // allow only one FACTOR THREE pipeline.
-        .setTotalPipelineNumLimit(numOfNodes + 1)
         .setHbInterval(1000)
         .setHbProcessorInterval(1000)
         .build();

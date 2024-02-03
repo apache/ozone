@@ -425,16 +425,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
     }
 
     /**
-     * Sets the total number of pipelines to create.
-     * @param val number of pipelines
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setTotalPipelineNumLimit(int val) {
-      pipelineNumLimit = val;
-      return this;
-    }
-
-    /**
      * Sets the number of HeartBeat Interval of Datanodes, the value should be
      * in MilliSeconds.
      *

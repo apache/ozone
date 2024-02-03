@@ -101,6 +101,8 @@ public class TestDeleteWithInAdequateDN {
    */
   @BeforeAll
   public static void init() throws Exception {
+    final int numOfDatanodes = 3;
+
     conf = new OzoneConfiguration();
     path = GenericTestUtils
         .getTempPath(TestContainerStateMachineFailures.class.getSimpleName());
@@ -110,6 +112,7 @@ public class TestDeleteWithInAdequateDN {
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
+    conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, numOfDatanodes + FACTOR_THREE_PIPELINE_COUNT);
     // Make the stale, dead and server failure timeout higher so that a dead
     // node is not detecte at SCM as well as the pipeline close action
     // never gets initiated early at Datanode in the test.
@@ -156,11 +159,8 @@ public class TestDeleteWithInAdequateDN {
     conf.setFromObject(ratisClientConfig);
 
     conf.setQuietMode(false);
-    int numOfDatanodes = 3;
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(numOfDatanodes)
-        .setTotalPipelineNumLimit(
-            numOfDatanodes + FACTOR_THREE_PIPELINE_COUNT)
         .setHbInterval(100)
         .build();
     cluster.waitForClusterToBeReady();

@@ -77,10 +77,10 @@ public class TestQueryNode {
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 3, SECONDS);
     conf.setTimeDuration(OZONE_SCM_DEADNODE_INTERVAL, 6, SECONDS);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 3);
+    conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, numOfDatanodes + numOfDatanodes / 2);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(numOfDatanodes)
-        .setTotalPipelineNumLimit(numOfDatanodes + numOfDatanodes / 2)
         .build();
     cluster.waitForClusterToBeReady();
     scmClient = new ContainerOperationClient(conf);
