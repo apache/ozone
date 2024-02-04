@@ -131,12 +131,11 @@ public class TestFailureHandlingByClientFlushDelay {
             Collections.singleton(HddsUtils.getHostName(conf))).get(0),
         "/rack1");
 
-    ClientConfigBuilder.newBuilder(conf)
+    ClientConfigBuilder.newBuilder(conf, StorageUnit.BYTES)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
         .setStreamBufferMaxSize(maxFlushSize)
-        .setStreamBufferSizeUnit(StorageUnit.BYTES)
         .setOn(conf);
 
     cluster = MiniOzoneCluster.newBuilder(conf)

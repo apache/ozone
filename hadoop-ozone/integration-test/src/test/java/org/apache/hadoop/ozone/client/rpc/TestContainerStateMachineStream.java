@@ -113,13 +113,12 @@ public class TestContainerStateMachineStream {
     raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(10));
     conf.setFromObject(raftClientConfig);
 
-    ClientConfigBuilder.newBuilder(conf)
+    ClientConfigBuilder.newBuilder(conf, StorageUnit.BYTES)
         .setDataStreamMinPacketSize(1024)
         .setBlockSize(BLOCK_SIZE)
         .setChunkSize(CHUNK_SIZE)
         .setStreamBufferFlushSize(FLUSH_SIZE)
         .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
-        .setStreamBufferSizeUnit(StorageUnit.BYTES)
         .setOn(conf);
 
     conf.setLong(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);

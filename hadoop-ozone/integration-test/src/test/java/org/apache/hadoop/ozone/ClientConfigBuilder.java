@@ -19,11 +19,9 @@ package org.apache.hadoop.ozone;
 
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.ConfigurationTarget;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 
-import java.util.Objects;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 
@@ -33,11 +31,11 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 /**
  * Helper for tests that want to set client stream properties.
  */
-public class ClientConfigBuilder {
+public final class ClientConfigBuilder {
 
   private final ConfigurationSource conf;
 
-  private int chunkSize = 1;
+  private int chunkSize = 1024 * 1024;
   private OptionalLong blockSize = OptionalLong.empty();
   private OptionalInt streamBufferSize = OptionalInt.empty();
   private OptionalLong streamBufferFlushSize = OptionalLong.empty();
@@ -45,70 +43,57 @@ public class ClientConfigBuilder {
   private OptionalLong dataStreamWindowSize = OptionalLong.empty();
   private OptionalLong streamBufferMaxSize = OptionalLong.empty();
   private OptionalInt dataStreamMinPacketSize = OptionalInt.empty();
-  private StorageUnit unit = StorageUnit.MB;
+  private final StorageUnit unit;
 
-  public static ClientConfigBuilder newBuilder() {
-    return new ClientConfigBuilder();
+  public static ClientConfigBuilder newBuilder(ConfigurationSource conf, StorageUnit unit) {
+    return new ClientConfigBuilder(conf, unit);
   }
 
-  public static ClientConfigBuilder newBuilder(ConfigurationSource conf) {
-    return new ClientConfigBuilder(conf);
-  }
-
-  private ClientConfigBuilder() {
-    this(new OzoneConfiguration());
-  }
-
-  private ClientConfigBuilder(ConfigurationSource conf) {
+  private ClientConfigBuilder(ConfigurationSource conf, StorageUnit unit) {
     this.conf = conf;
+    this.unit = unit;
   }
 
+  // FIXME store everything in bytes
   public ClientConfigBuilder setChunkSize(int size) {
-    chunkSize = size;
+    chunkSize = (int) toBytes(size);
     return this;
   }
 
   public ClientConfigBuilder setBlockSize(long size) {
-    blockSize = OptionalLong.of(size);
+    blockSize = OptionalLong.of(toBytes(size));
     return this;
   }
 
   public ClientConfigBuilder setStreamBufferSize(int size) {
-    streamBufferSize = OptionalInt.of(size);
+    streamBufferSize = OptionalInt.of((int) toBytes(size));
     return this;
   }
 
   public ClientConfigBuilder setStreamBufferFlushSize(long size) {
-    streamBufferFlushSize = OptionalLong.of(size);
+    streamBufferFlushSize = OptionalLong.of(toBytes(size));
     return this;
   }
 
   public ClientConfigBuilder setStreamBufferMaxSize(long size) {
-    streamBufferMaxSize = OptionalLong.of(size);
+    streamBufferMaxSize = OptionalLong.of(toBytes(size));
     return this;
   }
 
   public ClientConfigBuilder setDataStreamMinPacketSize(int size) {
-    dataStreamMinPacketSize = OptionalInt.of(size);
+    dataStreamMinPacketSize = OptionalInt.of((int) toBytes(size));
     return this;
   }
 
   // TODO fix typo
   public ClientConfigBuilder setDataStreamBufferFlushize(long size) {
-    dataStreamBufferFlushSize = OptionalLong.of(size);
+    dataStreamBufferFlushSize = OptionalLong.of(toBytes(size));
     return this;
   }
 
   // TODO fix typo in name
   public ClientConfigBuilder setDataStreamStreamWindowSize(long size) {
-    dataStreamWindowSize = OptionalLong.of(size);
-    return this;
-  }
-
-  // TODO rename
-  // TODO merge with setChunkSize
-  public ClientConfigBuilder setStreamBufferSizeUnit(StorageUnit unit) {
-    this.unit = Objects.requireNonNull(unit);
+    dataStreamWindowSize = OptionalLong.of(toBytes(size));
     return this;
   }
 
@@ -136,16 +121,16 @@ public class ClientConfigBuilder {
     }
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-    clientConfig.setStreamBufferSize((int) toBytes(streamBufferSize.getAsInt()));
-    clientConfig.setStreamBufferMaxSize(toBytes(streamBufferMaxSize.getAsLong()));
-    clientConfig.setStreamBufferFlushSize(toBytes(streamBufferFlushSize.getAsLong()));
-    clientConfig.setDataStreamBufferFlushSize(toBytes(dataStreamBufferFlushSize.getAsLong()));
-    clientConfig.setDataStreamMinPacketSize((int) toBytes(dataStreamMinPacketSize.getAsInt()));
-    clientConfig.setStreamWindowSize(toBytes(dataStreamWindowSize.getAsLong()));
+    clientConfig.setStreamBufferSize(streamBufferSize.getAsInt());
+    clientConfig.setStreamBufferMaxSize(streamBufferMaxSize.getAsLong());
+    clientConfig.setStreamBufferFlushSize(streamBufferFlushSize.getAsLong());
+    clientConfig.setDataStreamBufferFlushSize(dataStreamBufferFlushSize.getAsLong());
+    clientConfig.setDataStreamMinPacketSize(dataStreamMinPacketSize.getAsInt());
+    clientConfig.setStreamWindowSize(dataStreamWindowSize.getAsLong());
 
     target.setFromObject(clientConfig);
-    target.setStorageSize(OZONE_SCM_CHUNK_SIZE_KEY, chunkSize, unit);
-    target.setStorageSize(OZONE_SCM_BLOCK_SIZE, blockSize.getAsLong(), unit);
+    target.setStorageSize(OZONE_SCM_CHUNK_SIZE_KEY, chunkSize, StorageUnit.BYTES);
+    target.setStorageSize(OZONE_SCM_BLOCK_SIZE, blockSize.getAsLong(), StorageUnit.BYTES);
   }
 
   private long toBytes(long value) {

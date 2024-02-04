@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -74,11 +75,11 @@ public class TestOzoneFileSystemMetrics {
         BucketLayout.LEGACY.name());
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
 
-    ClientConfigBuilder.newBuilder(conf)
-        .setChunkSize(2) // MB
-        .setBlockSize(8) // MB
-        .setStreamBufferFlushSize(2) // MB
-        .setStreamBufferMaxSize(4) // MB
+    ClientConfigBuilder.newBuilder(conf, StorageUnit.MB)
+        .setChunkSize(2)
+        .setBlockSize(8)
+        .setStreamBufferFlushSize(2)
+        .setStreamBufferMaxSize(4)
         .setOn(conf);
 
     cluster = MiniOzoneCluster.newBuilder(conf)

@@ -101,12 +101,11 @@ public class Test2WayCommitInRatis {
     raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(10));
     conf.setFromObject(raftClientConfig);
 
-    ClientConfigBuilder.newBuilder(conf)
+    ClientConfigBuilder.newBuilder(conf, StorageUnit.BYTES)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
         .setStreamBufferMaxSize(maxFlushSize)
-        .setStreamBufferSizeUnit(StorageUnit.BYTES)
         .setOn(conf);
 
     conf.setQuietMode(false);

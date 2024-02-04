@@ -38,7 +38,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
-import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec;
@@ -49,6 +48,7 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -210,8 +210,8 @@ public abstract class TestOzoneRpcClientAbstract {
     clusterId = UUID.randomUUID().toString();
     conf.set("ozone.scm.stale.node.interval", "10s");
 
-    ClientConfigBuilder.newBuilder(conf)
-        .setDataStreamMinPacketSize(1) // 1MB
+    ClientConfigBuilder.newBuilder(conf, StorageUnit.MB)
+        .setDataStreamMinPacketSize(1)
         .setOn(conf);
 
     cluster = MiniOzoneCluster.newBuilder(conf)

@@ -132,12 +132,11 @@ public class TestCommitWatcher {
     clientConfig.setChecksumType(ChecksumType.NONE);
     conf.setFromObject(clientConfig);
 
-    ClientConfigBuilder.newBuilder(conf)
+    ClientConfigBuilder.newBuilder(conf, StorageUnit.BYTES)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
         .setStreamBufferMaxSize(maxFlushSize)
-        .setStreamBufferSizeUnit(StorageUnit.BYTES)
         .setOn(conf);
 
     conf.setQuietMode(false);

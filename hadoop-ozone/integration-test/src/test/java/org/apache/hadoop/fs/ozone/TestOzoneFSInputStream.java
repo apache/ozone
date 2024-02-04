@@ -35,6 +35,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.SequenceFile;
@@ -85,11 +86,11 @@ public class TestOzoneFSInputStream {
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         BucketLayout.LEGACY.name());
 
-    ClientConfigBuilder.newBuilder(conf)
-        .setChunkSize(2) // MB
-        .setBlockSize(8) // MB
-        .setStreamBufferFlushSize(2) // MB
-        .setStreamBufferMaxSize(4) // MB
+    ClientConfigBuilder.newBuilder(conf, StorageUnit.MB)
+        .setChunkSize(2)
+        .setBlockSize(8)
+        .setStreamBufferFlushSize(2)
+        .setStreamBufferMaxSize(4)
         .setOn(conf);
 
     cluster = MiniOzoneCluster.newBuilder(conf)

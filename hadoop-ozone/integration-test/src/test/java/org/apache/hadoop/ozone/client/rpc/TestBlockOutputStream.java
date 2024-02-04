@@ -106,12 +106,11 @@ class TestBlockOutputStream {
     ratisClientConfig.setWatchRequestTimeout(Duration.ofSeconds(30));
     conf.setFromObject(ratisClientConfig);
 
-    ClientConfigBuilder.newBuilder(conf)
+    ClientConfigBuilder.newBuilder(conf, StorageUnit.BYTES)
         .setBlockSize(BLOCK_SIZE)
         .setChunkSize(CHUNK_SIZE)
         .setStreamBufferFlushSize(FLUSH_SIZE)
         .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
-        .setStreamBufferSizeUnit(StorageUnit.BYTES)
         .setOn(conf);
 
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)

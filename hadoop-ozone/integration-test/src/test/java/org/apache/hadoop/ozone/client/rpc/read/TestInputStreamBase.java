@@ -64,12 +64,11 @@ abstract class TestInputStreamBase {
     repConf.setInterval(Duration.ofSeconds(1));
     conf.setFromObject(repConf);
 
-    ClientConfigBuilder.newBuilder(conf)
+    ClientConfigBuilder.newBuilder(conf, StorageUnit.BYTES)
         .setBlockSize(BLOCK_SIZE)
         .setChunkSize(CHUNK_SIZE)
         .setStreamBufferFlushSize(FLUSH_SIZE)
         .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
-        .setStreamBufferSizeUnit(StorageUnit.BYTES)
         .setOn(conf);
 
     return MiniOzoneCluster.newBuilder(conf)

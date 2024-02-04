@@ -93,13 +93,12 @@ public class TestBlockDataStreamOutput {
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,
         StorageUnit.MB);
 
-    ClientConfigBuilder.newBuilder(conf)
+    ClientConfigBuilder.newBuilder(conf, StorageUnit.BYTES)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
         .setStreamBufferMaxSize(maxFlushSize)
         .setDataStreamBufferFlushize(maxFlushSize)
-        .setStreamBufferSizeUnit(StorageUnit.BYTES)
         .setDataStreamMinPacketSize(chunkSize)
         .setDataStreamStreamWindowSize(5 * chunkSize)
         .setOn(conf);

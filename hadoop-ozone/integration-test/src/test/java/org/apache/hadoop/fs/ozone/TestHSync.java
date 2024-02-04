@@ -117,13 +117,12 @@ public class TestHSync {
     CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
     CONF.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
     CONF.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
-    ClientConfigBuilder.newBuilder(CONF)
+    ClientConfigBuilder.newBuilder(CONF, StorageUnit.BYTES)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
         .setStreamBufferMaxSize(maxFlushSize)
         .setDataStreamBufferFlushize(maxFlushSize)
-        .setStreamBufferSizeUnit(StorageUnit.BYTES)
         .setDataStreamMinPacketSize(chunkSize)
         .setDataStreamStreamWindowSize(5 * chunkSize)
         .setOn(CONF);

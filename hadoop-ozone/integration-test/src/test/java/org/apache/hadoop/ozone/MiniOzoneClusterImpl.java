@@ -27,7 +27,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 import java.util.Iterator;
@@ -36,7 +35,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -45,7 +43,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationTarget;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
@@ -656,58 +653,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       Files.createDirectories(metaDir);
       conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.toString());
       // conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
-      if (!chunkSize.isPresent()) {
-        //set it to 1MB by default in tests
-        chunkSize = Optional.of(1);
-      }
-      if (!streamBufferSize.isPresent()) {
-        streamBufferSize = OptionalInt.of(chunkSize.get());
-      }
-      if (!streamBufferFlushSize.isPresent()) {
-        streamBufferFlushSize = Optional.of((long) chunkSize.get());
-      }
-      if (!streamBufferMaxSize.isPresent()) {
-        streamBufferMaxSize = Optional.of(2 * streamBufferFlushSize.get());
-      }
-      if (!dataStreamBufferFlushSize.isPresent()) {
-        dataStreamBufferFlushSize = Optional.of((long) 4 * chunkSize.get());
-      }
-      if (!dataStreamMinPacketSize.isPresent()) {
-        dataStreamMinPacketSize = OptionalInt.of(chunkSize.get() / 4);
-      }
-      if (!datastreamWindowSize.isPresent()) {
-        datastreamWindowSize = Optional.of((long) 8 * chunkSize.get());
-      }
-      if (!blockSize.isPresent()) {
-        blockSize = Optional.of(2 * streamBufferMaxSize.get());
-      }
 
-      if (!streamBufferSizeUnit.isPresent()) {
-        streamBufferSizeUnit = Optional.of(StorageUnit.MB);
-      }
-
-      OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-      clientConfig.setStreamBufferSize(
-          (int) Math.round(
-              streamBufferSizeUnit.get().toBytes(streamBufferSize.getAsInt())));
-      clientConfig.setStreamBufferMaxSize(Math.round(
-          streamBufferSizeUnit.get().toBytes(streamBufferMaxSize.get())));
-      clientConfig.setStreamBufferFlushSize(Math.round(
-          streamBufferSizeUnit.get().toBytes(streamBufferFlushSize.get())));
-      clientConfig.setDataStreamBufferFlushSize(Math.round(
-          streamBufferSizeUnit.get().toBytes(dataStreamBufferFlushSize.get())));
-      clientConfig.setDataStreamMinPacketSize((int) Math.round(
-          streamBufferSizeUnit.get()
-              .toBytes(dataStreamMinPacketSize.getAsInt())));
-      clientConfig.setStreamWindowSize(Math.round(
-          streamBufferSizeUnit.get().toBytes(datastreamWindowSize.get())));
-      conf.setFromObject(clientConfig);
-
-      conf.setStorageSize(ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY,
-          chunkSize.get(), streamBufferSizeUnit.get());
-
-      conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, blockSize.get(),
-          streamBufferSizeUnit.get());
       // MiniOzoneCluster should have global pipeline upper limit.
       conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT,
           pipelineNumLimit >= DEFAULT_PIPELINE_LIMIT ?
