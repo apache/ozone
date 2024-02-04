@@ -17,9 +17,13 @@
  */
 package org.apache.hadoop.ozone.common;
 
+import org.apache.hadoop.hdds.JavaUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.util.zip.Checksum;
@@ -35,6 +39,8 @@ public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
   private final Checksum checksum;
 
   private static final Field IS_READY_ONLY_FIELD;
+  // To access Checksum.update(ByteBuffer) API from Java 9+.
+  private static final MethodHandle BYTE_BUFFER_UPDATE;
 
   static {
     Field f = null;
@@ -46,6 +52,18 @@ public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
       LOG.error("No isReadOnly field in ByteBuffer", e);
     }
     IS_READY_ONLY_FIELD = f;
+
+    MethodHandle byteBufferUpdate = null;
+    if (JavaUtils.isJavaVersionAtLeast(9)) {
+      try {
+        byteBufferUpdate = MethodHandles.publicLookup().findVirtual(Checksum.class, "update",
+            MethodType.methodType(void.class, ByteBuffer.class));
+      } catch (Throwable t) {
+        throw new IllegalStateException("Failed to lookup Checksum.update(ByteBuffer).");
+      }
+    }
+    BYTE_BUFFER_UPDATE = byteBufferUpdate;
+
   }
 
   public ChecksumByteBufferImpl(Checksum impl) {
@@ -69,7 +87,15 @@ public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
     if (buffer.hasArray()) {
       checksum.update(buffer.array(), buffer.position() + buffer.arrayOffset(),
           buffer.remaining());
+    } else if (BYTE_BUFFER_UPDATE != null && buffer.isDirect()) {
+      // fast path for direct buffer.
+      try {
+        BYTE_BUFFER_UPDATE.invokeExact(checksum, buffer);
+      } catch (Throwable e) {
+        throw new IllegalStateException("Error invoking " + BYTE_BUFFER_UPDATE,  e);
+      }
     } else {
+      // slow path for direct buffer
       byte[] b = new byte[buffer.remaining()];
       buffer.get(b);
       checksum.update(b, 0, b.length);
