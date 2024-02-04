@@ -70,10 +70,6 @@ public class TestOzoneManagerConfiguration {
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
     conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
         RATIS_RPC_TIMEOUT, TimeUnit.MILLISECONDS);
-    OMStorage omStore = new OMStorage(conf);
-    omStore.setClusterId("testClusterId");
-    // writes the version file properties
-    omStore.initialize();
   }
 
   @AfterEach
