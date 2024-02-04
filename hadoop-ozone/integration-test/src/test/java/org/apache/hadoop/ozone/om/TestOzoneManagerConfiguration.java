@@ -58,9 +58,6 @@ public class TestOzoneManagerConfiguration {
 
   private OzoneConfiguration conf;
   private MiniOzoneCluster cluster;
-  private String omId;
-  private String clusterId;
-  private String scmId;
   private OzoneManager om;
   private OzoneManagerRatisServer omRatisServer;
 
