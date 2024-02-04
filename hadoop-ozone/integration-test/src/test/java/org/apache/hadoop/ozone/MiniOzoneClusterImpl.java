@@ -764,10 +764,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         return;
       }
       scmStore.setClusterId(clusterId);
-      if (!scmId.isPresent()) {
-        scmId = Optional.of(UUID.randomUUID().toString());
-      }
-      scmStore.setScmId(scmId.get());
+      scmStore.setScmId(scmId);
       scmStore.initialize();
       //TODO: HDDS-6897
       //Disabling Ratis for only of MiniOzoneClusterImpl.
@@ -777,7 +774,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
               && SCMHAUtils.isSCMHAEnabled(conf)) {
         scmStore.setSCMHAFlag(true);
         scmStore.persistCurrentState();
-        SCMRatisServerImpl.initialize(clusterId, scmId.get(),
+        SCMRatisServerImpl.initialize(clusterId, scmId,
                 SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
                         .getLocalNodeDetails(), conf);
       }
@@ -788,10 +785,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         return;
       }
       omStorage.setClusterId(clusterId);
-      omStorage.setOmId(omId.orElse(UUID.randomUUID().toString()));
+      omStorage.setOmId(omId);
       // Initialize ozone certificate client if security is enabled.
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-        OzoneManager.initializeSecurity(conf, omStorage, scmId.get());
+        OzoneManager.initializeSecurity(conf, omStorage, scmId);
       }
       omStorage.initialize();
     }

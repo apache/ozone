@@ -322,8 +322,8 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected Optional<Boolean> enableTrace = Optional.of(false);
     protected Optional<Integer> hbInterval = Optional.empty();
     protected Optional<Integer> hbProcessorInterval = Optional.empty();
-    protected Optional<String> scmId = Optional.empty();
-    protected Optional<String> omId = Optional.empty();
+    protected String scmId = UUID.randomUUID().toString();
+    protected String omId = UUID.randomUUID().toString();
     
     protected Optional<String> datanodeReservedSpace = Optional.empty();
     protected Optional<Integer> chunkSize = Optional.empty();
