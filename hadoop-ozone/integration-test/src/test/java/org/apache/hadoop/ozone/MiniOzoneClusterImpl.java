@@ -838,7 +838,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     protected List<HddsDatanodeService> createHddsDatanodes(
         List<StorageContainerManager> scms, ReconServer reconServer)
         throws IOException {
-      configureHddsDatanodes();
       String scmAddress = getSCMAddresses(scms);
       String[] args = new String[] {};
       conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, scmAddress);
@@ -909,7 +908,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           localhostWithFreePort());
       conf.set(ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY,
           localhostWithFreePort());
-      conf.setInt(ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY, numOfScmHandlers);
       conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
           "3s");
       configureSCMheartbeat();
@@ -944,12 +942,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       conf.set(OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY,
           localhostWithFreePort());
       conf.setInt(OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, getFreePort());
-      conf.setInt(OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY, numOfOmHandlers);
-    }
-
-    private void configureHddsDatanodes() {
-      conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
-          enableContainerDatastream);
     }
 
     protected void configureDatanodePorts(ConfigurationTarget conf) {

@@ -325,7 +325,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected Optional<String> scmId = Optional.empty();
     protected Optional<String> omId = Optional.empty();
     
-    protected Boolean enableContainerDatastream = true;
     protected Optional<String> datanodeReservedSpace = Optional.empty();
     protected Optional<Integer> chunkSize = Optional.empty();
     protected OptionalInt streamBufferSize = OptionalInt.empty();
@@ -343,9 +342,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected Optional<Integer> scmLayoutVersion = Optional.empty();
     protected Optional<Integer> dnLayoutVersion = Optional.empty();
 
-    // Use relative smaller number of handlers for testing
-    protected int numOfOmHandlers = 20;
-    protected int numOfScmHandlers = 20;
     protected int numOfDatanodes = 3;
     protected int numDataVolumes = 1;
     protected boolean  startDataNodes = true;
@@ -540,11 +536,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
      */
     public Builder setChunkSize(int size) {
       chunkSize = Optional.of(size);
-      return this;
-    }
-
-    public Builder setStreamBufferSize(int size) {
-      streamBufferSize = OptionalInt.of(size);
       return this;
     }
 
