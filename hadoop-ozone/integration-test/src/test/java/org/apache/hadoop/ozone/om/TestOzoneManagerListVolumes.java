@@ -25,7 +25,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -93,9 +92,6 @@ public class TestOzoneManagerListVolumes {
       throws InterruptedException, TimeoutException, IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     UserGroupInformation.setLoginUser(adminUser);
-    String clusterId = UUID.randomUUID().toString();
-    String scmId = UUID.randomUUID().toString();
-    String omId = UUID.randomUUID().toString();
     conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
 
     // Use native impl here, default impl doesn't do actual checks
@@ -103,7 +99,6 @@ public class TestOzoneManagerListVolumes {
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .withoutDatanodes()
-        .setClusterId(clusterId).setScmId(scmId).setOmId(omId)
         .build();
     cluster.waitForClusterToBeReady();
 

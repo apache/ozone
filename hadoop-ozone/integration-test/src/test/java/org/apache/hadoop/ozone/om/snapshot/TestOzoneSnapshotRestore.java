@@ -53,7 +53,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -104,13 +103,9 @@ public class TestOzoneSnapshotRestore {
     // Enable filesystem snapshot feature for the test regardless of the default
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
 
-    String clusterId = UUID.randomUUID().toString();
-    String scmId = UUID.randomUUID().toString();
     String serviceID = OM_SERVICE_ID + RandomStringUtils.randomNumeric(5);
 
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
-            .setClusterId(clusterId)
-            .setScmId(scmId)
             .setOMServiceId(serviceID)
             .setNumOfOzoneManagers(3)
             .build();

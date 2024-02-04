@@ -57,7 +57,6 @@ import java.io.UnsupportedEncodingException;
 import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
@@ -108,8 +107,6 @@ public class TestOzoneTenantShell {
   private static final PrintStream OLD_ERR = System.err;
 
   private static String omServiceId;
-  private static String clusterId;
-  private static String scmId;
   private static int numOfOMs;
 
   private static final boolean USE_ACTUAL_RANGER = false;
@@ -156,11 +153,7 @@ public class TestOzoneTenantShell {
     // Init cluster
     omServiceId = "om-service-test1";
     numOfOMs = 3;
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
         .withoutDatanodes()  // Remove this once we are actually writing data

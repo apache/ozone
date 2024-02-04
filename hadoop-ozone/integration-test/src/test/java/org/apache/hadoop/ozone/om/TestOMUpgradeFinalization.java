@@ -29,7 +29,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -104,9 +103,6 @@ class TestOMUpgradeFinalization {
   private static MiniOzoneHAClusterImpl newCluster(OzoneConfiguration conf)
       throws IOException {
     return (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
-        .setClusterId(UUID.randomUUID().toString())
-        .setScmId(UUID.randomUUID().toString())
-        .setOMServiceId(UUID.randomUUID().toString())
         .setNumOfOzoneManagers(3)
         .setNumDatanodes(1)
         .setOmLayoutVersion(INITIAL_VERSION.layoutVersion())

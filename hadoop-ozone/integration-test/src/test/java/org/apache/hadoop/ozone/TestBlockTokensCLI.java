@@ -47,7 +47,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Properties;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -94,8 +93,6 @@ public final class TestBlockTokensCLI {
   private static File ozoneKeytab;
   private static File spnegoKeytab;
   private static String host;
-  private static String clusterId;
-  private static String scmId;
   private static String omServiceId;
   private static String scmServiceId;
   private static MiniOzoneHAClusterImpl cluster;
@@ -110,8 +107,6 @@ public final class TestBlockTokensCLI {
 
     workDir =
         GenericTestUtils.getTestDir(TestBlockTokens.class.getSimpleName());
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test";
     scmServiceId = "scm-service-test";
 
@@ -324,10 +319,8 @@ public final class TestBlockTokensCLI {
       throws IOException, TimeoutException, InterruptedException {
     OzoneManager.setTestSecureOmFlag(true);
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newHABuilder(conf)
-        .setClusterId(clusterId)
         .setSCMServiceId(scmServiceId)
         .setOMServiceId(omServiceId)
-        .setScmId(scmId)
         .setNumDatanodes(3)
         .setNumOfStorageContainerManagers(3)
         .setNumOfOzoneManagers(3);

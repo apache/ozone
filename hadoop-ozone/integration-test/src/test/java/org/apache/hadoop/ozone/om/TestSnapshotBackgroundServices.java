@@ -62,7 +62,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -112,8 +111,6 @@ public class TestSnapshotBackgroundServices {
   @BeforeEach
   public void init(TestInfo testInfo) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    String clusterId = UUID.randomUUID().toString();
-    String scmId = UUID.randomUUID().toString();
     String omServiceId = "om-service-test1";
     OzoneManagerRatisServerConfig omRatisConf = conf.getObject(OzoneManagerRatisServerConfig.class);
     omRatisConf.setLogAppenderWaitTimeMin(10);
@@ -157,8 +154,6 @@ public class TestSnapshotBackgroundServices {
         SNAPSHOT_THRESHOLD);
     int numOfOMs = 3;
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
         .setOMServiceId("om-service-test1")
         .setNumOfOzoneManagers(numOfOMs)
         .setNumOfActiveOMs(2)

@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.UUID;
 import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -112,8 +111,6 @@ public class TestOzoneManagerSnapshotAcl {
         + RandomStringUtils.randomNumeric(32);
 
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
-        .setClusterId(UUID.randomUUID().toString())
-        .setScmId(UUID.randomUUID().toString())
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(1)
         .build();

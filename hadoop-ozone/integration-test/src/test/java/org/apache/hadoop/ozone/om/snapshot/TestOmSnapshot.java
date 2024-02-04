@@ -196,8 +196,6 @@ public abstract class TestOmSnapshot {
    */
   private void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    String clusterId = UUID.randomUUID().toString();
-    String scmId = UUID.randomUUID().toString();
     conf.setBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, enabledFileSystemPaths);
     conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, bucketLayout.name());
     conf.setBoolean(OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF, forceFullSnapshotDiff);
@@ -211,12 +209,8 @@ public abstract class TestOmSnapshot {
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
         .setNumOfOzoneManagers(3)
-        .setOmLayoutVersion(OMLayoutFeature.
-          BUCKET_LAYOUT_SUPPORT.layoutVersion())
-        .setOmId(UUID.randomUUID().toString())
+        .setOmLayoutVersion(OMLayoutFeature.BUCKET_LAYOUT_SUPPORT.layoutVersion())
         .build();
 
     cluster.waitForClusterToBeReady();

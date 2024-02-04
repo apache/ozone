@@ -371,14 +371,11 @@ public interface MiniOzoneCluster extends AutoCloseable {
      * Sets the cluster Id.
      *
      * @param id cluster Id
-     *
-     * @return MiniOzoneCluster.Builder
      */
-    public Builder setClusterId(String id) {
+    void setClusterId(String id) {
       clusterId = id;
       path = GenericTestUtils.getTempPath(
           MiniOzoneClusterImpl.class.getSimpleName() + "-" + clusterId);
-      return this;
     }
 
     /**
@@ -411,30 +408,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
 
     public Builder setSecretKeyClient(SecretKeyClient client) {
       this.secretKeyClient = client;
-      return this;
-    }
-
-    /**
-     * Sets the SCM id.
-     *
-     * @param id SCM Id
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setScmId(String id) {
-      scmId = Optional.of(id);
-      return this;
-    }
-
-    /**
-     * Sets the OM id.
-     *
-     * @param id OM Id
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setOmId(String id) {
-      omId = Optional.of(id);
       return this;
     }
 
