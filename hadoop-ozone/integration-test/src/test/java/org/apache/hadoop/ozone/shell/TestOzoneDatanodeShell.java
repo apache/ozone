@@ -36,7 +36,7 @@ import picocli.CommandLine.ParseResult;
 import picocli.CommandLine.RunLast;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * This test class specified for testing Ozone datanode shell command.
@@ -90,17 +90,13 @@ public class TestOzoneDatanodeShell {
     if (Strings.isNullOrEmpty(expectedError)) {
       executeDatanode(hdds, args);
     } else {
-      try {
-        executeDatanode(hdds, args);
-        fail("Exception is expected from command execution " + Arrays.asList(args));
-      } catch (Exception ex) {
-        if (!Strings.isNullOrEmpty(expectedError)) {
-          Throwable exceptionToCheck = ex;
-          if (exceptionToCheck.getCause() != null) {
-            exceptionToCheck = exceptionToCheck.getCause();
-          }
-          assertThat(exceptionToCheck.getMessage()).contains(expectedError);
+      Exception ex = assertThrows(Exception.class, () -> executeDatanode(hdds, args));
+      if (!Strings.isNullOrEmpty(expectedError)) {
+        Throwable exceptionToCheck = ex;
+        if (exceptionToCheck.getCause() != null) {
+          exceptionToCheck = exceptionToCheck.getCause();
         }
+        assertThat(exceptionToCheck.getMessage()).contains(expectedError);
       }
     }
   }

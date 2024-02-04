@@ -74,18 +74,20 @@ public class TestReportSubCommand {
 
     cmd.execute(scmClient);
 
+    Pattern p = Pattern.compile("^The Container Report is not available until Replication Manager completes.*");
+    Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
+
     for (HddsProtos.LifeCycleState state : HddsProtos.LifeCycleState.values()) {
-      Pattern p = Pattern.compile(
-          "^" + state.toString() + ": 0$", Pattern.MULTILINE);
-      Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+      p = Pattern.compile("^" + state.toString() + ": 0$", Pattern.MULTILINE);
+      m = p.matcher(outContent.toString(DEFAULT_ENCODING));
       assertTrue(m.find());
     }
 
     for (ReplicationManagerReport.HealthState state :
         ReplicationManagerReport.HealthState.values()) {
-      Pattern p = Pattern.compile(
-          "^" + state.toString() + ": 0$", Pattern.MULTILINE);
-      Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+      p = Pattern.compile("^" + state.toString() + ": 0$", Pattern.MULTILINE);
+      m = p.matcher(outContent.toString(DEFAULT_ENCODING));
       assertTrue(m.find());
     }
   }
@@ -100,6 +102,10 @@ public class TestReportSubCommand {
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("--json");
     cmd.execute(scmClient);
+
+    Pattern p = Pattern.compile("^The Container Report is not available until Replication Manager completes.*");
+    Matcher m = p.matcher(errContent.toString(DEFAULT_ENCODING));
+    assertTrue(m.find());
 
     ObjectMapper mapper = new ObjectMapper();
     JsonNode json = mapper.readTree(outContent.toString("UTF-8"));

@@ -26,7 +26,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.regex.Pattern;
 
 /**
  * Utility class to facilitate network topology functions.
@@ -34,9 +33,6 @@ import java.util.regex.Pattern;
 public final class NetUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(NetUtils.class);
-
-  private static final Pattern TRAILING_PATH_SEPARATOR =
-      Pattern.compile(NetConstants.PATH_SEPARATOR_STR + "+$");
 
   private NetUtils() {
     // Prevent instantiation

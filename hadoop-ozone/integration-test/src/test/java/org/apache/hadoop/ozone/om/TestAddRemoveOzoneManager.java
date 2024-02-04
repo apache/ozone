@@ -65,8 +65,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test for OM bootstrap process.
@@ -249,21 +249,18 @@ public class TestAddRemoveOzoneManager {
 
     // Bootstrap a new node without updating the configs on existing OMs.
     // This should result in the bootstrap failing.
-    String newNodeId = "omNode-bootstrap-1";
-    try {
-      cluster.bootstrapOzoneManager(newNodeId, false, false);
-      fail("Bootstrap should have failed as configs are not updated on" +
-          " all OMs.");
-    } catch (Exception e) {
-      assertEquals(OmUtils.getOMAddressListPrintString(
-          Lists.newArrayList(existingOM.getNodeDetails())) + " do not have or" +
-          " have incorrect information of the bootstrapping OM. Update their " +
-          "ozone-site.xml before proceeding.", e.getMessage());
-      assertThat(omLog.getOutput()).contains("Remote OM config check " +
-          "failed on OM " + existingOMNodeId);
-      assertThat(miniOzoneClusterLog.getOutput()).contains(newNodeId +
-          " - System Exit");
-    }
+    final String newNodeId = "omNode-bootstrap-1";
+    Exception e =
+        assertThrows(Exception.class, () -> cluster.bootstrapOzoneManager(newNodeId, false, false),
+            "Bootstrap should have failed as configs are not updated on all OMs.");
+    assertEquals(OmUtils.getOMAddressListPrintString(
+        Lists.newArrayList(existingOM.getNodeDetails())) + " do not have or" +
+        " have incorrect information of the bootstrapping OM. Update their " +
+        "ozone-site.xml before proceeding.", e.getMessage());
+    assertThat(omLog.getOutput()).contains("Remote OM config check " +
+        "failed on OM " + existingOMNodeId);
+    assertThat(miniOzoneClusterLog.getOutput()).contains(newNodeId +
+        " - System Exit");
 
     /***************************************************************************
      * 2. Force bootstrap without updating config on any OM -> fail
@@ -276,15 +273,15 @@ public class TestAddRemoveOzoneManager {
     miniOzoneClusterLog.clearOutput();
     omLog.clearOutput();
 
-    newNodeId = "omNode-bootstrap-2";
+    String newNodeId1 = "omNode-bootstrap-2";
     try {
-      cluster.bootstrapOzoneManager(newNodeId, false, true);
-    } catch (IOException e) {
+      cluster.bootstrapOzoneManager(newNodeId1, false, true);
+    } catch (IOException ex) {
       assertThat(omLog.getOutput()).contains("Couldn't add OM " +
-          newNodeId + " to peer list.");
+          newNodeId1 + " to peer list.");
       assertThat(miniOzoneClusterLog.getOutput()).contains(
           existingOMNodeId + " - System Exit: There is no OM configuration " +
-              "for node ID " + newNodeId + " in ozone-site.xml.");
+              "for node ID " + newNodeId1 + " in ozone-site.xml.");
 
       // Verify that the existing OM has stopped.
       assertFalse(cluster.getOzoneManager(existingOMNodeId).isRunning());
@@ -323,23 +320,20 @@ public class TestAddRemoveOzoneManager {
      **************************************************************************/
 
     // Update configs on all active OMs and Bootstrap a new node
-    String newNodeId = "omNode-bootstrap-1";
-    try {
-      cluster.bootstrapOzoneManager(newNodeId, true, false);
-      fail("Bootstrap should have failed as configs are not updated on" +
-          " all OMs.");
-    } catch (IOException e) {
-      assertEquals(OmUtils.getOMAddressListPrintString(
-          Lists.newArrayList(downOM.getNodeDetails())) + " do not have or " +
-          "have incorrect information of the bootstrapping OM. Update their " +
-          "ozone-site.xml before proceeding.", e.getMessage());
-      assertThat(omLog.getOutput()).contains("Remote OM " + downOMNodeId +
-          " configuration returned null");
-      assertThat(omLog.getOutput()).contains("Remote OM config check " +
-          "failed on OM " + downOMNodeId);
-      assertThat(miniOzoneClusterLog.getOutput()).contains(newNodeId +
-          " - System Exit");
-    }
+    final String newNodeId = "omNode-bootstrap-1";
+    IOException e =
+        assertThrows(IOException.class, () -> cluster.bootstrapOzoneManager(newNodeId, true, false),
+            "Bootstrap should have failed as configs are not updated on all OMs.");
+    assertEquals(OmUtils.getOMAddressListPrintString(
+        Lists.newArrayList(downOM.getNodeDetails())) + " do not have or " +
+        "have incorrect information of the bootstrapping OM. Update their " +
+        "ozone-site.xml before proceeding.", e.getMessage());
+    assertThat(omLog.getOutput()).contains("Remote OM " + downOMNodeId +
+        " configuration returned null");
+    assertThat(omLog.getOutput()).contains("Remote OM config check " +
+        "failed on OM " + downOMNodeId);
+    assertThat(miniOzoneClusterLog.getOutput()).contains(newNodeId +
+        " - System Exit");
 
     /***************************************************************************
      * 2. Force bootstrap (with 1 node down and updated configs on rest) -> pass
@@ -349,9 +343,9 @@ public class TestAddRemoveOzoneManager {
     omLog.clearOutput();
 
     // Update configs on all active OMs and Force Bootstrap a new node
-    newNodeId = "omNode-bootstrap-2";
-    cluster.bootstrapOzoneManager(newNodeId, true, true);
-    OzoneManager newOM = cluster.getOzoneManager(newNodeId);
+    String newNodeId1 = "omNode-bootstrap-2";
+    cluster.bootstrapOzoneManager(newNodeId1, true, true);
+    OzoneManager newOM = cluster.getOzoneManager(newNodeId1);
 
     // Verify that the newly bootstrapped OM is running
     assertTrue(newOM.isRunning());

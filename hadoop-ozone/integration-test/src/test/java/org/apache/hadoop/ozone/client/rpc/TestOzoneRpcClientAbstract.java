@@ -133,6 +133,7 @@ import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
+import static org.apache.hadoop.ozone.OmUtils.LOG;
 import static org.apache.hadoop.ozone.OmUtils.MAX_TRXN_ID;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
@@ -153,7 +154,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -2864,13 +2864,10 @@ public abstract class TestOzoneRpcClientAbstract {
       String keyName2 = UUID.randomUUID().toString();
       OzoneBucket bucket2 = client.getObjectStore().getVolume(volumeName)
           .getBucket(bucketName);
-      try {
-        initiateMultipartUpload(bucket2, keyName2, anyReplication());
-        fail("User without permission should fail");
-      } catch (Exception e) {
-        OMException ome = assertInstanceOf(OMException.class, e);
-        assertEquals(ResultCodes.PERMISSION_DENIED, ome.getResult());
-      }
+      OMException ome =
+          assertThrows(OMException.class, () -> initiateMultipartUpload(bucket2, keyName2, anyReplication()),
+              "User without permission should fail");
+      assertEquals(ResultCodes.PERMISSION_DENIED, ome.getResult());
 
       // Add create permission for user, and try multi-upload init again
       OzoneAcl acl7 = new OzoneAcl(USER, userName, ACLType.CREATE, DEFAULT);
@@ -2899,12 +2896,12 @@ public abstract class TestOzoneRpcClientAbstract {
       completeMultipartUpload(bucket2, keyName2, uploadId, partsMap);
 
       // User without permission cannot read multi-uploaded object
-      try (OzoneInputStream ignored = bucket2.readKey(keyName)) {
-        fail("User without permission should fail");
-      } catch (Exception e) {
-        OMException ome = assertInstanceOf(OMException.class, e);
-        assertEquals(ResultCodes.PERMISSION_DENIED, ome.getResult());
-      }
+      OMException ex = assertThrows(OMException.class, () -> {
+        try (OzoneInputStream ignored = bucket2.readKey(keyName)) {
+          LOG.error("User without permission should fail");
+        }
+      }, "User without permission should fail");
+      assertEquals(ResultCodes.PERMISSION_DENIED, ex.getResult());
     }
   }
 
@@ -3182,14 +3179,8 @@ public abstract class TestOzoneRpcClientAbstract {
 
     // Abort before completing part upload.
     bucket.abortMultipartUpload(keyName, omMultipartInfo.getUploadID());
-
-    try {
-      ozoneOutputStream.close();
-      fail("testAbortUploadFailWithInProgressPartUpload failed");
-    } catch (IOException ex) {
-      OMException ome = assertInstanceOf(OMException.class, ex);
-      assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, ome.getResult());
-    }
+    OMException ome = assertThrows(OMException.class, () -> ozoneOutputStream.close());
+    assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, ome.getResult());
   }
 
   @Test
@@ -3244,14 +3235,8 @@ public abstract class TestOzoneRpcClientAbstract {
     String part1 = new String(data, UTF_8);
     sb.append(part1);
     assertEquals(sb.toString(), new String(fileContent, UTF_8));
-
-    try {
-      ozoneOutputStream.close();
-      fail("testCommitPartAfterCompleteUpload failed");
-    } catch (IOException ex) {
-      OMException ome = assertInstanceOf(OMException.class, ex);
-      assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, ome.getResult());
-    }
+    OMException ex = assertThrows(OMException.class, ozoneOutputStream::close);
+    assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, ex.getResult());
   }
 
 

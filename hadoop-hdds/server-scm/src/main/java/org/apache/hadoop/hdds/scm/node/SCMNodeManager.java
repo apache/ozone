@@ -511,19 +511,15 @@ public class SCMNodeManager implements NodeManager {
    * Send heartbeat to indicate the datanode is alive and doing well.
    *
    * @param datanodeDetails - DatanodeDetailsProto.
-   * @param layoutInfo - Layout Version Proto.
    * @return SCMheartbeat response.
    */
   @Override
   public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
-                                           LayoutVersionProto layoutInfo,
-      CommandQueueReportProto queueReport) {
+                                           CommandQueueReportProto queueReport) {
     Preconditions.checkNotNull(datanodeDetails, "Heartbeat is missing " +
         "DatanodeDetails.");
     try {
       nodeStateManager.updateLastHeartbeatTime(datanodeDetails);
-      nodeStateManager.updateLastKnownLayoutVersion(datanodeDetails,
-          layoutInfo);
       metrics.incNumHBProcessed();
       updateDatanodeOpState(datanodeDetails);
     } catch (NodeNotFoundException e) {
@@ -684,6 +680,15 @@ public class SCMNodeManager implements NodeManager {
       LOG.trace("HB is received from [datanode={}]: <json>{}</json>",
           datanodeDetails.getHostName(),
           layoutVersionReport.toString().replaceAll("\n", "\\\\n"));
+    }
+
+    try {
+      nodeStateManager.updateLastKnownLayoutVersion(datanodeDetails,
+          layoutVersionReport);
+    } catch (NodeNotFoundException e) {
+      LOG.error("SCM trying to process Layout Version from an " +
+          "unregistered node {}.", datanodeDetails);
+      return;
     }
 
     // Software layout version is hardcoded to the SCM.

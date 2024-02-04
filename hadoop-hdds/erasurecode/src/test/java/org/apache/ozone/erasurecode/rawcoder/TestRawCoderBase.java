@@ -93,13 +93,9 @@ public abstract class TestRawCoderBase extends TestCoderBase {
   protected void testCodingWithBadInput(boolean usingDirectBuffer) {
     this.usingDirectBuffer = usingDirectBuffer;
     prepareCoders(true);
-
-    try {
-      performTestCoding(baseChunkSize, false, true, false);
-      fail("Encoding test with bad input should fail");
-    } catch (Exception e) {
-      // Expected
-    }
+    assertThrows(Exception.class,
+        () -> performTestCoding(baseChunkSize, false, true, false),
+        "Encoding test with bad input should fail");
   }
 
   /**
@@ -109,13 +105,9 @@ public abstract class TestRawCoderBase extends TestCoderBase {
   protected void testCodingWithBadOutput(boolean usingDirectBuffer) {
     this.usingDirectBuffer = usingDirectBuffer;
     prepareCoders(true);
-
-    try {
-      performTestCoding(baseChunkSize, false, false, true);
-      fail("Decoding test with bad output should fail");
-    } catch (Exception e) {
-      // Expected
-    }
+    assertThrows(Exception.class,
+        () -> performTestCoding(baseChunkSize, false, false, true),
+        "Decoding test with bad output should fail");
   }
 
   /**
@@ -143,19 +135,8 @@ public abstract class TestRawCoderBase extends TestCoderBase {
 
   @Test
   public void testCodingWithErasingTooMany() {
-    try {
-      testCoding(true);
-      fail("Decoding test erasing too many should fail");
-    } catch (Exception e) {
-      // Expected
-    }
-
-    try {
-      testCoding(false);
-      fail("Decoding test erasing too many should fail");
-    } catch (Exception e) {
-      // Expected
-    }
+    assertThrows(Exception.class, () -> testCoding(true), "Decoding test erasing too many should fail");
+    assertThrows(Exception.class, () -> testCoding(false), "Decoding test erasing too many should fail");
   }
 
   @Test

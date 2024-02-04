@@ -132,7 +132,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
@@ -381,13 +380,11 @@ public class TestKeyManagerImpl {
     keyArgs.setLocationInfoList(
         keySession.getKeyInfo().getLatestVersionLocations().getLocationList());
     writeClient.commitKey(keyArgs, keySession.getId());
-    try {
-      writeClient.createDirectory(keyArgs);
-      fail("Creation should fail for directory.");
-    } catch (OMException e) {
-      assertEquals(e.getResult(),
-          OMException.ResultCodes.FILE_ALREADY_EXISTS);
-    }
+    OmKeyArgs finalKeyArgs = keyArgs;
+    OMException e =
+        assertThrows(OMException.class, () -> writeClient.createDirectory(finalKeyArgs),
+            "Creation should fail for directory.");
+    assertEquals(e.getResult(), OMException.ResultCodes.FILE_ALREADY_EXISTS);
 
     // create directory where parent is root
     keyName = RandomStringUtils.randomAlphabetic(5);
@@ -414,13 +411,12 @@ public class TestKeyManagerImpl {
     writeClient.commitKey(keyArgs, keySession.getId());
 
     // try to open created key with overWrite flag set to false
-    try {
-      writeClient.createFile(keyArgs, false, false);
-      fail("Open key should fail for non overwrite create");
-    } catch (OMException ex) {
-      if (ex.getResult() != OMException.ResultCodes.FILE_ALREADY_EXISTS) {
-        throw ex;
-      }
+    OmKeyArgs finalKeyArgs = keyArgs;
+    OMException ex =
+        assertThrows(OMException.class, () -> writeClient.createFile(finalKeyArgs, false, false),
+            "Open key should fail for non overwrite create");
+    if (ex.getResult() != OMException.ResultCodes.FILE_ALREADY_EXISTS) {
+      throw ex;
     }
 
     // create file should pass with overwrite flag set to true
@@ -437,13 +433,12 @@ public class TestKeyManagerImpl {
     keyArgs = createBuilder()
         .setKeyName(keyName)
         .build();
-    try {
-      writeClient.createFile(keyArgs, false, false);
-      fail("Open file should fail for non recursive write");
-    } catch (OMException ex) {
-      if (ex.getResult() != OMException.ResultCodes.DIRECTORY_NOT_FOUND) {
-        throw ex;
-      }
+    OmKeyArgs finalKeyArgs1 = keyArgs;
+    ex =
+        assertThrows(OMException.class, () -> writeClient.createFile(finalKeyArgs1, false, false),
+            "Open file should fail for non recursive write");
+    if (ex.getResult() != OMException.ResultCodes.DIRECTORY_NOT_FOUND) {
+      throw ex;
     }
 
     // file create should pass when recursive flag is set to true
@@ -458,13 +453,11 @@ public class TestKeyManagerImpl {
     keyArgs = createBuilder()
         .setKeyName("")
         .build();
-    try {
-      writeClient.createFile(keyArgs, true, true);
-      fail("Open file should fail for non recursive write");
-    } catch (OMException ex) {
-      if (ex.getResult() != OMException.ResultCodes.NOT_A_FILE) {
-        throw ex;
-      }
+    OmKeyArgs finalKeyArgs2 = keyArgs;
+    ex = assertThrows(OMException.class, () -> writeClient.createFile(finalKeyArgs2, true, true),
+        "Open file should fail for non recursive write");
+    if (ex.getResult() != OMException.ResultCodes.NOT_A_FILE) {
+      throw ex;
     }
   }
 
@@ -739,13 +732,12 @@ public class TestKeyManagerImpl {
         .build();
 
     // lookup for a non-existent file
-    try {
-      keyManager.lookupFile(keyArgs, null);
-      fail("Lookup file should fail for non existent file");
-    } catch (OMException ex) {
-      if (ex.getResult() != OMException.ResultCodes.FILE_NOT_FOUND) {
-        throw ex;
-      }
+    OmKeyArgs finalKeyArgs = keyArgs;
+    OMException ex =
+        assertThrows(OMException.class, () -> keyManager.lookupFile(finalKeyArgs, null),
+            "Lookup file should fail for non existent file");
+    if (ex.getResult() != OMException.ResultCodes.FILE_NOT_FOUND) {
+      throw ex;
     }
 
     // create a file
@@ -760,13 +752,11 @@ public class TestKeyManagerImpl {
     keyArgs = createBuilder()
         .setKeyName("")
         .build();
-    try {
-      keyManager.lookupFile(keyArgs, null);
-      fail("Lookup file should fail for a directory");
-    } catch (OMException ex) {
-      if (ex.getResult() != OMException.ResultCodes.NOT_A_FILE) {
-        throw ex;
-      }
+    OmKeyArgs finalKeyArgs1 = keyArgs;
+    ex = assertThrows(OMException.class, () -> keyManager.lookupFile(finalKeyArgs1, null),
+        "Lookup file should fail for a directory");
+    if (ex.getResult() != OMException.ResultCodes.NOT_A_FILE) {
+      throw ex;
     }
   }
 
@@ -782,13 +772,11 @@ public class TestKeyManagerImpl {
         .setSortDatanodesInPipeline(true)
         .build();
     // lookup for a non-existent key
-    try {
-      keyManager.lookupKey(keyArgs, resolvedBucket(), null);
-      fail("Lookup key should fail for non existent key");
-    } catch (OMException ex) {
-      if (ex.getResult() != OMException.ResultCodes.KEY_NOT_FOUND) {
-        throw ex;
-      }
+    OMException ex =
+        assertThrows(OMException.class, () -> keyManager.lookupKey(keyArgs, resolvedBucket(), null),
+            "Lookup key should fail for non existent key");
+    if (ex.getResult() != OMException.ResultCodes.KEY_NOT_FOUND) {
+      throw ex;
     }
 
     // create a key
@@ -877,13 +865,12 @@ public class TestKeyManagerImpl {
         .build();
 
     // lookup for a non-existent key
-    try {
-      keyManager.lookupKey(keyArgs, resolvedBucket(), null);
-      fail("Lookup key should fail for non existent key");
-    } catch (OMException ex) {
-      if (ex.getResult() != OMException.ResultCodes.KEY_NOT_FOUND) {
-        throw ex;
-      }
+    OmKeyArgs finalKeyArgs = keyArgs;
+    OMException ex =
+        assertThrows(OMException.class, () -> keyManager.lookupKey(finalKeyArgs, resolvedBucket(), null),
+            "Lookup key should fail for non existent key");
+    if (ex.getResult() != OMException.ResultCodes.KEY_NOT_FOUND) {
+      throw ex;
     }
 
     // create a key

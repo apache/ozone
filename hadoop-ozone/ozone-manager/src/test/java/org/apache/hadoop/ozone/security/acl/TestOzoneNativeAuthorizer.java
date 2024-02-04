@@ -16,7 +16,6 @@
  */
 package org.apache.hadoop.ozone.security.acl;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -42,10 +41,9 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -90,6 +88,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class TestOzoneNativeAuthorizer {
 
   private static final List<String> ADMIN_USERNAMES = singletonList("om");
+  @TempDir
   private static File testDir;
   private String vol;
   private String buck;
@@ -144,7 +143,6 @@ public class TestOzoneNativeAuthorizer {
     OzoneConfiguration ozConfig = new OzoneConfiguration();
     ozConfig.set(OZONE_ACL_AUTHORIZER_CLASS,
         OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
-    testDir = GenericTestUtils.getRandomizedTestDir();
     ozConfig.set(OZONE_METADATA_DIRS, testDir.toString());
     ozConfig.set(OZONE_ADMINISTRATORS, "om");
 
@@ -162,11 +160,6 @@ public class TestOzoneNativeAuthorizer {
         new String[]{"ozone"});
     testUgi = UserGroupInformation.createUserForTesting("testuser",
         new String[]{"test"});
-  }
-
-  @AfterAll
-  public static void cleanup() throws IOException {
-    FileUtils.deleteDirectory(testDir);
   }
 
   private void createKey(String volume,

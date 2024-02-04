@@ -417,6 +417,11 @@ public class TestListKeysWithFSO {
 
     expectedKeys = getExpectedKeyList("a", "a1", legacyOzoneBucket2);
     checkKeyList("a", "a1", expectedKeys, fsoOzoneBucket2);
+
+    // test when the keyPrefix = existing key
+    expectedKeys =
+        getExpectedKeyList("x/y/z/z1.tx", "", legacyOzoneBucket2);
+    checkKeyList("x/y/z/z1.tx", "", expectedKeys, fsoOzoneBucket2);
   }
 
   @Test
@@ -549,6 +554,7 @@ public class TestListKeysWithFSO {
     keys.add("/a3/b1/c1/c1.tx");
 
     keys.add("/x/y/z/z1.tx");
+    keys.add("/x/y/z/z1.txdir/z2.tx");
 
     keys.add("/dir1/dir2/dir3/d11.tx");
 

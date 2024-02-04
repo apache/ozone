@@ -25,10 +25,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTE
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_ACCESS_ID;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_AUTHORIZER_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.multitenant.AccessPolicy.AccessGrantType.ALLOW;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
-import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -54,7 +50,6 @@ import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
-import org.apache.hadoop.ozone.om.multitenant.AccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.AuthorizerLock;
 import org.apache.hadoop.ozone.om.multitenant.AuthorizerLockImpl;
 import org.apache.hadoop.ozone.om.multitenant.BucketNameSpace;
@@ -65,14 +60,11 @@ import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Policy;
 import org.apache.hadoop.ozone.om.multitenant.MultiTenantAccessController.Role;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
-import org.apache.hadoop.ozone.om.multitenant.OzoneOwnerPrincipal;
 import org.apache.hadoop.ozone.om.multitenant.OzoneTenant;
-import org.apache.hadoop.ozone.om.multitenant.RangerAccessPolicy;
 import org.apache.hadoop.ozone.om.multitenant.RangerClientMultiTenantAccessController;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserAccessIdInfo;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -849,24 +841,6 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
           INVALID_ACCESS_ID);
     }
     return optionalTenant.get();
-  }
-
-  // TODO: This policy doesn't seem necessary as the bucket-level policy has
-  //  already granted the key-level access.
-  //  Not sure if that is the intended behavior in Ranger though.
-  //  Still, could add this KeyAccess policy as well in Ranger, doesn't hurt.
-  private AccessPolicy newDefaultKeyAccessPolicy(String volumeName,
-      String bucketName) throws IOException {
-    AccessPolicy policy = new RangerAccessPolicy(
-        // principal already contains volume name
-        volumeName + "-KeyAccess");
-
-    OzoneObjInfo obj = OzoneObjInfo.Builder.newBuilder()
-        .setResType(KEY).setStoreType(OZONE).setVolumeName(volumeName)
-        .setBucketName("*").setKeyName("*").build();
-    // Bucket owners should have ALL permission on their keys
-    policy.addAccessPolicyElem(obj, new OzoneOwnerPrincipal(), ALL, ALLOW);
-    return policy;
   }
 
   public OzoneConfiguration getConf() {
