@@ -25,6 +25,7 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.ClientConfigBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -72,12 +73,16 @@ public class TestOzoneFileSystemMetrics {
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         BucketLayout.LEGACY.name());
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
+
+    ClientConfigBuilder.newBuilder(conf)
         .setChunkSize(2) // MB
         .setBlockSize(8) // MB
         .setStreamBufferFlushSize(2) // MB
         .setStreamBufferMaxSize(4) // MB
+        .setOn(conf);
+
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(3)
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();

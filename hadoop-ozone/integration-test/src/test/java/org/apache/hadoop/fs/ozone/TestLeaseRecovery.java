@@ -17,14 +17,15 @@
  */
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.ClientConfigBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -91,17 +92,20 @@ public class TestLeaseRecovery {
     conf.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
+    ClientConfigBuilder.newBuilder(conf)
+        .setBlockSize(blockSize)
+        .setChunkSize(chunkSize)
+        .setStreamBufferFlushSize(flushSize)
+        .setStreamBufferMaxSize(maxFlushSize)
+        .setDataStreamBufferFlushize(maxFlushSize)
+        .setStreamBufferSizeUnit(StorageUnit.BYTES)
+        .setDataStreamMinPacketSize(chunkSize)
+        .setDataStreamStreamWindowSize(5 * chunkSize)
+        .setOn(conf);
+
     cluster = MiniOzoneCluster.newBuilder(conf)
       .setNumDatanodes(5)
       .setTotalPipelineNumLimit(10)
-      .setBlockSize(blockSize)
-      .setChunkSize(chunkSize)
-      .setStreamBufferFlushSize(flushSize)
-      .setStreamBufferMaxSize(maxFlushSize)
-      .setDataStreamBufferFlushize(maxFlushSize)
-      .setStreamBufferSizeUnit(StorageUnit.BYTES)
-      .setDataStreamMinPacketSize(chunkSize)
-      .setDataStreamStreamWindowSize(5 * chunkSize)
       .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
