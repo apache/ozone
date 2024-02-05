@@ -75,12 +75,12 @@ public class TestOzoneFileSystemMetrics {
         BucketLayout.LEGACY.name());
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
 
-    ClientConfigBuilder.newBuilder(conf, StorageUnit.MB)
+    ClientConfigBuilder.newBuilder(StorageUnit.MB)
         .setChunkSize(2)
         .setBlockSize(8)
         .setStreamBufferFlushSize(2)
         .setStreamBufferMaxSize(4)
-        .setOn(conf);
+        .applyTo(conf);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)

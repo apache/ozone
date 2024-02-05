@@ -142,12 +142,12 @@ public class TestWatchForCommit {
 
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 30, TimeUnit.SECONDS);
 
-    ClientConfigBuilder.newBuilder(conf, StorageUnit.BYTES)
+    ClientConfigBuilder.newBuilder(StorageUnit.BYTES)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
         .setStreamBufferMaxSize(maxFlushSize)
-        .setOn(conf);
+        .applyTo(conf);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(9)

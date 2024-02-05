@@ -132,12 +132,12 @@ public class TestCommitWatcher {
     clientConfig.setChecksumType(ChecksumType.NONE);
     conf.setFromObject(clientConfig);
 
-    ClientConfigBuilder.newBuilder(conf, StorageUnit.BYTES)
+    ClientConfigBuilder.newBuilder(StorageUnit.BYTES)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
         .setStreamBufferMaxSize(maxFlushSize)
-        .setOn(conf);
+        .applyTo(conf);
 
     conf.setQuietMode(false);
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,

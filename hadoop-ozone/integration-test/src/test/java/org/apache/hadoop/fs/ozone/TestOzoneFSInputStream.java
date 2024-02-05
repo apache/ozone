@@ -86,12 +86,12 @@ public class TestOzoneFSInputStream {
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         BucketLayout.LEGACY.name());
 
-    ClientConfigBuilder.newBuilder(conf, StorageUnit.MB)
+    ClientConfigBuilder.newBuilder(StorageUnit.MB)
         .setChunkSize(2)
         .setBlockSize(8)
         .setStreamBufferFlushSize(2)
         .setStreamBufferMaxSize(4)
-        .setOn(conf);
+        .applyTo(conf);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(5)

@@ -117,7 +117,7 @@ public class TestHSync {
     CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
     CONF.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
     CONF.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
-    ClientConfigBuilder.newBuilder(CONF, StorageUnit.BYTES)
+    ClientConfigBuilder.newBuilder(StorageUnit.BYTES)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
@@ -125,7 +125,7 @@ public class TestHSync {
         .setDataStreamBufferFlushSize(maxFlushSize)
         .setDataStreamMinPacketSize(chunkSize)
         .setDataStreamWindowSize(5 * chunkSize)
-        .setOn(CONF);
+        .applyTo(CONF);
 
     cluster = MiniOzoneCluster.newBuilder(CONF)
         .setNumDatanodes(5)

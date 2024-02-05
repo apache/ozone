@@ -142,10 +142,10 @@ class TestOzoneAtRestEncryption {
     CertificateClientTestImpl certificateClientTest =
         new CertificateClientTestImpl(conf);
 
-    ClientConfigBuilder.newBuilder(conf, StorageUnit.BYTES)
+    ClientConfigBuilder.newBuilder(StorageUnit.BYTES)
         .setBlockSize(BLOCK_SIZE)
         .setChunkSize(CHUNK_SIZE)
-        .setOn(conf);
+        .applyTo(conf);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(10)

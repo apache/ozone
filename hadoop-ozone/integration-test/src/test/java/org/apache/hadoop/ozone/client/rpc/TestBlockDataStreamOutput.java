@@ -93,7 +93,7 @@ public class TestBlockDataStreamOutput {
     conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, 4,
         StorageUnit.MB);
 
-    ClientConfigBuilder.newBuilder(conf, StorageUnit.BYTES)
+    ClientConfigBuilder.newBuilder(StorageUnit.BYTES)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
@@ -101,7 +101,7 @@ public class TestBlockDataStreamOutput {
         .setDataStreamBufferFlushSize(maxFlushSize)
         .setDataStreamMinPacketSize(chunkSize)
         .setDataStreamWindowSize(5 * chunkSize)
-        .setOn(conf);
+        .applyTo(conf);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(5)

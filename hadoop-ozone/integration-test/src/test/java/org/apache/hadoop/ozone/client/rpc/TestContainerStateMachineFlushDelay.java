@@ -110,12 +110,12 @@ public class TestContainerStateMachineFlushDelay {
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "2s");
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");
 
-    ClientConfigBuilder.newBuilder(conf, StorageUnit.BYTES)
+    ClientConfigBuilder.newBuilder(StorageUnit.BYTES)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
         .setStreamBufferMaxSize(maxFlushSize)
-        .setOn(conf);
+        .applyTo(conf);
 
     cluster =
         MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1)

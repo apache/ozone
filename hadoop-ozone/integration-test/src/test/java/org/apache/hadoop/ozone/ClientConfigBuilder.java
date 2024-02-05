@@ -17,8 +17,7 @@
  */
 package org.apache.hadoop.ozone;
 
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.ConfigurationTarget;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 
@@ -33,8 +32,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
  */
 public final class ClientConfigBuilder {
 
-  private final ConfigurationSource conf;
-
   private int chunkSize = 1024 * 1024;
   private OptionalLong blockSize = OptionalLong.empty();
   private OptionalInt streamBufferSize = OptionalInt.empty();
@@ -45,12 +42,15 @@ public final class ClientConfigBuilder {
   private OptionalInt dataStreamMinPacketSize = OptionalInt.empty();
   private final StorageUnit unit;
 
-  public static ClientConfigBuilder newBuilder(ConfigurationSource conf, StorageUnit unit) {
-    return new ClientConfigBuilder(conf, unit);
+  /**
+   * @param unit Defines the unit in which size properties will be passed to the builder.
+   * All sizes are stored internally converted to {@link StorageUnit#BYTES}.
+   */
+  public static ClientConfigBuilder newBuilder(StorageUnit unit) {
+    return new ClientConfigBuilder(unit);
   }
 
-  private ClientConfigBuilder(ConfigurationSource conf, StorageUnit unit) {
-    this.conf = conf;
+  private ClientConfigBuilder(StorageUnit unit) {
     this.unit = unit;
   }
 
@@ -64,6 +64,7 @@ public final class ClientConfigBuilder {
     return this;
   }
 
+  @SuppressWarnings("unused") // kept for completeness
   public ClientConfigBuilder setStreamBufferSize(int size) {
     streamBufferSize = OptionalInt.of((int) toBytes(size));
     return this;
@@ -94,7 +95,7 @@ public final class ClientConfigBuilder {
     return this;
   }
 
-  public void setOn(ConfigurationTarget target) {
+  public void applyTo(MutableConfigurationSource conf) {
     if (!streamBufferSize.isPresent()) {
       streamBufferSize = OptionalInt.of(chunkSize);
     }
@@ -125,9 +126,9 @@ public final class ClientConfigBuilder {
     clientConfig.setDataStreamMinPacketSize(dataStreamMinPacketSize.getAsInt());
     clientConfig.setStreamWindowSize(dataStreamWindowSize.getAsLong());
 
-    target.setFromObject(clientConfig);
-    target.setStorageSize(OZONE_SCM_CHUNK_SIZE_KEY, chunkSize, StorageUnit.BYTES);
-    target.setStorageSize(OZONE_SCM_BLOCK_SIZE, blockSize.getAsLong(), StorageUnit.BYTES);
+    conf.setFromObject(clientConfig);
+    conf.setStorageSize(OZONE_SCM_CHUNK_SIZE_KEY, chunkSize, StorageUnit.BYTES);
+    conf.setStorageSize(OZONE_SCM_BLOCK_SIZE, blockSize.getAsLong(), StorageUnit.BYTES);
   }
 
   private long toBytes(long value) {

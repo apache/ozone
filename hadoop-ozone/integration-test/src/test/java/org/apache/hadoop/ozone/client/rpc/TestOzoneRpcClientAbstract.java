@@ -205,9 +205,9 @@ public abstract class TestOzoneRpcClientAbstract {
     //  for testZReadKeyWithUnhealthyContainerReplica.
     conf.set("ozone.scm.stale.node.interval", "10s");
 
-    ClientConfigBuilder.newBuilder(conf, StorageUnit.MB)
+    ClientConfigBuilder.newBuilder(StorageUnit.MB)
         .setDataStreamMinPacketSize(1)
-        .setOn(conf);
+        .applyTo(conf);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(14)

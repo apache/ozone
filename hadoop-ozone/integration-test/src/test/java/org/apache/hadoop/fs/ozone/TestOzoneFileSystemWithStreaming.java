@@ -88,7 +88,7 @@ public class TestOzoneFileSystemWithStreaming {
     CONF.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, true);
     CONF.set(OZONE_DEFAULT_BUCKET_LAYOUT, layout.name());
 
-    ClientConfigBuilder.newBuilder(CONF, StorageUnit.BYTES)
+    ClientConfigBuilder.newBuilder(StorageUnit.BYTES)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
@@ -96,7 +96,7 @@ public class TestOzoneFileSystemWithStreaming {
         .setDataStreamBufferFlushSize(maxFlushSize)
         .setDataStreamMinPacketSize(chunkSize)
         .setDataStreamWindowSize(5 * chunkSize)
-        .setOn(CONF);
+        .applyTo(CONF);
 
     cluster = MiniOzoneCluster.newBuilder(CONF)
         .setNumDatanodes(5)
