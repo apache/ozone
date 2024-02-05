@@ -830,7 +830,6 @@ public class TestStorageContainerManager {
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
         .setHbInterval(1000)
         .setHbProcessorInterval(3000)
-        .setTrace(false)
         .setNumDatanodes(1)
         .build();
     cluster.waitForClusterToBeReady();
