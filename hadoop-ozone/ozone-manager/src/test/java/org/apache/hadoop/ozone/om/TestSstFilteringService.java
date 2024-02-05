@@ -36,10 +36,10 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ratis.util.ExitUtils;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.LiveFileMetaData;
@@ -81,12 +81,8 @@ public class TestSstFilteringService {
   private KeyManager keyManager;
 
   @BeforeAll
-  public static void setup() {
+  void setup() throws AuthenticationException, IOException, InterruptedException, TimeoutException {
     ExitUtils.disableSystemExit();
-  }
-
-  @BeforeEach
-  void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(OZONE_METADATA_DIRS, folder.getAbsolutePath());
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
@@ -102,7 +98,7 @@ public class TestSstFilteringService {
     om = omTestManagers.getOzoneManager();
   }
 
-  @AfterEach
+  @AfterAll
   public void cleanup() throws Exception {
     if (keyManager != null) {
       keyManager.stop();
