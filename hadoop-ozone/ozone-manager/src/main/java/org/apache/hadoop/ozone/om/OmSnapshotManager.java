@@ -397,12 +397,12 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   /**
-   * Get snapshot instance LRU cache size. Used in tests.
+   * Get snapshot instance LRU cache size.
    * @return cache size.
    */
   @VisibleForTesting
   public int getSnapshotCacheSize() {
-    return snapshotCache.size();
+    return snapshotCache == null ? 0 : snapshotCache.size();
   }
 
   /**
@@ -612,7 +612,7 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   // Get OmSnapshot if the keyName has ".snapshot" key indicator
   @SuppressWarnings("unchecked")
-  public ReferenceCounted<IOmMetadataReader> checkForSnapshot(
+  public ReferenceCounted<IOmMetadataReader> getActiveFsMetaOrSnapshot(
       String volumeName,
       String bucketName,
       String keyName) throws IOException {
@@ -670,12 +670,6 @@ public final class OmSnapshotManager implements AutoCloseable {
     // Block FS API reads when snapshot is not active.
     if (!skipActiveCheck) {
       checkSnapshotActive(ozoneManager, snapshotTableKey);
-    }
-
-    // Warn if actual cache size exceeds the soft limit already.
-    if (snapshotCache.size() > softCacheSize) {
-      LOG.warn("Snapshot cache size ({}) exceeds configured soft-limit ({}).",
-          snapshotCache.size(), softCacheSize);
     }
 
     // retrieve the snapshot from the cache

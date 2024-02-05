@@ -127,6 +127,11 @@ public class SnapshotCache {
    */
   public ReferenceCounted<OmSnapshot> get(String key)
       throws IOException {
+    // Warn if actual cache size exceeds the soft limit already.
+    if (size() > cacheSizeLimit) {
+      LOG.warn("Snapshot cache size ({}) exceeds configured soft-limit ({}).",
+          size(), cacheSizeLimit);
+    }
     // Atomic operation to initialize the OmSnapshot instance (once) if the key
     // does not exist, and increment the reference count on the instance.
     ReferenceCounted<OmSnapshot> rcOmSnapshot =
