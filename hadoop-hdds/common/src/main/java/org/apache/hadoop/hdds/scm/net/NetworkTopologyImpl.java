@@ -315,11 +315,6 @@ public class NetworkTopologyImpl implements NetworkTopology {
     }
   }
 
-  @Override
-  public InnerNode getClusterTree() {
-    return clusterTree;
-  }
-
   /**
    * Given a string representation of Node, return its leaf nodes count.
    * @param loc a path-like string representation of Node

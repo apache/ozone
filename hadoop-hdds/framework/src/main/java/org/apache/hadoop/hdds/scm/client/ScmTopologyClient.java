@@ -36,8 +36,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Objects.requireNonNull;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_CLUSTER_TREE_REFRESH_DURATION;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_CLUSTER_TREE_REFRESH_DURATION_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_NETWORK_TOPOLOGY_REFRESH_DURATION;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_NETWORK_TOPOLOGY_REFRESH_DURATION_DEFAULT;
 
 /**
  * This client implements a background thread which periodically checks and
@@ -67,7 +67,7 @@ public class ScmTopologyClient {
 
   public void start(ConfigurationSource conf) throws IOException {
     final InnerNode initialTopology =
-        scmBlockLocationProtocol.getClusterTree();
+        scmBlockLocationProtocol.getNetworkTopology();
     LOG.info("Initial network topology fetched from SCM: {}.",
         initialTopology);
     cache.set(initialTopology);
@@ -78,7 +78,7 @@ public class ScmTopologyClient {
     if (executorService != null) {
       executorService.shutdown();
       try {
-        if (executorService.awaitTermination(1, TimeUnit.MINUTES)) {
+        if (executorService.awaitTermination(5, TimeUnit.SECONDS)) {
           executorService.shutdownNow();
         }
       } catch (InterruptedException e) {
@@ -99,7 +99,7 @@ public class ScmTopologyClient {
     executorService = Executors.newScheduledThreadPool(1, threadFactory);
     Duration initialDelay = Duration.between(Instant.now(), nextRefresh);
 
-    LOG.info("Scheduling NetworkTopologyPoller with an initial delay of {}.",
+    LOG.debug("Scheduling NetworkTopologyPoller with an initial delay of {}.",
         initialDelay);
     executorService.scheduleAtFixedRate(() -> checkAndRefresh(),
         initialDelay.toMillis(), refreshDuration.toMillis(),
@@ -108,8 +108,8 @@ public class ScmTopologyClient {
 
   public static Duration parseRefreshDuration(ConfigurationSource conf) {
     long refreshDurationInMs = conf.getTimeDuration(
-        OZONE_SCM_NETWORK_TOPOLOGY_CLUSTER_TREE_REFRESH_DURATION,
-        OZONE_SCM_NETWORK_TOPOLOGY_CLUSTER_TREE_REFRESH_DURATION_DEFAULT,
+        OZONE_OM_NETWORK_TOPOLOGY_REFRESH_DURATION,
+        OZONE_OM_NETWORK_TOPOLOGY_REFRESH_DURATION_DEFAULT,
         TimeUnit.MILLISECONDS);
     return Duration.ofMillis(refreshDurationInMs);
   }
@@ -117,7 +117,7 @@ public class ScmTopologyClient {
   private synchronized void checkAndRefresh() {
     InnerNode current = cache.get();
     try {
-      InnerNode newTopology = scmBlockLocationProtocol.getClusterTree();
+      InnerNode newTopology = scmBlockLocationProtocol.getNetworkTopology();
       if (!newTopology.equals(current)) {
         cache.set(newTopology);
         LOG.info("Updated network topology cluster tree fetched from " +

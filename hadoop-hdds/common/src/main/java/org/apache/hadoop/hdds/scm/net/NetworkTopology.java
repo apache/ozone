@@ -96,8 +96,6 @@ public interface NetworkTopology {
    */
   Node getNode(String loc);
 
-  InnerNode getClusterTree();
-
   /**
    * Given a string representation of a InnerNode, return its leaf nodes count.
    * @param loc a path-like string representation of a InnerNode

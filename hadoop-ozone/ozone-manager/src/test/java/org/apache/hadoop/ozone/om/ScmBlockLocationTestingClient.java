@@ -204,7 +204,7 @@ public class ScmBlockLocationTestingClient implements ScmBlockLocationProtocol {
   }
 
   @Override
-  public InnerNode getClusterTree() {
+  public InnerNode getNetworkTopology() {
     InnerNode.Factory factory = InnerNodeImpl.FACTORY;
     InnerNode clusterTree = factory.newInnerNode("", "", null,
         NetConstants.ROOT_LEVEL, 1);

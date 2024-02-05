@@ -140,5 +140,10 @@ public interface ScmBlockLocationProtocol extends Closeable {
   List<DatanodeDetails> sortDatanodes(List<String> nodes,
       String clientMachine) throws IOException;
 
-  InnerNode getClusterTree() throws IOException;
+  /**
+   * Retrieves the hierarchical cluster tree representing the network topology.
+   * @return the root node of the network topology cluster tree.
+   * @throws IOException
+   */
+  InnerNode getNetworkTopology() throws IOException;
 }

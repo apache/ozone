@@ -3753,7 +3753,7 @@
       is send to DN.</description>
   </property>
   <property>
-    <name>ozone.scm.network.topology.cluster.tree.refresh.duration</name>
+    <name>ozone.om.network.topology.refresh.duration</name>
     <value>1h</value>
     <tag>SCM, OZONE, OM</tag>
     <description>The duration at which we periodically fetch the updated network

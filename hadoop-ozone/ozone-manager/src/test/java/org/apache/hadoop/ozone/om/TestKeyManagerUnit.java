@@ -128,7 +128,7 @@ public class TestKeyManagerUnit {
     containerClient = mock(StorageContainerLocationProtocol.class);
     blockClient = mock(ScmBlockLocationProtocol.class);
     InnerNode.Factory factory = InnerNodeImpl.FACTORY;
-    when(blockClient.getClusterTree()).thenReturn(
+    when(blockClient.getNetworkTopology()).thenReturn(
         factory.newInnerNode("", "", null, NetConstants.ROOT_LEVEL, 1));
 
     OmTestManagers omTestManagers

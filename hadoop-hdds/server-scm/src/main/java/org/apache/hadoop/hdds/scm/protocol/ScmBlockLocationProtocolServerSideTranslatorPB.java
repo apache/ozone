@@ -287,7 +287,7 @@ public final class ScmBlockLocationProtocolServerSideTranslatorPB
       throws IOException {
     GetClusterTreeResponseProto.Builder resp =
         GetClusterTreeResponseProto.newBuilder();
-    InnerNode clusterTree = impl.getClusterTree();
+    InnerNode clusterTree = impl.getNetworkTopology();
     resp.setClusterTree(clusterTree.toProtobuf(clientVersion).getInnerNode());
     return resp.build();
   }

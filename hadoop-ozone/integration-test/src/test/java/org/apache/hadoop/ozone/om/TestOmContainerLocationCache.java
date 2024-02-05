@@ -166,7 +166,7 @@ public class TestOmContainerLocationCache {
     mockScmContainerClient =
         mock(StorageContainerLocationProtocol.class);
     InnerNode.Factory factory = InnerNodeImpl.FACTORY;
-    when(mockScmBlockLocationProtocol.getClusterTree()).thenReturn(
+    when(mockScmBlockLocationProtocol.getNetworkTopology()).thenReturn(
         factory.newInnerNode("", "", null, NetConstants.ROOT_LEVEL, 1));
 
     OmTestManagers omTestManagers = new OmTestManagers(conf,
@@ -258,7 +258,7 @@ public class TestOmContainerLocationCache {
     reset(mockScmBlockLocationProtocol, mockScmContainerClient,
         mockDn1Protocol, mockDn2Protocol);
     InnerNode.Factory factory = InnerNodeImpl.FACTORY;
-    when(mockScmBlockLocationProtocol.getClusterTree()).thenReturn(
+    when(mockScmBlockLocationProtocol.getNetworkTopology()).thenReturn(
         factory.newInnerNode("", "", null, NetConstants.ROOT_LEVEL, 1));
     when(mockDn1Protocol.getPipeline()).thenReturn(createPipeline(DN1));
     when(mockDn2Protocol.getPipeline()).thenReturn(createPipeline(DN2));

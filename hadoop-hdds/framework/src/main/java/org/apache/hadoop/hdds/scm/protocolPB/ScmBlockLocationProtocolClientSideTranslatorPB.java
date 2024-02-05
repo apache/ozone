@@ -333,7 +333,7 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public InnerNode getClusterTree() throws IOException {
+  public InnerNode getNetworkTopology() throws IOException {
     GetClusterTreeRequestProto request =
         GetClusterTreeRequestProto.newBuilder().build();
     SCMBlockLocationRequest wrapper = createSCMBlockRequest(Type.GetClusterTree)

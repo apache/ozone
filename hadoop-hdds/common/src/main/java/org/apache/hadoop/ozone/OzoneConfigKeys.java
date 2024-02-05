@@ -676,10 +676,10 @@ public final class OzoneConfigKeys {
       "hdds.scmclient.failover.max.retry";
 
   public static final String
-      OZONE_SCM_NETWORK_TOPOLOGY_CLUSTER_TREE_REFRESH_DURATION =
-      "ozone.scm.network.topology.cluster.tree.refresh.duration";
+      OZONE_OM_NETWORK_TOPOLOGY_REFRESH_DURATION =
+      "ozone.om.network.topology.refresh.duration";
   public static final String
-      OZONE_SCM_NETWORK_TOPOLOGY_CLUSTER_TREE_REFRESH_DURATION_DEFAULT = "1h";
+      OZONE_OM_NETWORK_TOPOLOGY_REFRESH_DURATION_DEFAULT = "1h";
 
   /**
    * There is no need to instantiate this class.

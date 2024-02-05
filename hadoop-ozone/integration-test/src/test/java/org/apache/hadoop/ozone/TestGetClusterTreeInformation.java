@@ -32,6 +32,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
+
+import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
@@ -80,8 +82,8 @@ public class TestGetClusterTreeInformation {
         new ScmBlockLocationProtocolClientSideTranslatorPB(
             failoverProxyProvider);
 
-    InnerNode expectedInnerNode = scm.getClusterMap().getClusterTree();
-    InnerNode actualInnerNode = scmBlockLocationClient.getClusterTree();
+    InnerNode expectedInnerNode = (InnerNode) scm.getClusterMap().getNode(ROOT);
+    InnerNode actualInnerNode = scmBlockLocationClient.getNetworkTopology();
     assertEquals(expectedInnerNode, actualInnerNode);
   }
 }
