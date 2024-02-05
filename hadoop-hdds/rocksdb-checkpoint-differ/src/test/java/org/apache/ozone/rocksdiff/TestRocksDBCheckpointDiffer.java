@@ -126,10 +126,10 @@ public class TestRocksDBCheckpointDiffer {
 
   private final List<List<ColumnFamilyHandle>> colHandles = new ArrayList<>();
 
-  private final String activeDbDirName = "./rocksdb-data";
-  private final String metadataDirName = "./metadata";
-  private final String compactionLogDirName = "compaction-log";
-  private final String sstBackUpDirName = "compaction-sst-backup";
+  private static final String ACTIVE_DB_DIR_NAME = "./rocksdb-data";
+  private static final String METADATA_DIR_NAME = "./metadata";
+  private static final String COMPACTION_LOG_DIR_NAME = "compaction-log";
+  private static final String SST_BACK_UP_DIR_NAME= "compaction-sst-backup";
   private File activeDbDir;
   private File metadataDirDir;
   private File compactionLogDir;
@@ -150,17 +150,17 @@ public class TestRocksDBCheckpointDiffer {
     // Test class log level. Set to DEBUG for verbose output
     GenericTestUtils.setLogLevel(TestRocksDBCheckpointDiffer.LOG, Level.INFO);
 
-    activeDbDir = new File(activeDbDirName);
-    createDir(activeDbDir, activeDbDirName);
+    activeDbDir = new File(ACTIVE_DB_DIR_NAME);
+    createDir(activeDbDir, ACTIVE_DB_DIR_NAME);
 
-    metadataDirDir = new File(metadataDirName);
-    createDir(metadataDirDir, metadataDirName);
+    metadataDirDir = new File(METADATA_DIR_NAME);
+    createDir(metadataDirDir, METADATA_DIR_NAME);
 
-    compactionLogDir = new File(metadataDirName, compactionLogDirName);
-    createDir(compactionLogDir, metadataDirName + "/" + compactionLogDirName);
+    compactionLogDir = new File(METADATA_DIR_NAME, COMPACTION_LOG_DIR_NAME);
+    createDir(compactionLogDir, METADATA_DIR_NAME + "/" + COMPACTION_LOG_DIR_NAME);
 
-    sstBackUpDir = new File(metadataDirName, sstBackUpDirName);
-    createDir(sstBackUpDir, metadataDirName + "/" + sstBackUpDirName);
+    sstBackUpDir = new File(METADATA_DIR_NAME, SST_BACK_UP_DIR_NAME);
+    createDir(sstBackUpDir, METADATA_DIR_NAME + "/" + SST_BACK_UP_DIR_NAME);
 
     config = mock(ConfigurationSource.class);
 
@@ -174,10 +174,10 @@ public class TestRocksDBCheckpointDiffer {
         OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS)).thenReturn(0L);
 
-    rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(metadataDirName,
-        sstBackUpDirName,
-        compactionLogDirName,
-        activeDbDirName,
+    rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(METADATA_DIR_NAME,
+        SST_BACK_UP_DIR_NAME,
+        COMPACTION_LOG_DIR_NAME,
+        ACTIVE_DB_DIR_NAME,
         config);
 
     ColumnFamilyOptions cfOpts = new ColumnFamilyOptions()
@@ -189,7 +189,7 @@ public class TestRocksDBCheckpointDiffer {
         .setCreateMissingColumnFamilies(true);
 
     rocksDBCheckpointDiffer.setRocksDBForCompactionTracking(dbOptions);
-    activeRocksDB = RocksDB.open(dbOptions, activeDbDirName, cfDescriptors,
+    activeRocksDB = RocksDB.open(dbOptions, ACTIVE_DB_DIR_NAME, cfDescriptors,
         cfHandles);
     keyTableCFHandle = cfHandles.get(1);
     directoryTableCFHandle = cfHandles.get(2);
@@ -518,7 +518,7 @@ public class TestRocksDBCheckpointDiffer {
   @Test
   void testDifferWithDB() throws Exception {
     writeKeysAndCheckpointing();
-    readRocksDBInstance(activeDbDirName, activeRocksDB, null,
+    readRocksDBInstance(ACTIVE_DB_DIR_NAME, activeRocksDB, null,
         rocksDBCheckpointDiffer);
 
     if (LOG.isDebugEnabled()) {
@@ -614,7 +614,7 @@ public class TestRocksDBCheckpointDiffer {
     }
     cpDirList.add(dir);
 
-    createCheckPoint(activeDbDirName, cpPath, rocksDB);
+    createCheckPoint(ACTIVE_DB_DIR_NAME, cpPath, rocksDB);
     final UUID snapshotId = UUID.randomUUID();
     List<ColumnFamilyHandle> colHandle = new ArrayList<>();
     colHandles.add(colHandle);
@@ -1273,7 +1273,7 @@ public class TestRocksDBCheckpointDiffer {
 
     if (compactionLogs != null) {
       for (int i = 0; i < compactionLogs.size(); i++) {
-        String compactionFileName = metadataDirName + "/" + compactionLogDirName
+        String compactionFileName = METADATA_DIR_NAME + "/" + COMPACTION_LOG_DIR_NAME
             + "/0000" + i + COMPACTION_LOG_FILE_NAME_SUFFIX;
         File compactionFile = new File(compactionFileName);
         Files.write(compactionFile.toPath(),
@@ -1491,8 +1491,8 @@ public class TestRocksDBCheckpointDiffer {
 
     Path compactionLogFilePath = null;
     if (compactionLog != null) {
-      String compactionLogFileName = metadataDirName + "/" +
-          compactionLogDirName + "/compaction_log" +
+      String compactionLogFileName = METADATA_DIR_NAME + "/" +
+          COMPACTION_LOG_DIR_NAME + "/compaction_log" +
           COMPACTION_LOG_FILE_NAME_SUFFIX;
       compactionLogFilePath = new File(compactionLogFileName).toPath();
       createFileWithContext(compactionLogFileName, compactionLog);
@@ -1512,7 +1512,7 @@ public class TestRocksDBCheckpointDiffer {
 
     Set<String> actualFileSetAfterPruning;
     try (Stream<Path> pathStream = Files.list(
-            Paths.get(metadataDirName + "/" + sstBackUpDirName))
+            Paths.get(METADATA_DIR_NAME + "/" + SST_BACK_UP_DIR_NAME))
         .filter(e -> e.toString().toLowerCase()
             .endsWith(SST_FILE_EXTENSION))
         .sorted()) {

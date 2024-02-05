@@ -83,7 +83,7 @@ public class TestOzoneManagerListVolumesSecure {
   private OzoneManager om;
   private static final String OM_CERT_SERIAL_ID = "9879877970576";
 
-  private final String adminUser = "om";
+  private static final String ADMIN_USER = "om";
   private String adminPrincipal;
   private String adminPrincipalInOtherHost;
   private File adminKeytab;
@@ -91,8 +91,8 @@ public class TestOzoneManagerListVolumesSecure {
   private UserGroupInformation adminUGI;
   private UserGroupInformation adminInOtherHostUGI;
 
-  private final String user1 = "user1";
-  private final String user2 = "user2";
+  private static final String USER_1 = "user1";
+  private static final String USER_2 = "user2";
   private String userPrincipal1;
   private String userPrincipal2;
   private File userKeytab1;
@@ -142,18 +142,18 @@ public class TestOzoneManagerListVolumesSecure {
     String host = InetAddress.getLocalHost()
         .getCanonicalHostName().toLowerCase();
     String hostAndRealm = host + "@" + this.realm;
-    this.adminPrincipal = adminUser + "/" + hostAndRealm;
-    this.adminPrincipalInOtherHost = adminUser + "/otherhost@" + this.realm;
-    this.adminKeytab = new File(workDir, adminUser + ".keytab");
-    this.adminKeytabInOtherHost = new File(workDir, adminUser +
+    this.adminPrincipal = ADMIN_USER + "/" + hostAndRealm;
+    this.adminPrincipalInOtherHost = ADMIN_USER + "/otherhost@" + this.realm;
+    this.adminKeytab = new File(workDir, ADMIN_USER + ".keytab");
+    this.adminKeytabInOtherHost = new File(workDir, ADMIN_USER +
         "InOtherHost.keytab");
     createPrincipal(this.adminKeytab, adminPrincipal);
     createPrincipal(this.adminKeytabInOtherHost, adminPrincipalInOtherHost);
 
-    this.userPrincipal1 = this.user1 + "/" + hostAndRealm;
-    this.userPrincipal2 = this.user2 + "/" + hostAndRealm;
-    this.userKeytab1  = new File(workDir, this.user1 + ".keytab");
-    this.userKeytab2  = new File(workDir, this.user2 + ".keytab");
+    this.userPrincipal1 = this.USER_1 + "/" + hostAndRealm;
+    this.userPrincipal2 = this.USER_2 + "/" + hostAndRealm;
+    this.userKeytab1  = new File(workDir, this.USER_1 + ".keytab");
+    this.userKeytab2  = new File(workDir, this.USER_2 + ".keytab");
     createPrincipal(this.userKeytab1, userPrincipal1);
     createPrincipal(this.userKeytab2, userPrincipal2);
   }
@@ -212,12 +212,12 @@ public class TestOzoneManagerListVolumesSecure {
     String aclUser1All = "user:user1:a";
     String aclUser2All = "user:user2:a";
     String aclWorldAll = "world::a";
-    createVolumeWithOwnerAndAcl(omClient, "volume1", user1, aclUser1All);
-    createVolumeWithOwnerAndAcl(omClient, "volume2", user2, aclUser2All);
-    createVolumeWithOwnerAndAcl(omClient, "volume3", user1, aclUser2All);
-    createVolumeWithOwnerAndAcl(omClient, "volume4", user2, aclUser1All);
-    createVolumeWithOwnerAndAcl(omClient, "volume5", user1, aclWorldAll);
-    createVolumeWithOwnerAndAcl(omClient, "volume6", adminUser, null);
+    createVolumeWithOwnerAndAcl(omClient, "volume1", USER_1, aclUser1All);
+    createVolumeWithOwnerAndAcl(omClient, "volume2", USER_2, aclUser2All);
+    createVolumeWithOwnerAndAcl(omClient, "volume3", USER_1, aclUser2All);
+    createVolumeWithOwnerAndAcl(omClient, "volume4", USER_2, aclUser1All);
+    createVolumeWithOwnerAndAcl(omClient, "volume5", USER_1, aclWorldAll);
+    createVolumeWithOwnerAndAcl(omClient, "volume6", ADMIN_USER, null);
     omClient.close();
   }
 
@@ -226,7 +226,7 @@ public class TestOzoneManagerListVolumesSecure {
       String ownerName, String aclString) throws IOException {
     // Create volume use adminUgi
     OmVolumeArgs.Builder builder =
-        OmVolumeArgs.newBuilder().setVolume(volumeName).setAdminName(adminUser);
+        OmVolumeArgs.newBuilder().setVolume(volumeName).setAdminName(ADMIN_USER);
     if (!Strings.isNullOrEmpty(ownerName)) {
       builder.setOwnerName(ownerName);
     }
@@ -313,21 +313,21 @@ public class TestOzoneManagerListVolumesSecure {
   public void testListVolumeWithOtherUsersListAllAllowed() throws Exception {
     setupEnvironment(true, true);
 
-    // Login as user1, list other users' volumes
+    // Login as USER_1, list other users' volumes
     doAs(userUGI1, () -> {
-      checkUser(user2, Arrays.asList("volume2", "volume3", "volume4",
+      checkUser(USER_2, Arrays.asList("volume2", "volume3", "volume4",
           "volume5"), true);
-      checkUser(adminUser, Arrays
+      checkUser(ADMIN_USER, Arrays
           .asList("volume1", "volume2", "volume3", "volume4", "volume5",
               "volume6", "s3v"), true);
       return true;
     });
 
-    // Login as user2, list other users' volumes
+    // Login as USER_2, list other users' volumes
     doAs(userUGI2, () -> {
-      checkUser(user1, Arrays.asList("volume1", "volume3", "volume4",
+      checkUser(USER_1, Arrays.asList("volume1", "volume3", "volume4",
           "volume5"), true);
-      checkUser(adminUser, Arrays
+      checkUser(ADMIN_USER, Arrays
           .asList("volume1", "volume2", "volume3", "volume4", "volume5",
               "volume6", "s3v"), true);
       return true;
@@ -335,18 +335,18 @@ public class TestOzoneManagerListVolumesSecure {
 
     // Login as admin, list other users' volumes
     doAs(adminUGI, () -> {
-      checkUser(user1, Arrays.asList("volume1", "volume3", "volume4",
+      checkUser(USER_1, Arrays.asList("volume1", "volume3", "volume4",
           "volume5"), true);
-      checkUser(user2, Arrays.asList("volume2", "volume3", "volume4",
+      checkUser(USER_2, Arrays.asList("volume2", "volume3", "volume4",
           "volume5"), true);
       return true;
     });
 
     // Login as admin in other host, list other users' volumes
     doAs(adminInOtherHostUGI, () -> {
-      checkUser(user1, Arrays.asList("volume1", "volume3",
+      checkUser(USER_1, Arrays.asList("volume1", "volume3",
           "volume4", "volume5"), true);
-      checkUser(user2, Arrays.asList("volume2", "volume3",
+      checkUser(USER_2, Arrays.asList("volume2", "volume3",
           "volume4", "volume5"), true);
       return true;
     });
@@ -361,20 +361,20 @@ public class TestOzoneManagerListVolumesSecure {
   public void testListVolumeWithOtherUsersListAllDisallowed() throws Exception {
     setupEnvironment(true, false);
 
-    // Login as user1, list other users' volumes, expect failure
+    // Login as USER_1, list other users' volumes, expect failure
     doAs(userUGI1, () -> {
-      checkUser(user2, Arrays.asList("volume2", "volume3", "volume4",
+      checkUser(USER_2, Arrays.asList("volume2", "volume3", "volume4",
           "volume5"), false);
-      checkUser(adminUser, Arrays.asList("volume1", "volume2", "volume3",
+      checkUser(ADMIN_USER, Arrays.asList("volume1", "volume2", "volume3",
               "volume4", "volume5", "volume6", "s3v"), false);
       return true;
     });
 
-    // Login as user2, list other users' volumes, expect failure
+    // Login as USER_2, list other users' volumes, expect failure
     doAs(userUGI2, () -> {
-      checkUser(user1, Arrays.asList("volume1", "volume3", "volume4",
+      checkUser(USER_1, Arrays.asList("volume1", "volume3", "volume4",
           "volume5"), false);
-      checkUser(adminUser,
+      checkUser(ADMIN_USER,
           Arrays.asList("volume1", "volume2", "volume3",
               "volume4", "volume5", "volume6", "s3v"), false);
       return true;
@@ -382,18 +382,18 @@ public class TestOzoneManagerListVolumesSecure {
 
     // While admin should be able to list volumes just fine.
     doAs(adminUGI, () -> {
-      checkUser(user1, Arrays.asList("volume1", "volume3", "volume4",
+      checkUser(USER_1, Arrays.asList("volume1", "volume3", "volume4",
           "volume5"), true);
-      checkUser(user2, Arrays.asList("volume2", "volume3", "volume4",
+      checkUser(USER_2, Arrays.asList("volume2", "volume3", "volume4",
           "volume5"), true);
       return true;
     });
 
     // While admin in other host should be able to list volumes just fine.
     doAs(adminInOtherHostUGI, () -> {
-      checkUser(user1, Arrays.asList("volume1", "volume3",
+      checkUser(USER_1, Arrays.asList("volume1", "volume3",
           "volume4", "volume5"), true);
-      checkUser(user2, Arrays.asList("volume2", "volume3",
+      checkUser(USER_2, Arrays.asList("volume2", "volume3",
           "volume4", "volume5"), true);
       return true;
     });
@@ -403,30 +403,30 @@ public class TestOzoneManagerListVolumesSecure {
   public void testAclEnabledListAllAllowed() throws Exception {
     setupEnvironment(true, true);
 
-    // Login as user1, list their own volumes
+    // Login as USER_1, list their own volumes
     doAs(userUGI1, () -> {
-      checkUser(user1, Arrays.asList("volume1", "volume3", "volume4",
+      checkUser(USER_1, Arrays.asList("volume1", "volume3", "volume4",
           "volume5"), true);
       return true;
     });
 
-    // Login as user2, list their own volumes
+    // Login as USER_2, list their own volumes
     doAs(userUGI2, () -> {
-      checkUser(user2, Arrays.asList("volume2", "volume3", "volume4",
+      checkUser(USER_2, Arrays.asList("volume2", "volume3", "volume4",
           "volume5"), true);
       return true;
     });
 
     // Login as admin, list their own volumes
     doAs(adminUGI, () -> {
-      checkUser(adminUser, Arrays.asList("volume1", "volume2", "volume3",
+      checkUser(ADMIN_USER, Arrays.asList("volume1", "volume2", "volume3",
           "volume4", "volume5", "volume6", "s3v"), true);
       return true;
     });
 
     // Login as admin in other host, list their own volumes
     doAs(adminInOtherHostUGI, () -> {
-      checkUser(adminUser, Arrays.asList("volume1", "volume2",
+      checkUser(ADMIN_USER, Arrays.asList("volume1", "volume2",
           "volume3", "volume4", "volume5", "volume6", "s3v"), true);
       return true;
     });
@@ -436,14 +436,14 @@ public class TestOzoneManagerListVolumesSecure {
   public void testAclEnabledListAllDisallowed() throws Exception {
     setupEnvironment(true, false);
 
-    // Login as user1, list their own volumes
+    // Login as USER_1, list their own volumes
     doAs(userUGI1, () -> {
-      checkUser(user1, Arrays.asList("volume1", "volume3", "volume4",
+      checkUser(USER_1, Arrays.asList("volume1", "volume3", "volume4",
           "volume5"), false);
       return true;
     });
 
-    // Login as user2, list their own volumes
+    // Login as USER_2, list their own volumes
     doAs(userUGI2, () -> {
       checkUser(userPrincipal2, Arrays.asList("volume2", "volume3",
           "volume4", "volume5"), false);
@@ -471,28 +471,28 @@ public class TestOzoneManagerListVolumesSecure {
   public void testAclDisabledListAllAllowed() throws Exception {
     setupEnvironment(false, true);
 
-      // Login as user1, list their own volumes
+      // Login as USER_1, list their own volumes
     doAs(userUGI1, () -> {
-      checkUser(user1, Arrays.asList("volume1", "volume3", "volume5"),
+      checkUser(USER_1, Arrays.asList("volume1", "volume3", "volume5"),
           true);
       return true;
     });
 
-    // Login as user2, list their own volumes
+    // Login as USER_2, list their own volumes
     doAs(userUGI2, () -> {
-      checkUser(user2, Arrays.asList("volume2", "volume4"),
+      checkUser(USER_2, Arrays.asList("volume2", "volume4"),
           true);
       return true;
     });
 
     doAs(adminUGI, () -> {
-      checkUser(adminUser, Arrays.asList("volume6", "s3v"), true);
+      checkUser(ADMIN_USER, Arrays.asList("volume6", "s3v"), true);
       return true;
     });
 
     // Login as admin in other host, list their own volumes
     doAs(adminInOtherHostUGI, () -> {
-      checkUser(adminUser, Arrays.asList("volume6", "s3v"),
+      checkUser(ADMIN_USER, Arrays.asList("volume6", "s3v"),
           true);
       return true;
     });
@@ -502,28 +502,28 @@ public class TestOzoneManagerListVolumesSecure {
   public void testAclDisabledListAllDisallowed() throws Exception {
     setupEnvironment(false, false);
 
-    // Login as user1, list their own volumes
+    // Login as USER_1, list their own volumes
     doAs(userUGI1, () -> {
-      checkUser(user1, Arrays.asList("volume1", "volume3", "volume5"),
+      checkUser(USER_1, Arrays.asList("volume1", "volume3", "volume5"),
           true);
       return true;
     });
 
-    // Login as user2, list their own volumes
+    // Login as USER_2, list their own volumes
     doAs(userUGI2, () -> {
-      checkUser(user2, Arrays.asList("volume2", "volume4"),
+      checkUser(USER_2, Arrays.asList("volume2", "volume4"),
           true);
       return true;
     });
 
     doAs(adminUGI, () -> {
-      checkUser(adminUser, Arrays.asList("volume6", "s3v"), true);
+      checkUser(ADMIN_USER, Arrays.asList("volume6", "s3v"), true);
       return true;
     });
 
     // Login as admin in other host, list their own volumes
     doAs(adminInOtherHostUGI, () -> {
-      checkUser(adminUser, Arrays.asList("volume6", "s3v"),
+      checkUser(ADMIN_USER, Arrays.asList("volume6", "s3v"),
           true);
       return true;
     });

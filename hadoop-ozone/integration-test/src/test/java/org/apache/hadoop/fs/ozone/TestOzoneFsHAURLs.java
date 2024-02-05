@@ -84,16 +84,16 @@ public class TestOzoneFsHAURLs {
   private String bucketName;
   private String rootPath;
 
-  private final String o3fsImplKey =
+  private static final String O3FS_IMPL_KEY =
       "fs." + OzoneConsts.OZONE_URI_SCHEME + ".impl";
-  private final String o3fsImplValue =
+  private static final String O3FS_IMPL_VALUE =
       "org.apache.hadoop.fs.ozone.OzoneFileSystem";
   private static OzoneClient client;
 
-  private final String ofsImplKey =
+  private static final String OFS_IMPL_KEY =
       "fs." + OzoneConsts.OZONE_OFS_URI_SCHEME + ".impl";
 
-  private final String ofsImplValue =
+  private static final String OFS_IMPL_VALUE =
       "org.apache.hadoop.fs.ozone.RootedOzoneFileSystem";
 
 
@@ -219,7 +219,7 @@ public class TestOzoneFsHAURLs {
   public void testWithQualifiedDefaultFS() throws Exception {
     OzoneConfiguration clientConf = new OzoneConfiguration(conf);
     clientConf.setQuietMode(false);
-    clientConf.set(o3fsImplKey, o3fsImplValue);
+    clientConf.set(O3FS_IMPL_KEY, O3FS_IMPL_VALUE);
     // fs.defaultFS = o3fs://bucketName.volumeName.omServiceId/
     clientConf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
 
@@ -314,7 +314,7 @@ public class TestOzoneFsHAURLs {
   private void testWithDefaultFS(String defaultFS) throws Exception {
     OzoneConfiguration clientConf = new OzoneConfiguration(conf);
     clientConf.setQuietMode(false);
-    clientConf.set(o3fsImplKey, o3fsImplValue);
+    clientConf.set(O3FS_IMPL_KEY, O3FS_IMPL_VALUE);
     // fs.defaultFS = file:///
     clientConf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY,
         defaultFS);
@@ -359,8 +359,8 @@ public class TestOzoneFsHAURLs {
   public void testIncorrectAuthorityInURI() throws Exception {
     OzoneConfiguration clientConf = new OzoneConfiguration(conf);
     clientConf.setQuietMode(false);
-    clientConf.set(o3fsImplKey, o3fsImplValue);
-    clientConf.set(ofsImplKey, ofsImplValue);
+    clientConf.set(O3FS_IMPL_KEY, O3FS_IMPL_VALUE);
+    clientConf.set(OFS_IMPL_KEY, OFS_IMPL_VALUE);
     FsShell shell = new FsShell(clientConf);
     String incorrectSvcId = "dummy";
     String o3fsPathWithCorrectSvcId =

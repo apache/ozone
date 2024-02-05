@@ -70,7 +70,7 @@ public class TestDatanodeStateMachine {
       LoggerFactory.getLogger(TestDatanodeStateMachine.class);
   // Changing it to 1, as current code checks for multiple scm directories,
   // and fail if exists
-  private final int scmServerCount = 1;
+  private static final int SCM_SERVER_COUNT = 1;
   private List<String> serverAddresses;
   private List<RPC.Server> scmServers;
   private List<ScmTestMock> mockServers;
@@ -93,7 +93,7 @@ public class TestDatanodeStateMachine {
     serverAddresses = new ArrayList<>();
     scmServers = new ArrayList<>();
     mockServers = new ArrayList<>();
-    for (int x = 0; x < scmServerCount; x++) {
+    for (int x = 0; x < SCM_SERVER_COUNT; x++) {
       int port = SCMTestUtils.getReuseableAddress().getPort();
       String address = "127.0.0.1";
       serverAddresses.add(address + ":" + port);
