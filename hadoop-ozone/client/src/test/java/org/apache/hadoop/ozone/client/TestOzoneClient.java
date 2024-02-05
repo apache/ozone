@@ -48,7 +48,6 @@ import java.util.UUID;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -68,12 +67,8 @@ public class TestOzoneClient {
       OMException.ResultCodes code,
       VoidCallable eval)
       throws Exception {
-    try {
-      eval.call();
-      fail("OMException is expected");
-    } catch (OMException ex) {
-      assertEquals(code, ex.getResult());
-    }
+    OMException ex = assertThrows(OMException.class, () -> eval.call());
+    assertEquals(code, ex.getResult());
   }
 
   @BeforeEach

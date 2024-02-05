@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -65,6 +66,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.io.TempDir;
 
 import jakarta.annotation.Nonnull;
 
@@ -276,7 +278,8 @@ public class TestReplicationSupervisor {
   }
 
   @ContainerLayoutTestInfo.ContainerTest
-  public void testDownloadAndImportReplicatorFailure() throws IOException {
+  public void testDownloadAndImportReplicatorFailure(ContainerLayoutVersion layout,
+      @TempDir File tempFile) throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
 
     ReplicationSupervisor supervisor = ReplicationSupervisor.newBuilder()
@@ -294,9 +297,7 @@ public class TestReplicationSupervisor {
             any(Path.class), any()))
         .thenReturn(res);
 
-    final String testDir = GenericTestUtils.getTempPath(
-        TestReplicationSupervisor.class.getSimpleName() +
-            "-" + UUID.randomUUID());
+    final String testDir = tempFile.getPath();
     MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
     when(volumeSet.getVolumesList())
         .thenReturn(singletonList(

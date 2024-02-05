@@ -51,7 +51,6 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker;
 
 import org.assertj.core.api.Fail;
@@ -110,7 +109,7 @@ import static org.mockito.Mockito.when;
 public class TestKeyValueContainer {
 
   @TempDir
-  private Path folder;
+  private File folder;
 
   private String scmId = UUID.randomUUID().toString();
   private VolumeSet volumeSet;
@@ -229,7 +228,7 @@ public class TestKeyValueContainer {
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
     String volumeDirPath =
-        Files.createDirectory(folder.resolve("volumeDir"))
+        Files.createDirectory(folder.toPath().resolve("volumeDir"))
             .toFile().getAbsolutePath();
     HddsVolume newVolume = new HddsVolume.Builder(volumeDirPath)
         .conf(CONF).datanodeUuid(datanodeId.toString()).build();
@@ -276,7 +275,7 @@ public class TestKeyValueContainer {
 
     //destination path
     File exportTar = Files.createFile(
-        folder.resolve("export.tar")).toFile();
+        folder.toPath().resolve("export.tar")).toFile();
     TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
     //export the container
     try (FileOutputStream fos = new FileOutputStream(exportTar)) {
@@ -309,7 +308,7 @@ public class TestKeyValueContainer {
     keyValueContainer.update(data.getMetadata(), true);
 
     //destination path
-    File exportTar = Files.createFile(folder.resolve("export.tar")).toFile();
+    File exportTar = Files.createFile(folder.toPath().resolve("export.tar")).toFile();
     TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
     //export the container
     try (FileOutputStream fos = new FileOutputStream(exportTar)) {
@@ -347,7 +346,7 @@ public class TestKeyValueContainer {
 
     //destination path
     File folderToExport = Files.createFile(
-        folder.resolve("export.tar")).toFile();
+        folder.toPath().resolve("export.tar")).toFile();
     for (CopyContainerCompression compr : CopyContainerCompression.values()) {
       TarContainerPacker packer = new TarContainerPacker(compr);
 
@@ -394,15 +393,14 @@ public class TestKeyValueContainer {
           containerData.getBytesUsed());
 
       //Can't overwrite existing container
-      try {
+      KeyValueContainer finalContainer = container;
+      assertThrows(IOException.class, () -> {
         try (FileInputStream fis = new FileInputStream(folderToExport)) {
-          container.importContainerData(fis, packer);
+          finalContainer.importContainerData(fis, packer);
         }
-        fail("Container is imported twice. Previous files are overwritten");
-      } catch (IOException ex) {
-        //all good
-        assertTrue(container.getContainerFile().exists());
-      }
+      }, "Container is imported twice. Previous files are overwritten");
+      //all good
+      assertTrue(container.getContainerFile().exists());
 
       //Import failure should cleanup the container directory
       containerData =
@@ -416,18 +414,18 @@ public class TestKeyValueContainer {
       containerVolume = volumeChoosingPolicy.chooseVolume(
           StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
       container.populatePathFields(scmId, containerVolume);
-      try {
-        FileInputStream fis = new FileInputStream(folderToExport);
-        fis.close();
-        container.importContainerData(fis, packer);
-        fail("Container import should fail");
-      } catch (Exception ex) {
-        assertInstanceOf(IOException.class, ex);
-      } finally {
-        File directory =
-            new File(container.getContainerData().getContainerPath());
-        assertFalse(directory.exists());
-      }
+      KeyValueContainer finalContainer1 = container;
+      assertThrows(IOException.class, () -> {
+        try {
+          FileInputStream fis = new FileInputStream(folderToExport);
+          fis.close();
+          finalContainer1.importContainerData(fis, packer);
+        } finally {
+          File directory =
+              new File(finalContainer1.getContainerData().getContainerPath());
+          assertFalse(directory.exists());
+        }
+      });
     }
   }
 
@@ -524,7 +522,7 @@ public class TestKeyValueContainer {
         .mapToObj(i -> new Thread(() -> {
           try {
             File file = Files.createFile(
-                folder.resolve("concurrent" + i + ".tar")).toFile();
+                folder.toPath().resolve("concurrent" + i + ".tar")).toFile();
             try (OutputStream out = Files.newOutputStream(file.toPath())) {
               keyValueContainer.exportContainerData(out, packer);
             }
@@ -820,7 +818,7 @@ public class TestKeyValueContainer {
     assumeTrue(isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3));
     // Create a new HDDS volume
     String volumeDirPath =
-        Files.createDirectory(folder.resolve("volumeDir")).toFile()
+        Files.createDirectory(folder.toPath().resolve("volumeDir")).toFile()
             .getAbsolutePath();
     HddsVolume newVolume = new HddsVolume.Builder(volumeDirPath)
         .conf(CONF).datanodeUuid(datanodeId.toString()).build();
@@ -859,7 +857,7 @@ public class TestKeyValueContainer {
         if (volume == newVolume) {
           File folderToExport =
               Files.createFile(
-                  folder.resolve(containerId + "_exported.tar.gz")).toFile();
+                  folder.toPath().resolve(containerId + "_exported.tar.gz")).toFile();
           TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
           //export the container
           try (FileOutputStream fos = new FileOutputStream(folderToExport)) {
@@ -929,7 +927,7 @@ public class TestKeyValueContainer {
 
     //destination path
     File folderToExport = Files.createFile(
-        folder.resolve("export.tar")).toFile();
+        folder.toPath().resolve("export.tar")).toFile();
     for (CopyContainerCompression compr : CopyContainerCompression.values()) {
       TarContainerPacker packer = new TarContainerPacker(compr);
 
@@ -978,7 +976,7 @@ public class TestKeyValueContainer {
 
     //destination path
     File folderToExport = Files.createFile(
-        folder.resolve("export.tar")).toFile();
+        folder.toPath().resolve("export.tar")).toFile();
     for (CopyContainerCompression compr : CopyContainerCompression.values()) {
       TarContainerPacker packer = new TarContainerPacker(compr);
 
@@ -1022,14 +1020,8 @@ public class TestKeyValueContainer {
   public void testImportV2ReplicaToV3HddsVolume(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
-    final String testDir = GenericTestUtils.getTempPath(
-        TestKeyValueContainer.class.getSimpleName() + "-"
-            + UUID.randomUUID());
-    try {
-      testMixedSchemaImport(testDir, false);
-    } finally {
-      FileUtils.deleteDirectory(new File(testDir));
-    }
+    final String testDir = folder.getPath();
+    testMixedSchemaImport(testDir, false);
   }
 
   /**
@@ -1039,14 +1031,8 @@ public class TestKeyValueContainer {
   public void testImportV3ReplicaToV2HddsVolume(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
-    final String testDir = GenericTestUtils.getTempPath(
-        TestKeyValueContainer.class.getSimpleName() + "-"
-            + UUID.randomUUID());
-    try {
-      testMixedSchemaImport(testDir, true);
-    } finally {
-      FileUtils.deleteDirectory(new File(testDir));
-    }
+    final String testDir = folder.getPath();
+    testMixedSchemaImport(testDir, true);
   }
 
   private void testMixedSchemaImport(String dir,

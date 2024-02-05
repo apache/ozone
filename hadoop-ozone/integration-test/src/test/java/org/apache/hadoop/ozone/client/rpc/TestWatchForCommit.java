@@ -69,7 +69,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.junit.jupiter.api.AfterEach;
@@ -275,25 +275,20 @@ public class TestWatchForCommit {
       cluster.getStorageContainerManager()
           .getPipelineManager().closePipeline(pipeline, false);
       // again write data with more than max buffer limit. This wi
-      try {
-        // just watch for a log index which in not updated in the commitInfo Map
-        // as well as there is no logIndex generate in Ratis.
-        // The basic idea here is just to test if its throws an exception.
-        xceiverClient
-            .watchForCommit(index + RandomUtils.nextInt(0, 100) + 10);
-        fail("expected exception not thrown");
-      } catch (Exception e) {
-        assertInstanceOf(ExecutionException.class, e);
-        // since the timeout value is quite long, the watch request will either
-        // fail with NotReplicated exceptio, RetryFailureException or
-        // RuntimeException
-        assertFalse(HddsClientUtils
-            .checkForException(e) instanceof TimeoutException);
-        // client should not attempt to watch with
-        // MAJORITY_COMMITTED replication level, except the grpc IO issue
-        if (!logCapturer.getOutput().contains("Connection refused")) {
-          assertThat(e.getMessage()).doesNotContain("Watch-MAJORITY_COMMITTED");
-        }
+      // just watch for a log index which in not updated in the commitInfo Map
+      // as well as there is no logIndex generate in Ratis.
+      // The basic idea here is just to test if its throws an exception.
+      ExecutionException e = assertThrows(ExecutionException.class,
+          () -> xceiverClient.watchForCommit(index + RandomUtils.nextInt(0, 100) + 10));
+      // since the timeout value is quite long, the watch request will either
+      // fail with NotReplicated exceptio, RetryFailureException or
+      // RuntimeException
+      assertFalse(HddsClientUtils
+          .checkForException(e) instanceof TimeoutException);
+      // client should not attempt to watch with
+      // MAJORITY_COMMITTED replication level, except the grpc IO issue
+      if (!logCapturer.getOutput().contains("Connection refused")) {
+        assertThat(e.getMessage()).doesNotContain("Watch-MAJORITY_COMMITTED");
       }
       clientManager.releaseClient(xceiverClient, false);
     }
@@ -368,17 +363,13 @@ public class TestWatchForCommit {
       List<Pipeline> pipelineList = new ArrayList<>();
       pipelineList.add(pipeline);
       TestHelper.waitForPipelineClose(pipelineList, cluster);
-      try {
-        // just watch for a log index which in not updated in the commitInfo Map
-        // as well as there is no logIndex generate in Ratis.
-        // The basic idea here is just to test if its throws an exception.
-        xceiverClient
-            .watchForCommit(reply.getLogIndex() +
-                RandomUtils.nextInt(0, 100) + 10);
-        fail("Expected exception not thrown");
-      } catch (Exception e) {
-        assertInstanceOf(GroupMismatchException.class, HddsClientUtils.checkForException(e));
-      }
+      // just watch for a log index which in not updated in the commitInfo Map
+      // as well as there is no logIndex generate in Ratis.
+      // The basic idea here is just to test if its throws an exception.
+      Exception e =
+          assertThrows(Exception.class,
+              () -> xceiverClient.watchForCommit(reply.getLogIndex() + RandomUtils.nextInt(0, 100) + 10));
+      assertInstanceOf(GroupMismatchException.class, HddsClientUtils.checkForException(e));
       clientManager.releaseClient(xceiverClient, false);
     }
   }

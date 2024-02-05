@@ -63,7 +63,7 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyInt;
@@ -311,13 +311,8 @@ public class TestECOverReplicationHandler {
     ECOverReplicationHandler ecORH =
         new ECOverReplicationHandler(policy, replicationManager);
 
-    try {
-      ecORH.processAndSendCommands(availableReplicas, ImmutableList.of(),
-          health, 1);
-      fail("Expected CommandTargetOverloadedException");
-    } catch (CommandTargetOverloadedException e) {
-      // This is expected.
-    }
+    assertThrows(CommandTargetOverloadedException.class,
+        () -> ecORH.processAndSendCommands(availableReplicas, ImmutableList.of(), health, 1));
     assertEquals(1, commandsSent.size());
   }
 

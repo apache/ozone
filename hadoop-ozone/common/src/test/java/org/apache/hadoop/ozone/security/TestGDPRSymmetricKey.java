@@ -22,8 +22,8 @@ import org.junit.jupiter.api.Test;
 
 import java.security.SecureRandom;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests GDPRSymmetricKey structure.
@@ -56,13 +56,8 @@ public class TestGDPRSymmetricKey {
 
   @Test
   public void testKeyGenerationWithInvalidInput() throws Exception {
-    try {
-      new GDPRSymmetricKey(RandomStringUtils.randomAlphabetic(5),
-          OzoneConsts.GDPR_ALGORITHM_NAME);
-      fail("Expect length mismatched");
-    } catch (IllegalArgumentException ex) {
-      assertTrue(ex.getMessage()
-          .equalsIgnoreCase("Secret must be exactly 16 characters"));
-    }
+    IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+        () -> new GDPRSymmetricKey(RandomStringUtils.randomAlphabetic(5), OzoneConsts.GDPR_ALGORITHM_NAME));
+    assertTrue(e.getMessage().equalsIgnoreCase("Secret must be exactly 16 characters"));
   }
 }

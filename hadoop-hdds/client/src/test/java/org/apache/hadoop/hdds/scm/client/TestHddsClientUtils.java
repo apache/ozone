@@ -102,7 +102,6 @@ public class TestHddsClientUtils {
     conf.set(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY, "scm1");
 
     int port = 9880;
-    int i = 1;
     for (String nodeId : nodes) {
       conf.setInt(ConfUtils.addKeySuffixes(OZONE_SCM_CLIENT_PORT_KEY,
           scmServiceId, nodeId), port);
@@ -229,12 +228,8 @@ public class TestHddsClientUtils {
     invalidNames.add(tooShort);
 
     for (String name : invalidNames) {
-      try {
-        HddsClientUtils.verifyResourceName(name);
-        fail("Did not reject invalid string [" + name + "] as a name");
-      } catch (IllegalArgumentException e) {
-        // throwing up on an invalid name. we're good
-      }
+      assertThrows(IllegalArgumentException.class, () -> HddsClientUtils.verifyResourceName(name),
+          "Did not reject invalid string [" + name + "] as a name");
     }
   }
 
@@ -258,12 +253,8 @@ public class TestHddsClientUtils {
 
 
     for (String name : invalidNames) {
-      try {
-        HddsClientUtils.verifyKeyName(name);
-        fail("Did not reject invalid string [" + name + "] as a name");
-      } catch (IllegalArgumentException e) {
-        // throwing up on an invalid name. it's working.
-      }
+      assertThrows(IllegalArgumentException.class, () -> HddsClientUtils.verifyKeyName(name),
+          "Did not reject invalid string [" + name + "] as a name");
     }
 
     List<String> validNames = new ArrayList<>();

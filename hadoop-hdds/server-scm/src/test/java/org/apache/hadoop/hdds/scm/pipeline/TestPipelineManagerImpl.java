@@ -332,28 +332,16 @@ public class TestPipelineManagerImpl {
           .getPipelines(RatisReplicationConfig
                   .getInstance(ReplicationFactor.THREE),
               Pipeline.PipelineState.OPEN).contains(pipeline));
-
-      try {
-        pipelineManager.removePipeline(pipeline);
-        fail();
-      } catch (IOException ioe) {
-        // Should not be able to remove the OPEN pipeline.
-        assertEquals(1, pipelineManager.getPipelines().size());
-      } catch (Exception e) {
-        fail("Should not reach here.");
-      }
+      assertThrows(IOException.class, () -> pipelineManager.removePipeline(pipeline));
+      // Should not be able to remove the OPEN pipeline.
+      assertEquals(1, pipelineManager.getPipelines().size());
 
       // Destroy pipeline
       pipelineManager.closePipeline(pipeline.getId());
       pipelineManager.deletePipeline(pipeline.getId());
 
-      try {
-        pipelineManager.getPipeline(pipeline.getId());
-        fail("Pipeline should not have been retrieved");
-      } catch (PipelineNotFoundException e) {
-        // There may be pipelines created by BackgroundPipelineCreator
-        // exist in pipelineManager, just ignore them.
-      }
+      assertThrows(PipelineNotFoundException.class, () -> pipelineManager.getPipeline(pipeline.getId()),
+          "Pipeline should not have been retrieved");
     }
   }
 
@@ -443,17 +431,11 @@ public class TestPipelineManagerImpl {
     assertEquals(0, numPipelineCreateFailed);
 
     //This should fail...
-    try {
-      pipelineManager
-          .createPipeline(RatisReplicationConfig
-              .getInstance(ReplicationFactor.THREE));
-      fail();
-    } catch (SCMException ioe) {
-      // pipeline creation failed this time.
-      assertEquals(
-          ResultCodes.FAILED_TO_FIND_SUITABLE_NODE,
-          ioe.getResult());
-    }
+    SCMException e =
+        assertThrows(SCMException.class,
+            () -> pipelineManager.createPipeline(RatisReplicationConfig.getInstance(ReplicationFactor.THREE)));
+    // pipeline creation failed this time.
+    assertEquals(ResultCodes.FAILED_TO_FIND_SUITABLE_NODE, e.getResult());
 
     metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
@@ -636,15 +618,11 @@ public class TestPipelineManagerImpl {
         new SCMSafeModeManager.SafeModeStatus(true, false));
 
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
-    try {
-      pipelineManager
-          .createPipeline(RatisReplicationConfig
-              .getInstance(ReplicationFactor.THREE));
-      fail("Pipelines should not have been created");
-    } catch (IOException e) {
-      // No pipeline is created.
-      assertTrue(pipelineManager.getPipelines().isEmpty());
-    }
+    assertThrows(IOException.class,
+        () -> pipelineManager.createPipeline(RatisReplicationConfig.getInstance(ReplicationFactor.THREE)),
+        "Pipelines should not have been created");
+    // No pipeline is created.
+    assertTrue(pipelineManager.getPipelines().isEmpty());
 
     // Ensure a pipeline of factor ONE can be created - no exceptions should be
     // raised.

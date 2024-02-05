@@ -53,6 +53,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.junit.jupiter.api.AfterEach;
@@ -230,28 +231,24 @@ public class TestOzoneClientRetriesOnExceptions {
     // the max retry count of N.
     Assumptions.assumeTrue(containerList.size() > MAX_RETRIES,
         containerList.size() + " <= " + MAX_RETRIES);
-    try {
+    IOException ioe = assertThrows(IOException.class, () -> {
       key.write(data1);
       // ensure that write is flushed to dn
       key.flush();
-      fail("Expected exception not thrown");
-    } catch (IOException ioe) {
-      assertInstanceOf(ContainerNotOpenException.class,
-          HddsClientUtils.checkForException(blockOutputStream.getIoException()));
-      assertThat(ioe.getMessage()).contains(
-              "Retry request failed. " +
-                  "retries get failed due to exceeded maximum " +
-                  "allowed retries number: " + MAX_RETRIES);
-    }
-    try {
-      key.flush();
-      fail("Expected exception not thrown");
-    } catch (IOException ioe) {
-      assertThat(ioe.getMessage()).contains("Stream is closed");
-    }
+    });
+    assertInstanceOf(ContainerNotOpenException.class,
+        HddsClientUtils.checkForException(blockOutputStream.getIoException()));
+    assertThat(ioe.getMessage()).contains(
+            "Retry request failed. " +
+                "retries get failed due to exceeded maximum " +
+                "allowed retries number: " + MAX_RETRIES);
+
+    ioe = assertThrows(IOException.class, () -> key.flush());
+    assertThat(ioe.getMessage()).contains("Stream is closed");
+
     try {
       key.close();
-    } catch (IOException ioe) {
+    } catch (IOException e) {
       fail("Expected should not be thrown");
     }
   }
