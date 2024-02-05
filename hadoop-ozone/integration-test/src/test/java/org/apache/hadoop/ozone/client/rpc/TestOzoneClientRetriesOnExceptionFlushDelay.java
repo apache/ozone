@@ -89,7 +89,7 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
     maxFlushSize = 2 * flushSize;
     blockSize = 2 * maxFlushSize;
 
-    OzoneClientConfig config = new OzoneClientConfig();
+    OzoneClientConfig config = conf.getObject(OzoneClientConfig.class);
     config.setChecksumType(ChecksumType.NONE);
     config.setMaxRetryCount(3);
     conf.setFromObject(config);

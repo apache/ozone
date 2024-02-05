@@ -128,7 +128,7 @@ public class TestCommitWatcher {
     ratisClientConfig.setWatchRequestTimeout(Duration.ofSeconds(10));
     conf.setFromObject(ratisClientConfig);
 
-    OzoneClientConfig clientConfig = new OzoneClientConfig();
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumType(ChecksumType.NONE);
     conf.setFromObject(clientConfig);
 

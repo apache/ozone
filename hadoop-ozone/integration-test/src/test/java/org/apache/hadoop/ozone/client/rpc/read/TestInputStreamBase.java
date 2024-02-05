@@ -46,7 +46,7 @@ abstract class TestInputStreamBase {
       ContainerLayoutVersion containerLayout) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
 
-    OzoneClientConfig config = new OzoneClientConfig();
+    OzoneClientConfig config = conf.getObject(OzoneClientConfig.class);
     config.setBytesPerChecksum(BYTES_PER_CHECKSUM);
     conf.setFromObject(config);
 
