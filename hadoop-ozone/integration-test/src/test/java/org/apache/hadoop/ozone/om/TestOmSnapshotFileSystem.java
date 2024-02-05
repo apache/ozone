@@ -582,7 +582,7 @@ public abstract class TestOmSnapshotFileSystem {
   }
 
   @Test
-  public void testReadFileFromSnapshot() throws Exception {
+  void testReadFileFromSnapshot() throws Exception {
     String keyName = "dir/file";
     byte[] strBytes = "Sample text".getBytes(StandardCharsets.UTF_8);
     Path parent = new Path("/");
@@ -612,8 +612,6 @@ public abstract class TestOmSnapshotFileSystem {
       byte[] readBytes = new byte[strBytes.length];
       System.arraycopy(buffer.array(), 0, readBytes, 0, strBytes.length);
       assertArrayEquals(strBytes, readBytes);
-    } catch (Exception e) {
-      fail("Failed to read file, Exception : " + e);
     }
 
     deleteSnapshot(snapshotName);

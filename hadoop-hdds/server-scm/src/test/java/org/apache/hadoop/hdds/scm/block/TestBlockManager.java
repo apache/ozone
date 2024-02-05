@@ -83,7 +83,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.fail;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -249,7 +248,7 @@ public class TestBlockManager {
   }
 
   @Test
-  public void testAllocateBlockInParallel() {
+  void testAllocateBlockInParallel() throws Exception {
     int threadCount = 20;
     List<ExecutorService> executors = new ArrayList<>(threadCount);
     for (int i = 0; i < threadCount; i++) {
@@ -273,17 +272,14 @@ public class TestBlockManager {
       }, executors.get(i));
       futureList.add(future);
     }
-    try {
-      CompletableFuture
-          .allOf(futureList.toArray(new CompletableFuture[futureList.size()]))
-          .get();
-    } catch (Exception e) {
-      fail("testAllocateBlockInParallel failed");
-    }
+
+    CompletableFuture
+        .allOf(futureList.toArray(new CompletableFuture[futureList.size()]))
+        .get();
   }
 
   @Test
-  public void testBlockDistribution() throws Exception {
+  void testBlockDistribution() throws Exception {
     int threadCount = numContainerPerOwnerInPipeline *
             numContainerPerOwnerInPipeline;
     nodeManager.setNumPipelinePerDatanode(1);
@@ -323,24 +319,19 @@ public class TestBlockManager {
       }, executors.get(i));
       futureList.add(future);
     }
-    try {
-      CompletableFuture.allOf(futureList.toArray(
-          new CompletableFuture[0])).get();
+    CompletableFuture.allOf(futureList.toArray(new CompletableFuture[0])).get();
 
-      assertEquals(1, pipelineManager.getPipelines(replicationConfig).size());
-      assertEquals(numContainerPerOwnerInPipeline, allocatedBlockMap.size());
-      assertEquals(numContainerPerOwnerInPipeline, allocatedBlockMap.values().size());
-      allocatedBlockMap.values().forEach(v -> {
-        assertEquals(numContainerPerOwnerInPipeline, v.size());
-      });
-    } catch (Exception e) {
-      fail("testAllocateBlockInParallel failed");
-    }
+    assertEquals(1, pipelineManager.getPipelines(replicationConfig).size());
+    assertEquals(numContainerPerOwnerInPipeline, allocatedBlockMap.size());
+    assertEquals(numContainerPerOwnerInPipeline, allocatedBlockMap.values().size());
+    allocatedBlockMap.values().forEach(v -> {
+      assertEquals(numContainerPerOwnerInPipeline, v.size());
+    });
   }
 
 
   @Test
-  public void testBlockDistributionWithMultipleDisks() throws Exception {
+  void testBlockDistributionWithMultipleDisks() throws Exception {
     int threadCount = numContainerPerOwnerInPipeline *
             numContainerPerOwnerInPipeline;
     nodeManager.setNumHealthyVolumes(numContainerPerOwnerInPipeline);
@@ -381,30 +372,26 @@ public class TestBlockManager {
       }, executors.get(i));
       futureList.add(future);
     }
-    try {
-      CompletableFuture
-              .allOf(futureList.toArray(
-                      new CompletableFuture[futureList.size()])).get();
-      assertEquals(1,
-          pipelineManager.getPipelines(replicationConfig).size());
-      Pipeline pipeline =
-          pipelineManager.getPipelines(replicationConfig).get(0);
-      // total no of containers to be created will be number of healthy
-      // volumes * number of numContainerPerOwnerInPipeline which is equal to
-      // the thread count
-      assertEquals(threadCount, pipelineManager.getNumberOfContainers(pipeline.getId()));
-      assertEquals(threadCount, allocatedBlockMap.size());
-      assertEquals(threadCount, allocatedBlockMap.values().size());
-      allocatedBlockMap.values().forEach(v -> {
-        assertEquals(1, v.size());
-      });
-    } catch (Exception e) {
-      fail("testAllocateBlockInParallel failed");
-    }
+    CompletableFuture
+        .allOf(futureList.toArray(
+            new CompletableFuture[futureList.size()])).get();
+    assertEquals(1,
+        pipelineManager.getPipelines(replicationConfig).size());
+    Pipeline pipeline =
+        pipelineManager.getPipelines(replicationConfig).get(0);
+    // total no of containers to be created will be number of healthy
+    // volumes * number of numContainerPerOwnerInPipeline which is equal to
+    // the thread count
+    assertEquals(threadCount, pipelineManager.getNumberOfContainers(pipeline.getId()));
+    assertEquals(threadCount, allocatedBlockMap.size());
+    assertEquals(threadCount, allocatedBlockMap.values().size());
+    allocatedBlockMap.values().forEach(v -> {
+      assertEquals(1, v.size());
+    });
   }
 
   @Test
-  public void testBlockDistributionWithMultipleRaftLogDisks() throws Exception {
+  void testBlockDistributionWithMultipleRaftLogDisks() throws Exception {
     int threadCount = numContainerPerOwnerInPipeline *
         numContainerPerOwnerInPipeline;
     int numMetaDataVolumes = 2;
@@ -446,25 +433,20 @@ public class TestBlockManager {
       }, executors.get(i));
       futureList.add(future);
     }
-    try {
-      CompletableFuture
-          .allOf(futureList.toArray(
-              new CompletableFuture[futureList.size()])).get();
-      assertEquals(1,
-          pipelineManager.getPipelines(replicationConfig).size());
-      Pipeline pipeline =
-          pipelineManager.getPipelines(replicationConfig).get(0);
-      // the pipeline per raft log disk config is set to 1 by default
-      int numContainers = (int)Math.ceil((double)
-              (numContainerPerOwnerInPipeline *
-                  numContainerPerOwnerInPipeline) / numMetaDataVolumes);
-      assertEquals(numContainers, pipelineManager.
-          getNumberOfContainers(pipeline.getId()));
-      assertEquals(numContainers, allocatedBlockMap.size());
-      assertEquals(numContainers, allocatedBlockMap.values().size());
-    } catch (Exception e) {
-      fail("testAllocateBlockInParallel failed");
-    }
+    CompletableFuture
+        .allOf(futureList.toArray(
+            new CompletableFuture[futureList.size()])).get();
+    assertEquals(1,
+        pipelineManager.getPipelines(replicationConfig).size());
+    Pipeline pipeline =
+        pipelineManager.getPipelines(replicationConfig).get(0);
+    // the pipeline per raft log disk config is set to 1 by default
+    int numContainers = (int)Math.ceil((double)
+        (numContainerPerOwnerInPipeline *
+            numContainerPerOwnerInPipeline) / numMetaDataVolumes);
+    assertEquals(numContainers, pipelineManager.getNumberOfContainers(pipeline.getId()));
+    assertEquals(numContainers, allocatedBlockMap.size());
+    assertEquals(numContainers, allocatedBlockMap.values().size());
   }
 
   @Test

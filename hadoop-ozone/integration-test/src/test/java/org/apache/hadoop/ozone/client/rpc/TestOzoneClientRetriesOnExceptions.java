@@ -54,7 +54,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.fail;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
@@ -189,7 +188,7 @@ public class TestOzoneClientRetriesOnExceptions {
   }
 
   @Test
-  public void testMaxRetriesByOzoneClient() throws Exception {
+  void testMaxRetriesByOzoneClient() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(
         keyName, ReplicationType.RATIS, (MAX_RETRIES + 1) * blockSize);
@@ -246,11 +245,7 @@ public class TestOzoneClientRetriesOnExceptions {
     ioe = assertThrows(IOException.class, () -> key.flush());
     assertThat(ioe.getMessage()).contains("Stream is closed");
 
-    try {
-      key.close();
-    } catch (IOException e) {
-      fail("Expected should not be thrown");
-    }
+    key.close();
   }
 
   private OzoneOutputStream createKey(String keyName, ReplicationType type,

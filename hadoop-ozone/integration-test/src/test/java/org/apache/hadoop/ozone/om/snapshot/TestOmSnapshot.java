@@ -278,7 +278,7 @@ public abstract class TestOmSnapshot {
    * Trigger OM upgrade finalization from the client and block until completion
    * (status FINALIZATION_DONE).
    */
-  private void finalizeOMUpgrade() throws IOException {
+  private void finalizeOMUpgrade() throws Exception {
     // Trigger OM upgrade finalization. Ref: FinalizeUpgradeSubCommand#call
     final OzoneManagerProtocol omClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
@@ -290,17 +290,12 @@ public abstract class TestOmSnapshot {
     assertTrue(isStarting(finalizationResponse.status()));
     // Wait for the finalization to be marked as done.
     // 10s timeout should be plenty.
-    try {
-      await(POLL_MAX_WAIT_MILLIS, POLL_INTERVAL_MILLIS, () -> {
-        final UpgradeFinalizer.StatusAndMessages progress =
-            omClient.queryUpgradeFinalizationProgress(
-                upgradeClientID, false, false);
-        return isDone(progress.status());
-      });
-    } catch (Exception e) {
-      fail("Unexpected exception while waiting for "
-          + "the OM upgrade to finalize: " + e.getMessage());
-    }
+    await(POLL_MAX_WAIT_MILLIS, POLL_INTERVAL_MILLIS, () -> {
+      final UpgradeFinalizer.StatusAndMessages progress =
+          omClient.queryUpgradeFinalizationProgress(
+              upgradeClientID, false, false);
+      return isDone(progress.status());
+    });
   }
 
   @AfterAll

@@ -50,7 +50,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * This test class verifies the parsing of SCM endpoint config settings. The
@@ -234,7 +233,7 @@ public class TestHddsClientUtils {
   }
 
   @Test
-  public void testVerifyKeyName() {
+  void testVerifyKeyName() throws IllegalArgumentException {
     List<String> invalidNames = new ArrayList<>();
     invalidNames.add("#");
     invalidNames.add("ab^cd");
@@ -276,13 +275,7 @@ public class TestHddsClientUtils {
     validNames.add("dollar$");
 
     for (String name : validNames) {
-      try {
-        HddsClientUtils.verifyKeyName(name);
-        // not throwing up on a valid name. it's working.
-      } catch (IllegalArgumentException e) {
-        // throwing up on an valid name. it's not working.
-        fail("Rejected valid string [" + name + "] as a name");
-      }
+      HddsClientUtils.verifyKeyName(name);
     }
   }
 
