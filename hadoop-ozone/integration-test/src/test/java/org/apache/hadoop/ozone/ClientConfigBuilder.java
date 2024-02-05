@@ -54,7 +54,6 @@ public final class ClientConfigBuilder {
     this.unit = unit;
   }
 
-  // FIXME store everything in bytes
   public ClientConfigBuilder setChunkSize(int size) {
     chunkSize = (int) toBytes(size);
     return this;
@@ -85,14 +84,12 @@ public final class ClientConfigBuilder {
     return this;
   }
 
-  // TODO fix typo
-  public ClientConfigBuilder setDataStreamBufferFlushize(long size) {
+  public ClientConfigBuilder setDataStreamBufferFlushSize(long size) {
     dataStreamBufferFlushSize = OptionalLong.of(toBytes(size));
     return this;
   }
 
-  // TODO fix typo in name
-  public ClientConfigBuilder setDataStreamStreamWindowSize(long size) {
+  public ClientConfigBuilder setDataStreamWindowSize(long size) {
     dataStreamWindowSize = OptionalLong.of(toBytes(size));
     return this;
   }
