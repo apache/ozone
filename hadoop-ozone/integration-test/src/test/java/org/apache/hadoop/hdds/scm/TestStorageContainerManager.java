@@ -374,7 +374,7 @@ public class TestStorageContainerManager {
     MiniOzoneCluster cluster =
         MiniOzoneCluster.newBuilder(conf).setHbInterval(1000)
             .setHbProcessorInterval(3000).setNumDatanodes(1)
-            .setClusterId(UUID.randomUUID().toString()).build();
+            .build();
     cluster.waitForClusterToBeReady();
 
     try {
@@ -776,7 +776,6 @@ public class TestStorageContainerManager {
   @Test
   public void testScmProcessDatanodeHeartbeat() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    String scmId = UUID.randomUUID().toString();
     conf.setClass(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
         StaticMapping.class, DNSToSwitchMapping.class);
     StaticMapping.addNodeToRack(NetUtils.normalizeHostNames(
@@ -786,7 +785,6 @@ public class TestStorageContainerManager {
     final int datanodeNum = 3;
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(datanodeNum)
-        .setScmId(scmId)
         .build();
     cluster.waitForClusterToBeReady();
     StorageContainerManager scm = cluster.getStorageContainerManager();
@@ -1062,10 +1060,7 @@ public class TestStorageContainerManager {
       throws IOException, AuthenticationException, InterruptedException,
       TimeoutException {
     final OzoneConfiguration conf = new OzoneConfiguration();
-    final String clusterID = UUID.randomUUID().toString();
     try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
-        .setClusterId(clusterID)
-        .setScmId(UUID.randomUUID().toString())
         .setNumDatanodes(3)
         .build()) {
       final StorageContainerManager nonRatisSCM = cluster
@@ -1077,7 +1072,7 @@ public class TestStorageContainerManager {
 
       DefaultConfigManager.clearDefaultConfigs();
       conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
-      StorageContainerManager.scmInit(conf, clusterID);
+      StorageContainerManager.scmInit(conf, cluster.getClusterId());
       cluster.restartStorageContainerManager(false);
 
       final StorageContainerManager ratisSCM = cluster

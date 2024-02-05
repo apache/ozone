@@ -79,9 +79,6 @@ public abstract class TestOzoneManagerHA {
   private static MiniOzoneCluster.Builder clusterBuilder = null;
   private static ObjectStore objectStore;
   private static OzoneConfiguration conf;
-  private static String clusterId;
-  private static String scmId;
-  private static String omId;
   private static String omServiceId;
   private static int numOfOMs = 3;
   private static final int LOG_PURGE_GAP = 50;
@@ -147,10 +144,7 @@ public abstract class TestOzoneManagerHA {
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
-    omId = UUID.randomUUID().toString();
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OzoneConfigKeys.OZONE_ADMINISTRATORS,
         OZONE_ADMINISTRATORS_WILDCARD);
@@ -184,10 +178,7 @@ public abstract class TestOzoneManagerHA {
     conf.set(OZONE_KEY_DELETING_LIMIT_PER_TASK, "2");
 
     clusterBuilder = MiniOzoneCluster.newOMHABuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
         .setOMServiceId(omServiceId)
-        .setOmId(omId)
         .setNumOfOzoneManagers(numOfOMs);
 
     cluster = (MiniOzoneHAClusterImpl) clusterBuilder.build();

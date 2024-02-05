@@ -34,7 +34,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -81,9 +80,6 @@ public class TestSCMDbCheckpointServlet {
   private StorageContainerManager scm;
   private SCMMetrics scmMetrics;
   private OzoneConfiguration conf;
-  private String clusterId;
-  private String scmId;
-  private String omId;
   private HttpServletRequest requestMock;
   private HttpServletResponse responseMock;
   private String method;
@@ -100,14 +96,8 @@ public class TestSCMDbCheckpointServlet {
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
-    omId = UUID.randomUUID().toString();
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
-        .setOmId(omId)
         .build();
     cluster.waitForClusterToBeReady();
     scm = cluster.getStorageContainerManager();
