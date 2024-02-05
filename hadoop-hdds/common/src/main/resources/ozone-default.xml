@@ -1287,15 +1287,6 @@
       see ozone.scm.heartbeat.thread.interval before changing this value.
     </description>
   </property>
-  <property>
-    <name>ozone.trace.enabled</name>
-    <value>false</value>
-    <tag>OZONE, DEBUG</tag>
-    <description>
-      Setting this flag to true dumps the HTTP request/ response in
-      the logs. Very useful when debugging REST protocol.
-    </description>
-  </property>
 
   <property>
     <name>ozone.key.preallocation.max.blocks</name>

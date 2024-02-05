@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -77,8 +76,6 @@ public class TestAddRemoveOzoneManager {
   private MiniOzoneHAClusterImpl cluster = null;
   private ObjectStore objectStore;
   private OzoneConfiguration conf;
-  private final String clusterId = UUID.randomUUID().toString();
-  private final String scmId = UUID.randomUUID().toString();
   private long lastTransactionIndex;
   private UserGroupInformation user;
 
@@ -99,8 +96,6 @@ public class TestAddRemoveOzoneManager {
     conf = new OzoneConfiguration();
     conf.setInt(OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, 5);
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
         .setSCMServiceId(SCM_DUMMY_SERVICE_ID)
         .setOMServiceId(OM_SERVICE_ID)
         .setNumOfOzoneManagers(numInitialOMs)

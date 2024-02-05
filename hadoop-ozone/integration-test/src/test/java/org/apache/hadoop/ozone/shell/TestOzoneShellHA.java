@@ -135,8 +135,6 @@ public class TestOzoneShellHA {
   private static final PrintStream OLD_ERR = System.err;
 
   private static String omServiceId;
-  private static String clusterId;
-  private static String scmId;
   private static int numOfOMs;
 
   /**
@@ -176,14 +174,10 @@ public class TestOzoneShellHA {
     // Init HA cluster
     omServiceId = "om-service-test1";
     numOfOMs = 3;
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
     final int numDNs = 5;
     conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH,
         getKeyProviderURI(miniKMS));
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
         .setNumDatanodes(numDNs)

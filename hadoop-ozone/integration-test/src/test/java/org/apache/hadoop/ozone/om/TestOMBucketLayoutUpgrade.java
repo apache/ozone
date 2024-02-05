@@ -93,8 +93,6 @@ class TestOMBucketLayoutUpgrade {
     OzoneConfiguration conf = new OzoneConfiguration();
     String omServiceId = UUID.randomUUID().toString();
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
-        .setClusterId(UUID.randomUUID().toString())
-        .setScmId(UUID.randomUUID().toString())
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(3)
         .setNumDatanodes(1)

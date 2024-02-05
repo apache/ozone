@@ -74,8 +74,6 @@ public class TestStorageContainerManagerHA {
 
   private MiniOzoneHAClusterImpl cluster = null;
   private OzoneConfiguration conf;
-  private String clusterId;
-  private String scmId;
   private String omServiceId;
   private static int numOfOMs = 3;
   private String scmServiceId;
@@ -95,13 +93,9 @@ public class TestStorageContainerManagerHA {
     conf.set(ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL,
         "5s");
     conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_GAP, "1");
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
     scmServiceId = "scm-service-test1";
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
         .setOMServiceId(omServiceId)
         .setSCMServiceId(scmServiceId)
         .setNumOfStorageContainerManagers(numOfSCMs)

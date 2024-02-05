@@ -22,7 +22,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.ozone.test.GenericTestUtils;
 
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -45,8 +44,6 @@ public class TestMiniOzoneOMHACluster {
 
   private MiniOzoneHAClusterImpl cluster = null;
   private OzoneConfiguration conf;
-  private String clusterId;
-  private String scmId;
   private String omServiceId;
   private int numOfOMs = 3;
 
@@ -58,15 +55,11 @@ public class TestMiniOzoneOMHACluster {
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
     omServiceId = "omServiceId1";
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OzoneConfigKeys.OZONE_ADMINISTRATORS,
         OZONE_ADMINISTRATORS_WILDCARD);
     cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
         .build();

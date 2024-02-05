@@ -98,7 +98,6 @@ public class TestOzoneClientMultipartUploadWithFSO {
   private static MiniOzoneCluster cluster = null;
   private static OzoneClient ozClient = null;
 
-  private static String scmId = UUID.randomUUID().toString();
   private String volumeName;
   private String bucketName;
   private String keyName;
@@ -137,7 +136,6 @@ public class TestOzoneClientMultipartUploadWithFSO {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(5)
         .setTotalPipelineNumLimit(10)
-        .setScmId(scmId)
         .build();
     cluster.waitForClusterToBeReady();
     ozClient = OzoneClientFactory.getRpcClient(conf);

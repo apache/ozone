@@ -99,8 +99,6 @@ public final class TestSecretKeysApi {
   private File testUserKeytab;
   private String testUserPrincipal;
   private String ozonePrincipal;
-  private String clusterId;
-  private String scmId;
   private MiniOzoneHAClusterImpl cluster;
 
   @BeforeEach
@@ -110,9 +108,6 @@ public final class TestSecretKeysApi {
 
     ExitUtils.disableSystemExit();
     ExitUtil.disableSystemExit();
-
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
 
     startMiniKdc();
     setSecureConfig();
@@ -332,9 +327,7 @@ public final class TestSecretKeysApi {
       throws IOException, TimeoutException, InterruptedException {
     OzoneManager.setTestSecureOmFlag(true);
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newHABuilder(conf)
-        .setClusterId(clusterId)
         .setSCMServiceId("TestSecretKey")
-        .setScmId(scmId)
         .setNumDatanodes(3)
         .setNumOfStorageContainerManagers(numSCMs)
         .setNumOfOzoneManagers(1);

@@ -105,7 +105,6 @@ import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWith
 import org.hadoop.ozone.recon.codegen.ReconSqlDbConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.event.Level;
 
 /**
  * MiniOzoneCluster creates a complete in-process Ozone cluster suitable for
@@ -668,7 +667,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       // pipeline.
       conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
           numOfDatanodes >= 3 ? 3 : 1);
-      configureTrace();
     }
 
     void removeConfiguration() {
@@ -710,10 +708,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         return;
       }
       scmStore.setClusterId(clusterId);
-      if (!scmId.isPresent()) {
-        scmId = Optional.of(UUID.randomUUID().toString());
-      }
-      scmStore.setScmId(scmId.get());
+      scmStore.setScmId(scmId);
       scmStore.initialize();
       //TODO: HDDS-6897
       //Disabling Ratis for only of MiniOzoneClusterImpl.
@@ -723,7 +718,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
               && SCMHAUtils.isSCMHAEnabled(conf)) {
         scmStore.setSCMHAFlag(true);
         scmStore.persistCurrentState();
-        SCMRatisServerImpl.initialize(clusterId, scmId.get(),
+        SCMRatisServerImpl.initialize(clusterId, scmId,
                 SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
                         .getLocalNodeDetails(), conf);
       }
@@ -734,10 +729,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         return;
       }
       omStorage.setClusterId(clusterId);
-      omStorage.setOmId(omId.orElse(UUID.randomUUID().toString()));
+      omStorage.setOmId(omId);
       // Initialize ozone certificate client if security is enabled.
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-        OzoneManager.initializeSecurity(conf, omStorage, scmId.get());
+        OzoneManager.initializeSecurity(conf, omStorage, scmId);
       }
       omStorage.initialize();
     }
@@ -784,7 +779,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     protected List<HddsDatanodeService> createHddsDatanodes(
         List<StorageContainerManager> scms, ReconServer reconServer)
         throws IOException {
-      configureHddsDatanodes();
       String scmAddress = getSCMAddresses(scms);
       String[] args = new String[] {};
       conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, scmAddress);
@@ -855,7 +849,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           localhostWithFreePort());
       conf.set(ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY,
           localhostWithFreePort());
-      conf.setInt(ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY, numOfScmHandlers);
       conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
           "3s");
       configureSCMheartbeat();
@@ -890,12 +883,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       conf.set(OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY,
           localhostWithFreePort());
       conf.setInt(OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, getFreePort());
-      conf.setInt(OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY, numOfOmHandlers);
-    }
-
-    private void configureHddsDatanodes() {
-      conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_ENABLED,
-          enableContainerDatastream);
     }
 
     protected void configureDatanodePorts(ConfigurationTarget conf) {
@@ -911,15 +898,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       conf.setInt(DFS_CONTAINER_RATIS_SERVER_PORT, getFreePort());
       conf.setInt(DFS_CONTAINER_RATIS_DATASTREAM_PORT, getFreePort());
       conf.setFromObject(new ReplicationConfig().setPort(getFreePort()));
-    }
-
-    private void configureTrace() {
-      if (enableTrace.isPresent()) {
-        conf.setBoolean(OzoneConfigKeys.OZONE_TRACE_ENABLED_KEY,
-            enableTrace.get());
-        GenericTestUtils.setRootLogLevel(Level.TRACE);
-      }
-      GenericTestUtils.setRootLogLevel(Level.INFO);
     }
 
     protected void configureRecon() throws IOException {

@@ -29,8 +29,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import java.util.UUID;
-
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,7 +50,6 @@ public class TestSCMSnapshot {
     cluster = MiniOzoneCluster
         .newBuilder(conf)
         .setNumDatanodes(3)
-        .setScmId(UUID.randomUUID().toString())
         .build();
     cluster.waitForClusterToBeReady();
   }

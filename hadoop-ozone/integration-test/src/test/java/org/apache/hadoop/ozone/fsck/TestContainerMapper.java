@@ -67,7 +67,6 @@ public class TestContainerMapper {
   private static OzoneManager ozoneManager;
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
-  private static final String SCM_ID = UUID.randomUUID().toString();
   private static String volName = UUID.randomUUID().toString();
   private static String bucketName = UUID.randomUUID().toString();
   private static OzoneConfiguration conf;
@@ -88,7 +87,6 @@ public class TestContainerMapper {
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 6);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
-        .setScmId(SCM_ID)
         .build();
     cluster.waitForClusterToBeReady();
     ozClient = OzoneClientFactory.getRpcClient(conf);

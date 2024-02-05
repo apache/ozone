@@ -195,10 +195,6 @@ public abstract class TestOzoneRpcClientAbstract {
   private static OzoneAcl inheritedGroupAcl = new OzoneAcl(GROUP,
       remoteGroupName, READ, ACCESS);
 
-  private static String scmId = UUID.randomUUID().toString();
-  private static String clusterId;
-
-
   /**
    * Create a MiniOzoneCluster for testing.
    * @param conf Configurations to start the cluster.
@@ -207,7 +203,6 @@ public abstract class TestOzoneRpcClientAbstract {
   static void startCluster(OzoneConfiguration conf) throws Exception {
     // Reduce long wait time in MiniOzoneClusterImpl#waitForHddsDatanodesStop
     //  for testZReadKeyWithUnhealthyContainerReplica.
-    clusterId = UUID.randomUUID().toString();
     conf.set("ozone.scm.stale.node.interval", "10s");
 
     ClientConfigBuilder.newBuilder(conf, StorageUnit.MB)
@@ -217,8 +212,6 @@ public abstract class TestOzoneRpcClientAbstract {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(14)
         .setTotalPipelineNumLimit(10)
-        .setScmId(scmId)
-        .setClusterId(clusterId)
         .build();
     cluster.waitForClusterToBeReady();
     ozClient = OzoneClientFactory.getRpcClient(conf);
@@ -270,10 +263,6 @@ public abstract class TestOzoneRpcClientAbstract {
 
   public static ObjectStore getStore() {
     return TestOzoneRpcClientAbstract.store;
-  }
-
-  public static void setClusterId(String clusterId) {
-    TestOzoneRpcClientAbstract.clusterId = clusterId;
   }
 
   public static OzoneClient getClient() {
@@ -2120,7 +2109,7 @@ public abstract class TestOzoneRpcClientAbstract {
       String containreBaseDir =
           container.getContainerData().getVolume().getHddsRootDir().getPath();
       File chunksLocationPath = KeyValueContainerLocationUtil
-          .getChunksLocationPath(containreBaseDir, clusterId, containerID);
+          .getChunksLocationPath(containreBaseDir, cluster.getClusterId(), containerID);
       byte[] corruptData = "corrupted data".getBytes(UTF_8);
       // Corrupt the contents of chunk files
       for (File file : FileUtils.listFiles(chunksLocationPath, null, false)) {

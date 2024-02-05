@@ -27,7 +27,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 
@@ -51,12 +50,8 @@ public class TestRocksObjectLeakDetector {
       TimeoutException {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_METADATA_STORE_ROCKSDB_STATISTICS, "ALL");
-    String clusterId = UUID.randomUUID().toString();
-    String scmId = UUID.randomUUID().toString();
     String omServiceId = "omServiceId1";
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(1)
         .build();
