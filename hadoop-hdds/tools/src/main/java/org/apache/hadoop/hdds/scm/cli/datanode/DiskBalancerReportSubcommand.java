@@ -39,8 +39,8 @@ import java.util.List;
 public class DiskBalancerReportSubcommand extends ScmSubcommand {
   @Option(names = {"-c", "--count"},
       description = "Result count to return. Sort by Volume Density " +
-          "in descending order.")
-  private int count;
+          "in descending order. Defaults to 25")
+  private int count = 25;
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
