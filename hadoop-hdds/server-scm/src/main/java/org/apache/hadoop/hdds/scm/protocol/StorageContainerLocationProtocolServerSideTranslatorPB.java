@@ -1318,7 +1318,9 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     case status:
       infoProtoList = impl.getDiskBalancerStatus(
           Optional.of(request.getHostsList()),
-          Optional.of(request.getStatus()),
+          // If an optional proto enum field is not set, it will return the first
+          // enum value. So, we need to check if the field is set.
+          request.hasStatus() ? Optional.of(request.getStatus()) : Optional.empty(),
           clientVersion);
       break;
     default:
