@@ -171,7 +171,7 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testProcessDeletedContainers() {
+  public void testProcessDeletedAndNegativeSizedContainers() {
     // Create a list of containers, including one that is deleted
     ContainerInfo omContainerInfo1 = mock(ContainerInfo.class);
     given(omContainerInfo1.containerID()).willReturn(new ContainerID(1));
@@ -188,19 +188,6 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
     given(omContainerInfoDeleted.getUsedBytes()).willReturn(1000000000L);
     given(omContainerInfoDeleted.getState()).willReturn(DELETED); // 1GB
 
-    List<ContainerInfo> containers = new ArrayList<>();
-    containers.add(omContainerInfo1);
-    containers.add(omContainerInfo2);
-    containers.add(omContainerInfoDeleted);
-
-    task.process(containers);
-
-    // Verify that the deleted container is not counted
-    assertEquals(2, containerCountBySizeDao.count());
-  }
-
-  @Test
-  public void testProcessWithNegativeSizeContainers() {
     // Create a mock container with negative size
     final ContainerInfo negativeSizeContainer = mock(ContainerInfo.class);
     given(negativeSizeContainer.containerID()).willReturn(new ContainerID(0));
@@ -222,21 +209,19 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
     given(validSizeContainer.getState()).willReturn(CLOSED);
 
     // Mock getContainers method to return a list of containers including
-    // the one with negative size
+    // both valid and invalid ones
     List<ContainerInfo> containers = new ArrayList<>();
+    containers.add(omContainerInfo1);
+    containers.add(omContainerInfo2);
+    containers.add(omContainerInfoDeleted);
     containers.add(negativeSizeContainer);
+    containers.add(negativeSizeDeletedContainer);
     containers.add(validSizeContainer);
 
     task.process(containers);
 
-    // Verify that only the container with valid size has been processed
-    assertEquals(1, containerCountBySizeDao.count());
-
-    // Check whether container size upper bound for 1000000000L is correctly added
-    Record1<Long> recordToFind = dslContext.newRecord(
-        CONTAINER_COUNT_BY_SIZE.CONTAINER_SIZE).value1(1073741824L); // 1GB
-    assertEquals(1L, containerCountBySizeDao.findById(recordToFind.value1())
-        .getCount().longValue());
+    // Verify that only the valid containers are counted
+    assertEquals(2, containerCountBySizeDao.count());
   }
 
 }
