@@ -26,15 +26,11 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
-import java.util.UUID;
 
 /**
  * Test implementation for OzoneClientFactory.
  */
 public class TestOzoneClientFactory {
-
-  private static String scmId = UUID.randomUUID().toString();
-  private static String clusterId = UUID.randomUUID().toString();
 
   @Test
   public void testRemoteException() {
@@ -44,8 +40,6 @@ public class TestOzoneClientFactory {
       MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
           .setNumDatanodes(3)
           .setTotalPipelineNumLimit(10)
-          .setScmId(scmId)
-          .setClusterId(clusterId)
           .build();
 
       String omPort = cluster.getOzoneManager().getRpcPort();

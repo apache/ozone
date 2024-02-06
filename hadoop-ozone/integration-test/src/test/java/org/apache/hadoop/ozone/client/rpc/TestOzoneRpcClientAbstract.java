@@ -84,7 +84,6 @@ import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
-import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -194,10 +193,6 @@ public abstract class TestOzoneRpcClientAbstract {
   private static OzoneAcl inheritedGroupAcl = new OzoneAcl(GROUP,
       remoteGroupName, READ, ACCESS);
 
-  private static String scmId = UUID.randomUUID().toString();
-  private static String clusterId;
-
-
   /**
    * Create a MiniOzoneCluster for testing.
    * @param conf Configurations to start the cluster.
@@ -206,13 +201,10 @@ public abstract class TestOzoneRpcClientAbstract {
   static void startCluster(OzoneConfiguration conf) throws Exception {
     // Reduce long wait time in MiniOzoneClusterImpl#waitForHddsDatanodesStop
     //  for testZReadKeyWithUnhealthyContainerReplica.
-    clusterId = UUID.randomUUID().toString();
     conf.set("ozone.scm.stale.node.interval", "10s");
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(14)
         .setTotalPipelineNumLimit(10)
-        .setScmId(scmId)
-        .setClusterId(clusterId)
         .setDataStreamMinPacketSize(1) // 1MB
         .build();
     cluster.waitForClusterToBeReady();
@@ -265,10 +257,6 @@ public abstract class TestOzoneRpcClientAbstract {
 
   public static ObjectStore getStore() {
     return TestOzoneRpcClientAbstract.store;
-  }
-
-  public static void setClusterId(String clusterId) {
-    TestOzoneRpcClientAbstract.clusterId = clusterId;
   }
 
   public static OzoneClient getClient() {
@@ -1912,7 +1900,7 @@ public abstract class TestOzoneRpcClientAbstract {
   // Make this executed at last, for it has some side effect to other UTs
   @Test
   @Flaky("HDDS-6151")
-  public void testZReadKeyWithUnhealthyContainerReplica() throws Exception {
+  void testZReadKeyWithUnhealthyContainerReplica() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
@@ -1995,16 +1983,12 @@ public abstract class TestOzoneRpcClientAbstract {
     }, 1000, 10000);
 
     // Try reading keyName2
-    try {
-      GenericTestUtils.setLogLevel(XceiverClientGrpc.getLogger(), DEBUG);
-      try (OzoneInputStream is = bucket.readKey(keyName2)) {
-        byte[] content = new byte[100];
-        is.read(content);
-        String retValue = new String(content, UTF_8);
-        assertEquals(value, retValue.trim());
-      }
-    } catch (IOException e) {
-      fail("Reading unhealthy replica should succeed.");
+    GenericTestUtils.setLogLevel(XceiverClientGrpc.getLogger(), DEBUG);
+    try (OzoneInputStream is = bucket.readKey(keyName2)) {
+      byte[] content = new byte[100];
+      is.read(content);
+      String retValue = new String(content, UTF_8);
+      assertEquals(value, retValue.trim());
     }
   }
 
@@ -2013,7 +1997,7 @@ public abstract class TestOzoneRpcClientAbstract {
    * @throws IOException
    */
   @Test
-  public void testReadKeyWithCorruptedDataWithMutiNodes() throws IOException {
+  void testReadKeyWithCorruptedDataWithMutiNodes() throws IOException {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
@@ -2062,8 +2046,6 @@ public abstract class TestOzoneRpcClientAbstract {
       byte[] b = new byte[data.length];
       is.read(b);
       assertArrayEquals(b, data);
-    } catch (OzoneChecksumException e) {
-      fail("Reading corrupted data should not fail.");
     }
     corruptData(containerList.get(1), key);
     // Try reading the key. Read will fail on the first node and will eventually
@@ -2072,8 +2054,6 @@ public abstract class TestOzoneRpcClientAbstract {
       byte[] b = new byte[data.length];
       is.read(b);
       assertArrayEquals(b, data);
-    } catch (OzoneChecksumException e) {
-      fail("Reading corrupted data should not fail.");
     }
     corruptData(containerList.get(2), key);
     // Try reading the key. Read will fail here as all the replicas are corrupt
@@ -2115,7 +2095,7 @@ public abstract class TestOzoneRpcClientAbstract {
       String containreBaseDir =
           container.getContainerData().getVolume().getHddsRootDir().getPath();
       File chunksLocationPath = KeyValueContainerLocationUtil
-          .getChunksLocationPath(containreBaseDir, clusterId, containerID);
+          .getChunksLocationPath(containreBaseDir, cluster.getClusterId(), containerID);
       byte[] corruptData = "corrupted data".getBytes(UTF_8);
       // Corrupt the contents of chunk files
       for (File file : FileUtils.listFiles(chunksLocationPath, null, false)) {

@@ -112,6 +112,7 @@ public class ECReconstructionCoordinator implements Closeable {
   private final TokenHelper tokenHelper;
   private final ECReconstructionMetrics metrics;
   private final StateContext context;
+  private final OzoneClientConfig ozoneClientConfig;
   private final BlockOutputStreamResourceProvider
       blockOutputStreamResourceProvider;
 
@@ -124,16 +125,17 @@ public class ECReconstructionCoordinator implements Closeable {
     this.containerOperationClient = new ECContainerOperationClient(conf,
         certificateClient);
     this.byteBufferPool = new ElasticByteBufferPool();
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setNameFormat(threadNamePrefix + "ec-reconstruct-reader-TID-%d")
+        .build();
+    ozoneClientConfig = conf.getObject(OzoneClientConfig.class);
     this.ecReconstructReadExecutor =
         new ThreadPoolExecutor(EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE,
-            conf.getObject(OzoneClientConfig.class)
-                .getEcReconstructStripeReadPoolLimit(),
+            ozoneClientConfig.getEcReconstructStripeReadPoolLimit(),
             60,
             TimeUnit.SECONDS,
             new SynchronousQueue<>(),
-            new ThreadFactoryBuilder()
-                .setNameFormat(threadNamePrefix + "ec-reconstruct-reader-TID-%d")
-                .build(),
+            threadFactory,
             new ThreadPoolExecutor.CallerRunsPolicy());
     this.ecReconstructWriteExecutor =
         new ThreadPoolExecutor(EC_RECONSTRUCT_STRIPE_WRITE_POOL_MIN_SIZE,
@@ -235,16 +237,15 @@ public class ECReconstructionCoordinator implements Closeable {
 
   private ECBlockOutputStream getECBlockOutputStream(
       BlockLocationInfo blockLocationInfo, DatanodeDetails datanodeDetails,
-      ECReplicationConfig repConfig, int replicaIndex,
-      OzoneClientConfig configuration) throws IOException {
+      ECReplicationConfig repConfig, int replicaIndex) throws IOException {
     StreamBufferArgs streamBufferArgs =
-        StreamBufferArgs.getDefaultStreamBufferArgs(repConfig, configuration);
+        StreamBufferArgs.getDefaultStreamBufferArgs(repConfig, ozoneClientConfig);
     return new ECBlockOutputStream(
         blockLocationInfo.getBlockID(),
         containerOperationClient.getXceiverClientManager(),
         containerOperationClient.singleNodePipeline(datanodeDetails,
             repConfig, replicaIndex),
-        BufferPool.empty(), configuration,
+        BufferPool.empty(), ozoneClientConfig,
         blockLocationInfo.getToken(), streamBufferArgs,
         blockOutputStreamResourceProvider
     );
@@ -292,15 +293,14 @@ public class ECReconstructionCoordinator implements Closeable {
       ECBlockOutputStream[] targetBlockStreams =
           new ECBlockOutputStream[toReconstructIndexes.size()];
       ByteBuffer[] bufs = new ByteBuffer[toReconstructIndexes.size()];
-      OzoneClientConfig configuration = new OzoneClientConfig();
       try {
         for (int i = 0; i < toReconstructIndexes.size(); i++) {
           int replicaIndex = toReconstructIndexes.get(i);
           DatanodeDetails datanodeDetails =
               targetMap.get(replicaIndex);
           targetBlockStreams[i] = getECBlockOutputStream(blockLocationInfo,
-              datanodeDetails, repConfig, replicaIndex,
-              configuration);
+              datanodeDetails, repConfig, replicaIndex
+          );
           bufs[i] = byteBufferPool.getBuffer(false, repConfig.getEcChunkSize());
           // Make sure it's clean. Don't want to reuse the erroneously returned
           // buffers from the pool.

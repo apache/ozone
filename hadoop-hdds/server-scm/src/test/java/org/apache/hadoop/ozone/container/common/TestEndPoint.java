@@ -100,6 +100,9 @@ public class TestEndPoint {
   private static DatanodeLayoutStorage layoutStorage;
   private static DatanodeDetails dnDetails;
 
+  @TempDir
+  private File tempDir;
+
   @AfterAll
   public static void tearDown() throws Exception {
     if (scmServer != null) {
@@ -110,7 +113,7 @@ public class TestEndPoint {
   @BeforeAll
   static void setUp() throws Exception {
     serverAddress = SCMTestUtils.getReuseableAddress();
-    ozoneConf = SCMTestUtils.getConf();
+    ozoneConf = SCMTestUtils.getConf(testDir);
     scmServerImpl = new ScmTestMock();
     dnDetails = randomDatanodeDetails();
     layoutStorage = new DatanodeLayoutStorage(ozoneConf,
@@ -128,7 +131,7 @@ public class TestEndPoint {
   @Test
   public void testGetVersion() throws Exception {
     try (EndpointStateMachine rpcEndPoint =
-        createEndpoint(SCMTestUtils.getConf(),
+        createEndpoint(SCMTestUtils.getConf(tempDir),
             serverAddress, 1000)) {
       SCMVersionResponseProto responseProto = rpcEndPoint.getEndPoint()
           .getVersion(null);
@@ -316,7 +319,7 @@ public class TestEndPoint {
    */
   @Test
   public void testGetVersionToInvalidEndpoint() throws Exception {
-    OzoneConfiguration conf = SCMTestUtils.getConf();
+    OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
     InetSocketAddress nonExistentServerAddress = SCMTestUtils
         .getReuseableAddress();
     try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
@@ -344,7 +347,7 @@ public class TestEndPoint {
   public void testGetVersionAssertRpcTimeOut() throws Exception {
     final long rpcTimeout = 1000;
     final long tolerance = 100;
-    OzoneConfiguration conf = SCMTestUtils.getConf();
+    OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
 
     try (EndpointStateMachine rpcEndPoint = createEndpoint(conf,
         serverAddress, (int) rpcTimeout)) {
@@ -369,7 +372,7 @@ public class TestEndPoint {
   public void testRegister() throws Exception {
     DatanodeDetails nodeToRegister = randomDatanodeDetails();
     try (EndpointStateMachine rpcEndPoint = createEndpoint(
-        SCMTestUtils.getConf(), serverAddress, 1000)) {
+        SCMTestUtils.getConf(tempDir), serverAddress, 1000)) {
       SCMRegisteredResponseProto responseProto = rpcEndPoint.getEndPoint()
           .register(nodeToRegister.getExtendedProtoBufMessage(), HddsTestUtils
                   .createNodeReport(
@@ -403,7 +406,7 @@ public class TestEndPoint {
   private EndpointStateMachine registerTaskHelper(InetSocketAddress scmAddress,
       int rpcTimeout, boolean clearDatanodeDetails
   ) throws Exception {
-    OzoneConfiguration conf = SCMTestUtils.getConf();
+    OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
     EndpointStateMachine rpcEndPoint =
         createEndpoint(conf,
             scmAddress, rpcTimeout);
@@ -481,7 +484,7 @@ public class TestEndPoint {
   public void testHeartbeat() throws Exception {
     DatanodeDetails dataNode = randomDatanodeDetails();
     try (EndpointStateMachine rpcEndPoint =
-        createEndpoint(SCMTestUtils.getConf(),
+        createEndpoint(SCMTestUtils.getConf(tempDir),
             serverAddress, 1000)) {
       SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
           .setDatanodeDetails(dataNode.getProtoBufMessage())
@@ -501,7 +504,7 @@ public class TestEndPoint {
   public void testHeartbeatWithCommandStatusReport() throws Exception {
     DatanodeDetails dataNode = randomDatanodeDetails();
     try (EndpointStateMachine rpcEndPoint =
-        createEndpoint(SCMTestUtils.getConf(),
+        createEndpoint(SCMTestUtils.getConf(tempDir),
             serverAddress, 1000)) {
       // Add some scmCommands for heartbeat response
       addScmCommands();
@@ -572,7 +575,7 @@ public class TestEndPoint {
       InetSocketAddress scmAddress,
       int rpcTimeout
   ) throws Exception {
-    OzoneConfiguration conf = SCMTestUtils.getConf();
+    OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
     // Mini Ozone cluster will not come up if the port is not true, since
     // Ratis will exit if the server port cannot be bound. We can remove this
     // hard coding once we fix the Ratis default behaviour.

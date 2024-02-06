@@ -28,7 +28,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -55,7 +54,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -80,8 +78,8 @@ public class TestDatanodeStateMachine {
   private File testRoot;
 
   @BeforeEach
-  public void setUp() throws Exception {
-    conf = SCMTestUtils.getConf();
+  void setUp() throws Exception {
+    conf = SCMTestUtils.getConf(testRoot);
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_RPC_TIMEOUT, 500,
         TimeUnit.MILLISECONDS);
     conf.setBoolean(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT, true);
@@ -106,15 +104,6 @@ public class TestDatanodeStateMachine {
     conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES,
         serverAddresses.toArray(new String[0]));
 
-    File dataDir = new File(testRoot, "data");
-    conf.set(HDDS_DATANODE_DIR_KEY, dataDir.getAbsolutePath());
-    if (!dataDir.mkdirs()) {
-      LOG.info("Data dir create failed.");
-    }
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        new File(testRoot, "scm").getAbsolutePath());
-    String path = new File(testRoot, "datanodeID").getAbsolutePath();
-    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ID_DIR, path);
     executorService = HadoopExecutors.newCachedThreadPool(
         new ThreadFactoryBuilder().setDaemon(true)
             .setNameFormat("TestDataNodeStateMachineThread-%d").build());

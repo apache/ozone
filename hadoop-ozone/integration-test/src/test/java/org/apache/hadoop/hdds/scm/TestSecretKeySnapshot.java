@@ -47,7 +47,6 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
@@ -96,8 +95,6 @@ public final class TestSecretKeySnapshot {
   private File ozoneKeytab;
   private File spnegoKeytab;
   private String host;
-  private String clusterId;
-  private String scmId;
   private MiniOzoneHAClusterImpl cluster;
 
   @BeforeEach
@@ -106,9 +103,6 @@ public final class TestSecretKeySnapshot {
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
 
     ExitUtils.disableSystemExit();
-
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
 
     startMiniKdc();
     setSecureConfig();
@@ -125,9 +119,7 @@ public final class TestSecretKeySnapshot {
     conf.set(HDDS_SECRET_KEY_EXPIRY_DURATION, EXPIRY_DURATION_MS + "ms");
 
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newHABuilder(conf)
-        .setClusterId(clusterId)
         .setSCMServiceId("TestSecretKeySnapshot")
-        .setScmId(scmId)
         .setSCMServiceId("SCMServiceId")
         .setNumDatanodes(1)
         .setNumOfStorageContainerManagers(3)

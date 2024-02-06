@@ -74,7 +74,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.fail;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
@@ -201,7 +200,7 @@ public class TestDeleteWithInAdequateDN {
    * data is not deleted from any of the nodes which have the closed replica.
    */
   @Test
-  public void testDeleteKeyWithInAdequateDN() throws Exception {
+  void testDeleteKeyWithInAdequateDN() throws Exception {
     String keyName = "ratis";
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
@@ -289,14 +288,11 @@ public class TestDeleteWithInAdequateDN {
         deleteKey("ratis");
     // make sure the chunk was never deleted on the leader even though
     // deleteBlock handler is invoked
-    try {
-      for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
-        keyValueHandler.getChunkManager()
-            .readChunk(container, blockID, ChunkInfo.getFromProtoBuf(chunkInfo),
-                null);
-      }
-    } catch (IOException ioe) {
-      fail("Exception should not be thrown.");
+
+    for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
+      keyValueHandler.getChunkManager()
+          .readChunk(container, blockID, ChunkInfo.getFromProtoBuf(chunkInfo),
+              null);
     }
     long numReadStateMachineOps =
         stateMachine.getMetrics().getNumReadStateMachineOps();

@@ -86,7 +86,7 @@ public class TestSCMSafeModeWithPipelineRules {
 
 
   @Test
-  public void testScmSafeMode() throws Exception {
+  void testScmSafeMode() throws Exception {
     int datanodeCount = 6;
     setup(datanodeCount);
     waitForRatis3NodePipelines(datanodeCount / 3);
@@ -136,11 +136,7 @@ public class TestSCMSafeModeWithPipelineRules {
 
     DatanodeDetails restartedDatanode = pipelineList.get(1).getFirstNode();
     // Now restart one datanode from the 2nd pipeline
-    try {
-      cluster.restartHddsDatanode(restartedDatanode, false);
-    } catch (Exception ex) {
-      fail("Datanode restart failed");
-    }
+    cluster.restartHddsDatanode(restartedDatanode, false);
 
     GenericTestUtils.waitFor(() ->
         scmSafeModeManager.getOneReplicaPipelineSafeModeRule()

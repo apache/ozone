@@ -95,8 +95,6 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
-  private static final String SCM_ID = UUID.randomUUID().toString();
-  private static final String CLUSTER_ID = UUID.randomUUID().toString();
   private static File testDir;
   private static OzoneConfiguration conf;
 
@@ -129,8 +127,6 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
         OMConfigKeys.OZONE_BUCKET_LAYOUT_OBJECT_STORE);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(14)
-        .setScmId(SCM_ID)
-        .setClusterId(CLUSTER_ID)
         .setCertificateClient(certificateClientTest)
         .setSecretKeyClient(new SecretKeyTestClient())
         .build();
@@ -147,7 +143,6 @@ public class TestSecureOzoneRpcClient extends TestOzoneRpcClient {
     TestOzoneRpcClient.setStorageContainerLocationClient(
         storageContainerLocationClient);
     TestOzoneRpcClient.setStore(store);
-    TestOzoneRpcClient.setClusterId(CLUSTER_ID);
   }
 
   /**

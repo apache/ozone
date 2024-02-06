@@ -66,7 +66,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOK
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_RENEW_GRACE_DURATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_CERTIFICATE_POLLING_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -148,7 +147,7 @@ public class TestRootCARotationManager {
   }
 
   @Test
-  public void testProperties() {
+  void testProperties() throws Exception {
     // invalid check interval
     ozoneConfig.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL, "P28");
     assertThrows(DateTimeParseException.class, () -> rootCARotationManager = new RootCARotationManager(scm));
@@ -169,20 +168,13 @@ public class TestRootCARotationManager {
     ozoneConfig.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL, "P1D");
     ozoneConfig.set(HDDS_X509_CA_ROTATION_TIME_OF_DAY, "01:00:00");
 
-    try {
-      rootCARotationManager = new RootCARotationManager(scm);
-    } catch (Exception e) {
-      fail("Should succeed");
-    }
+    rootCARotationManager = new RootCARotationManager(scm);
 
     // invalid property value is ignored when auto rotation is disabled.
     ozoneConfig.setBoolean(HDDS_X509_CA_ROTATION_ENABLED, false);
     ozoneConfig.set(HDDS_X509_CA_ROTATION_CHECK_INTERNAL, "P28D");
-    try {
-      rootCARotationManager = new RootCARotationManager(scm);
-    } catch (Exception e) {
-      fail("Should succeed");
-    }
+
+    rootCARotationManager = new RootCARotationManager(scm);
   }
 
   @Test
