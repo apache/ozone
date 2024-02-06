@@ -117,7 +117,7 @@ public class TestOMKeyResponse {
 
   @Nonnull
   protected OmKeyInfo getOmKeyInfo() {
-    return OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName, replicationConfig);
+    return OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName, replicationConfig).build();
   }
 
   @Nonnull

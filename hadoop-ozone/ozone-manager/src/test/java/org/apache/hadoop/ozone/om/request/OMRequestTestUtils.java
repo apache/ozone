@@ -267,8 +267,8 @@ public final class OMRequestTestUtils {
       ReplicationConfig replicationConfig, long trxnLogIndex,
       OMMetadataManager omMetadataManager) throws Exception {
 
-    OmKeyInfo omKeyInfo = createOmKeyInfo(volumeName, bucketName, keyName,
-        replicationConfig, trxnLogIndex);
+    OmKeyInfo omKeyInfo = createOmKeyInfo(volumeName, bucketName, keyName, replicationConfig)
+        .setObjectID(trxnLogIndex).build();
 
     addKeyToTable(openKeyTable, addToCache, omKeyInfo, clientID, trxnLogIndex,
         omMetadataManager);
@@ -437,7 +437,7 @@ public final class OMRequestTestUtils {
       OMMetadataManager omMetadataManager) {
 
     OmKeyInfo omKeyInfo = createOmKeyInfo(volumeName, bucketName, keyName,
-        replicationConfig);
+        replicationConfig).build();
 
     omMetadataManager.getKeyTable(getDefaultBucketLayout()).addCacheEntry(
         new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName,
@@ -534,33 +534,41 @@ public final class OMRequestTestUtils {
   /**
    * Create OmKeyInfo.
    */
-  public static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
+  public static OmKeyInfo.Builder createOmKeyInfo(String volumeName, String bucketName,
+      String keyName, ReplicationConfig replicationConfig, OmKeyLocationInfoGroup omKeyLocationInfoGroup) {
+    return new OmKeyInfo.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setFileName(OzoneFSUtils.getFileName(keyName))
+        .setReplicationConfig(replicationConfig)
+        .setObjectID(0L)
+        .setUpdateID(0L)
+        .setCreationTime(Time.now())
+        .addOmKeyLocationInfoGroup(omKeyLocationInfoGroup)
+        .setDataSize(1000L);
+  }
+
+  public static OmKeyInfo.Builder createOmKeyInfo(String volumeName, String bucketName,
       String keyName, ReplicationConfig replicationConfig) {
-    return createOmKeyInfo(volumeName, bucketName, keyName, replicationConfig, 0L);
+    return createOmKeyInfo(volumeName, bucketName, keyName, replicationConfig,
+        new OmKeyLocationInfoGroup(0L, new ArrayList<>(), false));
   }
 
   /**
    * Create OmDirectoryInfo.
    */
   public static OmDirectoryInfo createOmDirectoryInfo(String keyName,
-                                                      long objectID,
-                                                      long parentObjID) {
+      long objectID,
+      long parentObjID) {
     return new OmDirectoryInfo.Builder()
-            .setName(keyName)
-            .setCreationTime(Time.now())
-            .setModificationTime(Time.now())
-            .setObjectID(objectID)
-            .setParentObjectID(parentObjID)
-            .setUpdateID(50)
-            .build();
-  }
-
-  /**
-   * Create OmKeyInfo.
-   */
-  public static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
-      String keyName, ReplicationConfig replicationConfig, long objectID) {
-    return createOmKeyInfo(volumeName, bucketName, keyName, replicationConfig, objectID, Time.now());
+        .setName(keyName)
+        .setCreationTime(Time.now())
+        .setModificationTime(Time.now())
+        .setObjectID(objectID)
+        .setParentObjectID(parentObjID)
+        .setUpdateID(50)
+        .build();
   }
 
   /**
@@ -611,8 +619,8 @@ public final class OMRequestTestUtils {
    * Create OmMultipartKeyInfo for OBS/LEGACY bucket.
    */
   public static OmMultipartKeyInfo createOmMultipartKeyInfo(String uploadId,
-        long creationTime, HddsProtos.ReplicationType replicationType,
-        HddsProtos.ReplicationFactor replicationFactor, long objectID) {
+      long creationTime, HddsProtos.ReplicationType replicationType,
+      HddsProtos.ReplicationFactor replicationFactor, long objectID) {
     return new OmMultipartKeyInfo.Builder()
         .setUploadID(uploadId)
         .setCreationTime(creationTime)

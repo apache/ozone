@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.util.Time;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -108,11 +107,13 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
     Path keyPath = Paths.get(keyName);
     long parentId = checkIntermediatePaths(keyPath);
     String fileName = OzoneFSUtils.getFileName(keyName);
-    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-        bucketName, fileName, RatisReplicationConfig.getInstance(ONE), parentId + 1, parentId, 100,
-        Time.now());
-    OMRequestTestUtils.addFileToKeyTable(false, false,
-            fileName, omKeyInfo, -1, 50, omMetadataManager);
+    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, fileName,
+            RatisReplicationConfig.getInstance(ONE))
+        .setObjectID(parentId + 1L)
+        .setParentObjectID(parentId)
+        .setUpdateID(100L)
+        .build();
+    OMRequestTestUtils.addFileToKeyTable(false, false, fileName, omKeyInfo, -1, 50, omMetadataManager);
   }
 
   @Override

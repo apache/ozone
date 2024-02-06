@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.om.request.key.acl.OMKeyAddAclRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeyRemoveAclRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.acl.OMKeySetAclRequestWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.util.Time;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 
@@ -46,20 +45,22 @@ public class TestOMKeyAclRequestWithFSO extends TestOMKeyAclRequest {
         .addParentsToDirTable(volumeName, bucketName, parentDir,
             omMetadataManager);
 
-    OmKeyInfo omKeyInfo = OMRequestTestUtils
-        .createOmKeyInfo(volumeName, bucketName, key,
-            RatisReplicationConfig.getInstance(ONE),
-            parentId + 1, parentId, 100, Time.now());
+    OmKeyInfo omKeyInfo =
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, key, RatisReplicationConfig.getInstance(ONE))
+            .setObjectID(parentId + 1L)
+            .setParentObjectID(parentId)
+            .setUpdateID(100L)
+            .build();
     OMRequestTestUtils
         .addFileToKeyTable(false, false, fileName, omKeyInfo, -1, 50,
             omMetadataManager);
     final long volumeId = omMetadataManager.getVolumeId(
-            omKeyInfo.getVolumeName());
+        omKeyInfo.getVolumeName());
     final long bucketId = omMetadataManager.getBucketId(
-            omKeyInfo.getVolumeName(), omKeyInfo.getBucketName());
+        omKeyInfo.getVolumeName(), omKeyInfo.getBucketName());
     return omMetadataManager.getOzonePathKey(
-            volumeId, bucketId, omKeyInfo.getParentObjectID(),
-            fileName);
+        volumeId, bucketId, omKeyInfo.getParentObjectID(),
+        fileName);
   }
 
   @Override

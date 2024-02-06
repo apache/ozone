@@ -18,16 +18,17 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.TestOMResponseUtils;
-import org.apache.hadoop.util.Time;
 
 import java.io.IOException;
 import java.util.UUID;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
@@ -37,17 +38,21 @@ public class TestOMKeyRenameResponseWithFSO extends TestOMKeyRenameResponse {
   @Override
   protected OmKeyInfo getOmKeyInfo(String keyName) {
     long bucketId = random.nextLong();
-    return OMRequestTestUtils.createOmKeyInfo(
-        volumeName, bucketName, keyName, replicationConfig,
-        bucketId + 100L, bucketId + 101L, 0L, Time.now());
+    return OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName, RatisReplicationConfig.getInstance(ONE))
+        .setObjectID(bucketId + 100)
+        .setParentObjectID(bucketId + 101)
+        .build();
   }
 
   @Override
   protected OmKeyInfo getOmKeyInfo(OmKeyInfo toKeyInfo,
                                    String keyName) {
-    return OMRequestTestUtils.createOmKeyInfo(toKeyInfo.getVolumeName(),
-        toKeyInfo.getBucketName(), keyName, replicationConfig, toKeyInfo.getObjectID(),
-        toKeyInfo.getParentObjectID(), 0L, toKeyInfo.getCreationTime());
+    return OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName, RatisReplicationConfig.getInstance(ONE))
+        .setObjectID(toKeyInfo.getObjectID())
+        .setParentObjectID(toKeyInfo.getParentObjectID())
+        .setUpdateID(0L)
+        .setCreationTime(toKeyInfo.getCreationTime())
+        .build();
   }
 
   @Override
@@ -77,12 +82,12 @@ public class TestOMKeyRenameResponseWithFSO extends TestOMKeyRenameResponse {
     long bucketId = random.nextLong();
     String fromKeyParentName = UUID.randomUUID().toString();
     String toKeyParentName = UUID.randomUUID().toString();
-    fromKeyParent = OMRequestTestUtils.createOmKeyInfo(volumeName,
-        bucketName, fromKeyParentName, replicationConfig,
-        bucketId + 100L);
-    toKeyParent = OMRequestTestUtils.createOmKeyInfo(volumeName,
-        bucketName, toKeyParentName, replicationConfig,
-        bucketId + 101L);
+    fromKeyParent = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, fromKeyParentName, replicationConfig)
+        .setObjectID(bucketId + 100L)
+        .build();
+    toKeyParent = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, toKeyParentName, replicationConfig)
+        .setObjectID(bucketId + 101L)
+        .build();
     fromKeyParent.setParentObjectID(bucketId);
     toKeyParent.setParentObjectID(bucketId);
     fromKeyParent.setFileName(OzoneFSUtils.getFileName(

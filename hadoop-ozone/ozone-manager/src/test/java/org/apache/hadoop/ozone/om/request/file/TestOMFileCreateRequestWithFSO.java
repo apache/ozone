@@ -29,7 +29,6 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
@@ -115,10 +114,11 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     // Add the key to key table
     OmDirectoryInfo omDirInfo = getDirInfo("c/d/e");
     OmKeyInfo omKeyInfo =
-            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, key,
-                RatisReplicationConfig.getInstance(ONE),
-                omDirInfo.getObjectID() + 10,
-                omDirInfo.getObjectID(), 100, Time.now());
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, key, RatisReplicationConfig.getInstance(ONE))
+            .setObjectID(omDirInfo.getObjectID() + 10)
+            .setParentObjectID(omDirInfo.getObjectID())
+            .setUpdateID(100)
+            .build();
     OMRequestTestUtils.addFileToKeyTable(false, false,
             "f", omKeyInfo, -1,
             omDirInfo.getObjectID() + 10, omMetadataManager);
@@ -136,22 +136,22 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     String fileName = "f";
     String key = parentDir + "/" + fileName;
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-            omMetadataManager, getBucketLayout());
+        omMetadataManager, getBucketLayout());
     // Create parent dirs for the path
     long parentId = OMRequestTestUtils.addParentsToDirTable(volumeName,
-            bucketName, parentDir, omMetadataManager);
+        bucketName, parentDir, omMetadataManager);
 
     // Need to add the path which starts with "c/d/e" to OpenKeyTable as this is
     // non-recursive parent should exist.
     testNonRecursivePath(key, false, false, false);
 
     OmKeyInfo omKeyInfo =
-            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, key,
-                RatisReplicationConfig.getInstance(ONE),
-                parentId + 1,
-                parentId, 100, Time.now());
-    OMRequestTestUtils.addFileToKeyTable(false, false,
-            fileName, omKeyInfo, -1, 50, omMetadataManager);
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, key, RatisReplicationConfig.getInstance(ONE))
+            .setObjectID(parentId + 1L)
+            .setParentObjectID(parentId)
+            .setUpdateID(100L)
+            .build();
+    OMRequestTestUtils.addFileToKeyTable(false, false, fileName, omKeyInfo, -1, 50, omMetadataManager);
 
     // Even if key exists in KeyTable, should be able to create file as
     // overwrite is set to true

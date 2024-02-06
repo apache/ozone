@@ -322,7 +322,9 @@ public class TestOMSnapshotCreateRequest {
       throws Exception {
     String fromKeyParentName = UUID.randomUUID().toString();
     OmKeyInfo fromKeyParent = OMRequestTestUtils.createOmKeyInfo(volumeName,
-        bucketName, fromKeyParentName, RatisReplicationConfig.getInstance(THREE), 100L);
+            bucketName, fromKeyParentName, RatisReplicationConfig.getInstance(THREE))
+        .setObjectID(100L)
+        .build();
 
     OmKeyInfo toKeyInfo = addKey(toKey, offset + 4L);
     OmKeyInfo fromKeyInfo = addKey(fromKey, offset + 5L);
@@ -381,8 +383,8 @@ public class TestOMSnapshotCreateRequest {
 
   private OmKeyInfo addKey(String keyName, long objectId) {
     return OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
-        RatisReplicationConfig.getInstance(THREE),
-        objectId);
+            RatisReplicationConfig.getInstance(THREE)).setObjectID(objectId)
+        .build();
   }
 
   protected String addKeyToTable(OmKeyInfo keyInfo) throws Exception {

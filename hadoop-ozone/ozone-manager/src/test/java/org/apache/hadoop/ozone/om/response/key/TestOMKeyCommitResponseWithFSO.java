@@ -31,7 +31,6 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.util.Time;
 import jakarta.annotation.Nonnull;
 
 import java.io.IOException;
@@ -65,10 +64,11 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
   @Override
   protected OmKeyInfo getOmKeyInfo() {
     assertNotNull(omBucketInfo);
-    return OMRequestTestUtils.createOmKeyInfo(volumeName,
-        omBucketInfo.getBucketName(), keyName, replicationConfig,
-        omBucketInfo.getObjectID() + 1,
-        omBucketInfo.getObjectID(), 100, Time.now());
+    return OMRequestTestUtils.createOmKeyInfo(volumeName, omBucketInfo.getBucketName(), keyName, replicationConfig)
+        .setObjectID(omBucketInfo.getObjectID() + 1)
+        .setParentObjectID(omBucketInfo.getObjectID())
+        .setUpdateID(100L)
+        .build();
   }
 
   @Nonnull
@@ -79,10 +79,11 @@ public class TestOMKeyCommitResponseWithFSO extends TestOMKeyCommitResponse {
     long objectId = parentID + 10;
 
     OmKeyInfo omKeyInfoFSO =
-        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
-            RatisReplicationConfig.getInstance(ONE), objectId, parentID, 100,
-            Time.now());
-
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName, RatisReplicationConfig.getInstance(ONE))
+            .setObjectID(objectId)
+            .setParentObjectID(parentID)
+            .setUpdateID(100L)
+            .build();
     String fileName = OzoneFSUtils.getFileName(keyName);
     OMRequestTestUtils.addFileToKeyTable(true, false,
             fileName, omKeyInfoFSO, clientID, txnLogId, omMetadataManager);

@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeyRequest;
-import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -181,10 +180,10 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
   @Override
   protected OmKeyInfo getOmKeyInfo(String keyName) {
     long bucketId = random.nextLong();
-    return OMRequestTestUtils.createOmKeyInfo(
-        volumeName, bucketName, keyName,
-        RatisReplicationConfig.getInstance(ONE),
-        bucketId + 100L, bucketId + 101L, 0L, Time.now());
+    return OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName, RatisReplicationConfig.getInstance(ONE))
+        .setObjectID(bucketId + 100L)
+        .setParentObjectID(bucketId + 101L)
+        .build();
   }
 
   @Override

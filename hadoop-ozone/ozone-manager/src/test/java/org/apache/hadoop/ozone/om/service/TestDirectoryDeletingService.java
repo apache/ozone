@@ -131,9 +131,11 @@ public class TestDirectoryDeletingService {
     for (int i = 0; i < 2000; ++i) {
       String keyName = "key" + longName + i;
       OmKeyInfo omKeyInfo =
-          OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName,
-              keyName, RatisReplicationConfig.getInstance(ONE), dir1.getObjectID() + 1 + i,
-              dir1.getObjectID(), 100, Time.now());
+          OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName, RatisReplicationConfig.getInstance(ONE))
+              .setObjectID(dir1.getObjectID() + 1 + i)
+              .setParentObjectID(dir1.getObjectID())
+              .setUpdateID(100L)
+              .build();
       OMRequestTestUtils.addFileToKeyTable(false, true, keyName,
           omKeyInfo, 1234L, i + 1, om.getMetadataManager());
     }

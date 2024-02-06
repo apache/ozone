@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.om.response.bucket.OMBucketDeleteResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -94,9 +93,11 @@ public class TestOMKeysDeleteResponseWithFSO
       keyName = keyPrefix + i;
 
       OmKeyInfo omKeyInfo =
-          OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
-              RatisReplicationConfig.getInstance(ONE), dirId + 1, buckId,
-              dirId + 1, Time.now());
+          OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName, RatisReplicationConfig.getInstance(ONE))
+              .setObjectID(dirId + 1)
+              .setParentObjectID(buckId)
+              .setUpdateID(dirId + 1)
+              .build();
       ozoneDBKey = OMRequestTestUtils.addFileToKeyTable(false, false,
           keyName, omKeyInfo, -1, 50, omMetadataManager);
 

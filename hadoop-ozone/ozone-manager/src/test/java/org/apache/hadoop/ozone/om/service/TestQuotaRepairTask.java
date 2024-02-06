@@ -61,11 +61,13 @@ public class TestQuotaRepairTask extends TestOMKeyRequest {
         fsoBucketName, "c/d/e", omMetadataManager);
     for (int i = 0; i < count; i++) {
       String fileName = "file1" + i;
-      OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(
-          volumeName, fsoBucketName, fileName,
-          RatisReplicationConfig.getInstance(ONE),
-          parentId + 1 + i,
-          parentId, 100 + i, Time.now());
+      OmKeyInfo omKeyInfo =
+          OMRequestTestUtils.createOmKeyInfo(volumeName, fsoBucketName, fileName,
+                  RatisReplicationConfig.getInstance(ONE))
+              .setObjectID(parentId + 1 + i)
+              .setParentObjectID(parentId)
+              .setUpdateID(100L)
+              .build();
       omKeyInfo.setKeyName(fileName);
       OMRequestTestUtils.addFileToKeyTable(false, false,
           fileName, omKeyInfo, -1, 50 + i, omMetadataManager);

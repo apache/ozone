@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.util.Time;
 import jakarta.annotation.Nonnull;
 
 /**
@@ -67,9 +66,11 @@ public class TestOMAllocateBlockRequestWithFSO
     long objectId = parentID + 1;
 
     OmKeyInfo omKeyInfoFSO =
-            OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
-                RatisReplicationConfig.getInstance(ONE), objectId, parentID, txnId,
-                Time.now());
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName, RatisReplicationConfig.getInstance(ONE))
+            .setObjectID(objectId)
+            .setParentObjectID(parentID)
+            .setUpdateID(txnId)
+            .build();
 
     // add key to openFileTable
     OMRequestTestUtils.addFileToKeyTable(true, false,
