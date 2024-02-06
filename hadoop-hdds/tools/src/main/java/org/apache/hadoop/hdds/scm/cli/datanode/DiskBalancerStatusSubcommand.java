@@ -27,12 +27,8 @@ import picocli.CommandLine.Option;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * Handler to get disk balancer status.
@@ -44,12 +40,9 @@ import java.util.Set;
     versionProvider = HddsVersionProvider.class)
 public class DiskBalancerStatusSubcommand extends ScmSubcommand {
 
-  private final Set<String> stateSet =
-      new HashSet<>(Arrays.asList("RUNNING", "STOPPED", "UNKNOWN"));
-
   @Option(names = {"-s", "--state"},
-      description = "RUNNING, STOPPED, UNKNOWN. Default state is RUNNING.")
-  private String state = "RUNNING";
+      description = "Display only datanodes with the given status: RUNNING, STOPPED, UNKNOWN.")
+  private HddsProtos.DiskBalancerRunningStatus state = null;
 
   @CommandLine.Option(names = {"-d", "--datanodes"},
       description = "Get diskBalancer status on specific datanodes.")
@@ -57,17 +50,10 @@ public class DiskBalancerStatusSubcommand extends ScmSubcommand {
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    if (state != null && !stateSet.contains(state.toUpperCase(Locale.ROOT))) {
-      System.err.println("Unsupported state: " + state);
-    }
-
-    assert state != null;
     List<HddsProtos.DatanodeDiskBalancerInfoProto> resultProto =
         scmClient.getDiskBalancerStatus(
-            hosts.size() == 0 ? Optional.empty() : Optional.of(hosts),
-            Optional.of(HddsProtos.DiskBalancerRunningStatus.valueOf(
-                state.toUpperCase(Locale.ROOT)))
-            );
+            hosts.isEmpty() ? Optional.empty() : Optional.of(hosts),
+            state == null ? Optional.empty() : Optional.of(state));
 
     System.out.println(generateStatus(resultProto));
   }
