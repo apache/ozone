@@ -71,8 +71,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.container.ec.reconstruction.TokenHelper.encode;
@@ -125,8 +127,9 @@ public class ECReconstructionCoordinator implements Closeable {
     this.containerOperationClient = new ECContainerOperationClient(conf,
         certificateClient);
     this.byteBufferPool = new ElasticByteBufferPool();
-    ThreadFactory threadFactory = new ThreadFactoryBuilder()
-        .setNameFormat(threadNamePrefix + "ec-reconstruct-reader-TID-%d")
+    Function<String, ThreadFactory> threadFactoryCreator = name ->
+        new ThreadFactoryBuilder()
+        .setNameFormat(threadNamePrefix + name)
         .build();
     ozoneClientConfig = conf.getObject(OzoneClientConfig.class);
     this.ecReconstructReadExecutor =
@@ -135,7 +138,7 @@ public class ECReconstructionCoordinator implements Closeable {
             60,
             TimeUnit.SECONDS,
             new SynchronousQueue<>(),
-            threadFactory,
+            threadFactoryCreator.apply("ec-reconstruct-reader-TID-%d"),
             new ThreadPoolExecutor.CallerRunsPolicy());
     this.ecReconstructWriteExecutor =
         new ThreadPoolExecutor(EC_RECONSTRUCT_STRIPE_WRITE_POOL_MIN_SIZE,
@@ -144,9 +147,7 @@ public class ECReconstructionCoordinator implements Closeable {
             60,
             TimeUnit.SECONDS,
             new SynchronousQueue<>(),
-            new ThreadFactoryBuilder()
-                .setNameFormat(threadNamePrefix + "ec-reconstruct-write-TID-%d")
-                .build(),
+            threadFactoryCreator.apply("ec-reconstruct-writer-TID-%d"),
             new ThreadPoolExecutor.CallerRunsPolicy());
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, () -> ecReconstructReadExecutor);
