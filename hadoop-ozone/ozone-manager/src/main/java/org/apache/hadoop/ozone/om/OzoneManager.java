@@ -4703,7 +4703,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   private ReferenceCounted<IOmMetadataReader> getReader(OmKeyArgs keyArgs)
       throws IOException {
-    return omSnapshotManager.getActiveFsMetaOrSnapshot(
+    return omSnapshotManager.getActiveFsMetadataOrSnapshot(
         keyArgs.getVolumeName(), keyArgs.getBucketName(), keyArgs.getKeyName());
   }
 
@@ -4718,7 +4718,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   private ReferenceCounted<IOmMetadataReader> getReader(
           String volumeName, String bucketName, String key) throws IOException {
-    return omSnapshotManager.getActiveFsMetaOrSnapshot(
+    return omSnapshotManager.getActiveFsMetadataOrSnapshot(
         volumeName, bucketName, key);
   }
 
@@ -4731,7 +4731,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   private ReferenceCounted<IOmMetadataReader> getReader(OzoneObj ozoneObj)
       throws IOException {
-    return omSnapshotManager.getActiveFsMetaOrSnapshot(
+    return omSnapshotManager.getActiveFsMetadataOrSnapshot(
         ozoneObj.getVolumeName(),
         ozoneObj.getBucketName(),
         ozoneObj.getKeyName());

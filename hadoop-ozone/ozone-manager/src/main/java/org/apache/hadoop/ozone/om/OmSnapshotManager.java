@@ -612,7 +612,7 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   // Get OmSnapshot if the keyName has ".snapshot" key indicator
   @SuppressWarnings("unchecked")
-  public ReferenceCounted<IOmMetadataReader> getActiveFsMetaOrSnapshot(
+  public ReferenceCounted<IOmMetadataReader> getActiveFsMetadataOrSnapshot(
       String volumeName,
       String bucketName,
       String keyName) throws IOException {
