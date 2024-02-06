@@ -19,6 +19,8 @@
 package org.apache.hadoop.ozone.recon.tasks;
 
 
+import com.google.common.base.Preconditions;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -41,6 +43,7 @@ import java.util.Map;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETED;
 import static org.hadoop.ozone.recon.schema.tables.ContainerCountBySizeTable.CONTAINER_COUNT_BY_SIZE;
 
 
@@ -122,6 +125,11 @@ public class ContainerSizeCountTask extends ReconScmTask {
       Map<ContainerSizeCountKey, Long> map) {
     final ContainerID id = container.containerID();
     final long currentSize = container.getUsedBytes();
+    if (currentSize < 0) {
+      LOG.error("Negative container size: {} for container: {}", currentSize,
+          id);
+      return;
+    }
     final Long previousSize = processedContainers.put(id, currentSize);
     if (previousSize != null) {
       decrementContainerSizeCount(previousSize, map);
@@ -132,36 +140,40 @@ public class ContainerSizeCountTask extends ReconScmTask {
   /**
    * The process() function is responsible for updating the counts of
    * containers being tracked in a containerSizeCountMap based on the
-   * ContainerInfo objects in the list containers.It then iterates through
+   * ContainerInfo objects in the list containers. It then iterates through
    * the list of containers and does the following for each container:
    *
-   * 1) If the container is not present in processedContainers,
-   * it is a new container, so it is added to the processedContainers map
-   * and the count for its size in the containerSizeCountMap is incremented
-   * by 1 using the handlePutKeyEvent() function.
-   * 2) If the container is present in processedContainers but its size has
-   * been updated to the new size then the count for the old size in the
-   * containerSizeCountMap is decremented by 1 using the
-   * handleDeleteKeyEvent() function. The count for the new size is then
-   * incremented by 1 using the handlePutKeyEvent() function.
-   * 3) If the container is not present in containers list, it means the
-   * container has been deleted.
-   * The remaining containers inside the deletedContainers map are the ones
-   * that are not in the cluster and need to be deleted. Finally, the counts in
-   * the containerSizeCountMap are written to the database using the
-   * writeCountsToDB() function.
+   * 1) If the container's state is not "deleted," it will be processed:
+   *    - If the container is not present in processedContainers, it is a new
+   *      container. Therefore, it is added to the processedContainers map, and
+   *      the count for its size in the containerSizeCountMap is incremented by
+   *      1 using the handlePutKeyEvent() function.
+   *    - If the container is present in processedContainers but its size has
+   *      been updated to a new size, the count for the old size in the
+   *      containerSizeCountMap is decremented by 1 using the
+   *      handleDeleteKeyEvent() function. Subsequently, the count for the new
+   *      size is incremented by 1 using the handlePutKeyEvent() function.
+   *
+   * 2) If the container's state is "deleted," it is skipped, as deleted
+   *    containers are not processed.
+   *
+   * After processing, the remaining containers inside the deletedContainers map
+   * are those that are not in the cluster and need to be deleted from the total
+   * size counts. Finally, the counts in the containerSizeCountMap are written
+   * to the database using the writeCountsToDB() function.
    */
   public void process(List<ContainerInfo> containers) {
     lock.writeLock().lock();
     try {
       final Map<ContainerSizeCountKey, Long> containerSizeCountMap
           = new HashMap<>();
-      final Map<ContainerID, Long> deletedContainers
-          = new HashMap<>(processedContainers);
-
+      final Map<ContainerID, Long> deletedContainers =
+          new HashMap<>(processedContainers);
       // Loop to handle container create and size-update operations
       for (ContainerInfo container : containers) {
-        // The containers present in the cache hence it is not yet deleted
+        if (container.getState().equals(DELETED)) {
+          continue; // Skip deleted containers
+        }
         deletedContainers.remove(container.containerID());
         // For New Container being created
         try {
@@ -261,6 +273,9 @@ public class ContainerSizeCountTask extends ReconScmTask {
       Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
     for (Map.Entry<ContainerID, Long> containerId :
         deletedContainers.entrySet()) {
+      // processedContainers will only keep a track of all containers that have
+      // been processed except DELETED containers.
+      processedContainers.remove(containerId.getKey());
       long containerSize = deletedContainers.get(containerId.getKey());
       decrementContainerSizeCount(containerSize, containerSizeCountMap);
     }
