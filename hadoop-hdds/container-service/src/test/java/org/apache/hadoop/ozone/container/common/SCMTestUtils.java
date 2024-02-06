@@ -22,7 +22,6 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -40,12 +39,9 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.ozone.protocol.StorageContainerDatanodeProtocol;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolServerSideTranslatorPB;
-import org.apache.ozone.test.GenericTestUtils;
 
 import com.google.protobuf.BlockingService;
 
-import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
-import static org.apache.logging.log4j.util.StackLocatorUtil.getCallerClass;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -123,15 +119,6 @@ public final class SCMTestUtils {
       String addr = InetAddress.getLoopbackAddress().getHostAddress();
       return new InetSocketAddress(addr, port);
     }
-  }
-
-  public static OzoneConfiguration getConf() {
-    String name = getCallerClass(2).getSimpleName()
-        + "-" + randomAlphanumeric(10);
-    File testDir = GenericTestUtils.getTestDir(name);
-    Runtime.getRuntime().addShutdownHook(new Thread(
-        () -> FileUtils.deleteQuietly(testDir)));
-    return getConf(testDir);
   }
 
   public static OzoneConfiguration getConf(File testDir) {

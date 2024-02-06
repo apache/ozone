@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.block;
 
+import java.io.File;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.ZoneId;
-import java.nio.file.Path;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
@@ -114,14 +114,13 @@ public class TestBlockManager {
   private ReplicationConfig replicationConfig;
 
   @BeforeEach
-  public void setUp(@TempDir Path tempDir) throws Exception {
-    conf = SCMTestUtils.getConf();
+  void setUp(@TempDir File tempDir) throws Exception {
+    conf = SCMTestUtils.getConf(tempDir);
     numContainerPerOwnerInPipeline = conf.getInt(
         ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
         ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
 
 
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempDir.toString());
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION, false);
     conf.setTimeDuration(HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL, 5,
         TimeUnit.SECONDS);
