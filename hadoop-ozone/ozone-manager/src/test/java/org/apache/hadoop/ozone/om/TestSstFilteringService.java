@@ -38,10 +38,13 @@ import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ratis.util.ExitUtils;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.LiveFileMetaData;
 
@@ -73,6 +76,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Test SST Filtering Service.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@TestMethodOrder(OrderAnnotation.class)
 public class TestSstFilteringService {
   public static final String SST_FILE_EXTENSION = ".sst";;
   private OzoneManagerProtocol writeClient;
@@ -129,6 +133,7 @@ public class TestSstFilteringService {
    * @throws IOException - on Failure.
    */
   @Test
+  @Order(1)
   public void testIrrelevantSstFileDeletion()
       throws Exception {
     RDBStore activeDbStore = (RDBStore) om.getMetadataManager().getStore();
@@ -176,7 +181,7 @@ public class TestSstFilteringService {
     assertThat(nonLevel0FilesCountAfterCompact).isGreaterThan(0);
 
     String bucketName2 = "buck2";
-    createVolumeAndBucket(volumeName, bucketName2);
+    addBucketToVolume(volumeName, bucketName2);
     createKeys(volumeName, bucketName2, keyCount);
 
     activeDbStore.getDb().flush(OmMetadataManagerImpl.KEY_TABLE);
@@ -233,17 +238,22 @@ public class TestSstFilteringService {
     Set<String> keysFromSnapshot2 =
         getKeysFromSnapshot(volumeName, bucketName2, snapshotName2);
     assertEquals(keysFromActiveDb2, keysFromSnapshot2);
+    writeClient.deleteSnapshot(volumeName, bucketName2, snapshotName1);
+    writeClient.deleteSnapshot(volumeName, bucketName2, snapshotName2);
+    await(10_000, 1_000, () -> filteringService.getSnapshotFilteredCount().get() == 0);
   }
 
   @Test
+  @Order(2)
   public void testActiveAndDeletedSnapshotCleanup() throws Exception {
     RDBStore activeDbStore = (RDBStore) om.getMetadataManager().getStore();
     String volumeName = "volume1";
     List<String> bucketNames = Arrays.asList("bucket1", "bucket2");
 
+    createVolume(volumeName);
     // Create 2 Buckets
     for (String bucketName : bucketNames) {
-      createVolumeAndBucket(volumeName, bucketName);
+      addBucketToVolume(volumeName, bucketName);
     }
     // Write 25 keys in each bucket, 2 sst files would be generated each for
     // keys in a single bucket
@@ -300,6 +310,9 @@ public class TestSstFilteringService {
     assertEquals(snap1SstFileCountBeforeFilter, snap1SstFileCountAfterFilter);
     assertEquals(snap2SstFileCountBeforeFilter - 1,
         snap2SstFileCountAfterFilter);
+    //clear data
+    writeClient.deleteSnapshot(volumeName, bucketNames.get(0), "snap2");
+    await(10_000, 1_000, () -> sstFilteringService.getSnapshotFilteredCount().get() == 0);
   }
 
   private void createKeys(String volumeName,
@@ -322,6 +335,25 @@ public class TestSstFilteringService {
             .setVolume(volumeName)
             .build());
 
+    OMRequestTestUtils.addBucketToOM(keyManager.getMetadataManager(),
+        OmBucketInfo.newBuilder().setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setIsVersionEnabled(false)
+            .build());
+  }
+
+  private void createVolume(String volumeName)
+      throws IOException {
+    OMRequestTestUtils.addVolumeToOM(keyManager.getMetadataManager(),
+        OmVolumeArgs.newBuilder()
+            .setOwnerName("o")
+            .setAdminName("a")
+            .setVolume(volumeName)
+            .build());
+  }
+
+  private void addBucketToVolume(String volumeName, String bucketName)
+      throws IOException {
     OMRequestTestUtils.addBucketToOM(keyManager.getMetadataManager(),
         OmBucketInfo.newBuilder().setVolumeName(volumeName)
             .setBucketName(bucketName)
@@ -362,6 +394,7 @@ public class TestSstFilteringService {
    * snapshot bucket.
    */
   @Test
+  @Order(3)
   public void testSstFilteringService() throws Exception {
     RDBStore activeDbStore = (RDBStore) om.getMetadataManager().getStore();
     String volumeName = "volume";
@@ -425,6 +458,12 @@ public class TestSstFilteringService {
     assertEquals(keyInBucket, keyInBucketAfterFilteringRun);
     assertEquals(keyInBucket1, keyInBucket1AfterFilteringRun);
     assertEquals(keyInBucket2, keyInBucket2AfterFilteringRun);
+    //clear data
+    for (int i = 0; i < 3; i++) {
+      writeClient.deleteSnapshot(volumeName, bucketNames.get(i),
+          snapshotNames.get(i));
+    }
+    await(10_000, 1_000, () -> sstFilteringService.getSnapshotFilteredCount().get() == 0);
   }
 
   private static void waitForSnapshotsAtLeast(SstFilteringService filteringService, long n)
