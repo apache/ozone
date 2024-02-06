@@ -22,10 +22,6 @@ package org.apache.hadoop.hdds.fs;
  */
 public final class MockSpaceUsageSource {
 
-  public static SpaceUsageSource zero() {
-    return fixed(0, 0);
-  }
-
   public static SpaceUsageSource unlimited() {
     return fixed(Long.MAX_VALUE, Long.MAX_VALUE);
   }

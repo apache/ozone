@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.PriorityQueue;
 import java.util.TreeMap;
+import java.util.function.Predicate;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -117,14 +118,17 @@ public class ListIterator {
         ? extends Table.KeyValue<String, Value>> tableIterator;
 
     private final Table<String, Value> table;
-    private HeapEntry currentKey;
+    private HeapEntry currentEntry;
+    private Predicate<String> doesKeyExistInCache;
 
     DbTableIter(int entryIteratorId, Table<String, Value> table,
-                String prefixKey, String startKey) throws IOException {
+                String prefixKey, String startKey,
+                Predicate<String> doesKeyExistInCache) throws IOException {
       this.entryIteratorId = entryIteratorId;
       this.table = table;
       this.tableIterator = table.iterator(prefixKey);
-      this.currentKey = null;
+      this.currentEntry = null;
+      this.doesKeyExistInCache = doesKeyExistInCache;
 
       // only seek for the start key if the start key is lexicographically
       // after the prefix key. For example
@@ -141,11 +145,11 @@ public class ListIterator {
     }
 
     private void getNextKey() throws IOException {
-      while (tableIterator.hasNext() && currentKey == null) {
+      while (tableIterator.hasNext() && currentEntry == null) {
         Table.KeyValue<String, Value> entry = tableIterator.next();
         String entryKey = entry.getKey();
-        if (!KeyManagerImpl.isKeyInCache(entryKey, table)) {
-          currentKey = new HeapEntry(entryIteratorId,
+        if (!doesKeyExistInCache.test(entryKey)) {
+          currentEntry = new HeapEntry(entryIteratorId,
               table.getName(), entryKey, entry.getValue());
         }
       }
@@ -157,13 +161,13 @@ public class ListIterator {
       } catch (IOException t) {
         throw new UncheckedIOException(t);
       }
-      return currentKey != null;
+      return currentEntry != null;
     }
 
     public HeapEntry next() {
       if (hasNext()) {
-        HeapEntry ret = currentKey;
-        currentKey = null;
+        HeapEntry ret = currentEntry;
+        currentEntry = null;
         return ret;
       }
       throw new NoSuchElementException();
@@ -186,7 +190,6 @@ public class ListIterator {
     private final String prefixKey;
     private final String startKey;
     private final String tableName;
-
     private final int entryIteratorId;
 
     CacheIter(int entryIteratorId, String tableName,
@@ -194,7 +197,6 @@ public class ListIterator {
                   CacheValue<Value>>> cacheIter, String startKey,
               String prefixKey) {
       this.cacheKeyMap = new TreeMap<>();
-
       this.startKey = startKey;
       this.prefixKey = prefixKey;
       this.tableName = tableName;
@@ -202,7 +204,7 @@ public class ListIterator {
 
       populateCacheMap(cacheIter);
 
-      cacheCreatedKeyIter = cacheKeyMap.entrySet().iterator();
+      cacheCreatedKeyIter = cacheKeyMap.entrySet().stream().filter(e -> e.getValue() != null).iterator();
     }
 
     private void populateCacheMap(Iterator<Map.Entry<CacheKey<String>,
@@ -234,6 +236,10 @@ public class ListIterator {
           }
         }
       }
+    }
+
+    public boolean doesKeyExistInCache(String key) {
+      return cacheKeyMap.containsKey(key);
     }
 
     public boolean hasNext() {
@@ -292,11 +298,13 @@ public class ListIterator {
       try {
         int iteratorId = 0;
         for (Table table : tables) {
-          iterators.add(new CacheIter<>(iteratorId, table.getName(),
-                  table.cacheIterator(), startKey, prefixKey));
+          CacheIter cacheIter = new CacheIter<>(iteratorId, table.getName(),
+              table.cacheIterator(), startKey, prefixKey);
+          Predicate<String> doesKeyExistInCache = cacheIter::doesKeyExistInCache;
+          iterators.add(cacheIter);
           iteratorId++;
           iterators.add(new DbTableIter<>(iteratorId, table, prefixKey,
-              startKey));
+              startKey, doesKeyExistInCache));
           iteratorId++;
         }
       } finally {

@@ -28,7 +28,6 @@ import java.util.NoSuchElementException;
 import java.util.UUID;
 
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -46,7 +45,6 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.ozone.test.GenericTestUtils;
 
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
@@ -60,6 +58,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -75,6 +74,7 @@ public class TestKeyValueBlockIterator {
   private KeyValueContainerData containerData;
   private MutableVolumeSet volumeSet;
   private OzoneConfiguration conf;
+  @TempDir
   private File testRoot;
   private DBHandle db;
   private ContainerLayoutVersion layout;
@@ -110,7 +110,6 @@ public class TestKeyValueBlockIterator {
   }
 
   public void setup() throws Exception {
-    testRoot = GenericTestUtils.getRandomizedTestDir();
     conf.set(HDDS_DATANODE_DIR_KEY, testRoot.getAbsolutePath());
     conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testRoot.getAbsolutePath());
     volumeSet = new MutableVolumeSet(datanodeID, clusterID, conf, null,
@@ -135,7 +134,6 @@ public class TestKeyValueBlockIterator {
     db.cleanup();
     BlockUtils.shutdownCache(conf);
     volumeSet.shutdown();
-    FileUtil.fullyDelete(testRoot);
   }
 
   @ParameterizedTest

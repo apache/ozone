@@ -43,7 +43,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -128,17 +128,15 @@ public class TestPartUpload {
 
   @Test
   public void testPartUploadWithIncorrectUploadID() throws Exception {
-    try {
+    OS3Exception ex = assertThrows(OS3Exception.class, () -> {
       String content = "Multipart Upload With Incorrect uploadID";
       ByteArrayInputStream body =
           new ByteArrayInputStream(content.getBytes(UTF_8));
       REST.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, content.length(), 1,
           "random", body);
-      fail("testPartUploadWithIncorrectUploadID failed");
-    } catch (OS3Exception ex) {
-      assertEquals("NoSuchUpload", ex.getCode());
-      assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
-    }
+    });
+    assertEquals("NoSuchUpload", ex.getCode());
+    assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
   }
 
   @Test

@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.security.token.Token.TrivialRenewer;
 import org.apache.hadoop.util.ProtobufUtils;
 
 import java.io.DataInput;
@@ -184,18 +183,6 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
       builder.addModes(AccessModeProto.valueOf(mode.name()));
     }
     return builder.build().toByteArray();
-  }
-
-  /**
-   * Default TrivialRenewer.
-   */
-  @InterfaceAudience.Private
-  public static class Renewer extends TrivialRenewer {
-
-    @Override
-    protected Text getKind() {
-      return KIND_NAME;
-    }
   }
 }
 

@@ -42,7 +42,7 @@ import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -181,13 +181,10 @@ public class TestMultipartUploadComplete {
     CompleteMultipartUploadRequest completeMultipartUploadRequest = new
         CompleteMultipartUploadRequest();
     completeMultipartUploadRequest.setPartList(partsList);
-    try {
-      completeMultipartUpload(key, completeMultipartUploadRequest, uploadID);
-      fail("testMultipartInvalidPartOrderError");
-    } catch (OS3Exception ex) {
-      assertEquals(S3ErrorTable.INVALID_PART_ORDER.getCode(), ex.getCode());
-    }
-
+    OS3Exception ex =
+        assertThrows(OS3Exception.class,
+            () -> completeMultipartUpload(key, completeMultipartUploadRequest, uploadID));
+    assertEquals(S3ErrorTable.INVALID_PART_ORDER.getCode(), ex.getCode());
   }
 
   @Test
@@ -218,12 +215,9 @@ public class TestMultipartUploadComplete {
     CompleteMultipartUploadRequest completeMultipartUploadRequest = new
         CompleteMultipartUploadRequest();
     completeMultipartUploadRequest.setPartList(partsList);
-    try {
-      completeMultipartUpload(key, completeMultipartUploadRequest, uploadID);
-      fail("testMultipartInvalidPartError");
-    } catch (OS3Exception ex) {
-      assertEquals(ex.getCode(), S3ErrorTable.INVALID_PART.getCode());
-    }
-
+    OS3Exception ex =
+        assertThrows(OS3Exception.class,
+            () -> completeMultipartUpload(key, completeMultipartUploadRequest, uploadID));
+    assertEquals(ex.getCode(), S3ErrorTable.INVALID_PART.getCode());
   }
 }

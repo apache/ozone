@@ -124,15 +124,11 @@ public class TestDefaultCAServer {
         ((DefaultCAServer) testCA).processVerificationStatus(
             DefaultCAServer.VerificationStatus.MISSING_CERTIFICATE,
             CAType.ROOT);
-    try {
-
-      caInitializer.accept(securityConfig);
-      fail("code should not reach here, exception should have been thrown.");
-    } catch (IllegalStateException e) {
-      // This also is a runtime exception. Hence not caught by junit expected
-      // exception.
-      assertThat(e.toString()).contains("Missing Root Certs");
-    }
+    IllegalStateException e =
+        assertThrows(IllegalStateException.class, () -> caInitializer.accept(securityConfig));
+    // This also is a runtime exception. Hence not caught by junit expected
+    // exception.
+    assertThat(e.toString()).contains("Missing Root Certs");
   }
 
   @Test
@@ -145,15 +141,11 @@ public class TestDefaultCAServer {
     Consumer<SecurityConfig> caInitializer =
         ((DefaultCAServer) testCA).processVerificationStatus(
             DefaultCAServer.VerificationStatus.MISSING_KEYS, CAType.ROOT);
-    try {
-
-      caInitializer.accept(securityConfig);
-      fail("code should not reach here, exception should have been thrown.");
-    } catch (IllegalStateException e) {
-      // This also is a runtime exception. Hence not caught by junit expected
-      // exception.
-      assertThat(e.toString()).contains("Missing Keys");
-    }
+    IllegalStateException e =
+        assertThrows(IllegalStateException.class, () -> caInitializer.accept(securityConfig));
+    // This also is a runtime exception. Hence not caught by junit expected
+    // exception.
+    assertThat(e.toString()).contains("Missing Keys");
   }
 
   /**

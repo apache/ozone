@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.checknative;
 
 import org.apache.hadoop.ozone.shell.checknative.CheckNative;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.AfterAll;
@@ -28,6 +27,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
@@ -56,9 +56,9 @@ public class TestCheckNative {
     // trims multiple spaces
     String stdOut = outputStream.toString(DEFAULT_ENCODING)
         .replaceAll(" +", " ");
-    assertTrue(stdOut.contains("Native library checking:"));
-    assertTrue(stdOut.contains("hadoop: false"));
-    assertTrue(stdOut.contains("ISA-L: false"));
+    assertThat(stdOut).contains("Native library checking:");
+    assertThat(stdOut).contains("hadoop: false");
+    assertThat(stdOut).contains("ISA-L: false");
   }
 
   @AfterEach

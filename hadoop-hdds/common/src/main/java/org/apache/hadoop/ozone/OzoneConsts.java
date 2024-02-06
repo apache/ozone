@@ -148,17 +148,6 @@ public final class OzoneConsts {
 
   public static final String MULTIPART_FORM_DATA_BOUNDARY = "---XXX";
 
-  /**
-   * Supports Bucket Versioning.
-   */
-  public enum Versioning {
-    NOT_DEFINED, ENABLED, DISABLED;
-
-    public static Versioning getVersioning(boolean versioning) {
-      return versioning ? ENABLED : DISABLED;
-    }
-  }
-
   // Block ID prefixes used in datanode containers.
   public static final String DELETING_KEY_PREFIX = "#deleting#";
 

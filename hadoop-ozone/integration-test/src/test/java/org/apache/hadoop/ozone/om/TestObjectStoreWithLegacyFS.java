@@ -62,6 +62,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -207,14 +208,11 @@ public class TestObjectStoreWithLegacyFS {
     omBucketArgs = builder.build();
     volume.createBucket(legacyBuckName, omBucketArgs);
     bucket = volume.getBucket(legacyBuckName);
-
-    try {
-      uploadMPUWithDirectoryExists(bucket, keyName);
-      fail("Must throw error as there is " +
-          "already directory in the given path");
-    } catch (OMException ome) {
-      assertEquals(OMException.ResultCodes.NOT_A_FILE, ome.getResult());
-    }
+    OzoneBucket finalBucket = bucket;
+    OMException ome =
+        assertThrows(OMException.class, () -> uploadMPUWithDirectoryExists(finalBucket, keyName),
+            "Must throw error as there is " + "already directory in the given path");
+    assertEquals(OMException.ResultCodes.NOT_A_FILE, ome.getResult());
   }
 
   private OmMultipartUploadCompleteInfo uploadMPUWithDirectoryExists(

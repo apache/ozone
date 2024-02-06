@@ -77,9 +77,11 @@ import static org.apache.hadoop.ozone.om.OMMultiTenantManager.OZONE_TENANT_RANGE
 import static org.apache.hadoop.security.authentication.util.KerberosName.DEFAULT_MECHANISM;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.framework;
@@ -487,31 +489,15 @@ public class TestRangerBGSyncService {
     // by OzoneManager Multi-Tenancy tables are cleaned up by sync thread
 
     for (String policy : policiesCreated) {
-      try {
-        final Policy policyRead = accessController.getPolicy(policy);
-        fail("The policy should have been deleted: " + policyRead);
-      } catch (IOException ex) {
-        if (!(ex.getCause() instanceof RangerServiceException)) {
-          fail("Expected RangerServiceException, got " +
-              ex.getCause().getClass().getSimpleName());
-        }
-        RangerServiceException rse = (RangerServiceException) ex.getCause();
-        assertEquals(404, rse.getStatus().getStatusCode());
-      }
+      IOException ex = assertThrows(IOException.class, () -> accessController.getPolicy(policy));
+      RangerServiceException rse = assertInstanceOf(RangerServiceException.class, ex.getCause());
+      assertEquals(404, rse.getStatus().getStatusCode());
     }
 
     for (String roleName : rolesCreated) {
-      try {
-        final Role role = accessController.getRole(roleName);
-        fail("This role should have been deleted from Ranger: " + role);
-      } catch (IOException ex) {
-        if (!(ex.getCause() instanceof RangerServiceException)) {
-          fail("Expected RangerServiceException, got " +
-              ex.getCause().getClass().getSimpleName());
-        }
-        RangerServiceException rse = (RangerServiceException) ex.getCause();
-        assertEquals(400, rse.getStatus().getStatusCode());
-      }
+      IOException ex = assertThrows(IOException.class, () -> accessController.getRole(roleName));
+      RangerServiceException rse = assertInstanceOf(RangerServiceException.class, ex.getCause());
+      assertEquals(400, rse.getStatus().getStatusCode());
     }
   }
 

@@ -17,31 +17,40 @@
  */
 package org.apache.hadoop.fs.ozone.contract;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.contract.AbstractContractUnbufferTest;
-import org.apache.hadoop.fs.contract.AbstractFSContract;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-
 import java.io.IOException;
 
-/**
- * Ozone contract tests for {@link org.apache.hadoop.fs.CanUnbuffer#unbuffer}.
- */
-public class ITestOzoneContractUnbuffer extends AbstractContractUnbufferTest {
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.contract.AbstractFSContract;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
 
-  @BeforeClass
-  public static void createCluster() throws IOException {
-    OzoneContract.createCluster();
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+/**
+ * Base class for Ozone filesystem contracts.  It needs a {@link MiniOzoneCluster},
+ * and provides the {@link FileSystem} that's subject of the test.
+ */
+abstract class AbstractOzoneContract extends AbstractFSContract {
+
+  private final MiniOzoneCluster cluster;
+
+  /**
+   * @return root URI for the FileSystem
+   */
+  protected abstract String getRootURI() throws IOException;
+
+  protected MiniOzoneCluster getCluster() {
+    return cluster;
   }
 
-  @AfterClass
-  public static void teardownCluster() throws IOException {
-    OzoneContract.destroyCluster();
+  AbstractOzoneContract(MiniOzoneCluster cluster) {
+    super(cluster.getConf());
+    this.cluster = cluster;
   }
 
   @Override
-  protected AbstractFSContract createContract(Configuration conf) {
-    return new OzoneContract(conf);
+  public FileSystem getTestFileSystem() throws IOException {
+    assertNotNull(cluster, "cluster not created");
+    getConf().set("fs.defaultFS", getRootURI());
+    return FileSystem.get(getConf());
   }
 }

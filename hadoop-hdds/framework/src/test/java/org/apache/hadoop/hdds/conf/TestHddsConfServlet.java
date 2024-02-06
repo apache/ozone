@@ -19,9 +19,9 @@ package org.apache.hadoop.hdds.conf;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -170,12 +170,8 @@ public class TestHddsConfServlet {
   @Test
   public void testBadFormat() throws Exception {
     StringWriter sw = new StringWriter();
-    try {
-      HddsConfServlet.writeResponse(getTestConf(), sw, "not a format", null);
-      fail("writeResponse with bad format didn't throw!");
-    } catch (HddsConfServlet.BadFormatException bfe) {
-      // expected
-    }
+    assertThrows(HddsConfServlet.BadFormatException.class,
+        () -> HddsConfServlet.writeResponse(getTestConf(), sw, "not a format", null));
     assertEquals("", sw.toString());
   }
 

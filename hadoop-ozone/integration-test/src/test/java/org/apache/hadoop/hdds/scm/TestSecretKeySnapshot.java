@@ -37,6 +37,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,7 +47,6 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
@@ -68,6 +68,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -89,12 +90,11 @@ public final class TestSecretKeySnapshot {
 
   private MiniKdc miniKdc;
   private OzoneConfiguration conf;
+  @TempDir
   private File workDir;
   private File ozoneKeytab;
   private File spnegoKeytab;
   private String host;
-  private String clusterId;
-  private String scmId;
   private MiniOzoneHAClusterImpl cluster;
 
   @BeforeEach
@@ -103,10 +103,6 @@ public final class TestSecretKeySnapshot {
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
 
     ExitUtils.disableSystemExit();
-
-    workDir = GenericTestUtils.getTestDir(getClass().getSimpleName());
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
 
     startMiniKdc();
     setSecureConfig();
@@ -123,9 +119,7 @@ public final class TestSecretKeySnapshot {
     conf.set(HDDS_SECRET_KEY_EXPIRY_DURATION, EXPIRY_DURATION_MS + "ms");
 
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newHABuilder(conf)
-        .setClusterId(clusterId)
         .setSCMServiceId("TestSecretKeySnapshot")
-        .setScmId(scmId)
         .setSCMServiceId("SCMServiceId")
         .setNumDatanodes(1)
         .setNumOfStorageContainerManagers(3)
@@ -237,7 +231,7 @@ public final class TestSecretKeySnapshot {
         100, 3000);
     long followerLastAppliedIndex =
         followerSM.getLastAppliedTermIndex().getIndex();
-    assertTrue(followerLastAppliedIndex >= 200);
+    assertThat(followerLastAppliedIndex).isGreaterThanOrEqualTo(200);
     assertFalse(followerSM.getLifeCycleState().isPausingOrPaused());
 
     // Verify that the follower has the secret keys created
@@ -248,8 +242,8 @@ public final class TestSecretKeySnapshot {
     List<ManagedSecretKey> followerKeys =
         followerSecretKeyManager.getSortedKeys();
     LOG.info("Follower secret keys after snapshot: {}", followerKeys);
-    assertTrue(followerKeys.size() >= 2);
-    assertTrue(followerKeys.contains(currentKeyInLeader));
+    assertThat(followerKeys.size()).isGreaterThanOrEqualTo(2);
+    assertThat(followerKeys).contains(currentKeyInLeader);
     assertEquals(leaderSecretKeyManager.getSortedKeys(), followerKeys);
 
     // Wait for the next rotation, assert that the updates can be synchronized

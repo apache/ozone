@@ -134,6 +134,7 @@ import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
+import static org.apache.hadoop.ozone.OmUtils.LOG;
 import static org.apache.hadoop.ozone.OmUtils.MAX_TRXN_ID;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
@@ -156,7 +157,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -201,16 +201,12 @@ public abstract class TestOzoneRpcClientAbstract {
       READ, ACCESS);
   private static OzoneAcl inheritedGroupAcl = new OzoneAcl(GROUP,
       remoteGroupName, READ, ACCESS);
-
-  private static String scmId = UUID.randomUUID().toString();
-  private static String clusterId;
   private static MessageDigest eTagProvider;
 
   @BeforeAll
   public static void initialize() throws NoSuchAlgorithmException {
     eTagProvider = MessageDigest.getInstance(MD5_HASH);
   }
-
 
   /**
    * Create a MiniOzoneCluster for testing.
@@ -220,13 +216,10 @@ public abstract class TestOzoneRpcClientAbstract {
   static void startCluster(OzoneConfiguration conf) throws Exception {
     // Reduce long wait time in MiniOzoneClusterImpl#waitForHddsDatanodesStop
     //  for testZReadKeyWithUnhealthyContainerReplica.
-    clusterId = UUID.randomUUID().toString();
     conf.set("ozone.scm.stale.node.interval", "10s");
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(14)
         .setTotalPipelineNumLimit(10)
-        .setScmId(scmId)
-        .setClusterId(clusterId)
         .setDataStreamMinPacketSize(1) // 1MB
         .build();
     cluster.waitForClusterToBeReady();
@@ -279,10 +272,6 @@ public abstract class TestOzoneRpcClientAbstract {
 
   public static ObjectStore getStore() {
     return TestOzoneRpcClientAbstract.store;
-  }
-
-  public static void setClusterId(String clusterId) {
-    TestOzoneRpcClientAbstract.clusterId = clusterId;
   }
 
   public static OzoneClient getClient() {
@@ -2130,7 +2119,7 @@ public abstract class TestOzoneRpcClientAbstract {
       String containreBaseDir =
           container.getContainerData().getVolume().getHddsRootDir().getPath();
       File chunksLocationPath = KeyValueContainerLocationUtil
-          .getChunksLocationPath(containreBaseDir, clusterId, containerID);
+          .getChunksLocationPath(containreBaseDir, cluster.getClusterId(), containerID);
       byte[] corruptData = "corrupted data".getBytes(UTF_8);
       // Corrupt the contents of chunk files
       for (File file : FileUtils.listFiles(chunksLocationPath, null, false)) {
@@ -2827,13 +2816,10 @@ public abstract class TestOzoneRpcClientAbstract {
       String keyName2 = UUID.randomUUID().toString();
       OzoneBucket bucket2 = client.getObjectStore().getVolume(volumeName)
           .getBucket(bucketName);
-      try {
-        initiateMultipartUpload(bucket2, keyName2, anyReplication());
-        fail("User without permission should fail");
-      } catch (Exception e) {
-        OMException ome = assertInstanceOf(OMException.class, e);
-        assertEquals(ResultCodes.PERMISSION_DENIED, ome.getResult());
-      }
+      OMException ome =
+          assertThrows(OMException.class, () -> initiateMultipartUpload(bucket2, keyName2, anyReplication()),
+              "User without permission should fail");
+      assertEquals(ResultCodes.PERMISSION_DENIED, ome.getResult());
 
       // Add create permission for user, and try multi-upload init again
       OzoneAcl acl7 = new OzoneAcl(USER, userName, ACLType.CREATE, DEFAULT);
@@ -2863,12 +2849,12 @@ public abstract class TestOzoneRpcClientAbstract {
       completeMultipartUpload(bucket2, keyName2, uploadId, eTagsMaps);
 
       // User without permission cannot read multi-uploaded object
-      try (OzoneInputStream ignored = bucket2.readKey(keyName)) {
-        fail("User without permission should fail");
-      } catch (Exception e) {
-        OMException ome = assertInstanceOf(OMException.class, e);
-        assertEquals(ResultCodes.PERMISSION_DENIED, ome.getResult());
-      }
+      OMException ex = assertThrows(OMException.class, () -> {
+        try (OzoneInputStream ignored = bucket2.readKey(keyName)) {
+          LOG.error("User without permission should fail");
+        }
+      }, "User without permission should fail");
+      assertEquals(ResultCodes.PERMISSION_DENIED, ex.getResult());
     }
   }
 
@@ -3072,14 +3058,8 @@ public abstract class TestOzoneRpcClientAbstract {
 
     // Abort before completing part upload.
     bucket.abortMultipartUpload(keyName, omMultipartInfo.getUploadID());
-
-    try {
-      ozoneOutputStream.close();
-      fail("testAbortUploadFailWithInProgressPartUpload failed");
-    } catch (IOException ex) {
-      OMException ome = assertInstanceOf(OMException.class, ex);
-      assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, ome.getResult());
-    }
+    OMException ome = assertThrows(OMException.class, () -> ozoneOutputStream.close());
+    assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, ome.getResult());
   }
 
   @Test
@@ -3140,14 +3120,8 @@ public abstract class TestOzoneRpcClientAbstract {
     String part1 = new String(data, UTF_8);
     sb.append(part1);
     assertEquals(sb.toString(), new String(fileContent, UTF_8));
-
-    try {
-      ozoneOutputStream.close();
-      fail("testCommitPartAfterCompleteUpload failed");
-    } catch (IOException ex) {
-      OMException ome = assertInstanceOf(OMException.class, ex);
-      assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, ome.getResult());
-    }
+    OMException ex = assertThrows(OMException.class, ozoneOutputStream::close);
+    assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, ex.getResult());
   }
 
 

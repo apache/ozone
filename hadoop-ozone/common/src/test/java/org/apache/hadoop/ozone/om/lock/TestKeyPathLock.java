@@ -30,7 +30,7 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
@@ -239,14 +239,11 @@ class TestKeyPathLock extends TestOzoneManagerLock {
         higherResourceName = new String[]{volumeName, bucketName};
 
     lock.acquireWriteLock(resource, resourceName);
-    try {
-      lock.acquireWriteLock(higherResource, higherResourceName);
-      fail("testAcquireWriteBucketLockWhileAcquiredWriteKeyPathLock() failed");
-    } catch (RuntimeException ex) {
-      String message = "cannot acquire " + higherResource.getName() + " lock " +
-          "while holding [" + resource.getName() + "] lock(s).";
-      assertThat(ex).hasMessageContaining(message);
-    }
+    RuntimeException ex =
+        assertThrows(RuntimeException.class, () -> lock.acquireWriteLock(higherResource, higherResourceName));
+    String message = "cannot acquire " + higherResource.getName() + " lock " +
+        "while holding [" + resource.getName() + "] lock(s).";
+    assertThat(ex).hasMessageContaining(message);
   }
 
   @Test
@@ -264,14 +261,11 @@ class TestKeyPathLock extends TestOzoneManagerLock {
         higherResourceName = new String[]{volumeName, bucketName};
 
     lock.acquireReadLock(resource, resourceName);
-    try {
-      lock.acquireWriteLock(higherResource, higherResourceName);
-      fail("testAcquireWriteBucketLockWhileAcquiredReadKeyPathLock() failed");
-    } catch (RuntimeException ex) {
-      String message = "cannot acquire " + higherResource.getName() + " lock " +
-          "while holding [" + resource.getName() + "] lock(s).";
-      assertThat(ex).hasMessageContaining(message);
-    }
+    RuntimeException ex =
+        assertThrows(RuntimeException.class, () -> lock.acquireWriteLock(higherResource, higherResourceName));
+    String message = "cannot acquire " + higherResource.getName() + " lock " +
+        "while holding [" + resource.getName() + "] lock(s).";
+    assertThat(ex).hasMessageContaining(message);
   }
 
   @Test
@@ -289,14 +283,11 @@ class TestKeyPathLock extends TestOzoneManagerLock {
         higherResourceName = new String[]{volumeName, bucketName};
 
     lock.acquireReadLock(resource, resourceName);
-    try {
-      lock.acquireReadLock(higherResource, higherResourceName);
-      fail("testAcquireReadBucketLockWhileAcquiredReadKeyPathLock() failed");
-    } catch (RuntimeException ex) {
-      String message = "cannot acquire " + higherResource.getName() + " lock " +
-          "while holding [" + resource.getName() + "] lock(s).";
-      assertThat(ex).hasMessageContaining(message);
-    }
+    RuntimeException ex =
+        assertThrows(RuntimeException.class, () -> lock.acquireReadLock(higherResource, higherResourceName));
+    String message = "cannot acquire " + higherResource.getName() + " lock " +
+        "while holding [" + resource.getName() + "] lock(s).";
+    assertThat(ex).hasMessageContaining(message);
   }
 
   @Test
@@ -314,13 +305,10 @@ class TestKeyPathLock extends TestOzoneManagerLock {
         higherResourceName = new String[]{volumeName, bucketName};
 
     lock.acquireWriteLock(resource, resourceName);
-    try {
-      lock.acquireReadLock(higherResource, higherResourceName);
-      fail("testAcquireReadBucketLockWhileAcquiredWriteKeyPathLock() failed");
-    } catch (RuntimeException ex) {
-      String message = "cannot acquire " + higherResource.getName() + " lock " +
-          "while holding [" + resource.getName() + "] lock(s).";
-      assertThat(ex).hasMessageContaining(message);
-    }
+    RuntimeException ex =
+        assertThrows(RuntimeException.class, () -> lock.acquireReadLock(higherResource, higherResourceName));
+    String message = "cannot acquire " + higherResource.getName() + " lock " +
+        "while holding [" + resource.getName() + "] lock(s).";
+    assertThat(ex).hasMessageContaining(message);
   }
 }

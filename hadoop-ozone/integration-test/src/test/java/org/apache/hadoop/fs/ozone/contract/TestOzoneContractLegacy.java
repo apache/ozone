@@ -15,18 +15,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.ozone.test;
+package org.apache.hadoop.fs.ozone.contract;
 
-import org.junit.rules.Timeout;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.contract.AbstractFSContract;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
+import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
 
 /**
- * Disables the given JUnit4 timeout rule if JUnit5-specific timeout-mode is set
- * to "disabled".
+ * Tests O3FS with LEGACY bucket.
  */
-public class JUnit5AwareTimeout extends DisableOnProperty {
+class TestOzoneContractLegacy extends AbstractOzoneContractTest {
 
-  public JUnit5AwareTimeout(Timeout delegate) {
-    super(delegate, "junit.jupiter.execution.timeout.mode", "disabled");
+  @Override
+  OzoneConfiguration createOzoneConfig() {
+    OzoneConfiguration conf = createBaseConfiguration();
+    conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, LEGACY.name());
+    return conf;
   }
 
+  @Override
+  AbstractFSContract createOzoneContract(Configuration conf) {
+    return new OzoneContract(getCluster());
+  }
 }

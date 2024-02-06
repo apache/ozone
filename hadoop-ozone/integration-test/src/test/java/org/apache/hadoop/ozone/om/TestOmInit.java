@@ -18,7 +18,6 @@ package org.apache.hadoop.ozone.om;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
-import java.util.UUID;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -38,9 +37,6 @@ public class TestOmInit {
   private static MiniOzoneCluster cluster = null;
   private static OMMetrics omMetrics;
   private static OzoneConfiguration conf;
-  private static String clusterId;
-  private static String scmId;
-  private static String omId;
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -52,13 +48,7 @@ public class TestOmInit {
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
-    omId = UUID.randomUUID().toString();
     cluster =  MiniOzoneCluster.newBuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
-        .setOmId(omId)
         .build();
     cluster.waitForClusterToBeReady();
     omMetrics = cluster.getOzoneManager().getMetrics();

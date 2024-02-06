@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.shell;
 
 import java.net.InetSocketAddress;
-import java.util.UUID;
 
 import org.apache.hadoop.hdds.cli.OzoneAdmin;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -36,8 +35,6 @@ public class TestScmAdminHA {
   private static OzoneConfiguration conf;
   private static String omServiceId;
   private static int numOfOMs;
-  private static String clusterId;
-  private static String scmId;
   private static MiniOzoneCluster cluster;
 
   @BeforeAll
@@ -48,11 +45,7 @@ public class TestScmAdminHA {
     // Init HA cluster
     omServiceId = "om-service-test1";
     numOfOMs = 3;
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
         .build();

@@ -37,7 +37,7 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,7 +68,7 @@ public class ECContainerOperationClient implements Closeable {
     this(createClientManager(conf, certificateClient));
   }
 
-  @NotNull
+  @Nonnull
   private static XceiverClientManager createClientManager(
       ConfigurationSource conf, CertificateClient certificateClient)
       throws IOException {

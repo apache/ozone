@@ -42,8 +42,8 @@ import org.junit.jupiter.api.Timeout;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * * Integration test for {@code ozone admin reconfig} command. HA enabled.
@@ -68,8 +68,6 @@ public class TestReconfigShell {
     OzoneConfiguration conf = new OzoneConfiguration();
     String omServiceId = UUID.randomUUID().toString();
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
-        .setClusterId(UUID.randomUUID().toString())
-        .setScmId(UUID.randomUUID().toString())
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(1)
         .setNumOfStorageContainerManagers(1)
@@ -138,7 +136,7 @@ public class TestReconfigShell {
     List<String> outs =
         Arrays.asList(output.split(System.getProperty("line.separator")));
     for (String property : except) {
-      assertTrue(outs.contains(property), String.format("Not found %s in output: %s", property, output));
+      assertThat(outs).contains(property);
     }
   }
 
@@ -176,8 +174,7 @@ public class TestReconfigShell {
           "reconfig",  "--in-service-datanodes", "properties"});
       String output = capture.getOutput();
 
-      assertTrue(capture.getOutput().contains(String.format("successfully %d", except)),
-          String.format("Excepted successfully %d. output: %s%n", except, output));
+      assertThat(capture.getOutput()).contains(String.format("successfully %d", except));
     }
   }
 }

@@ -152,7 +152,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -698,10 +698,12 @@ public class KeyManagerImpl implements KeyManager {
     return multipartUploadCleanupService;
   }
 
+  @Override
   public SstFilteringService getSnapshotSstFilteringService() {
     return snapshotSstFilteringService;
   }
 
+  @Override
   public SnapshotDeletingService getSnapshotDeletingService() {
     return snapshotDeletingService;
   }
@@ -838,8 +840,8 @@ public class KeyManagerImpl implements KeyManager {
           //if there are no parts, use the replicationType from the open key.
           if (isBucketFSOptimized(volumeName, bucketName)) {
             multipartKey =
-                getMultipartOpenKeyFSO(volumeName, bucketName, keyName,
-                    uploadID);
+                    OMMultipartUploadUtils.getMultipartOpenKey(volumeName, bucketName, keyName, uploadID,
+                            metadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
           }
           OmKeyInfo omKeyInfo =
               metadataManager.getOpenKeyTable(bucketLayout)
@@ -907,13 +909,6 @@ public class KeyManagerImpl implements KeyManager {
       return fullKeyPartName.toString();
     }
     return partName;
-  }
-
-  private String getMultipartOpenKeyFSO(String volumeName, String bucketName,
-      String keyName, String uploadID) throws IOException {
-    OMMetadataManager metaMgr = metadataManager;
-    return OMMultipartUploadUtils.getMultipartOpenKeyFSO(
-        volumeName, bucketName, keyName, uploadID, metaMgr);
   }
 
   /**
@@ -1466,10 +1461,6 @@ public class KeyManagerImpl implements KeyManager {
         && omKeyInfoCacheValue.getCacheValue() == null;
   }
 
-  public static boolean isKeyInCache(String key, Table keyTable) {
-    return keyTable.getCacheValue(new CacheKey(key)) != null;
-  }
-
   /**
    * Helper function for listStatus to find key in TableCache.
    */
@@ -1688,9 +1679,7 @@ public class KeyManagerImpl implements KeyManager {
     TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> iterator;
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
         cacheIter = keyTable.cacheIterator();
-    String startCacheKey = OZONE_URI_DELIMITER + volumeName +
-        OZONE_URI_DELIMITER + bucketName + OZONE_URI_DELIMITER +
-        ((startKey.equals(OZONE_URI_DELIMITER)) ? "" : startKey);
+    String startCacheKey = metadataManager.getOzoneKey(volumeName, bucketName, startKey);
 
     // First, find key in TableCache
     listStatusFindKeyInTableCache(cacheIter, keyArgs, startCacheKey,
@@ -2117,7 +2106,7 @@ public class KeyManagerImpl implements KeyManager {
     }
   }
 
-  @NotNull
+  @Nonnull
   private Stream<Long> extractContainerIDs(OmKeyInfo keyInfo) {
     return keyInfo.getKeyLocationVersions().stream()
         .flatMap(v -> v.getLocationList().stream())

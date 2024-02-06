@@ -36,7 +36,6 @@ public final class NetConstants {
   public static final int NODE_COST_DEFAULT = 0;
   public static final int ANCESTOR_GENERATION_DEFAULT = 0;
   public static final int ROOT_LEVEL = 1;
-  public static final String NODE_COST_PREFIX = "$";
   public static final String DEFAULT_RACK = "/default-rack";
   public static final String DEFAULT_NODEGROUP = "/default-nodegroup";
   public static final String DEFAULT_DATACENTER = "/default-datacenter";

@@ -35,6 +35,7 @@ import static org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFa
 import static org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFactory.OM_KEY_REQUEST_CLASSES;
 import static org.apache.hadoop.ozone.om.request.BucketLayoutAwareOMKeyRequestFactory.addRequestClass;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
@@ -135,21 +136,17 @@ public class TestBucketLayoutAwareOMKeyFactory {
     addRequestClass(Type.PurgeDirectories,
             OMDirectoriesPurgeRequestWithFSO.class,
             BucketLayout.FILE_SYSTEM_OPTIMIZED);
-    try {
-      // This should fail, since this class does not have a valid constructor -
-      // one that takes an OMRequest and a BucketLayout as parameters.
-      getRequestInstanceFromMap(
-          OMRequest.newBuilder()
-              .setCmdType(Type.PurgeKeys)
-              .setClientId("xyz")
-              .build(),
-          getKey(Type.PurgeDirectories, BucketLayout.FILE_SYSTEM_OPTIMIZED),
-          BucketLayout.FILE_SYSTEM_OPTIMIZED);
-      fail("No exception thrown for invalid OMKeyRequest class");
-    } catch (NoSuchMethodException ex) {
-      // expected exception.
-      LOG.info("Expected exception thrown for invalid OMKeyRequest class", ex);
-    }
+    // This should fail, since this class does not have a valid constructor -
+    // one that takes an OMRequest and a BucketLayout as parameters.
+    assertThrows(NoSuchMethodException.class,
+        () -> getRequestInstanceFromMap(
+            OMRequest.newBuilder()
+                .setCmdType(Type.PurgeKeys)
+                .setClientId("xyz")
+                .build(),
+            getKey(Type.PurgeDirectories, BucketLayout.FILE_SYSTEM_OPTIMIZED),
+            BucketLayout.FILE_SYSTEM_OPTIMIZED),
+        "No exception thrown for invalid OMKeyRequest class");
   }
 
   /**

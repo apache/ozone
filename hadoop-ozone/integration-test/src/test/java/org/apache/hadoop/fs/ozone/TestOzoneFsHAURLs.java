@@ -35,7 +35,6 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ozone.test.GenericTestUtils;
@@ -46,19 +45,19 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.UUID;
 
 import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostPort;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test client-side URI handling with Ozone Manager HA.
@@ -74,10 +73,7 @@ public class TestOzoneFsHAURLs {
 
   private OzoneConfiguration conf;
   private static MiniOzoneCluster cluster;
-  private static String omId;
   private static String omServiceId;
-  private static String clusterId;
-  private static String scmId;
   private static OzoneManager om;
   private static int numOfOMs;
 
@@ -99,33 +95,21 @@ public class TestOzoneFsHAURLs {
 
 
   @BeforeAll
-  public static void initClass() throws Exception {
+  static void initClass(@TempDir File tempDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    omId = UUID.randomUUID().toString();
     omServiceId = "om-service-test1";
     numOfOMs = 3;
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
-    final String path = GenericTestUtils.getTempPath(omId);
-    java.nio.file.Path metaDirPath = java.nio.file.Paths.get(path, "om-meta");
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempDir.getAbsolutePath());
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 3);
 
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         BucketLayout.LEGACY.name());
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
 
-    OMStorage omStore = new OMStorage(conf);
-    omStore.setClusterId(clusterId);
-    // writes the version file properties
-    omStore.initialize();
-
     // Start the cluster
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
         .setNumDatanodes(5)
         .setTotalPipelineNumLimit(3)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
         .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
         .build();
@@ -385,8 +369,7 @@ public class TestOzoneFsHAURLs {
         res = ToolRunner.run(shell,
             new String[] {"-ls", ofsPathWithIncorrectSvcId });
         assertEquals(1, res);
-        assertTrue(
-            capture.getOutput().contains("Cannot resolve OM host"));
+        assertThat(capture.getOutput()).contains("Cannot resolve OM host");
       }
 
       try (GenericTestUtils.SystemErrCapturer capture = new
@@ -394,8 +377,7 @@ public class TestOzoneFsHAURLs {
         res = ToolRunner.run(shell,
             new String[] {"-ls", o3fsPathWithInCorrectSvcId });
         assertEquals(1, res);
-        assertTrue(
-            capture.getOutput().contains("Cannot resolve OM host"));
+        assertThat(capture.getOutput()).contains("Cannot resolve OM host");
       }
     } finally {
       shell.close();

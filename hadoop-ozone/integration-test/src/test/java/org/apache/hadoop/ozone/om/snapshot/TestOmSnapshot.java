@@ -87,8 +87,7 @@ import org.apache.log4j.Logger;
 import org.apache.ozone.rocksdiff.CompactionNode;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Slow;
-import org.apache.ozone.test.tag.Unhealthy;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -197,8 +196,6 @@ public abstract class TestOmSnapshot {
    */
   private void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    String clusterId = UUID.randomUUID().toString();
-    String scmId = UUID.randomUUID().toString();
     conf.setBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, enabledFileSystemPaths);
     conf.set(OZONE_DEFAULT_BUCKET_LAYOUT, bucketLayout.name());
     conf.setBoolean(OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF, forceFullSnapshotDiff);
@@ -212,12 +209,8 @@ public abstract class TestOmSnapshot {
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
         .setNumOfOzoneManagers(3)
-        .setOmLayoutVersion(OMLayoutFeature.
-          BUCKET_LAYOUT_SUPPORT.layoutVersion())
-        .setOmId(UUID.randomUUID().toString())
+        .setOmLayoutVersion(OMLayoutFeature.BUCKET_LAYOUT_SUPPORT.layoutVersion())
         .build();
 
     cluster.waitForClusterToBeReady();
@@ -1784,9 +1777,7 @@ public abstract class TestOmSnapshot {
    * sst filtering code path.
    */
   @Test
-  @Unhealthy("HDDS-8005")
-  public void testSnapDiffWithMultipleSSTs()
-      throws Exception {
+  public void testSnapDiffWithMultipleSSTs() throws Exception {
     // Create a volume and 2 buckets
     String volumeName1 = "vol-" + counter.incrementAndGet();
     String bucketName1 = "buck1";
@@ -1800,29 +1791,27 @@ public abstract class TestOmSnapshot {
     String keyPrefix = "key-";
     // add file to bucket1 and take snapshot
     createFileKeyWithPrefix(bucket1, keyPrefix);
+    int keyTableSize = getKeyTableSstFiles().size();
     String snap1 = "snap" + counter.incrementAndGet();
     createSnapshot(volumeName1, bucketName1, snap1); // 1.sst
-    assertEquals(1, getKeyTableSstFiles().size());
+    assertEquals(1, (getKeyTableSstFiles().size() - keyTableSize));
     // add files to bucket2 and flush twice to create 2 sst files
     for (int i = 0; i < 5; i++) {
       createFileKeyWithPrefix(bucket2, keyPrefix);
     }
     flushKeyTable(); // 1.sst 2.sst
-    assertEquals(2, getKeyTableSstFiles().size());
+    assertEquals(2, (getKeyTableSstFiles().size() - keyTableSize));
     for (int i = 0; i < 5; i++) {
       createFileKeyWithPrefix(bucket2, keyPrefix);
     }
     flushKeyTable(); // 1.sst 2.sst 3.sst
-    assertEquals(3, getKeyTableSstFiles().size());
+    assertEquals(3, (getKeyTableSstFiles().size() - keyTableSize));
     // add a file to bucket1 and take second snapshot
     createFileKeyWithPrefix(bucket1, keyPrefix);
     String snap2 = "snap" + counter.incrementAndGet();
     createSnapshot(volumeName1, bucketName1, snap2); // 1.sst 2.sst 3.sst 4.sst
-    assertEquals(4, getKeyTableSstFiles().size());
-    SnapshotDiffReportOzone diff1 =
-        store.snapshotDiff(volumeName1, bucketName1, snap1, snap2,
-                null, 0, forceFullSnapshotDiff, disableNativeDiff)
-            .getSnapshotDiffReport();
+    assertEquals(4, (getKeyTableSstFiles().size() - keyTableSize));
+    SnapshotDiffReportOzone diff1 = getSnapDiffReport(volumeName1, bucketName1, snap1, snap2);
     assertEquals(1, diff1.getDiffList().size());
   }
 
@@ -1949,7 +1938,7 @@ public abstract class TestOmSnapshot {
     assertEquals(buckUsedBytesIntial, bucket1.getUsedBytes());
   }
 
-  @NotNull
+  @Nonnull
   private List<LiveFileMetaData> getKeyTableSstFiles()
       throws IOException {
     if (!bucketLayout.isFileSystemOptimized()) {
