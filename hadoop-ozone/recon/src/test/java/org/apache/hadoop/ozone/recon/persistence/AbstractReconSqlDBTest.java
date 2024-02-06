@@ -18,9 +18,12 @@
 package org.apache.hadoop.ozone.recon.persistence;
 
 import static org.hadoop.ozone.recon.codegen.SqlDbUtils.DERBY_DRIVER_CLASS;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -36,53 +39,50 @@ import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
 import org.jooq.impl.DefaultConfiguration;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.rules.TemporaryFolder;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Module;
 import com.google.inject.Provider;
+import org.junit.jupiter.api.io.TempDir;
+import org.springframework.util.FileSystemUtils;
 
 /**
  * Class that provides a Recon SQL DB with all the tables created, and APIs
  * to access the DAOs easily.
  */
 public class AbstractReconSqlDBTest {
-
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
-
   private Injector injector;
   private DSLContext dslContext;
   private Provider<DataSourceConfiguration> configurationProvider;
 
   public AbstractReconSqlDBTest() {
+  }
+
+  public void init(Path temporaryFolder) {
     try {
-      temporaryFolder.create();
+      FileSystemUtils.deleteRecursively(temporaryFolder.resolve("Config"));
       configurationProvider =
-          new DerbyDataSourceConfigurationProvider(temporaryFolder.newFolder());
+          new DerbyDataSourceConfigurationProvider(Files.createDirectory(
+              temporaryFolder.resolve("Config")).toFile());
     } catch (IOException e) {
-      Assert.fail();
+      fail();
     }
+  }
+
+  public AbstractReconSqlDBTest(Path temporaryFolder) {
+    init(temporaryFolder);
   }
 
   protected AbstractReconSqlDBTest(Provider<DataSourceConfiguration> provider) {
-    try {
-      temporaryFolder.create();
-      configurationProvider = provider;
-    } catch (IOException e) {
-      Assert.fail();
-    }
+    configurationProvider = provider;
   }
 
   @BeforeEach
-  @Before
-  public void createReconSchemaForTest() throws IOException {
+  public void createReconSchemaForTest(@TempDir Path temporaryFolder) throws IOException {
+    init(temporaryFolder);
     injector = Guice.createInjector(getReconSqlDBModules());
     dslContext = DSL.using(new DefaultConfiguration().set(
         injector.getInstance(DataSource.class)));

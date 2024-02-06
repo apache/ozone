@@ -33,7 +33,7 @@ import java.time.Duration;
 import java.util.List;
 
 /**
- * Managed BloomFilter.
+ * Managed {@link RocksDB}.
  */
 public class ManagedRocksDB extends ManagedObject<RocksDB> {
   public static final Class<RocksDB> ORIGINAL_CLASS = RocksDB.class;

@@ -33,37 +33,38 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
-import org.junit.rules.TemporaryFolder;
-import org.mockito.Mockito;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INVALID_REQUEST;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
  * Test OM Ratis request handling.
  */
+@Timeout(300)
 public class TestOzoneManagerRatisRequest {
-  @Rule public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   private OzoneManager ozoneManager;
-  private OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+  private final OzoneConfiguration ozoneConfiguration =
+      new OzoneConfiguration();
   private OMMetadataManager omMetadataManager;
 
-  @Test(timeout = 300_000)
-  public void testRequestWithNonExistentBucket()
-      throws Exception {
-    // Test: Creating a client request for a bucket which doesn't exist.
-    ozoneManager = Mockito.mock(OzoneManager.class);
+  @Test
+  public void testRequestWithNonExistentBucket() throws Exception {
+    ozoneManager = mock(OzoneManager.class);
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        folder.newFolder().getAbsolutePath());
+        folder.resolve("om").toAbsolutePath().toString());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
@@ -85,21 +86,16 @@ public class TestOzoneManagerRatisRequest {
         .createCompleteMPURequest(volumeName, bucketName, "mpuKey", "mpuKeyID",
             new ArrayList<>());
 
-    try {
-      // Request creation flow should throw exception if the bucket associated
-      // with the request doesn't exist.
-      OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
-      fail("Expected OMException: Bucket not found");
-    } catch (OMException oe) {
-      // Expected exception.
-      Assert.assertEquals(OMException.ResultCodes.BUCKET_NOT_FOUND,
-          oe.getResult());
-    }
+    OMException omException = assertThrows(OMException.class,
+        () -> OzoneManagerRatisUtils.createClientRequest(omRequest,
+            ozoneManager));
+    assertEquals(OMException.ResultCodes.BUCKET_NOT_FOUND,
+        omException.getResult());
   }
 
   @Test
-  public void testUnknownRequestHandling() throws IOException,
-      ServiceException {
+  public void testUnknownRequestHandling()
+      throws IOException, ServiceException {
     // Create an instance of OMRequest with an unknown command type.
     OzoneManagerProtocolProtos.OMRequest omRequest =
         OzoneManagerProtocolProtos.OMRequest.newBuilder()
@@ -107,18 +103,17 @@ public class TestOzoneManagerRatisRequest {
             .setClientId("test-client-id")
             .build();
 
-    ozoneManager = Mockito.mock(OzoneManager.class);
+    ozoneManager = mock(OzoneManager.class);
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        folder.newFolder().getAbsolutePath());
+        folder.resolve("om").toAbsolutePath().toString());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
         ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
 
-    OzoneManagerRatisServer ratisServer =
-        Mockito.mock(OzoneManagerRatisServer.class);
+    OzoneManagerRatisServer ratisServer = mock(OzoneManagerRatisServer.class);
     ProtocolMessageMetrics<ProtocolMessageEnum> protocolMessageMetrics =
-        Mockito.mock(ProtocolMessageMetrics.class);
+        mock(ProtocolMessageMetrics.class);
     long lastTransactionIndexForNonRatis = 100L;
 
     OzoneManagerProtocolProtos.OMResponse expectedResponse =
@@ -141,7 +136,7 @@ public class TestOzoneManagerRatisRequest {
       OzoneManagerProtocolProtos.OMResponse actualResponse =
           serverSideTranslatorPB.processRequest(omRequest);
 
-      Assertions.assertEquals(expectedResponse, actualResponse);
+      assertEquals(expectedResponse, actualResponse);
     }
   }
 }

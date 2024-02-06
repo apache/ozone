@@ -21,7 +21,9 @@ package org.apache.hadoop.ozone.reconfig;
 import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.conf.ReconfigurationException;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
 import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig;
 import org.junit.jupiter.api.Test;
 
@@ -53,6 +55,7 @@ class TestScmReconfiguration extends ReconfigurationTestBase {
             .reconfigurableProperties())
         .addAll(new WritableECContainerProviderConfig()
             .reconfigurableProperties())
+        .addAll(new ScmConfig().reconfigurableProperties())
         .build();
 
     assertProperties(getSubject(), expected);
@@ -96,6 +99,21 @@ class TestScmReconfiguration extends ReconfigurationTestBase {
   private ReplicationManagerConfiguration replicationManagerConfig() {
     return getCluster().getStorageContainerManager().getReplicationManager()
         .getConfig();
+  }
+
+  @Test
+  void blockDeletionPerInterval() throws ReconfigurationException {
+    SCMBlockDeletingService blockDeletingService =
+        getCluster().getStorageContainerManager().getScmBlockManager()
+        .getSCMBlockDeletingService();
+    int blockDeleteTXNum = blockDeletingService.getBlockDeleteTXNum();
+    int newValue = blockDeleteTXNum + 1;
+
+    getSubject().reconfigurePropertyImpl(
+        "hdds.scm.block.deletion.per-interval.max",
+        String.valueOf(newValue));
+
+    assertEquals(newValue, blockDeletingService.getBlockDeleteTXNum());
   }
 
 }

@@ -265,8 +265,16 @@ public final class SCMContainerPlacementRackScatter
         usedRacksCntMap.merge(rack, 1, Math::addExact);
       }
     }
+
+    List<Node> unavailableRacks = findRacksWithOnlyExcludedNodes(excludedNodes,
+        usedRacksCntMap);
+    for (Node rack : unavailableRacks) {
+      racks.remove(rack);
+    }
+
     int requiredReplicationFactor = usedNodes.size() + nodesRequired;
-    int numberOfRacksRequired = getRequiredRackCount(requiredReplicationFactor);
+    int numberOfRacksRequired = getRequiredRackCount(requiredReplicationFactor,
+        unavailableRacks.size());
     int additionalRacksRequired =
         Math.min(nodesRequired, numberOfRacksRequired - usedRacksCntMap.size());
     LOG.debug("Additional nodes required: {}. Additional racks required: {}.",
@@ -364,6 +372,54 @@ public final class SCMContainerPlacementRackScatter
     return result;
   }
 
+  /**
+   * Given a list of excluded nodes, check if the rack for each excluded node is
+   * empty after removing the excluded nodes. If it is empty, then the rack
+   * contains only excluded nodes, and we return a list of these racks.
+   * @param excludedNodes List of excluded nodes
+   * @param usedRacksCntMap Map of used racks and their used node count
+   * @return List of racks that contain only excluded nodes or an empty list
+   */
+  private List<Node> findRacksWithOnlyExcludedNodes(
+      List<DatanodeDetails> excludedNodes, Map<Node, Integer> usedRacksCntMap) {
+    if (excludedNodes == null || excludedNodes.isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    List<Node> unavailableRacks = new ArrayList<>();
+    Set<Node> excludedNodeRacks = new HashSet<>();
+    for (Node node : excludedNodes) {
+      Node rack = networkTopology.getAncestor(node, RACK_LEVEL);
+      if (rack != null && !usedRacksCntMap.containsKey(rack)) {
+        // Dead nodes are removed from the topology, so the node may have a null
+        // rack, hence the not null check.
+        // Anything that reaches here is the rack for an excluded node and no
+        // used nodes on are on the rack.
+        excludedNodeRacks.add(rack);
+      }
+    }
+    Set<Node> exc = new HashSet<>(excludedNodes);
+    for (Node rack : excludedNodeRacks) {
+      // If a node is removed from the cluster (eg goes dead), but the client
+      // already added it to the exclude list, then the rack may not be in the
+      // topology any longer. See test
+      // testExcludedNodesOverlapsOutOfServiceNodes
+      String rackPath = rack.getNetworkFullPath();
+      if (networkTopology.getNode(rackPath) == null) {
+        continue;
+      }
+
+      Node node = networkTopology.chooseRandom(rack.getNetworkFullPath(), exc);
+      if (node == null) {
+        // This implies we have a rack with all nodes excluded, so it is as if
+        // that rack does not exist. We also know there are no used nodes on
+        // this rack, so it means we need to reduce the rack count by 1
+        unavailableRacks.add(rack);
+      }
+    }
+    return unavailableRacks;
+  }
+
   @Override
   public DatanodeDetails chooseNode(List<DatanodeDetails> healthyNodes) {
     return null;
@@ -430,15 +486,19 @@ public final class SCMContainerPlacementRackScatter
    * For EC placement policy, desired rack count would be equal to the num of
    * Replicas.
    * @param numReplicas - num of Replicas.
+   * @param excludedRackCount - The number of racks excluded due to containing
+   *                          only excluded nodes. The total racks on the
+   *                          cluster will be reduced by this number.
    * @return required rack count.
    */
   @Override
-  protected int getRequiredRackCount(int numReplicas) {
+  protected int getRequiredRackCount(int numReplicas, int excludedRackCount) {
     if (networkTopology == null) {
       return 1;
     }
     int maxLevel = networkTopology.getMaxLevel();
-    int numRacks = networkTopology.getNumOfNodes(maxLevel - 1);
+    int numRacks = networkTopology.getNumOfNodes(maxLevel - 1)
+        - excludedRackCount;
     // Return the num of Rack if numRack less than numReplicas
     return Math.min(numRacks, numReplicas);
   }

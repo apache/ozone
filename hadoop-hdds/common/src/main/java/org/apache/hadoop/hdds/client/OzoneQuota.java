@@ -19,8 +19,6 @@
 package org.apache.hadoop.hdds.client;
 
 import com.google.common.base.Strings;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.OzoneConsts.KB;
@@ -33,8 +31,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.TB;
  * a storage volume.
  */
 public final class OzoneQuota {
-  public static final Logger LOG =
-      LoggerFactory.getLogger(OzoneQuota.class);
 
   public static final String OZONE_QUOTA_B = "B";
   public static final String OZONE_QUOTA_KB = "KB";
@@ -145,16 +141,6 @@ public final class OzoneQuota {
   }
 
   /**
-   * Formats a quota as a string.
-   *
-   * @param quota the quota to format
-   * @return string representation of quota
-   */
-  public static String formatQuota(OzoneQuota quota) {
-    return String.valueOf(quota.getRawSize()) + quota.getUnit();
-  }
-
-  /**
    * Parses a user provided string space quota and returns the
    * Quota Object.
    *
@@ -190,15 +176,13 @@ public final class OzoneQuota {
       }
       nSize = Long.parseLong(size);
     } catch (NumberFormatException e) {
-      throw new IllegalArgumentException("Invalid values for quota, to ensure" +
-              " that the Quota format is legal(supported values are B," +
-              " KB, MB, GB and TB with positive long values)." +
-              " And the quota value cannot be greater than " +
-              "Long.MAX_VALUE BYTES");
+      throw new IllegalArgumentException(quotaInBytes + " is invalid. " +
+          "The quota value should be a positive integer " +
+          "with byte numeration(B, KB, MB, GB and TB)");
     }
 
     if (nSize <= 0) {
-      throw new IllegalArgumentException("Invalid values for space quota: "
+      throw new IllegalArgumentException("Invalid value for space quota: "
           + nSize);
     }
 
@@ -218,12 +202,17 @@ public final class OzoneQuota {
       throw new IllegalArgumentException(
           "Quota string cannot be null or empty.");
     }
-    long nameSpaceQuota = Long.parseLong(quotaInNamespace);
-    if (nameSpaceQuota <= 0) {
-      throw new IllegalArgumentException(
-          "Invalid values for namespace quota: " + nameSpaceQuota);
+    try {
+      long nameSpaceQuota = Long.parseLong(quotaInNamespace);
+      if (nameSpaceQuota <= 0) {
+        throw new IllegalArgumentException(
+            "Invalid value for namespace quota: " + nameSpaceQuota);
+      }
+      return new OzoneQuota(nameSpaceQuota, new RawQuotaInBytes(Units.B, -1));
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(quotaInNamespace + " is invalid. " +
+          "The quota value should be a positive integer");
     }
-    return new OzoneQuota(nameSpaceQuota, new RawQuotaInBytes(Units.B, -1));
   }
 
   /**

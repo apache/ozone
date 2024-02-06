@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.hdfs.server.datanode.checker.Checkable;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
@@ -35,7 +36,7 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
+import jakarta.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -50,6 +51,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion.getLatestVersion;
+
 
 /**
  * StorageVolume represents a generic Volume in datanode, could be
@@ -452,6 +454,16 @@ public abstract class StorageVolume
   public long getAvailable() {
     return volumeInfo.map(VolumeInfo::getAvailable).orElse(0L);
 
+  }
+
+  public long getAvailable(SpaceUsageSource precomputedVolumeSpace) {
+    return volumeInfo.map(info -> info.getAvailable(precomputedVolumeSpace))
+        .orElse(0L);
+  }
+
+  public SpaceUsageSource getCurrentUsage() {
+    return volumeInfo.map(VolumeInfo::getCurrentUsage)
+        .orElse(SpaceUsageSource.UNKNOWN);
   }
 
   public long getUsedSpace() {

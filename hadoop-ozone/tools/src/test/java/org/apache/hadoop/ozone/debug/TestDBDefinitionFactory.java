@@ -32,8 +32,9 @@ import org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_CONTAINER_KEY_DB;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
-import static org.junit.Assert.assertTrue;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+
+import org.junit.jupiter.api.Test;
 
 /**
  * Simple factory unit test.
@@ -44,37 +45,37 @@ public class TestDBDefinitionFactory {
   public void testGetDefinition() {
     DBDefinition definition =
         DBDefinitionFactory.getDefinition(new OMDBDefinition().getName());
-    assertTrue(definition instanceof OMDBDefinition);
+    assertInstanceOf(OMDBDefinition.class, definition);
 
     definition = DBDefinitionFactory.getDefinition(
         new SCMDBDefinition().getName());
-    assertTrue(definition instanceof SCMDBDefinition);
+    assertInstanceOf(SCMDBDefinition.class, definition);
 
     definition = DBDefinitionFactory.getDefinition(
         new ReconSCMDBDefinition().getName());
-    assertTrue(definition instanceof ReconSCMDBDefinition);
+    assertInstanceOf(ReconSCMDBDefinition.class, definition);
 
     definition = DBDefinitionFactory.getDefinition(
         RECON_OM_SNAPSHOT_DB + "_1");
-    assertTrue(definition instanceof OMDBDefinition);
+    assertInstanceOf(OMDBDefinition.class, definition);
 
     definition = DBDefinitionFactory.getDefinition(
         RECON_CONTAINER_KEY_DB + "_1");
-    assertTrue(definition instanceof ReconDBDefinition);
+    assertInstanceOf(ReconDBDefinition.class, definition);
     DBDefinitionFactory.setDnDBSchemaVersion("V2");
     definition =
         DBDefinitionFactory.getDefinition(Paths.get("/tmp/test-container.db"),
             new OzoneConfiguration());
-    assertTrue(definition instanceof DatanodeSchemaTwoDBDefinition);
+    assertInstanceOf(DatanodeSchemaTwoDBDefinition.class, definition);
     DBDefinitionFactory.setDnDBSchemaVersion("V1");
     definition =
         DBDefinitionFactory.getDefinition(Paths.get("/tmp/test-container.db"),
             new OzoneConfiguration());
-    assertTrue(definition instanceof DatanodeSchemaOneDBDefinition);
+    assertInstanceOf(DatanodeSchemaOneDBDefinition.class, definition);
     DBDefinitionFactory.setDnDBSchemaVersion("V3");
     definition =
         DBDefinitionFactory.getDefinition(Paths.get("/tmp/test-container.db"),
             new OzoneConfiguration());
-    assertTrue(definition instanceof DatanodeSchemaThreeDBDefinition);
+    assertInstanceOf(DatanodeSchemaThreeDBDefinition.class, definition);
   }
 }

@@ -24,13 +24,15 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
-import org.junit.Rule;
-import org.junit.Before;
-import org.junit.After;
-import org.junit.rules.TemporaryFolder;
-import org.mockito.Mockito;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.nio.file.Path;
+
+import static org.mockito.Mockito.framework;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -39,34 +41,28 @@ import static org.mockito.Mockito.when;
 @SuppressWarnings("visibilitymodifier")
 public class TestOMDelegationTokenRequest {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   protected OzoneManager ozoneManager;
   protected OMMetrics omMetrics;
   protected OMMetadataManager omMetadataManager;
   protected ConfigurationSource conf;
 
-  // Just setting OzoneManagerDoubleBuffer which does nothing.
-  protected OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper =
-      ((response, transactionIndex) -> {
-        return null;
-      });
-
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
-    ozoneManager = Mockito.mock(OzoneManager.class);
+    ozoneManager = mock(OzoneManager.class);
 
     conf = new OzoneConfiguration();
     ((OzoneConfiguration) conf)
-        .set(OZONE_OM_DB_DIRS, folder.newFolder().getAbsolutePath());
+        .set(OZONE_OM_DB_DIRS, folder.toAbsolutePath().toString());
     omMetadataManager = new OmMetadataManagerImpl((OzoneConfiguration) conf,
         ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
   }
 
-  @After
+  @AfterEach
   public void stop() {
-    Mockito.framework().clearInlineMocks();
+    framework().clearInlineMocks();
   }
 }

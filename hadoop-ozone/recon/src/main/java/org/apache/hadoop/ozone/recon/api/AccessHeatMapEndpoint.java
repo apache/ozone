@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import org.apache.hadoop.ozone.recon.api.types.EntityReadAccessHeatMapResponse;
+import org.apache.hadoop.ozone.recon.api.types.FeatureProvider;
 import org.apache.hadoop.ozone.recon.heatmap.HeatMapServiceImpl;
 
 import javax.inject.Inject;
@@ -30,6 +31,8 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+
+import java.util.List;
 
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_ACCESS_METADATA_START_DATE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_ENTITY_PATH;
@@ -78,6 +81,7 @@ public class AccessHeatMapEndpoint {
       @DefaultValue("key") @QueryParam(RECON_ENTITY_TYPE) String entityType,
       @DefaultValue("24H") @QueryParam(RECON_ACCESS_METADATA_START_DATE)
       String startDate) {
+    checkIfHeatMapFeatureIsEnabled();
     EntityReadAccessHeatMapResponse entityReadAccessHeatMapResponse = null;
     try {
       entityReadAccessHeatMapResponse =
@@ -87,5 +91,20 @@ public class AccessHeatMapEndpoint {
           Response.Status.INTERNAL_SERVER_ERROR);
     }
     return Response.ok(entityReadAccessHeatMapResponse).build();
+  }
+
+  private static void checkIfHeatMapFeatureIsEnabled() {
+    FeatureProvider.Feature heatMapFeature = null;
+    List<FeatureProvider.Feature> allDisabledFeatures =
+        FeatureProvider.getAllDisabledFeatures();
+    for (FeatureProvider.Feature feature : allDisabledFeatures) {
+      if ("HeatMap".equals(feature.getFeatureName())) {
+        heatMapFeature = feature;
+        break;
+      }
+    }
+    if (null != heatMapFeature) {
+      throw new WebApplicationException(Response.Status.NOT_FOUND);
+    }
   }
 }

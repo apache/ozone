@@ -40,7 +40,7 @@ public final class BufferUtils {
    * @param bufferCapacity max capacity of each ByteBuffer
    */
   public static ByteBuffer[] assignByteBuffers(long totalLen,
-      long bufferCapacity) {
+      int bufferCapacity) {
     Preconditions.checkArgument(totalLen > 0, "Buffer Length should be a " +
         "positive integer.");
     Preconditions.checkArgument(bufferCapacity > 0, "Buffer Capacity should " +
@@ -49,16 +49,16 @@ public final class BufferUtils {
     int numBuffers = getNumberOfBins(totalLen, bufferCapacity);
 
     ByteBuffer[] dataBuffers = new ByteBuffer[numBuffers];
-    int buffersAllocated = 0;
+    long allocatedLen = 0;
     // For each ByteBuffer (except the last) allocate bufferLen of capacity
     for (int i = 0; i < numBuffers - 1; i++) {
-      dataBuffers[i] = ByteBuffer.allocate((int) bufferCapacity);
-      buffersAllocated += bufferCapacity;
+      dataBuffers[i] = ByteBuffer.allocate(bufferCapacity);
+      allocatedLen += bufferCapacity;
     }
     // For the last ByteBuffer, allocate as much space as is needed to fit
     // remaining bytes
     dataBuffers[numBuffers - 1] = ByteBuffer.allocate(
-        (int) (totalLen - buffersAllocated));
+        Math.toIntExact(totalLen - allocatedLen));
     return dataBuffers;
   }
 
@@ -124,13 +124,16 @@ public final class BufferUtils {
    * @param maxElementsPerBin max number of elements per bin
    * @return number of bins
    */
-  public static int getNumberOfBins(long numElements, long maxElementsPerBin) {
-    return (int) Math.ceil((double) numElements / (double) maxElementsPerBin);
-  }
-
-  public static void clearBuffers(ByteBuffer[] byteBuffers) {
-    for (ByteBuffer buffer : byteBuffers) {
-      buffer.clear();
+  public static int getNumberOfBins(long numElements, int maxElementsPerBin) {
+    Preconditions.checkArgument(numElements >= 0);
+    Preconditions.checkArgument(maxElementsPerBin > 0);
+    final long n = 1 + (numElements - 1) / maxElementsPerBin;
+    if (n > Integer.MAX_VALUE) {
+      throw new IllegalArgumentException("Integer overflow: n = " + n
+          + " > Integer.MAX_VALUE = " + Integer.MAX_VALUE
+          + ", numElements = " + numElements
+          + ", maxElementsPerBin = " + maxElementsPerBin);
     }
+    return Math.toIntExact(n);
   }
 }

@@ -148,7 +148,7 @@ public abstract class MisReplicationHandler implements
             .collect(Collectors.toMap(Function.identity(), sources::contains)));
 
     ReplicationManagerUtil.ExcludedAndUsedNodes excludedAndUsedNodes
-        = ReplicationManagerUtil.getExcludedAndUsedNodes(
+        = ReplicationManagerUtil.getExcludedAndUsedNodes(container,
             new ArrayList(replicas), replicasToBeReplicated,
             Collections.emptyList(), replicationManager);
 

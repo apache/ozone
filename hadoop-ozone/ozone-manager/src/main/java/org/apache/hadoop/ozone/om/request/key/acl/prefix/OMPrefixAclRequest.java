@@ -19,8 +19,11 @@
 package org.apache.hadoop.ozone.om.request.key.acl.prefix;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.Map;
 
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -29,7 +32,6 @@ import org.apache.hadoop.ozone.om.PrefixManagerImpl;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl.OMPrefixAclOpResult;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -53,14 +55,14 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long trxnLogIndex, OzoneManagerDoubleBufferHelper omDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long trxnLogIndex = termIndex.getIndex();
 
     OmPrefixInfo omPrefixInfo = null;
 
     OMResponse.Builder omResponse = onInit();
     OMClientResponse omClientResponse = null;
-    IOException exception = null;
+    Exception exception = null;
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     boolean lockAcquired = false;
@@ -74,7 +76,9 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
     PrefixManagerImpl prefixManager =
         (PrefixManagerImpl) ozoneManager.getPrefixManager();
     try {
+      prefixManager.validateOzoneObj(getOzoneObj());
       String prefixPath = getOzoneObj().getPath();
+      validatePrefixPath(prefixPath);
       ObjectParser objectParser = new ObjectParser(prefixPath,
           OzoneManagerProtocolProtos.OzoneObj.ObjectType.PREFIX);
       volume = objectParser.getVolume();
@@ -88,10 +92,14 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
             volume, bucket, key);
       }
 
-      lockAcquired =
-          omMetadataManager.getLock().acquireWriteLock(PREFIX_LOCK, prefixPath);
+      mergeOmLockDetails(omMetadataManager.getLock()
+          .acquireWriteLock(PREFIX_LOCK, prefixPath));
+      lockAcquired = getOmLockDetails().isLockAcquired();
 
       omPrefixInfo = omMetadataManager.getPrefixTable().get(prefixPath);
+      if (omPrefixInfo != null) {
+        omPrefixInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+      }
 
       try {
         operationResult = apply(prefixManager, omPrefixInfo, trxnLogIndex);
@@ -110,7 +118,6 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
             "No prefix info for the prefix path: " + prefixPath,
             OMException.ResultCodes.PREFIX_NOT_FOUND);
       }
-      omPrefixInfo.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
 
       // As for remove acl list, for a prefix if after removing acl from
       // the existing acl list, if list size becomes zero, delete the
@@ -131,16 +138,17 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
       omClientResponse = onSuccess(omResponse, omPrefixInfo, opResult);
       result = Result.SUCCESS;
 
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
-      omClientResponse = onFailure(omResponse, ex);
+      omClientResponse = onFailure(omResponse, exception);
     } finally {
-      addResponseToDoubleBuffer(trxnLogIndex, omClientResponse,
-          omDoubleBufferHelper);
       if (lockAcquired) {
-        omMetadataManager.getLock().releaseWriteLock(PREFIX_LOCK,
-            getOzoneObj().getPath());
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(PREFIX_LOCK, getOzoneObj().getPath()));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 
@@ -150,6 +158,13 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
         trxnLogIndex, ozoneManager.getAuditLogger(), auditMap);
 
     return omClientResponse;
+  }
+
+  private void validatePrefixPath(String prefixPath) throws OMException {
+    if (!OzoneFSUtils.isValidName(prefixPath)) {
+      throw new OMException("Invalid prefix path name: " + prefixPath,
+          OMException.ResultCodes.INVALID_PATH_IN_ACL_REQUEST);
+    }
   }
 
   /**
@@ -184,7 +199,7 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
    * @return OMClientResponse
    */
   abstract OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException exception);
+      Exception exception);
 
   /**
    * Completion hook for final processing before return without lock.
@@ -193,7 +208,7 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
    * @param exception
    * @param omMetrics
    */
-  abstract void onComplete(boolean operationResult, IOException exception,
+  abstract void onComplete(boolean operationResult, Exception exception,
       OMMetrics omMetrics, Result result, long trxnLogIndex,
       AuditLogger auditLogger, Map<String, String> auditMap);
 

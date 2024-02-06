@@ -69,14 +69,14 @@ public class DUFactory implements SpaceUsageCheckFactory {
         description = "Disk space usage information will be refreshed with the"
             + "specified period following the completion of the last check."
     )
-    private long refreshPeriod;
+    private Duration refreshPeriod;
 
     public void setRefreshPeriod(Duration duration) {
-      refreshPeriod = duration.toMillis();
+      refreshPeriod = duration;
     }
 
     public Duration getRefreshPeriod() {
-      return Duration.ofMillis(refreshPeriod);
+      return refreshPeriod;
     }
   }
 }

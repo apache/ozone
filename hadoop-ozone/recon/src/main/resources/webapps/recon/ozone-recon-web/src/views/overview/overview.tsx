@@ -62,7 +62,6 @@ interface IOverviewState {
   omStatus: string;
   openContainers: number;
   deletedContainers: number;
-  keysPendingDeletion: number;
   openSummarytotalUnrepSize: number,
   openSummarytotalRepSize: number,
   openSummarytotalOpenKeys: number,
@@ -100,7 +99,6 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       omStatus: '',
       openContainers: 0,
       deletedContainers: 0,
-      keysPendingDeletion: 0,
       openSummarytotalUnrepSize: 0,
       openSummarytotalRepSize: 0,
       openSummarytotalOpenKeys: 0,
@@ -137,7 +135,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
       const missingContainersCount = clusterState.missingContainers;
       const omDBDeltaObject = taskStatus && taskStatus.find((item:any) => item.taskName === 'OmDeltaRequest');
       const omDBFullObject = taskStatus && taskStatus.find((item:any) => item.taskName === 'OmSnapshotRequest');
-    
+
       this.setState({
         loading: false,
         datanodes: `${clusterState.healthyDatanodes}/${clusterState.totalDatanodes}`,
@@ -149,7 +147,6 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         keys: clusterState.keys,
         missingContainersCount,
         openContainers: clusterState.openContainers,
-        keysPendingDeletion: clusterState.keysPendingDeletion,
         deletedContainers: clusterState.deletedContainers,
         lastRefreshed: Number(moment()),
         lastUpdatedOMDBDelta: omDBDeltaObject && omDBDeltaObject.lastUpdatedTimestamp,
@@ -182,7 +179,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
     );
     cancelOMDBSyncSignal = controller;
 
-    request.then( omstatusResponse => {    
+    request.then( omstatusResponse => {
       const omStatus = omstatusResponse.data;
       this.setState({
         loading: false,
@@ -211,7 +208,7 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
 
   render() {
     const {loading, datanodes, pipelines, storageReport, containers, volumes, buckets, openSummarytotalUnrepSize, openSummarytotalRepSize, openSummarytotalOpenKeys,
-      deletePendingSummarytotalUnrepSize,deletePendingSummarytotalRepSize,deletePendingSummarytotalDeletedKeys,keysPendingDeletion,
+      deletePendingSummarytotalUnrepSize,deletePendingSummarytotalRepSize,deletePendingSummarytotalDeletedKeys,
       keys, missingContainersCount, lastRefreshed, lastUpdatedOMDBDelta, lastUpdatedOMDBFull, omStatus, openContainers, deletedContainers } = this.state;
       
     const datanodesElement = (
@@ -235,7 +232,8 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
   );
     const containersTooltip = missingContainersCount === 1 ? 'container is missing' : 'containers are missing';
     const containersLink = missingContainersCount > 0 ? '/MissingContainers' : '/Containers';
-    const duLink = '/DiskUsage';
+    const volumesLink = '/Volumes';
+    const bucketsLink = '/Buckets';
     const containersElement = missingContainersCount > 0 ? (
       <span>
         <Tooltip placement='bottom' title={missingContainersCount > 1000 ? `1000+ Containers are missing. For more information, go to the Containers page.` : `${missingContainersCount} ${containersTooltip}`}>
@@ -287,10 +285,10 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
         </Row>
         <Row gutter={[25, 25]}>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
-            <OverviewCard loading={loading} title='Volumes' data={volumes.toString()} icon='inbox' linkToUrl={duLink}/>
+            <OverviewCard loading={loading} title='Volumes' data={volumes.toString()} icon='inbox' linkToUrl={volumesLink}/>
           </Col>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
-            <OverviewCard loading={loading} title='Buckets' data={buckets.toString()} icon='folder-open' linkToUrl='/Buckets'/>
+            <OverviewCard loading={loading} title='Buckets' data={buckets.toString()} icon='folder-open' linkToUrl={bucketsLink}/>
           </Col>
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
             <OverviewCard loading={loading} title='Keys' data={keys.toString()} icon='file-text'/>
@@ -298,14 +296,11 @@ export class Overview extends React.Component<Record<string, object>, IOverviewS
           <Col xs={24} sm={18} md={12} lg={12} xl={6}>
             <OverviewCard loading={loading} title='Deleted Containers' data={deletedContainers.toString()} icon='delete' />
           </Col>
-          <Col xs={24} sm={18} md={12} lg={12} xl={6}>
-            <OverviewCard loading={loading} title='Pending Key Deletions' data={keysPendingDeletion.toString()} icon='delete' />
+          <Col xs={24} sm={18} md={12} lg={12} xl={6} className='summary-font'>
+            <OverviewCard loading={loading} title='Open Keys Summary' data={openSummaryData} icon='file-text' linkToUrl='/Om' />
           </Col>
           <Col xs={24} sm={18} md={12} lg={12} xl={6} className='summary-font'>
-            <OverviewCard loading={loading} title='Open Keys Summary' data={openSummaryData} icon='file-text' />
-          </Col>
-          <Col xs={24} sm={18} md={12} lg={12} xl={6} className='summary-font'>
-            <OverviewCard loading={loading} title='Pending Deleted Keys Summary' data={deletePendingSummaryData} icon='delete' />
+            <OverviewCard loading={loading} title='Pending Deleted Keys Summary' data={deletePendingSummaryData} icon='delete' linkToUrl='/Om'/>
           </Col>
         </Row>
       </div>

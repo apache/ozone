@@ -42,6 +42,21 @@
   </property>
 
   <property>
+    <name>ozone.scm.handler.count.key</name>
+    <value>20</value>
+  </property>
+
+  <property>
+    <name>ozone.om.handler.count.key</name>
+    <value>20</value>
+  </property>
+
+  <property>
+    <name>dfs.container.ratis.datastream.enabled</name>
+    <value>true</value>
+  </property>
+
+  <property>
     <name>ozone.scm.close.container.wait.duration</name>
     <value>1s</value>
   </property>
@@ -51,4 +66,16 @@
     <value>1s</value>
   </property>
 
+  <property>
+    <name>dfs.container.ratis.log.appender.queue.byte-limit</name>
+    <value>8MB</value>
+  </property>
+  <property>
+    <name>ozone.om.ratis.log.appender.queue.byte-limit</name>
+    <value>4MB</value>
+  </property>
+  <property>
+    <name>ozone.scm.ha.ratis.log.appender.queue.byte-limit</name>
+    <value>4MB</value>
+  </property>
 </configuration>

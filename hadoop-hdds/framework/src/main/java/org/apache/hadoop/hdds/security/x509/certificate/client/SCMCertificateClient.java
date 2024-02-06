@@ -19,35 +19,47 @@
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CAType;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.DefaultCAServer;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultCAProfile;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.PKIProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.math.BigInteger;
+import java.net.InetAddress;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyPair;
+import java.security.cert.CertPath;
 import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
-import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.FAILURE;
-import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.GETCERT;
-import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.RECOVER;
-import static org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient.InitResponse.SUCCESS;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
+import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getEncodedString;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
 
 /**
@@ -67,12 +79,36 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   private String cId;
   private String scmHostname;
   private ExecutorService executorService;
+  private boolean isPrimarySCM = false;
+  private Consumer<String> saveCertIdCallback;
+
+  @SuppressWarnings("parameternumber")
+  public SCMCertificateClient(SecurityConfig securityConfig,
+      SCMSecurityProtocolClientSideTranslatorPB scmClient,
+      String scmId, String clusterId, String scmCertId, String hostname,
+      boolean isPrimarySCM, Consumer<String> saveCertId) {
+    super(securityConfig, scmClient, LOG, scmCertId, COMPONENT_NAME,
+        HddsUtils.threadNamePrefix(scmId), saveCertId, null);
+    this.scmId = scmId;
+    this.cId = clusterId;
+    this.scmHostname = hostname;
+    this.isPrimarySCM = isPrimarySCM;
+    this.saveCertIdCallback = saveCertId;
+  }
 
   public SCMCertificateClient(SecurityConfig securityConfig,
       SCMSecurityProtocolClientSideTranslatorPB scmClient,
       String scmId, String clusterId, String scmCertId, String hostname) {
-    super(securityConfig, scmClient, LOG, scmCertId,
-        COMPONENT_NAME, null, null);
+    this(securityConfig, scmClient, scmId, clusterId, scmCertId, hostname,
+        COMPONENT_NAME);
+  }
+
+  private SCMCertificateClient(SecurityConfig securityConfig,
+      SCMSecurityProtocolClientSideTranslatorPB scmClient,
+      String scmId, String clusterId, String scmCertId, String hostname,
+      String component) {
+    super(securityConfig, scmClient, LOG, scmCertId, component,
+        HddsUtils.threadNamePrefix(scmId), null, null);
     this.scmId = scmId;
     this.cId = clusterId;
     this.scmHostname = hostname;
@@ -82,72 +118,18 @@ public class SCMCertificateClient extends DefaultCertificateClient {
       SecurityConfig securityConfig,
       SCMSecurityProtocolClientSideTranslatorPB scmClient,
       String certSerialId) {
-    super(securityConfig, scmClient, LOG, certSerialId,
-        COMPONENT_NAME, null, null);
+    this(securityConfig, scmClient, null, null, certSerialId, null,
+        COMPONENT_NAME);
   }
 
   public SCMCertificateClient(
       SecurityConfig securityConfig,
       SCMSecurityProtocolClientSideTranslatorPB scmClient,
       String certSerialId,
+      String scmId,
       String component) {
-    super(securityConfig, scmClient, LOG, certSerialId, component, null, null);
-  }
-
-  @Override
-  protected InitResponse handleCase(InitCase init)
-      throws CertificateException {
-    // This is similar to OM.
-    switch (init) {
-    case NONE:
-      LOG.info("Creating keypair for client as keypair and certificate not " +
-          "found.");
-      bootstrapClientKeys();
-      return GETCERT;
-    case CERT:
-      LOG.error("Private key not found, while certificate is still present." +
-          "Delete keypair and try again.");
-      return FAILURE;
-    case PUBLIC_KEY:
-      LOG.error("Found public key but private key and certificate missing.");
-      return FAILURE;
-    case PRIVATE_KEY:
-      LOG.info("Found private key but public key and certificate is missing.");
-      // TODO: Recovering public key from private might be possible in some
-      //  cases.
-      return FAILURE;
-    case PUBLICKEY_CERT:
-      LOG.error("Found public key and certificate but private key is " +
-          "missing.");
-      return FAILURE;
-    case PRIVATEKEY_CERT:
-      LOG.info("Found private key and certificate but public key missing.");
-      if (recoverPublicKey()) {
-        return SUCCESS;
-      } else {
-        LOG.error("Public key recovery failed.");
-        return FAILURE;
-      }
-    case PUBLICKEY_PRIVATEKEY:
-      LOG.info("Found private and public key but certificate is missing.");
-      if (validateKeyPair(getPublicKey())) {
-        return RECOVER;
-      } else {
-        LOG.error("Keypair validation failed.");
-        return FAILURE;
-      }
-    case ALL:
-      LOG.info("Found certificate file along with KeyPair.");
-      if (validateKeyPairAndCertificate()) {
-        return SUCCESS;
-      } else {
-        return FAILURE;
-      }
-    default:
-      LOG.error("Unexpected case: {} (private/public/cert)",
-          Integer.toBinaryString(init.ordinal()));
-      return FAILURE;
-    }
+    this(securityConfig, scmClient, scmId, null, certSerialId, null,
+        component);
   }
 
   /**
@@ -156,21 +138,17 @@ public class SCMCertificateClient extends DefaultCertificateClient {
    *
    * @return CertificateSignRequest.Builder
    */
-  @Override
   public CertificateSignRequest.Builder getCSRBuilder()
       throws CertificateException {
-    String subject = String.format(SCM_SUB_CA_PREFIX, System.nanoTime())
-        + scmHostname;
+    String subject = SCM_SUB_CA_PREFIX + scmHostname;
 
     LOG.info("Creating csr for SCM->hostName:{},scmId:{},clusterId:{}," +
-            "subject:{}", scmHostname, scmId, cId, subject);
+        "subject:{}", scmHostname, scmId, cId, subject);
 
     return super.getCSRBuilder()
         .setSubject(subject)
         .setScmID(scmId)
         .setClusterID(cId)
-        .setDigitalEncryption(true)
-        .setDigitalSignature(true)
         // Set CA to true, as this will be used to sign certs for OM/DN.
         .setCA(true)
         .setKey(new KeyPair(getPublicKey(), getPrivateKey()));
@@ -239,8 +217,9 @@ public class SCMCertificateClient extends DefaultCertificateClient {
   public void refreshCACertificates() throws IOException {
     if (executorService == null) {
       executorService = Executors.newSingleThreadExecutor(
-          new ThreadFactoryBuilder().setNameFormat(
-                  getComponentName() + "-refreshCACertificates")
+          new ThreadFactoryBuilder()
+              .setNameFormat(threadNamePrefix() + getComponentName()
+                  + "-refreshCACertificates")
               .setDaemon(true).build());
     }
     executorService.execute(new RefreshCACertificates(getScmSecureClient()));
@@ -299,5 +278,150 @@ public class SCMCertificateClient extends DefaultCertificateClient {
       executorService.shutdownNow();
       executorService = null;
     }
+  }
+
+  @Override
+  protected void recoverStateIfNeeded(InitResponse state) throws IOException {
+    LOG.info("Init response: {}", state);
+    switch (state) {
+    case SUCCESS:
+      LOG.info("Initialization successful.");
+      break;
+    case GETCERT:
+      if (!isPrimarySCM) {
+        getRootCASignedSCMCert();
+      } else {
+        getPrimarySCMSelfSignedCert();
+      }
+      LOG.info("Successfully stored SCM signed certificate.");
+      break;
+    case FAILURE:
+    default:
+      LOG.error("SCM security initialization failed. Init response: {}",
+          state);
+      throw new RuntimeException("SCM security initialization failed.");
+    }
+  }
+
+  /**
+   * For bootstrapped SCM get sub-ca signed certificate and root CA
+   * certificate using scm security client and store it using certificate
+   * client.
+   */
+  private void getRootCASignedSCMCert() {
+    try {
+      // Generate CSR.
+      PKCS10CertificationRequest csr = getCSRBuilder().build();
+      HddsProtos.ScmNodeDetailsProto scmNodeDetailsProto =
+          HddsProtos.ScmNodeDetailsProto.newBuilder()
+              .setClusterId(cId)
+              .setHostName(scmHostname)
+              .setScmNodeId(scmId).build();
+
+      // Get SCM sub CA cert.
+      SCMGetCertResponseProto response = getScmSecureClient().
+          getSCMCertChain(scmNodeDetailsProto, getEncodedString(csr), false);
+      String pemEncodedCert = response.getX509Certificate();
+
+      // Store SCM sub CA and root CA certificate.
+      if (response.hasX509CACertificate()) {
+        String pemEncodedRootCert = response.getX509CACertificate();
+        storeCertificate(pemEncodedRootCert, CAType.SUBORDINATE);
+        storeCertificate(pemEncodedCert, CAType.NONE);
+        //note: this does exactly the same as store certificate
+        persistSubCACertificate(pemEncodedCert);
+
+        X509Certificate certificate =
+            CertificateCodec.getX509Certificate(pemEncodedCert);
+        // Persist scm cert serial ID.
+        saveCertIdCallback.accept(certificate.getSerialNumber().toString());
+      } else {
+        throw new RuntimeException("Unable to retrieve SCM certificate chain");
+      }
+    } catch (IOException | java.security.cert.CertificateException e) {
+      LOG.error("Error while fetching/storing SCM signed certificate.", e);
+      throw new RuntimeException(e);
+    }
+  }
+
+
+  /**
+   * For primary SCM get sub-ca signed certificate and root CA certificate by
+   * root CA certificate server and store it using certificate client.
+   */
+  private void getPrimarySCMSelfSignedCert() {
+    try {
+      CertificateServer rootCAServer = initializeRootCertificateServer(
+          getSecurityConfig(), null, BigInteger.ONE,
+          new DefaultCAProfile(), SCM_ROOT_CA_COMPONENT_NAME);
+      CertPath rootCACertificatePath = rootCAServer.getCaCertPath();
+      String pemEncodedRootCert =
+          CertificateCodec.getPEMEncodedString(rootCACertificatePath);
+
+      PKCS10CertificationRequest csr = getCSRBuilder().build();
+      CertPath subSCMCertHolderList = rootCAServer.requestCertificate(
+          csr, KERBEROS_TRUSTED, SCM,
+              BigInteger.ONE.add(BigInteger.ONE).toString()).get();
+      String pemEncodedCert =
+          CertificateCodec.getPEMEncodedString(subSCMCertHolderList);
+
+      storeCertificate(pemEncodedRootCert, CAType.SUBORDINATE);
+      storeCertificate(pemEncodedCert, CAType.NONE);
+      //note: this does exactly the same as store certificate
+      persistSubCACertificate(pemEncodedCert);
+      X509Certificate cert =
+          (X509Certificate) subSCMCertHolderList.getCertificates().get(0);
+      X509CertificateHolder subSCMCertHolder =
+          CertificateCodec.getCertificateHolder(cert);
+
+      // Persist scm cert serial ID.
+      saveCertIdCallback.accept(subSCMCertHolder.getSerialNumber().toString());
+    } catch (InterruptedException | ExecutionException | IOException |
+             java.security.cert.CertificateException e) {
+      LOG.error("Error while fetching/storing SCM signed certificate.", e);
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * This function creates/initializes a certificate server as needed.
+   * This function is idempotent, so calling this again and again after the
+   * server is initialized is not a problem.
+   *
+   * @param config
+   * @param scmCertStore
+   * @param pkiProfile
+   * @param component
+   */
+  public CertificateServer initializeRootCertificateServer(
+      SecurityConfig config, CertificateStore scmCertStore,
+      BigInteger rootCertId, PKIProfile pkiProfile, String component)
+      throws IOException {
+    String subject = String.format(SCM_ROOT_CA_PREFIX, rootCertId) +
+        InetAddress.getLocalHost().getHostName();
+
+    DefaultCAServer rootCAServer = new DefaultCAServer(subject,
+        cId, scmId, scmCertStore, rootCertId, pkiProfile,
+        component);
+
+    rootCAServer.init(config, CAType.ROOT);
+    return rootCAServer;
+  }
+
+  /**
+   * Persists the sub SCM signed certificate to the location which can be
+   * read by sub CA Certificate server.
+   *
+   * @param certificateHolder
+   * @throws IOException
+   */
+  private void persistSubCACertificate(
+      String certificateHolder) throws IOException {
+    CertificateCodec certCodec =
+        new CertificateCodec(getSecurityConfig(), getComponentName());
+
+    certCodec.writeCertificate(certCodec.getLocation().toAbsolutePath(),
+        getSecurityConfig().getCertificateFileName(), certificateHolder);
   }
 }

@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:HA-secure
+#suite:leadership
 
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
@@ -47,4 +47,4 @@ SCMID=$(execute_command_in_container scm4.org bash -c "ozone admin scm roles" | 
 docker-compose stop scm4.org
 execute_robot_test scm3.org kinit.robot
 wait_for_execute_command scm3.org 60 "ozone admin scm decommission --nodeid=${SCMID} | grep Decommissioned"
-execute_robot_test scm3.org scmha/scm-decommission.robot
+execute_robot_test s3g scmha/scm-decommission.robot

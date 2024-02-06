@@ -23,7 +23,6 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -45,7 +44,7 @@ import org.apache.ratis.util.ExitUtils;
 /**
  * Interface used for MiniOzoneClusters.
  */
-public interface MiniOzoneCluster {
+public interface MiniOzoneCluster extends AutoCloseable {
 
   /**
    * Returns the Builder to construct MiniOzoneCluster.
@@ -260,6 +259,10 @@ public interface MiniOzoneCluster {
    */
   void shutdown();
 
+  default void close() {
+    shutdown();
+  }
+
   /**
    * Stop the MiniOzoneCluster without any cleanup.
    */
@@ -316,13 +319,11 @@ public interface MiniOzoneCluster {
     protected int numOfActiveSCMs = ACTIVE_SCMS_NOT_SET;
     protected SCMConfigurator scmConfigurator;
 
-    protected Optional<Boolean> enableTrace = Optional.of(false);
     protected Optional<Integer> hbInterval = Optional.empty();
     protected Optional<Integer> hbProcessorInterval = Optional.empty();
-    protected Optional<String> scmId = Optional.empty();
-    protected Optional<String> omId = Optional.empty();
+    protected String scmId = UUID.randomUUID().toString();
+    protected String omId = UUID.randomUUID().toString();
     
-    protected Boolean enableContainerDatastream = true;
     protected Optional<String> datanodeReservedSpace = Optional.empty();
     protected Optional<Integer> chunkSize = Optional.empty();
     protected OptionalInt streamBufferSize = OptionalInt.empty();
@@ -340,9 +341,6 @@ public interface MiniOzoneCluster {
     protected Optional<Integer> scmLayoutVersion = Optional.empty();
     protected Optional<Integer> dnLayoutVersion = Optional.empty();
 
-    // Use relative smaller number of handlers for testing
-    protected int numOfOmHandlers = 20;
-    protected int numOfScmHandlers = 20;
     protected int numOfDatanodes = 3;
     protected int numDataVolumes = 1;
     protected boolean  startDataNodes = true;
@@ -372,14 +370,11 @@ public interface MiniOzoneCluster {
      * Sets the cluster Id.
      *
      * @param id cluster Id
-     *
-     * @return MiniOzoneCluster.Builder
      */
-    public Builder setClusterId(String id) {
+    void setClusterId(String id) {
       clusterId = id;
       path = GenericTestUtils.getTempPath(
           MiniOzoneClusterImpl.class.getSimpleName() + "-" + clusterId);
-      return this;
     }
 
     /**
@@ -412,30 +407,6 @@ public interface MiniOzoneCluster {
 
     public Builder setSecretKeyClient(SecretKeyClient client) {
       this.secretKeyClient = client;
-      return this;
-    }
-
-    /**
-     * Sets the SCM id.
-     *
-     * @param id SCM Id
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setScmId(String id) {
-      scmId = Optional.of(id);
-      return this;
-    }
-
-    /**
-     * Sets the OM id.
-     *
-     * @param id OM Id
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setOmId(String id) {
-      omId = Optional.of(id);
       return this;
     }
 
@@ -501,18 +472,6 @@ public interface MiniOzoneCluster {
     }
 
     /**
-     * When set to true, enables trace level logging.
-     *
-     * @param trace true or false
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setTrace(Boolean trace) {
-      enableTrace = Optional.of(trace);
-      return this;
-    }
-
-    /**
      * Sets the reserved space
      * {@link org.apache.hadoop.hdds.scm.ScmConfigKeys}
      * HDDS_DATANODE_DIR_DU_RESERVED
@@ -537,11 +496,6 @@ public interface MiniOzoneCluster {
      */
     public Builder setChunkSize(int size) {
       chunkSize = Optional.of(size);
-      return this;
-    }
-
-    public Builder setStreamBufferSize(int size) {
-      streamBufferSize = OptionalInt.of(size);
       return this;
     }
 
@@ -653,36 +607,5 @@ public interface MiniOzoneCluster {
      * @throws IOException
      */
     public abstract MiniOzoneCluster build() throws IOException;
-  }
-
-  /**
-   * Helper class to get free port avoiding randomness.
-   */
-  class PortAllocator {
-
-    private static final int MIN_PORT = 15000;
-    private static final int MAX_PORT = 32000;
-    private static final AtomicInteger NEXT_PORT = new AtomicInteger(MIN_PORT);
-
-    private PortAllocator() {
-      // no instances
-    }
-
-    static synchronized int getFreePort() {
-      int port = NEXT_PORT.getAndIncrement();
-      if (port > MAX_PORT) {
-        NEXT_PORT.set(MIN_PORT);
-        port = NEXT_PORT.getAndIncrement();
-      }
-      return port;
-    }
-
-    static String localhostWithFreePort() {
-      return "127.0.0.1:" + getFreePort();
-    }
-
-    static String anyHostWithFreePort() {
-      return "0.0.0.0:" + getFreePort();
-    }
   }
 }

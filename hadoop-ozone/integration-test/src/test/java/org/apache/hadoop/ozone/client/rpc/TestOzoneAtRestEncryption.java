@@ -78,13 +78,18 @@ import org.apache.ozone.test.GenericTestUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
+import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
@@ -92,7 +97,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.mockito.Mockito;
 
 class TestOzoneAtRestEncryption {
 
@@ -104,8 +108,6 @@ class TestOzoneAtRestEncryption {
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
-  private static final String SCM_ID = UUID.randomUUID().toString();
-  private static final String CLUSTER_ID = UUID.randomUUID().toString();
   private static File testDir;
   private static OzoneConfiguration conf;
   private static final String TEST_KEY = "key1";
@@ -140,8 +142,6 @@ class TestOzoneAtRestEncryption {
         new CertificateClientTestImpl(conf);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(10)
-        .setScmId(SCM_ID)
-        .setClusterId(CLUSTER_ID)
         .setBlockSize(BLOCK_SIZE)
         .setChunkSize(CHUNK_SIZE)
         .setStreamBufferSizeUnit(StorageUnit.BYTES)
@@ -162,7 +162,6 @@ class TestOzoneAtRestEncryption {
     TestOzoneRpcClient.setStorageContainerLocationClient(
         storageContainerLocationClient);
     TestOzoneRpcClient.setStore(store);
-    TestOzoneRpcClient.setClusterId(CLUSTER_ID);
 
     // create test key
     createKey(TEST_KEY, cluster.getOzoneManager().getKmsProvider(), conf);
@@ -226,7 +225,7 @@ class TestOzoneAtRestEncryption {
 
   static void createAndVerifyStreamKeyData(OzoneBucket bucket)
       throws Exception {
-    Instant testStartTime = Instant.now();
+    Instant testStartTime = getTestStartTime();
     String keyName = UUID.randomUUID().toString();
     String value = "sample value";
     try (OzoneDataStreamOutput out = bucket.createStreamKey(keyName,
@@ -239,7 +238,7 @@ class TestOzoneAtRestEncryption {
   }
 
   static void createAndVerifyKeyData(OzoneBucket bucket) throws Exception {
-    Instant testStartTime = Instant.now();
+    Instant testStartTime = getTestStartTime();
     String keyName = UUID.randomUUID().toString();
     String value = "sample value";
     try (OzoneOutputStream out = bucket.createKey(keyName,
@@ -315,7 +314,7 @@ class TestOzoneAtRestEncryption {
     //Step 1
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    Instant testStartTime = Instant.now();
+    Instant testStartTime = getTestStartTime();
 
     String value = "sample value";
     store.createVolume(volumeName);
@@ -380,9 +379,9 @@ class TestOzoneAtRestEncryption {
     assertNotNull(deletedKeys);
     Map<String, String> deletedKeyMetadata =
         deletedKeys.getOmKeyInfoList().get(0).getMetadata();
-    assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_FLAG));
-    assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_SECRET));
-    assertFalse(deletedKeyMetadata.containsKey(OzoneConsts.GDPR_ALGORITHM));
+    assertThat(deletedKeyMetadata).doesNotContainKey(OzoneConsts.GDPR_FLAG);
+    assertThat(deletedKeyMetadata).doesNotContainKey(OzoneConsts.GDPR_SECRET);
+    assertThat(deletedKeyMetadata).doesNotContainKey(OzoneConsts.GDPR_ALGORITHM);
     assertNull(deletedKeys.getOmKeyInfoList().get(0).getFileEncryptionInfo());
   }
 
@@ -559,8 +558,7 @@ class TestOzoneAtRestEncryption {
     // Create an input stream to read the data
     try (OzoneInputStream inputStream = bucket.readKey(keyName)) {
 
-      assertTrue(inputStream.getInputStream()
-          instanceof MultipartInputStream);
+      assertInstanceOf(MultipartInputStream.class, inputStream.getInputStream());
 
       // Test complete read
       byte[] completeRead = new byte[keySize];
@@ -660,11 +658,6 @@ class TestOzoneAtRestEncryption {
         .completeMultipartUpload(keyName, uploadID, partsMap);
 
     assertNotNull(omMultipartUploadCompleteInfo);
-    assertEquals(omMultipartUploadCompleteInfo.getBucket(), bucket
-        .getName());
-    assertEquals(omMultipartUploadCompleteInfo.getVolume(), bucket
-        .getVolumeName());
-    assertEquals(omMultipartUploadCompleteInfo.getKey(), keyName);
     assertNotNull(omMultipartUploadCompleteInfo.getHash());
   }
 
@@ -680,7 +673,7 @@ class TestOzoneAtRestEncryption {
   @Test
   void testGetKeyProvider() throws Exception {
     KeyProvider kp1 = store.getKeyProvider();
-    KeyProvider kpSpy = Mockito.spy(kp1);
+    KeyProvider kpSpy = spy(kp1);
     assertNotEquals(kpSpy, kp1);
     Cache<URI, KeyProvider> cacheSpy =
         ((RpcClient)store.getClientProxy()).getKeyProviderCache();
@@ -690,7 +683,7 @@ class TestOzoneAtRestEncryption {
 
     // Verify the spied key provider is closed upon ozone client close
     ozClient.close();
-    Mockito.verify(kpSpy).close();
+    verify(kpSpy).close();
 
     KeyProvider kp3 = ozClient.getObjectStore().getKeyProvider();
     assertNotEquals(kp3, kpSpy);

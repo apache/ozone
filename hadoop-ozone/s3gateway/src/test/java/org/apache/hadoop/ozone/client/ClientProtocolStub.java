@@ -19,7 +19,7 @@
  */
 package org.apache.hadoop.ozone.client;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
@@ -115,6 +116,13 @@ public class ClientProtocolStub implements ClientProtocol {
 
   @Override
   public OzoneKeyDetails getS3KeyDetails(String bucketName, String keyName)
+      throws IOException {
+    return objectStoreStub.getS3Volume().getBucket(bucketName).getKey(keyName);
+  }
+
+  @Override
+  public OzoneKeyDetails getS3KeyDetails(String bucketName, String keyName,
+                                         int partNumber)
       throws IOException {
     return objectStoreStub.getS3Volume().getBucket(bucketName).getKey(keyName);
   }
@@ -371,7 +379,7 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   @Nonnull
   public S3SecretValue getS3Secret(String kerberosID) throws IOException {
-    return new S3SecretValue(STUB_KERBEROS_ID, STUB_SECRET);
+    return S3SecretValue.of(STUB_KERBEROS_ID, STUB_SECRET);
   }
 
   @Override
@@ -520,6 +528,13 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public List<OzoneFileStatusLight> listStatusLight(String volumeName,
+      String bucketName, String keyName, boolean recursive, String startKey,
+      long numEntries, boolean allowPartialPrefixes) throws IOException {
+    return null;
+  }
+
+  @Override
   public boolean addAcl(OzoneObj obj, OzoneAcl acl) throws IOException {
     return false;
   }
@@ -558,6 +573,14 @@ public class ClientProtocolStub implements ClientProtocol {
 
   }
 
+  @Deprecated
+  @Override
+  public void setEncryptionKey(String volumeName, String bucketName,
+                               String bekName)
+      throws IOException {
+
+  }
+
   @Override
   public OzoneKey headObject(String volumeName, String bucketName,
                              String keyName) throws IOException {
@@ -566,6 +589,11 @@ public class ClientProtocolStub implements ClientProtocol {
 
   @Override
   public void setThreadLocalS3Auth(S3Auth s3Auth) {
+
+  }
+
+  @Override
+  public void setIsS3Request(boolean isS3Request) {
 
   }
 
@@ -633,6 +661,12 @@ public class ClientProtocolStub implements ClientProtocol {
       String bucketName, String snapshotName)
       throws IOException {
 
+  }
+
+  @Override
+  public OzoneSnapshot getSnapshotInfo(String volumeName, String bucketName,
+                                       String snapshotName) throws IOException {
+    return null;
   }
 
   public String printCompactionLogDag(String fileNamePrefix,

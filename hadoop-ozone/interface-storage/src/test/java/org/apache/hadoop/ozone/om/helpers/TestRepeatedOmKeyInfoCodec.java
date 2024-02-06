@@ -27,7 +27,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.Proto2CodecTestBase;
 import org.apache.hadoop.util.Time;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -36,10 +36,9 @@ import java.util.List;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Test {@link RepeatedOmKeyInfo#getCodec(boolean)}.
@@ -87,7 +86,7 @@ public class TestRepeatedOmKeyInfoCodec
   }
 
   @Test
-  public void test() throws InterruptedException {
+  void test() throws Exception {
     threadSafety();
     testWithoutPipeline(1);
     testWithoutPipeline(2);
@@ -95,39 +94,28 @@ public class TestRepeatedOmKeyInfoCodec
     testCompatibility(2);
   }
 
-  public void testWithoutPipeline(int chunkNum) {
+  public void testWithoutPipeline(int chunkNum) throws IOException {
     final Codec<RepeatedOmKeyInfo> codec = RepeatedOmKeyInfo.getCodec(true);
     OmKeyInfo originKey = getKeyInfo(chunkNum);
     RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(originKey);
-    try {
-      byte[] rawData = codec.toPersistedFormat(repeatedOmKeyInfo);
-      RepeatedOmKeyInfo key = codec.fromPersistedFormat(rawData);
-      System.out.println("Chunk number = " + chunkNum +
-          ", Serialized key size without pipeline = " + rawData.length);
-      assertNull(key.getOmKeyInfoList().get(0).getLatestVersionLocations()
-          .getLocationList().get(0).getPipeline());
-    } catch (IOException e) {
-      fail("Should success");
-    }
+
+    byte[] rawData = codec.toPersistedFormat(repeatedOmKeyInfo);
+    RepeatedOmKeyInfo key = codec.fromPersistedFormat(rawData);
+    assertNull(key.getOmKeyInfoList().get(0).getLatestVersionLocations()
+        .getLocationList().get(0).getPipeline());
   }
 
-  public void testCompatibility(int chunkNum) {
+  public void testCompatibility(int chunkNum) throws IOException {
     final Codec<RepeatedOmKeyInfo> codecWithoutPipeline
         = RepeatedOmKeyInfo.getCodec(true);
     final Codec<RepeatedOmKeyInfo> codecWithPipeline
         = RepeatedOmKeyInfo.getCodec(false);
     OmKeyInfo originKey = getKeyInfo(chunkNum);
     RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(originKey);
-    try {
-      byte[] rawData = codecWithPipeline.toPersistedFormat(repeatedOmKeyInfo);
-      RepeatedOmKeyInfo key = codecWithoutPipeline.fromPersistedFormat(rawData);
-      System.out.println("Chunk number = " + chunkNum +
-          ", Serialized key size with pipeline = " + rawData.length);
-      assertNotNull(key.getOmKeyInfoList().get(0).getLatestVersionLocations()
-          .getLocationList().get(0).getPipeline());
-    } catch (IOException e) {
-      fail("Should success");
-    }
+    byte[] rawData = codecWithPipeline.toPersistedFormat(repeatedOmKeyInfo);
+    RepeatedOmKeyInfo key = codecWithoutPipeline.fromPersistedFormat(rawData);
+    assertNotNull(key.getOmKeyInfoList().get(0).getLatestVersionLocations()
+        .getLocationList().get(0).getPipeline());
   }
 
   public void threadSafety() throws InterruptedException {

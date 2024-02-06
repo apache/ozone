@@ -19,15 +19,18 @@
 package org.apache.hadoop.ozone.client.io;
 
 import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Map;
 
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -51,7 +54,7 @@ import org.slf4j.LoggerFactory;
  * entries that represent a writing channel towards DataNodes are the main
  * responsibility of this class.
  */
-public class BlockOutputStreamEntryPool {
+public class BlockOutputStreamEntryPool implements KeyMetadataAware {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(BlockOutputStreamEntryPool.class);
@@ -81,6 +84,7 @@ public class BlockOutputStreamEntryPool {
   private final long openID;
   private final ExcludeList excludeList;
   private final ContainerClientMetrics clientMetrics;
+  private final StreamBufferArgs streamBufferArgs;
 
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public BlockOutputStreamEntryPool(
@@ -91,7 +95,7 @@ public class BlockOutputStreamEntryPool {
       boolean isMultipart, OmKeyInfo info,
       boolean unsafeByteBufferConversion,
       XceiverClientFactory xceiverClientFactory, long openID,
-      ContainerClientMetrics clientMetrics
+      ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs
   ) {
     this.config = config;
     this.xceiverClientFactory = xceiverClientFactory;
@@ -108,37 +112,37 @@ public class BlockOutputStreamEntryPool {
     this.excludeList = createExcludeList();
 
     this.bufferPool =
-        new BufferPool(config.getStreamBufferSize(),
-            (int) (config.getStreamBufferMaxSize() / config
+        new BufferPool(streamBufferArgs.getStreamBufferSize(),
+            (int) (streamBufferArgs.getStreamBufferMaxSize() / streamBufferArgs
                 .getStreamBufferSize()),
             ByteStringConversion
                 .createByteBufferConversion(unsafeByteBufferConversion));
     this.clientMetrics = clientMetrics;
+    this.streamBufferArgs = streamBufferArgs;
   }
 
   ExcludeList createExcludeList() {
-    return new ExcludeList();
+    return new ExcludeList(getConfig().getExcludeNodesExpiryTime(),
+        Clock.system(ZoneOffset.UTC));
   }
 
-  BlockOutputStreamEntryPool(ContainerClientMetrics clientMetrics) {
+  BlockOutputStreamEntryPool(ContainerClientMetrics clientMetrics,
+      OzoneClientConfig clientConfig, StreamBufferArgs streamBufferArgs) {
     streamEntries = new ArrayList<>();
     omClient = null;
     keyArgs = null;
     xceiverClientFactory = null;
-    config =
-        new OzoneConfiguration().getObject(OzoneClientConfig.class);
-    config.setStreamBufferSize(0);
-    config.setStreamBufferMaxSize(0);
-    config.setStreamBufferFlushSize(0);
-    config.setStreamBufferFlushDelay(false);
+    config = clientConfig;
+    streamBufferArgs.setStreamBufferFlushDelay(false);
     requestID = null;
     int chunkSize = 0;
     bufferPool = new BufferPool(chunkSize, 1);
 
     currentStreamIndex = 0;
     openID = -1;
-    excludeList = new ExcludeList();
+    excludeList = createExcludeList();
     this.clientMetrics = clientMetrics;
+    this.streamBufferArgs = null;
   }
 
   /**
@@ -185,6 +189,7 @@ public class BlockOutputStreamEntryPool {
             .setBufferPool(bufferPool)
             .setToken(subKeyInfo.getToken())
             .setClientMetrics(clientMetrics)
+            .setStreamBufferArgs(streamBufferArgs)
             .build();
   }
 
@@ -249,6 +254,10 @@ public class BlockOutputStreamEntryPool {
 
   ContainerClientMetrics getClientMetrics() {
     return clientMetrics;
+  }
+
+  StreamBufferArgs getStreamBufferArgs() {
+    return streamBufferArgs;
   }
 
   /**
@@ -427,5 +436,17 @@ public class BlockOutputStreamEntryPool {
 
   boolean isEmpty() {
     return streamEntries.isEmpty();
+  }
+
+  @Override
+  public Map<String, String> getMetadata() {
+    if (keyArgs != null) {
+      return this.keyArgs.getMetadata();
+    }
+    return null;
+  }
+
+  long getDataSize() {
+    return keyArgs.getDataSize();
   }
 }

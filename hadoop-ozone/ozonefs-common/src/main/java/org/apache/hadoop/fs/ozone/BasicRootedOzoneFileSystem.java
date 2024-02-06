@@ -128,6 +128,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       "ofs://om-host.example.com:5678/path/to/key";
 
   private static final int PATH_DEPTH_TO_BUCKET = 2;
+  private OzoneConfiguration ozoneConfiguration;
+
 
   @Override
   public void initialize(URI name, Configuration conf) throws IOException {
@@ -200,6 +202,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       LOG.error(msg, ue);
       throw new IOException(msg, ue);
     }
+    ozoneConfiguration = OzoneConfiguration.of(getConfSource());
   }
 
   protected OzoneClientAdapter createAdapter(ConfigurationSource conf,
@@ -328,7 +331,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       LOG.trace("rename from:{} to:{}", this.srcPath, this.dstPath);
       // Initialize bucket here to reduce number of RPC calls
       OFSPath ofsPath = new OFSPath(srcPath,
-          OzoneConfiguration.of(getConfSource()));
+          ozoneConfiguration);
       // TODO: Refactor later.
       adapterImpl = (BasicRootedOzoneClientAdapterImpl) adapter;
       this.bucket = adapterImpl.getBucket(ofsPath, false);
@@ -338,7 +341,19 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     boolean processKeyPath(List<String> keyPathList) throws IOException {
       for (String keyPath : keyPathList) {
         String newPath = dstPath.concat(keyPath.substring(srcPath.length()));
-        adapterImpl.rename(this.bucket, keyPath, newPath);
+        try {
+          adapterImpl.rename(this.bucket, keyPath, newPath);
+        } catch (OMException ome) {
+          LOG.error("Key rename failed for source key: {} to " +
+              "destination key: {}.", keyPath, newPath, ome);
+          if (OMException.ResultCodes.KEY_ALREADY_EXISTS == ome.getResult() ||
+              OMException.ResultCodes.KEY_RENAME_ERROR  == ome.getResult() ||
+              OMException.ResultCodes.KEY_NOT_FOUND == ome.getResult()) {
+            return false;
+          } else {
+            throw ome;
+          }
+        }
       }
       return true;
     }
@@ -374,9 +389,9 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
     // src and dst should be in the same bucket
     OFSPath ofsSrc = new OFSPath(src,
-        OzoneConfiguration.of(getConfSource()));
+        ozoneConfiguration);
     OFSPath ofsDst = new OFSPath(dst,
-        OzoneConfiguration.of(getConfSource()));
+        ozoneConfiguration);
     if (!ofsSrc.isInSameBucketAs(ofsDst)) {
       throw new IOException("Cannot rename a key to a different bucket");
     }
@@ -539,7 +554,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       }
       // Initialize bucket here to reduce number of RPC calls
       OFSPath ofsPath = new OFSPath(f,
-          OzoneConfiguration.of(getConfSource()));
+          ozoneConfiguration);
       // TODO: Refactor later.
       adapterImpl = (BasicRootedOzoneClientAdapterImpl) adapter;
       this.bucket = adapterImpl.getBucket(ofsPath, false);
@@ -570,7 +585,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       this.recursive = recursive;
       // Initialize bucket here to reduce number of RPC calls
       OFSPath ofsPath = new OFSPath(f,
-          OzoneConfiguration.of(getConfSource()));
+          ozoneConfiguration);
       adapterImpl = (BasicRootedOzoneClientAdapterImpl) adapter;
       this.bucket = adapterImpl.getBucket(ofsPath, false);
       LOG.debug("Deleting bucket with name {} is via DeleteIteratorWithFSO.",
@@ -602,7 +617,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       this.path = f;
       this.recursive = recursive;
       this.ofsPath = new OFSPath(f,
-          OzoneConfiguration.of(getConfSource()));
+          ozoneConfiguration);
     }
 
     OzoneListingIterator getDeleteIterator()
@@ -657,7 +672,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
     String key = pathToKey(f);
     OFSPath ofsPath = new OFSPath(key,
-        OzoneConfiguration.of(getConfSource()));
+        ozoneConfiguration);
     // Handle rm root
     if (ofsPath.isRoot()) {
       // Intentionally drop support for rm root
@@ -669,7 +684,14 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
 
     // Handle delete volume
     if (ofsPath.isVolume()) {
-      return deleteVolume(f, recursive, ofsPath);
+      if (recursive) {
+        LOG.warn("Recursive volume delete using ofs is not supported");
+        throw new IOException("Recursive volume delete using " +
+            "ofs is not supported. " +
+            "Instead use 'ozone sh volume delete -r -skipTrash " +
+            "-id <OM_SERVICE_ID> <Volume_URI>' command");
+      }
+      return deleteVolume(f, ofsPath);
     }
 
     // delete bucket
@@ -781,7 +803,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
   }
 
-  private boolean deleteVolume(Path f, boolean recursive, OFSPath ofsPath)
+  private boolean deleteVolume(Path f, OFSPath ofsPath)
       throws IOException {
     // verify volume exist
     try {
@@ -792,18 +814,6 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     }
     
     String volumeName = ofsPath.getVolumeName();
-    if (recursive) {
-      // Delete all buckets first
-      OzoneVolume volume =
-          adapterImpl.getObjectStore().getVolume(volumeName);
-      Iterator<? extends OzoneBucket> it = volume.listBuckets("");
-      String prefixVolumePathStr = addTrailingSlashIfNeeded(f.toString());
-      while (it.hasNext()) {
-        OzoneBucket bucket = it.next();
-        String nextBucket = prefixVolumePathStr + bucket.getName();
-        delete(new Path(nextBucket), true);
-      }
-    }
     try {
       adapterImpl.getObjectStore().deleteVolume(volumeName);
       return true;
@@ -963,8 +973,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   @Override
   public Path getTrashRoot(Path path) {
     OFSPath ofsPath = new OFSPath(path,
-        OzoneConfiguration.of(getConfSource()));
-    return ofsPath.getTrashRoot();
+        ozoneConfiguration);
+    return this.makeQualified(ofsPath.getTrashRoot());
   }
 
   /**
@@ -1127,6 +1137,15 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   @Override
   public RemoteIterator<FileStatus> listStatusIterator(Path f)
       throws IOException {
+    OFSPath ofsPath = new OFSPath(f,
+        ozoneConfiguration);
+    if (ofsPath.isRoot() || ofsPath.isVolume()) {
+      LOG.warn("Recursive root/volume list using ofs is not supported");
+      throw new IOException("Recursive list root/volume " +
+          "using ofs is not supported. " +
+          "Instead use 'ozone sh key list " +
+          "<Volume_URI>' command");
+    }
     return new OzoneFileStatusIterator<>(f);
   }
 
@@ -1371,7 +1390,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       if (status.isDir()) {
         LOG.trace("Iterating directory: {}", pathKey);
         OFSPath ofsPath = new OFSPath(pathKey,
-            OzoneConfiguration.of(getConfSource()));
+            ozoneConfiguration);
         String ofsPathPrefix =
             ofsPath.getNonKeyPathNoPrefixDelim() + OZONE_URI_DELIMITER;
         if (isFSO) {
@@ -1380,7 +1399,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
           for (FileStatusAdapter fileStatus : fileStatuses) {
             String keyName =
                 new OFSPath(fileStatus.getPath().toString(),
-                    OzoneConfiguration.of(getConfSource())).getKeyName();
+                    ozoneConfiguration).getKeyName();
             keyPathList.add(ofsPathPrefix + keyName);
           }
           if (keyPathList.size() >= batchSize) {
@@ -1475,7 +1494,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   FileStatus convertFileStatus(FileStatusAdapter fileStatusAdapter) {
     FileStatus fileStatus = constructFileStatus(fileStatusAdapter);
     BlockLocation[] blockLocations = fileStatusAdapter.getBlockLocations();
-    if (blockLocations == null || blockLocations.length == 0) {
+    if (blockLocations.length == 0) {
       return fileStatus;
     }
     return new LocatedFileStatus(fileStatus, blockLocations);
@@ -1522,7 +1541,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   @Override
   public Path getLinkTarget(Path f) throws IOException {
     OFSPath ofsPath = new OFSPath(f,
-        OzoneConfiguration.of(getConfSource()));
+        ozoneConfiguration);
     if (ofsPath.isBucket()) {  // only support bucket links
       OzoneBucket bucket = adapterImpl.getBucket(ofsPath, false);
       if (bucket.isLink()) {
@@ -1538,7 +1557,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       final String fromSnapshot, final String toSnapshot)
       throws IOException, InterruptedException {
     OFSPath ofsPath =
-        new OFSPath(snapshotDir, OzoneConfiguration.of(getConf()));
+        new OFSPath(snapshotDir, ozoneConfiguration);
     Preconditions.checkArgument(ofsPath.isBucket(),
         "Unsupported : Path is not a bucket");
     // TODO:HDDS-7681 support snapdiff when toSnapshot="." referring to

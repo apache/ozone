@@ -371,13 +371,11 @@ public class ReplicationNodeManagerMock implements NodeManager {
    * Send heartbeat to indicate the datanode is alive and doing well.
    *
    * @param dd - Datanode Details.
-   * @param layoutInfo - Layout Version Proto
    * @param commandQueueReportProto - Command Queue Report Proto
    * @return SCMheartbeat response list
    */
   @Override
   public List<SCMCommand> processHeartbeat(DatanodeDetails dd,
-      LayoutVersionProto layoutInfo,
       CommandQueueReportProto commandQueueReportProto) {
     return null;
   }
@@ -533,5 +531,10 @@ public class ReplicationNodeManagerMock implements NodeManager {
   @Override
   public int minPipelineLimit(List<DatanodeDetails> dn) {
     return 0;
+  }
+
+  @Override
+  public long getLastHeartbeat(DatanodeDetails datanodeDetails) {
+    return -1;
   }
 }

@@ -17,7 +17,9 @@
 package org.apache.hadoop.ozone.om;
 
 import java.io.File;
-import java.util.UUID;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -27,32 +29,33 @@ import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeTestUtils;
 
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test that the ozone manager will not start when it loads a VERSION file
  * indicating a metadata layout version larger than its software layout version.
  */
 public class TestOmStartupSlvLessThanMlv {
-  @Rule
-  public TemporaryFolder tempFolder = new TemporaryFolder();
+
+  @TempDir
+  private Path folder;
 
   @Test
   public void testStartupSlvLessThanMlv() throws Exception {
     // Add subdirectories under the temporary folder where the version file
     // will be placed.
-    File omSubdir = tempFolder.newFolder("om", "current");
+    String subDir = folder.toAbsolutePath() + "/om/current";
+    File omSubdir = Files.createDirectories(Paths.get(subDir)).toFile();
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        tempFolder.getRoot().getAbsolutePath());
+        folder.toAbsolutePath().toString());
 
-    // Set metadata layout version larger then software layout version.
+    // Set metadata layout version larger than software layout version.
     int largestSlv = 0;
     for (LayoutFeature f: OMLayoutFeature.values()) {
       largestSlv = Math.max(largestSlv, f.layoutVersion());
@@ -62,19 +65,13 @@ public class TestOmStartupSlvLessThanMlv {
     // Create version file with MLV > SLV, which should fail the cluster build.
     UpgradeTestUtils.createVersionFile(omSubdir, HddsProtos.NodeType.OM, mlv);
 
-    MiniOzoneCluster.Builder clusterBuilder = MiniOzoneCluster.newBuilder(conf)
-        .setClusterId(UUID.randomUUID().toString())
-        .setScmId(UUID.randomUUID().toString())
-        .setOmId(UUID.randomUUID().toString());
+    MiniOzoneCluster.Builder clusterBuilder = MiniOzoneCluster.newBuilder(conf);
 
-    try {
-      clusterBuilder.build();
-      Assert.fail("Expected OMException due to incorrect MLV on OM creation.");
-    } catch (OMException e) {
-      String expectedMessage = String.format("Cannot initialize " +
-              "VersionManager. Metadata layout version (%s) > software layout" +
-              " version (%s)", mlv, largestSlv);
-      GenericTestUtils.assertExceptionContains(expectedMessage, e);
-    }
+    OMException omException = assertThrows(OMException.class,
+        clusterBuilder::build);
+    String expectedMessage = String.format("Cannot initialize " +
+        "VersionManager. Metadata layout version (%s) > software layout" +
+        " version (%s)", mlv, largestSlv);
+    assertEquals(expectedMessage, omException.getMessage());
   }
 }

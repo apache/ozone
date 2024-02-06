@@ -69,14 +69,14 @@ public class RatisClientConfig {
         "The timeout duration for ratis client request (except "
             + "for watch request). It should be set greater than leader "
             + "election timeout in Ratis.")
-    private long rpcRequestTimeout = Duration.ofSeconds(60).toMillis();
+    private Duration rpcRequestTimeout = Duration.ofSeconds(60);
 
     public Duration getRpcRequestTimeout() {
-      return Duration.ofMillis(rpcRequestTimeout);
+      return rpcRequestTimeout;
     }
 
     public void setRpcRequestTimeout(Duration duration) {
-      this.rpcRequestTimeout = duration.toMillis();
+      rpcRequestTimeout = duration;
     }
 
     @Config(key = "rpc.watch.request.timeout",
@@ -87,14 +87,14 @@ public class RatisClientConfig {
         "The timeout duration for ratis client watch request. "
             + "Timeout for the watch API in Ratis client to acknowledge a "
             + "particular request getting replayed to all servers.")
-    private long rpcWatchRequestTimeout = Duration.ofSeconds(180).toMillis();
+    private Duration rpcWatchRequestTimeout = Duration.ofSeconds(180);
 
     public Duration getRpcWatchRequestTimeout() {
-      return Duration.ofMillis(rpcWatchRequestTimeout);
+      return rpcWatchRequestTimeout;
     }
 
     public void setRpcWatchRequestTimeout(Duration duration) {
-      this.rpcWatchRequestTimeout = duration.toMillis();
+      rpcWatchRequestTimeout = duration;
     }
   }
 
@@ -103,15 +103,14 @@ public class RatisClientConfig {
       type = ConfigType.TIME,
       tags = { OZONE, CLIENT, PERFORMANCE },
       description = "Timeout for ratis client write request.")
-  private long writeRequestTimeoutInMs =
-      Duration.ofMinutes(5).toMillis();
+  private Duration writeRequestTimeout = Duration.ofMinutes(5);
 
   public Duration getWriteRequestTimeout() {
-    return Duration.ofMillis(writeRequestTimeoutInMs);
+    return writeRequestTimeout;
   }
 
   public void setWriteRequestTimeout(Duration duration) {
-    writeRequestTimeoutInMs = duration.toMillis();
+    writeRequestTimeout = duration;
   }
 
   @Config(key = "client.request.watch.timeout",
@@ -119,14 +118,14 @@ public class RatisClientConfig {
       type = ConfigType.TIME,
       tags = { OZONE, CLIENT, PERFORMANCE },
       description = "Timeout for ratis client watch request.")
-  private long watchRequestTimeoutInMs = Duration.ofMinutes(3).toMillis();
+  private Duration watchRequestTimeout = Duration.ofMinutes(3);
 
   public Duration getWatchRequestTimeout() {
-    return Duration.ofMillis(watchRequestTimeoutInMs);
+    return watchRequestTimeout;
   }
 
   public void setWatchRequestTimeout(Duration duration) {
-    watchRequestTimeoutInMs = duration.toMillis();
+    watchRequestTimeout = duration;
   }
 
   @Config(key = "client.multilinear.random.retry.policy",
@@ -156,15 +155,14 @@ public class RatisClientConfig {
           + " With the default base sleep of 4s, the sleep duration for ith"
           + " retry is min(4 * pow(2, i), max_sleep) * r, where r is "
           + "random number in the range [0.5, 1.5).")
-  private long exponentialPolicyBaseSleepInMs =
-      Duration.ofSeconds(4).toMillis();
+  private Duration exponentialPolicyBaseSleep = Duration.ofSeconds(4);
 
   public Duration getExponentialPolicyBaseSleep() {
-    return Duration.ofMillis(exponentialPolicyBaseSleepInMs);
+    return exponentialPolicyBaseSleep;
   }
 
   public void setExponentialPolicyBaseSleep(Duration duration) {
-    exponentialPolicyBaseSleepInMs = duration.toMillis();
+    exponentialPolicyBaseSleep = duration;
   }
 
   @Config(key = "client.exponential.backoff.max.sleep",
@@ -175,15 +173,14 @@ public class RatisClientConfig {
           + "policy is limited by the configured max sleep. Refer "
           + "dfs.ratis.client.exponential.backoff.base.sleep for further "
           + "details.")
-  private long exponentialPolicyMaxSleepInMs =
-      Duration.ofSeconds(40).toMillis();
+  private Duration exponentialPolicyMaxSleep = Duration.ofSeconds(40);
 
   public Duration getExponentialPolicyMaxSleep() {
-    return Duration.ofMillis(exponentialPolicyMaxSleepInMs);
+    return exponentialPolicyMaxSleep;
   }
 
   public void setExponentialPolicyMaxSleep(Duration duration) {
-    exponentialPolicyMaxSleepInMs = duration.toMillis();
+    exponentialPolicyMaxSleep = duration;
   }
 
   @Config(key = "client.retrylimited.retry.interval",

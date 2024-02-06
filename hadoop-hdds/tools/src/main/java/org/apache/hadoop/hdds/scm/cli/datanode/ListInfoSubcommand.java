@@ -29,6 +29,7 @@ import picocli.CommandLine;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -51,6 +52,11 @@ public class ListInfoSubcommand extends ScmSubcommand {
       description = "Show info by datanode UUID.",
       defaultValue = "")
   private String uuid;
+
+  @CommandLine.Option(names = {"--hostname"},
+      description = "Show info by datanode hostname.",
+      defaultValue = "")
+  private String hostname;
 
   @CommandLine.Option(names = {"--operational-state"},
       description = "Show info by datanode NodeOperationalState(" +
@@ -77,14 +83,23 @@ public class ListInfoSubcommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     pipelines = scmClient.listPipelines();
+    if (!Strings.isNullOrEmpty(uuid)) {
+      HddsProtos.Node node = scmClient.queryNode(UUID.fromString(uuid));
+      DatanodeWithAttributes dwa = new DatanodeWithAttributes(DatanodeDetails
+          .getFromProtoBuf(node.getNodeID()),
+          node.getNodeOperationalStates(0),
+          node.getNodeStates(0));
+      printDatanodeInfo(dwa);
+      return;
+    }
     Stream<DatanodeWithAttributes> allNodes = getAllNodes(scmClient).stream();
     if (!Strings.isNullOrEmpty(ipaddress)) {
       allNodes = allNodes.filter(p -> p.getDatanodeDetails().getIpAddress()
           .compareToIgnoreCase(ipaddress) == 0);
     }
-    if (!Strings.isNullOrEmpty(uuid)) {
-      allNodes = allNodes.filter(p ->
-          p.getDatanodeDetails().getUuidString().equals(uuid));
+    if (!Strings.isNullOrEmpty(hostname)) {
+      allNodes = allNodes.filter(p -> p.getDatanodeDetails().getHostName()
+          .compareToIgnoreCase(hostname) == 0);
     }
     if (!Strings.isNullOrEmpty(nodeOperationalState)) {
       allNodes = allNodes.filter(p -> p.getOpState().toString()

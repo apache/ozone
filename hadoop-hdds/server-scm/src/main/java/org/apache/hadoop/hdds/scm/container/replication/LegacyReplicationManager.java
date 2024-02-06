@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import com.google.common.collect.ImmutableList;
 import com.google.protobuf.Message;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
@@ -86,7 +87,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -98,6 +98,8 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType.MOVE;
+import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
+import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
 
 /**
  * Legacy Replication Manager (RM) is a legacy , which is used to process
@@ -381,8 +383,10 @@ public class LegacyReplicationManager {
          */
         if (state == LifeCycleState.CLOSING) {
           setHealthStateForClosing(replicas, container, report);
+          boolean foundHealthy = false;
           for (ContainerReplica replica: replicas) {
             if (replica.getState() != State.UNHEALTHY) {
+              foundHealthy = true;
               sendCloseCommand(
                   container, replica.getDatanodeDetails(), false);
             }
@@ -398,7 +402,21 @@ public class LegacyReplicationManager {
            */
           if (replicas.isEmpty() && (container.getNumberOfKeys() == 0)) {
             closeEmptyContainer(container);
+            return;
           }
+
+          if (!foundHealthy) {
+            /* If we get here, then this container has replicas and all are
+            UNHEALTHY. Move it from CLOSING to QUASI_CLOSED so RM can then try
+            to maintain replication factor number of replicas.
+            */
+            containerManager.updateContainerState(container.containerID(),
+                HddsProtos.LifeCycleEvent.QUASI_CLOSE);
+            LOG.debug("Moved container {} from CLOSING to QUASI_CLOSED " +
+                "because it has only UNHEALTHY replicas: {}.", container,
+                replicas);
+          }
+
           return;
         }
 
@@ -482,6 +500,22 @@ public class LegacyReplicationManager {
           return;
         }
 
+        // If the container is empty and has no replicas, it is possible it was
+        // a container which stuck in the closing state which never got any
+        // replicas created on the datanodes. In this case, we don't have enough
+        // information to delete the container, so we just log it as EMPTY,
+        // leaving it as CLOSED and return true, otherwise, it will end up
+        // marked as missing by the under replication handling.
+        if (replicas.isEmpty()
+            && container.getState() == LifeCycleState.CLOSED
+            && container.getNumberOfKeys() == 0) {
+          LOG.debug("Container {} appears empty and is closed, but cannot be " +
+              "deleted because it has no replicas. Marking as EMPTY.",
+              container);
+          report.incrementAndSample(HealthState.EMPTY, container.containerID());
+          return;
+        }
+
         /*
          * Check if the container is under replicated and take appropriate
          * action.
@@ -518,6 +552,29 @@ public class LegacyReplicationManager {
         }
 
         /*
+         * A QUASI_CLOSED container may have some UNHEALTHY replicas with the
+         * same Sequence ID as the container. RM should try to maintain one
+         * copy of such replicas when there are no healthy replicas that
+         * match the container's Sequence ID.
+         */
+        List<ContainerReplica> vulnerableUnhealthy =
+            replicaSet.getVulnerableUnhealthyReplicas(dn -> {
+              try {
+                return nodeManager.getNodeStatus(dn);
+              } catch (NodeNotFoundException e) {
+                LOG.warn("Exception for datanode {} while getting vulnerable replicas for container {}, with all " +
+                    "replicas {}.", dn, container, replicas, e);
+                return null;
+              }
+            });
+        if (!vulnerableUnhealthy.isEmpty()) {
+          report.incrementAndSample(HealthState.UNDER_REPLICATED,
+              container.containerID());
+          handleVulnerableUnhealthyReplicas(replicaSet, vulnerableUnhealthy);
+          return;
+        }
+
+        /*
          * Check if the container is over replicated and take appropriate
          * action.
          */
@@ -545,6 +602,37 @@ public class LegacyReplicationManager {
     } catch (Exception ex) {
       LOG.warn("Process container {} error: ", id, ex);
     }
+  }
+
+  /**
+   * Sends a replicate command for each replica specified in
+   * vulnerableUnhealthy.
+   * @param replicaCount RatisContainerReplicaCount for this container
+   * @param vulnerableUnhealthy List of UNHEALTHY replicas that need to be
+   * replicated
+   */
+  private void handleVulnerableUnhealthyReplicas(
+      RatisContainerReplicaCount replicaCount,
+      List<ContainerReplica> vulnerableUnhealthy) {
+    ContainerInfo container = replicaCount.getContainer();
+    LOG.debug("Handling vulnerable UNHEALTHY replicas {} for container {}.",
+        vulnerableUnhealthy, container);
+    int pendingAdds = getInflightAdd(container.containerID());
+    if (pendingAdds >= vulnerableUnhealthy.size()) {
+      LOG.debug("There are {} pending adds for container {}, while " +
+              "the number of UNHEALTHY replicas is {}.", pendingAdds,
+          container.containerID(), vulnerableUnhealthy.size());
+      return;
+    }
+
+    /*
+    Since we're replicating UNHEALTHY replicas, it's possible that
+    replication keeps on failing. Shuffling gives other replicas a chance to be
+    replicated since there's a limit on inflight adds.
+     */
+    Collections.shuffle(vulnerableUnhealthy);
+    replicateEachSource(container, vulnerableUnhealthy,
+        replicaCount.getReplicas());
   }
 
   private void updateCompletedReplicationMetrics(ContainerInfo container,
@@ -971,7 +1059,7 @@ public class LegacyReplicationManager {
     synchronized (container) {
       final Set<ContainerReplica> replica = containerManager
           .getContainerReplicas(container.containerID());
-      return getContainerReplicaCount(container, replica);
+      return getReplicaCountOptionallyConsiderUnhealthy(container, replica);
     }
   }
 
@@ -990,6 +1078,28 @@ public class LegacyReplicationManager {
     return new LegacyRatisContainerReplicaCount(
         container,
         replica,
+        getInflightAdd(container.containerID()),
+        getInflightDel(container.containerID()),
+        container.getReplicationConfig().getRequiredNodes(),
+        minHealthyForMaintenance);
+  }
+
+  private RatisContainerReplicaCount getReplicaCountOptionallyConsiderUnhealthy(
+      ContainerInfo container, Set<ContainerReplica> replicas) {
+    LegacyRatisContainerReplicaCount withUnhealthy =
+        new LegacyRatisContainerReplicaCount(container, replicas,
+            getPendingOps(container.containerID()), minHealthyForMaintenance,
+            true);
+    if (withUnhealthy.getHealthyReplicaCount() == 0 &&
+        withUnhealthy.getUnhealthyReplicaCount() > 0) {
+      // if the container has only UNHEALTHY replicas, return the correct
+      // RatisContainerReplicaCount object which can handle UNHEALTHY replicas
+      return withUnhealthy;
+    }
+
+    return new LegacyRatisContainerReplicaCount(
+        container,
+        replicas,
         getInflightAdd(container.containerID()),
         getInflightDel(container.containerID()),
         container.getReplicationConfig().getRequiredNodes(),
@@ -1138,11 +1248,68 @@ public class LegacyReplicationManager {
           container.containerID());
     }
 
+    State matchingReplicaState = State.CLOSED;
+    if (container.getState() == LifeCycleState.QUASI_CLOSED) {
+      // If we are replicating quasi closed replicas, they should have the
+      // same origin node ID and therefore the same BCSID. If they have
+      // different origin node IDs, then we have 2/3 containers and it should
+      // have been closed before replicating.
+      matchingReplicaState = State.QUASI_CLOSED;
+    }
     List<ContainerReplica> replicationSources = getReplicationSources(container,
-        replicaSet.getReplicas(), State.CLOSED, State.QUASI_CLOSED);
+        replicaSet.getReplicas(), matchingReplicaState);
     // This method will handle topology even if replicasNeeded <= 0.
-    replicateAnyWithTopology(container, replicationSources,
-        placementStatus, replicasNeeded);
+    try {
+      replicateAnyWithTopology(container, replicationSources,
+          placementStatus, replicasNeeded, replicaSet.getReplicas());
+    } catch (SCMException e) {
+      if (e.getResult()
+          .equals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE) &&
+          replicasNeeded > 0) {
+        /*
+        If we reach here, the container is under replicated but placement
+        policy could not find any target Datanodes to host new replicas.
+        We can try unblocking under replication handling by removing any
+        unhealthy replicas. This will free up those datanodes, so they can host
+        healthy replicas.
+         */
+        deleteUnhealthyReplicaIfNeeded(container, replicaSet);
+      }
+    }
+  }
+
+  /**
+   * Finds and deletes an unhealthy replica (UNHEALTHY or QUASI_CLOSED) under
+   * certain conditions.
+   */
+  private void deleteUnhealthyReplicaIfNeeded(ContainerInfo container,
+      RatisContainerReplicaCount replicaCount) {
+    LOG.info("Finding an unhealthy replica to delete for container {} with " +
+        "replicas {} to unblock under replication handling.", container,
+        replicaCount.getReplicas());
+
+    Set<ContainerReplica> replicas = new HashSet<>(replicaCount.getReplicas());
+    ContainerReplica replica = ReplicationManagerUtil
+        .selectUnhealthyReplicaForDelete(container, replicas,
+            getInflightDel(container.containerID()),
+            (dnd) -> {
+              try {
+                return nodeManager.getNodeStatus(dnd);
+              } catch (NodeNotFoundException e) {
+                LOG.warn("Exception while finding an unhealthy replica to " +
+                    "delete for container {}.", container, e);
+                return null;
+              }
+            });
+
+    if (replica == null) {
+      LOG.info(
+          "Could not find any unhealthy replica to delete when unblocking " +
+              "under replication handling for container {} with replicas {}.",
+          container, replicas);
+    } else {
+      sendDeleteCommand(container, replica.getDatanodeDetails(), true);
+    }
   }
 
   /**
@@ -1206,21 +1373,50 @@ public class LegacyReplicationManager {
       ReplicationManagerReport report) {
 
     List<ContainerReplica> replicas = replicaSet.getReplicas();
-    int excessReplicas = replicas.size() -
-        container.getReplicationConfig().getRequiredNodes();
-    int missingReplicas = excessReplicas * -1;
 
-    if (missingReplicas > 0) {
+    RatisContainerReplicaCount unhealthyReplicaSet =
+        new LegacyRatisContainerReplicaCount(container,
+            new HashSet<>(replicaSet.getReplicas()),
+            getPendingOps(container.containerID()),
+            minHealthyForMaintenance,
+            true);
+
+    if (unhealthyReplicaSet.isUnderReplicated()) {
       handleUnderReplicatedAllUnhealthy(container, replicas,
-          placementStatus, missingReplicas, report);
-    } else if (excessReplicas > 0) {
+          placementStatus, unhealthyReplicaSet.additionalReplicaNeeded(),
+          report);
+    } else if (unhealthyReplicaSet.isOverReplicated()) {
       handleOverReplicatedAllUnhealthy(container, replicas,
-          excessReplicas, report);
+          unhealthyReplicaSet.getExcessRedundancy(true), report);
     } else {
       // We have the correct number of unhealthy replicas. See if any of them
       // can be closed.
       closeReplicasIfPossible(container, replicas);
     }
+  }
+
+  /**
+   * Transform the Legacy inflight operation in the pendingOps format.
+   * @param containerID The contaiuner to get the pending ops for.
+   * @return A list of pendingOp, or an empty list if none exist.
+   */
+  private List<ContainerReplicaOp> getPendingOps(ContainerID containerID) {
+    List<ContainerReplicaOp> pendingOps = new ArrayList<>();
+    List<InflightAction> inflightActions = inflightReplication.get(containerID);
+    if (inflightActions != null) {
+      for (InflightAction a : inflightActions) {
+        pendingOps.add(new ContainerReplicaOp(
+            ADD, a.getDatanode(), 0, Long.MAX_VALUE));
+      }
+    }
+    inflightActions = inflightDeletion.get(containerID);
+    if (inflightActions != null) {
+      for (InflightAction a : inflightActions) {
+        pendingOps.add(new ContainerReplicaOp(
+            DELETE, a.getDatanode(), 0, Long.MAX_VALUE));
+      }
+    }
+    return pendingOps;
   }
 
   /**
@@ -1249,26 +1445,29 @@ public class LegacyReplicationManager {
     // for deletion, since this method is deleting unhealthy containers only.
     closeReplicasIfPossible(container, unhealthyReplicas);
     if (!unhealthyReplicas.isEmpty()) {
-      LOG.info("Container {} has {} excess unhealthy replicas. Excess " +
-              "unhealthy replicas will be deleted.",
-          container.getContainerID(), unhealthyReplicas.size());
-
-      report.incrementAndSample(HealthState.OVER_REPLICATED,
-          container.containerID());
-
       int excessReplicaCount = replicas.size() -
           container.getReplicationConfig().getRequiredNodes();
+      boolean excessDeleted = false;
       if (container.getState() == LifeCycleState.CLOSED) {
         // The container is already closed. The unhealthy replicas are extras
         // and unnecessary.
         deleteExcess(container, unhealthyReplicas, excessReplicaCount);
+        excessDeleted = true;
       } else {
         // Container is not yet closed.
         // We only need to save the unhealthy replicas if they
         // represent unique origin node IDs. If recovering these replicas is
         // possible in the future they could be used to close the container.
-        deleteExcessWithNonUniqueOriginNodeIDs(container,
+        excessDeleted = deleteExcessWithNonUniqueOriginNodeIDs(container,
             replicaSet.getReplicas(), unhealthyReplicas, excessReplicaCount);
+      }
+
+      if (excessDeleted) {
+        LOG.info("Container {} has {} excess unhealthy replicas. Excess " +
+                "unhealthy replicas will be deleted.",
+            container.getContainerID(), unhealthyReplicas.size());
+        report.incrementAndSample(HealthState.OVER_REPLICATED,
+            container.containerID());
       }
     }
   }
@@ -1303,8 +1502,14 @@ public class LegacyReplicationManager {
       final ContainerPlacementStatus placementStatus = getPlacementStatus(
           new HashSet<>(replicationSources),
           container.getReplicationConfig().getRequiredNodes());
-      replicateAnyWithTopology(container, replicationSources,
-          placementStatus, replicas.size() - replicationSources.size());
+      try {
+        replicateAnyWithTopology(container, replicationSources,
+            placementStatus, replicas.size() - replicationSources.size(),
+            replicas);
+      } catch (SCMException e) {
+        LOG.warn("Could not fix container {} with replicas {}.", container,
+            replicas, e);
+      }
     }
   }
 
@@ -1504,12 +1709,13 @@ public class LegacyReplicationManager {
     final long containerID = id.getId();
     final ReplicateContainerCommand replicateCommand =
         ReplicateContainerCommand.fromSources(containerID, sources);
-    LOG.info("Sending {} to {}", replicateCommand, target);
+    LOG.debug("Trying to send {} to {}", replicateCommand, target);
 
     final boolean sent = sendAndTrackDatanodeCommand(target, replicateCommand,
         action -> addInflight(InflightType.REPLICATION, id, action));
 
     if (sent) {
+      LOG.info("Sent {} to {}", replicateCommand, target);
       metrics.incrReplicationCmdsSentTotal();
       metrics.incrReplicationBytesTotal(container.getUsedBytes());
     }
@@ -2023,27 +2229,33 @@ public class LegacyReplicationManager {
     }
 
     if (excess > 0) {
-      report.incrementAndSample(HealthState.OVER_REPLICATED,
-          container.containerID());
-      int replicationFactor = container.getReplicationFactor().getNumber();
-      LOG.info("Container {} has all unhealthy replicas and is over " +
-              "replicated. Expected replica count" +
-              " is {}, but found {}.", container.getContainerID(),
-          replicationFactor, replicationFactor + excess);
-    }
+      boolean excessDeleted = false;
+      if (container.getState() == LifeCycleState.CLOSED) {
+        // Prefer to delete unhealthy replicas with lower BCS IDs.
+        // If the replica became unhealthy after the container was closed but
+        // before the replica could be closed, it may have a smaller BCSID.
+        deleteExcessLowestBcsIDs(container, deleteCandidates, excess);
+        excessDeleted = true;
+      } else {
+        // Container is not yet closed.
+        // We only need to save the unhealthy replicas if they
+        // represent unique origin node IDs. If recovering these replicas is
+        // possible in the future they could be used to close the container.
+        // If all excess replicas are unique then it is possible none of them
+        // are deleted.
+        excessDeleted = deleteExcessWithNonUniqueOriginNodeIDs(container,
+            replicas, deleteCandidates, excess);
+      }
 
-    if (container.getState() == LifeCycleState.CLOSED) {
-      // Prefer to delete unhealthy replicas with lower BCS IDs.
-      // If the replica became unhealthy after the container was closed but
-      // before the replica could be closed, it may have a smaller BCSID.
-      deleteExcessLowestBcsIDs(container, deleteCandidates, excess);
-    } else {
-      // Container is not yet closed.
-      // We only need to save the unhealthy replicas if they
-      // represent unique origin node IDs. If recovering these replicas is
-      // possible in the future they could be used to close the container.
-      deleteExcessWithNonUniqueOriginNodeIDs(container,
-          replicas, deleteCandidates, excess);
+      if (excessDeleted) {
+        report.incrementAndSample(HealthState.OVER_REPLICATED,
+            container.containerID());
+        int replicationFactor = container.getReplicationFactor().getNumber();
+        LOG.info("Container {} has all unhealthy replicas and is over " +
+                "replicated. Expected replica count" +
+                " is {}, but found {}.", container.getContainerID(),
+            replicationFactor, replicationFactor + excess);
+      }
     }
   }
 
@@ -2074,9 +2286,14 @@ public class LegacyReplicationManager {
           container.getContainerID(), additionalReplicasNeeded);
       // TODO Datanodes currently shuffle sources, so we cannot prioritize
       //  some replicas based on BCSID or origin node ID.
-      replicateAnyWithTopology(container,
-          getReplicationSources(container, replicas), placementStatus,
-          additionalReplicasNeeded);
+      try {
+        replicateAnyWithTopology(container,
+            getReplicationSources(container, replicas), placementStatus,
+            additionalReplicasNeeded, replicas);
+      } catch (SCMException e) {
+        LOG.warn("Could not fix container {} with replicas {}.", container,
+            replicas, e);
+      }
     }
   }
 
@@ -2150,32 +2367,38 @@ public class LegacyReplicationManager {
     }
   }
 
-  private void deleteExcessWithNonUniqueOriginNodeIDs(ContainerInfo container,
+  /**
+   * @param container The container to operate on.
+   * @param allReplicas All replicas, providing all unique origin node IDs to
+   *                   this method.
+   * @param deleteCandidates The subset of allReplicas that are eligible for
+   *                         deletion.
+   * @param excess The maximum number of replicas to delete. If all origin
+   *               node IDs are unique, no replicas may be deleted.
+   * @return True if replicas could be deleted. False otherwise.
+   */
+  private boolean deleteExcessWithNonUniqueOriginNodeIDs(
+      ContainerInfo container,
       List<ContainerReplica> allReplicas,
       List<ContainerReplica> deleteCandidates, int excess) {
     // Remove delete candidates whose origin node ID is not already covered
     // by an existing replica.
     // TODO topology handling must be improved to make an optimal
     //  choice as to which replica to keep.
-
-    // Gather the origin node IDs of replicas which are not candidates for
-    // deletion.
-    Set<UUID> existingOriginNodeIDs = allReplicas.stream()
-        .filter(r -> !deleteCandidates.contains(r))
-        .map(ContainerReplica::getOriginDatanodeId)
-        .collect(Collectors.toSet());
-
-    List<ContainerReplica> nonUniqueDeleteCandidates = new ArrayList<>();
-    for (ContainerReplica replica: deleteCandidates) {
-      if (existingOriginNodeIDs.contains(replica.getOriginDatanodeId())) {
-        nonUniqueDeleteCandidates.add(replica);
-      } else {
-        // Spare this replica with this new origin node ID from deletion.
-        // delete candidates seen later in the loop with this same origin
-        // node ID can be deleted.
-        existingOriginNodeIDs.add(replica.getOriginDatanodeId());
-      }
-    }
+    Set<ContainerReplica> allReplicasSet = new HashSet<>(allReplicas);
+    List<ContainerReplica> nonUniqueDeleteCandidates =
+        ReplicationManagerUtil.findNonUniqueDeleteCandidates(allReplicasSet,
+            deleteCandidates, (dnd) -> {
+              try {
+                return nodeManager.getNodeStatus(dnd);
+              } catch (NodeNotFoundException e) {
+                LOG.warn(
+                    "Exception while finding excess unhealthy replicas to " +
+                        "delete for container {} with replicas {}.", container,
+                    allReplicas, e);
+                return null;
+              }
+            });
 
     if (LOG.isDebugEnabled() && nonUniqueDeleteCandidates.size() < excess) {
       LOG.debug("Unable to delete {} excess replicas of container {}. Only {}" +
@@ -2183,7 +2406,12 @@ public class LegacyReplicationManager {
           "this unclosed container.", excess, container.getContainerID(),
           nonUniqueDeleteCandidates.size());
     }
-    deleteExcess(container, nonUniqueDeleteCandidates, excess);
+
+    boolean deleteCandidatesPresent = !nonUniqueDeleteCandidates.isEmpty();
+    if (deleteCandidatesPresent) {
+      deleteExcess(container, nonUniqueDeleteCandidates, excess);
+    }
+    return deleteCandidatesPresent;
   }
 
   /**
@@ -2195,7 +2423,7 @@ public class LegacyReplicationManager {
     // Sort containers with lowest BCSID first. These will be the first ones
     // deleted.
     deleteCandidates.sort(
-        Comparator.comparingLong(ContainerReplica::getSequenceId).reversed());
+        Comparator.comparingLong(ContainerReplica::getSequenceId));
     deleteExcess(container, deleteCandidates, excess);
   }
 
@@ -2205,12 +2433,14 @@ public class LegacyReplicationManager {
    * topology requirements.
    */
   private void replicateAnyWithTopology(ContainerInfo container,
-      List<ContainerReplica> replicas,
-      ContainerPlacementStatus placementStatus, int additionalReplicasNeeded) {
+      List<ContainerReplica> sourceReplicas,
+      ContainerPlacementStatus placementStatus, int additionalReplicasNeeded,
+      List<ContainerReplica> allReplicas)
+      throws SCMException {
     try {
       final ContainerID id = container.containerID();
 
-      final List<DatanodeDetails> sourceDNs = replicas.stream()
+      final List<DatanodeDetails> sourceDNs = sourceReplicas.stream()
           .map(ContainerReplica::getDatanodeDetails)
           .collect(Collectors.toList());
       final List<DatanodeDetails> replicationInFlight
@@ -2236,19 +2466,15 @@ public class LegacyReplicationManager {
           return;
         }
 
-        // We should ensure that the target datanode has enough space
-        // for a complete container to be created, but since the container
-        // size may be changed smaller than origin, we should be defensive.
-        final long dataSizeRequired = Math.max(container.getUsedBytes(),
-            currentContainerSize);
-        final List<DatanodeDetails> excludeList = replicas.stream()
-                .filter(r -> !r.getDatanodeDetails().isDecommissioned())
+        final List<DatanodeDetails> excludeList = allReplicas.stream()
             .map(ContainerReplica::getDatanodeDetails)
             .collect(Collectors.toList());
         excludeList.addAll(replicationInFlight);
-        final List<DatanodeDetails> selectedDatanodes = containerPlacement
-            .chooseDatanodes(excludeList, null, replicasNeeded,
-                0, dataSizeRequired);
+        final List<DatanodeDetails> selectedDatanodes =
+            ReplicationManagerUtil.getTargetDatanodes(containerPlacement,
+                replicasNeeded, null, excludeList, currentContainerSize,
+                container);
+
         if (additionalReplicasNeeded > 0) {
           LOG.info("Container {} is under replicated. Expected replica count" +
                   " is {}, but found {}.", id, replicationFactor,
@@ -2283,9 +2509,48 @@ public class LegacyReplicationManager {
                 "replica found.",
             container.containerID());
       }
-    } catch (IOException | IllegalStateException ex) {
+    } catch (IllegalStateException ex) {
       LOG.warn("Exception while replicating container {}.",
           container.getContainerID(), ex);
+    }
+  }
+
+  /**
+   * Replicates each of the ContainerReplica specified in sources to new
+   * Datanodes. Will not consider Datanodes hosting existing replicas and
+   * Datanodes pending adds as targets. Note that this method simply skips
+   * the replica if there's an exception.
+   * @param container Container whose replicas are specified as sources
+   * @param sources List containing replicas, each will be replicated
+   * @param allReplicas all existing replicas of this container
+   */
+  private void replicateEachSource(ContainerInfo container,
+      List<ContainerReplica> sources, List<ContainerReplica> allReplicas) {
+    final List<DatanodeDetails> excludeList = allReplicas.stream()
+        .map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toList());
+
+    for (ContainerReplica replica : sources) {
+      // also exclude any DNs pending to receive a replica of this container
+      final List<DatanodeDetails> replicationInFlight
+          = inflightReplication.getDatanodeDetails(container.containerID());
+      for (DatanodeDetails dn : replicationInFlight) {
+        if (!excludeList.contains(dn)) {
+          excludeList.add(dn);
+        }
+      }
+
+      try {
+        final List<DatanodeDetails> target =
+            ReplicationManagerUtil.getTargetDatanodes(containerPlacement,
+                1, null, excludeList, currentContainerSize,
+                container);
+        sendReplicateCommand(container, target.iterator().next(),
+            ImmutableList.of(replica.getDatanodeDetails()));
+      } catch (SCMException e) {
+        LOG.warn("Exception while trying to replicate {} of container {}.",
+            replica, container, e);
+      }
     }
   }
 

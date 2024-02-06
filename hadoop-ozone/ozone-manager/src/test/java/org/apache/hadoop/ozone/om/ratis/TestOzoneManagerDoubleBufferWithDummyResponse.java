@@ -19,17 +19,18 @@
 package org.apache.hadoop.ozone.om.ratis;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.apache.ratis.server.protocol.TermIndex;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -48,46 +49,40 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * This class tests OzoneManagerDoubleBuffer implementation with
  * dummy response class.
  */
+@Timeout(300)
 public class TestOzoneManagerDoubleBufferWithDummyResponse {
 
   private OMMetadataManager omMetadataManager;
   private OzoneManagerDoubleBuffer doubleBuffer;
   private final AtomicLong trxId = new AtomicLong(0);
-  private long lastAppliedIndex;
   private long term = 1L;
+  @TempDir
+  private Path folder;
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
-
-  @Before
+  @BeforeEach
   public void setup() throws IOException {
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(OZONE_METADATA_DIRS,
-        folder.newFolder().getAbsolutePath());
+        folder.toAbsolutePath().toString());
     omMetadataManager =
         new OmMetadataManagerImpl(configuration, null);
-    OzoneManagerRatisSnapshot ozoneManagerRatisSnapshot = index -> {
-      lastAppliedIndex = index.get(index.size() - 1);
-    };
-    doubleBuffer = new OzoneManagerDoubleBuffer.Builder()
+    doubleBuffer = OzoneManagerDoubleBuffer.newBuilder()
         .setOmMetadataManager(omMetadataManager)
-        .setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
-        .setmaxUnFlushedTransactionCount(10000)
+        .setMaxUnFlushedTransactionCount(10000)
         .enableRatis(true)
-        .setIndexToTerm((val) -> term)
         .build();
   }
 
-  @After
+  @AfterEach
   public void stop() {
     doubleBuffer.stop();
   }
@@ -97,12 +92,11 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
    * check OM DB bucket table has 100 entries or not. In addition checks
    * flushed transaction count is matching with expected count or not.
    */
-  @Test(timeout = 300_000)
+  @Test
   public void testDoubleBufferWithDummyResponse() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     int bucketCount = 100;
-    OzoneManagerDoubleBufferMetrics metrics =
-        doubleBuffer.getOzoneManagerDoubleBufferMetrics();
+    final OzoneManagerDoubleBufferMetrics metrics = doubleBuffer.getMetrics();
 
     // As we have not flushed/added any transactions, all metrics should have
     // value zero.
@@ -112,38 +106,33 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
 
     for (int i = 0; i < bucketCount; i++) {
       doubleBuffer.add(createDummyBucketResponse(volumeName),
-          trxId.incrementAndGet());
+          TermIndex.valueOf(term, trxId.incrementAndGet()));
     }
     waitFor(() -> metrics.getTotalNumOfFlushedTransactions() == bucketCount,
         100, 60000);
 
-    assertTrue(metrics.getTotalNumOfFlushOperations() > 0);
-    assertEquals(bucketCount, doubleBuffer.getFlushedTransactionCount());
-    assertTrue(metrics.getMaxNumberOfTransactionsFlushedInOneIteration() > 0);
+    assertThat(metrics.getTotalNumOfFlushOperations()).isGreaterThan(0);
+    assertEquals(bucketCount, doubleBuffer.getFlushedTransactionCountForTesting());
+    assertThat(metrics.getMaxNumberOfTransactionsFlushedInOneIteration()).isGreaterThan(0);
     assertEquals(bucketCount, omMetadataManager.countRowsInTable(
         omMetadataManager.getBucketTable()));
-    assertTrue(doubleBuffer.getFlushIterations() > 0);
-    assertTrue(metrics.getFlushTime().lastStat().numSamples() > 0);
-    assertTrue(metrics.getAvgFlushTransactionsInOneIteration() > 0);
+    assertThat(doubleBuffer.getFlushIterationsForTesting()).isGreaterThan(0);
+    assertThat(metrics.getFlushTime().lastStat().numSamples()).isGreaterThan(0);
+    assertThat(metrics.getAvgFlushTransactionsInOneIteration()).isGreaterThan(0);
     assertEquals(bucketCount, (long) metrics.getQueueSize().lastStat().total());
-    assertTrue(metrics.getQueueSize().lastStat().numSamples() > 0);
+    assertThat(metrics.getQueueSize().lastStat().numSamples()).isGreaterThan(0);
 
     // Assert there is only instance of OM Double Metrics.
     OzoneManagerDoubleBufferMetrics metricsCopy =
         OzoneManagerDoubleBufferMetrics.create();
     assertEquals(metrics, metricsCopy);
 
-    // Check lastAppliedIndex is updated correctly or not.
-    assertEquals(bucketCount, lastAppliedIndex);
-
-
     TransactionInfo transactionInfo =
         omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
+    // Check lastAppliedIndex is updated correctly or not.
     assertNotNull(transactionInfo);
-
-    Assert.assertEquals(lastAppliedIndex,
-        transactionInfo.getTransactionIndex());
-    Assert.assertEquals(term, transactionInfo.getTerm());
+    assertEquals(bucketCount, transactionInfo.getTransactionIndex());
+    assertEquals(term, transactionInfo.getTerm());
   }
 
   /**

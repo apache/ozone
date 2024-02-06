@@ -71,7 +71,7 @@ public class GrpcMetrics implements MetricsSource {
           new MutableQuantiles[intervals.length];
       for (int i = 0; i < intervals.length; i++) {
         int interval = intervals[i];
-        grpcProcessingTimeMillisQuantiles[i] = registry
+        grpcQueueTimeMillisQuantiles[i] = registry
             .newQuantiles("grpcQueueTime" + interval
                     + "s", "grpc queue time in millisecond", "ops",
                 "latency", interval);
@@ -104,18 +104,9 @@ public class GrpcMetrics implements MetricsSource {
 
   @Override
   public synchronized void getMetrics(MetricsCollector collector, boolean all) {
+    registry.snapshot(collector.addRecord(registry.info()), all);
     MetricsRecordBuilder recordBuilder = collector.addRecord(SOURCE_NAME);
-
     recordBuilder.tag(LATEST_REQUEST_TYPE, requestType);
-
-    sentBytes.snapshot(recordBuilder, all);
-    receivedBytes.snapshot(recordBuilder, all);
-    unknownMessagesSent.snapshot(recordBuilder, all);
-    unknownMessagesReceived.snapshot(recordBuilder, all);
-    grpcQueueTime.snapshot(recordBuilder, all);
-    grpcProcessingTime.snapshot(recordBuilder, all);
-    numOpenClientConnections.snapshot(recordBuilder, all);
-    recordBuilder.endRecord();
   }
 
   @Metric("Number of sent bytes")

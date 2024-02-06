@@ -27,48 +27,38 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.TemporaryFolder;
-import org.junit.rules.Timeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.mockito.Mockito;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.UUID;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.OPEN;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
-import static org.hamcrest.core.Is.is;
-import static org.junit.Assert.assertThat;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.anyList;
+import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests unhealthy container functionality in the {@link KeyValueContainer}
  * class.
  */
-@RunWith(Parameterized.class)
+@Timeout(600)
 public class TestKeyValueContainerMarkUnhealthy {
   public static final Logger LOG = LoggerFactory.getLogger(
       TestKeyValueContainerMarkUnhealthy.class);
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
-
-  @Rule
-  public Timeout timeout = Timeout.seconds(600);
-
-  @Rule
-  public ExpectedException thrown = ExpectedException.none();
+  @TempDir
+  private Path folder;
 
   private OzoneConfiguration conf;
   private String scmId = UUID.randomUUID().toString();
@@ -78,22 +68,18 @@ public class TestKeyValueContainerMarkUnhealthy {
   private KeyValueContainer keyValueContainer;
   private UUID datanodeId;
 
-  private final ContainerLayoutVersion layout;
+  private ContainerLayoutVersion layout;
 
-  public TestKeyValueContainerMarkUnhealthy(ContainerLayoutVersion layout) {
-    this.layout = layout;
+  private void initTestData(ContainerLayoutVersion layoutVersion) throws Exception {
+    this.layout = layoutVersion;
+    setup();
   }
 
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
-    return ContainerLayoutTestInfo.containerLayoutParameters();
-  }
-
-  @Before
-  public void setUp() throws Exception {
+  public void setup() throws Exception {
     conf = new OzoneConfiguration();
     datanodeId = UUID.randomUUID();
-    String dataDir = folder.newFolder("data").getAbsolutePath();
+    String dataDir = Files.createDirectory(
+        folder.resolve("data")).toAbsolutePath().toString();
     HddsVolume hddsVolume = new HddsVolume.Builder(dataDir)
         .conf(conf)
         .datanodeUuid(datanodeId.toString())
@@ -103,14 +89,15 @@ public class TestKeyValueContainerMarkUnhealthy {
 
     volumeSet = mock(MutableVolumeSet.class);
     volumeChoosingPolicy = mock(RoundRobinVolumeChoosingPolicy.class);
-    Mockito.when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong()))
         .thenReturn(hddsVolume);
 
     keyValueContainerData = new KeyValueContainerData(1L,
         layout,
         (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
         datanodeId.toString());
-    final File metaDir = folder.newFolder("meta");
+    final File metaDir = Files.createDirectory(
+        folder.resolve("meta")).toAbsolutePath().toFile();
     keyValueContainerData.setMetadataPath(metaDir.getPath());
 
 
@@ -118,7 +105,7 @@ public class TestKeyValueContainerMarkUnhealthy {
         keyValueContainerData, conf);
   }
 
-  @After
+  @AfterEach
   public void teardown() {
     volumeSet = null;
     keyValueContainer = null;
@@ -131,64 +118,71 @@ public class TestKeyValueContainerMarkUnhealthy {
    *
    * @throws IOException
    */
-  @Test
-  public void testMarkContainerUnhealthy() throws IOException {
-    assertThat(keyValueContainerData.getState(), is(OPEN));
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testMarkContainerUnhealthy(ContainerLayoutVersion layoutVersion) throws Exception {
+    initTestData(layoutVersion);
+    assertThat(keyValueContainerData.getState()).isEqualTo(OPEN);
     keyValueContainer.markContainerUnhealthy();
-    assertThat(keyValueContainerData.getState(), is(UNHEALTHY));
+    assertThat(keyValueContainerData.getState()).isEqualTo(UNHEALTHY);
 
     // Check metadata in the .container file
     File containerFile = keyValueContainer.getContainerFile();
 
     keyValueContainerData = (KeyValueContainerData) ContainerDataYaml
         .readContainerFile(containerFile);
-    assertThat(keyValueContainerData.getState(), is(UNHEALTHY));
+    assertThat(keyValueContainerData.getState()).isEqualTo(UNHEALTHY);
   }
 
   /**
    * Attempting to close an unhealthy container should fail.
+   *
    * @throws IOException
    */
-  @Test
-  public void testCloseUnhealthyContainer() throws IOException {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testCloseUnhealthyContainer(ContainerLayoutVersion layoutVersion) throws Exception {
+    initTestData(layoutVersion);
     keyValueContainer.markContainerUnhealthy();
-    thrown.expect(StorageContainerException.class);
-    keyValueContainer.markContainerForClose();
+    assertThrows(StorageContainerException.class, () ->
+        keyValueContainer.markContainerForClose());
+
   }
 
   /**
    * Attempting to mark a closed container as unhealthy should succeed.
    */
-  @Test
-  public void testMarkClosedContainerAsUnhealthy() throws IOException {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testMarkClosedContainerAsUnhealthy(ContainerLayoutVersion layoutVersion) throws Exception {
+    initTestData(layoutVersion);
     // We need to create the container so the compact-on-close operation
     // does not NPE.
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
     keyValueContainer.close();
     keyValueContainer.markContainerUnhealthy();
-    assertThat(keyValueContainerData.getState(), is(UNHEALTHY));
+    assertThat(keyValueContainerData.getState()).isEqualTo(UNHEALTHY);
   }
 
   /**
    * Attempting to mark a quasi-closed container as unhealthy should succeed.
    */
-  @Test
-  public void testMarkQuasiClosedContainerAsUnhealthy() throws IOException {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testMarkQuasiClosedContainerAsUnhealthy(ContainerLayoutVersion layoutVersion) throws Exception {
+    initTestData(layoutVersion);
     // We need to create the container so the sync-on-quasi-close operation
     // does not NPE.
     keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
     keyValueContainer.quasiClose();
     keyValueContainer.markContainerUnhealthy();
-    assertThat(keyValueContainerData.getState(), is(UNHEALTHY));
+    assertThat(keyValueContainerData.getState()).isEqualTo(UNHEALTHY);
   }
 
   /**
    * Attempting to mark a closing container as unhealthy should succeed.
    */
-  @Test
-  public void testMarkClosingContainerAsUnhealthy() throws IOException {
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testMarkClosingContainerAsUnhealthy(ContainerLayoutVersion layoutVersion) throws Exception {
+    initTestData(layoutVersion);
     keyValueContainer.markContainerForClose();
     keyValueContainer.markContainerUnhealthy();
-    assertThat(keyValueContainerData.getState(), is(UNHEALTHY));
+    assertThat(keyValueContainerData.getState()).isEqualTo(UNHEALTHY);
   }
 }

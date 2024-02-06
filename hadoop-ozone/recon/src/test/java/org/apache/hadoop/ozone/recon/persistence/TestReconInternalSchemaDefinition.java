@@ -40,6 +40,10 @@ import org.junit.jupiter.api.Test;
  */
 public class TestReconInternalSchemaDefinition extends AbstractReconSqlDBTest {
 
+  public TestReconInternalSchemaDefinition() {
+    super();
+  }
+
   @Test
   public void testSchemaCreated() throws Exception {
 

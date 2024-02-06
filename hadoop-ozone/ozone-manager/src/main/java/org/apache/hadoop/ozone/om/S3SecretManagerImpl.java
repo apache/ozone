@@ -26,6 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.List;
 
 import static org.apache.hadoop.hdds.security.exception.OzoneSecurityException.ResultCodes.S3_SECRET_NOT_FOUND;
 
@@ -56,8 +57,12 @@ public class S3SecretManagerImpl implements S3SecretManager {
         "kerberosID cannot be null or empty.");
     S3SecretValue cacheValue = s3SecretCache.get(kerberosID);
     if (cacheValue != null) {
-      return new S3SecretValue(cacheValue.getKerberosID(),
-          cacheValue.getAwsSecret());
+      if (cacheValue.isDeleted()) {
+        // The cache entry is marked as deleted which means the user has
+        // purposely deleted the secret. Hence, we do not have to check the DB.
+        return null;
+      }
+      return cacheValue;
     }
     S3SecretValue result = s3SecretStore.getSecret(kerberosID);
     if (result != null) {
@@ -103,6 +108,11 @@ public class S3SecretManagerImpl implements S3SecretManager {
   }
 
   @Override
+  public void clearS3Cache(List<Long> flushedTransactionIds) {
+    clearCache(flushedTransactionIds);
+  }
+
+  @Override
   public <T> T doUnderLock(String lockId, S3SecretFunction<T> action)
       throws IOException {
     throw new UnsupportedOperationException(
@@ -117,5 +127,10 @@ public class S3SecretManagerImpl implements S3SecretManager {
   @Override
   public S3Batcher batcher() {
     return s3SecretStore.batcher();
+  }
+
+  @Override
+  public void updateCache(String kerberosID, S3SecretValue secret) {
+    S3SecretManager.super.updateCache(kerberosID, secret);
   }
 }

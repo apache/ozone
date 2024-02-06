@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.security;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -33,7 +34,6 @@ import java.util.UUID;
 import com.google.common.collect.ImmutableList;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.io.Text;
@@ -57,21 +57,23 @@ import org.apache.hadoop.util.Time;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import org.apache.ratis.protocol.RaftPeerId;
 import org.bouncycastle.jcajce.provider.asymmetric.x509.CertificateFactory;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.mockito.Mockito;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test class for {@link OzoneDelegationTokenSecretManager}.
@@ -84,17 +86,17 @@ public class TestOzoneDelegationTokenSecretManager {
   private OzoneManager om;
   private OzoneDelegationTokenSecretManager secretManager;
   private SecurityConfig securityConfig;
-  private CertificateClient certificateClient;
+  private OMCertificateClient certificateClient;
   private long expiryTime;
   private Text serviceRpcAdd;
   private OzoneConfiguration conf;
   private static final Text TEST_USER = new Text("testUser");
   private S3SecretManager s3SecretManager;
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     conf = createNewTestPath();
     securityConfig = new SecurityConfig(conf);
@@ -104,15 +106,15 @@ public class TestOzoneDelegationTokenSecretManager {
     serviceRpcAdd = new Text("localhost");
     final Map<String, S3SecretValue> s3Secrets = new HashMap<>();
     s3Secrets.put("testuser1",
-        new S3SecretValue("testuser1", "dbaksbzljandlkandlsd"));
+        S3SecretValue.of("testuser1", "dbaksbzljandlkandlsd"));
     s3Secrets.put("abc",
-        new S3SecretValue("abc", "djakjahkd"));
-    om = Mockito.mock(OzoneManager.class);
+        S3SecretValue.of("abc", "djakjahkd"));
+    om = mock(OzoneManager.class);
     OMMetadataManager metadataManager = new OmMetadataManagerImpl(conf, om);
-    Mockito.when(om.getMetadataManager()).thenReturn(metadataManager);
+    when(om.getMetadataManager()).thenReturn(metadataManager);
     s3SecretManager = new S3SecretLockedManager(
         new S3SecretManagerImpl(new S3SecretStoreMap(s3Secrets),
-            Mockito.mock(S3SecretCache.class)),
+            mock(S3SecretCache.class)),
         metadataManager.getLock()
     );
   }
@@ -127,9 +129,9 @@ public class TestOzoneDelegationTokenSecretManager {
     //  OzoneDelegationTokenSecretManager, this test should be updated to
     //  test both ratis enabled and disabled case.
     config.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
-    File newFolder = folder.newFolder();
+    File newFolder = folder.toFile();
     if (!newFolder.exists()) {
-      Assert.assertTrue(newFolder.mkdirs());
+      assertTrue(newFolder.mkdirs());
     }
     ServerUtils.setOzoneMetaDirPath(config, newFolder.toString());
     return config;
@@ -138,7 +140,7 @@ public class TestOzoneDelegationTokenSecretManager {
   /**
    * Helper function to create certificate client.
    * */
-  private CertificateClient setupCertificateClient() throws Exception {
+  private OMCertificateClient setupCertificateClient() throws Exception {
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
     CertificateFactory fact = CertificateCodec.getCertFactory();
     X509Certificate singleCert = KeyStoreTestUtil
@@ -174,7 +176,7 @@ public class TestOzoneDelegationTokenSecretManager {
     };
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws IOException {
     secretManager.stop();
     certificateClient.close();
@@ -184,32 +186,33 @@ public class TestOzoneDelegationTokenSecretManager {
   public void testLeadershipCheckinRetrievePassword() throws Exception {
     secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
         expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
-    Mockito.doThrow(new OMNotLeaderException(RaftPeerId.valueOf("om")))
+    doThrow(new OMNotLeaderException(RaftPeerId.valueOf("om")))
         .when(om).checkLeaderStatus();
     OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
     try {
       secretManager.retrievePassword(identifier);
     } catch (Exception e) {
-      Assert.assertEquals(SecretManager.InvalidToken.class, e.getClass());
-      Assert.assertEquals(OMNotLeaderException.class, e.getCause().getClass());
+      assertEquals(SecretManager.InvalidToken.class, e.getClass());
+      assertEquals(OMNotLeaderException.class,
+          e.getCause().getClass());
     }
 
-    Mockito.doThrow(new OMLeaderNotReadyException("Leader not ready"))
+    doThrow(new OMLeaderNotReadyException("Leader not ready"))
         .when(om).checkLeaderStatus();
     try {
       secretManager.retrievePassword(identifier);
     } catch (Exception e) {
-      Assert.assertEquals(SecretManager.InvalidToken.class, e.getClass());
-      Assert.assertEquals(OMLeaderNotReadyException.class,
+      assertEquals(SecretManager.InvalidToken.class, e.getClass());
+      assertEquals(OMLeaderNotReadyException.class,
           e.getCause().getClass());
     }
 
-    Mockito.doNothing().when(om).checkLeaderStatus();
+    doNothing().when(om).checkLeaderStatus();
     try {
       secretManager.retrievePassword(identifier);
     } catch (Exception e) {
-      Assert.assertEquals(SecretManager.InvalidToken.class, e.getClass());
-      Assert.assertNull(e.getCause());
+      assertEquals(SecretManager.InvalidToken.class, e.getClass());
+      assertNull(e.getCause());
     }
   }
 
@@ -223,9 +226,9 @@ public class TestOzoneDelegationTokenSecretManager {
     OzoneTokenIdentifier identifier =
         OzoneTokenIdentifier.readProtoBuf(token.getIdentifier());
     // Check basic details.
-    Assert.assertTrue(identifier.getRealUser().equals(TEST_USER));
-    Assert.assertTrue(identifier.getRenewer().equals(TEST_USER));
-    Assert.assertTrue(identifier.getOwner().equals(TEST_USER));
+    assertEquals(identifier.getRealUser(), TEST_USER);
+    assertEquals(identifier.getRenewer(), TEST_USER);
+    assertEquals(identifier.getOwner(), TEST_USER);
 
     validateHash(token.getPassword(), token.getIdentifier());
   }
@@ -252,7 +255,7 @@ public class TestOzoneDelegationTokenSecretManager {
     }
 
     long renewalTime = secretManager.renewToken(token, TEST_USER.toString());
-    Assert.assertTrue(renewalTime > 0);
+    assertThat(renewalTime).isGreaterThan(0);
   }
 
   @Test
@@ -318,7 +321,7 @@ public class TestOzoneDelegationTokenSecretManager {
     IOException ioException =
         assertThrows(IOException.class,
             () -> secretManager.renewToken(token, TEST_USER.toString()));
-    assertTrue(ioException.getMessage().contains("is expired"));
+    assertThat(ioException.getMessage()).contains("is expired");
   }
 
   @Test
@@ -369,7 +372,7 @@ public class TestOzoneDelegationTokenSecretManager {
         .getSerialNumber().toString());
     id.setMaxDate(Time.now() + 60 * 60 * 24);
     id.setOwner(new Text("test"));
-    Assert.assertTrue(secretManager.verifySignature(id,
+    assertTrue(secretManager.verifySignature(id,
         certificateClient.signData(id.getBytes())));
   }
 
@@ -383,7 +386,7 @@ public class TestOzoneDelegationTokenSecretManager {
     id.setOmCertSerialId("1927393");
     id.setMaxDate(Time.now() + 60 * 60 * 24);
     id.setOwner(new Text("test"));
-    Assert.assertFalse(secretManager.verifySignature(id, id.getBytes()));
+    assertFalse(secretManager.verifySignature(id, id.getBytes()));
   }
 
   @Test
@@ -463,7 +466,7 @@ public class TestOzoneDelegationTokenSecretManager {
             securityConfig.getProvider());
     rsaSignature.initVerify(certificateClient.getPublicKey());
     rsaSignature.update(identifier);
-    Assert.assertTrue(rsaSignature.verify(hash));
+    assertTrue(rsaSignature.verify(hash));
   }
 
   /**

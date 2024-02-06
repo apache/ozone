@@ -27,14 +27,12 @@ import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.junit.Assert;
-import org.junit.Rule;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.rules.Timeout;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -45,32 +43,27 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.Stream;
 
 import static com.google.common.collect.Lists.newLinkedList;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_CACHE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
 import static org.junit.jupiter.params.provider.Arguments.of;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test covers listKeys(keyPrefix, startKey, shallow) combinations
  * in a legacy/OBS bucket layout type.
  */
+@Timeout(1200)
 public class TestListKeys {
 
   private static MiniOzoneCluster cluster = null;
 
   private static OzoneConfiguration conf;
-  private static String clusterId;
-  private static String scmId;
-  private static String omId;
 
   private static OzoneBucket legacyOzoneBucket;
   private static OzoneClient client;
-
-  @Rule
-  public Timeout timeout = new Timeout(1200000);
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -82,14 +75,10 @@ public class TestListKeys {
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
-    omId = UUID.randomUUID().toString();
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 3);
     conf.setInt(OZONE_CLIENT_LIST_CACHE_SIZE, 3);
-    cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
-        .setScmId(scmId).setOmId(omId).build();
+    cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
 
@@ -295,7 +284,7 @@ public class TestListKeys {
     List <String> keyLists = new ArrayList<>();
     while (ozoneKeyIterator.hasNext()) {
       OzoneKey ozoneKey = ozoneKeyIterator.next();
-      Assert.assertEquals(expectedReplication, ozoneKey.getReplicationConfig());
+      assertEquals(expectedReplication, ozoneKey.getReplicationConfig());
       keyLists.add(ozoneKey.getName());
     }
     LinkedList outputKeysList = new LinkedList(keyLists);
@@ -306,7 +295,7 @@ public class TestListKeys {
     }
     System.out.println("END:::keyPrefix---> " + keyPrefix + ":::---> " +
         startKey);
-    Assert.assertEquals(keys, outputKeysList);
+    assertEquals(keys, outputKeysList);
   }
 
   private static void createKeys(OzoneBucket ozoneBucket, List<String> keys)
@@ -335,7 +324,6 @@ public class TestListKeys {
     ozoneInputStream.read(read, 0, length);
     ozoneInputStream.close();
 
-    Assert.assertEquals(new String(input, StandardCharsets.UTF_8),
-        new String(read, StandardCharsets.UTF_8));
+    assertEquals(new String(input, StandardCharsets.UTF_8), new String(read, StandardCharsets.UTF_8));
   }
 }

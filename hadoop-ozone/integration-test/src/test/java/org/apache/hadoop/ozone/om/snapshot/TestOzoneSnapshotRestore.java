@@ -42,9 +42,9 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -53,7 +53,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -63,11 +62,13 @@ import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 /**
  * Tests Snapshot Restore function.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(value = 300)
 public class TestOzoneSnapshotRestore {
   private static final String OM_SERVICE_ID = "om-service-test-1";
@@ -96,19 +97,15 @@ public class TestOzoneSnapshotRestore {
     counter = new AtomicInteger();
   }
 
-  @BeforeEach
+  @BeforeAll
   public void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     // Enable filesystem snapshot feature for the test regardless of the default
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, true);
 
-    String clusterId = UUID.randomUUID().toString();
-    String scmId = UUID.randomUUID().toString();
     String serviceID = OM_SERVICE_ID + RandomStringUtils.randomNumeric(5);
 
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
-            .setClusterId(clusterId)
-            .setScmId(scmId)
             .setOMServiceId(serviceID)
             .setNumOfOzoneManagers(3)
             .build();
@@ -133,7 +130,7 @@ public class TestOzoneSnapshotRestore {
 
   }
 
-  @AfterEach
+  @AfterAll
   public void tearDown() throws Exception {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -194,7 +191,7 @@ public class TestOzoneSnapshotRestore {
       // Copy key from source to destination path
       int res = ToolRunner.run(shell,
               new String[]{"-cp", sourcePath, destPath});
-      Assertions.assertEquals(0, res);
+      assertEquals(0, res);
     } finally {
       shell.close();
     }
@@ -222,12 +219,11 @@ public class TestOzoneSnapshotRestore {
 
     String snapshotKeyPrefix = createSnapshot(volume, bucket, snapshotName);
 
-    int volBucketKeyCount = keyCount(buck, snapshotKeyPrefix + keyPrefix);
-    Assertions.assertEquals(5, volBucketKeyCount);
+    assertDoesNotThrow(() -> waitForKeyCount(buck,
+        snapshotKeyPrefix + keyPrefix, 5));
 
     deleteKeys(buck);
-    int delKeyCount = keyCount(buck, keyPrefix);
-    Assertions.assertEquals(0, delKeyCount);
+    assertDoesNotThrow(() -> waitForKeyCount(buck, keyPrefix, 0));
 
     String sourcePath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket
         + OM_KEY_PREFIX + snapshotKeyPrefix;
@@ -266,8 +262,9 @@ public class TestOzoneSnapshotRestore {
 
     String snapshotKeyPrefix = createSnapshot(volume, bucket, snapshotName);
 
-    int volBucketKeyCount = keyCount(buck, snapshotKeyPrefix + keyPrefix);
-    Assertions.assertEquals(5, volBucketKeyCount);
+    assertDoesNotThrow(() -> waitForKeyCount(buck,
+        snapshotKeyPrefix + keyPrefix, 5));
+
 
     // Delete keys from the source bucket.
     // This is temporary fix to make sure that test passes all the time.
@@ -325,8 +322,8 @@ public class TestOzoneSnapshotRestore {
 
     String snapshotKeyPrefix = createSnapshot(volume, bucket, snapshotName);
 
-    int volBucketKeyCount = keyCount(buck, snapshotKeyPrefix + keyPrefix);
-    Assertions.assertEquals(5, volBucketKeyCount);
+    assertDoesNotThrow(() -> waitForKeyCount(buck,
+        snapshotKeyPrefix + keyPrefix, 5));
 
     String sourcePath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket
         + OM_KEY_PREFIX + snapshotKeyPrefix;
@@ -373,8 +370,7 @@ public class TestOzoneSnapshotRestore {
 
     // delete all keys in bucket before restoring from snapshot
     deleteKeys(buck);
-    int keyCountAfterDelete = keyCount(buck, "key-");
-    Assertions.assertEquals(0, keyCountAfterDelete);
+    assertDoesNotThrow(() -> waitForKeyCount(buck, "key-", 0));
 
     String sourcePath = OM_KEY_PREFIX + volume + OM_KEY_PREFIX + bucket
             + OM_KEY_PREFIX + snapshotKeyPrefix[9];

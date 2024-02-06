@@ -46,11 +46,13 @@ import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImp
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTask;
 import org.hadoop.ozone.recon.schema.tables.daos.GlobalStatsDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.GlobalStats;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import javax.ws.rs.core.Response;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.ArrayList;
@@ -67,6 +69,9 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandom
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -74,7 +79,8 @@ import static org.mockito.Mockito.when;
  * Unit test for OmDBInsightEndPoint.
  */
 public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
-
+  @TempDir
+  private Path temporaryFolder;
   private OzoneStorageContainerManager ozoneStorageContainerManager;
   private ReconContainerMetadataManager reconContainerMetadataManager;
   private OMMetadataManager omMetadataManager;
@@ -86,6 +92,10 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private OzoneConfiguration ozoneConfiguration;
   private Set<Long> generatedIds = new HashSet<>();
 
+  public TestOmDBInsightEndPoint() {
+    super();
+  }
+
   private long generateUniqueRandomLong() {
     long newValue;
     do {
@@ -96,14 +106,16 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     return newValue;
   }
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     omMetadataManager = initializeNewOmMetadataManager(
-        temporaryFolder.newFolder());
+        Files.createDirectory(temporaryFolder.resolve(
+            "JunitOmMetadata")).toFile());
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
-        temporaryFolder.newFolder());
+        Files.createDirectory(temporaryFolder.resolve(
+            "JunitOmMetadataTest")).toFile());
     ReconTestInjector reconTestInjector =
-        new ReconTestInjector.Builder(temporaryFolder)
+        new ReconTestInjector.Builder(temporaryFolder.toFile())
             .withReconSqlDb()
             .withReconOm(reconOMMetadataManager)
             .withOmServiceProvider(mock(OzoneManagerServiceProviderImpl.class))
@@ -215,13 +227,13 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     OmKeyInfo omKeyInfo1 =
         reconOMMetadataManager.getOpenKeyTable(getBucketLayout())
             .get("/sampleVol/bucketOne/key_one");
-    Assertions.assertEquals("key_one", omKeyInfo1.getKeyName());
+    assertEquals("key_one", omKeyInfo1.getKeyName());
     Response openKeyInfoResp =
         omdbInsightEndpoint.getOpenKeyInfo(-1, "", true, true);
     KeyInsightInfoResponse keyInsightInfoResp =
         (KeyInsightInfoResponse) openKeyInfoResp.getEntity();
-    Assertions.assertNotNull(keyInsightInfoResp);
-    Assertions.assertEquals("key_one",
+    assertNotNull(keyInsightInfoResp);
+    assertEquals("key_one",
         keyInsightInfoResp.getNonFSOKeyInfoList().get(0).getPath());
   }
 
@@ -246,16 +258,16 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
 
     Response openKeyInfoResp =
         omdbInsightEndpoint.getOpenKeySummary();
-    Assertions.assertNotNull(openKeyInfoResp);
+    assertNotNull(openKeyInfoResp);
 
     Map<String, Long> openKeysSummary =
         (Map<String, Long>) openKeyInfoResp.getEntity();
     // Assert that the key prefix format is accepted in the global stats
-    Assertions.assertEquals(6L,
+    assertEquals(6L,
         openKeysSummary.get("totalOpenKeys"));
-    Assertions.assertEquals(300L,
+    assertEquals(300L,
         openKeysSummary.get("totalReplicatedDataSize"));
-    Assertions.assertEquals(100L,
+    assertEquals(100L,
         openKeysSummary.get("totalUnreplicatedDataSize"));
 
     // Delete the previous records and Update the new value for valid key prefix
@@ -274,16 +286,16 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
 
     openKeyInfoResp =
         omdbInsightEndpoint.getOpenKeySummary();
-    Assertions.assertNotNull(openKeyInfoResp);
+    assertNotNull(openKeyInfoResp);
 
     openKeysSummary =
         (Map<String, Long>) openKeyInfoResp.getEntity();
     // Assert that the key format is not accepted in the global stats
-    Assertions.assertEquals(0L,
+    assertEquals(0L,
         openKeysSummary.get("totalOpenKeys"));
-    Assertions.assertEquals(0L,
+    assertEquals(0L,
         openKeysSummary.get("totalReplicatedDataSize"));
-    Assertions.assertEquals(0L,
+    assertEquals(0L,
         openKeysSummary.get("totalUnreplicatedDataSize"));
   }
 
@@ -313,31 +325,31 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     // Call the API of Open keys to get the response
     Response openKeyInfoResp =
         omdbInsightEndpoint.getOpenKeySummary();
-    Assertions.assertNotNull(openKeyInfoResp);
+    assertNotNull(openKeyInfoResp);
 
     Map<String, Long> openKeysSummary =
         (Map<String, Long>) openKeyInfoResp.getEntity();
 
-    Assertions.assertEquals(60L,
+    assertEquals(60L,
         openKeysSummary.get("totalReplicatedDataSize"));
-    Assertions.assertEquals(20L,
+    assertEquals(20L,
         openKeysSummary.get("totalUnreplicatedDataSize"));
-    Assertions.assertEquals(6L,
+    assertEquals(6L,
         openKeysSummary.get("totalOpenKeys"));
 
     // Call the API of Deleted keys to get the response
     Response deletedKeyInfoResp =
         omdbInsightEndpoint.getDeletedKeySummary();
-    Assertions.assertNotNull(deletedKeyInfoResp);
+    assertNotNull(deletedKeyInfoResp);
 
     Map<String, Long> deletedKeysSummary = (Map<String, Long>)
         deletedKeyInfoResp.getEntity();
 
-    Assertions.assertEquals(30L,
+    assertEquals(30L,
         deletedKeysSummary.get("totalReplicatedDataSize"));
-    Assertions.assertEquals(10L,
+    assertEquals(10L,
         deletedKeysSummary.get("totalUnreplicatedDataSize"));
-    Assertions.assertEquals(3L,
+    assertEquals(3L,
         deletedKeysSummary.get("totalDeletedKeys"));
   }
 
@@ -367,25 +379,25 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         omdbInsightEndpoint.getOpenKeyInfo(2, "", true, true);
     KeyInsightInfoResponse keyInsightInfoResp =
         (KeyInsightInfoResponse) openKeyInfoResp.getEntity();
-    Assertions.assertNotNull(keyInsightInfoResp);
-    Assertions.assertEquals(2,
+    assertNotNull(keyInsightInfoResp);
+    assertEquals(2,
         keyInsightInfoResp.getNonFSOKeyInfoList().size());
-    Assertions.assertEquals(0, keyInsightInfoResp.getFsoKeyInfoList().size());
-    Assertions.assertEquals(2, keyInsightInfoResp.getFsoKeyInfoList().size() +
+    assertEquals(0, keyInsightInfoResp.getFsoKeyInfoList().size());
+    assertEquals(2, keyInsightInfoResp.getFsoKeyInfoList().size() +
         keyInsightInfoResp.getNonFSOKeyInfoList().size());
-    Assertions.assertEquals("key_three",
+    assertEquals("key_three",
         keyInsightInfoResp.getNonFSOKeyInfoList().get(1).getPath());
 
     openKeyInfoResp = omdbInsightEndpoint.getOpenKeyInfo(3, "", true, true);
     keyInsightInfoResp =
         (KeyInsightInfoResponse) openKeyInfoResp.getEntity();
-    Assertions.assertNotNull(keyInsightInfoResp);
-    Assertions.assertEquals(2,
+    assertNotNull(keyInsightInfoResp);
+    assertEquals(2,
         keyInsightInfoResp.getNonFSOKeyInfoList().size());
-    Assertions.assertEquals(1, keyInsightInfoResp.getFsoKeyInfoList().size());
-    Assertions.assertEquals(3, keyInsightInfoResp.getFsoKeyInfoList().size() +
+    assertEquals(1, keyInsightInfoResp.getFsoKeyInfoList().size());
+    assertEquals(3, keyInsightInfoResp.getFsoKeyInfoList().size() +
         keyInsightInfoResp.getNonFSOKeyInfoList().size());
-    Assertions.assertEquals("key_three",
+    assertEquals("key_three",
         keyInsightInfoResp.getNonFSOKeyInfoList().get(1).getPath());
   }
 
@@ -430,10 +442,10 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         omdbInsightEndpoint.getOpenKeyInfo(10, "", true, false);
     KeyInsightInfoResponse keyInsightInfoResp =
         (KeyInsightInfoResponse) openKeyInfoResp.getEntity();
-    Assertions.assertNotNull(keyInsightInfoResp);
-    Assertions.assertEquals(4,
+    assertNotNull(keyInsightInfoResp);
+    assertEquals(4,
         keyInsightInfoResp.getFsoKeyInfoList().size());
-    Assertions.assertEquals(0,
+    assertEquals(0,
         keyInsightInfoResp.getNonFSOKeyInfoList().size());
 
     // CASE 2 :- Display only Non-FSO keys in response
@@ -441,10 +453,10 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     openKeyInfoResp =
         omdbInsightEndpoint.getOpenKeyInfo(10, "", false, true);
     keyInsightInfoResp = (KeyInsightInfoResponse) openKeyInfoResp.getEntity();
-    Assertions.assertNotNull(keyInsightInfoResp);
-    Assertions.assertEquals(0,
+    assertNotNull(keyInsightInfoResp);
+    assertEquals(0,
         keyInsightInfoResp.getFsoKeyInfoList().size());
-    Assertions.assertEquals(3,
+    assertEquals(3,
         keyInsightInfoResp.getNonFSOKeyInfoList().size());
 
     // CASE 3 :- Display both FSO and Non-FSO keys in response
@@ -452,10 +464,10 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     openKeyInfoResp =
         omdbInsightEndpoint.getOpenKeyInfo(10, "", true, true);
     keyInsightInfoResp = (KeyInsightInfoResponse) openKeyInfoResp.getEntity();
-    Assertions.assertNotNull(keyInsightInfoResp);
-    Assertions.assertEquals(4,
+    assertNotNull(keyInsightInfoResp);
+    assertEquals(4,
         keyInsightInfoResp.getFsoKeyInfoList().size());
-    Assertions.assertEquals(3,
+    assertEquals(3,
         keyInsightInfoResp.getNonFSOKeyInfoList().size());
 
     // CASE 4 :- Don't Display both FSO and Non-FSO keys in response
@@ -463,10 +475,10 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     openKeyInfoResp =
         omdbInsightEndpoint.getOpenKeyInfo(10, "", false, false);
     keyInsightInfoResp = (KeyInsightInfoResponse) openKeyInfoResp.getEntity();
-    Assertions.assertNotNull(keyInsightInfoResp);
-    Assertions.assertEquals(0,
+    assertNotNull(keyInsightInfoResp);
+    assertEquals(0,
         keyInsightInfoResp.getFsoKeyInfoList().size());
-    Assertions.assertEquals(0,
+    assertEquals(0,
         keyInsightInfoResp.getNonFSOKeyInfoList().size());
   }
 
@@ -490,15 +502,15 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
             true, true);
     KeyInsightInfoResponse keyInsightInfoResp =
         (KeyInsightInfoResponse) openKeyInfoResp.getEntity();
-    Assertions.assertNotNull(keyInsightInfoResp);
-    Assertions.assertEquals(1,
+    assertNotNull(keyInsightInfoResp);
+    assertEquals(1,
         keyInsightInfoResp.getNonFSOKeyInfoList().size());
-    Assertions.assertEquals(1, keyInsightInfoResp.getFsoKeyInfoList().size());
-    Assertions.assertEquals(2, keyInsightInfoResp.getFsoKeyInfoList().size() +
+    assertEquals(1, keyInsightInfoResp.getFsoKeyInfoList().size());
+    assertEquals(2, keyInsightInfoResp.getFsoKeyInfoList().size() +
         keyInsightInfoResp.getNonFSOKeyInfoList().size());
-    Assertions.assertEquals("key_three",
+    assertEquals("key_three",
         keyInsightInfoResp.getNonFSOKeyInfoList().get(0).getPath());
-    Assertions.assertEquals("key_two",
+    assertEquals("key_two",
         keyInsightInfoResp.getFsoKeyInfoList().get(0).getPath());
   }
 
@@ -521,12 +533,12 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     OmKeyInfo omKeyInfoCopy =
         reconOMMetadataManager.getKeyTable(getBucketLayout())
             .get("/sampleVol/bucketOne/key_one");
-    Assertions.assertEquals("key_one", omKeyInfoCopy.getKeyName());
+    assertEquals("key_one", omKeyInfoCopy.getKeyName());
     RepeatedOmKeyInfo repeatedOmKeyInfo1 = new RepeatedOmKeyInfo(omKeyInfoCopy);
 
     reconOMMetadataManager.getDeletedTable()
         .put("/sampleVol/bucketOne/key_one", repeatedOmKeyInfo1);
-    Assertions.assertEquals("key_one",
+    assertEquals("key_one",
         repeatedOmKeyInfo1.getOmKeyInfoList().get(0).getKeyName());
 
     RepeatedOmKeyInfo repeatedOmKeyInfo2 = new RepeatedOmKeyInfo(omKeyInfo2);
@@ -539,10 +551,10 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     Response deletedKeyInfo = omdbInsightEndpoint.getDeletedKeyInfo(2, "");
     KeyInsightInfoResponse keyInsightInfoResp =
         (KeyInsightInfoResponse) deletedKeyInfo.getEntity();
-    Assertions.assertNotNull(keyInsightInfoResp);
-    Assertions.assertEquals(2,
+    assertNotNull(keyInsightInfoResp);
+    assertEquals(2,
         keyInsightInfoResp.getRepeatedOmKeyInfoList().size());
-    Assertions.assertEquals("key_two",
+    assertEquals("key_two",
         keyInsightInfoResp.getRepeatedOmKeyInfoList().get(1).getOmKeyInfoList()
             .get(0).getKeyName());
   }
@@ -571,8 +583,8 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         "/sampleVol/bucketOne/key_one");
     KeyInsightInfoResponse keyInsightInfoResp =
         (KeyInsightInfoResponse) deletedKeyInfo.getEntity();
-    Assertions.assertNotNull(keyInsightInfoResp);
-    Assertions.assertEquals(2,
+    assertNotNull(keyInsightInfoResp);
+    assertEquals(2,
         keyInsightInfoResp.getRepeatedOmKeyInfoList().size());
 
     List<String> pendingDeleteKeys =
@@ -581,7 +593,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
                 repeatedOmKeyInfo -> repeatedOmKeyInfo.getOmKeyInfoList().get(0)
                     .getKeyName())
             .collect(Collectors.toList());
-    Assertions.assertFalse(pendingDeleteKeys.contains("key_one"));
+    assertThat(pendingDeleteKeys).doesNotContain("key_one");
   }
 
   @Test
@@ -593,20 +605,20 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         .put("/sampleVol/bucketOne/key_one", omKeyInfo);
     OmKeyInfo omKeyInfo1 = reconOMMetadataManager.getKeyTable(getBucketLayout())
         .get("/sampleVol/bucketOne/key_one");
-    Assertions.assertEquals("key_one", omKeyInfo1.getKeyName());
+    assertEquals("key_one", omKeyInfo1.getKeyName());
     RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(omKeyInfo);
     reconOMMetadataManager.getDeletedTable()
         .put("/sampleVol/bucketOne/key_one", repeatedOmKeyInfo);
     RepeatedOmKeyInfo repeatedOmKeyInfo1 =
         reconOMMetadataManager.getDeletedTable()
             .get("/sampleVol/bucketOne/key_one");
-    Assertions.assertEquals("key_one",
+    assertEquals("key_one",
         repeatedOmKeyInfo1.getOmKeyInfoList().get(0).getKeyName());
     Response deletedKeyInfo = omdbInsightEndpoint.getDeletedKeyInfo(-1, "");
     KeyInsightInfoResponse keyInsightInfoResp =
         (KeyInsightInfoResponse) deletedKeyInfo.getEntity();
-    Assertions.assertNotNull(keyInsightInfoResp);
-    Assertions.assertEquals("key_one",
+    assertNotNull(keyInsightInfoResp);
+    assertEquals("key_one",
         keyInsightInfoResp.getRepeatedOmKeyInfoList().get(0).getOmKeyInfoList()
             .get(0).getKeyName());
   }
@@ -644,15 +656,15 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     OmKeyInfo omKeyInfoCopy =
         reconOMMetadataManager.getDeletedDirTable()
             .get("/sampleVol/bucketOne/dir_one");
-    Assertions.assertEquals("dir_one", omKeyInfoCopy.getKeyName());
+    assertEquals("dir_one", omKeyInfoCopy.getKeyName());
 
     Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(2, "");
     KeyInsightInfoResponse keyInsightInfoResp =
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
-    Assertions.assertNotNull(keyInsightInfoResp);
-    Assertions.assertEquals(2,
+    assertNotNull(keyInsightInfoResp);
+    assertEquals(2,
         keyInsightInfoResp.getDeletedDirInfoList().size());
-    Assertions.assertEquals("/sampleVol/bucketOne/dir_one",
+    assertEquals("dir_one",
         keyInsightInfoResp.getDeletedDirInfoList().get(0).getKey());
   }
 
@@ -675,18 +687,18 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     OmKeyInfo omKeyInfoCopy =
         reconOMMetadataManager.getDeletedDirTable()
             .get("/sampleVol/bucketOne/dir_one");
-    Assertions.assertEquals("dir_one", omKeyInfoCopy.getKeyName());
+    assertEquals("dir_one", omKeyInfoCopy.getKeyName());
 
     Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(2,
         "/sampleVol/bucketOne/dir_one");
     KeyInsightInfoResponse keyInsightInfoResp =
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
-    Assertions.assertNotNull(keyInsightInfoResp);
-    Assertions.assertEquals(2,
+    assertNotNull(keyInsightInfoResp);
+    assertEquals(2,
         keyInsightInfoResp.getDeletedDirInfoList().size());
-    Assertions.assertEquals("/sampleVol/bucketOne/dir_three",
+    assertEquals("dir_three",
         keyInsightInfoResp.getDeletedDirInfoList().get(0).getKey());
-    Assertions.assertEquals("/sampleVol/bucketOne/dir_two",
+    assertEquals("/sampleVol/bucketOne/dir_two",
         keyInsightInfoResp.getLastKey());
   }
 
@@ -709,17 +721,19 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     OmKeyInfo omKeyInfoCopy =
         reconOMMetadataManager.getDeletedDirTable()
             .get("/sampleVol/bucketOne/dir_one");
-    Assertions.assertEquals("dir_one", omKeyInfoCopy.getKeyName());
+    assertEquals("dir_one", omKeyInfoCopy.getKeyName());
 
     Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(-1, "");
     KeyInsightInfoResponse keyInsightInfoResp =
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
-    Assertions.assertNotNull(keyInsightInfoResp);
-    Assertions.assertEquals(3,
+    assertNotNull(keyInsightInfoResp);
+    assertEquals(3,
         keyInsightInfoResp.getDeletedDirInfoList().size());
-    Assertions.assertEquals("/sampleVol/bucketOne/dir_one",
+    assertEquals("sampleVol/bucketOne/dir_one", keyInsightInfoResp
+        .getDeletedDirInfoList().get(0).getPath());
+    assertEquals("dir_one",
         keyInsightInfoResp.getDeletedDirInfoList().get(0).getKey());
-    Assertions.assertEquals("/sampleVol/bucketOne/dir_two",
+    assertEquals("/sampleVol/bucketOne/dir_two",
         keyInsightInfoResp.getLastKey());
   }
 
@@ -754,21 +768,21 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(-1, "");
     KeyInsightInfoResponse keyInsightInfoResp =
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
-    Assertions.assertNotNull(keyInsightInfoResp);
-    Assertions.assertEquals(3,
+    assertNotNull(keyInsightInfoResp);
+    assertEquals(3,
         keyInsightInfoResp.getDeletedDirInfoList().size());
     // Assert the total size under directory dir1 is 5L
-    Assertions.assertEquals(5L,
+    assertEquals(5L,
         keyInsightInfoResp.getDeletedDirInfoList().get(0).getSize());
     // Assert the total size under directory dir2 is 6L
-    Assertions.assertEquals(6L,
+    assertEquals(6L,
         keyInsightInfoResp.getDeletedDirInfoList().get(1).getSize());
     // Assert the total size under directory dir3 is 7L
-    Assertions.assertEquals(7L,
+    assertEquals(7L,
         keyInsightInfoResp.getDeletedDirInfoList().get(2).getSize());
 
     // Assert the total of all the deleted directories is 18L
-    Assertions.assertEquals(18L, keyInsightInfoResp.getUnreplicatedDataSize());
+    assertEquals(18L, keyInsightInfoResp.getUnreplicatedDataSize());
   }
 
   private NSSummary getNsSummary(long size) {

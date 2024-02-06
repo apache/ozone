@@ -27,10 +27,10 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.fromSources;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Helper to check scheduling efficiency.
@@ -118,7 +118,8 @@ public class ReplicationSupervisorScheduling {
     rs.shutdownAfterFinish();
     final long executionTime = System.currentTimeMillis() - start;
     System.out.println(executionTime);
-    Assertions.assertTrue(executionTime < 100_000,
-        "Execution was too slow : " + executionTime + " ms");
+    assertThat(executionTime)
+        .withFailMessage("Execution was too slow : " + executionTime + " ms")
+        .isLessThan(100_000);
   }
 }

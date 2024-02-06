@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType;
 import org.apache.hadoop.hdds.security.x509.crl.CRLInfo;
 import org.bouncycastle.asn1.x509.CRLReason;
 import org.bouncycastle.cert.X509CertificateHolder;
@@ -97,29 +96,15 @@ public interface CertificateServer {
    * @param csr  - Certificate Signing Request.
    * @param type - An Enum which says what kind of approval process to follow.
    * @param role : OM/SCM/DN
+   * @param certSerialId - New certificate ID
    * @return A future that will have this certificate when this request is
    * approved.
    * @throws SCMSecurityException - on Error.
    */
   Future<CertPath> requestCertificate(
       PKCS10CertificationRequest csr,
-      CertificateApprover.ApprovalType type, NodeType role)
-      throws SCMSecurityException;
-
-
-  /**
-   * Request a Certificate based on Certificate Signing Request.
-   *
-   * @param csr       - Certificate Signing Request as a PEM encoded String.
-   * @param type      - An Enum which says what kind of approval process to
-   *                  follow.
-   * @param nodeType: OM/SCM/DN
-   * @return A future that will have this certificate when this request is
-   * approved.
-   * @throws SCMSecurityException - on Error.
-   */
-  Future<CertPath> requestCertificate(String csr,
-      ApprovalType type, NodeType nodeType) throws IOException;
+      CertificateApprover.ApprovalType type, NodeType role,
+      String certSerialId) throws SCMSecurityException;
 
   /**
    * Revokes a Certificate issued by this CertificateServer.

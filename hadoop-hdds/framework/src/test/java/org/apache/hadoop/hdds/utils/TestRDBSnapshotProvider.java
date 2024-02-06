@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -57,6 +56,7 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.writeDBCheckpointToStream;
 import static org.apache.hadoop.hdds.utils.db.TestRDBStore.newRDBStore;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -88,6 +88,8 @@ public class TestRDBSnapshotProvider {
 
   @BeforeEach
   public void init(@TempDir File tempDir) throws Exception {
+    CodecBuffer.enableLeakDetection();
+
     options = getNewDBOptions();
     configSet = new HashSet<>();
     for (String name : families) {
@@ -159,8 +161,8 @@ public class TestRDBSnapshotProvider {
     checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(leaderId);
     int second = HAUtils.getExistingSstFiles(
         rdbSnapshotProvider.getCandidateDir()).size();
-    assertTrue(second > first, "The second snapshot should" +
-        " have more SST files");
+    assertThat(second).withFailMessage("The second snapshot should have more SST files")
+        .isGreaterThan(first);
     DBCheckpoint latestCheckpoint = latestCK.get();
     compareDB(latestCheckpoint.getCheckpointLocation().toFile(),
         checkpoint.getCheckpointLocation().toFile(), numUsedCF);
@@ -169,8 +171,8 @@ public class TestRDBSnapshotProvider {
     checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(leaderId);
     int third = HAUtils.getExistingSstFiles(
         rdbSnapshotProvider.getCandidateDir()).size();
-    assertTrue(third > second, "The third snapshot should" +
-        " have more SST files");
+    assertThat(third).withFailMessage("The third snapshot should have more SST files")
+        .isGreaterThan(second);
     compareDB(latestCK.get().getCheckpointLocation().toFile(),
         checkpoint.getCheckpointLocation().toFile(), numUsedCF);
 
@@ -226,7 +228,7 @@ public class TestRDBSnapshotProvider {
       throws IOException {
     try (Table<byte[], byte[]> firstTable = dbStore.getTable(families.
         get(familyIndex))) {
-      Assertions.assertNotNull(firstTable, "Table cannot be null");
+      assertNotNull(firstTable, "Table cannot be null");
       for (int x = 0; x < 100; x++) {
         byte[] key =
             RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);

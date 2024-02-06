@@ -28,10 +28,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,7 +42,9 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateKey;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.DeleteKeys;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.RenameKey;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -63,33 +64,37 @@ public class TestRequestValidations {
 
   private OMMetadataManager metadataManager;
 
-  @Before
+  @BeforeEach
   public void setup() {
     metadataManager = mock(OMMetadataManager.class);
     startValidatorTest();
     validationListener.attach();
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     validationListener.detach();
     finishValidatorTest();
   }
 
-  @Test(expected = NullPointerException.class)
+  @Test
   public void testUsingRegistryWithoutLoading() throws Exception {
-    new RequestValidations()
-        .fromPackage(PACKAGE)
-        .withinContext(of(aFinalizedVersionManager(), metadataManager))
-        .validateRequest(aCreateKeyRequest(currentClientVersion()));
+    assertThrows(NullPointerException.class, () -> {
+      new RequestValidations()
+          .fromPackage(PACKAGE)
+          .withinContext(of(aFinalizedVersionManager(), metadataManager))
+          .validateRequest(aCreateKeyRequest(currentClientVersion()));
+    });
   }
 
-  @Test(expected = NullPointerException.class)
+  @Test
   public void testUsingRegistryWithoutContext() throws Exception {
-    new RequestValidations()
-        .fromPackage(PACKAGE)
-        .load()
-        .validateRequest(aCreateKeyRequest(currentClientVersion()));
+    assertThrows(NullPointerException.class, () -> {
+      new RequestValidations()
+          .fromPackage(PACKAGE)
+          .load()
+          .validateRequest(aCreateKeyRequest(currentClientVersion()));
+    });
   }
 
   @Test
@@ -153,11 +158,8 @@ public class TestRequestValidations {
   public void testPreProcessorExceptionHandling() throws Exception {
     ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadValidations(ctx);
-
-    try {
-      validations.validateRequest(aDeleteKeysRequest(olderClientVersion()));
-      fail("ServiceException was expected but was not thrown.");
-    } catch (Exception ignored) { }
+    assertThrows(Exception.class,
+        () -> validations.validateRequest(aDeleteKeysRequest(olderClientVersion())));
 
     validationListener.assertNumOfEvents(1);
     validationListener.assertExactListOfValidatorsCalled(
@@ -168,12 +170,8 @@ public class TestRequestValidations {
   public void testPostProcessorExceptionHandling() {
     ValidationContext ctx = of(aFinalizedVersionManager(), metadataManager);
     RequestValidations validations = loadValidations(ctx);
-
-    try {
-      validations.validateResponse(
-          aDeleteKeysRequest(olderClientVersion()), aDeleteKeysResponse());
-      fail("ServiceException was expected but was not thrown.");
-    } catch (Exception ignored) { }
+    assertThrows(Exception.class,
+        () -> validations.validateResponse(aDeleteKeysRequest(olderClientVersion()), aDeleteKeysResponse()));
 
     validationListener.assertNumOfEvents(1);
     validationListener.assertExactListOfValidatorsCalled(
@@ -268,7 +266,7 @@ public class TestRequestValidations {
         .thenReturn(BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     BucketLayout buckLayout = ctx.getBucketLayout("vol-1", "buck-1");
-    Assert.assertTrue(buckLayout.isFileSystemOptimized());
+    assertTrue(buckLayout.isFileSystemOptimized());
   }
 
   private RequestValidations loadValidations(ValidationContext ctx) {

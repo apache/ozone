@@ -55,8 +55,9 @@ public final class OzoneConfigKeys {
    * When set to true, allocate a random free port for ozone container,
    * so that a mini cluster is able to launch multiple containers on a node.
    *
-   * When set to false (default), container port is fixed as specified by
-   * DFS_CONTAINER_IPC_PORT_DEFAULT.
+   * When set to false (default), the container port will be specified as
+   * {@link #DFS_CONTAINER_IPC_PORT} and the default value will be specified
+   * as {@link #DFS_CONTAINER_IPC_PORT_DEFAULT}.
    */
   public static final String DFS_CONTAINER_IPC_RANDOM_PORT =
       "dfs.container.ipc.random.port";
@@ -136,9 +137,6 @@ public final class OzoneConfigKeys {
       "dfs.container.ratis.ipc.random.port";
   public static final boolean DFS_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT =
       false;
-  public static final String OZONE_TRACE_ENABLED_KEY =
-      "ozone.trace.enabled";
-  public static final boolean OZONE_TRACE_ENABLED_DEFAULT = false;
 
   public static final String OZONE_METADATA_STORE_ROCKSDB_STATISTICS =
       "ozone.metastore.rocksdb.statistics";
@@ -182,6 +180,14 @@ public final class OzoneConfigKeys {
   public static final int OZONE_CLIENT_EC_GRPC_RETRIES_MAX_DEFAULT = 3;
   public static final String OZONE_GPRC_METRICS_PERCENTILES_INTERVALS_KEY
       = "ozone.grpc.metrics.percentiles.intervals";
+
+  public static final String OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT =
+      "ozone.client.ec.grpc.write.timeout";
+  public static final String OZONE_CLIENT_EC_GRPC_WRITE_TIMEOUT_DEFAULT = "30s";
+
+  public static final String OZONE_EC_GRPC_ZERO_COPY_ENABLED =
+      "ozone.ec.grpc.zerocopy.enabled";
+  public static final boolean OZONE_EC_GRPC_ZERO_COPY_ENABLED_DEFAULT = true;
 
   /**
    * Ozone administrator users delimited by comma.
@@ -372,9 +378,6 @@ public final class OzoneConfigKeys {
   public static final String
       DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES =
       ScmConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES;
-  public static final int
-      DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES_DEFAULT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_RETRIES_DEFAULT;
   public static final String DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS =
       ScmConfigKeys.DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS;
   public static final int DFS_CONTAINER_RATIS_LOG_QUEUE_NUM_ELEMENTS_DEFAULT =
@@ -519,6 +522,11 @@ public final class OzoneConfigKeys {
   public static final String OZONE_MANAGER_FAIR_LOCK = "ozone.om.lock.fair";
   public static final boolean OZONE_MANAGER_FAIR_LOCK_DEFAULT = false;
 
+  public static final String OZONE_MANAGER_STRIPED_LOCK_SIZE_PREFIX =
+      "ozone.om.lock.stripes.";
+
+  public static final int OZONE_MANAGER_STRIPED_LOCK_SIZE_DEFAULT = 512;
+
   public static final String OZONE_CLIENT_LIST_TRASH_KEYS_MAX =
       "ozone.client.list.trash.keys.max";
   public static final int OZONE_CLIENT_LIST_TRASH_KEYS_MAX_DEFAULT = 1000;
@@ -656,6 +664,14 @@ public final class OzoneConfigKeys {
       TimeDuration.valueOf(150, TimeUnit.SECONDS);
   public static final String OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION =
       "ozone.scm.close.container.wait.duration";
+
+  public static final String HDDS_SCM_CLIENT_RPC_TIME_OUT =
+      "hdds.scmclient.rpc.timeout";
+  public static final String HDDS_SCM_CLIENT_MAX_RETRY_TIMEOUT =
+      "hdds.scmclient.max.retry.timeout";
+  public static final String HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY =
+      "hdds.scmclient.failover.max.retry";
+
 
   /**
    * There is no need to instantiate this class.

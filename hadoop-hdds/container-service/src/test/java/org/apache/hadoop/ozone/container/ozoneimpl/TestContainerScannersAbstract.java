@@ -26,7 +26,6 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.mockito.verification.VerificationMode;
@@ -42,12 +41,14 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.conf.OzoneConfiguration.newInstanceOf;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getDeletedContainerResult;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyScanResult;
 import static org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration.CONTAINER_SCAN_MIN_GAP_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -71,6 +72,9 @@ public abstract class TestContainerScannersAbstract {
 
   @Mock
   protected Container<ContainerData> corruptData;
+
+  @Mock
+  protected Container<ContainerData> deletedContainer;
 
   @Mock
   protected HddsVolume vol;
@@ -128,7 +132,7 @@ public abstract class TestContainerScannersAbstract {
     Instant oldLastScanTime = Instant.now()
         .minus(CONTAINER_SCAN_MIN_GAP_DEFAULT, ChronoUnit.MILLIS)
         .minus(10, ChronoUnit.MINUTES);
-    Mockito.when(container.getContainerData().lastDataScanTime())
+    when(container.getContainerData().lastDataScanTime())
         .thenReturn(Optional.of(oldLastScanTime));
   }
 
@@ -138,14 +142,14 @@ public abstract class TestContainerScannersAbstract {
     Instant recentLastScanTime = Instant.now()
         .minus(CONTAINER_SCAN_MIN_GAP_DEFAULT, ChronoUnit.MILLIS)
         .plus(1, ChronoUnit.MINUTES);
-    Mockito.when(container.getContainerData().lastDataScanTime())
+    when(container.getContainerData().lastDataScanTime())
         .thenReturn(Optional.of(recentLastScanTime));
   }
 
   protected void verifyContainerMarkedUnhealthy(
       Container<?> container, VerificationMode invocationTimes)
       throws Exception {
-    Mockito.verify(controller, invocationTimes).markContainerUnhealthy(
+    verify(controller, invocationTimes).markContainerUnhealthy(
         eq(container.getContainerData().getContainerID()), any());
   }
 
@@ -156,7 +160,7 @@ public abstract class TestContainerScannersAbstract {
    * containers.
    */
   protected Container<?> mockKeyValueContainer() {
-    KeyValueContainer unhealthy = Mockito.mock(KeyValueContainer.class);
+    KeyValueContainer unhealthy = mock(KeyValueContainer.class);
 
     KeyValueContainerData data = mock(KeyValueContainerData.class);
     when(data.getContainerID()).thenReturn(CONTAINER_SEQ_ID.incrementAndGet());
@@ -206,7 +210,13 @@ public abstract class TestContainerScannersAbstract {
         false, getUnhealthyScanResult(), ScanResult.healthy(),
         CONTAINER_SEQ_ID, vol);
 
-    containers.addAll(Arrays.asList(healthy, corruptData, openCorruptMetadata));
+    // Mock container that has been deleted during scan.
+    ContainerTestUtils.setupMockContainer(deletedContainer,
+        true, ScanResult.healthy(), getDeletedContainerResult(),
+        CONTAINER_SEQ_ID, vol);
+
+    containers.addAll(Arrays.asList(healthy, corruptData, openCorruptMetadata,
+        deletedContainer));
     ContainerController mock = mock(ContainerController.class);
     when(mock.getContainers(vol)).thenReturn(containers.iterator());
     when(mock.getContainers()).thenReturn(containers);

@@ -39,25 +39,19 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.FakeTimer;
-import org.junit.Rule;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.rules.TemporaryFolder;
-import org.junit.Test;
-import org.junit.rules.TestName;
-import org.junit.rules.Timeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
+import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.IOException;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.Optional;
@@ -66,10 +60,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult.FAILED;
-import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.anyObject;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.isNull;
 import static org.mockito.Mockito.mock;
@@ -81,63 +74,49 @@ import static org.mockito.Mockito.when;
 /**
  * Tests for {@link StorageVolumeChecker}.
  */
-@RunWith(Parameterized.class)
+@Timeout(300)
 public class TestStorageVolumeChecker {
   public static final Logger LOG = LoggerFactory.getLogger(
       TestStorageVolumeChecker.class);
 
   private static final int NUM_VOLUMES = 2;
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
-
-  @Rule
-  public TestName testName = new TestName();
-
-  @Rule
-  public Timeout globalTimeout = Timeout.seconds(30);
+  @TempDir
+  private Path folder;
 
   private OzoneConfiguration conf = new OzoneConfiguration();
 
   /**
    * When null, the check call should throw an exception.
    */
-  private final VolumeCheckResult expectedVolumeHealth;
+  private VolumeCheckResult expectedVolumeHealth;
 
-  private final ContainerLayoutVersion layout;
+  private ContainerLayoutVersion layoutVersion;
 
-  public TestStorageVolumeChecker(VolumeCheckResult result,
+  private void initTest(VolumeCheckResult result,
       ContainerLayoutVersion layout) {
     this.expectedVolumeHealth = result;
-    this.layout = layout;
+    this.layoutVersion = layout;
+    setup();
   }
 
-  @Before
-  public void setup() throws IOException {
+  private void setup() {
     conf = new OzoneConfiguration();
-    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, folder.getRoot()
-        .getAbsolutePath());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        folder.newFolder().getAbsolutePath());
-  }
-
-  @After
-  public void cleanup() throws IOException {
-    FileUtils.deleteDirectory(folder.getRoot());
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, folder.toString());
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, folder.toString());
   }
 
   /**
    * Run each test case for each possible value of {@link VolumeCheckResult}.
    * Including "null" for 'throw exception'.
    */
-  @Parameters
-  public static Collection<Object[]> data() {
-    List<Object[]> values = new ArrayList<>();
+  private static List<Arguments> provideTestData() {
+    List<Arguments> values = new ArrayList<>();
     for (ContainerLayoutVersion layout : ContainerLayoutVersion.values()) {
       for (VolumeCheckResult result : VolumeCheckResult.values()) {
-        values.add(new Object[]{result, layout});
+        values.add(Arguments.of(result, layout));
       }
-      values.add(new Object[]{null, layout});
+      values.add(Arguments.of(null, layout));
     }
     return values;
   }
@@ -149,12 +128,16 @@ public class TestStorageVolumeChecker {
    *
    * @throws Exception
    */
-  @Test
-  public void testCheckOneVolume() throws Exception {
-    LOG.info("Executing {}", testName.getMethodName());
+  @ParameterizedTest
+  @MethodSource("provideTestData")
+  public void testCheckOneVolume(
+      VolumeCheckResult checkResult, ContainerLayoutVersion layout,
+      TestInfo testInfo) throws Exception {
+    initTest(checkResult, layout);
+    LOG.info("Executing {}", testInfo.getTestMethod());
     final HddsVolume volume = makeVolumes(1, expectedVolumeHealth).get(0);
     final StorageVolumeChecker checker =
-        new StorageVolumeChecker(new OzoneConfiguration(), new FakeTimer());
+        new StorageVolumeChecker(new OzoneConfiguration(), new FakeTimer(), "");
     checker.setDelegateChecker(new DummyChecker());
     final AtomicLong numCallbackInvocations = new AtomicLong(0);
 
@@ -166,20 +149,20 @@ public class TestStorageVolumeChecker {
           numCallbackInvocations.incrementAndGet();
           if (expectedVolumeHealth != null &&
               expectedVolumeHealth != FAILED) {
-            assertThat(healthyVolumes.size(), is(1));
-            assertThat(failedVolumes.size(), is(0));
+            assertThat(healthyVolumes.size()).isEqualTo(1);
+            assertThat(failedVolumes.size()).isEqualTo(0);
           } else {
-            assertThat(healthyVolumes.size(), is(0));
-            assertThat(failedVolumes.size(), is(1));
+            assertThat(healthyVolumes.size()).isEqualTo(0);
+            assertThat(failedVolumes.size()).isEqualTo(1);
           }
         });
 
     GenericTestUtils.waitFor(() -> numCallbackInvocations.get() > 0, 5, 10000);
 
     // Ensure that the check was invoked at least once.
-    verify(volume, times(1)).check(anyObject());
+    verify(volume, times(1)).check(any());
     if (result) {
-      assertThat(numCallbackInvocations.get(), is(1L));
+      assertThat(numCallbackInvocations.get()).isEqualTo(1L);
     }
 
     checker.shutdownAndWait(0, TimeUnit.SECONDS);
@@ -191,14 +174,17 @@ public class TestStorageVolumeChecker {
    *
    * @throws Exception
    */
-  @Test
-  public void testCheckAllVolumes() throws Exception {
-    LOG.info("Executing {}", testName.getMethodName());
+  @ParameterizedTest
+  @MethodSource("provideTestData")
+  public void testCheckAllVolumes(VolumeCheckResult checkResult,
+      ContainerLayoutVersion layout, TestInfo testInfo) throws Exception {
+    initTest(checkResult, layout);
+    LOG.info("Executing {}", testInfo.getTestMethod());
 
     final List<HddsVolume> volumes = makeVolumes(
         NUM_VOLUMES, expectedVolumeHealth);
     final StorageVolumeChecker checker =
-        new StorageVolumeChecker(new OzoneConfiguration(), new FakeTimer());
+        new StorageVolumeChecker(new OzoneConfiguration(), new FakeTimer(), "");
     checker.setDelegateChecker(new DummyChecker());
 
     Set<? extends StorageVolume> failedVolumes =
@@ -206,14 +192,14 @@ public class TestStorageVolumeChecker {
     LOG.info("Got back {} failed volumes", failedVolumes.size());
 
     if (expectedVolumeHealth == null || expectedVolumeHealth == FAILED) {
-      assertThat(failedVolumes.size(), is(NUM_VOLUMES));
+      assertThat(failedVolumes.size()).isEqualTo(NUM_VOLUMES);
     } else {
       assertTrue(failedVolumes.isEmpty());
     }
 
     // Ensure each volume's check() method was called exactly once.
     for (HddsVolume volume : volumes) {
-      verify(volume, times(1)).check(anyObject());
+      verify(volume, times(1)).check(any());
     }
 
     checker.shutdownAndWait(0, TimeUnit.SECONDS);
@@ -226,9 +212,12 @@ public class TestStorageVolumeChecker {
    *
    * @throws Exception
    */
-  @Test
-  public void testVolumeDeletion() throws Exception {
-    LOG.info("Executing {}", testName.getMethodName());
+  @ParameterizedTest
+  @MethodSource("provideTestData")
+  public void testVolumeDeletion(VolumeCheckResult checkResult,
+      ContainerLayoutVersion layout, TestInfo testInfo) throws Exception {
+    initTest(checkResult, layout);
+    LOG.info("Executing {}", testInfo.getTestMethod());
 
     DatanodeConfiguration dnConf =
         conf.getObject(DatanodeConfiguration.class);
@@ -245,7 +234,7 @@ public class TestStorageVolumeChecker {
     StorageVolumeChecker volumeChecker = volumeSet.getVolumeChecker();
     volumeChecker.setDelegateChecker(new DummyChecker());
     File volParentDir =
-        new File(folder.getRoot(), UUID.randomUUID().toString());
+        new File(folder.toString(), UUID.randomUUID().toString());
     volumeSet.addVolume(volParentDir.getPath());
     File volRootDir = new File(volParentDir, "hdds");
 
@@ -267,14 +256,14 @@ public class TestStorageVolumeChecker {
     // delete the volume directory
     FileUtils.deleteDirectory(volParentDir);
 
-    Assert.assertEquals(2, volumeSet.getVolumesList().size());
+    assertEquals(2, volumeSet.getVolumesList().size());
     volumeSet.checkAllVolumes();
     // failed volume should be removed from volumeSet volume list
-    Assert.assertEquals(1, volumeSet.getVolumesList().size());
-    Assert.assertEquals(1, volumeSet.getFailedVolumesList().size());
+    assertEquals(1, volumeSet.getVolumesList().size());
+    assertEquals(1, volumeSet.getFailedVolumesList().size());
 
     // All containers should be removed from containerSet
-    Assert.assertEquals(0, containerSet.getContainerMap().size());
+    assertEquals(0, containerSet.getContainerMap().size());
 
     ozoneContainer.stop();
   }

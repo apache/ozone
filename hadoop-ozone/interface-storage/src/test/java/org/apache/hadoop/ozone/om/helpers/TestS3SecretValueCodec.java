@@ -22,8 +22,11 @@ import java.util.UUID;
 
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.Proto2CodecTestBase;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 
 /**
  * Test {@link S3SecretValue#getCodec()}.
@@ -40,14 +43,14 @@ public class TestS3SecretValueCodec
     final Codec<S3SecretValue> codec = getCodec();
 
     S3SecretValue s3SecretValue =
-        new S3SecretValue(UUID.randomUUID().toString(),
+        S3SecretValue.of(UUID.randomUUID().toString(),
             UUID.randomUUID().toString());
 
     byte[] data = codec.toPersistedFormat(s3SecretValue);
-    Assert.assertNotNull(data);
+    assertNotNull(data);
 
     S3SecretValue docdedS3Secret = codec.fromPersistedFormat(data);
 
-    Assert.assertEquals(s3SecretValue, docdedS3Secret);
+    assertEquals(s3SecretValue, docdedS3Secret);
   }
 }

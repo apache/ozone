@@ -21,6 +21,7 @@ package org.apache.hadoop.ozone.om.service;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -41,36 +42,36 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test Directory Deleting Service.
  */
 public class TestDirectoryDeletingService {
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
   private OzoneManagerProtocol writeClient;
   private OzoneManager om;
   private String volumeName;
   private String bucketName;
 
-  @BeforeClass
+  @BeforeAll
   public static void setup() {
     ExitUtils.disableSystemExit();
   }
 
   private OzoneConfiguration createConfAndInitValues() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
-    File newFolder = folder.newFolder();
+    File newFolder = folder.toFile();
     if (!newFolder.exists()) {
-      Assert.assertTrue(newFolder.mkdirs());
+      assertTrue(newFolder.mkdirs());
     }
     System.setProperty(DBConfigFromFile.CONFIG_DIR, "/");
     ServerUtils.setOzoneMetaDirPath(conf, newFolder.toString());
@@ -85,7 +86,7 @@ public class TestDirectoryDeletingService {
     return conf;
   }
 
-  @After
+  @AfterEach
   public void cleanup() throws Exception {
     om.stop();
   }
@@ -155,6 +156,6 @@ public class TestDirectoryDeletingService {
         () -> dirDeletingService.getMovedFilesCount() >= 1000
             && dirDeletingService.getMovedFilesCount() < 2000,
         500, 60000);
-    Assert.assertTrue(dirDeletingService.getRunCount().get() >= 1);
+    assertThat(dirDeletingService.getRunCount().get()).isGreaterThanOrEqualTo(1);
   }
 }

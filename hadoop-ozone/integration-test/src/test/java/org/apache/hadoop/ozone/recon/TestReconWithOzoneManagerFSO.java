@@ -17,6 +17,9 @@
 package org.apache.hadoop.ozone.recon;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.util.UUID;
 
@@ -40,32 +43,25 @@ import org.apache.hadoop.ozone.recon.api.types.EntityType;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
-
-import org.junit.Rule;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Timeout;
 
 import javax.ws.rs.core.Response;
 
 /**
  * Test Ozone Recon.
  */
+@Timeout(300)
 public class TestReconWithOzoneManagerFSO {
 
   private static OzoneClient client;
-  /**
-   * Set a timeout for each test.
-   */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
   private static ObjectStore store;
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
@@ -82,7 +78,7 @@ public class TestReconWithOzoneManagerFSO {
     store = client.getObjectStore();
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -132,13 +128,13 @@ public class TestReconWithOzoneManagerFSO {
     Response basicInfo = endpoint.getBasicInfo("/vol1/bucket1/dir1");
     NamespaceSummaryResponse entity =
             (NamespaceSummaryResponse) basicInfo.getEntity();
-    Assert.assertSame(entity.getEntityType(), EntityType.DIRECTORY);
-    Assert.assertEquals(1, entity.getCountStats().getNumTotalKey());
-    Assert.assertEquals(0, entity.getCountStats().getNumTotalDir());
-    Assert.assertEquals(-1, entity.getCountStats().getNumVolume());
-    Assert.assertEquals(-1, entity.getCountStats().getNumBucket());
+    assertSame(entity.getEntityType(), EntityType.DIRECTORY);
+    assertEquals(1, entity.getCountStats().getNumTotalKey());
+    assertEquals(0, entity.getCountStats().getNumTotalDir());
+    assertEquals(-1, entity.getCountStats().getNumVolume());
+    assertEquals(-1, entity.getCountStats().getNumBucket());
     for (int i = 0; i < 10; i++) {
-      Assert.assertNotNull(impl.getOMMetadataManagerInstance()
+      assertNotNull(impl.getOMMetadataManagerInstance()
               .getVolumeTable().get("/vol" + i));
     }
     addKeys(10, 12, "dir");
@@ -146,7 +142,7 @@ public class TestReconWithOzoneManagerFSO {
 
     // test Recon is sync'ed with OM.
     for (int i = 10; i < 12; i++) {
-      Assert.assertNotNull(impl.getOMMetadataManagerInstance()
+      assertNotNull(impl.getOMMetadataManagerInstance()
               .getVolumeTable().getSkipCache("/vol" + i));
     }
 
@@ -154,12 +150,12 @@ public class TestReconWithOzoneManagerFSO {
     Response rootBasicRes = endpoint.getBasicInfo("/");
     NamespaceSummaryResponse rootBasicEntity =
             (NamespaceSummaryResponse) rootBasicRes.getEntity();
-    Assert.assertSame(EntityType.ROOT, rootBasicEntity.getEntityType());
+    assertSame(EntityType.ROOT, rootBasicEntity.getEntityType());
     // one additional dummy volume at creation
-    Assert.assertEquals(13, rootBasicEntity.getCountStats().getNumVolume());
-    Assert.assertEquals(12, rootBasicEntity.getCountStats().getNumBucket());
-    Assert.assertEquals(12, rootBasicEntity.getCountStats().getNumTotalDir());
-    Assert.assertEquals(12, rootBasicEntity.getCountStats().getNumTotalKey());
+    assertEquals(13, rootBasicEntity.getCountStats().getNumVolume());
+    assertEquals(12, rootBasicEntity.getCountStats().getNumBucket());
+    assertEquals(12, rootBasicEntity.getCountStats().getNumTotalDir());
+    assertEquals(12, rootBasicEntity.getCountStats().getNumTotalKey());
   }
 
   /**

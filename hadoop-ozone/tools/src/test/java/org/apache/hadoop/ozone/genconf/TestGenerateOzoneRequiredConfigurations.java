@@ -19,15 +19,17 @@
 package org.apache.hadoop.ozone.genconf;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -68,20 +70,20 @@ public class TestGenerateOzoneRequiredConfigurations {
    *
    * @throws Exception In case of exception while creating output directory.
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     outputBaseDir = GenericTestUtils.getTestDir();
     FileUtils.forceMkdir(outputBaseDir);
     genconfTool = new GenerateOzoneRequiredConfigurations();
   }
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     System.setOut(new PrintStream(out, false, DEFAULT_ENCODING));
     System.setErr(new PrintStream(err, false, DEFAULT_ENCODING));
   }
 
-  @After
+  @AfterEach
   public void reset() {
     // reset stream after each unit test
     out.reset();
@@ -95,7 +97,7 @@ public class TestGenerateOzoneRequiredConfigurations {
   /**
    * Cleans up the output base directory.
    */
-  @AfterClass
+  @AfterAll
   public static void cleanup() throws IOException {
     FileUtils.deleteDirectory(outputBaseDir);
   }
@@ -122,7 +124,7 @@ public class TestGenerateOzoneRequiredConfigurations {
         };
     cmd.parseWithHandlers(new CommandLine.RunLast(),
         exceptionHandler, args);
-    Assert.assertTrue(out.toString(DEFAULT_ENCODING).contains(msg));
+    assertThat(out.toString(DEFAULT_ENCODING)).contains(msg);
   }
 
   private void executeWithException(String[] args, String msg) {
@@ -148,8 +150,7 @@ public class TestGenerateOzoneRequiredConfigurations {
       cmd.parseWithHandlers(new CommandLine.RunLast(),
           exceptionHandler, args);
     }  catch (Exception ex) {
-      Assert.assertTrue("Expected " + msg + ", but got: " + ex.getMessage(),
-          ex.getMessage().contains(msg));
+      assertThat(ex.getMessage()).contains(msg);
     }
   }
 
@@ -161,8 +162,7 @@ public class TestGenerateOzoneRequiredConfigurations {
    * @throws Exception
    */
   @Test
-  public void testGenerateConfigurations() throws Exception {
-    File tempPath = getRandomTempDir();
+  public void testGenerateConfigurations(@TempDir File tempPath) throws Exception {
     String[] args = new String[]{tempPath.getAbsolutePath()};
     execute(args, "ozone-site.xml has been generated at " +
         tempPath.getAbsolutePath());
@@ -176,8 +176,7 @@ public class TestGenerateOzoneRequiredConfigurations {
 
     //Asserts all properties have a non-empty value
     for (OzoneConfiguration.Property p : allProperties) {
-      Assert.assertTrue(
-          p.getValue() != null && p.getValue().length() > 0);
+      assertThat(p.getValue()).isNotNull().isNotEmpty();
     }
   }
 
@@ -189,46 +188,42 @@ public class TestGenerateOzoneRequiredConfigurations {
    * @throws Exception
    */
   @Test
-  public void testGenerateSecurityConfigurations() throws Exception {
+  public void testGenerateSecurityConfigurations(@TempDir File tempPathDefault, @TempDir File tempPathSecure)
+      throws Exception {
     int ozoneConfigurationCount, ozoneSecurityConfigurationCount;
 
     // Generate default Ozone Configuration
-    File tempPath = getRandomTempDir();
-    String[] args = new String[]{tempPath.getAbsolutePath()};
+    String[] args = new String[]{tempPathDefault.getAbsolutePath()};
     execute(args, "ozone-site.xml has been generated at " +
-        tempPath.getAbsolutePath());
+        tempPathDefault.getAbsolutePath());
 
-    URL url = new File(tempPath.getAbsolutePath() + "/ozone-site.xml")
+    URL url = new File(tempPathDefault.getAbsolutePath() + "/ozone-site.xml")
         .toURI().toURL();
     OzoneConfiguration oc = new OzoneConfiguration();
     List<OzoneConfiguration.Property> allProperties =
         oc.readPropertyFromXml(url);
 
     for (OzoneConfiguration.Property p : allProperties) {
-      Assert.assertTrue(
-          p.getValue() != null && p.getValue().length() > 0);
+      assertThat(p.getValue()).isNotNull().isNotEmpty();
     }
     ozoneConfigurationCount = allProperties.size();
 
     // Generate secure Ozone Configuration
-    tempPath = getRandomTempDir();
-    args = new String[]{"--security", tempPath.getAbsolutePath()};
+    args = new String[]{"--security", tempPathSecure.getAbsolutePath()};
     execute(args, "ozone-site.xml has been generated at " +
-        tempPath.getAbsolutePath());
+        tempPathSecure.getAbsolutePath());
 
-    url = new File(tempPath.getAbsolutePath() + "/ozone-site.xml")
+    url = new File(tempPathSecure.getAbsolutePath() + "/ozone-site.xml")
         .toURI().toURL();
     oc = new OzoneConfiguration();
     allProperties = oc.readPropertyFromXml(url);
 
     for (OzoneConfiguration.Property p : allProperties) {
-      Assert.assertTrue(
-          p.getValue() != null && p.getValue().length() > 0);
+      assertThat(p.getValue()).isNotNull().isNotEmpty();
     }
     ozoneSecurityConfigurationCount = allProperties.size();
 
-    Assert.assertNotEquals(ozoneConfigurationCount,
-        ozoneSecurityConfigurationCount);
+    assertNotEquals(ozoneConfigurationCount, ozoneSecurityConfigurationCount);
   }
 
   /**
@@ -238,8 +233,7 @@ public class TestGenerateOzoneRequiredConfigurations {
    * @throws Exception
    */
   @Test
-  public void testDoesNotOverwrite() throws Exception {
-    File tempPath = getRandomTempDir();
+  public void testDoesNotOverwrite(@TempDir File tempPath) throws Exception {
     String[] args = new String[]{tempPath.getAbsolutePath()};
     execute(args, "ozone-site.xml has been generated at " +
         tempPath.getAbsolutePath());
@@ -255,8 +249,7 @@ public class TestGenerateOzoneRequiredConfigurations {
    * @throws Exception
    */
   @Test
-  public void genconfFailureByInsufficientPermissions() throws Exception {
-    File tempPath = getRandomTempDir();
+  public void genconfFailureByInsufficientPermissions(@TempDir File tempPath) throws Exception {
     tempPath.setReadOnly();
     String[] args = new String[]{tempPath.getAbsolutePath()};
     executeWithException(args, "Insufficient permission.");
@@ -267,8 +260,7 @@ public class TestGenerateOzoneRequiredConfigurations {
    * @throws Exception
    */
   @Test
-  public void genconfFailureByInvalidPath() throws Exception {
-    File tempPath = getRandomTempDir();
+  public void genconfFailureByInvalidPath(@TempDir File tempPath) throws Exception {
     String[] args = new String[]{"invalid-path"};
     executeWithException(args, "Invalid directory path.");
   }
@@ -278,8 +270,7 @@ public class TestGenerateOzoneRequiredConfigurations {
    * @throws Exception
    */
   @Test
-  public void genconfPathNotSpecified() throws Exception {
-    File tempPath = getRandomTempDir();
+  public void genconfPathNotSpecified(@TempDir File tempPath) throws Exception {
     String[] args = new String[]{};
     executeWithException(args, "Missing required parameter: '<path>'");
   }
@@ -289,16 +280,8 @@ public class TestGenerateOzoneRequiredConfigurations {
    * @throws Exception
    */
   @Test
-  public void genconfHelp() throws Exception {
-    File tempPath = getRandomTempDir();
+  public void genconfHelp(@TempDir File tempPath) throws Exception {
     String[] args = new String[]{"--help"};
     execute(args, "Usage: ozone genconf [-hV] [--security] [--verbose]");
-  }
-
-  private File getRandomTempDir() throws IOException {
-    File tempDir = new File(outputBaseDir,
-        RandomStringUtils.randomAlphanumeric(5));
-    FileUtils.forceMkdir(tempDir);
-    return tempDir;
   }
 }

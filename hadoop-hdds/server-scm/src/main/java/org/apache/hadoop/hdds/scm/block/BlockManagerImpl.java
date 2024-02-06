@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
@@ -79,7 +80,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
    * @throws IOException
    */
   public BlockManagerImpl(final ConfigurationSource conf,
-                          final StorageContainerManager scm)
+      ScmConfig scmConfig, final StorageContainerManager scm)
       throws IOException {
     Objects.requireNonNull(scm, "SCM cannot be null");
     this.scm = scm;
@@ -96,19 +97,17 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
 
     // SCM block deleting transaction log and deleting service.
     deletedBlockLog = new DeletedBlockLogImpl(conf,
+        scm,
         scm.getContainerManager(),
-        scm.getScmHAManager().getRatisServer(),
-        scm.getScmMetadataStore().getDeletedBlocksTXTable(),
         scm.getScmHAManager().getDBTransactionBuffer(),
-        scm.getScmContext(),
-        scm.getSequenceIdGen(),
         metrics);
+
 
     blockDeletingService =
         new SCMBlockDeletingService(deletedBlockLog,
             scm.getScmNodeManager(), scm.getEventQueue(), scm.getScmContext(),
-            scm.getSCMServiceManager(), conf,
-            metrics, scm.getSystemClock());
+            scm.getSCMServiceManager(), conf, scmConfig,
+            metrics, scm.getSystemClock(), scm.getReconfigurationHandler());
   }
 
   /**

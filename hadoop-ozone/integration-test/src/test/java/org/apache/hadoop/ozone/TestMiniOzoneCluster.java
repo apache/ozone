@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -81,7 +80,6 @@ public class TestMiniOzoneCluster {
   }
 
   @Test
-  @Flaky("HDDS-6112")
   public void testStartMultipleDatanodes() throws Exception {
     final int numberOfNodes = 3;
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -111,8 +109,8 @@ public class TestMiniOzoneCluster {
   }
 
   @Test
-  public void testContainerRandomPort() throws IOException {
-    OzoneConfiguration ozoneConf = SCMTestUtils.getConf();
+  void testContainerRandomPort(@TempDir File tempDir) throws IOException {
+    OzoneConfiguration ozoneConf = SCMTestUtils.getConf(tempDir);
 
     // Each instance of SM will create an ozone container
     // that bounds to a random port.
@@ -210,7 +208,6 @@ public class TestMiniOzoneCluster {
    * @throws Exception
    */
   @Test @Timeout(100)
-  @Flaky("HDDS-6111")
   public void testDNstartAfterSCM() throws Exception {
     // Start a cluster with 3 DN
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -236,7 +233,6 @@ public class TestMiniOzoneCluster {
             EndpointStateMachine.EndPointStates.GETVERSION,
             endpoint.getState());
       }
-      Thread.sleep(1000);
     }
 
     // DN should successfully register with the SCM after SCM is restarted.

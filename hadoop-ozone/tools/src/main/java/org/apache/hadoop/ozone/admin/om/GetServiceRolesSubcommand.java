@@ -49,7 +49,7 @@ public class GetServiceRolesSubcommand implements Callable<Void> {
 
   @CommandLine.Option(names = {"-id", "--service-id"},
       description = "OM Service ID",
-      required = true)
+      required = false)
   private String omServiceId;
 
   @CommandLine.Option(names = { "--json" },

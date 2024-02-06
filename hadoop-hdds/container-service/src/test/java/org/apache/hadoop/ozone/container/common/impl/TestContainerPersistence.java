@@ -73,47 +73,47 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
-import org.apache.ozone.test.GenericTestUtils;
 
 import com.google.common.collect.Maps;
 import org.apache.commons.io.FileUtils;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BCSID_MISMATCH;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getChunk;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getData;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.setDataChecksum;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Assert;
-
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
-import static org.junit.Assert.fail;
-import static org.junit.Assume.assumeFalse;
-import static org.junit.Assume.assumeTrue;
-
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
-import org.junit.rules.ExpectedException;
-import org.junit.rules.Timeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Simple tests to verify that container persistence works as expected. Some of
  * these tests are specific to {@link KeyValueContainer}. If a new {@link
  * ContainerProtos.ContainerType} is added, the tests need to be modified.
  */
-@RunWith(Parameterized.class)
+@Timeout(300)
 public class TestContainerPersistence {
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
   private static final String SCM_ID = UUID.randomUUID().toString();
-  private static Logger log =
+  private static final Logger LOGGER =
       LoggerFactory.getLogger(TestContainerPersistence.class);
+  @TempDir
+  private static File hddsFile;
   private static String hddsPath;
   private static OzoneConfiguration conf;
   private static VolumeChoosingPolicy volumeChoosingPolicy;
@@ -123,44 +123,34 @@ public class TestContainerPersistence {
   private BlockManager blockManager;
   private ChunkManager chunkManager;
 
-  @Rule
-  public ExpectedException exception = ExpectedException.none();
   /**
    * Set the timeout for every test.
    */
-  @Rule
-  public Timeout testTimeout = Timeout.seconds(300);
 
-  private final ContainerLayoutVersion layout;
-  private final String schemaVersion;
+  private ContainerLayoutVersion layout;
+  private String schemaVersion;
 
-  public TestContainerPersistence(ContainerTestVersionInfo versionInfo) {
+  private void initSchemaAndVersionInfo(ContainerTestVersionInfo versionInfo) {
     this.layout = versionInfo.getLayout();
     this.schemaVersion = versionInfo.getSchemaVersion();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 
-  @Parameterized.Parameters
-  public static Iterable<Object[]> parameters() {
-    return ContainerTestVersionInfo.versionParameters();
-  }
-
-  @BeforeClass
+  @BeforeAll
   public static void init() {
     conf = new OzoneConfiguration();
-    hddsPath = GenericTestUtils
-        .getTempPath(TestContainerPersistence.class.getSimpleName());
+    hddsPath = hddsFile.getPath();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, hddsPath);
     conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, hddsPath);
     volumeChoosingPolicy = new RoundRobinVolumeChoosingPolicy();
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdown() throws IOException {
     FileUtils.deleteDirectory(new File(hddsPath));
   }
 
-  @Before
+  @BeforeEach
   public void setupPaths() throws IOException {
     containerSet = new ContainerSet(1000);
     volumeSet = new MutableVolumeSet(DATANODE_UUID, conf, null,
@@ -170,7 +160,7 @@ public class TestContainerPersistence {
         volumeSet.getVolumesList())) {
       boolean success = StorageVolumeUtil.checkVolume(volume, SCM_ID, SCM_ID,
           conf, null, null);
-      Assert.assertTrue(success);
+      assertTrue(success);
     }
     blockManager = new BlockManagerImpl(conf);
     chunkManager = ChunkManagerFactory.createChunkManager(conf, blockManager,
@@ -182,13 +172,13 @@ public class TestContainerPersistence {
     }
   }
 
-  @After
+  @AfterEach
   public void cleanupDir() throws IOException {
     // Cleanup cache
     BlockUtils.shutdownCache(conf);
 
     // Clean up SCM metadata
-    log.info("Deleting {}", hddsPath);
+    LOGGER.info("Deleting {}", hddsPath);
     FileUtils.deleteDirectory(new File(hddsPath));
 
     // Clean up SCM datanode container metadata/data
@@ -200,10 +190,6 @@ public class TestContainerPersistence {
 
   private long getTestContainerID() {
     return ContainerTestHelper.getTestContainerID();
-  }
-
-  private DispatcherContext getDispatcherContext() {
-    return new DispatcherContext.Builder().build();
   }
 
   private KeyValueContainer addContainer(ContainerSet cSet, long cID)
@@ -226,55 +212,50 @@ public class TestContainerPersistence {
         .getVolume().getCommittedBytes();
     commitIncrement = commitBytesAfter - commitBytesBefore;
     // did we commit space for the new container?
-    Assert.assertTrue(commitIncrement ==
+    assertEquals(commitIncrement,
         ContainerTestHelper.CONTAINER_MAX_SIZE);
     return container;
   }
 
-  @Test
-  public void testCreateContainer() throws Exception {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testCreateContainer(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    initSchemaAndVersionInfo(versionInfo);
     long testContainerID = getTestContainerID();
     addContainer(containerSet, testContainerID);
-    Assert.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+    assertThat(containerSet.getContainerMapCopy()).containsKey(testContainerID);
     KeyValueContainerData kvData =
         (KeyValueContainerData) containerSet.getContainer(testContainerID)
             .getContainerData();
 
-    Assert.assertNotNull(kvData);
-    Assert.assertTrue(new File(kvData.getMetadataPath()).exists());
-    Assert.assertTrue(new File(kvData.getChunksPath()).exists());
-    Assert.assertTrue(kvData.getDbFile().exists());
+    assertNotNull(kvData);
+    assertTrue(new File(kvData.getMetadataPath()).exists());
+    assertTrue(new File(kvData.getChunksPath()).exists());
+    assertTrue(kvData.getDbFile().exists());
 
     Path meta = kvData.getDbFile().toPath().getParent();
-    Assert.assertTrue(meta != null && Files.exists(meta));
+    assertTrue(meta != null && Files.exists(meta));
 
-    DBHandle store = null;
-    try {
-      store = BlockUtils.getDB(kvData, conf);
-      Assert.assertNotNull(store);
-    } finally {
-      if (store != null) {
-        store.close();
-      }
+    try (DBHandle store = BlockUtils.getDB(kvData, conf)) {
+      assertNotNull(store);
     }
   }
 
-  @Test
-  public void testCreateDuplicateContainer() throws Exception {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testCreateDuplicateContainer(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    initSchemaAndVersionInfo(versionInfo);
     long testContainerID = getTestContainerID();
 
     Container container = addContainer(containerSet, testContainerID);
-    try {
-      containerSet.addContainer(container);
-      fail("Expected Exception not thrown.");
-    } catch (IOException ex) {
-      Assert.assertNotNull(ex);
-    }
+    IOException ex = assertThrows(IOException.class, () -> containerSet.addContainer(container));
+    assertNotNull(ex);
   }
 
-  @Test
-  public void testAddingBlockToDeletedContainer() throws Exception {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testAddingBlockToDeletedContainer(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    initSchemaAndVersionInfo(versionInfo);
     // With schema v3, we don't have a container dedicated db,
     // so skip check the behaviors related to it.
     assumeFalse(isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3));
@@ -286,33 +267,35 @@ public class TestContainerPersistence {
         addContainer(containerSet, testContainerID);
     container.close();
 
-    Assert.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+    assertThat(containerSet.getContainerMapCopy())
+        .containsKey(testContainerID);
 
     KeyValueContainerUtil.removeContainer(container.getContainerData(), conf);
     container.delete();
     containerSet.removeContainer(testContainerID);
-    Assert.assertFalse(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+    assertThat(containerSet.getContainerMapCopy()).doesNotContainKey(testContainerID);
 
     // Adding block to a deleted container should fail.
-    exception.expect(StorageContainerException.class);
-    exception.expectMessage("Error opening DB.");
     BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID);
     BlockData someKey = new BlockData(blockID);
     someKey.setChunks(new LinkedList<>());
-    blockManager.putBlock(container, someKey);
+    Exception exception = assertThrows(StorageContainerException.class,
+        () -> blockManager.putBlock(container, someKey));
+    assertThat(exception.getMessage())
+        .contains("Error opening DB.");
   }
 
-  @Test
-  public void testDeleteNonEmptyContainer() throws Exception {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testDeleteNonEmptyContainer(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    initSchemaAndVersionInfo(versionInfo);
     long testContainerID = getTestContainerID();
     Container<KeyValueContainerData> container =
         addContainer(containerSet, testContainerID);
     container.close();
 
-    Assert.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+    assertThat(containerSet.getContainerMapCopy())
+        .containsKey(testContainerID);
 
     // Deleting a non-empty container should fail.
     BlockID blockID = ContainerTestHelper.getTestBlockID(testContainerID);
@@ -330,24 +313,27 @@ public class TestContainerPersistence {
         datanodeId, containerSet, volumeSet, metrics,
         c -> icrReceived.incrementAndGet());
 
-    exception.expect(StorageContainerException.class);
-    exception.expectMessage(
-        "Non-force deletion of non-empty container is not allowed.");
-    kvHandler.deleteContainer(container, false);
-    Assert.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+    Exception exception = assertThrows(
+        StorageContainerException.class,
+        () -> kvHandler.deleteContainer(container, false));
+    assertThat(containerSet.getContainerMapCopy())
+        .containsKey(testContainerID);
+    assertThat(exception.getMessage())
+        .contains("Non-force deletion of non-empty container is not allowed.");
   }
 
-  @Test
-  public void testDeleteContainer() throws IOException {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testDeleteContainer(ContainerTestVersionInfo versionInfo)
+      throws IOException {
+    initSchemaAndVersionInfo(versionInfo);
     assumeTrue(isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3));
     long testContainerID = getTestContainerID();
     Container<KeyValueContainerData> container = addContainer(containerSet,
         testContainerID);
     BlockID blockID = addBlockToContainer(container);
     container.close();
-    Assert.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+    assertThat(containerSet.getContainerMapCopy())
+        .containsKey(testContainerID);
     KeyValueContainerData containerData = container.getContainerData();
 
     // Block data and metadata tables should have data.
@@ -358,8 +344,8 @@ public class TestContainerPersistence {
         container.getContainerData().getVolume().getConf());
     container.delete();
     containerSet.removeContainer(testContainerID);
-    Assert.assertFalse(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+    assertThat(containerSet.getContainerMapCopy())
+        .doesNotContainKey(testContainerID);
 
     // Block data and metadata tables should be cleared.
     assertContainerNotInSchema3DB(containerData, blockID);
@@ -379,9 +365,9 @@ public class TestContainerPersistence {
       Table<String, Long> metadataTable = store.getMetadataTable();
 
       // Block data and metadata tables should have data.
-      Assertions.assertNotNull(blockTable
+      assertNotNull(blockTable
           .getIfExist(containerData.getBlockKey(testBlock.getLocalID())));
-      Assertions.assertNotNull(metadataTable
+      assertNotNull(metadataTable
           .getIfExist(containerData.getBlockCountKey()));
     }
   }
@@ -401,9 +387,9 @@ public class TestContainerPersistence {
       Table<String, Long> metadataTable = store.getMetadataTable();
 
       // Block data and metadata tables should have data.
-      Assertions.assertNull(blockTable
+      assertNull(blockTable
           .getIfExist(containerData.getBlockKey(testBlock.getLocalID())));
-      Assertions.assertNull(metadataTable
+      assertNull(metadataTable
           .getIfExist(containerData.getBlockCountKey()));
     }
   }
@@ -426,11 +412,13 @@ public class TestContainerPersistence {
    * If SchemaV3 is enabled, HddsVolume has already been
    * formatted and initialized in
    * setupPaths#createDbInstancesForTestIfNeeded.
+   *
    * @throws Exception
    */
-  @Test
-  public void testDeleteContainerWithRenaming()
-      throws Exception {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testDeleteContainerWithRenaming(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    initSchemaAndVersionInfo(versionInfo);
     // Set up container 1.
     long testContainerID1 = getTestContainerID();
     Container<KeyValueContainerData> container1 =
@@ -449,10 +437,10 @@ public class TestContainerPersistence {
     KeyValueContainerData container2Data = container2.getContainerData();
     assertContainerInSchema3DB(container2Data, container2Block);
 
-    Assert.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID1));
-    Assert.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID2));
+    assertThat(containerSet.getContainerMapCopy())
+        .containsKey(testContainerID1);
+    assertThat(containerSet.getContainerMapCopy())
+        .containsKey(testContainerID2);
 
     // Since this test only uses one volume, both containers will reside in
     // the same volume.
@@ -460,11 +448,12 @@ public class TestContainerPersistence {
     // Volume setup should have created the tmp directory for container
     // deletion.
     File volumeTmpDir = hddsVolume.getTmpDir();
-    Assert.assertTrue(String.format("Volume level tmp dir %s not created.",
-            volumeTmpDir), volumeTmpDir.exists());
+    assertTrue(volumeTmpDir.exists(), String.format("Volume level " +
+        "tmp dir %s not created.", volumeTmpDir));
     File deletedContainerDir = hddsVolume.getDeletedContainerDir();
-    Assert.assertTrue(String.format("Volume level container deleted directory" +
-        " %s not created.", deletedContainerDir), deletedContainerDir.exists());
+    assertTrue(deletedContainerDir.exists(),
+        String.format("Volume level container deleted directory" +
+            " %s not created.", deletedContainerDir));
 
     // Move containers to delete directory. RocksDB should not yet be updated.
     KeyValueContainerUtil.moveToDeletedContainerDir(container1Data, hddsVolume);
@@ -474,17 +463,17 @@ public class TestContainerPersistence {
 
     // Both containers should be present in the deleted directory.
     File[] deleteDirFilesArray = deletedContainerDir.listFiles();
-    Assert.assertNotNull(deleteDirFilesArray);
+    assertNotNull(deleteDirFilesArray);
     Set<File> deleteDirFiles = Arrays.stream(deleteDirFilesArray)
         .collect(Collectors.toSet());
-    Assert.assertEquals(2, deleteDirFiles.size());
+    assertEquals(2, deleteDirFiles.size());
 
     File container1Dir = KeyValueContainerUtil.getTmpDirectoryPath(
         container1Data, hddsVolume).toFile();
-    Assert.assertTrue(deleteDirFiles.contains(container1Dir));
+    assertThat(deleteDirFiles).contains(container1Dir);
     File container2Dir = KeyValueContainerUtil.getTmpDirectoryPath(
         container2Data, hddsVolume).toFile();
-    Assert.assertTrue(deleteDirFiles.contains(container2Dir));
+    assertThat(deleteDirFiles).contains(container2Dir);
 
     // Delete container1 from the disk. Container2 should remain in the
     // deleted containers directory.
@@ -497,9 +486,9 @@ public class TestContainerPersistence {
 
     // Check the delete directory again. Only container 2 should remain.
     deleteDirFilesArray = deletedContainerDir.listFiles();
-    Assert.assertNotNull(deleteDirFilesArray);
-    Assert.assertEquals(1, deleteDirFilesArray.length);
-    Assert.assertEquals(deleteDirFilesArray[0], container2Dir);
+    assertNotNull(deleteDirFilesArray);
+    assertEquals(1, deleteDirFilesArray.length);
+    assertEquals(deleteDirFilesArray[0], container2Dir);
 
     // Delete container2 from the disk.
     KeyValueContainerUtil.removeContainerDB(
@@ -512,19 +501,21 @@ public class TestContainerPersistence {
     // Remove containers from containerSet
     containerSet.removeContainer(testContainerID1);
     containerSet.removeContainer(testContainerID2);
-    Assert.assertFalse(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID1));
-    Assert.assertFalse(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID2));
+    assertThat(containerSet.getContainerMapCopy())
+        .doesNotContainKey(testContainerID1);
+    assertThat(containerSet.getContainerMapCopy())
+        .doesNotContainKey(testContainerID2);
 
     // Deleted containers directory should now be empty.
     deleteDirFilesArray = deletedContainerDir.listFiles();
-    Assert.assertNotNull(deleteDirFilesArray);
-    Assert.assertEquals(0, deleteDirFilesArray.length);
+    assertNotNull(deleteDirFilesArray);
+    assertEquals(0, deleteDirFilesArray.length);
   }
 
-  @Test
-  public void testGetContainerReports() throws Exception {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testGetContainerReports(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    initSchemaAndVersionInfo(versionInfo);
     final int count = 10;
     List<Long> containerIDs = new ArrayList<>();
 
@@ -543,13 +534,13 @@ public class TestContainerPersistence {
     // and closed) reports.
     List<StorageContainerDatanodeProtocolProtos.ContainerReplicaProto> reports =
         containerSet.getContainerReport().getReportsList();
-    Assert.assertEquals(10, reports.size());
+    assertEquals(10, reports.size());
     for (StorageContainerDatanodeProtocolProtos.ContainerReplicaProto report :
         reports) {
       long actualContainerID = report.getContainerID();
-      Assert.assertTrue(containerIDs.remove(actualContainerID));
+      assertTrue(containerIDs.remove(actualContainerID));
     }
-    Assert.assertTrue(containerIDs.isEmpty());
+    assertThat(containerIDs).isEmpty();
   }
 
   /**
@@ -558,8 +549,10 @@ public class TestContainerPersistence {
    *
    * @throws IOException
    */
-  @Test
-  public void testListContainer() throws IOException {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testListContainer(ContainerTestVersionInfo versionInfo)
+      throws IOException {
+    initSchemaAndVersionInfo(versionInfo);
     final int count = 10;
     final int step = 5;
 
@@ -582,13 +575,13 @@ public class TestContainerPersistence {
       long nextKey = results.get(results.size() - 1).getContainerID();
 
       //Assert that container is returning results in a sorted fashion.
-      Assert.assertTrue(prevKey < nextKey);
+      assertThat(prevKey).isLessThan(nextKey);
       prevKey = nextKey + 1;
       results.clear();
     }
     // Assert that we listed all the keys that we had put into
     // container.
-    Assert.assertTrue(testMap.isEmpty());
+    assertThat(testMap).isEmpty();
   }
 
   private ChunkInfo writeChunkHelper(BlockID blockID) throws IOException {
@@ -608,12 +601,12 @@ public class TestContainerPersistence {
     commitBytesBefore = container.getContainerData()
         .getVolume().getCommittedBytes();
     chunkManager.writeChunk(container, blockID, info, data,
-        getDispatcherContext());
+        DispatcherContext.getHandleWriteChunk());
     commitBytesAfter = container.getContainerData()
         .getVolume().getCommittedBytes();
     commitDecrement = commitBytesBefore - commitBytesAfter;
     // did we decrement commit bytes by the amount of data we wrote?
-    Assert.assertTrue(commitDecrement == info.getLen());
+    assertEquals(commitDecrement, info.getLen());
     return info;
 
   }
@@ -624,9 +617,10 @@ public class TestContainerPersistence {
    * @throws IOException
    * @throws NoSuchAlgorithmException
    */
-  @Test
-  public void testWriteChunk() throws IOException,
-      NoSuchAlgorithmException {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testWriteChunk(ContainerTestVersionInfo versionInfo)
+      throws IOException {
+    initSchemaAndVersionInfo(versionInfo);
     BlockID blockID = ContainerTestHelper.
         getTestBlockID(getTestContainerID());
     writeChunkHelper(blockID);
@@ -639,8 +633,10 @@ public class TestContainerPersistence {
    * @throws IOException
    * @throws NoSuchAlgorithmException
    */
-  @Test
-  public void testWritReadManyChunks() throws IOException {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testWritReadManyChunks(ContainerTestVersionInfo versionInfo)
+      throws IOException {
+    initSchemaAndVersionInfo(versionInfo);
     final int datalen = 1024;
     final int chunkCount = 1024;
 
@@ -655,7 +651,7 @@ public class TestContainerPersistence {
       ChunkBuffer data = getData(datalen);
       setDataChecksum(info, data);
       chunkManager.writeChunk(container, blockID, info, data,
-          getDispatcherContext());
+          DispatcherContext.getHandleWriteChunk());
       chunks.add(info);
       blockData.addChunk(info.getProtoBufMessage());
     }
@@ -663,7 +659,7 @@ public class TestContainerPersistence {
 
     KeyValueContainerData cNewData =
         (KeyValueContainerData) container.getContainerData();
-    Assert.assertNotNull(cNewData);
+    assertNotNull(cNewData);
     Path dataDir = Paths.get(cNewData.getChunksPath());
 
     // Read chunk via file system and verify.
@@ -672,10 +668,10 @@ public class TestContainerPersistence {
     // Read chunk via ReadChunk call.
     for (int x = 0; x < chunkCount; x++) {
       ChunkInfo info = chunks.get(x);
-      ChunkBuffer data = chunkManager
-          .readChunk(container, blockID, info, getDispatcherContext());
+      final ChunkBuffer data = chunkManager.readChunk(container, blockID, info,
+          DispatcherContext.getHandleReadChunk());
       ChecksumData checksumData = checksum.computeChecksum(data);
-      Assert.assertEquals(info.getChecksumData(), checksumData);
+      assertEquals(info.getChecksumData(), checksumData);
     }
   }
 
@@ -684,11 +680,11 @@ public class TestContainerPersistence {
    * flag then re-tries with overwrite flag.
    *
    * @throws IOException
-   * @throws NoSuchAlgorithmException
    */
-  @Test
-  public void testOverWrite() throws IOException,
-      NoSuchAlgorithmException {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testOverWrite(ContainerTestVersionInfo versionInfo)
+      throws IOException {
+    initSchemaAndVersionInfo(versionInfo);
     final int datalen = 1024;
 
     long testContainerID = getTestContainerID();
@@ -700,31 +696,31 @@ public class TestContainerPersistence {
     ChunkBuffer data = getData(datalen);
     setDataChecksum(info, data);
     chunkManager.writeChunk(container, blockID, info, data,
-        getDispatcherContext());
+        DispatcherContext.getHandleWriteChunk());
     data.rewind();
     chunkManager.writeChunk(container, blockID, info, data,
-        getDispatcherContext());
+        DispatcherContext.getHandleWriteChunk());
     data.rewind();
     // With the overwrite flag it should work now.
     info.addMetadata(OzoneConsts.CHUNK_OVERWRITE, "true");
     chunkManager.writeChunk(container, blockID, info, data,
-        getDispatcherContext());
+        DispatcherContext.getHandleWriteChunk());
     long bytesUsed = container.getContainerData().getBytesUsed();
-    Assert.assertEquals(datalen, bytesUsed);
+    assertEquals(datalen, bytesUsed);
 
     long bytesWrite = container.getContainerData().getWriteBytes();
-    Assert.assertEquals(datalen * 3, bytesWrite);
+    assertEquals(datalen * 3, bytesWrite);
   }
 
   /**
    * Writes a chunk and deletes it, re-reads to make sure it is gone.
    *
    * @throws IOException
-   * @throws NoSuchAlgorithmException
    */
-  @Test
-  public void testDeleteChunk() throws IOException,
-      NoSuchAlgorithmException {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testDeleteChunk(ContainerTestVersionInfo versionInfo)
+      throws IOException {
+    initSchemaAndVersionInfo(versionInfo);
     final int datalen = 1024;
     long testContainerID = getTestContainerID();
     Container container = addContainer(containerSet, testContainerID);
@@ -735,20 +731,22 @@ public class TestContainerPersistence {
     ChunkBuffer data = getData(datalen);
     setDataChecksum(info, data);
     chunkManager.writeChunk(container, blockID, info, data,
-        getDispatcherContext());
+        DispatcherContext.getHandleWriteChunk());
     chunkManager.deleteChunk(container, blockID, info);
-    exception.expect(StorageContainerException.class);
-    chunkManager.readChunk(container, blockID, info, getDispatcherContext());
+    assertThrows(StorageContainerException.class,
+        () -> chunkManager.readChunk(
+            container, blockID, info, DispatcherContext.getHandleReadChunk()));
   }
 
   /**
    * Tests a put block and read block.
    *
    * @throws IOException
-   * @throws NoSuchAlgorithmException
    */
-  @Test
-  public void testPutBlock() throws IOException, NoSuchAlgorithmException {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testPutBlock(ContainerTestVersionInfo versionInfo)
+      throws IOException {
+    initSchemaAndVersionInfo(versionInfo);
     long testContainerID = getTestContainerID();
     Container container = addContainer(containerSet, testContainerID);
 
@@ -763,18 +761,18 @@ public class TestContainerPersistence {
         getBlock(container, blockData.getBlockID());
     ChunkInfo readChunk =
         ChunkInfo.getFromProtoBuf(readBlockData.getChunks().get(0));
-    Assert.assertEquals(info.getChecksumData(), readChunk.getChecksumData());
+    assertEquals(info.getChecksumData(), readChunk.getChecksumData());
   }
 
   /**
    * Tests a put block and read block with invalid bcsId.
    *
    * @throws IOException
-   * @throws NoSuchAlgorithmException
    */
-  @Test
-  public void testPutBlockWithInvalidBCSId()
-      throws IOException, NoSuchAlgorithmException {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testPutBlockWithInvalidBCSId(ContainerTestVersionInfo versionInfo)
+      throws IOException {
+    initSchemaAndVersionInfo(versionInfo);
     long testContainerID = getTestContainerID();
     Container container = addContainer(containerSet, testContainerID);
 
@@ -797,42 +795,39 @@ public class TestContainerPersistence {
     blockData.setBlockCommitSequenceId(4);
     blockManager.putBlock(container, blockData);
     BlockData readBlockData;
-    try {
+    StorageContainerException sce = assertThrows(StorageContainerException.class, () -> {
       blockID1.setBlockCommitSequenceId(5);
       // read with bcsId higher than container bcsId
       blockManager.
           getBlock(container, blockID1);
-      Assert.fail("Expected exception not thrown");
-    } catch (StorageContainerException sce) {
-      Assert.assertTrue(sce.getResult() == UNKNOWN_BCSID);
-    }
+    });
+    assertSame(UNKNOWN_BCSID, sce.getResult());
 
-    try {
+    sce = assertThrows(StorageContainerException.class, () -> {
       blockID1.setBlockCommitSequenceId(4);
       // read with bcsId lower than container bcsId but greater than committed
       // bcsId.
       blockManager.
           getBlock(container, blockID1);
-      Assert.fail("Expected exception not thrown");
-    } catch (StorageContainerException sce) {
-      Assert.assertTrue(sce.getResult() == BCSID_MISMATCH);
-    }
+    });
+    assertSame(BCSID_MISMATCH, sce.getResult());
+
     readBlockData = blockManager.
         getBlock(container, blockData.getBlockID());
     ChunkInfo readChunk =
         ChunkInfo.getFromProtoBuf(readBlockData.getChunks().get(0));
-    Assert.assertEquals(info.getChecksumData(), readChunk.getChecksumData());
+    assertEquals(info.getChecksumData(), readChunk.getChecksumData());
   }
 
   /**
    * Tests a put block and read block.
    *
    * @throws IOException
-   * @throws NoSuchAlgorithmException
    */
-  @Test
-  public void testPutBlockWithLotsOfChunks() throws IOException,
-      NoSuchAlgorithmException {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testPutBlockWithLotsOfChunks(ContainerTestVersionInfo versionInfo)
+      throws IOException {
+    initSchemaAndVersionInfo(versionInfo);
     final int chunkCount = 2;
     final int datalen = 1024;
     long totalSize = 0L;
@@ -846,19 +841,19 @@ public class TestContainerPersistence {
       ChunkBuffer data = getData(datalen);
       setDataChecksum(info, data);
       chunkManager.writeChunk(container, blockID, info, data,
-          getDispatcherContext());
+          DispatcherContext.getHandleWriteChunk());
       totalSize += datalen;
       chunkList.add(info);
     }
 
     long bytesUsed = container.getContainerData().getBytesUsed();
-    Assert.assertEquals(totalSize, bytesUsed);
+    assertEquals(totalSize, bytesUsed);
     long writeBytes = container.getContainerData().getWriteBytes();
-    Assert.assertEquals(chunkCount * datalen, writeBytes);
+    assertEquals(chunkCount * datalen, writeBytes);
     long readCount = container.getContainerData().getReadCount();
-    Assert.assertEquals(0, readCount);
+    assertEquals(0, readCount);
     long writeCount = container.getContainerData().getWriteCount();
-    Assert.assertEquals(chunkCount, writeCount);
+    assertEquals(chunkCount, writeCount);
 
     BlockData blockData = new BlockData(blockID);
     List<ContainerProtos.ChunkInfo> chunkProtoList = new LinkedList<>();
@@ -873,7 +868,7 @@ public class TestContainerPersistence {
     ChunkInfo readChunk =
         ChunkInfo.getFromProtoBuf(readBlockData.getChunks().get(readBlockData
             .getChunks().size() - 1));
-    Assert.assertEquals(
+    assertEquals(
         lastChunk.getChecksumData(), readChunk.getChecksumData());
   }
 
@@ -883,14 +878,16 @@ public class TestContainerPersistence {
    *
    * @throws IOException
    */
-  @Test
-  public void testUpdateContainer() throws IOException {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testUpdateContainer(ContainerTestVersionInfo versionInfo)
+      throws IOException {
+    initSchemaAndVersionInfo(versionInfo);
     long testContainerID = ContainerTestHelper.getTestContainerID();
     KeyValueContainer container =
         (KeyValueContainer) addContainer(containerSet, testContainerID);
 
     File orgContainerFile = container.getContainerFile();
-    Assert.assertTrue(orgContainerFile.exists());
+    assertTrue(orgContainerFile.exists());
 
     Map<String, String> newMetadata = Maps.newHashMap();
     newMetadata.put("VOLUME", "shire_new");
@@ -898,33 +895,33 @@ public class TestContainerPersistence {
 
     container.update(newMetadata, false);
 
-    Assert.assertEquals(1, containerSet.getContainerMapCopy().size());
-    Assert.assertTrue(containerSet.getContainerMapCopy()
-        .containsKey(testContainerID));
+    assertEquals(1, containerSet.getContainerMapCopy().size());
+    assertThat(containerSet.getContainerMapCopy())
+        .containsKey(testContainerID);
 
     // Verify in-memory map
     KeyValueContainerData actualNewData = (KeyValueContainerData)
         containerSet.getContainer(testContainerID).getContainerData();
-    Assert.assertEquals("shire_new",
+    assertEquals("shire_new",
         actualNewData.getMetadata().get("VOLUME"));
-    Assert.assertEquals("bilbo_new",
+    assertEquals("bilbo_new",
         actualNewData.getMetadata().get("owner"));
 
     // Verify container data on disk
     File containerBaseDir = new File(actualNewData.getMetadataPath())
         .getParentFile();
     File newContainerFile = ContainerUtils.getContainerFile(containerBaseDir);
-    Assert.assertTrue("Container file should exist.",
-        newContainerFile.exists());
-    Assert.assertEquals("Container file should be in same location.",
-        orgContainerFile.getAbsolutePath(),
-        newContainerFile.getAbsolutePath());
+    assertTrue(newContainerFile.exists(),
+        "Container file should exist.");
+    assertEquals(
+        orgContainerFile.getAbsolutePath(), newContainerFile.getAbsolutePath(),
+        "Container file should be in same location.");
 
     ContainerData actualContainerData = ContainerDataYaml.readContainerFile(
         newContainerFile);
-    Assert.assertEquals("shire_new",
+    assertEquals("shire_new",
         actualContainerData.getMetadata().get("VOLUME"));
-    Assert.assertEquals("bilbo_new",
+    assertEquals("bilbo_new",
         actualContainerData.getMetadata().get("owner"));
 
 
@@ -934,7 +931,7 @@ public class TestContainerPersistence {
     try {
       container.update(newMetadata, false);
     } catch (StorageContainerException ex) {
-      Assert.assertEquals("Updating a closed container without " +
+      assertEquals("Updating a closed container without " +
           "force option is not allowed. ContainerID: " +
           testContainerID, ex.getMessage());
     }
@@ -947,26 +944,28 @@ public class TestContainerPersistence {
     // Verify in-memory map
     actualNewData = (KeyValueContainerData)
         containerSet.getContainer(testContainerID).getContainerData();
-    Assert.assertEquals("shire_new_1",
+    assertEquals("shire_new_1",
         actualNewData.getMetadata().get("VOLUME"));
-    Assert.assertEquals("bilbo_new_1",
+    assertEquals("bilbo_new_1",
         actualNewData.getMetadata().get("owner"));
 
   }
 
   private BlockData writeBlockHelper(BlockID blockID, int i)
-      throws IOException, NoSuchAlgorithmException {
+      throws IOException {
     ChunkInfo info = writeChunkHelper(blockID);
     BlockData blockData = new BlockData(blockID);
-    blockData.setBlockCommitSequenceId((long) i);
+    blockData.setBlockCommitSequenceId(i);
     List<ContainerProtos.ChunkInfo> chunkList = new LinkedList<>();
     chunkList.add(info.getProtoBufMessage());
     blockData.setChunks(chunkList);
     return blockData;
   }
 
-  @Test
-  public void testListBlock() throws Exception {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testListBlock(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    initSchemaAndVersionInfo(versionInfo);
     long testContainerID = getTestContainerID();
     Container container = addContainer(containerSet, testContainerID);
     List<BlockID> expectedBlocks = new ArrayList<>();
@@ -980,13 +979,13 @@ public class TestContainerPersistence {
     // List all blocks
     List<BlockData> result = blockManager.listBlock(
         container, 0, 100);
-    Assert.assertEquals(10, result.size());
+    assertEquals(10, result.size());
 
     int index = 0;
     for (int i = index; i < result.size(); i++) {
       BlockData data = result.get(i);
-      Assert.assertEquals(testContainerID, data.getContainerID());
-      Assert.assertEquals(expectedBlocks.get(i).getLocalID(),
+      assertEquals(testContainerID, data.getContainerID());
+      assertEquals(expectedBlocks.get(i).getLocalID(),
           data.getLocalID());
       index++;
     }
@@ -995,15 +994,16 @@ public class TestContainerPersistence {
     long k6 = expectedBlocks.get(6).getLocalID();
     result = blockManager.listBlock(container, k6, 100);
 
-    Assert.assertEquals(4, result.size());
+    assertEquals(4, result.size());
     for (int i = 6; i < 10; i++) {
-      Assert.assertEquals(expectedBlocks.get(i).getLocalID(),
+      assertEquals(expectedBlocks.get(i).getLocalID(),
           result.get(i - 6).getLocalID());
     }
 
     // Count must be >0
-    exception.expect(IllegalArgumentException.class);
-    exception.expectMessage("Count must be a positive number.");
-    blockManager.listBlock(container, 0, -1);
+    Exception exception = assertThrows(IllegalArgumentException.class,
+        () -> blockManager.listBlock(container, 0, -1));
+    assertThat(exception.getMessage())
+        .contains("Count must be a positive number.");
   }
 }

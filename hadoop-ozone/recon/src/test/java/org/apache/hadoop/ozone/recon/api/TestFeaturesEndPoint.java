@@ -27,20 +27,22 @@ import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import javax.ws.rs.core.Response;
-
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_ENABLE_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HEATMAP_PROVIDER_KEY;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -48,8 +50,8 @@ import static org.mockito.Mockito.mock;
  */
 public class TestFeaturesEndPoint {
 
-  @Rule
-  public TemporaryFolder temporaryFolder = new TemporaryFolder();
+  @TempDir
+  private Path temporaryFolder;
   private FeaturesEndpoint featuresEndPoint;
   private boolean isSetupDone = false;
   private ReconOMMetadataManager reconOMMetadataManager;
@@ -58,11 +60,12 @@ public class TestFeaturesEndPoint {
   private void initializeInjector() throws Exception {
     ozoneConfiguration = new OzoneConfiguration();
     reconOMMetadataManager = getTestReconOmMetadataManager(
-        initializeNewOmMetadataManager(temporaryFolder.newFolder()),
-        temporaryFolder.newFolder());
+        initializeNewOmMetadataManager(Files.createDirectory(
+            temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+        Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
 
     ReconTestInjector reconTestInjector =
-        new ReconTestInjector.Builder(temporaryFolder)
+        new ReconTestInjector.Builder(temporaryFolder.toFile())
             .withReconSqlDb()
             .withReconOm(reconOMMetadataManager)
             .withOmServiceProvider(mock(OzoneManagerServiceProviderImpl.class))
@@ -80,7 +83,7 @@ public class TestFeaturesEndPoint {
         FeaturesEndpoint.class);
   }
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     // The following setup runs only once
     if (!isSetupDone) {
@@ -96,9 +99,9 @@ public class TestFeaturesEndPoint {
     Response disabledFeatures = featuresEndPoint.getDisabledFeatures();
     List<FeatureProvider.Feature> allDisabledFeatures =
         (List<FeatureProvider.Feature>) disabledFeatures.getEntity();
-    Assertions.assertNotNull(allDisabledFeatures);
-    Assertions.assertTrue(allDisabledFeatures.size() > 0);
-    Assertions.assertEquals(FeatureProvider.Feature.HEATMAP.getFeatureName(),
+    assertNotNull(allDisabledFeatures);
+    assertThat(allDisabledFeatures.size()).isGreaterThan(0);
+    assertEquals(FeatureProvider.Feature.HEATMAP.getFeatureName(),
         allDisabledFeatures.get(0).getFeatureName());
   }
 
@@ -111,8 +114,8 @@ public class TestFeaturesEndPoint {
     Response disabledFeatures = featuresEndPoint.getDisabledFeatures();
     List<FeatureProvider.Feature> allDisabledFeatures =
         (List<FeatureProvider.Feature>) disabledFeatures.getEntity();
-    Assertions.assertNotNull(allDisabledFeatures);
-    Assertions.assertTrue(allDisabledFeatures.size() == 0);
+    assertNotNull(allDisabledFeatures);
+    assertEquals(0, allDisabledFeatures.size());
   }
 
   @Test
@@ -124,9 +127,9 @@ public class TestFeaturesEndPoint {
     Response disabledFeatures = featuresEndPoint.getDisabledFeatures();
     List<FeatureProvider.Feature> allDisabledFeatures =
         (List<FeatureProvider.Feature>) disabledFeatures.getEntity();
-    Assertions.assertNotNull(allDisabledFeatures);
-    Assertions.assertTrue(allDisabledFeatures.size() > 0);
-    Assertions.assertEquals(FeatureProvider.Feature.HEATMAP.getFeatureName(),
+    assertNotNull(allDisabledFeatures);
+    assertThat(allDisabledFeatures.size()).isGreaterThan(0);
+    assertEquals(FeatureProvider.Feature.HEATMAP.getFeatureName(),
         allDisabledFeatures.get(0).getFeatureName());
   }
 
@@ -139,7 +142,7 @@ public class TestFeaturesEndPoint {
     Response disabledFeatures = featuresEndPoint.getDisabledFeatures();
     List<FeatureProvider.Feature> allDisabledFeatures =
         (List<FeatureProvider.Feature>) disabledFeatures.getEntity();
-    Assertions.assertNotNull(allDisabledFeatures);
-    Assertions.assertTrue(allDisabledFeatures.size() == 0);
+    assertNotNull(allDisabledFeatures);
+    assertEquals(0, allDisabledFeatures.size());
   }
 }

@@ -32,39 +32,37 @@ import org.apache.hadoop.ozone.storage.proto.
     OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
-import java.io.IOException;
+import java.nio.file.Path;
 import java.util.UUID;
 
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * This class tests OMVolumeCreateResponse.
  */
 public class TestOMVolumeCreateResponse {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   private OMMetadataManager omMetadataManager;
   private BatchOperation batchOperation;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        folder.newFolder().getAbsolutePath());
+        folder.toAbsolutePath().toString());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     if (batchOperation != null) {
       batchOperation.close();
@@ -99,18 +97,18 @@ public class TestOMVolumeCreateResponse {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
 
-    Assert.assertEquals(1,
+    assertEquals(1,
         omMetadataManager.countRowsInTable(omMetadataManager.getVolumeTable()));
-    Assert.assertEquals(omVolumeArgs,
+    assertEquals(omVolumeArgs,
         omMetadataManager.getVolumeTable().iterator().next().getValue());
 
-    Assert.assertEquals(volumeList,
+    assertEquals(volumeList,
         omMetadataManager.getUserTable().get(
             omMetadataManager.getUserKey(userName)));
   }
 
   @Test
-  public void testAddToDBBatchNoOp() throws Exception {
+  void testAddToDBBatchNoOp() throws Exception {
 
     OMResponse omResponse = OMResponse.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
@@ -122,15 +120,10 @@ public class TestOMVolumeCreateResponse {
     OMVolumeCreateResponse omVolumeCreateResponse =
         new OMVolumeCreateResponse(omResponse);
 
-    try {
-      omVolumeCreateResponse.checkAndUpdateDB(omMetadataManager,
-          batchOperation);
-      Assert.assertTrue(omMetadataManager.countRowsInTable(
-          omMetadataManager.getVolumeTable()) == 0);
-    } catch (IOException ex) {
-      fail("testAddToDBBatchFailure failed");
-    }
-
+    omVolumeCreateResponse.checkAndUpdateDB(omMetadataManager,
+        batchOperation);
+    assertEquals(0, omMetadataManager.countRowsInTable(
+        omMetadataManager.getVolumeTable()));
   }
 
 

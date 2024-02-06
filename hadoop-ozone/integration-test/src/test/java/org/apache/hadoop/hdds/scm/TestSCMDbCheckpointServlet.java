@@ -25,15 +25,15 @@ import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Stream;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -44,30 +44,31 @@ import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 
-import org.apache.commons.io.FileUtils;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConsts.MULTIPART_FORM_DATA_BOUNDARY;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -79,9 +80,6 @@ public class TestSCMDbCheckpointServlet {
   private StorageContainerManager scm;
   private SCMMetrics scmMetrics;
   private OzoneConfiguration conf;
-  private String clusterId;
-  private String scmId;
-  private String omId;
   private HttpServletRequest requestMock;
   private HttpServletResponse responseMock;
   private String method;
@@ -98,14 +96,8 @@ public class TestSCMDbCheckpointServlet {
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
-    omId = UUID.randomUUID().toString();
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
-        .setOmId(omId)
         .build();
     cluster.waitForClusterToBeReady();
     scm = cluster.getStorageContainerManager();
@@ -154,67 +146,63 @@ public class TestSCMDbCheckpointServlet {
 
   @ParameterizedTest
   @MethodSource("getHttpMethods")
-  public void testEndpoint(String httpMethod)
+  void testEndpoint(String httpMethod, @TempDir Path tempDir)
       throws ServletException, IOException, InterruptedException {
     this.method = httpMethod;
 
-    File tempFile = null;
-    try {
-      List<String> toExcludeList = new ArrayList<>();
-      toExcludeList.add("sstFile1.sst");
-      toExcludeList.add("sstFile2.sst");
+    List<String> toExcludeList = new ArrayList<>();
+    toExcludeList.add("sstFile1.sst");
+    toExcludeList.add("sstFile2.sst");
 
-      setupHttpMethod(toExcludeList);
+    setupHttpMethod(toExcludeList);
 
-      doNothing().when(responseMock).setContentType("application/x-tgz");
-      doNothing().when(responseMock).setHeader(Mockito.anyString(),
-          Mockito.anyString());
+    doNothing().when(responseMock).setContentType("application/x-tgz");
+    doNothing().when(responseMock).setHeader(anyString(), anyString());
 
-      tempFile = File.createTempFile("testEndpoint_" + System
-          .currentTimeMillis(), ".tar");
+    final Path outputPath = tempDir.resolve("testEndpoint.tar");
+    when(responseMock.getOutputStream()).thenReturn(
+        new ServletOutputStream() {
+          private final OutputStream fileOutputStream = Files.newOutputStream(outputPath);
 
-      FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
-      when(responseMock.getOutputStream()).thenReturn(
-          new ServletOutputStream() {
-            @Override
-            public boolean isReady() {
-              return true;
-            }
+          @Override
+          public boolean isReady() {
+            return true;
+          }
 
-            @Override
-            public void setWriteListener(WriteListener writeListener) {
-            }
+          @Override
+          public void setWriteListener(WriteListener writeListener) {
+          }
 
-            @Override
-            public void write(int b) throws IOException {
-              fileOutputStream.write(b);
-            }
-          });
+          @Override
+          public void close() throws IOException {
+            fileOutputStream.close();
+            super.close();
+          }
 
-      when(scmDbCheckpointServletMock.getBootstrapStateLock()).thenReturn(
-          new DBCheckpointServlet.Lock());
-      scmDbCheckpointServletMock.init();
-      long initialCheckpointCount =
-          scmMetrics.getDBCheckpointMetrics().getNumCheckpoints();
+          @Override
+          public void write(int b) throws IOException {
+            fileOutputStream.write(b);
+          }
+        });
 
-      doEndpoint();
+    when(scmDbCheckpointServletMock.getBootstrapStateLock()).thenReturn(
+        new DBCheckpointServlet.Lock());
+    scmDbCheckpointServletMock.init();
+    long initialCheckpointCount =
+        scmMetrics.getDBCheckpointMetrics().getNumCheckpoints();
 
-      Assertions.assertTrue(tempFile.length() > 0);
-      Assertions.assertTrue(
-          scmMetrics.getDBCheckpointMetrics().
-              getLastCheckpointCreationTimeTaken() > 0);
-      Assertions.assertTrue(
-          scmMetrics.getDBCheckpointMetrics().
-              getLastCheckpointStreamingTimeTaken() > 0);
-      Assertions.assertTrue(scmMetrics.getDBCheckpointMetrics().
-          getNumCheckpoints() > initialCheckpointCount);
+    doEndpoint();
 
-      Mockito.verify(scmDbCheckpointServletMock).writeDbDataToStream(any(),
-          any(), any(), eq(toExcludeList), any(), any());
-    } finally {
-      FileUtils.deleteQuietly(tempFile);
-    }
+    assertThat(outputPath.toFile().length()).isGreaterThan(0);
+    assertThat(scmMetrics.getDBCheckpointMetrics().getLastCheckpointCreationTimeTaken())
+        .isGreaterThan(0);
+    assertThat(scmMetrics.getDBCheckpointMetrics().getLastCheckpointStreamingTimeTaken())
+        .isGreaterThan(0);
+    assertThat(scmMetrics.getDBCheckpointMetrics().getNumCheckpoints())
+        .isGreaterThan(initialCheckpointCount);
 
+    verify(scmDbCheckpointServletMock).writeDbDataToStream(any(),
+        any(), any(), eq(toExcludeList), any(), any());
   }
 
   @Test
@@ -225,7 +213,7 @@ public class TestSCMDbCheckpointServlet {
 
     scmDbCheckpointServletMock.doPost(requestMock, responseMock);
 
-    Mockito.verify(responseMock).setStatus(HttpServletResponse.SC_BAD_REQUEST);
+    verify(responseMock).setStatus(HttpServletResponse.SC_BAD_REQUEST);
   }
 
   /**
@@ -288,7 +276,7 @@ public class TestSCMDbCheckpointServlet {
     // Use generated form data as input stream to the HTTP request
     InputStream input = new ByteArrayInputStream(
         sb.toString().getBytes(StandardCharsets.UTF_8));
-    ServletInputStream inputStream = Mockito.mock(ServletInputStream.class);
+    ServletInputStream inputStream = mock(ServletInputStream.class);
     when(requestMock.getInputStream()).thenReturn(inputStream);
     when(inputStream.read(any(byte[].class), anyInt(), anyInt()))
         .thenAnswer(invocation -> {
