@@ -41,6 +41,7 @@ import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.LiveFileMetaData;
 
@@ -71,17 +72,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Test SST Filtering Service.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestSstFilteringService {
-  public static final String SST_FILE_EXTENSION = ".sst";
-  @TempDir
-  private File folder;
+  public static final String SST_FILE_EXTENSION = ".sst";;
   private OzoneManagerProtocol writeClient;
   private OzoneManager om;
   private OzoneConfiguration conf;
   private KeyManager keyManager;
 
   @BeforeAll
-  void setup() throws AuthenticationException, IOException, InterruptedException, TimeoutException {
+  void setup(@TempDir File folder) throws AuthenticationException, IOException, InterruptedException, TimeoutException {
     ExitUtils.disableSystemExit();
     conf = new OzoneConfiguration();
     conf.set(OZONE_METADATA_DIRS, folder.getAbsolutePath());
