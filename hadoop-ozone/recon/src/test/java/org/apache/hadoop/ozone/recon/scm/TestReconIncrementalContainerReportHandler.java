@@ -23,13 +23,12 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OP
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -56,8 +55,8 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test Recon ICR handler.
@@ -67,7 +66,7 @@ public class TestReconIncrementalContainerReportHandler
   private HDDSLayoutVersionManager versionManager;
 
   @Test
-  public void testProcessICR()
+  public void testProcessICR(@TempDir Path scmPath)
       throws IOException, NodeNotFoundException, TimeoutException {
 
     ContainerID containerID = ContainerID.valueOf(100L);
@@ -90,9 +89,6 @@ public class TestReconIncrementalContainerReportHandler
         .getExistContainerWithPipelinesInBatch(any(
             ArrayList.class))).thenReturn(containerWithPipelineList);
 
-    final String path =
-        GenericTestUtils.getTempPath(UUID.randomUUID().toString());
-    Path scmPath = Paths.get(path, "scm-meta");
     final OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);

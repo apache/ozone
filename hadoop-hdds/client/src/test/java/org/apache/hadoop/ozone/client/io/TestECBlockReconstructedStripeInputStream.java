@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.collect.ImmutableSet;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -41,7 +42,6 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import java.util.SplittableRandom;
 import java.util.concurrent.ExecutorService;
@@ -52,6 +52,7 @@ import static java.util.Collections.emptySet;
 import static java.util.Collections.singleton;
 import static java.util.stream.Collectors.toSet;
 import static org.apache.hadoop.ozone.client.io.ECStreamTestUtil.generateParity;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -645,7 +646,7 @@ public class TestECBlockReconstructedStripeInputStream {
   }
 
   private Integer getRandomStreamIndex(Set<Integer> set) {
-    return set.stream().skip(new Random().nextInt(set.size()))
+    return set.stream().skip(RandomUtils.nextInt(0, set.size()))
         .findFirst().orElse(null);
   }
 
@@ -800,7 +801,7 @@ public class TestECBlockReconstructedStripeInputStream {
       // created in the stream factory, indicating we did not read them.
       List<TestBlockInputStream> streams = streamFactory.getBlockStreams();
       for (TestBlockInputStream stream : streams) {
-        assertTrue(stream.getEcReplicaIndex() > 2);
+        assertThat(stream.getEcReplicaIndex()).isGreaterThan(2);
       }
     }
   }

@@ -48,7 +48,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -91,7 +90,7 @@ public class TestOzoneContainer {
   }
 
   @Test
-  public void testOzoneContainerStart(
+  void testOzoneContainerStart(
       @TempDir File ozoneMetaDir, @TempDir File hddsNodeDir) throws Exception {
     OzoneConfiguration conf = newOzoneConfiguration();
     OzoneContainer container = null;
@@ -110,18 +109,12 @@ public class TestOzoneContainer {
 
       String clusterId = UUID.randomUUID().toString();
       container.start(clusterId);
-      try {
-        container.start(clusterId);
-      } catch (Exception e) {
-        fail();
-      }
+
+      container.start(clusterId);
 
       container.stop();
-      try {
-        container.stop();
-      } catch (Exception e) {
-        fail();
-      }
+
+      container.stop();
 
     } finally {
       if (container != null) {
@@ -199,7 +192,7 @@ public class TestOzoneContainer {
       response = client.sendCommand(request);
       int chunksCount = putBlockRequest.getPutBlock().getBlockData().
           getChunksCount();
-      ContainerTestHelper.verifyGetBlock(request, response, chunksCount);
+      ContainerTestHelper.verifyGetBlock(response, chunksCount);
 
       // Delete Block and Delete Chunk are handled by BlockDeletingService
       // ContainerCommandRequestProto DeleteBlock and DeleteChunk requests
@@ -367,7 +360,7 @@ public class TestOzoneContainer {
       response = client.sendCommand(request);
       int chunksCount = putBlockRequest.getPutBlock().getBlockData()
           .getChunksCount();
-      ContainerTestHelper.verifyGetBlock(request, response, chunksCount);
+      ContainerTestHelper.verifyGetBlock(response, chunksCount);
     } finally {
       if (client != null) {
         client.close();

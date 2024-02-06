@@ -40,6 +40,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
  */
 public class TestStatsSchemaDefinition extends AbstractReconSqlDBTest {
 
+  public TestStatsSchemaDefinition() {
+    super();
+  }
+
   @Test
   public void testIfStatsSchemaCreated() throws Exception {
     Connection connection = getConnection();

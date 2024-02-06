@@ -169,7 +169,6 @@ public class OzoneContainer {
     containerSet = new ContainerSet(recoveringContainerTimeout);
     metadataScanner = null;
 
-    buildContainerSet();
     metrics = ContainerMetrics.create(conf);
     handlers = Maps.newHashMap();
 
@@ -286,9 +285,10 @@ public class OzoneContainer {
   }
 
   /**
-   * Build's container map.
+   * Build's container map after volume format.
    */
-  private void buildContainerSet() {
+  @VisibleForTesting
+  public void buildContainerSet() {
     Iterator<StorageVolume> volumeSetIterator = volumeSet.getVolumesList()
         .iterator();
     ArrayList<Thread> volumeThreads = new ArrayList<>();
@@ -442,6 +442,8 @@ public class OzoneContainer {
       return;
     }
 
+    buildContainerSet();
+
     // Start background volume checks, which will begin after the configured
     // delay.
     volumeChecker.start();
@@ -582,6 +584,10 @@ public class OzoneContainer {
 
   public BlockDeletingService getBlockDeletingService() {
     return blockDeletingService;
+  }
+
+  public ReplicationServer getReplicationServer() {
+    return replicationServer;
   }
 
 }

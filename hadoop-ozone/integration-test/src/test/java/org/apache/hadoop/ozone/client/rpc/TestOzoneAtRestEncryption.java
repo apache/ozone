@@ -78,6 +78,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
+import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -107,8 +108,6 @@ class TestOzoneAtRestEncryption {
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
-  private static final String SCM_ID = UUID.randomUUID().toString();
-  private static final String CLUSTER_ID = UUID.randomUUID().toString();
   private static File testDir;
   private static OzoneConfiguration conf;
   private static final String TEST_KEY = "key1";
@@ -143,8 +142,6 @@ class TestOzoneAtRestEncryption {
         new CertificateClientTestImpl(conf);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(10)
-        .setScmId(SCM_ID)
-        .setClusterId(CLUSTER_ID)
         .setBlockSize(BLOCK_SIZE)
         .setChunkSize(CHUNK_SIZE)
         .setStreamBufferSizeUnit(StorageUnit.BYTES)
@@ -165,7 +162,6 @@ class TestOzoneAtRestEncryption {
     TestOzoneRpcClient.setStorageContainerLocationClient(
         storageContainerLocationClient);
     TestOzoneRpcClient.setStore(store);
-    TestOzoneRpcClient.setClusterId(CLUSTER_ID);
 
     // create test key
     createKey(TEST_KEY, cluster.getOzoneManager().getKmsProvider(), conf);
@@ -229,7 +225,7 @@ class TestOzoneAtRestEncryption {
 
   static void createAndVerifyStreamKeyData(OzoneBucket bucket)
       throws Exception {
-    Instant testStartTime = Instant.now();
+    Instant testStartTime = getTestStartTime();
     String keyName = UUID.randomUUID().toString();
     String value = "sample value";
     try (OzoneDataStreamOutput out = bucket.createStreamKey(keyName,
@@ -242,7 +238,7 @@ class TestOzoneAtRestEncryption {
   }
 
   static void createAndVerifyKeyData(OzoneBucket bucket) throws Exception {
-    Instant testStartTime = Instant.now();
+    Instant testStartTime = getTestStartTime();
     String keyName = UUID.randomUUID().toString();
     String value = "sample value";
     try (OzoneOutputStream out = bucket.createKey(keyName,
@@ -318,7 +314,7 @@ class TestOzoneAtRestEncryption {
     //Step 1
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
-    Instant testStartTime = Instant.now();
+    Instant testStartTime = getTestStartTime();
 
     String value = "sample value";
     store.createVolume(volumeName);

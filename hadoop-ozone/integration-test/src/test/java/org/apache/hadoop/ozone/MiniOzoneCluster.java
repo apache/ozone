@@ -319,13 +319,11 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected int numOfActiveSCMs = ACTIVE_SCMS_NOT_SET;
     protected SCMConfigurator scmConfigurator;
 
-    protected Optional<Boolean> enableTrace = Optional.of(false);
     protected Optional<Integer> hbInterval = Optional.empty();
     protected Optional<Integer> hbProcessorInterval = Optional.empty();
-    protected Optional<String> scmId = Optional.empty();
-    protected Optional<String> omId = Optional.empty();
+    protected String scmId = UUID.randomUUID().toString();
+    protected String omId = UUID.randomUUID().toString();
     
-    protected Boolean enableContainerDatastream = true;
     protected Optional<String> datanodeReservedSpace = Optional.empty();
     protected Optional<Integer> chunkSize = Optional.empty();
     protected OptionalInt streamBufferSize = OptionalInt.empty();
@@ -343,9 +341,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected Optional<Integer> scmLayoutVersion = Optional.empty();
     protected Optional<Integer> dnLayoutVersion = Optional.empty();
 
-    // Use relative smaller number of handlers for testing
-    protected int numOfOmHandlers = 20;
-    protected int numOfScmHandlers = 20;
     protected int numOfDatanodes = 3;
     protected int numDataVolumes = 1;
     protected boolean  startDataNodes = true;
@@ -375,14 +370,11 @@ public interface MiniOzoneCluster extends AutoCloseable {
      * Sets the cluster Id.
      *
      * @param id cluster Id
-     *
-     * @return MiniOzoneCluster.Builder
      */
-    public Builder setClusterId(String id) {
+    void setClusterId(String id) {
       clusterId = id;
       path = GenericTestUtils.getTempPath(
           MiniOzoneClusterImpl.class.getSimpleName() + "-" + clusterId);
-      return this;
     }
 
     /**
@@ -415,30 +407,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
 
     public Builder setSecretKeyClient(SecretKeyClient client) {
       this.secretKeyClient = client;
-      return this;
-    }
-
-    /**
-     * Sets the SCM id.
-     *
-     * @param id SCM Id
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setScmId(String id) {
-      scmId = Optional.of(id);
-      return this;
-    }
-
-    /**
-     * Sets the OM id.
-     *
-     * @param id OM Id
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setOmId(String id) {
-      omId = Optional.of(id);
       return this;
     }
 
@@ -504,18 +472,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
     }
 
     /**
-     * When set to true, enables trace level logging.
-     *
-     * @param trace true or false
-     *
-     * @return MiniOzoneCluster.Builder
-     */
-    public Builder setTrace(Boolean trace) {
-      enableTrace = Optional.of(trace);
-      return this;
-    }
-
-    /**
      * Sets the reserved space
      * {@link org.apache.hadoop.hdds.scm.ScmConfigKeys}
      * HDDS_DATANODE_DIR_DU_RESERVED
@@ -540,11 +496,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
      */
     public Builder setChunkSize(int size) {
       chunkSize = Optional.of(size);
-      return this;
-    }
-
-    public Builder setStreamBufferSize(int size) {
-      streamBufferSize = OptionalInt.of(size);
       return this;
     }
 

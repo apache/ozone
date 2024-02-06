@@ -45,15 +45,14 @@ import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test recursive acl checks for delete and rename for FSO Buckets.
@@ -168,23 +167,17 @@ public class TestRecursiveAclWithFSO {
       OzoneBucket ozoneBucket = volume.getBucket("bucket1");
 
       // perform  delete
-      try {
-        ozoneBucket.deleteDirectory("a/b2", true);
-        fail("Should throw permission denied !");
-      } catch (OMException ome) {
-        // expect permission error
-        assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
-            ome.getResult(), "Permission check failed");
-      }
+      OMException e =
+          assertThrows(OMException.class, () -> ozoneBucket.deleteDirectory("a/b2", true));
+      // expect permission error
+      assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+          e.getResult(), "Permission check failed");
+
       // perform rename
-      try {
-        ozoneBucket.renameKey("a/b2", "a/b2_renamed");
-        fail("Should throw permission denied !");
-      } catch (OMException ome) {
-        // expect permission error
-        assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
-            ome.getResult(), "Permission check failed");
-      }
+      e = assertThrows(OMException.class, () -> ozoneBucket.renameKey("a/b2", "a/b2_renamed"));
+      // expect permission error
+      assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+          e.getResult(), "Permission check failed");
 
       // Test case 2
       // Remove acl from directory c2, delete/rename a/b1 should throw
@@ -200,35 +193,23 @@ public class TestRecursiveAclWithFSO {
 
       UserGroupInformation.setLoginUser(user2);
       // perform  delete
-      try {
-        ozoneBucket.deleteDirectory("a/b1", true);
-        fail("Should throw permission denied !");
-      } catch (OMException ome) {
-        // expect permission error
-        assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
-            ome.getResult(), "Permission check failed");
-      }
+      e = assertThrows(OMException.class, () -> ozoneBucket.deleteDirectory("a/b1", true));
+      // expect permission error
+      assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+          e.getResult(), "Permission check failed");
 
       // perform rename
-      try {
-        ozoneBucket.renameKey("a/b1", "a/b1_renamed");
-        fail("Should throw permission denied !");
-      } catch (OMException ome) {
-        // expect permission error
-        assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
-            ome.getResult(), "Permission check failed");
-      }
+      e = assertThrows(OMException.class, () -> ozoneBucket.renameKey("a/b1", "a/b1_renamed"));
+      // expect permission error
+      assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+          e.getResult(), "Permission check failed");
 
       // Test case 3
       // delete b3 and this should throw exception because user2 has no acls
-      try {
-        ozoneBucket.deleteDirectory("a/b3", true);
-        fail("Should throw permission denied !");
-      } catch (OMException ome) {
-        // expect permission error
-        assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
-            ome.getResult(), "Permission check failed");
-      }
+      e = assertThrows(OMException.class, () -> ozoneBucket.deleteDirectory("a/b3", true));
+      // expect permission error
+      assertEquals(OMException.ResultCodes.PERMISSION_DENIED,
+          e.getResult(), "Permission check failed");
     }
   }
 
@@ -251,9 +232,6 @@ public class TestRecursiveAclWithFSO {
   private void startCluster() throws Exception {
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    String clusterId = UUID.randomUUID().toString();
-    String scmId = UUID.randomUUID().toString();
-    String omId = UUID.randomUUID().toString();
 
     // Use native impl here, default impl doesn't do actual checks
     conf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
@@ -262,9 +240,7 @@ public class TestRecursiveAclWithFSO {
 
     OMRequestTestUtils.configureFSOptimizedPaths(conf, true);
 
-    cluster =
-        MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
-            .setScmId(scmId).setOmId(omId).build();
+    cluster = MiniOzoneCluster.newBuilder(conf).build();
     cluster.waitForClusterToBeReady();
 
   }

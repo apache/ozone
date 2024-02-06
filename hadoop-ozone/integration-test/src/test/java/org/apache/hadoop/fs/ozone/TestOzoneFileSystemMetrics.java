@@ -40,9 +40,9 @@ import org.junit.jupiter.api.Timeout;
 
 import java.io.IOException;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test OM Metrics for OzoneFileSystem operations.
@@ -149,13 +149,13 @@ public class TestOzoneFileSystemMetrics {
 
     long numKeysAfterCommit = cluster
         .getOzoneManager().getMetrics().getNumKeys();
-    assertTrue(numKeysAfterCommit > 0);
+    assertThat(numKeysAfterCommit).isGreaterThan(0);
     assertEquals(numKeysBeforeCreate + 2, numKeysAfterCommit);
     fs.delete(parentDir, true);
 
     long numKeysAfterDelete = cluster
         .getOzoneManager().getMetrics().getNumKeys();
-    assertTrue(numKeysAfterDelete >= 0);
+    assertThat(numKeysAfterDelete).isGreaterThanOrEqualTo(0);
     assertEquals(numKeysBeforeCreate, numKeysAfterDelete);
   }
 }

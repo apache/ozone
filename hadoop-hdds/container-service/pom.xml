@@ -28,7 +28,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <name>Apache Ozone HDDS Container Service</name>
   <packaging>jar</packaging>
   <properties>
-    <allow.junit4>false</allow.junit4>
   </properties>
   <dependencies>
     <dependency>

@@ -27,8 +27,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -58,10 +56,10 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 
@@ -83,7 +81,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test for PipelinePlacementPolicy.
@@ -96,6 +93,7 @@ public class TestPipelinePlacementPolicy {
   private NetworkTopologyImpl cluster;
   private static final int PIPELINE_PLACEMENT_MAX_NODES_COUNT = 10;
   private static final int PIPELINE_LOAD_LIMIT = 5;
+  @TempDir
   private File testDir;
   private DBStore dbStore;
   private SCMHAManager scmhaManager;
@@ -109,14 +107,11 @@ public class TestPipelinePlacementPolicy {
     // start with nodes with rack awareness.
     nodeManager = new MockNodeManager(cluster, getNodesWithRackAwareness(),
         false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
-    conf = SCMTestUtils.getConf();
+    conf = SCMTestUtils.getConf(testDir);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, PIPELINE_LOAD_LIMIT);
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         10, StorageUnit.MB);
     nodeManager.setNumPipelinePerDatanode(PIPELINE_LOAD_LIMIT);
-    testDir = GenericTestUtils.getTestDir(
-        TestPipelinePlacementPolicy.class.getSimpleName() + UUID.randomUUID());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
     scmhaManager = SCMHAManagerStub.getInstance(true);
@@ -135,8 +130,6 @@ public class TestPipelinePlacementPolicy {
     if (dbStore != null) {
       dbStore.close();
     }
-
-    FileUtil.fullyDelete(testDir);
   }
 
   private NetworkTopologyImpl initTopology() {
@@ -251,25 +244,19 @@ public class TestPipelinePlacementPolicy {
 
     String expectedMessageSubstring = "Unable to find enough nodes that meet " +
         "the space requirement";
-    try {
-      // A huge container size
-      localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
-          new ArrayList<>(datanodes.size()), nodesRequired,
-          0, 10 * OzoneConsts.TB);
-      fail("SCMException should have been thrown.");
-    } catch (SCMException ex) {
-      assertThat(ex.getMessage()).contains(expectedMessageSubstring);
-    }
 
-    try {
-      // a huge free space min configured
-      localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
-          new ArrayList<>(datanodes.size()), nodesRequired, 10 * OzoneConsts.TB,
-          0);
-      fail("SCMException should have been thrown.");
-    } catch (SCMException ex) {
-      assertThat(ex.getMessage()).contains(expectedMessageSubstring);
-    }
+    // A huge container size
+    SCMException ex =
+        assertThrows(SCMException.class,
+            () -> localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
+                new ArrayList<>(datanodes.size()), nodesRequired, 0, 10 * OzoneConsts.TB));
+    assertThat(ex.getMessage()).contains(expectedMessageSubstring);
+
+    // a huge free space min configured
+    ex = assertThrows(SCMException.class,
+        () -> localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
+            new ArrayList<>(datanodes.size()), nodesRequired, 10 * OzoneConsts.TB, 0));
+    assertThat(ex.getMessage()).contains(expectedMessageSubstring);
   }
 
   @Test

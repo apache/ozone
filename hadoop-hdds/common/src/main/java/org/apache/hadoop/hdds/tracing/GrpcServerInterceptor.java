@@ -45,7 +45,7 @@ public class GrpcServerInterceptor implements ServerInterceptor {
             .importAndCreateSpan(
                 call.getMethodDescriptor().getFullMethodName(),
                 headers.get(GrpcClientInterceptor.TRACING_HEADER));
-        try (Scope scope = GlobalTracer.get().activateSpan(span)) {
+        try (Scope ignored = GlobalTracer.get().activateSpan(span)) {
           super.onMessage(message);
         } finally {
           span.finish();

@@ -25,7 +25,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.Test;
 
 import javax.ws.rs.core.HttpHeaders;
@@ -92,7 +92,7 @@ public class TestInitiateMultipartUpload {
     assertNotNull(multipartUploadInitiateResponse.getUploadID());
   }
 
-  @NotNull
+  @Nonnull
   private ObjectEndpoint getObjectEndpoint(OzoneClient client,
       HttpHeaders headers) {
     ObjectEndpoint rest = new ObjectEndpoint();

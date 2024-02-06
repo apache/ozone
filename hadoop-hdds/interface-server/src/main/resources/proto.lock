@@ -127,6 +127,14 @@
               {
                 "name": "FINALIZE",
                 "integer": 8
+              },
+              {
+                "name": "SECRET_KEY",
+                "integer": 9
+              },
+              {
+                "name": "CERT_ROTATE",
+                "integer": 10
               }
             ]
           }
@@ -461,6 +469,296 @@
       }
     },
     {
+      "protopath": "ScmSecretKeyProtocol.proto",
+      "def": {
+        "enums": [
+          {
+            "name": "Type",
+            "enum_fields": [
+              {
+                "name": "GetCurrentSecretKey",
+                "integer": 1
+              },
+              {
+                "name": "GetSecretKey",
+                "integer": 2
+              },
+              {
+                "name": "GetAllSecretKeys",
+                "integer": 3
+              },
+              {
+                "name": "CheckAndRotate",
+                "integer": 4
+              }
+            ]
+          },
+          {
+            "name": "Status",
+            "enum_fields": [
+              {
+                "name": "OK",
+                "integer": 1
+              },
+              {
+                "name": "INTERNAL_ERROR",
+                "integer": 2
+              },
+              {
+                "name": "SECRET_KEY_NOT_ENABLED",
+                "integer": 3
+              },
+              {
+                "name": "SECRET_KEY_NOT_INITIALIZED",
+                "integer": 4
+              }
+            ]
+          }
+        ],
+        "messages": [
+          {
+            "name": "SCMSecretKeyRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "cmdType",
+                "type": "Type",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "getSecretKeyRequest",
+                "type": "SCMGetSecretKeyRequest",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "checkAndRotateRequest",
+                "type": "SCMGetCheckAndRotateRequest",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "SCMSecretKeyResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "cmdType",
+                "type": "Type",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "success",
+                "type": "bool",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "true"
+                  }
+                ]
+              },
+              {
+                "id": 4,
+                "name": "message",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "status",
+                "type": "Status",
+                "required": true
+              },
+              {
+                "id": 11,
+                "name": "currentSecretKeyResponseProto",
+                "type": "SCMGetCurrentSecretKeyResponse",
+                "optional": true
+              },
+              {
+                "id": 12,
+                "name": "getSecretKeyResponseProto",
+                "type": "SCMGetSecretKeyResponse",
+                "optional": true
+              },
+              {
+                "id": 13,
+                "name": "secretKeysListResponseProto",
+                "type": "SCMSecretKeysListResponse",
+                "optional": true
+              },
+              {
+                "id": 14,
+                "name": "checkAndRotateResponseProto",
+                "type": "SCMGetCheckAndRotateResponse",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "ManagedSecretKey",
+            "fields": [
+              {
+                "id": 1,
+                "name": "id",
+                "type": "UUID",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "creationTime",
+                "type": "uint64",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "expiryTime",
+                "type": "uint64",
+                "required": true
+              },
+              {
+                "id": 4,
+                "name": "algorithm",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 5,
+                "name": "encoded",
+                "type": "bytes",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "SCMGetSecretKeyRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "secretKeyId",
+                "type": "UUID",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "SCMGetCheckAndRotateRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "force",
+                "type": "bool",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "false"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "SCMGetCurrentSecretKeyResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "secretKey",
+                "type": "ManagedSecretKey",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "SCMGetSecretKeyResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "secretKey",
+                "type": "ManagedSecretKey",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "SCMSecretKeysListResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "secretKeys",
+                "type": "ManagedSecretKey",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "SCMGetCheckAndRotateResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "status",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          }
+        ],
+        "services": [
+          {
+            "name": "SCMSecretKeyProtocolService",
+            "rpcs": [
+              {
+                "name": "submitRequest",
+                "in_type": "SCMSecretKeyRequest",
+                "out_type": "SCMSecretKeyResponse"
+              }
+            ]
+          }
+        ],
+        "imports": [
+          {
+            "path": "hdds.proto"
+          }
+        ],
+        "package": {
+          "name": "hadoop.hdds.security.symmetric"
+        },
+        "options": [
+          {
+            "name": "java_package",
+            "value": "org.apache.hadoop.hdds.protocol.proto"
+          },
+          {
+            "name": "java_outer_classname",
+            "value": "SCMSecretKeyProtocolProtos"
+          },
+          {
+            "name": "java_generic_services",
+            "value": "true"
+          },
+          {
+            "name": "java_generate_equals_and_hash",
+            "value": "true"
+          }
+        ]
+      }
+    },
+    {
       "protopath": "ScmServerDatanodeHeartbeatProtocol.proto",
       "def": {
         "enums": [
@@ -679,6 +977,19 @@
               {
                 "name": "reconstructECContainersCommand",
                 "integer": 11
+              }
+            ]
+          },
+          {
+            "name": "ReplicationCommandPriority",
+            "enum_fields": [
+              {
+                "name": "NORMAL",
+                "integer": 1
+              },
+              {
+                "name": "LOW",
+                "integer": 2
               }
             ]
           }
@@ -999,6 +1310,12 @@
                 "name": "commands",
                 "type": "SCMCommandProto",
                 "is_repeated": true
+              },
+              {
+                "id": 3,
+                "name": "term",
+                "type": "int64",
+                "optional": true
               }
             ]
           },
@@ -1292,6 +1609,18 @@
                 "name": "replicaIndex",
                 "type": "int32",
                 "optional": true
+              },
+              {
+                "id": 15,
+                "name": "isEmpty",
+                "type": "bool",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "false"
+                  }
+                ]
               }
             ]
           },
@@ -1552,6 +1881,12 @@
                 "name": "encodedToken",
                 "type": "string",
                 "optional": true
+              },
+              {
+                "id": 17,
+                "name": "deadlineMsSinceEpoch",
+                "type": "int64",
+                "optional": true
               }
             ]
           },
@@ -1742,6 +2077,24 @@
                 "name": "replicaIndex",
                 "type": "int32",
                 "optional": true
+              },
+              {
+                "id": 5,
+                "name": "target",
+                "type": "DatanodeDetailsProto",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "priority",
+                "type": "ReplicationCommandPriority",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "NORMAL"
+                  }
+                ]
               }
             ]
           },
@@ -2176,6 +2529,34 @@
               {
                 "name": "FAILED_TO_ADD_CRL_CLIENT",
                 "integer": 39
+              },
+              {
+                "name": "INVALID_PIPELINE_STATE",
+                "integer": 40
+              },
+              {
+                "name": "DUPLICATED_PIPELINE_ID",
+                "integer": 41
+              },
+              {
+                "name": "TIMEOUT",
+                "integer": 42
+              },
+              {
+                "name": "CA_ROTATION_IN_PROGRESS",
+                "integer": 43
+              },
+              {
+                "name": "CA_ROTATION_IN_POST_PROGRESS",
+                "integer": 44
+              },
+              {
+                "name": "CONTAINER_ALREADY_CLOSED",
+                "integer": 45
+              },
+              {
+                "name": "CONTAINER_ALREADY_CLOSING",
+                "integer": 46
               }
             ]
           },
@@ -2405,6 +2786,12 @@
                 "name": "ecReplicationConfig",
                 "type": "hadoop.hdds.ECReplicationConfig",
                 "optional": true
+              },
+              {
+                "id": 9,
+                "name": "client",
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -2632,6 +3019,14 @@
               {
                 "name": "GetCert",
                 "integer": 12
+              },
+              {
+                "name": "GetAllRootCaCertificates",
+                "integer": 13
+              },
+              {
+                "name": "RemoveExpiredCertificates",
+                "integer": 14
               }
             ]
           },
@@ -2864,6 +3259,18 @@
                 "name": "getCertRequest",
                 "type": "SCMGetCertRequestProto",
                 "optional": true
+              },
+              {
+                "id": 14,
+                "name": "getAllRootCaCertificatesRequestProto",
+                "type": "SCMGetAllRootCaCertificatesRequestProto",
+                "optional": true
+              },
+              {
+                "id": 15,
+                "name": "removeExpiredCertificatesRequestProto",
+                "type": "SCMRemoveExpiredCertificatesRequestProto",
+                "optional": true
               }
             ]
           },
@@ -2935,6 +3342,18 @@
                 "name": "revokeCertificatesResponseProto",
                 "type": "SCMRevokeCertificatesResponseProto",
                 "optional": true
+              },
+              {
+                "id": 11,
+                "name": "allRootCaCertificatesResponseProto",
+                "type": "SCMGetAllRootCaCertificatesResponseProto",
+                "optional": true
+              },
+              {
+                "id": 12,
+                "name": "removeExpiredCertificatesResponseProto",
+                "type": "SCMRemoveExpiredCertificatesResponseProto",
+                "optional": true
               }
             ]
           },
@@ -3003,6 +3422,18 @@
                 "name": "CSR",
                 "type": "string",
                 "required": true
+              },
+              {
+                "id": 3,
+                "name": "renew",
+                "type": "bool",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "false"
+                  }
+                ]
               }
             ]
           },
@@ -3096,6 +3527,28 @@
             ]
           },
           {
+            "name": "SCMGetAllRootCaCertificatesResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "allX509RootCaCertificates",
+                "type": "string",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "SCMRemoveExpiredCertificatesResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "removedExpiredCertificates",
+                "type": "string",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
             "name": "SCMGetRootCACertificateRequestProto"
           },
           {
@@ -3167,6 +3620,9 @@
             ]
           },
           {
+            "name": "SCMGetAllRootCaCertificatesRequestProto"
+          },
+          {
             "name": "SCMRevokeCertificatesResponseProto",
             "fields": [
               {
@@ -3176,6 +3632,9 @@
                 "optional": true
               }
             ]
+          },
+          {
+            "name": "SCMRemoveExpiredCertificatesRequestProto"
           }
         ],
         "services": [

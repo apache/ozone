@@ -54,6 +54,10 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
   private ContainerSizeCountTask task;
   private DSLContext dslContext;
 
+  public TestContainerSizeCountTask() {
+    super();
+  }
+
   @BeforeEach
   public void setUp() {
     utilizationSchemaDefinition =

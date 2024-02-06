@@ -45,8 +45,10 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -305,8 +307,8 @@ abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSyste
         .getModificationTime();
     // rename should change the parent directory of source and object files
     // modification time but not change modification time of the renamed file
-    assertTrue(dir1BeforeMTime < dir1AfterMTime);
-    assertTrue(dir2BeforeMTime < dir2AfterMTime);
+    assertThat(dir1BeforeMTime).isLessThan(dir1AfterMTime);
+    assertThat(dir2BeforeMTime).isLessThan(dir2AfterMTime);
     assertEquals(file1BeforeMTime, file1AfterMTime);
 
     // mv "/dir1/subdir1/" to "/dir2/subdir1/"
@@ -323,8 +325,8 @@ abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSyste
     dir2AfterMTime = getFs().getFileStatus(dir2).getModificationTime();
     long subdir1AfterMTime = getFs().getFileStatus(renamedSubdir1)
         .getModificationTime();
-    assertTrue(dir1BeforeMTime < dir1AfterMTime);
-    assertTrue(dir2BeforeMTime < dir2AfterMTime);
+    assertThat(dir1BeforeMTime).isLessThan(dir1AfterMTime);
+    assertThat(dir2BeforeMTime).isLessThan(dir2AfterMTime);
     assertEquals(subdir1BeforeMTime, subdir1AfterMTime);
   }
 
@@ -379,7 +381,7 @@ abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSyste
     long bucketAfterMTime = omBucketInfo.getModificationTime();
     long fileAfterMTime = getFs().getFileStatus(to).getModificationTime();
     if (exceptChangeMtime) {
-      assertTrue(bucketBeforeMTime < bucketAfterMTime);
+      assertThat(bucketBeforeMTime).isLessThan(bucketAfterMTime);
     } else {
       assertEquals(bucketBeforeMTime, bucketAfterMTime);
     }
@@ -434,7 +436,7 @@ abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSyste
     long d6ObjectID =
         verifyDirKey(volumeId, bucketId, d4ObjectID,
                 "d6", "/d1/d2/d3/d4/d6", dirKeys, omMgr);
-    assertTrue(d5ObjectID != d6ObjectID, "Wrong objectIds for sub-dirs[" + d5ObjectID + "/d5, " + d6ObjectID
+    assertNotEquals(d5ObjectID, d6ObjectID, "Wrong objectIds for sub-dirs[" + d5ObjectID + "/d5, " + d6ObjectID
         + "/d6] of same parent!");
 
     assertEquals(6, getCluster().getOzoneManager().getMetrics().getNumKeys(), "Wrong OM numKeys metrics");
@@ -520,10 +522,10 @@ abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSyste
     GenericTestUtils.LogCapturer logCapture = GenericTestUtils.LogCapturer
         .captureLogs(BasicOzoneClientAdapterImpl.LOG);
     getFs().delete(new Path("/d1/d3/noexist/"), true);
-    assertTrue(logCapture.getOutput().contains(
-        "delete key failed Unable to get file status"));
-    assertTrue(logCapture.getOutput().contains(
-        "WARN  ozone.BasicOzoneClientAdapterImpl"));
+    assertThat(logCapture.getOutput()).contains(
+        "delete key failed Unable to get file status");
+    assertThat(logCapture.getOutput()).contains(
+        "WARN  ozone.BasicOzoneClientAdapterImpl");
   }
 
   private void verifyOMFileInfoFormat(OmKeyInfo omKeyInfo, String fileName,
@@ -546,7 +548,7 @@ abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSyste
         " using dbKey: " + dbKey);
     assertEquals(parentId, dirInfo.getParentObjectID(), "Parent Id mismatches");
     assertEquals(dirKey, dirInfo.getName(), "Mismatches directory name");
-    assertTrue(dirInfo.getCreationTime() > 0, "Mismatches directory creation time param");
+    assertThat(dirInfo.getCreationTime()).isGreaterThan(0);
     assertEquals(dirInfo.getCreationTime(), dirInfo.getModificationTime());
     return dirInfo.getObjectID();
   }

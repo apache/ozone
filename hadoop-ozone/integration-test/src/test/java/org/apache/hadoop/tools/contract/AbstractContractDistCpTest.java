@@ -56,7 +56,7 @@ import org.apache.hadoop.tools.util.DistCpTestUtils;
 import org.apache.hadoop.util.functional.RemoteIterators;
 
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

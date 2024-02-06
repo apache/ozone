@@ -22,19 +22,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.ozone.test.JUnit5AwareTimeout;
 import org.assertj.core.api.Assertions;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Rule;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInfo;
-import org.junit.rules.TestName;
-import org.junit.rules.TestRule;
-import org.junit.rules.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,12 +70,8 @@ public abstract class AbstractFSContractTestBase implements ContractOptions {
    */
   private Path testPath;
 
-  @Rule
-  public TestName methodName = new TestName();
-
   private String testMethodName;
 
-  @BeforeClass
   @BeforeAll
   public static void nameTestThread() {
     Thread.currentThread().setName("JUnit");
@@ -91,12 +79,6 @@ public abstract class AbstractFSContractTestBase implements ContractOptions {
 
   private void nameThread() {
     Thread.currentThread().setName("JUnit-" + getMethodName());
-  }
-
-  @Before
-  public void getTestMethodName() {
-    testMethodName = methodName.getMethodName();
-    nameThread();
   }
 
   @BeforeEach
@@ -180,12 +162,6 @@ public abstract class AbstractFSContractTestBase implements ContractOptions {
   }
 
   /**
-   * Set the timeout for every test.
-   */
-  @Rule
-  public TestRule testTimeout = new JUnit5AwareTimeout(new Timeout(getTestTimeoutMillis()));
-
-  /**
    * Option for tests to override the default timeout value.
    * @return the current test timeout
    */
@@ -198,7 +174,6 @@ public abstract class AbstractFSContractTestBase implements ContractOptions {
    * Setup: create the contract then init it.
    * @throws Exception on any failure
    */
-  @Before
   @BeforeEach
   public void setup() throws Exception {
     Thread.currentThread().setName("setup");
@@ -231,7 +206,6 @@ public abstract class AbstractFSContractTestBase implements ContractOptions {
    * Teardown.
    * @throws Exception on any failure
    */
-  @After
   @AfterEach
   public void teardown() throws Exception {
     Thread.currentThread().setName("teardown");

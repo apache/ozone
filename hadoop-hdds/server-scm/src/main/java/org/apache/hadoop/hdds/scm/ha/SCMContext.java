@@ -27,7 +27,6 @@ import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Optional;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -78,17 +77,13 @@ public final class SCMContext {
    */
   private volatile FinalizationCheckpoint finalizationCheckpoint;
 
-  private SCMContext(boolean isLeader, long term,
-      final SafeModeStatus safeModeStatus,
-      final FinalizationCheckpoint finalizationCheckpoint,
-      final OzoneStorageContainerManager scm, String threadNamePrefix) {
-    this.isLeader = isLeader;
-    this.term = term;
-    this.safeModeStatus = safeModeStatus;
-    this.finalizationCheckpoint = finalizationCheckpoint;
-    this.scm = scm;
-    this.isLeaderReady = false;
-    this.threadNamePrefix = threadNamePrefix;
+  private SCMContext(Builder b) {
+    isLeader = b.isLeader;
+    term = b.term;
+    safeModeStatus = new SafeModeStatus(b.isInSafeMode, b.isPreCheckComplete);
+    finalizationCheckpoint = b.finalizationCheckpoint;
+    scm = b.scm;
+    threadNamePrefix = b.threadNamePrefix;
   }
 
   /**
@@ -104,9 +99,9 @@ public final class SCMContext {
       isLeader = leader;
       // If it is not leader, set isLeaderReady to false.
       if (!isLeader) {
-        isLeaderReady = false;
         LOG.info("update <isLeaderReady> from <{}> to <{}>", isLeaderReady,
             false);
+        isLeaderReady = false;
       }
       term = newTerm;
     } finally {
@@ -285,7 +280,7 @@ public final class SCMContext {
     private boolean isInSafeMode = false;
     private boolean isPreCheckComplete = true;
     private OzoneStorageContainerManager scm = null;
-    private FinalizationCheckpoint finalizationCheckpoint;
+    private FinalizationCheckpoint finalizationCheckpoint = FinalizationCheckpoint.FINALIZATION_COMPLETE;
     private String threadNamePrefix = "";
 
     public Builder setLeader(boolean leader) {
@@ -335,13 +330,7 @@ public final class SCMContext {
      */
     @VisibleForTesting
     SCMContext buildMaybeInvalid() {
-      return new SCMContext(
-          isLeader,
-          term,
-          new SafeModeStatus(isInSafeMode, isPreCheckComplete),
-          Optional.ofNullable(finalizationCheckpoint).orElse(
-              FinalizationCheckpoint.FINALIZATION_COMPLETE),
-          scm, threadNamePrefix);
+      return new SCMContext(this);
     }
   }
 }

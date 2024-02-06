@@ -33,6 +33,10 @@ import org.junit.jupiter.api.Test;
  */
 public class TestSqlSchemaSetup extends AbstractReconSqlDBTest {
 
+  public TestSqlSchemaSetup() {
+    super();
+  }
+
   /**
    * Make sure schema was created correctly.
    * @throws SQLException

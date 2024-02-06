@@ -70,7 +70,7 @@ class TestChunkUtils {
   private static final Random RANDOM = new Random();
 
   @TempDir
-  private Path tempDir;
+  private File tempDir;
 
   static ChunkBuffer readData(File file, long off, long len)
       throws StorageContainerException {
@@ -84,7 +84,7 @@ class TestChunkUtils {
     String s = "Hello World";
     byte[] array = s.getBytes(UTF_8);
     ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.wrap(array));
-    Path tempFile = tempDir.resolve("concurrent");
+    Path tempFile = tempDir.toPath().resolve("concurrent");
     int len = data.limit();
     int offset = 0;
     File file = tempFile.toFile();
@@ -136,7 +136,7 @@ class TestChunkUtils {
         0, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
     AtomicInteger processed = new AtomicInteger();
     for (int i = 0; i < threads; i++) {
-      Path path = tempDir.resolve(String.valueOf(i));
+      Path path = tempDir.toPath().resolve(String.valueOf(i));
       executor.execute(() -> {
         try {
           ChunkUtils.processFileExclusively(path, () -> {
@@ -166,7 +166,7 @@ class TestChunkUtils {
     String s = "Hello World";
     byte[] array = s.getBytes(UTF_8);
     ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.wrap(array));
-    Path tempFile = tempDir.resolve("serial");
+    Path tempFile = tempDir.toPath().resolve("serial");
     File file = tempFile.toFile();
     int len = data.limit();
     int offset = 0;
@@ -185,7 +185,7 @@ class TestChunkUtils {
   @Test
   void validateChunkForOverwrite() throws IOException {
 
-    Path tempFile = tempDir.resolve("overwrite");
+    Path tempFile = tempDir.toPath().resolve("overwrite");
     FileUtils.write(tempFile.toFile(), "test", UTF_8);
 
     assertTrue(
@@ -226,7 +226,7 @@ class TestChunkUtils {
 
   @Test
   void testReadData() throws Exception {
-    final File dir = GenericTestUtils.getTestDir("testReadData");
+    final File dir = new File(tempDir, "testReadData");
     try {
       assertTrue(dir.mkdirs());
 

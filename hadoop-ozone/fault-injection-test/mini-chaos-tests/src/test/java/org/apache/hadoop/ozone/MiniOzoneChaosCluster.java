@@ -63,7 +63,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
   private final FailureManager failureManager;
 
-  private final int waitForClusterToBeReadyTimeout = 120000; // 2 min
+  private static final int WAIT_FOR_CLUSTER_TO_BE_READY_TIMEOUT = 120000; // 2 min
 
   private final Set<OzoneManager> failedOmSet;
   private final Set<StorageContainerManager> failedScmSet;
@@ -158,7 +158,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
         }
       }
       return true;
-    }, 1000, waitForClusterToBeReadyTimeout);
+    }, 1000, WAIT_FOR_CLUSTER_TO_BE_READY_TIMEOUT);
   }
 
   /**

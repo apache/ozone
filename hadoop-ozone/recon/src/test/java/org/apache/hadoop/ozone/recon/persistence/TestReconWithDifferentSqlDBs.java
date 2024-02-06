@@ -63,7 +63,7 @@ public class TestReconWithDifferentSqlDBs {
   public void testSchemaSetup(Provider<DataSourceConfiguration> provider)
       throws SQLException, IOException {
     AbstractReconSqlDBTest reconSqlDB = new AbstractReconSqlDBTest(provider);
-    reconSqlDB.createReconSchemaForTest();
+    reconSqlDB.createReconSchemaForTest(temporaryFolder);
     assertNotNull(reconSqlDB.getInjector());
     assertNotNull(reconSqlDB.getConfiguration());
     assertNotNull(reconSqlDB.getDslContext());
