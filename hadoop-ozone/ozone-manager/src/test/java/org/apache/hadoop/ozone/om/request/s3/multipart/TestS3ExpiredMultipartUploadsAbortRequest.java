@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -52,7 +53,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Expired
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadsExpiredAbortRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.util.Time;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -481,9 +481,13 @@ public class TestS3ExpiredMultipartUploadsAbortRequest
                 commitMultipartRequest, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
         // Add key to open key table to be used in MPU commit processing
-        OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volume,
-            bucket, keyName, RatisReplicationConfig.getInstance(ONE), parentID + j, parentID,
-            trxnLogIndex, Time.now(), true);
+        OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volume, bucket, keyName,
+                RatisReplicationConfig.getInstance(ONE), new OmKeyLocationInfoGroup(0L, new ArrayList<>(), true))
+            .setObjectID(parentID + j)
+            .setParentObjectID(parentID)
+            .setUpdateID(trxnLogIndex)
+            .build();
+
         String fileName = OzoneFSUtils.getFileName(keyName);
         OMRequestTestUtils.addFileToKeyTable(true, false,
             fileName, omKeyInfo, clientID, trxnLogIndex, omMetadataManager);

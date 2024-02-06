@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -50,6 +51,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import java.io.File;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
@@ -621,8 +623,10 @@ public class TestOmMetadataManager {
     for (int i = 0; i < numExpiredOpenKeys + numUnexpiredOpenKeys; i++) {
       final long creationTime = i < numExpiredOpenKeys ?
           expiredOpenKeyCreationTime : Time.now();
-      final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-          bucketName, "expired" + i, RatisReplicationConfig.getInstance(ONE), 0L, creationTime);
+      final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(
+              volumeName, bucketName, "expired" + i, RatisReplicationConfig.getInstance(ONE))
+          .setCreationTime(creationTime)
+          .build();
 
       final String dbOpenKeyName;
       if (bucketLayout.isFileSystemOptimized()) {
@@ -690,10 +694,10 @@ public class TestOmMetadataManager {
     // Ensure that "expired" MPU-related open keys are not fetched.
     // MPU-related open keys, identified by isMultipartKey = false
     for (int i = 0; i < numExpiredMPUOpenKeys; i++) {
-      final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-          bucketName, "expired" + i,
-          RatisReplicationConfig.getInstance(ONE),
-          0L, expiredOpenKeyCreationTime, true);
+      final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, "expired" + i,
+              RatisReplicationConfig.getInstance(ONE), new OmKeyLocationInfoGroup(0L, new ArrayList<>(), true))
+          .setCreationTime(expiredOpenKeyCreationTime)
+          .build();
 
       final String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
       final OmMultipartKeyInfo multipartKeyInfo = OMRequestTestUtils.
@@ -723,10 +727,10 @@ public class TestOmMetadataManager {
     // HDDS-9017. Although these open keys are MPU-related,
     // the isMultipartKey flags are set to false
     for (int i = numExpiredMPUOpenKeys; i < 2 * numExpiredMPUOpenKeys; i++) {
-      final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-          bucketName, "expired" + i,
-          RatisReplicationConfig.getInstance(ONE),
-          0L, expiredOpenKeyCreationTime, false);
+      final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(
+              volumeName, bucketName, "expired" + i, RatisReplicationConfig.getInstance(ONE))
+          .setCreationTime(expiredOpenKeyCreationTime)
+          .build();
 
       final String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
       final OmMultipartKeyInfo multipartKeyInfo = OMRequestTestUtils.
@@ -789,7 +793,9 @@ public class TestOmMetadataManager {
       String keyName = "expired" + i;
       // Key info to construct the MPU DB key
       final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-          bucketName, keyName, RatisReplicationConfig.getInstance(ONE), 0L, creationTime);
+              bucketName, keyName, RatisReplicationConfig.getInstance(ONE))
+          .setCreationTime(creationTime)
+          .build();
 
 
       for (int j = 1; j <= numPartsPerMPU; j++) {

@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.utils.UniqueId;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartAbortInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -282,7 +283,8 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
 
       ReplicationConfig replicationConfig = RatisReplicationConfig.getInstance(ONE);
       final OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volume, bucket, keyName, replicationConfig,
-          0L, Time.now(), true);
+              new OmKeyLocationInfoGroup(0L, new ArrayList<>(), true))
+          .build();
 
       if (getBucketLayout().equals(BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
         omKeyInfo.setParentObjectID(omBucketInfo.getObjectID());

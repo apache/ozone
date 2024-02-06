@@ -572,26 +572,6 @@ public final class OMRequestTestUtils {
   }
 
   /**
-   * Create OmKeyInfo.
-   */
-  public static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
-      String keyName, ReplicationConfig replicationConfig, long objectID,
-      long creationTime) {
-    return createOmKeyInfo(volumeName, bucketName, keyName, replicationConfig, objectID, creationTime, 0L, false);
-  }
-
-  /**
-   * Create OmKeyInfo.
-   */
-  @SuppressWarnings("parameterNumber")
-  public static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
-      String keyName, ReplicationConfig replicationConfig, long objectID,
-      long creationTime, boolean isMultipartKey) {
-    return createOmKeyInfo(volumeName, bucketName, keyName, replicationConfig, objectID, creationTime, 0L,
-        isMultipartKey);
-  }
-
-  /**
    * Create OmKeyInfo for LEGACY/OBS bucket.
    */
   @SuppressWarnings("parameterNumber")
@@ -1394,31 +1374,6 @@ public final class OMRequestTestUtils {
     omMetadataManager.getVolumeTable().addCacheEntry(
         new CacheKey<>(dbVolumeKey),
         CacheValue.get(1L, omVolumeArgs));
-  }
-
-  /**
-   * Create OmKeyInfo.
-   */
-  @SuppressWarnings("parameterNumber")
-  public static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
-      String keyName, ReplicationConfig replicationConfig, long objectID,
-      long parentID, long trxnLogIndex, long creationTime) {
-    return createOmKeyInfo(volumeName, bucketName, keyName,
-        replicationConfig, objectID,
-        parentID, trxnLogIndex, creationTime, 0L, false);
-  }
-
-  /**
-   * Create OmKeyInfo with isMultipartKey flag.
-   */
-  @SuppressWarnings("parameterNumber")
-  public static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
-      String keyName, ReplicationConfig replicationConfig, long objectID,
-      long parentID, long trxnLogIndex, long creationTime,
-      boolean isMultipartKey) {
-    return createOmKeyInfo(volumeName, bucketName, keyName,
-        replicationConfig, objectID,
-        parentID, trxnLogIndex, creationTime, 0L, isMultipartKey);
   }
 
   /**
