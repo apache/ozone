@@ -255,8 +255,8 @@ public final class ContainerStateManagerImpl
             // CLOSING state by ReplicationManager's OpenContainerHandler
             // For more info: HDDS-10231
             LOG.warn("Found container {} which is in OPEN state with " +
-                "pipeline {} that does not exist. Marking container for " +
-                "closing.", container, container.getPipelineID());
+                "pipeline {} that does not exist.",
+                container, container.getPipelineID());
           }
         }
       }
