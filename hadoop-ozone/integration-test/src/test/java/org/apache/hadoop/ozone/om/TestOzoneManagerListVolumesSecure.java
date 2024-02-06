@@ -150,10 +150,10 @@ public class TestOzoneManagerListVolumesSecure {
     createPrincipal(this.adminKeytab, adminPrincipal);
     createPrincipal(this.adminKeytabInOtherHost, adminPrincipalInOtherHost);
 
-    this.userPrincipal1 = this.USER_1 + "/" + hostAndRealm;
-    this.userPrincipal2 = this.USER_2 + "/" + hostAndRealm;
-    this.userKeytab1  = new File(workDir, this.USER_1 + ".keytab");
-    this.userKeytab2  = new File(workDir, this.USER_2 + ".keytab");
+    this.userPrincipal1 = USER_1 + "/" + hostAndRealm;
+    this.userPrincipal2 = USER_2 + "/" + hostAndRealm;
+    this.userKeytab1  = new File(workDir, USER_1 + ".keytab");
+    this.userKeytab2  = new File(workDir, USER_2 + ".keytab");
     createPrincipal(this.userKeytab1, userPrincipal1);
     createPrincipal(this.userKeytab2, userPrincipal2);
   }
@@ -313,7 +313,7 @@ public class TestOzoneManagerListVolumesSecure {
   public void testListVolumeWithOtherUsersListAllAllowed() throws Exception {
     setupEnvironment(true, true);
 
-    // Login as USER_1, list other users' volumes
+    // Login as user1, list other users' volumes
     doAs(userUGI1, () -> {
       checkUser(USER_2, Arrays.asList("volume2", "volume3", "volume4",
           "volume5"), true);
@@ -323,7 +323,7 @@ public class TestOzoneManagerListVolumesSecure {
       return true;
     });
 
-    // Login as USER_2, list other users' volumes
+    // Login as user2, list other users' volumes
     doAs(userUGI2, () -> {
       checkUser(USER_1, Arrays.asList("volume1", "volume3", "volume4",
           "volume5"), true);
@@ -361,7 +361,7 @@ public class TestOzoneManagerListVolumesSecure {
   public void testListVolumeWithOtherUsersListAllDisallowed() throws Exception {
     setupEnvironment(true, false);
 
-    // Login as USER_1, list other users' volumes, expect failure
+    // Login as user1, list other users' volumes, expect failure
     doAs(userUGI1, () -> {
       checkUser(USER_2, Arrays.asList("volume2", "volume3", "volume4",
           "volume5"), false);
@@ -370,7 +370,7 @@ public class TestOzoneManagerListVolumesSecure {
       return true;
     });
 
-    // Login as USER_2, list other users' volumes, expect failure
+    // Login as user2, list other users' volumes, expect failure
     doAs(userUGI2, () -> {
       checkUser(USER_1, Arrays.asList("volume1", "volume3", "volume4",
           "volume5"), false);
@@ -403,14 +403,14 @@ public class TestOzoneManagerListVolumesSecure {
   public void testAclEnabledListAllAllowed() throws Exception {
     setupEnvironment(true, true);
 
-    // Login as USER_1, list their own volumes
+    // Login as user1, list their own volumes
     doAs(userUGI1, () -> {
       checkUser(USER_1, Arrays.asList("volume1", "volume3", "volume4",
           "volume5"), true);
       return true;
     });
 
-    // Login as USER_2, list their own volumes
+    // Login as user2, list their own volumes
     doAs(userUGI2, () -> {
       checkUser(USER_2, Arrays.asList("volume2", "volume3", "volume4",
           "volume5"), true);
@@ -436,7 +436,7 @@ public class TestOzoneManagerListVolumesSecure {
   public void testAclEnabledListAllDisallowed() throws Exception {
     setupEnvironment(true, false);
 
-    // Login as USER_1, list their own volumes
+    // Login as user1, list their own volumes
     doAs(userUGI1, () -> {
       checkUser(USER_1, Arrays.asList("volume1", "volume3", "volume4",
           "volume5"), false);
@@ -471,14 +471,14 @@ public class TestOzoneManagerListVolumesSecure {
   public void testAclDisabledListAllAllowed() throws Exception {
     setupEnvironment(false, true);
 
-      // Login as USER_1, list their own volumes
+      // Login as user1, list their own volumes
     doAs(userUGI1, () -> {
       checkUser(USER_1, Arrays.asList("volume1", "volume3", "volume5"),
           true);
       return true;
     });
 
-    // Login as USER_2, list their own volumes
+    // Login as user2, list their own volumes
     doAs(userUGI2, () -> {
       checkUser(USER_2, Arrays.asList("volume2", "volume4"),
           true);
@@ -502,14 +502,14 @@ public class TestOzoneManagerListVolumesSecure {
   public void testAclDisabledListAllDisallowed() throws Exception {
     setupEnvironment(false, false);
 
-    // Login as USER_1, list their own volumes
+    // Login as user1, list their own volumes
     doAs(userUGI1, () -> {
       checkUser(USER_1, Arrays.asList("volume1", "volume3", "volume5"),
           true);
       return true;
     });
 
-    // Login as USER_2, list their own volumes
+    // Login as user2, list their own volumes
     doAs(userUGI2, () -> {
       checkUser(USER_2, Arrays.asList("volume2", "volume4"),
           true);
