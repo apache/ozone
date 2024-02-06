@@ -81,6 +81,8 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
           decommissioningNodes.size() + " node(s)");
     }
 
+    String metricsJson = scmClient.getMetrics("Hadoop:service=StorageContainerManager,name=NodeDecommissionMetrics");
+    System.out.println("metrics:" + metricsJson);
     for (HddsProtos.Node node : decommissioningNodes) {
       DatanodeDetails datanode = DatanodeDetails.getFromProtoBuf(
           node.getNodeID());

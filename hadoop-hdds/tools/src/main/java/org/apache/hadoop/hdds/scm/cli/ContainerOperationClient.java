@@ -563,4 +563,9 @@ public class ContainerOperationClient implements ScmClient {
     return storageContainerLocationClient.decommissionScm(scmId);
   }
 
+  @Override
+  public String getMetrics(String query) throws IOException {
+    return storageContainerLocationClient.getMetrics(query);
+  }
+
 }
