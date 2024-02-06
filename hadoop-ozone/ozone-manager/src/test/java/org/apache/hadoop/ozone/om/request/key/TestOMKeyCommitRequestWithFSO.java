@@ -27,13 +27,14 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.util.Time;
 import jakarta.annotation.Nonnull;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -81,8 +82,11 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
 
     OmKeyInfo omKeyInfoFSO =
         OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
-            RatisReplicationConfig.getInstance(ONE), objectId, parentID, 100,
-            Time.now(), version);
+                RatisReplicationConfig.getInstance(ONE), new OmKeyLocationInfoGroup(version, new ArrayList<>(), false))
+            .setObjectID(objectId)
+            .setParentObjectID(parentID)
+            .setUpdateID(100L)
+            .build();
     omKeyInfoFSO.appendNewBlocks(locationList, false);
 
     String fileName = OzoneFSUtils.getFileName(keyName);

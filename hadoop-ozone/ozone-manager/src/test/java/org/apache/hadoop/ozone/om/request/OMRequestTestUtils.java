@@ -248,12 +248,14 @@ public final class OMRequestTestUtils {
       List<OmKeyLocationInfo> locationList, long version) throws Exception {
 
     OmKeyInfo omKeyInfo = createOmKeyInfo(volumeName, bucketName, keyName,
-        replicationConfig, trxnLogIndex, Time.now(), version,
-        false);
+        replicationConfig, new OmKeyLocationInfoGroup(version, new ArrayList<>(), false))
+        .setObjectID(trxnLogIndex)
+        .build();
+
     omKeyInfo.appendNewBlocks(locationList, false);
 
     addKeyToTable(openKeyTable, addToCache, omKeyInfo, clientID, trxnLogIndex,
-            omMetadataManager);
+        omMetadataManager);
   }
 
   /**
@@ -286,8 +288,9 @@ public final class OMRequestTestUtils {
       OMMetadataManager omMetadataManager) throws Exception {
 
     OmKeyInfo omKeyInfo = createOmKeyInfo(volumeName, bucketName, keyName,
-        replicationConfig, trxnLogIndex, Time.now(), 0L,
-        isMultipartKey);
+        replicationConfig, new OmKeyLocationInfoGroup(0, new ArrayList<>(), isMultipartKey))
+        .setObjectID(trxnLogIndex)
+        .build();
 
     addKeyToTable(openKeyTable, addToCache, omKeyInfo, clientID, trxnLogIndex,
         omMetadataManager);
@@ -533,6 +536,7 @@ public final class OMRequestTestUtils {
 
   /**
    * Create OmKeyInfo.
+   * Initializes most values to a sensible default.
    */
   public static OmKeyInfo.Builder createOmKeyInfo(String volumeName, String bucketName,
       String keyName, ReplicationConfig replicationConfig, OmKeyLocationInfoGroup omKeyLocationInfoGroup) {
@@ -568,30 +572,6 @@ public final class OMRequestTestUtils {
         .setObjectID(objectID)
         .setParentObjectID(parentObjID)
         .setUpdateID(50)
-        .build();
-  }
-
-  /**
-   * Create OmKeyInfo for LEGACY/OBS bucket.
-   */
-  @SuppressWarnings("parameterNumber")
-  private static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
-      String keyName, ReplicationConfig replicationConfig, long objectID,
-      long creationTime, long version, boolean isMultipartKey) {
-    return new OmKeyInfo.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyName)
-        .setFileName(OzoneFSUtils.getFileName(keyName))
-        .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(version, new ArrayList<>(),
-                isMultipartKey)))
-        .setCreationTime(creationTime)
-        .setModificationTime(Time.now())
-        .setDataSize(1000L)
-        .setReplicationConfig(replicationConfig)
-        .setObjectID(objectID)
-        .setUpdateID(objectID)
         .build();
   }
 
@@ -1375,46 +1355,6 @@ public final class OMRequestTestUtils {
         new CacheKey<>(dbVolumeKey),
         CacheValue.get(1L, omVolumeArgs));
   }
-
-  /**
-   * Create OmKeyInfo.
-   */
-  @SuppressWarnings("parameterNumber")
-  public static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
-      String keyName, ReplicationConfig replicationConfig, long objectID,
-      long parentID, long trxnLogIndex, long creationTime, long version) {
-    return createOmKeyInfo(volumeName, bucketName, keyName, replicationConfig, objectID, parentID, trxnLogIndex,
-        creationTime,
-        version, false);
-  }
-
-  /**
-   * Create OmKeyInfo for FSO bucket.
-   */
-  @SuppressWarnings("parameterNumber")
-  private static OmKeyInfo createOmKeyInfo(String volumeName, String bucketName,
-      String keyName, ReplicationConfig replicationConfig, long objectID,
-      long parentID, long trxnLogIndex, long creationTime, long version,
-      boolean isMultipartKey) {
-    String fileName = OzoneFSUtils.getFileName(keyName);
-    return new OmKeyInfo.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyName)
-        .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(version, new ArrayList<>(),
-                isMultipartKey)))
-        .setCreationTime(creationTime)
-        .setModificationTime(Time.now())
-        .setDataSize(1000L)
-        .setReplicationConfig(replicationConfig)
-        .setObjectID(objectID)
-        .setUpdateID(trxnLogIndex)
-        .setParentObjectID(parentID)
-        .setFileName(fileName)
-        .build();
-  }
-
 
   /**
    * Add key entry to KeyTable. if openKeyTable flag is true, add's entries
