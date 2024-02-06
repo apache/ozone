@@ -80,7 +80,7 @@ public class FetchMetrics {
           jg.close();
         }
       }
-      return new String(opStream.toByteArray(),StandardCharsets.UTF_8);
+      return new String(opStream.toByteArray(), StandardCharsets.UTF_8);
     } catch (IOException var12) {
       LOG.error("Caught an exception while processing JMX request", var12);
     } catch (MalformedObjectNameException var13) {
