@@ -58,7 +58,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
 
   private final Set<String> pendingEvictionQueue;
   private final Scheduler scheduler;
-  private static final String snapshotCacheCleanupServiceName =
+  private static final String SNAPSHOT_CACHE_CLEANUP_SERVICE =
       "SnapshotCacheCleanupService";
 
 
@@ -72,7 +72,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
     this.cacheSizeLimit = cacheSizeLimit;
     this.pendingEvictionQueue = ConcurrentHashMap.newKeySet();
     if (cleanupInterval > 0) {
-      this.scheduler = new Scheduler(snapshotCacheCleanupServiceName,
+      this.scheduler = new Scheduler(SNAPSHOT_CACHE_CLEANUP_SERVICE,
           true, 1);
       this.scheduler.scheduleWithFixedDelay(this::cleanup, cleanupInterval,
           cleanupInterval, TimeUnit.MILLISECONDS);
@@ -134,9 +134,9 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
 
   @Override
   public void close() {
-      if (this.scheduler != null) {
-        this.scheduler.close();
-      }
+    if (this.scheduler != null) {
+      this.scheduler.close();
+    }
   }
 
   /**
