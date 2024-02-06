@@ -63,7 +63,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
 
   private final FailureManager failureManager;
 
-  private static final int WAIT_FOR_CLUSTER_TO_BE_READY_TIMEOUT= 120000; // 2 min
+  private static final int WAIT_FOR_CLUSTER_TO_BE_READY_TIMEOUT = 120000; // 2 min
 
   private final Set<OzoneManager> failedOmSet;
   private final Set<StorageContainerManager> failedScmSet;
@@ -385,7 +385,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
   }
   
   @Override
-  public void restartHddsDatanode(DatanodeDetails dn, boolean Datanode)
+  public void restartHddsDatanode(DatanodeDetails dn, boolean waitForDatanode)
       throws InterruptedException, TimeoutException, IOException {
     failedDnSet.add(dn);
     super.restartHddsDatanode(dn, waitForDatanode);

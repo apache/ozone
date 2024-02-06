@@ -129,7 +129,7 @@ public class TestRocksDBCheckpointDiffer {
   private static final String ACTIVE_DB_DIR_NAME = "./rocksdb-data";
   private static final String METADATA_DIR_NAME = "./metadata";
   private static final String COMPACTION_LOG_DIR_NAME = "compaction-log";
-  private static final String SST_BACK_UP_DIR_NAME= "compaction-sst-backup";
+  private static final String SST_BACK_UP_DIR_NAME = "compaction-sst-backup";
   private File activeDbDir;
   private File metadataDirDir;
   private File compactionLogDir;
