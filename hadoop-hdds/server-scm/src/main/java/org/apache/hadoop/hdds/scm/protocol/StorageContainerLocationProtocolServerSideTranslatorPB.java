@@ -1336,23 +1336,26 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           DatanodeDiskBalancerOpRequestProto request)
       throws IOException {
     List<DatanodeAdminError> errors;
+    HddsProtos.DiskBalancerConfigurationProto conf = request.getConf();
     switch (request.getOpType()) {
     case START:
       errors = impl.startDiskBalancer(
-          Optional.of(request.getConf().getThreshold()),
-          Optional.of(request.getConf().getDiskBandwidthInMB()),
-          Optional.of(request.getConf().getParallelThread()),
-          Optional.of(request.getHostsList()));
+          conf.hasThreshold() ? Optional.of(conf.getThreshold()) : Optional.empty(),
+          conf.hasDiskBandwidthInMB() ? Optional.of(conf.getDiskBandwidthInMB()) : Optional.empty(),
+          conf.hasParallelThread() ? Optional.of(conf.getParallelThread()) : Optional.empty(),
+          request.getHostsList().isEmpty() ? Optional.empty() : Optional.of(request.getHostsList()));
       break;
     case UPDATE:
+
       errors = impl.updateDiskBalancerConfiguration(
-          Optional.of(request.getConf().getThreshold()),
-          Optional.of(request.getConf().getDiskBandwidthInMB()),
-          Optional.of(request.getConf().getParallelThread()),
-          Optional.of(request.getHostsList()));
+          conf.hasThreshold() ? Optional.of(conf.getThreshold()) : Optional.empty(),
+          conf.hasDiskBandwidthInMB() ? Optional.of(conf.getDiskBandwidthInMB()) : Optional.empty(),
+          conf.hasParallelThread() ? Optional.of(conf.getParallelThread()) : Optional.empty(),
+          request.getHostsList().isEmpty() ? Optional.empty() : Optional.of(request.getHostsList()));
       break;
     case STOP:
-      errors = impl.stopDiskBalancer(Optional.of(request.getHostsList()));
+      errors = impl.stopDiskBalancer(
+          request.getHostsList().isEmpty() ? Optional.empty() : Optional.of(request.getHostsList()));
       break;
     default:
       errors = new ArrayList<>();
