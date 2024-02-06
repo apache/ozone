@@ -23,9 +23,9 @@ import com.fasterxml.jackson.core.JsonGenerator;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Array;
+import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.Set;
 import javax.management.AttributeNotFoundException;
@@ -64,10 +64,10 @@ public class FetchMetrics {
   public String getMetrics(String qry) {
     try {
       JsonGenerator jg = null;
-      OutputStream outputStream = new ByteArrayOutputStream();
+      ByteArrayOutputStream opStream = new ByteArrayOutputStream();
 
       try {
-        jg = this.jsonFactory.createGenerator(outputStream, JsonEncoding.UTF8);
+        jg = this.jsonFactory.createGenerator(opStream, JsonEncoding.UTF8);
         jg.disable(JsonGenerator.Feature.AUTO_CLOSE_TARGET);
         jg.useDefaultPrettyPrinter();
         jg.writeStartObject();
@@ -80,7 +80,7 @@ public class FetchMetrics {
           jg.close();
         }
       }
-      return outputStream.toString();
+      return new String(opStream.toByteArray(),StandardCharsets.UTF_8);
     } catch (IOException var12) {
       LOG.error("Caught an exception while processing JMX request", var12);
     } catch (MalformedObjectNameException var13) {
