@@ -115,7 +115,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
     when(ozoneManager.isAdmin(any())).thenReturn(true);
     when(ozoneManager.isFilesystemSnapshotEnabled()).thenReturn(true);
 
-    ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcOmMetadataReader =
+    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmMetadataReader =
         mock(ReferenceCounted.class);
     when(ozoneManager.getOmMetadataReader()).thenReturn(rcOmMetadataReader);
     omSnapshotManager = new OmSnapshotManager(ozoneManager);

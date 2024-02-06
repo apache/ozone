@@ -394,7 +394,8 @@ public class TestSnapshotDiffManager {
     omSnapshotManager = mock(OmSnapshotManager.class);
     when(omSnapshotManager.isSnapshotStatus(
         any(), any())).thenReturn(true);
-    snapshotCache = new SnapshotCache(omSnapshotManager, loader, 10);
+    snapshotCache = new SnapshotCache(omSnapshotManager, loader,
+        10, 0);
 
     snapshotDiffManager = new SnapshotDiffManager(db, differ, ozoneManager,
         snapshotCache, snapDiffJobTable, snapDiffReportTable,
@@ -444,9 +445,9 @@ public class TestSnapshotDiffManager {
         eq(diffDir))
     ).thenReturn(Lists.newArrayList(randomStrings));
 
-    ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcFromSnapshot =
+    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcFromSnapshot =
         snapshotCache.get(snap1.toString());
-    ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcToSnapshot =
+    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcToSnapshot =
         snapshotCache.get(snap2.toString());
     OmSnapshot fromSnapshot = (OmSnapshot) rcFromSnapshot.get();
     OmSnapshot toSnapshot = (OmSnapshot) rcToSnapshot.get();
@@ -509,9 +510,9 @@ public class TestSnapshotDiffManager {
             .thenReturn(Collections.emptyList());
       }
 
-      ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcFromSnapshot =
+      ReferenceCounted<IOmMetadataReader, SnapshotCache> rcFromSnapshot =
           snapshotCache.get(snap1.toString());
-      ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcToSnapshot =
+      ReferenceCounted<IOmMetadataReader, SnapshotCache> rcToSnapshot =
           snapshotCache.get(snap2.toString());
       OmSnapshot fromSnapshot = (OmSnapshot) rcFromSnapshot.get();
       OmSnapshot toSnapshot = (OmSnapshot) rcToSnapshot.get();
@@ -572,9 +573,9 @@ public class TestSnapshotDiffManager {
               any(DifferSnapshotInfo.class),
               anyString());
 
-      ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcFromSnapshot =
+      ReferenceCounted<IOmMetadataReader, SnapshotCache> rcFromSnapshot =
           snapshotCache.get(snap1.toString());
-      ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcToSnapshot =
+      ReferenceCounted<IOmMetadataReader, SnapshotCache> rcToSnapshot =
           snapshotCache.get(snap2.toString());
       OmSnapshot fromSnapshot = (OmSnapshot) rcFromSnapshot.get();
       OmSnapshot toSnapshot = (OmSnapshot) rcToSnapshot.get();

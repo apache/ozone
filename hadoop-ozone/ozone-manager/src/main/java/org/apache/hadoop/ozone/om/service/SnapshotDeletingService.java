@@ -143,9 +143,9 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
       getRunCount().incrementAndGet();
 
-      ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcOmSnapshot =
+      ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot =
           null;
-      ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcOmPreviousSnapshot =
+      ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmPreviousSnapshot =
           null;
 
       Table<String, SnapshotInfo> snapshotInfoTable =

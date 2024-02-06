@@ -183,7 +183,7 @@ public class SstFilteringService extends BackgroundService
                     snapshotInfo.getBucketName());
 
             try (
-                ReferenceCounted<IOmMetadataReader, SnapshotCache, String>
+                ReferenceCounted<IOmMetadataReader, SnapshotCache>
                     snapshotMetadataReader = snapshotCache.get().get(
                         snapshotInfo.getTableKey())) {
               OmSnapshot omSnapshot = (OmSnapshot) snapshotMetadataReader.get();

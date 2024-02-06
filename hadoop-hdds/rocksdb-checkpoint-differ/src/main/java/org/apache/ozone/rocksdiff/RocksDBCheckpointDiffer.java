@@ -172,7 +172,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
   private ColumnFamilyHandle snapshotInfoTableCFHandle;
   private final AtomicInteger tarballRequestCount;
-  private final String dagPruningServiceName = "CompactionDagPruningService";
+  private static final String dagPruningServiceName = "CompactionDagPruningService";
   private AtomicBoolean suspended;
 
   private ColumnFamilyHandle compactionLogTableCFHandle;
@@ -301,7 +301,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   @Override
-  public void close() throws Exception {
+  public void close() {
     if (!closed) {
       synchronized (this) {
         if (!closed) {

@@ -264,7 +264,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             continue;
           }
 
-          try (ReferenceCounted<IOmMetadataReader, SnapshotCache, String>
+          try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
               rcCurrOmSnapshot = omSnapshotManager.checkForSnapshot(
                   currSnapInfo.getVolumeName(),
                   currSnapInfo.getBucketName(),
@@ -304,7 +304,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
 
             Table<String, OmKeyInfo> previousKeyTable = null;
             Table<String, String> prevRenamedTable = null;
-            ReferenceCounted<IOmMetadataReader, SnapshotCache, String>
+            ReferenceCounted<IOmMetadataReader, SnapshotCache>
                 rcPrevOmSnapshot = null;
 
             // Split RepeatedOmKeyInfo and update current snapshot
@@ -324,7 +324,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
             }
 
             Table<String, OmKeyInfo> previousToPrevKeyTable = null;
-            ReferenceCounted<IOmMetadataReader, SnapshotCache, String>
+            ReferenceCounted<IOmMetadataReader, SnapshotCache>
                 rcPrevToPrevOmSnapshot = null;
             if (previousToPrevSnapshot != null) {
               rcPrevToPrevOmSnapshot = omSnapshotManager.checkForSnapshot(

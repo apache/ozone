@@ -158,9 +158,9 @@ public class SnapshotDirectoryCleaningService
             continue;
           }
 
-          ReferenceCounted<IOmMetadataReader, SnapshotCache, String>
+          ReferenceCounted<IOmMetadataReader, SnapshotCache>
               rcPrevOmSnapshot = null;
-          ReferenceCounted<IOmMetadataReader, SnapshotCache, String>
+          ReferenceCounted<IOmMetadataReader, SnapshotCache>
               rcPrevToPrevOmSnapshot = null;
           try {
             long volumeId = metadataManager
@@ -220,7 +220,7 @@ public class SnapshotDirectoryCleaningService
 
             String dbBucketKeyForDir = getOzonePathKeyForFso(metadataManager,
                 currSnapInfo.getVolumeName(), currSnapInfo.getBucketName());
-            try (ReferenceCounted<IOmMetadataReader, SnapshotCache, String>
+            try (ReferenceCounted<IOmMetadataReader, SnapshotCache>
                      rcCurrOmSnapshot = omSnapshotManager.checkForSnapshot(
                 currSnapInfo.getVolumeName(),
                 currSnapInfo.getBucketName(),

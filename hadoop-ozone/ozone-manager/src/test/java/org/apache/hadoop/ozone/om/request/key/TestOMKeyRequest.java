@@ -169,7 +169,7 @@ public class TestOMKeyRequest {
     when(ozoneManager.getAccessAuthorizer())
         .thenReturn(new OzoneNativeAuthorizer());
 
-    ReferenceCounted<IOmMetadataReader, SnapshotCache, String> rcOmMetadataReader =
+    ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmMetadataReader =
         mock(ReferenceCounted.class);
     when(ozoneManager.getOmMetadataReader()).thenReturn(rcOmMetadataReader);
     // Init OmMetadataReader to let the test pass

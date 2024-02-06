@@ -56,7 +56,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.service.SnapshotCacheCleanupService;
 import org.apache.hadoop.ozone.om.service.SnapshotDiffCleanupService;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
@@ -85,8 +84,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_TIMEOUT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_MAX_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DB_MAX_OPEN_FILES;
@@ -168,7 +165,6 @@ public final class OmSnapshotManager implements AutoCloseable {
   private final List<ColumnFamilyDescriptor> columnFamilyDescriptors;
   private final List<ColumnFamilyHandle> columnFamilyHandles;
   private final SnapshotDiffCleanupService snapshotDiffCleanupService;
-  private final SnapshotCacheCleanupService snapshotCacheCleanupService;
 
   private final int maxPageSize;
 
@@ -276,8 +272,14 @@ public final class OmSnapshotManager implements AutoCloseable {
       }
     };
 
+
     // Init snapshot cache
-    this.snapshotCache = new SnapshotCache(this, loader, softCacheSize);
+    long cacheCleanupServiceInterval = ozoneManager.getConfiguration()
+        .getTimeDuration(OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL,
+            OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT,
+            TimeUnit.MILLISECONDS);
+    this.snapshotCache = new SnapshotCache(this, loader,
+        softCacheSize, cacheCleanupServiceInterval);
 
     this.snapshotDiffManager = new SnapshotDiffManager(snapshotDiffDb, differ,
         ozoneManager, snapshotCache, snapDiffJobCf, snapDiffReportCf,
@@ -287,19 +289,10 @@ public final class OmSnapshotManager implements AutoCloseable {
         .getTimeDuration(OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL,
             OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT,
             TimeUnit.MILLISECONDS);
-    long cacheCleanupServiceInterval = ozoneManager.getConfiguration()
-        .getTimeDuration(OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL,
-            OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL_DEFAULT,
-            TimeUnit.MILLISECONDS);
-
 
     long diffCleanupServiceTimeout = ozoneManager.getConfiguration()
         .getTimeDuration(OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT,
             OZONE_OM_SNAPSHOT_DIFF_CLEANUP_SERVICE_TIMEOUT_DEFAULT,
-            TimeUnit.MILLISECONDS);
-    long cacheCleanupServiceTimeout = ozoneManager.getConfiguration()
-        .getTimeDuration(OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_TIMEOUT,
-            OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_TIMEOUT_DEFAULT,
             TimeUnit.MILLISECONDS);
 
     if (ozoneManager.isFilesystemSnapshotEnabled()) {
@@ -317,11 +310,6 @@ public final class OmSnapshotManager implements AutoCloseable {
     } else {
       this.snapshotDiffCleanupService = null;
     }
-
-    this.snapshotCacheCleanupService = new SnapshotCacheCleanupService(
-        cacheCleanupServiceInterval, cacheCleanupServiceTimeout,
-        ozoneManager.getThreadNamePrefix(), snapshotCache);
-    this.snapshotCacheCleanupService.start();
   }
 
   /**
@@ -521,11 +509,6 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   @VisibleForTesting
-  public SnapshotCacheCleanupService getSnapshotCacheCleanupService() {
-    return snapshotCacheCleanupService;
-  }
-
-  @VisibleForTesting
   public SnapshotDiffCleanupService getSnapshotDiffCleanupService() {
     return snapshotDiffCleanupService;
   }
@@ -615,7 +598,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   // Get OmSnapshot if the keyName has ".snapshot" key indicator
-  public ReferenceCounted<IOmMetadataReader, SnapshotCache, String> checkForSnapshot(
+  public ReferenceCounted<IOmMetadataReader, SnapshotCache> checkForSnapshot(
       String volumeName,
       String bucketName,
       String keyName,
@@ -921,13 +904,10 @@ public final class OmSnapshotManager implements AutoCloseable {
     }
     if (snapshotCache != null) {
       snapshotCache.invalidateAll();
+      snapshotCache.close();
     }
     if (snapshotDiffCleanupService != null) {
       snapshotDiffCleanupService.shutdown();
-    }
-
-    if (snapshotCacheCleanupService != null) {
-      snapshotCacheCleanupService.shutdown();
     }
 
     if (columnFamilyHandles != null) {
