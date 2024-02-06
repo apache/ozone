@@ -101,8 +101,6 @@ public class TestRepeatedOmKeyInfoCodec
 
     byte[] rawData = codec.toPersistedFormat(repeatedOmKeyInfo);
     RepeatedOmKeyInfo key = codec.fromPersistedFormat(rawData);
-    System.out.println("Chunk number = " + chunkNum +
-        ", Serialized key size without pipeline = " + rawData.length);
     assertNull(key.getOmKeyInfoList().get(0).getLatestVersionLocations()
         .getLocationList().get(0).getPipeline());
   }
@@ -116,8 +114,6 @@ public class TestRepeatedOmKeyInfoCodec
     RepeatedOmKeyInfo repeatedOmKeyInfo = new RepeatedOmKeyInfo(originKey);
     byte[] rawData = codecWithPipeline.toPersistedFormat(repeatedOmKeyInfo);
     RepeatedOmKeyInfo key = codecWithoutPipeline.fromPersistedFormat(rawData);
-    System.out.println("Chunk number = " + chunkNum +
-        ", Serialized key size with pipeline = " + rawData.length);
     assertNotNull(key.getOmKeyInfoList().get(0).getLatestVersionLocations()
         .getLocationList().get(0).getPipeline());
   }

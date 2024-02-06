@@ -705,30 +705,29 @@ public class TestContainerStateMachineFailures {
   @Test
   void testContainerStateMachineSingleFailureRetry()
       throws Exception {
-    OzoneOutputStream key =
-        objectStore.getVolume(volumeName).getBucket(bucketName)
-            .createKey("ratis1", 1024,
-                ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
-                    ReplicationFactor.THREE), new HashMap<>());
+    try (OzoneOutputStream key = objectStore.getVolume(volumeName).getBucket(bucketName)
+        .createKey("ratis1", 1024,
+            ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+                ReplicationFactor.THREE), new HashMap<>())) {
 
-    key.write("ratis".getBytes(UTF_8));
-    key.flush();
-    key.write("ratis".getBytes(UTF_8));
-    key.write("ratis".getBytes(UTF_8));
+      key.write("ratis".getBytes(UTF_8));
+      key.flush();
+      key.write("ratis".getBytes(UTF_8));
+      key.write("ratis".getBytes(UTF_8));
 
-    KeyOutputStream groupOutputStream = (KeyOutputStream) key.
-        getOutputStream();
-    List<OmKeyLocationInfo> locationInfoList =
-        groupOutputStream.getLocationInfoList();
-    assertEquals(1, locationInfoList.size());
+      KeyOutputStream groupOutputStream = (KeyOutputStream) key.
+          getOutputStream();
+      List<OmKeyLocationInfo> locationInfoList =
+          groupOutputStream.getLocationInfoList();
+      assertEquals(1, locationInfoList.size());
 
-    OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
+      OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
 
-    induceFollowerFailure(omKeyLocationInfo, 2);
-    key.flush();
-    key.write("ratis".getBytes(UTF_8));
-    key.flush();
-    key.close();
+      induceFollowerFailure(omKeyLocationInfo, 2);
+      key.flush();
+      key.write("ratis".getBytes(UTF_8));
+      key.flush();
+    }
 
     validateData("ratis1", 2, "ratisratisratisratis");
   }
