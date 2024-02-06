@@ -17,8 +17,7 @@
  */
 package org.apache.hadoop.hdds.scm.node;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.apache.hadoop.hdds.scm.FetchMetrics;
 import org.junit.jupiter.api.Test;
 
 import java.util.regex.Matcher;
@@ -28,14 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TestFetchMetrics {
   private static FetchMetrics fetchMetrics = new FetchMetrics();
-
-  @BeforeEach
-  void setUp() {
-  }
-
-  @AfterEach
-  void tearDown() {
-  }
 
   @Test
   public void testFetchAll() {
