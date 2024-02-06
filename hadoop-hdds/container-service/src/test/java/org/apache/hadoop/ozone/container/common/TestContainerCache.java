@@ -33,7 +33,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -145,7 +144,7 @@ public class TestContainerCache {
   }
 
   @Test
-  public void testConcurrentDBGet() throws Exception {
+  void testConcurrentDBGet() throws Exception {
     File root = new File(testRoot);
     root.mkdirs();
     root.deleteOnExit();
@@ -172,11 +171,7 @@ public class TestContainerCache {
     futureList.add(executorService.submit(task));
     futureList.add(executorService.submit(task));
     for (Future future: futureList) {
-      try {
-        future.get();
-      } catch (InterruptedException | ExecutionException e) {
-        fail("Should get the DB instance");
-      }
+      future.get();
     }
 
     ReferenceCountedDB db = cache.getDB(1, "RocksDB",

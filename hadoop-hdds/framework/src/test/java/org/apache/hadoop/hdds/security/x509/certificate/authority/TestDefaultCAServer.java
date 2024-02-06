@@ -78,7 +78,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests the Default CA Server.
@@ -449,7 +448,7 @@ public class TestDefaultCAServer {
   }
 
   @Test
-  public void testIntermediaryCA() throws Exception {
+  void testIntermediaryCA() throws Exception {
 
     conf.set(HddsConfigKeys.HDDS_X509_MAX_DURATION, "P3650D");
     securityConfig = new SecurityConfig(conf);
@@ -519,11 +518,8 @@ public class TestDefaultCAServer {
           clusterId, scmId, caStore, new DefaultProfile(),
           scmCertificateClient.getComponentName());
 
-      try {
-        scmCA.init(securityConfig, CAType.SUBORDINATE);
-      } catch (Exception e) {
-        fail("testIntermediaryCA failed during init");
-      }
+
+      scmCA.init(securityConfig, CAType.SUBORDINATE);
     }
   }
 
