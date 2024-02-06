@@ -345,7 +345,11 @@ public class ContainerBalancer extends StatefulService {
     balancingThread.interrupt();
     LOG.info("Container Balancer waiting for {} to stop", balancingThread);
     try {
-      balancingThread.join();
+      while (balancingThread.isAlive()) {
+        // retry interrupt every 5ms to avoid waiting when thread is sleeping
+        balancingThread.interrupt();
+        balancingThread.join(5);
+      }
     } catch (InterruptedException exception) {
       Thread.currentThread().interrupt();
     }
