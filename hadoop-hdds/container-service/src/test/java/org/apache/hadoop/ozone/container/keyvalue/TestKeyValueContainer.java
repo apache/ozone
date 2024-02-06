@@ -53,7 +53,6 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
 import org.apache.hadoop.util.DiskChecker;
 
-import org.assertj.core.api.Fail;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -812,7 +811,7 @@ public class TestKeyValueContainer {
   }
 
   @ContainerTestVersionInfo.ContainerTest
-  public void testAutoCompactionSmallSstFile(
+  void testAutoCompactionSmallSstFile(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
     assumeTrue(isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3));
@@ -903,8 +902,6 @@ public class TestKeyValueContainer {
       List<LiveFileMetaData> fileMetaDataList2 =
           ((RDBStore)(dnStore.getStore())).getDb().getLiveFilesMetaData();
       assertThat(fileMetaDataList2.size()).isLessThan(fileMetaDataList1.size());
-    } catch (Exception e) {
-      Fail.fail("TestAutoCompactionSmallSstFile failed");
     } finally {
       // clean up
       for (KeyValueContainer c : containerList) {

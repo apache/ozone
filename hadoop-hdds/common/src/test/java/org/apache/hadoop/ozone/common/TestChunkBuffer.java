@@ -37,7 +37,6 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test {@link ChunkBuffer} implementations.
@@ -49,7 +48,7 @@ public class TestChunkBuffer {
 
   @Test
   @Timeout(1)
-  public void testImplWithByteBuffer() {
+  void testImplWithByteBuffer() throws IOException {
     runTestImplWithByteBuffer(1);
     runTestImplWithByteBuffer(1 << 10);
     for (int i = 0; i < 10; i++) {
@@ -57,7 +56,7 @@ public class TestChunkBuffer {
     }
   }
 
-  private static void runTestImplWithByteBuffer(int n) {
+  private static void runTestImplWithByteBuffer(int n) throws IOException {
     final byte[] expected = new byte[n];
     ThreadLocalRandom.current().nextBytes(expected);
     runTestImpl(expected, 0, ChunkBuffer.allocate(n));
@@ -65,7 +64,7 @@ public class TestChunkBuffer {
 
   @Test
   @Timeout(1)
-  public void testIncrementalChunkBuffer() {
+  void testIncrementalChunkBuffer() throws IOException {
     runTestIncrementalChunkBuffer(1, 1);
     runTestIncrementalChunkBuffer(4, 8);
     runTestIncrementalChunkBuffer(16, 1 << 10);
@@ -76,7 +75,7 @@ public class TestChunkBuffer {
     }
   }
 
-  private static void runTestIncrementalChunkBuffer(int increment, int n) {
+  private static void runTestIncrementalChunkBuffer(int increment, int n) throws IOException {
     final byte[] expected = new byte[n];
     ThreadLocalRandom.current().nextBytes(expected);
     runTestImpl(expected, increment,
@@ -85,7 +84,7 @@ public class TestChunkBuffer {
 
   @Test
   @Timeout(1)
-  public void testImplWithList() {
+  void testImplWithList() throws IOException {
     runTestImplWithList(4, 8);
     runTestImplWithList(16, 1 << 10);
     for (int i = 0; i < 10; i++) {
@@ -95,7 +94,7 @@ public class TestChunkBuffer {
     }
   }
 
-  private static void runTestImplWithList(int count, int n) {
+  private static void runTestImplWithList(int count, int n) throws IOException {
     final byte[] expected = new byte[n];
     ThreadLocalRandom.current().nextBytes(expected);
 
@@ -117,7 +116,7 @@ public class TestChunkBuffer {
     runTestImpl(expected, -1, impl);
   }
 
-  private static void runTestImpl(byte[] expected, int bpc, ChunkBuffer impl) {
+  private static void runTestImpl(byte[] expected, int bpc, ChunkBuffer impl) throws IOException {
     final int n = expected.length;
     System.out.println("n=" + n + ", impl=" + impl);
 
@@ -207,18 +206,12 @@ public class TestChunkBuffer {
         "offset=" + offset + ", length=" + length);
   }
 
-  private static void assertWrite(byte[] expected, ChunkBuffer impl) {
+  private static void assertWrite(byte[] expected, ChunkBuffer impl) throws IOException {
     impl.rewind();
     assertEquals(0, impl.position());
 
     ByteArrayOutputStream output = new ByteArrayOutputStream(expected.length);
-
-    try {
-      impl.writeTo(new MockGatheringChannel(Channels.newChannel(output)));
-    } catch (IOException e) {
-      fail("Unexpected error: " + e);
-    }
-
+    impl.writeTo(new MockGatheringChannel(Channels.newChannel(output)));
     assertArrayEquals(expected, output.toByteArray());
     assertFalse(impl.hasRemaining());
   }
