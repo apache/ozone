@@ -74,24 +74,22 @@ public class FetchMetrics {
         if (qry == null) {
           qry = "*:*";
         }
-        this.listBeans(jg, new ObjectName(qry)/*, (String) null*/);
+        this.listBeans(jg, new ObjectName(qry));
       } finally {
         if (jg != null) {
           jg.close();
         }
       }
       return new String(opStream.toByteArray(), StandardCharsets.UTF_8);
-    } catch (IOException var12) {
-      LOG.error("Caught an exception while processing JMX request", var12);
-    } catch (MalformedObjectNameException var13) {
-      LOG.error("Caught an exception while processing JMX request", var13);
+    } catch (IOException | MalformedObjectNameException ex) {
+      LOG.error("Caught an exception while processing getMetrics request", ex);
     }
     return null;
   }
 
-  private void listBeans(JsonGenerator jg, ObjectName qry/*, String attribute*/)
+  private void listBeans(JsonGenerator jg, ObjectName qry)
       throws IOException {
-    LOG.info("Listing beans for " + qry);
+    LOG.debug("Listing beans for " + qry);
     Set<ObjectName> names = null;
     names = this.mBeanServer.queryNames(qry, (QueryExp) null);
     jg.writeArrayFieldStart("beans");
@@ -100,7 +98,6 @@ public class FetchMetrics {
     while (it.hasNext()) {
       ObjectName oname = (ObjectName) it.next();
       String code = "";
-      //Object attributeinfo = null;
 
       MBeanInfo minfo;
       try {
@@ -113,59 +110,24 @@ public class FetchMetrics {
             prs = "modelerType";
             code = (String) this.mBeanServer.getAttribute(oname, prs);
           }
-
-          /*if (attribute != null) {
-            attributeinfo = this.mBeanServer.getAttribute(oname, attribute);
-          }*/
-        } catch (AttributeNotFoundException var13) {
-          LOG.error("getting attribute " + prs + " of " + oname + " threw an exception", var13);
-        } catch (MBeanException var14) {
-          LOG.error("getting attribute " + prs + " of " + oname + " threw an exception", var14);
-        } catch (RuntimeException var15) {
-          LOG.error("getting attribute " + prs + " of " + oname + " threw an exception", var15);
-        } catch (ReflectionException var16) {
-          LOG.error("getting attribute " + prs + " of " + oname + " threw an exception", var16);
+        } catch (AttributeNotFoundException | MBeanException | RuntimeException | ReflectionException ex) {
+          LOG.error("getting attribute " + prs + " of " + oname + " threw an exception", ex);
         }
       } catch (InstanceNotFoundException var17) {
         continue;
-      } catch (IntrospectionException var18) {
-        LOG.error("Problem while trying to process JMX query: " + qry + " with MBean " + oname, var18);
-        continue;
-      } catch (ReflectionException var19) {
-        LOG.error("Problem while trying to process JMX query: " + qry + " with MBean " + oname, var19);
+      } catch (IntrospectionException | ReflectionException ex) {
+        LOG.error("Problem while trying to process JMX query: " + qry + " with MBean " + oname, ex);
         continue;
       }
-
       jg.writeStartObject();
       jg.writeStringField("name", oname.toString());
       jg.writeStringField("modelerType", code);
-      /*if (attribute != null && attributeinfo == null) {
-        jg.writeStringField("result", "ERROR");
-        jg.writeStringField("message", "No attribute with name " + attribute + " was found.");
-        jg.writeEndObject();
-        jg.writeEndArray();
-        jg.close();
-        return;
-      }*/
-
       MBeanAttributeInfo[] attrs = minfo.getAttributes();
       for (int i = 0; i < attrs.length; ++i) {
         this.writeAttribute(jg, oname, attrs[i]);
       }
-
-      /*if (attribute != null) {
-        this.writeAttribute(jg, attribute, attributeinfo);
-      } else {
-        MBeanAttributeInfo[] attrs = minfo.getAttributes();
-
-        for (int i = 0; i < attrs.length; ++i) {
-          this.writeAttribute(jg, oname, attrs[i]);
-        }
-      }*/
-
       jg.writeEndObject();
     }
-
     jg.writeEndArray();
   }
 
@@ -180,30 +142,20 @@ public class FetchMetrics {
             value = this.mBeanServer.getAttribute(oname, attName);
           } catch (RuntimeMBeanException var7) {
             if (var7.getCause() instanceof UnsupportedOperationException) {
-              LOG.info("getting attribute " + attName + " of " + oname + " threw an exception", var7);
+              LOG.debug("getting attribute " + attName + " of " + oname + " threw an exception", var7);
             } else {
               LOG.error("getting attribute " + attName + " of " + oname + " threw an exception", var7);
             }
-
             return;
           } catch (RuntimeErrorException var8) {
             LOG.error("getting attribute {} of {} threw an exception", new Object[]{attName, oname, var8});
             return;
-          } catch (AttributeNotFoundException var9) {
+          } catch (MBeanException | RuntimeException | ReflectionException ex) {
+            LOG.error("getting attribute " + attName + " of " + oname + " threw an exception", ex);
             return;
-          } catch (MBeanException var10) {
-            LOG.error("getting attribute " + attName + " of " + oname + " threw an exception", var10);
-            return;
-          } catch (RuntimeException var11) {
-            LOG.error("getting attribute " + attName + " of " + oname + " threw an exception", var11);
-            return;
-          } catch (ReflectionException var12) {
-            LOG.error("getting attribute " + attName + " of " + oname + " threw an exception", var12);
-            return;
-          } catch (InstanceNotFoundException var13) {
+          } catch (AttributeNotFoundException | InstanceNotFoundException ex) {
             return;
           }
-
           this.writeAttribute(jg, attName, value);
         }
       }
@@ -259,12 +211,10 @@ public class FetchMetrics {
           entry = var14.next();
           this.writeObject(jg, entry);
         }
-
         jg.writeEndArray();
       } else {
         jg.writeString(value.toString());
       }
     }
-
   }
 }
