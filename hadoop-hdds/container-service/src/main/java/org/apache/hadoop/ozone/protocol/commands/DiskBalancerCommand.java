@@ -76,4 +76,9 @@ public class DiskBalancerCommand extends SCMCommand<DiskBalancerCommandProto> {
   public DiskBalancerConfiguration getDiskBalancerConfiguration() {
     return diskBalancerConfiguration;
   }
+
+  @Override
+  public String toString() {
+    return getType() + ": opType=" + opType + ", configuration=" + diskBalancerConfiguration;
+  }
 }

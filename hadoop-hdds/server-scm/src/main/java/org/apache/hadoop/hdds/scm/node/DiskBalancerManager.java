@@ -156,7 +156,7 @@ public class DiskBalancerManager {
     List<DatanodeAdminError> errors = new ArrayList<>();
     for (DatanodeDetails dn : dns) {
       try {
-        if (nodeManager.getNodeStatus(dn).isHealthy()) {
+        if (!nodeManager.getNodeStatus(dn).isHealthy()) {
           errors.add(new DatanodeAdminError(dn.getHostName(),
               "Datanode not in healthy state"));
           continue;
@@ -169,6 +169,7 @@ public class DiskBalancerManager {
             HddsProtos.DiskBalancerOpType.START, updateConf);
         sendCommand(dn, command);
       } catch (Exception e) {
+        LOG.info("Caught an error for {}", dn);
         errors.add(new DatanodeAdminError(dn.getHostName(), e.getMessage()));
       }
     }
@@ -355,6 +356,7 @@ public class DiskBalancerManager {
           " since not leader SCM.", dn.getUuidString());
       return;
     }
+    LOG.info("Sending {} to Datanode {}", command, dn);
     scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
         new CommandForDatanode<>(dn.getUuid(), command));
   }
