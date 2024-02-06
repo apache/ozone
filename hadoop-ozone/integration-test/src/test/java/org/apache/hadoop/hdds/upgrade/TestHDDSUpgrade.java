@@ -115,7 +115,7 @@ public class TestHDDSUpgrade {
   private StorageContainerManager scm;
   private ContainerManager scmContainerManager;
   private PipelineManager scmPipelineManager;
-  private final int numContainersCreated = 1;
+  private static final int NUM_CONTAINERS_CREATED = 1;
   private HDDSLayoutVersionManager scmVersionManager;
   private AtomicBoolean testPassed = new AtomicBoolean(true);
   private static
@@ -316,7 +316,7 @@ public class TestHDDSUpgrade {
     // Verify Post-Upgrade conditions on the SCM.
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
         cluster.getStorageContainerManagersList(),
-        numContainersCreated, NUM_DATA_NODES);
+            NUM_CONTAINERS_CREATED, NUM_DATA_NODES);
 
     // All datanodes on the SCM should have moved to HEALTHY-READONLY state.
     TestHddsUpgradeUtils.testDataNodesStateOnSCM(
@@ -327,7 +327,7 @@ public class TestHDDSUpgrade {
     // In the happy path case, no containers should have been quasi closed as
     // a result of the upgrade.
     TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
-        cluster.getHddsDatanodes(), numContainersCreated, CLOSED);
+        cluster.getHddsDatanodes(), NUM_CONTAINERS_CREATED, CLOSED);
 
     // Test that we can use a pipeline after upgrade.
     // Will fail with exception if there are no pipelines.
@@ -871,7 +871,7 @@ public class TestHDDSUpgrade {
     // Verify Post-Upgrade conditions on the SCM.
     // With failure injection
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
-        cluster.getStorageContainerManagersList(), numContainersCreated,
+        cluster.getStorageContainerManagersList(), NUM_CONTAINERS_CREATED,
         NUM_DATA_NODES);
 
     // All datanodes on the SCM should have moved to HEALTHY-READONLY state.
@@ -898,7 +898,7 @@ public class TestHDDSUpgrade {
 
     // Verify the SCM has driven all the DataNodes through Layout Upgrade.
     TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
-        cluster.getHddsDatanodes(), numContainersCreated);
+        cluster.getHddsDatanodes(), NUM_CONTAINERS_CREATED);
 
     // Verify that new pipeline can be created with upgraded datanodes.
     try {
