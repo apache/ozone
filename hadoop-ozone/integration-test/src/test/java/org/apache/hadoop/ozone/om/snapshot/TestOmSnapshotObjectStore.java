@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.junit.jupiter.api.Timeout;
 
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;

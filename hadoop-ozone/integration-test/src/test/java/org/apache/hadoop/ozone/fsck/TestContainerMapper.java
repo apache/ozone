@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ozone.test.GenericTestUtils;
@@ -122,7 +123,7 @@ public class TestContainerMapper {
   public void testContainerMapper() throws Exception {
     ContainerMapper containerMapper = new ContainerMapper();
     Map<Long, List<Map<Long, BlockIdDetails>>> dataMap =
-        containerMapper.parseOmDB(conf);
+        containerMapper.parseOmDB(conf, new OMPerformanceMetrics());
     // As we have created 20 keys with 10 MB size, and each
     // container max size is 100 MB, it should create 3 containers because
     // containers are closing before reaching the threshold
