@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 
+import java.io.IOException;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -52,7 +53,7 @@ class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
   }
 
   @Override
-  XceiverClientReply watchForCommit(long commitIndex) {
+  XceiverClientReply watchForCommit(long commitIndex) throws IOException {
     // No need to call actual client.watchForCommit() because Ratis client
     // send() call alone now would suffice with the API improvement in RATIS-1994
     adjustBuffers(commitIndex);
