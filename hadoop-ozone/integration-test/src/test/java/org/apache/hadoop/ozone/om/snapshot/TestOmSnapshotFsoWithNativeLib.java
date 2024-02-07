@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import org.apache.ozone.test.tag.Native;
-import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.Timeout;
 
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
