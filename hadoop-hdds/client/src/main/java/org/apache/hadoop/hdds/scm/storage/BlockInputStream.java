@@ -63,7 +63,7 @@ import static org.apache.hadoop.hdds.client.ReplicationConfig.getLegacyFactor;
  */
 public class BlockInputStream extends BlockExtendedInputStream {
 
-  private static final Logger LOG =
+  public static final Logger LOG =
       LoggerFactory.getLogger(BlockInputStream.class);
 
   private final BlockID blockID;
@@ -256,8 +256,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
     final Pipeline pipeline = xceiverClient.getPipeline();
 
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Initializing BlockInputStream for get key to access {}",
-          blockID.getContainerID());
+      LOG.debug("Initializing BlockInputStream for get key to access block {}",
+          blockID);
     }
 
     DatanodeBlockID.Builder blkIDBuilder =

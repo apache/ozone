@@ -56,6 +56,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Service
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -67,6 +69,8 @@ import java.util.function.Function;
  * OM transport for testing with in-memory state.
  */
 public class MockOmTransport implements OmTransport {
+  private static final Logger LOG =
+      LoggerFactory.getLogger(MockOmTransport.class);
 
   private final MockBlockAllocator blockAllocator;
   //volumename -> volumeinfo
@@ -185,11 +189,44 @@ public class MockOmTransport implements OmTransport {
         .build();
   }
 
+  private boolean isHSync(CommitKeyRequest commitKeyRequest) {
+    return commitKeyRequest.hasHsync() && commitKeyRequest.getHsync();
+  }
+
+  private boolean isRecovery(CommitKeyRequest commitKeyRequest) {
+    return commitKeyRequest.hasRecovery() && commitKeyRequest.getRecovery();
+  }
+
+  private String toOperationString(CommitKeyRequest commitKeyRequest) {
+    boolean hsync = isHSync(commitKeyRequest);
+    boolean recovery = isRecovery(commitKeyRequest);
+    if (hsync) {
+      return "hsync";
+    }
+    if (recovery) {
+      return "recover";
+    }
+    return "commit";
+  }
+
+
   private CommitKeyResponse commitKey(CommitKeyRequest commitKeyRequest) {
     final KeyArgs keyArgs = commitKeyRequest.getKeyArgs();
     final KeyInfo openKey =
         openKeys.get(keyArgs.getVolumeName()).get(keyArgs.getBucketName())
-            .remove(keyArgs.getKeyName());
+            .get(keyArgs.getKeyName());
+    LOG.debug("{} open key vol: {} bucket: {} key: {}",
+        toOperationString(commitKeyRequest),
+        keyArgs.getVolumeName(),
+        keyArgs.getBucketName(),
+        keyArgs.getKeyName());
+    boolean hsync = isHSync(commitKeyRequest);
+    if (!hsync) {
+      KeyInfo deleteKey = openKeys.get(keyArgs.getVolumeName())
+          .get(keyArgs.getBucketName())
+          .remove(keyArgs.getKeyName());
+      assert deleteKey != null;
+    }
     final KeyInfo.Builder committedKeyInfoWithLocations =
         KeyInfo.newBuilder().setVolumeName(keyArgs.getVolumeName())
             .setBucketName(keyArgs.getBucketName())
