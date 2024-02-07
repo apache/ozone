@@ -466,31 +466,29 @@ public class BlockOutputStream extends OutputStream {
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto> future =
           asyncReply.getResponse();
       flushFuture = future.thenApplyAsync(e -> {
-        synchronized (this) {
-          try {
-            validateResponse(e);
-          } catch (IOException sce) {
-            throw new CompletionException(sce);
+        try {
+          validateResponse(e);
+        } catch (IOException sce) {
+          throw new CompletionException(sce);
+        }
+        // if the ioException is not set, putBlock is successful
+        if (getIoException() == null && !force) {
+          BlockID responseBlockID = BlockID.getFromProtobuf(
+              e.getPutBlock().getCommittedBlockLength().getBlockID());
+          Preconditions.checkState(blockID.get().getContainerBlockID()
+              .equals(responseBlockID.getContainerBlockID()));
+          // updates the bcsId of the block
+          blockID.set(responseBlockID);
+          if (LOG.isDebugEnabled()) {
+            LOG.debug(
+                "Adding index " + asyncReply.getLogIndex() + " flushLength "
+                    + flushPos + " numBuffers " + byteBufferList.size()
+                    + " blockID " + blockID + " bufferPool size" + bufferPool
+                    .getSize() + " currentBufferIndex " + bufferPool
+                    .getCurrentBufferIndex());
           }
-          // if the ioException is not set, putBlock is successful
-          if (getIoException() == null && !force) {
-            BlockID responseBlockID = BlockID.getFromProtobuf(
-                e.getPutBlock().getCommittedBlockLength().getBlockID());
-            Preconditions.checkState(blockID.get().getContainerBlockID()
-                .equals(responseBlockID.getContainerBlockID()));
-            // updates the bcsId of the block
-            blockID.set(responseBlockID);
-            if (LOG.isDebugEnabled()) {
-              LOG.debug(
-                  "Adding index " + asyncReply.getLogIndex() + " flushLength "
-                      + flushPos + " numBuffers " + byteBufferList.size()
-                      + " blockID " + blockID + " bufferPool size" + bufferPool
-                      .getSize() + " currentBufferIndex " + bufferPool
-                      .getCurrentBufferIndex());
-            }
-            // for standalone protocol, logIndex will always be 0.
-            updateCommitInfo(asyncReply, byteBufferList);
-          }
+          // for standalone protocol, logIndex will always be 0.
+          updateCommitInfo(asyncReply, byteBufferList);
         }
         return e;
       }, responseExecutor).exceptionally(e -> {
@@ -726,12 +724,10 @@ public class BlockOutputStream extends OutputStream {
           respFuture = asyncReply.getResponse();
       CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
           validateFuture = respFuture.thenApplyAsync(e -> {
-            synchronized (this) {
-              try {
-                validateResponse(e);
-              } catch (IOException sce) {
-                respFuture.completeExceptionally(sce);
-              }
+            try {
+              validateResponse(e);
+            } catch (IOException sce) {
+              respFuture.completeExceptionally(sce);
             }
             return e;
           }, responseExecutor).exceptionally(e -> {
