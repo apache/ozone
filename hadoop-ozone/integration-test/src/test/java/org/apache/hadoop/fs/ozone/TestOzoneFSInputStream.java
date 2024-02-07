@@ -52,9 +52,10 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.Assertions;
 
 import static org.apache.hadoop.hdds.StringUtils.string2Bytes;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 /**
  * Test OzoneFSInputStream by reading through multiple interfaces.
@@ -147,11 +148,11 @@ public class TestOzoneFSInputStream {
           break;
         }
         value[i] = (byte) val;
-        Assertions.assertEquals(value[i], data[i], "value mismatch at:" + i);
+        assertEquals(value[i], data[i], "value mismatch at:" + i);
         i++;
       }
-      Assertions.assertEquals(i, data.length);
-      Assertions.assertArrayEquals(value, data);
+      assertEquals(i, data.length);
+      assertArrayEquals(value, data);
     }
   }
 
@@ -169,8 +170,8 @@ public class TestOzoneFSInputStream {
         System.arraycopy(tmp, 0, value, i * tmp.length, tmp.length);
         i++;
       }
-      Assertions.assertEquals((long) i * tmp.length, data.length);
-      Assertions.assertArrayEquals(value, data);
+      assertEquals((long) i * tmp.length, data.length);
+      assertArrayEquals(value, data);
     }
   }
 
@@ -181,12 +182,12 @@ public class TestOzoneFSInputStream {
       ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024);
       int byteRead = inputStream.read(buffer);
 
-      Assertions.assertEquals(byteRead, 1024 * 1024);
+      assertEquals(byteRead, 1024 * 1024);
 
       byte[] value = new byte[1024 * 1024];
       System.arraycopy(data, 0, value, 0, value.length);
 
-      Assertions.assertArrayEquals(value, buffer.array());
+      assertArrayEquals(value, buffer.array());
     }
   }
 
@@ -208,7 +209,7 @@ public class TestOzoneFSInputStream {
     in.sync(0);
     blockStart = in.getPosition();
     // The behavior should be consistent with HDFS
-    Assertions.assertEquals(srcfile.length(), blockStart);
+    assertEquals(srcfile.length(), blockStart);
     in.close();
   }
 
@@ -230,7 +231,7 @@ public class TestOzoneFSInputStream {
     in.sync(0);
     blockStart = in.getPosition();
     // The behavior should be consistent with HDFS
-    Assertions.assertEquals(srcfile.length(), blockStart);
+    assertEquals(srcfile.length(), blockStart);
     in.close();
   }
 }

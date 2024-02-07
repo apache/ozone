@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
@@ -33,8 +34,8 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
@@ -42,6 +43,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
@@ -51,6 +53,11 @@ import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
+import org.apache.hadoop.hdds.scm.net.NodeSchema;
+import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
@@ -62,20 +69,23 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.test.PathUtils;
-
 import org.apache.commons.io.IOUtils;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
-
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
-
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
+
+import static java.util.Collections.emptyList;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+
 
 /**
  * Test for different container placement policy.
@@ -135,24 +145,23 @@ public class TestContainerPlacement {
 
   SCMNodeManager createNodeManager(OzoneConfiguration config) {
     EventQueue eventQueue = new EventQueue();
-    eventQueue.addHandler(SCMEvents.NEW_NODE,
-        Mockito.mock(NewNodeHandler.class));
-    eventQueue.addHandler(SCMEvents.STALE_NODE,
-        Mockito.mock(StaleNodeHandler.class));
-    eventQueue.addHandler(SCMEvents.DEAD_NODE,
-        Mockito.mock(DeadNodeHandler.class));
+    eventQueue.addHandler(SCMEvents.NEW_NODE, mock(NewNodeHandler.class));
+    eventQueue.addHandler(SCMEvents.STALE_NODE, mock(StaleNodeHandler.class));
+    eventQueue.addHandler(SCMEvents.DEAD_NODE, mock(DeadNodeHandler.class));
 
-    SCMStorageConfig storageConfig = Mockito.mock(SCMStorageConfig.class);
-    Mockito.when(storageConfig.getClusterID()).thenReturn("cluster1");
+    SCMStorageConfig storageConfig = mock(SCMStorageConfig.class);
+    when(storageConfig.getClusterID()).thenReturn("cluster1");
 
-    HDDSLayoutVersionManager versionManager =
-        Mockito.mock(HDDSLayoutVersionManager.class);
-    Mockito.when(versionManager.getMetadataLayoutVersion())
-        .thenReturn(maxLayoutVersion());
-    Mockito.when(versionManager.getSoftwareLayoutVersion())
-        .thenReturn(maxLayoutVersion());
+    HDDSLayoutVersionManager versionManager = mock(HDDSLayoutVersionManager.class);
+    when(versionManager.getMetadataLayoutVersion()).thenReturn(maxLayoutVersion());
+    when(versionManager.getSoftwareLayoutVersion()).thenReturn(maxLayoutVersion());
+    NodeSchema[] schemas = new NodeSchema[]
+        {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
+    NodeSchemaManager.getInstance().init(schemas, true);
+    NetworkTopology networkTopology =
+        new NetworkTopologyImpl(NodeSchemaManager.getInstance());
     SCMNodeManager scmNodeManager = new SCMNodeManager(config, storageConfig,
-        eventQueue, null, SCMContext.emptyContext(), versionManager);
+        eventQueue, networkTopology, SCMContext.emptyContext(), versionManager);
     return scmNodeManager;
   }
 
@@ -172,7 +181,6 @@ public class TestContainerPlacement {
    * @throws InterruptedException
    */
   @Test
-  @Unhealthy
   public void testContainerPlacementCapacity() throws IOException,
       InterruptedException, TimeoutException {
     final int nodeCount = 4;
@@ -186,6 +194,7 @@ public class TestContainerPlacement {
         testDir.getAbsolutePath());
     conf.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementCapacity.class, PlacementPolicy.class);
+    conf.setBoolean(ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY, true);
 
     SCMNodeManager scmNodeManager = createNodeManager(conf);
     containerManager = createContainerManager();
@@ -199,6 +208,19 @@ public class TestContainerPlacement {
             versionManager.getSoftwareLayoutVersion());
     try {
       for (DatanodeDetails datanodeDetails : datanodes) {
+        UUID dnId = datanodeDetails.getUuid();
+        DatanodeInfo datanodeInfo = scmNodeManager.getNodeStateManager()
+            .getNode(dnId);
+        StorageContainerDatanodeProtocolProtos.StorageReportProto report =
+            HddsTestUtils
+                .createStorageReport(dnId,
+                    testDir.getAbsolutePath() + "/" + dnId, capacity, used,
+                    remaining, null);
+        StorageContainerDatanodeProtocolProtos.NodeReportProto nodeReportProto =
+            HddsTestUtils.createNodeReport(
+                Arrays.asList(report), emptyList());
+        datanodeInfo.updateStorageReports(
+            nodeReportProto.getStorageReportList());
         scmNodeManager.processHeartbeat(datanodeDetails, layoutInfo);
       }
 
@@ -220,9 +242,23 @@ public class TestContainerPlacement {
                   SCMTestUtils.getReplicationType(conf),
                   SCMTestUtils.getReplicationFactor(conf)),
               OzoneConsts.OZONE);
+      int replicaCount = 0;
+      for (DatanodeDetails datanodeDetails : datanodes) {
+        if (replicaCount ==
+            SCMTestUtils.getReplicationFactor(conf).getNumber()) {
+          break;
+        }
+        UUID dnId = datanodeDetails.getUuid();
+        DatanodeInfo datanodeInfo = scmNodeManager.getNodeStateManager()
+            .getNode(dnId);
+        addReplica(container, datanodeInfo);
+        replicaCount++;
+      }
       assertEquals(SCMTestUtils.getReplicationFactor(conf).getNumber(),
           containerManager.getContainerReplicas(
               container.containerID()).size());
+    } catch (NodeNotFoundException e) {
+      throw new RuntimeException(e);
     } finally {
       IOUtils.closeQuietly(containerManager);
       IOUtils.closeQuietly(scmNodeManager);
@@ -231,5 +267,17 @@ public class TestContainerPlacement {
       }
       FileUtil.fullyDelete(testDir);
     }
+  }
+
+  private void addReplica(ContainerInfo cont, DatanodeDetails node) {
+    ContainerReplica replica = ContainerReplica.newBuilder()
+        .setContainerID(cont.containerID())
+        .setContainerState(
+            StorageContainerDatanodeProtocolProtos.ContainerReplicaProto
+                .State.CLOSED)
+        .setDatanodeDetails(node)
+        .build();
+    containerManager.getContainerStateManager()
+        .updateContainerReplica(cont.containerID(), replica);
   }
 }

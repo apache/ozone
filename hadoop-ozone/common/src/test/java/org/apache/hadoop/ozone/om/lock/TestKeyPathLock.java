@@ -29,23 +29,23 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests OzoneManagerLock.Resource.KEY_PATH_LOCK.
  */
-public class TestKeyPathLock extends TestOzoneManagerLock {
+class TestKeyPathLock extends TestOzoneManagerLock {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestKeyPathLock.class);
 
-  private OzoneManagerLock.Resource resource =
+  private final OzoneManagerLock.Resource resource =
       OzoneManagerLock.Resource.KEY_PATH_LOCK;
 
   @Test
-  public void testKeyPathLockMultiThreading() throws Exception {
+  void testKeyPathLockMultiThreading() throws Exception {
     testSameKeyPathWriteLockMultiThreading(10, 100);
     testDiffKeyPathWriteLockMultiThreading(10, 100);
   }
@@ -70,8 +70,8 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
   // "/a/b/c/d/key1 - WLock - 5th iteration"  -- blocked
   // (iterations are sequential)
 
-  public void testSameKeyPathWriteLockMultiThreading(int threadCount,
-                                                     int iterations)
+  void testSameKeyPathWriteLockMultiThreading(int threadCount,
+      int iterations)
       throws InterruptedException {
 
     String volumeName = UUID.randomUUID().toString();
@@ -140,9 +140,7 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
     lock.acquireWriteLock(resource, sampleResourceName);
     LOG.info("Write Lock Acquired by " + Thread.currentThread().getName());
 
-    /**
-     * Critical Section. count = count + 1;
-     */
+    // Critical Section. count = count + 1;
     for (int idx = 0; idx < iterations; idx++) {
       counter.incrementCount();
     }
@@ -164,8 +162,8 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
   // "/a/b/c/d/key5 - WLock - 5th iteration"  -- allowed
   // (iterations are parallel)
 
-  public void testDiffKeyPathWriteLockMultiThreading(int threadCount,
-                                                     int iterations)
+  void testDiffKeyPathWriteLockMultiThreading(int threadCount,
+      int iterations)
       throws Exception {
 
     String volumeName = UUID.randomUUID().toString();
@@ -190,9 +188,7 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
       threads[i].start();
     }
 
-    /**
-     * Waiting for all the threads to count down
-     */
+    // Waiting for all the threads to count down
     GenericTestUtils.waitFor(() -> {
       if (countDown.getCount() > 0) {
         LOG.info("Waiting for the threads to count down {} ",
@@ -229,7 +225,7 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
   }
 
   @Test
-  public void testAcquireWriteBucketLockWhileAcquiredWriteKeyPathLock() {
+  void testAcquireWriteBucketLockWhileAcquiredWriteKeyPathLock() {
     OzoneManagerLock.Resource higherResource =
         OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -249,12 +245,12 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
     } catch (RuntimeException ex) {
       String message = "cannot acquire " + higherResource.getName() + " lock " +
           "while holding [" + resource.getName() + "] lock(s).";
-      assertTrue(ex.getMessage().contains(message), ex.getMessage());
+      assertThat(ex).hasMessageContaining(message);
     }
   }
 
   @Test
-  public void testAcquireWriteBucketLockWhileAcquiredReadKeyPathLock() {
+  void testAcquireWriteBucketLockWhileAcquiredReadKeyPathLock() {
     OzoneManagerLock.Resource higherResource =
         OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -274,12 +270,12 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
     } catch (RuntimeException ex) {
       String message = "cannot acquire " + higherResource.getName() + " lock " +
           "while holding [" + resource.getName() + "] lock(s).";
-      assertTrue(ex.getMessage().contains(message), ex.getMessage());
+      assertThat(ex).hasMessageContaining(message);
     }
   }
 
   @Test
-  public void testAcquireReadBucketLockWhileAcquiredReadKeyPathLock() {
+  void testAcquireReadBucketLockWhileAcquiredReadKeyPathLock() {
     OzoneManagerLock.Resource higherResource =
         OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -299,12 +295,12 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
     } catch (RuntimeException ex) {
       String message = "cannot acquire " + higherResource.getName() + " lock " +
           "while holding [" + resource.getName() + "] lock(s).";
-      assertTrue(ex.getMessage().contains(message), ex.getMessage());
+      assertThat(ex).hasMessageContaining(message);
     }
   }
 
   @Test
-  public void testAcquireReadBucketLockWhileAcquiredWriteKeyPathLock() {
+  void testAcquireReadBucketLockWhileAcquiredWriteKeyPathLock() {
     OzoneManagerLock.Resource higherResource =
         OzoneManagerLock.Resource.BUCKET_LOCK;
 
@@ -324,7 +320,7 @@ public class TestKeyPathLock extends TestOzoneManagerLock {
     } catch (RuntimeException ex) {
       String message = "cannot acquire " + higherResource.getName() + " lock " +
           "while holding [" + resource.getName() + "] lock(s).";
-      assertTrue(ex.getMessage().contains(message), ex.getMessage());
+      assertThat(ex).hasMessageContaining(message);
     }
   }
 }

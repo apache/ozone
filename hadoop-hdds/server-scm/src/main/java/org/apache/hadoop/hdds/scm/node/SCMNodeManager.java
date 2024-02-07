@@ -69,7 +69,9 @@ import org.slf4j.LoggerFactory;
 
 import javax.management.ObjectName;
 import java.io.IOException;
+import java.math.RoundingMode;
 import java.net.InetAddress;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -138,9 +140,11 @@ public class SCMNodeManager implements NodeManager {
    * consistent view of the node state.
    */
   private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
-  private final String opeState = "OPSTATE";
-  private final String comState = "COMSTATE";
-  private final String lastHeartbeat = "LASTHEARTBEAT";
+  private static final String OPESTATE = "OPSTATE";
+  private static final String COMSTATE = "COMSTATE";
+  private static final String LASTHEARTBEAT = "LASTHEARTBEAT";
+  private static final String USEDSPACEPERCENT = "USEDSPACEPERCENT";
+  private static final String TOTALCAPACITY = "CAPACITY";
   /**
    * Constructs SCM machine Manager.
    */
@@ -1103,9 +1107,9 @@ public class SCMNodeManager implements NodeManager {
         heartbeatTimeDiff = getLastHeartbeatTimeDiff(dni.getLastHeartbeatTime());
       }
       Map<String, String> map = new HashMap<>();
-      map.put(opeState, opstate);
-      map.put(comState, healthState);
-      map.put(lastHeartbeat, heartbeatTimeDiff);
+      map.put(OPESTATE, opstate);
+      map.put(COMSTATE, healthState);
+      map.put(LASTHEARTBEAT, heartbeatTimeDiff);
       if (httpPort != null) {
         map.put(httpPort.getName().toString(), httpPort.getValue().toString());
       }
@@ -1113,9 +1117,95 @@ public class SCMNodeManager implements NodeManager {
         map.put(httpsPort.getName().toString(),
                   httpsPort.getValue().toString());
       }
+      String capacity = calculateStorageCapacity(dni.getStorageReports());
+      map.put(TOTALCAPACITY, capacity);
+      String[] storagePercentage = calculateStoragePercentage(
+          dni.getStorageReports());
+      String scmUsedPerc = storagePercentage[0];
+      String nonScmUsedPerc = storagePercentage[1];
+      map.put(USEDSPACEPERCENT,
+          "Ozone: " + scmUsedPerc + "%, other: " + nonScmUsedPerc + "%");
       nodes.put(hostName, map);
     }
     return nodes;
+  }
+
+  /**
+   * Calculate the storage capacity of the DataNode node.
+   * @param storageReports Calculate the storage capacity corresponding
+   *                       to the storage collection.
+   * @return
+   */
+  public static String calculateStorageCapacity(
+      List<StorageReportProto> storageReports) {
+    long capacityByte = 0;
+    if (storageReports != null && !storageReports.isEmpty()) {
+      for (StorageReportProto storageReport : storageReports) {
+        capacityByte += storageReport.getCapacity();
+      }
+    }
+
+    double ua = capacityByte;
+    StringBuilder unit = new StringBuilder("B");
+    if (ua > 1024) {
+      ua = ua / 1024;
+      unit.replace(0, 1, "KB");
+    }
+    if (ua > 1024) {
+      ua = ua / 1024;
+      unit.replace(0, 2, "MB");
+    }
+    if (ua > 1024) {
+      ua = ua / 1024;
+      unit.replace(0, 2, "GB");
+    }
+    if (ua > 1024) {
+      ua = ua / 1024;
+      unit.replace(0, 2, "TB");
+    }
+
+    DecimalFormat decimalFormat = new DecimalFormat("#0.0");
+    decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
+    String capacity = decimalFormat.format(ua);
+    return capacity + unit.toString();
+  }
+
+  /**
+   * Calculate the storage usage percentage of a DataNode node.
+   * @param storageReports Calculate the storage percentage corresponding
+   *                       to the storage collection.
+   * @return
+   */
+  public static String[] calculateStoragePercentage(
+      List<StorageReportProto> storageReports) {
+    String[] storagePercentage = new String[2];
+    String usedPercentage = "N/A";
+    String nonUsedPercentage = "N/A";
+    if (storageReports != null && !storageReports.isEmpty()) {
+      long capacity = 0;
+      long scmUsed = 0;
+      long remaining = 0;
+      for (StorageReportProto storageReport : storageReports) {
+        capacity += storageReport.getCapacity();
+        scmUsed += storageReport.getScmUsed();
+        remaining += storageReport.getRemaining();
+      }
+      long scmNonUsed = capacity - scmUsed - remaining;
+
+      DecimalFormat decimalFormat = new DecimalFormat("#0.00");
+      decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
+
+      double usedPerc = ((double) scmUsed / capacity) * 100;
+      usedPerc = usedPerc > 100.0 ? 100.0 : usedPerc;
+      double nonUsedPerc = ((double) scmNonUsed / capacity) * 100;
+      nonUsedPerc = nonUsedPerc > 100.0 ? 100.0 : nonUsedPerc;
+      usedPercentage = decimalFormat.format(usedPerc);
+      nonUsedPercentage = decimalFormat.format(nonUsedPerc);
+    }
+
+    storagePercentage[0] = usedPercentage;
+    storagePercentage[1] = nonUsedPercentage;
+    return storagePercentage;
   }
 
   /**

@@ -34,7 +34,11 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
+import org.apache.hadoop.hdds.scm.net.NodeSchema;
+import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
 import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig;
+import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.CapacityPipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.RandomPipelineChoosePolicy;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -43,8 +47,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.Mockito;
-
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -56,18 +58,27 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.apache.hadoop.hdds.conf.StorageUnit.BYTES;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
+import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
-import static org.hamcrest.CoreMatchers.containsString;
-import static org.hamcrest.MatcherAssert.assertThat;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
 
 /**
  * Tests to validate the WritableECContainerProvider works correctly.
@@ -77,12 +88,12 @@ public class TestWritableECContainerProvider {
   private static final String OWNER = "SCM";
   private PipelineManager pipelineManager;
   private final ContainerManager containerManager
-      = Mockito.mock(ContainerManager.class);
+      = mock(ContainerManager.class);
 
   private OzoneConfiguration conf;
   private DBStore dbStore;
   private SCMHAManager scmhaManager;
-  private MockNodeManager nodeManager;
+  private static MockNodeManager nodeManager;
   private WritableContainerProvider<ECReplicationConfig> provider;
   private ECReplicationConfig repConfig;
 
@@ -91,8 +102,20 @@ public class TestWritableECContainerProvider {
 
   public static Collection<PipelineChoosePolicy> policies() {
     Collection<PipelineChoosePolicy> policies = new ArrayList<>();
+    // init nodeManager
+    NodeSchemaManager.getInstance().init(new NodeSchema[]
+        {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA}, true);
+    NetworkTopologyImpl cluster =
+        new NetworkTopologyImpl(NodeSchemaManager.getInstance());
+    int count = 10;
+    List<DatanodeDetails> datanodes = IntStream.range(0, count)
+        .mapToObj(i -> MockDatanodeDetails.randomDatanodeDetails())
+        .collect(Collectors.toList());
+    nodeManager = new MockNodeManager(cluster, datanodes, false, count);
+
     policies.add(new RandomPipelineChoosePolicy());
     policies.add(new HealthyPipelineChoosePolicy());
+    policies.add(new CapacityPipelineChoosePolicy().init(nodeManager));
     return policies;
   }
 
@@ -108,11 +131,10 @@ public class TestWritableECContainerProvider {
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
     scmhaManager = SCMHAManagerStub.getInstance(true);
-    nodeManager = new MockNodeManager(true, 10);
     pipelineManager =
         new MockPipelineManager(dbStore, scmhaManager, nodeManager);
 
-    Mockito.doAnswer(call -> {
+    doAnswer(call -> {
       Pipeline pipeline = (Pipeline)call.getArguments()[2];
       ContainerInfo container = createContainer(pipeline,
           repConfig, System.nanoTime());
@@ -120,12 +142,12 @@ public class TestWritableECContainerProvider {
           pipeline.getId(), container.containerID());
       containers.put(container.containerID(), container);
       return container;
-    }).when(containerManager).getMatchingContainer(Mockito.anyLong(),
-        Mockito.anyString(), Mockito.any(Pipeline.class));
+    }).when(containerManager).getMatchingContainer(anyLong(),
+        anyString(), any(Pipeline.class));
 
-    Mockito.doAnswer(call ->
+    doAnswer(call ->
         containers.get((ContainerID)call.getArguments()[0]))
-        .when(containerManager).getContainer(Mockito.any(ContainerID.class));
+        .when(containerManager).getContainer(any(ContainerID.class));
 
   }
 
@@ -312,8 +334,8 @@ public class TestWritableECContainerProvider {
 
     IOException ioException = assertThrows(IOException.class,
         () -> provider.getContainer(1, repConfig, OWNER, new ExcludeList()));
-    assertThat(ioException.getMessage(),
-        containsString("Cannot create pipelines"));
+    assertThat(ioException.getMessage())
+        .contains("Cannot create pipelines");
   }
 
   @ParameterizedTest
@@ -341,14 +363,14 @@ public class TestWritableECContainerProvider {
 
     IOException ioException = assertThrows(IOException.class,
         () -> provider.getContainer(1, repConfig, OWNER, new ExcludeList()));
-    assertThat(ioException.getMessage(),
-        containsString("Cannot create pipelines"));
+    assertThat(ioException.getMessage())
+        .contains("Cannot create pipelines");
 
     for (int i = 0; i < 5; i++) {
       ioException = assertThrows(IOException.class,
           () -> provider.getContainer(1, repConfig, OWNER, new ExcludeList()));
-      assertThat(ioException.getMessage(),
-          containsString("Cannot create pipelines"));
+      assertThat(ioException.getMessage())
+          .contains("Cannot create pipelines");
     }
   }
 
@@ -424,9 +446,9 @@ public class TestWritableECContainerProvider {
 
     // Ensure ContainerManager always throws when a container is requested so
     // existing pipelines cannot be used
-    Mockito.doAnswer(call -> {
+    doAnswer(call -> {
       throw new ContainerNotFoundException();
-    }).when(containerManager).getContainer(Mockito.any(ContainerID.class));
+    }).when(containerManager).getContainer(any(ContainerID.class));
 
     ContainerInfo newContainer =
         provider.getContainer(1, repConfig, OWNER, new ExcludeList());
@@ -508,7 +530,7 @@ public class TestWritableECContainerProvider {
   @MethodSource("policies")
   public void testExcludedNodesPassedToCreatePipelineIfProvided(
       PipelineChoosePolicy policy) throws IOException {
-    PipelineManager pipelineManagerSpy = Mockito.spy(pipelineManager);
+    PipelineManager pipelineManagerSpy = spy(pipelineManager);
     provider = createSubject(pipelineManagerSpy, policy);
     ExcludeList excludeList = new ExcludeList();
 

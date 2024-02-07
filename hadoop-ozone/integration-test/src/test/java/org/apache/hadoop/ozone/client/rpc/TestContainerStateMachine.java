@@ -54,11 +54,13 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import org.apache.ratis.statemachine.impl.StatemachineImplTestUtil;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -156,7 +158,7 @@ public class TestContainerStateMachine {
 
     List<OmKeyLocationInfo> locationInfoList =
         groupOutputStream.getLocationInfoList();
-    Assertions.assertEquals(1, locationInfoList.size());
+    assertEquals(1, locationInfoList.size());
     OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
 
     // delete the container dir
@@ -168,7 +170,7 @@ public class TestContainerStateMachine {
 
     key.close();
     // Make sure the container is marked unhealthy
-    Assertions.assertEquals(
+    assertEquals(
         ContainerProtos.ContainerDataProto.State.UNHEALTHY,
         cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
             .getContainer().getContainerSet()
@@ -183,7 +185,7 @@ public class TestContainerStateMachine {
         (ContainerStateMachine) TestHelper.getStateMachine(cluster);
     SimpleStateMachineStorage storage =
         (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
-    Assertions.assertNull(StatemachineImplTestUtil.findLatestSnapshot(storage));
+    assertNull(StatemachineImplTestUtil.findLatestSnapshot(storage));
 
     // Write 10 keys. Num snapshots should be equal to config value.
     for (int i = 1; i <= 10; i++) {
@@ -207,8 +209,8 @@ public class TestContainerStateMachine {
     storage = (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
     Path parentPath = getSnapshotPath(storage);
     int numSnapshots = parentPath.getParent().toFile().listFiles().length;
-    Assertions.assertTrue(Math.abs(ratisServerConfiguration
-        .getNumSnapshotsRetained() - numSnapshots) <= 1);
+    assertThat(Math.abs(ratisServerConfiguration.getNumSnapshotsRetained() - numSnapshots))
+        .isLessThanOrEqualTo(1);
 
     // Write 10 more keys. Num Snapshots should remain the same.
     for (int i = 11; i <= 20; i++) {
@@ -228,8 +230,8 @@ public class TestContainerStateMachine {
     storage = (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
     parentPath = getSnapshotPath(storage);
     numSnapshots = parentPath.getParent().toFile().listFiles().length;
-    Assertions.assertTrue(Math.abs(ratisServerConfiguration
-        .getNumSnapshotsRetained() - numSnapshots) <= 1);
+    assertThat(Math.abs(ratisServerConfiguration.getNumSnapshotsRetained() - numSnapshots))
+        .isLessThanOrEqualTo(1);
   }
 
   static Path getSnapshotPath(SimpleStateMachineStorage storage)

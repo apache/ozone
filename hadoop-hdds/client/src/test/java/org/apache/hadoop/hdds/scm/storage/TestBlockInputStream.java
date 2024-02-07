@@ -19,6 +19,7 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import com.google.common.primitives.Bytes;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -50,7 +51,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -63,8 +63,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
@@ -186,9 +186,8 @@ public class TestBlockInputStream {
     assertThrows(EOFException.class, () -> seekAndVerify(finalPos));
 
     // Seek to random positions between 0 and the block size.
-    Random random = new Random();
     for (int i = 0; i < 10; i++) {
-      pos = random.nextInt(blockSize);
+      pos = RandomUtils.nextInt(0, blockSize);
       seekAndVerify(pos);
     }
   }

@@ -133,6 +133,17 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
     }
     BlockTokenSecretProto token =
         BlockTokenSecretProto.parseFrom((DataInputStream) in);
+    readFromProto(token);
+  }
+
+  @Override
+  public void readFromByteArray(byte[] bytes) throws IOException {
+    BlockTokenSecretProto token =
+        BlockTokenSecretProto.parseFrom(bytes);
+    readFromProto(token);
+  }
+
+  private void readFromProto(BlockTokenSecretProto token) {
     setOwnerId(token.getOwnerId());
     setExpiry(Instant.ofEpochMilli(token.getExpiryDate()));
     setSecretKeyId(ProtobufUtils.fromProtobuf(token.getSecretKeyId()));
@@ -157,6 +168,11 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
 
   @Override
   public void write(DataOutput out) throws IOException {
+    out.write(getBytes());
+  }
+
+  @Override
+  public byte[] getBytes() {
     BlockTokenSecretProto.Builder builder = BlockTokenSecretProto.newBuilder()
         .setBlockId(blockId)
         .setOwnerId(getOwnerId())
@@ -167,7 +183,7 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
     for (AccessModeProto mode : modes) {
       builder.addModes(AccessModeProto.valueOf(mode.name()));
     }
-    out.write(builder.build().toByteArray());
+    return builder.build().toByteArray();
   }
 
   /**

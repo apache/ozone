@@ -67,7 +67,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
@@ -81,16 +81,13 @@ class TestOzoneManagerDoubleBuffer {
 
   private OzoneManagerDoubleBuffer doubleBuffer;
   private OzoneManager ozoneManager;
-  private OmMetadataManagerImpl omMetadataManager;
   private S3SecretLockedManager secretManager;
-  private CreateSnapshotResponse snapshotResponse1 =
-      mock(CreateSnapshotResponse.class);
-  private CreateSnapshotResponse snapshotResponse2 =
-      mock(CreateSnapshotResponse.class);
-  private OMResponse omKeyResponse = mock(OMResponse.class);
-  private OMResponse omBucketResponse = mock(OMResponse.class);
-  private OMResponse omSnapshotResponse1 = mock(OMResponse.class);
-  private OMResponse omSnapshotResponse2 = mock(OMResponse.class);
+  private final CreateSnapshotResponse snapshotResponse1 = mock(CreateSnapshotResponse.class);
+  private final CreateSnapshotResponse snapshotResponse2 = mock(CreateSnapshotResponse.class);
+  private final OMResponse omKeyResponse = mock(OMResponse.class);
+  private final OMResponse omBucketResponse = mock(OMResponse.class);
+  private final OMResponse omSnapshotResponse1 = mock(OMResponse.class);
+  private final OMResponse omSnapshotResponse2 = mock(OMResponse.class);
   private static OMClientResponse omKeyCreateResponse =
       mock(OMKeyCreateResponse.class);
   private static OMClientResponse omBucketCreateResponse =
@@ -104,10 +101,6 @@ class TestOzoneManagerDoubleBuffer {
   private OzoneManagerDoubleBuffer.FlushNotifier flushNotifier;
   private OzoneManagerDoubleBuffer.FlushNotifier spyFlushNotifier;
 
-  private static String userPrincipalId1 = "alice@EXAMPLE.COM";
-  private static String userPrincipalId2 = "messi@EXAMPLE.COM";
-  private static String userPrincipalId3 = "ronaldo@EXAMPLE.COM";
-
   @BeforeEach
   public void setup() throws IOException {
     OMMetrics omMetrics = OMMetrics.create();
@@ -117,8 +110,8 @@ class TestOzoneManagerDoubleBuffer {
 
     ozoneManager = mock(OzoneManager.class);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
-    omMetadataManager =
-        new OmMetadataManagerImpl(ozoneConfiguration, ozoneManager);
+
+    final OmMetadataManagerImpl omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, ozoneManager);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getMaxUserVolumeCount()).thenReturn(10L);
     AuditLogger auditLogger = mock(AuditLogger.class);
@@ -135,16 +128,13 @@ class TestOzoneManagerDoubleBuffer {
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
-    OzoneManagerRatisSnapshot ozoneManagerRatisSnapshot = index -> {
-    };
 
     flushNotifier = new OzoneManagerDoubleBuffer.FlushNotifier();
     spyFlushNotifier = spy(flushNotifier);
-    doubleBuffer = new OzoneManagerDoubleBuffer.Builder()
+    doubleBuffer = OzoneManagerDoubleBuffer.newBuilder()
         .setOmMetadataManager(omMetadataManager)
         .setS3SecretManager(secretManager)
-        .setOzoneManagerRatisSnapShot(ozoneManagerRatisSnapshot)
-        .setmaxUnFlushedTransactionCount(1000)
+        .setMaxUnFlushedTransactionCount(1000)
         .enableRatis(true)
         .setFlushNotifier(spyFlushNotifier)
         .build();
@@ -247,12 +237,10 @@ class TestOzoneManagerDoubleBuffer {
     // Flush the current buffer.
     doubleBuffer.flushCurrentBuffer();
 
-    assertEquals(expectedFlushCounts, doubleBuffer.getFlushIterations());
-    assertEquals(expectedFlushedTransactionCount,
-        doubleBuffer.getFlushedTransactionCount());
+    assertEquals(expectedFlushCounts, doubleBuffer.getFlushIterationsForTesting());
+    assertEquals(expectedFlushedTransactionCount, doubleBuffer.getFlushedTransactionCountForTesting());
 
-    OzoneManagerDoubleBufferMetrics bufferMetrics =
-        doubleBuffer.getOzoneManagerDoubleBufferMetrics();
+    final OzoneManagerDoubleBufferMetrics bufferMetrics = doubleBuffer.getMetrics();
 
     assertEquals(expectedFlushCountsInMetric,
         bufferMetrics.getTotalNumOfFlushOperations());
@@ -262,11 +250,13 @@ class TestOzoneManagerDoubleBuffer {
         bufferMetrics.getMaxNumberOfTransactionsFlushedInOneIteration());
     assertEquals(expectedAvgFlushTransactionsInMetric,
         bufferMetrics.getAvgFlushTransactionsInOneIteration(), 0.001);
+
+    // reset max
+    bufferMetrics.setMaxNumberOfTransactionsFlushedInOneIteration(0);
   }
 
   @Test
-  public void testAwaitFlush()
-      throws ExecutionException, InterruptedException {
+  public void testAwaitFlush() throws Exception {
     List<OMClientResponse> omClientResponses =
         Arrays.asList(omKeyCreateResponse,
         omBucketCreateResponse);
@@ -287,9 +277,9 @@ class TestOzoneManagerDoubleBuffer {
       notifyCounter.incrementAndGet();
       assertEquals(0, doubleBuffer.getCurrentBufferSize());
       assertEquals(0, doubleBuffer.getReadyBufferSize());
-      flushNotifier.notifyFlush();
-      return null;
+      return flushNotifier.notifyFlush();
     }).when(spyFlushNotifier).notifyFlush();
+    doAnswer(i -> flushNotifier.await()).when(spyFlushNotifier).await();
 
     // Init double buffer.
     for (OMClientResponse omClientResponse : omClientResponses) {
@@ -299,7 +289,7 @@ class TestOzoneManagerDoubleBuffer {
         doubleBuffer.getCurrentBufferSize());
 
     // Start double buffer and wait for flush.
-    Future<?> await = awaitFlush(executorService);
+    final Future<?> await = doubleBuffer.awaitFlushAsync();
     Future<Boolean> flusher = flushTransactions(executorService);
     await.get();
 
@@ -312,8 +302,7 @@ class TestOzoneManagerDoubleBuffer {
     assertEquals(0, doubleBuffer.getReadyBufferSize());
 
     // Run again to make sure it works when double buffer is empty
-    await = awaitFlush(executorService);
-    await.get();
+    doubleBuffer.awaitFlushAsync().get();
 
     // Clean up.
     flusher.cancel(false);
@@ -323,6 +312,10 @@ class TestOzoneManagerDoubleBuffer {
 
   @Test
   public void testS3SecretCacheSizePostDoubleBufferFlush() throws IOException {
+    final String userPrincipalId1 = "alice@EXAMPLE.COM";
+    final String userPrincipalId2 = "messi@EXAMPLE.COM";
+    final String userPrincipalId3 = "ronaldo@EXAMPLE.COM";
+
     // Create a secret for "alice".
     // This effectively makes alice an S3 admin.
     KerberosName.setRuleMechanism(DEFAULT_MECHANISM);
@@ -330,8 +323,7 @@ class TestOzoneManagerDoubleBuffer {
         "RULE:[2:$1@$0](.*@EXAMPLE.COM)s/@.*//\n" +
             "RULE:[1:$1@$0](.*@EXAMPLE.COM)s/@.*//\n" +
             "DEFAULT");
-    UserGroupInformation ugiAlice;
-    ugiAlice = UserGroupInformation.createRemoteUser(userPrincipalId1);
+    final UserGroupInformation ugiAlice = UserGroupInformation.createRemoteUser(userPrincipalId1);
     UserGroupInformation.createRemoteUser(userPrincipalId2);
     UserGroupInformation.createRemoteUser(userPrincipalId3);
     assertEquals("alice", ugiAlice.getShortUserName());
@@ -343,9 +335,9 @@ class TestOzoneManagerDoubleBuffer {
       doubleBuffer.stopDaemon();
 
       // Create 3 secrets and store them in the cache and double buffer.
-      processSuccessSecretRequest(userPrincipalId1, 1, true);
-      processSuccessSecretRequest(userPrincipalId2, 2, true);
-      processSuccessSecretRequest(userPrincipalId3, 3, true);
+      processSuccessSecretRequest(userPrincipalId1, 1);
+      processSuccessSecretRequest(userPrincipalId2, 2);
+      processSuccessSecretRequest(userPrincipalId3, 3);
 
       S3SecretCache cache = secretManager.cache();
       // Check if all the three secrets are cached.
@@ -362,8 +354,7 @@ class TestOzoneManagerDoubleBuffer {
       assertNull(cache.get(userPrincipalId1));
     } finally {
       // cleanup metrics
-      OzoneManagerDoubleBufferMetrics metrics =
-          doubleBuffer.getOzoneManagerDoubleBufferMetrics();
+      final OzoneManagerDoubleBufferMetrics metrics = doubleBuffer.getMetrics();
       metrics.setMaxNumberOfTransactionsFlushedInOneIteration(0);
       metrics.setAvgFlushTransactionsInOneIteration(0);
       metrics.incrTotalSizeOfFlushedTransactions(
@@ -373,10 +364,7 @@ class TestOzoneManagerDoubleBuffer {
     }
   }
 
-  private void processSuccessSecretRequest(
-      String userPrincipalId,
-      int txLogIndex,
-      boolean shouldHaveResponse) throws IOException {
+  private void processSuccessSecretRequest(String userPrincipalId, int txLogIndex) throws IOException {
     S3GetSecretRequest s3GetSecretRequest =
         new S3GetSecretRequest(
             new S3GetSecretRequest(
@@ -404,14 +392,6 @@ class TestOzoneManagerDoubleBuffer {
         ).build();
   }
 
-  // Return a future that waits for the flush.
-  private Future<Boolean> awaitFlush(ExecutorService executorService) {
-    return executorService.submit(() -> {
-      doubleBuffer.awaitFlush();
-      return true;
-    });
-  }
-
   private Future<Boolean> flushTransactions(ExecutorService executorService) {
     return executorService.submit(() -> {
       doubleBuffer.resume();
@@ -433,12 +413,11 @@ class TestOzoneManagerDoubleBuffer {
 
     // Confirm nothing waiting yet.
     assertEquals(0, fn.notifyFlush());
-    ExecutorService executorService = Executors.newCachedThreadPool();
     List<Future<Boolean>> tasks = new ArrayList<>();
 
     // Simulate 3 waiting.
     for (int i = 0; i < 3; i++) {
-      tasks.add(waitFN(fn, executorService));
+      tasks.add(waitFN(fn));
     }
     Thread.sleep(2000);
 
@@ -449,7 +428,7 @@ class TestOzoneManagerDoubleBuffer {
     assertEquals(3, fn.notifyFlush());
 
     // Add a fourth.
-    tasks.add(waitFN(fn, executorService));
+    tasks.add(waitFN(fn));
     Thread.sleep(2000);
     assertEquals(4, fn.notifyFlush());
 
@@ -467,15 +446,7 @@ class TestOzoneManagerDoubleBuffer {
 
   }
 
-  // Have a thread wait until notified.
-  private Future<Boolean> waitFN(OzoneManagerDoubleBuffer.FlushNotifier fn,
-      ExecutorService executorService) {
-    return executorService.submit(() -> {
-      try {
-        fn.await();
-      } catch (InterruptedException e) {
-      }
-      return true;
-    });
+  private static Future<Boolean> waitFN(OzoneManagerDoubleBuffer.FlushNotifier fn) {
+    return fn.await().thenApply(n -> true);
   }
 }

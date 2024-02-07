@@ -46,9 +46,11 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -143,12 +145,12 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
     byte[] data1 =
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
             .getBytes(UTF_8);
-    Assertions.assertTrue(key.getOutputStream() instanceof KeyOutputStream);
-    KeyOutputStream keyOutputStream = (KeyOutputStream) key.getOutputStream();
+    KeyOutputStream keyOutputStream =
+        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
     long containerID =
         keyOutputStream.getStreamEntries().get(0).
             getBlockID().getContainerID();
-    Assertions.assertEquals(1, keyOutputStream.getStreamEntries().size());
+    assertEquals(1, keyOutputStream.getStreamEntries().size());
     ContainerInfo container =
         cluster.getStorageContainerManager().getContainerManager()
             .getContainer(ContainerID.valueOf(containerID));
@@ -163,17 +165,16 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
     key.write(data1);
     OutputStream stream = keyOutputStream.getStreamEntries().get(0)
         .getOutputStream();
-    Assertions.assertTrue(stream instanceof BlockOutputStream);
-    BlockOutputStream blockOutputStream = (BlockOutputStream) stream;
+    BlockOutputStream blockOutputStream = assertInstanceOf(BlockOutputStream.class, stream);
     TestHelper.waitForPipelineClose(key, cluster, false);
     key.flush();
-    Assertions.assertTrue(HddsClientUtils.checkForException(blockOutputStream
-        .getIoException()) instanceof GroupMismatchException);
-    Assertions.assertTrue(keyOutputStream.getExcludeList().getPipelineIds()
-        .contains(pipeline.getId()));
-    Assertions.assertEquals(2, keyOutputStream.getStreamEntries().size());
+    assertInstanceOf(GroupMismatchException.class,
+        HddsClientUtils.checkForException(blockOutputStream.getIoException()));
+    assertThat(keyOutputStream.getExcludeList().getPipelineIds())
+        .contains(pipeline.getId());
+    assertEquals(2, keyOutputStream.getStreamEntries().size());
     key.close();
-    Assertions.assertEquals(0, keyOutputStream.getStreamEntries().size());
+    assertEquals(0, keyOutputStream.getStreamEntries().size());
     validateData(keyName, data1);
   }
 

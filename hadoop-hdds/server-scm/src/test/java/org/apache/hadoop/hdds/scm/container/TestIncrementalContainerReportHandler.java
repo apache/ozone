@@ -57,10 +57,8 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -87,6 +85,12 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.any;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.apache.hadoop.hdds.scm.container.TestContainerReportHandler.getContainerReportsProto;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 
@@ -114,16 +118,13 @@ public class TestIncrementalContainerReportHandler {
         GenericTestUtils.getTempPath(UUID.randomUUID().toString());
     Path scmPath = Paths.get(path, "scm-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
-    this.containerManager = Mockito.mock(ContainerManager.class);
+    this.containerManager = mock(ContainerManager.class);
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
     SCMStorageConfig storageConfig = new SCMStorageConfig(conf);
-    this.versionManager =
-        Mockito.mock(HDDSLayoutVersionManager.class);
-    Mockito.when(versionManager.getMetadataLayoutVersion())
-        .thenReturn(maxLayoutVersion());
-    Mockito.when(versionManager.getSoftwareLayoutVersion())
-        .thenReturn(maxLayoutVersion());
+    this.versionManager = mock(HDDSLayoutVersionManager.class);
+    when(versionManager.getMetadataLayoutVersion()).thenReturn(maxLayoutVersion());
+    when(versionManager.getSoftwareLayoutVersion()).thenReturn(maxLayoutVersion());
     this.nodeManager =
         new SCMNodeManager(conf, storageConfig, eventQueue, clusterMap,
             scmContext, versionManager);
@@ -147,48 +148,48 @@ public class TestIncrementalContainerReportHandler {
             Clock.system(ZoneId.systemDefault())))
         .build();
 
-    this.publisher = Mockito.mock(EventPublisher.class);
+    this.publisher = mock(EventPublisher.class);
 
-    Mockito.when(containerManager.getContainer(Mockito.any(ContainerID.class)))
+    when(containerManager.getContainer(any(ContainerID.class)))
         .thenAnswer(invocation -> containerStateManager
             .getContainer(((ContainerID)invocation
                 .getArguments()[0])));
 
-    Mockito.when(containerManager.getContainerReplicas(
-        Mockito.any(ContainerID.class)))
+    when(containerManager.getContainerReplicas(
+        any(ContainerID.class)))
         .thenAnswer(invocation -> containerStateManager
             .getContainerReplicas(((ContainerID)invocation
                 .getArguments()[0])));
 
-    Mockito.doAnswer(invocation -> {
+    doAnswer(invocation -> {
       containerStateManager
           .removeContainerReplica(((ContainerID)invocation
                   .getArguments()[0]),
               (ContainerReplica)invocation.getArguments()[1]);
       return null;
     }).when(containerManager).removeContainerReplica(
-        Mockito.any(ContainerID.class),
-        Mockito.any(ContainerReplica.class));
+        any(ContainerID.class),
+        any(ContainerReplica.class));
 
-    Mockito.doAnswer(invocation -> {
+    doAnswer(invocation -> {
       containerStateManager
           .updateContainerState(((ContainerID)invocation
                   .getArguments()[0]).getProtobuf(),
               (HddsProtos.LifeCycleEvent)invocation.getArguments()[1]);
       return null;
     }).when(containerManager).updateContainerState(
-        Mockito.any(ContainerID.class),
-        Mockito.any(HddsProtos.LifeCycleEvent.class));
+        any(ContainerID.class),
+        any(HddsProtos.LifeCycleEvent.class));
 
-    Mockito.doAnswer(invocation -> {
+    doAnswer(invocation -> {
       containerStateManager
           .updateContainerReplica(((ContainerID)invocation
                   .getArguments()[0]),
               (ContainerReplica) invocation.getArguments()[1]);
       return null;
     }).when(containerManager).updateContainerReplica(
-        Mockito.any(ContainerID.class),
-        Mockito.any(ContainerReplica.class));
+        any(ContainerID.class),
+        any(ContainerReplica.class));
 
   }
 
@@ -233,8 +234,7 @@ public class TestIncrementalContainerReportHandler {
         new IncrementalContainerReportFromDatanode(
             datanodeOne, containerReport);
     reportHandler.onMessage(icrFromDatanode, publisher);
-    Assertions.assertEquals(LifeCycleState.CLOSED,
-        containerManager.getContainer(container.containerID()).getState());
+    assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(container.containerID()).getState());
   }
 
   /**
@@ -253,20 +253,17 @@ public class TestIncrementalContainerReportHandler {
     createAndHandleICR(container.containerID(),
         ContainerReplicaProto.State.CLOSED, dns.get(1), 2);
     // index is 2; container shouldn't transition to CLOSED
-    Assertions.assertEquals(LifeCycleState.CLOSING,
-        containerManager.getContainer(container.containerID()).getState());
+    assertEquals(LifeCycleState.CLOSING, containerManager.getContainer(container.containerID()).getState());
 
     createAndHandleICR(container.containerID(),
         ContainerReplicaProto.State.CLOSED, dns.get(2), 3);
     // index is 3; container shouldn't transition to CLOSED
-    Assertions.assertEquals(LifeCycleState.CLOSING,
-        containerManager.getContainer(container.containerID()).getState());
+    assertEquals(LifeCycleState.CLOSING, containerManager.getContainer(container.containerID()).getState());
 
     createAndHandleICR(container.containerID(),
         ContainerReplicaProto.State.CLOSED, dns.get(0), 1);
     // index is 1; container should transition to CLOSED
-    Assertions.assertEquals(LifeCycleState.CLOSED,
-        containerManager.getContainer(container.containerID()).getState());
+    assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(container.containerID()).getState());
 
     // Test with an EC 6-3 container
     replicationConfig = new ECReplicationConfig(6, 3);
@@ -277,14 +274,12 @@ public class TestIncrementalContainerReportHandler {
     createAndHandleICR(container2.containerID(),
         ContainerReplicaProto.State.CLOSED, dns.get(5), 6);
     // index is 6, container shouldn't transition to CLOSED
-    Assertions.assertEquals(LifeCycleState.CLOSING,
-        containerManager.getContainer(container2.containerID()).getState());
+    assertEquals(LifeCycleState.CLOSING, containerManager.getContainer(container2.containerID()).getState());
 
     createAndHandleICR(container2.containerID(),
         ContainerReplicaProto.State.CLOSED, dns.get(8), 9);
     // index is 9, container should transition to CLOSED
-    Assertions.assertEquals(LifeCycleState.CLOSED,
-        containerManager.getContainer(container2.containerID()).getState());
+    assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(container2.containerID()).getState());
   }
 
   /**
@@ -324,8 +319,7 @@ public class TestIncrementalContainerReportHandler {
   private List<DatanodeDetails> setupECContainerForTesting(
       ContainerInfo container)
       throws IOException, TimeoutException, NodeNotFoundException {
-    Assertions.assertEquals(HddsProtos.ReplicationType.EC,
-        container.getReplicationType());
+    assertEquals(HddsProtos.ReplicationType.EC, container.getReplicationType());
     final int numDatanodes =
         container.getReplicationConfig().getRequiredNodes();
     // Register required number of datanodes with NodeManager
@@ -387,8 +381,7 @@ public class TestIncrementalContainerReportHandler {
         new IncrementalContainerReportFromDatanode(
             datanodeOne, containerReport);
     reportHandler.onMessage(icrFromDatanode, publisher);
-    Assertions.assertEquals(LifeCycleState.QUASI_CLOSED,
-        containerManager.getContainer(container.containerID()).getState());
+    assertEquals(LifeCycleState.QUASI_CLOSED, containerManager.getContainer(container.containerID()).getState());
   }
 
   @Test
@@ -424,8 +417,7 @@ public class TestIncrementalContainerReportHandler {
         new IncrementalContainerReportFromDatanode(
             datanodeOne, containerReport);
     reportHandler.onMessage(icr, publisher);
-    Assertions.assertEquals(LifeCycleState.CLOSED,
-        containerManager.getContainer(container.containerID()).getState());
+    assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(container.containerID()).getState());
   }
 
   @Test
@@ -465,8 +457,7 @@ public class TestIncrementalContainerReportHandler {
         new IncrementalContainerReportFromDatanode(
             datanodeThree, containerReport);
     reportHandler.onMessage(icr, publisher);
-    Assertions.assertEquals(LifeCycleState.CLOSING,
-        containerManager.getContainer(container.containerID()).getState());
+    assertEquals(LifeCycleState.CLOSING, containerManager.getContainer(container.containerID()).getState());
   }
 
   @Test
@@ -490,18 +481,15 @@ public class TestIncrementalContainerReportHandler {
     containerStateManager.addContainer(container.getProtobuf());
     containerReplicas.forEach(r -> {
       containerStateManager.updateContainerReplica(container.containerID(), r);
-      try {
-        nodeManager.addContainer(
-            r.getDatanodeDetails(), container.containerID());
-      } catch (NodeNotFoundException e) {
-        Assertions.fail("Node should be found");
-      }
+
+      assertDoesNotThrow(() -> nodeManager.addContainer(r.getDatanodeDetails(), container.containerID()),
+          "Node should be found");
     });
-    Assertions.assertEquals(3, containerStateManager
+    assertEquals(3, containerStateManager
         .getContainerReplicas(container.containerID()).size());
-    Assertions.assertEquals(1, nodeManager.getContainers(datanodeOne).size());
-    Assertions.assertEquals(1, nodeManager.getContainers(datanodeTwo).size());
-    Assertions.assertEquals(1, nodeManager.getContainers(datanodeThree)
+    assertEquals(1, nodeManager.getContainers(datanodeOne).size());
+    assertEquals(1, nodeManager.getContainers(datanodeTwo).size());
+    assertEquals(1, nodeManager.getContainers(datanodeThree)
         .size());
     final IncrementalContainerReportProto containerReport =
         getIncrementalContainerReportProto(container.containerID(),
@@ -511,11 +499,11 @@ public class TestIncrementalContainerReportHandler {
         new IncrementalContainerReportFromDatanode(
             datanodeOne, containerReport);
     reportHandler.onMessage(icr, publisher);
-    Assertions.assertEquals(2, containerStateManager
+    assertEquals(2, containerStateManager
         .getContainerReplicas(container.containerID()).size());
-    Assertions.assertEquals(0, nodeManager.getContainers(datanodeOne).size());
-    Assertions.assertEquals(1, nodeManager.getContainers(datanodeTwo).size());
-    Assertions.assertEquals(1, nodeManager.getContainers(datanodeThree)
+    assertEquals(0, nodeManager.getContainers(datanodeOne).size());
+    assertEquals(1, nodeManager.getContainers(datanodeTwo).size());
+    assertEquals(1, nodeManager.getContainers(datanodeThree)
         .size());
   }
 
@@ -538,7 +526,7 @@ public class TestIncrementalContainerReportHandler {
     containerStateManager.addContainer(container.getProtobuf());
     containerStateManager.addContainer(containerTwo.getProtobuf());
 
-    Assertions.assertEquals(0, nodeManager.getContainers(datanode).size());
+    assertEquals(0, nodeManager.getContainers(datanode).size());
 
     final IncrementalContainerReportProto containerReport =
         getIncrementalContainerReportProto(container.containerID(),
@@ -573,21 +561,21 @@ public class TestIncrementalContainerReportHandler {
         if (nmContainers.contains(container.containerID())) {
           // If we find "container" in the NM, then we must also have it in
           // Container Manager.
-          Assertions.assertEquals(1, containerStateManager
+          assertEquals(1, containerStateManager
               .getContainerReplicas(container.containerID())
               .size());
-          Assertions.assertEquals(2, nmContainers.size());
+          assertEquals(2, nmContainers.size());
         } else {
           // If the race condition occurs as mentioned in HDDS-5249, then this
           // assert should fail. We will have found nothing for "container" in
           // NM, but have found something for it in ContainerManager, and that
           // should not happen. It should be in both, or neither.
-          Assertions.assertEquals(0, containerStateManager
+          assertEquals(0, containerStateManager
               .getContainerReplicas(container.containerID())
               .size());
-          Assertions.assertEquals(1, nmContainers.size());
+          assertEquals(1, nmContainers.size());
         }
-        Assertions.assertEquals(1, containerStateManager
+        assertEquals(1, containerStateManager
             .getContainerReplicas(containerTwo.containerID())
             .size());
       }
@@ -653,10 +641,9 @@ public class TestIncrementalContainerReportHandler {
             new IncrementalContainerReportHandler(nodeManager,
                     containerManager, scmContext);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
-    Assertions.assertEquals(containerStateManager
-            .getContainerReplicas(container.containerID()).stream()
-            .collect(Collectors.toMap(ContainerReplica::getDatanodeDetails,
-                    ContainerReplica::getReplicaIndex)), expectedReplicaMap);
+    assertEquals(containerStateManager.getContainerReplicas(container.containerID()).stream()
+        .collect(Collectors.toMap(ContainerReplica::getDatanodeDetails,
+            ContainerReplica::getReplicaIndex)), expectedReplicaMap);
 
   }
 

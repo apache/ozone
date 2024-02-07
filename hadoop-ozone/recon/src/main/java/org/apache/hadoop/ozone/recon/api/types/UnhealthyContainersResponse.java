@@ -61,6 +61,10 @@ public class UnhealthyContainersResponse {
     this.containers = containers;
   }
 
+  // Default constructor, used by jackson lib for object deserialization.
+  public UnhealthyContainersResponse() {
+  }
+
   public void setSummaryCount(String state, long count) {
     if (state.equals(UnHealthyContainerStates.MISSING.toString())) {
       this.missingCount = count;

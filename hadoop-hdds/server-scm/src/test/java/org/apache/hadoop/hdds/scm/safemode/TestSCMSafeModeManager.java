@@ -25,10 +25,13 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -64,13 +67,13 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.mockito.Mockito;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 
 /** Test class for SCMSafeModeManager.
  */
@@ -135,6 +138,7 @@ public class TestSCMSafeModeManager {
         serviceManager, scmContext);
 
     assertTrue(scmSafeModeManager.getInSafeMode());
+    validateRuleStatus("DatanodeSafeModeRule", "registered datanodes 0");
     queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT,
         HddsTestUtils.createNodeRegistrationContainerReport(containers));
 
@@ -176,7 +180,8 @@ public class TestSCMSafeModeManager {
         .getNumContainerWithOneReplicaReportedThreshold().value());
 
     assertTrue(scmSafeModeManager.getInSafeMode());
-
+    validateRuleStatus("ContainerSafeModeRule",
+        "% of containers with at least one reported");
     testContainerThreshold(containers.subList(0, 25), 0.25);
     assertEquals(25, scmSafeModeManager.getSafeModeMetrics()
         .getCurrentContainersWithOneReplicaReportedCount().value());
@@ -316,6 +321,13 @@ public class TestSCMSafeModeManager {
         scmContext);
 
     assertTrue(scmSafeModeManager.getInSafeMode());
+    if (healthyPipelinePercent > 0) {
+      validateRuleStatus("HealthyPipelineSafeModeRule",
+          "healthy Ratis/THREE pipelines");
+    }
+    validateRuleStatus("OneReplicaPipelineSafeModeRule",
+        "reported Ratis/THREE pipelines with at least one datanode");
+
     testContainerThreshold(containers, 1.0);
 
     List<Pipeline> pipelines = pipelineManager.getPipelines();
@@ -374,6 +386,22 @@ public class TestSCMSafeModeManager {
         100, 1000 * 5);
   }
 
+  /**
+   * @param safeModeRule verify that this rule is not satisfied
+   * @param stringToMatch string to match in the rule status.
+   */
+  private void validateRuleStatus(String safeModeRule, String stringToMatch) {
+    Set<Map.Entry<String, Pair<Boolean, String>>> ruleStatuses =
+        scmSafeModeManager.getRuleStatus().entrySet();
+    for (Map.Entry<String, Pair<Boolean, String>> entry : ruleStatuses) {
+      if (entry.getKey().equals(safeModeRule)) {
+        Pair<Boolean, String> value = entry.getValue();
+        assertEquals(false, value.getLeft());
+        assertThat(value.getRight()).contains(stringToMatch);
+      }
+    }
+  }
+
   private void checkHealthy(int expectedCount) throws Exception {
     GenericTestUtils.waitFor(() -> scmSafeModeManager
             .getHealthyPipelineSafeModeRule()
@@ -421,7 +449,7 @@ public class TestSCMSafeModeManager {
   public void testDisableSafeMode() {
     OzoneConfiguration conf = new OzoneConfiguration(config);
     conf.setBoolean(HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED, false);
-    PipelineManager pipelineManager = Mockito.mock(PipelineManager.class);
+    PipelineManager pipelineManager = mock(PipelineManager.class);
     scmSafeModeManager = new SCMSafeModeManager(
         conf, containers, null, pipelineManager, queue, serviceManager,
         scmContext);

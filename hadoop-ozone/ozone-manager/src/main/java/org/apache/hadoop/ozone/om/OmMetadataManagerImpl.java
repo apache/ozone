@@ -86,6 +86,7 @@ import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
 import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
@@ -318,6 +319,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       new HashMap<>();
   private SnapshotChainManager snapshotChainManager;
   private final OMPerformanceMetrics perfMetrics;
+  private final S3Batcher s3Batcher = new S3SecretBatcher();
 
   /**
    * OmMetadataManagerImpl constructor.
@@ -885,6 +887,20 @@ private void init(OzoneConfiguration conf,
     return OmMultipartUpload.getDbKey(volume, bucket, key, uploadId);
   }
 
+  @Override
+  public String getMultipartKeyFSO(String volume, String bucket, String key, String uploadId) throws IOException {
+    final long volumeId = getVolumeId(volume);
+    final long bucketId = getBucketId(volume,
+            bucket);
+    long parentId =
+            OMFileRequest.getParentID(volumeId, bucketId, key, this);
+
+    String fileName = OzoneFSUtils.getFileName(key);
+
+    return getMultipartKey(volumeId, bucketId, parentId,
+            fileName, uploadId);
+  }
+
   /**
    * Returns the OzoneManagerLock used on Metadata DB.
    *
@@ -1054,10 +1070,13 @@ private void init(OzoneConfiguration conf,
    */
   private <T> boolean isKeyPresentInTable(String keyPrefix,
                                           Table<String, T> table)
-      throws IOException {
+          throws IOException {
     try (TableIterator<String, ? extends KeyValue<String, T>>
-             keyIter = table.iterator()) {
-      KeyValue<String, T> kv = keyIter.seek(keyPrefix);
+                 keyIter = table.iterator(keyPrefix)) {
+      KeyValue<String, T> kv = null;
+      if (keyIter.hasNext()) {
+        kv = keyIter.next();
+      }
 
       // Iterate through all the entries in the table which start with
       // the current bucket's prefix.
@@ -1404,8 +1423,8 @@ private void init(OzoneConfiguration conf,
             bucketName, snapshotInfoTable)) {
       try {
         while (snapshotIterator.hasNext() && maxListResult > 0) {
-          SnapshotInfo snapshotInfo = (SnapshotInfo) snapshotIterator.next()
-              .getValue();
+          SnapshotInfo snapshotInfo =
+              (SnapshotInfo) snapshotIterator.next().getValue();
           if (!snapshotInfo.getName().equals(prevSnapshot)) {
             snapshotInfos.add(snapshotInfo);
             maxListResult--;
@@ -1972,25 +1991,7 @@ private void init(OzoneConfiguration conf,
 
   @Override
   public S3Batcher batcher() {
-    return new S3Batcher() {
-      @Override
-      public void addWithBatch(AutoCloseable batchOperator,
-                               String id, S3SecretValue s3SecretValue)
-          throws IOException {
-        if (batchOperator instanceof BatchOperation) {
-          s3SecretTable.putWithBatch((BatchOperation) batchOperator,
-              id, s3SecretValue);
-        }
-      }
-
-      @Override
-      public void deleteWithBatch(AutoCloseable batchOperator, String id)
-          throws IOException {
-        if (batchOperator instanceof BatchOperation) {
-          s3SecretTable.deleteWithBatch((BatchOperation) batchOperator, id);
-        }
-      }
-    };
+    return s3Batcher;
   }
 
   @Override
@@ -2201,5 +2202,24 @@ private void init(OzoneConfiguration conf,
     }
 
     return false;
+  }
+
+  private final class S3SecretBatcher implements S3Batcher {
+    @Override
+    public void addWithBatch(AutoCloseable batchOperator, String id, S3SecretValue s3SecretValue)
+        throws IOException {
+      if (batchOperator instanceof BatchOperation) {
+        s3SecretTable.putWithBatch((BatchOperation) batchOperator,
+            id, s3SecretValue);
+      }
+    }
+
+    @Override
+    public void deleteWithBatch(AutoCloseable batchOperator, String id)
+        throws IOException {
+      if (batchOperator instanceof BatchOperation) {
+        s3SecretTable.deleteWithBatch((BatchOperation) batchOperator, id);
+      }
+    }
   }
 }

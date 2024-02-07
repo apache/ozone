@@ -30,9 +30,10 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
+import org.junit.jupiter.api.Test;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import org.junit.jupiter.api.Test;
 
 /**
  * Asserts that allocation strategy works as expected.
@@ -73,8 +74,7 @@ public class TestContainerPlacement {
     DescriptiveStatistics beforeRandom = computeStatistics(nodeManagerRandom);
 
     //Assert that our initial layout of clusters are similar.
-    assertEquals(beforeCapacity.getStandardDeviation(), beforeRandom
-        .getStandardDeviation(), 0.001);
+    assertEquals(beforeCapacity.getStandardDeviation(), beforeRandom.getStandardDeviation(), 0.001);
 
     SCMContainerPlacementCapacity capacityPlacer = new
         SCMContainerPlacementCapacity(nodeManagerCapacity,

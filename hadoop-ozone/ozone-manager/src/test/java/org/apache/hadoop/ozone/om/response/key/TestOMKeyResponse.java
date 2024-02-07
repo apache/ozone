@@ -34,7 +34,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
@@ -111,19 +111,19 @@ public class TestOMKeyResponse {
             CacheValue.get(1, omBucketInfo));
   }
 
-  @NotNull
+  @Nonnull
   protected String getOpenKeyName()  throws IOException {
     return omMetadataManager.getOpenKey(volumeName, bucketName, keyName,
             clientID);
   }
 
-  @NotNull
+  @Nonnull
   protected OmKeyInfo getOmKeyInfo() {
     return OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
             replicationType, replicationFactor);
   }
 
-  @NotNull
+  @Nonnull
   protected OzoneConfiguration getOzoneConfiguration() {
     return new OzoneConfiguration();
   }

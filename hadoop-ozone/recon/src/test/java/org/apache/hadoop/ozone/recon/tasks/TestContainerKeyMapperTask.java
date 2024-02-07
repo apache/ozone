@@ -26,8 +26,8 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestRe
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeDataToOm;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -106,11 +106,11 @@ public class TestContainerKeyMapperTask {
 
     Map<ContainerKeyPrefix, Integer> keyPrefixesForContainer =
         reconContainerMetadataManager.getKeyPrefixesForContainer(1);
-    assertTrue(keyPrefixesForContainer.isEmpty());
+    assertThat(keyPrefixesForContainer).isEmpty();
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(2);
-    assertTrue(keyPrefixesForContainer.isEmpty());
+    assertThat(keyPrefixesForContainer).isEmpty();
 
     Pipeline pipeline = getRandomPipeline();
 
@@ -172,12 +172,12 @@ public class TestContainerKeyMapperTask {
     // Make sure the key prefixes are empty for container 1
     Map<ContainerKeyPrefix, Integer> keyPrefixesForContainer =
         reconContainerMetadataManager.getKeyPrefixesForContainer(1L);
-    assertTrue(keyPrefixesForContainer.isEmpty());
+    assertThat(keyPrefixesForContainer).isEmpty();
 
     // Make sure the key prefixes are empty for container 2
     keyPrefixesForContainer =
         reconContainerMetadataManager.getKeyPrefixesForContainer(2L);
-    assertTrue(keyPrefixesForContainer.isEmpty());
+    assertThat(keyPrefixesForContainer).isEmpty();
 
     // Create a random pipeline and a list of OmKeyLocationInfo objects
     Pipeline pipeline = getRandomPipeline();
@@ -246,11 +246,11 @@ public class TestContainerKeyMapperTask {
   public void testKeyTableProcess() throws IOException {
     Map<ContainerKeyPrefix, Integer> keyPrefixesForContainer =
         reconContainerMetadataManager.getKeyPrefixesForContainer(1);
-    assertTrue(keyPrefixesForContainer.isEmpty());
+    assertThat(keyPrefixesForContainer).isEmpty();
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(2);
-    assertTrue(keyPrefixesForContainer.isEmpty());
+    assertThat(keyPrefixesForContainer).isEmpty();
 
     Pipeline pipeline = getRandomPipeline();
 
@@ -328,7 +328,7 @@ public class TestContainerKeyMapperTask {
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(2);
-    assertTrue(keyPrefixesForContainer.isEmpty());
+    assertThat(keyPrefixesForContainer).isEmpty();
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(3);
@@ -351,7 +351,7 @@ public class TestContainerKeyMapperTask {
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(3);
-    assertTrue(keyPrefixesForContainer.isEmpty());
+    assertThat(keyPrefixesForContainer).isEmpty();
 
     assertEquals(1, reconContainerMetadataManager.getKeyCountForContainer(1L));
     assertEquals(1, reconContainerMetadataManager.getKeyCountForContainer(2L));
@@ -366,11 +366,11 @@ public class TestContainerKeyMapperTask {
     // Verify that keyPrefixesForContainer is empty for container 1 and 2
     Map<ContainerKeyPrefix, Integer> keyPrefixesForContainer =
         reconContainerMetadataManager.getKeyPrefixesForContainer(1);
-    assertTrue(keyPrefixesForContainer.isEmpty());
+    assertThat(keyPrefixesForContainer).isEmpty();
 
     keyPrefixesForContainer = reconContainerMetadataManager
         .getKeyPrefixesForContainer(2);
-    assertTrue(keyPrefixesForContainer.isEmpty());
+    assertThat(keyPrefixesForContainer).isEmpty();
 
     // Create a random pipeline and a list of OmKeyLocationInfo objects
     Pipeline pipeline = getRandomPipeline();

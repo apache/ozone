@@ -98,8 +98,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.anyList;
+import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
@@ -193,8 +193,8 @@ public class TestKeyValueContainer {
     String chunksPath = keyValueContainerData.getChunksPath();
 
     // Check whether containerMetaDataPath and chunksPath exists or not.
-    assertTrue(containerMetaDataPath != null);
-    assertTrue(chunksPath != null);
+    assertNotNull(containerMetaDataPath);
+    assertNotNull(chunksPath);
     // Check whether container file and container db file exists or not.
     assertTrue(keyValueContainer.getContainerFile().exists(),
         ".Container File does not exist");

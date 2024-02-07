@@ -24,12 +24,10 @@ import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 
-import org.apache.ozone.test.UnhealthyTest;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.experimental.categories.Category;
 import org.junit.jupiter.api.Timeout;
 
 import java.util.Optional;
@@ -71,7 +69,7 @@ public class TestContainerBalancerOperations {
    * @throws Exception
    */
   @Test
-  @Category(UnhealthyTest.class) @Unhealthy("Since the cluster doesn't have " +
+  @Unhealthy("Since the cluster doesn't have " +
       "unbalanced nodes, ContainerBalancer stops before the assertion checks " +
       "whether balancer is running.")
   public void testContainerBalancerCLIOperations() throws Exception {

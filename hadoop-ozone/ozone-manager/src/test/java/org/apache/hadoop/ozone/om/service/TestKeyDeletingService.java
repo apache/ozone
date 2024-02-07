@@ -669,7 +669,6 @@ t
              iterator = snapshotInfoTable.iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> snapshotEntry = iterator.next();
-        System.out.println(snapshotEntry.getValue());
         String snapshotName = snapshotEntry.getValue().getName();
         assertEquals(expectedSize.get(snapshotName),
             snapshotEntry.getValue().
