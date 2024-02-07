@@ -139,6 +139,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private CertificateClient caClient;
   private final Set<AutoCloseable> clients = ConcurrentHashMap.newKeySet();
   private SecretKeyClient secretKeyClient;
+  private static MockedStatic mockDNStatic = Mockito.mockStatic(HddsDatanodeService.class);
 
   /**
    * Creates a new MiniOzoneCluster with Recon.
@@ -402,6 +403,11 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         return true;
       }
     }, 1000, waitForClusterToBeReadyTimeout);
+  }
+
+  private static void overrideDatanodeVersions(int dnInitialVersion, int dnCurrentVersion) {
+    mockDNStatic.when(HddsDatanodeService::getDefaultInitialVersion).thenReturn(dnInitialVersion);
+    mockDNStatic.when(HddsDatanodeService::getDefaultCurrentVersion).thenReturn(dnCurrentVersion);
   }
 
   @Override
@@ -847,10 +853,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, scmAddress);
       List<HddsDatanodeService> hddsDatanodes = new ArrayList<>();
 
-      // Override default datanode initial and current version
-      MockedStatic mocked = Mockito.mockStatic(HddsDatanodeService.class);
-      mocked.when(HddsDatanodeService::getDefaultInitialVersion).thenReturn(dnInitialVersion);
-      mocked.when(HddsDatanodeService::getDefaultCurrentVersion).thenReturn(dnCurrentVersion);
+      // Override default datanode initial and current version if necessary
+      overrideDatanodeVersions(dnInitialVersion, dnCurrentVersion);
 
       for (int i = 0; i < numOfDatanodes; i++) {
         OzoneConfiguration dnConf = new OzoneConfiguration(conf);
