@@ -23,14 +23,15 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 
-import static org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory.Conf.configKeyForClassName;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
+
+import static org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory.Conf.configKeyForClassName;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import org.slf4j.LoggerFactory;
 
 /**
  * Tests for {@link SpaceUsageCheckFactory}.
@@ -101,9 +102,7 @@ public class TestSpaceUsageFactory {
   }
 
   private void assertLogged(String substring) {
-    String output = capturer.getOutput();
-    assertTrue(output.contains(substring), () -> "Expected " + substring + " " +
-        "in log output, but only got: " + output);
+    assertThat(capturer.getOutput()).contains(substring);
   }
 
   private static <T extends SpaceUsageCheckFactory> OzoneConfiguration

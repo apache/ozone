@@ -52,6 +52,10 @@ public class ReportSubcommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     ReplicationManagerReport report = scmClient.getReplicationManagerReport();
+    if (report.getReportTimeStamp() == 0) {
+      System.err.println("The Container Report is not available until Replication Manager completes" +
+          " its first run after startup or fail over. All values will be zero until that time.\n");
+    }
 
     if (json) {
       output(JsonUtils.toJsonStringWithDefaultPrettyPrinter(report));
@@ -68,9 +72,11 @@ public class ReportSubcommand extends ScmSubcommand {
   }
 
   private void outputHeader(long epochMs) {
+    if (epochMs == 0) {
+      epochMs = Instant.now().toEpochMilli();
+    }
     Instant reportTime = Instant.ofEpochSecond(epochMs / 1000);
     outputHeading("Container Summary Report generated at " + reportTime);
-
   }
 
   private void outputContainerStats(ReplicationManagerReport report) {

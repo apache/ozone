@@ -18,12 +18,13 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import java.io.IOException;
 import java.util.UUID;
 
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -64,8 +65,7 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
         getS3InitiateMultipartUploadReq(initiateMPURequest);
 
     OMClientResponse omClientResponse =
-        s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager,
-            1L, ozoneManagerDoubleBufferHelper);
+        s3InitiateMultipartUploadRequest.validateAndUpdateCache(ozoneManager, 1L);
 
     String multipartUploadID = omClientResponse.getOMResponse()
         .getInitiateMultiPartUploadResponse().getMultipartUploadID();
@@ -78,8 +78,7 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
         getS3MultipartUploadAbortReq(abortMPURequest);
 
     omClientResponse =
-        s3MultipartUploadAbortRequest.validateAndUpdateCache(ozoneManager, 2L,
-            ozoneManagerDoubleBufferHelper);
+        s3MultipartUploadAbortRequest.validateAndUpdateCache(ozoneManager, 2L);
 
     String multipartKey = omMetadataManager.getMultipartKey(volumeName,
         bucketName, keyName, multipartUploadID);
@@ -88,11 +87,10 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
         keyName, multipartUploadID);
 
     // Check table and response.
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omClientResponse.getOMResponse().getStatus());
-    Assert.assertNull(
-        omMetadataManager.getMultipartInfoTable().get(multipartKey));
-    Assert.assertNull(omMetadataManager
+    assertNull(omMetadataManager.getMultipartInfoTable().get(multipartKey));
+    assertNull(omMetadataManager
         .getOpenKeyTable(s3MultipartUploadAbortRequest.getBucketLayout())
         .get(multipartOpenKey));
 
@@ -117,11 +115,10 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
         getS3MultipartUploadAbortReq(abortMPURequest);
 
     OMClientResponse omClientResponse =
-        s3MultipartUploadAbortRequest.validateAndUpdateCache(ozoneManager, 2L,
-            ozoneManagerDoubleBufferHelper);
+        s3MultipartUploadAbortRequest.validateAndUpdateCache(ozoneManager, 2L);
 
     // Check table and response.
-    Assert.assertEquals(
+    assertEquals(
         OzoneManagerProtocolProtos.Status.NO_SUCH_MULTIPART_UPLOAD_ERROR,
         omClientResponse.getOMResponse().getStatus());
 
@@ -145,11 +142,10 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
         new S3MultipartUploadAbortRequest(abortMPURequest);
 
     OMClientResponse omClientResponse =
-        s3MultipartUploadAbortRequest.validateAndUpdateCache(ozoneManager, 2L,
-            ozoneManagerDoubleBufferHelper);
+        s3MultipartUploadAbortRequest.validateAndUpdateCache(ozoneManager, 2L);
 
     // Check table and response.
-    Assert.assertEquals(
+    assertEquals(
         OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
 
@@ -174,11 +170,10 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
         new S3MultipartUploadAbortRequest(abortMPURequest);
 
     OMClientResponse omClientResponse =
-        s3MultipartUploadAbortRequest.validateAndUpdateCache(ozoneManager, 2L,
-            ozoneManagerDoubleBufferHelper);
+        s3MultipartUploadAbortRequest.validateAndUpdateCache(ozoneManager, 2L);
 
     // Check table and response.
-    Assert.assertEquals(
+    assertEquals(
         OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
         omClientResponse.getOMResponse().getStatus());
 

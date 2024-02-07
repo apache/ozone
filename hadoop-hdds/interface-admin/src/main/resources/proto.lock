@@ -171,6 +171,22 @@
               {
                 "name": "ResetDeletedBlockRetryCount",
                 "integer": 36
+              },
+              {
+                "name": "GetClosedContainerCount",
+                "integer": 37
+              },
+              {
+                "name": "TransferLeadership",
+                "integer": 38
+              },
+              {
+                "name": "GetFailedDeletedBlocksTransaction",
+                "integer": 39
+              },
+              {
+                "name": "DecommissionScm",
+                "integer": 40
               }
             ]
           },
@@ -192,6 +208,23 @@
               {
                 "name": "scmNotLeader",
                 "integer": 4
+              }
+            ]
+          },
+          {
+            "name": "SCMCloseContainerResponseProto.Status",
+            "enum_fields": [
+              {
+                "name": "OK",
+                "integer": 1
+              },
+              {
+                "name": "CONTAINER_ALREADY_CLOSED",
+                "integer": 2
+              },
+              {
+                "name": "CONTAINER_ALREADY_CLOSING",
+                "integer": 3
               }
             ]
           },
@@ -445,6 +478,24 @@
                 "id": 41,
                 "name": "resetDeletedBlockRetryCountRequest",
                 "type": "ResetDeletedBlockRetryCountRequestProto",
+                "optional": true
+              },
+              {
+                "id": 42,
+                "name": "transferScmLeadershipRequest",
+                "type": "TransferLeadershipRequestProto",
+                "optional": true
+              },
+              {
+                "id": 43,
+                "name": "getFailedDeletedBlocksTxnRequest",
+                "type": "GetFailedDeletedBlocksTxnRequestProto",
+                "optional": true
+              },
+              {
+                "id": 44,
+                "name": "decommissionScmRequest",
+                "type": "DecommissionScmRequestProto",
                 "optional": true
               }
             ]
@@ -702,6 +753,24 @@
                 "id": 41,
                 "name": "resetDeletedBlockRetryCountResponse",
                 "type": "ResetDeletedBlockRetryCountResponseProto",
+                "optional": true
+              },
+              {
+                "id": 42,
+                "name": "transferScmLeadershipResponse",
+                "type": "TransferLeadershipResponseProto",
+                "optional": true
+              },
+              {
+                "id": 43,
+                "name": "getFailedDeletedBlocksTxnResponse",
+                "type": "GetFailedDeletedBlocksTxnResponseProto",
+                "optional": true
+              },
+              {
+                "id": 44,
+                "name": "decommissionScmResponse",
+                "type": "DecommissionScmResponseProto",
                 "optional": true
               }
             ]
@@ -1031,7 +1100,15 @@
             ]
           },
           {
-            "name": "SCMCloseContainerResponseProto"
+            "name": "SCMCloseContainerResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "status",
+                "type": "Status",
+                "optional": true
+              }
+            ]
           },
           {
             "name": "NodeQueryRequestProto",
@@ -1507,6 +1584,40 @@
             ]
           },
           {
+            "name": "GetFailedDeletedBlocksTxnRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "traceID",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "count",
+                "type": "int32",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "startTxId",
+                "type": "int64",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "GetFailedDeletedBlocksTxnResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "deletedBlocksTransactions",
+                "type": "DeletedBlocksTransactionInfo",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
             "name": "ResetDeletedBlockRetryCountRequestProto",
             "fields": [
               {
@@ -1615,7 +1726,19 @@
                 "id": 4,
                 "name": "certSerialId",
                 "type": "string",
-                "required": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
+              },
+              {
+                "id": 5,
+                "name": "secretKeyId",
+                "type": "UUID",
+                "optional": true
               }
             ]
           },
@@ -1762,6 +1885,34 @@
                 "name": "isRunning",
                 "type": "bool",
                 "required": true
+              }
+            ]
+          },
+          {
+            "name": "DecommissionScmRequestProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "scmId",
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "DecommissionScmResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "success",
+                "type": "bool",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "errorMsg",
+                "type": "string",
+                "optional": true
               }
             ]
           }

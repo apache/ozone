@@ -17,8 +17,10 @@
  */
 package org.apache.hadoop.ozone.container.replication;
 
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerResponse;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -67,6 +69,15 @@ class SendContainerRequestHandler
           req.getContainerID(), req.getOffset(), length);
 
       assertSame(nextOffset, req.getOffset(), "offset");
+
+      // check and avoid download of container file if target already have
+      // container data and import in progress
+      if (!importer.isAllowedContainerImport(req.getContainerID())) {
+        containerId = req.getContainerID();
+        throw new StorageContainerException("Container exists or " +
+            "import in progress with container Id " + req.getContainerID(),
+            ContainerProtos.Result.CONTAINER_EXISTS);
+      }
 
       if (containerId == -1) {
         containerId = req.getContainerID();

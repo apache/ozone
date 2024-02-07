@@ -18,18 +18,16 @@
  */
 
 /**
- * RocksDB is deprecating the RocksObject's finalizer that cleans up native
- * resources. In fact, the finalizer is removed in the new version of RocksDB
- * as per https://github.com/facebook/rocksdb/commit/99d86252b. That poses a
+ * RocksDB has deprecated the RocksObject's finalizer that cleans up native
+ * resources, see https://github.com/facebook/rocksdb/commit/99d86252b. That poses a
  * requirement for RocksDb's applications to explicitly close RocksObject
  * instances themselves to avoid leaking native resources. The general approach
  * is to close RocksObjects with try-with-resource statement.
  * Yet, this is not always an easy option in Ozone we need a mechanism to
  * manage and detect leaks.
  *
- * This package contains wrappers and utilities to catch RocksObject
- * instantiates in Ozone, intercept their finalizers and assert if the created
- * instances are closed properly before being GCed.
+ * This package contains RocksObject decorators and utilities to catch track RocksObject's
+ * lifecycle to ensure they're properly closed before being GCed.
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 

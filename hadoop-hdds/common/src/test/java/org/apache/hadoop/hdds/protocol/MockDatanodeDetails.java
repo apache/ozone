@@ -18,9 +18,7 @@
 package org.apache.hadoop.hdds.protocol;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-
-import java.io.IOException;
-import java.net.ServerSocket;
+import org.apache.ozone.test.GenericTestUtils;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -112,14 +110,11 @@ public final class MockDatanodeDetails {
    *
    * @return DatanodeDetails
    */
-  public static DatanodeDetails randomLocalDatanodeDetails()
-      throws IOException {
-    try (ServerSocket socket = new ServerSocket(0)) {
-      return createDatanodeDetails(UUID.randomUUID().toString(),
-          socket.getInetAddress().getHostName(),
-          socket.getInetAddress().getHostAddress(), null,
-          socket.getLocalPort());
-    }
+  public static DatanodeDetails randomLocalDatanodeDetails() {
+    return createDatanodeDetails(UUID.randomUUID().toString(),
+        GenericTestUtils.PortAllocator.HOSTNAME,
+        GenericTestUtils.PortAllocator.HOST_ADDRESS, null,
+        GenericTestUtils.PortAllocator.getFreePort());
   }
 
   private MockDatanodeDetails() {

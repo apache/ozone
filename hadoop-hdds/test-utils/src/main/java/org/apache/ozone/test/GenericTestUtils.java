@@ -22,38 +22,38 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.OutputStream;
 import java.io.PrintStream;
-import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
 import com.google.common.base.Preconditions;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.Layout;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
-import org.junit.Assert;
+import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.lang3.RandomStringUtils.randomAlphanumeric;
 import static org.apache.logging.log4j.util.StackLocatorUtil.getCallerClass;
-import static org.junit.Assert.assertTrue;
 
 /**
  * Provides some very generic helpers which might be used across the tests.
  */
 public abstract class GenericTestUtils {
-
   public static final String SYSPROP_TEST_DATA_DIR = "test.build.data";
   public static final String DEFAULT_TEST_DATA_DIR;
   public static final String DEFAULT_TEST_DATA_PATH = "target/test/data/";
@@ -74,6 +74,18 @@ public abstract class GenericTestUtils {
   static {
     DEFAULT_TEST_DATA_DIR =
         "target" + File.separator + "test" + File.separator + "data";
+  }
+
+  /**
+   * Return current time in millis as an {@code Instant}.  This may be
+   * before {@link Instant#now()}, since the latter includes nanoseconds, too.
+   * This is needed for some tests that verify volume/bucket creation time,
+   * which also uses {@link Instant#ofEpochMilli(long)}.
+   *
+   * @return current time as {@code Instant};
+   */
+  public static Instant getTestStartTime() {
+    return Instant.ofEpochMilli(System.currentTimeMillis());
   }
 
   /**
@@ -148,50 +160,11 @@ public abstract class GenericTestUtils {
   }
 
   /**
-   * Assert that a given file exists.
-   */
-  public static void assertExists(File f) {
-    assertTrue("File " + f + " should exist", f.exists());
-  }
-
-  /**
    * Assert that a given dir can be created or it already exists.
    */
   public static void assertDirCreation(File f) {
-    assertTrue("Could not create dir " + f + ", nor does it exist",
-        f.mkdirs() || f.exists());
-  }
-
-  public static void assertExceptionContains(String expectedText, Throwable t) {
-    assertExceptionContains(expectedText, t, "");
-  }
-
-  public static void assertExceptionContains(String expectedText, Throwable t,
-      String message) {
-    Assert.assertNotNull("Null Throwable", t);
-    String msg = t.toString();
-    if (msg == null) {
-      throw new AssertionError("Null Throwable.toString() value", t);
-    } else if (expectedText != null && !msg.contains(expectedText)) {
-      String prefix = StringUtils.isEmpty(message) ? "" : message + ": ";
-      throw new AssertionError(String
-          .format("%s Expected to find '%s' %s: %s", prefix, expectedText,
-              "but got unexpected exception",
-              stringifyException(t)), t);
-    }
-  }
-
-  /**
-   * Make a string representation of the exception.
-   * @param e The exception to stringify
-   * @return A string with exception name and call stack.
-   */
-  public static String stringifyException(Throwable e) {
-    StringWriter stm = new StringWriter();
-    PrintWriter wrt = new PrintWriter(stm);
-    e.printStackTrace(wrt);
-    wrt.close();
-    return stm.toString();
+    Assertions.assertTrue(f.mkdirs() || f.exists(),
+        "Could not create dir " + f + ", nor does it exist");
   }
 
   /**
@@ -245,17 +218,13 @@ public abstract class GenericTestUtils {
     setLogLevel(toLog4j(logger), Level.toLevel(level.toString()));
   }
 
-  public static void setRootLogLevel(org.slf4j.event.Level level) {
-    setLogLevel(LogManager.getRootLogger(), Level.toLevel(level.toString()));
-  }
-
   public static <T> T mockFieldReflection(Object object, String fieldName)
           throws NoSuchFieldException, IllegalAccessException {
     Field field = object.getClass().getDeclaredField(fieldName);
     boolean isAccessible = field.isAccessible();
 
     field.setAccessible(true);
-    Field modifiersField = Field.class.getDeclaredField("modifiers");
+    Field modifiersField = ReflectionUtils.getModifiersField();
     boolean modifierFieldAccessible = modifiersField.isAccessible();
     modifiersField.setAccessible(true);
     int modifierVal = modifiersField.getInt(field);
@@ -275,7 +244,7 @@ public abstract class GenericTestUtils {
     boolean isAccessible = field.isAccessible();
 
     field.setAccessible(true);
-    Field modifiersField = Field.class.getDeclaredField("modifiers");
+    Field modifiersField = ReflectionUtils.getModifiersField();
     boolean modifierFieldAccessible = modifiersField.isAccessible();
     modifiersField.setAccessible(true);
     int modifierVal = modifiersField.getInt(field);
@@ -464,4 +433,78 @@ public abstract class GenericTestUtils {
     }
   }
 
+  /**
+   * Helper class to get free port avoiding randomness.
+   */
+  public static final class PortAllocator {
+
+    public static final String HOSTNAME = "localhost";
+    public static final String HOST_ADDRESS = "127.0.0.1";
+    public static final int MIN_PORT = 15000;
+    public static final int MAX_PORT = 32000;
+    public static final AtomicInteger NEXT_PORT = new AtomicInteger(MIN_PORT);
+
+    private PortAllocator() {
+      // no instances
+    }
+
+    public static synchronized int getFreePort() {
+      int port = NEXT_PORT.getAndIncrement();
+      if (port > MAX_PORT) {
+        NEXT_PORT.set(MIN_PORT);
+        port = NEXT_PORT.getAndIncrement();
+      }
+      return port;
+    }
+
+    public static String localhostWithFreePort() {
+      return HOST_ADDRESS + ":" + getFreePort();
+    }
+
+    public static String anyHostWithFreePort() {
+      return "0.0.0.0:" + getFreePort();
+    }
+  }
+
+  /**
+   * This class is a utility class for java reflection operations.
+   */
+  public static final class ReflectionUtils {
+
+    /**
+     * This method provides the modifiers field using reflection approach which is compatible
+     * for both pre Java 9 and post java 9 versions.
+     * @return modifiers field
+     * @throws IllegalAccessException
+     * @throws NoSuchFieldException
+     */
+    public static Field getModifiersField() throws IllegalAccessException, NoSuchFieldException {
+      Field modifiersField = null;
+      try {
+        modifiersField = Field.class.getDeclaredField("modifiers");
+      } catch (NoSuchFieldException e) {
+        try {
+          Method getDeclaredFields0 = Class.class.getDeclaredMethod(
+              "getDeclaredFields0", boolean.class);
+          boolean accessibleBeforeSet = getDeclaredFields0.isAccessible();
+          getDeclaredFields0.setAccessible(true);
+          Field[] fields = (Field[]) getDeclaredFields0.invoke(Field.class, false);
+          getDeclaredFields0.setAccessible(accessibleBeforeSet);
+          for (Field field : fields) {
+            if ("modifiers".equals(field.getName())) {
+              modifiersField = field;
+              break;
+            }
+          }
+          if (modifiersField == null) {
+            throw e;
+          }
+        } catch (InvocationTargetException | NoSuchMethodException ex) {
+          e.addSuppressed(ex);
+          throw e;
+        }
+      }
+      return modifiersField;
+    }
+  }
 }

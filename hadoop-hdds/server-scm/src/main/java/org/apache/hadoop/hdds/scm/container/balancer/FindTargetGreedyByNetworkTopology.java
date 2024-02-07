@@ -25,7 +25,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
@@ -41,6 +42,8 @@ import java.util.List;
  */
 public class FindTargetGreedyByNetworkTopology
     extends AbstractFindTargetGreedy {
+  public static final Logger LOG =
+      LoggerFactory.getLogger(FindTargetGreedyByNetworkTopology.class);
 
   private NetworkTopology networkTopology;
   private List potentialTargets;
@@ -51,7 +54,7 @@ public class FindTargetGreedyByNetworkTopology
       NodeManager nodeManager,
       NetworkTopology networkTopology) {
     super(containerManager, placementPolicyValidateProxy, nodeManager);
-    setLogger(LoggerFactory.getLogger(FindTargetGreedyByNetworkTopology.class));
+    setLogger(LOG);
     potentialTargets = new LinkedList<>();
     setPotentialTargets(potentialTargets);
     this.networkTopology = networkTopology;
@@ -87,7 +90,7 @@ public class FindTargetGreedyByNetworkTopology
    */
   @Override
   public void resetPotentialTargets(
-      @NotNull Collection<DatanodeDetails> targets) {
+      @Nonnull Collection<DatanodeDetails> targets) {
     // create DatanodeUsageInfo from DatanodeDetails
     List<DatanodeUsageInfo> usageInfos = new ArrayList<>(targets.size());
     targets.forEach(datanodeDetails -> usageInfos.add(

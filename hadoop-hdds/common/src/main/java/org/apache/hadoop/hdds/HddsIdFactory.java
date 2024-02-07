@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds;
 
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -39,15 +38,6 @@ public final class HddsIdFactory {
    */
   public static long getLongId() {
     return LONG_COUNTER.incrementAndGet();
-  }
-
-  /**
-   * Returns a uuid.
-   *
-   * @return UUID.
-   */
-  public static UUID getUUId() {
-    return UUID.randomUUID();
   }
 
 }

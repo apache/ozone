@@ -29,15 +29,7 @@ public class ManagedSstFileReader extends ManagedObject<SstFileReader> {
     super(original);
   }
 
-  public static ManagedSstFileReader managed(
-      SstFileReader reader) {
+  public static ManagedSstFileReader managed(SstFileReader reader) {
     return new ManagedSstFileReader(reader);
   }
-
-  @Override
-  protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
-    super.finalize();
-  }
-
 }

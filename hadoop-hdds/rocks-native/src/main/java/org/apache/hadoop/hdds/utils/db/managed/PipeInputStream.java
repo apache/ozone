@@ -18,22 +18,14 @@
 
 package org.apache.hadoop.hdds.utils.db.managed;
 
-import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
-import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import java.io.InputStream;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
 
 /**
  * JNI for reading data from pipe.
  */
 public class PipeInputStream extends InputStream {
 
-  static {
-    NativeLibraryLoader.getInstance()
-            .loadLibrary(ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
-  }
   private byte[] byteBuffer;
   private long nativeHandle;
   private int numberOfBytesLeftToRead;
@@ -42,12 +34,7 @@ public class PipeInputStream extends InputStream {
 
   private AtomicBoolean cleanup;
 
-  PipeInputStream(int capacity) throws NativeLibraryNotLoadedException {
-    if (!NativeLibraryLoader.isLibraryLoaded(ROCKS_TOOLS_NATIVE_LIBRARY_NAME)) {
-      throw new NativeLibraryNotLoadedException(
-              ROCKS_TOOLS_NATIVE_LIBRARY_NAME);
-    }
-
+  PipeInputStream(int capacity) {
     this.byteBuffer = new byte[capacity];
     this.numberOfBytesLeftToRead = 0;
     this.capacity = capacity;

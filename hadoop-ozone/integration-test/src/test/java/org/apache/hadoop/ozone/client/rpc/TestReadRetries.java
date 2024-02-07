@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
  * work for additional information regarding copyright ownership.  The ASF
@@ -18,241 +18,139 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
+import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.XceiverClientFactory;
-import org.apache.hadoop.hdds.scm.XceiverClientRatis;
-import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneKeyLocation;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.io.KeyOutputStream;
-import org.apache.hadoop.ozone.client.io.OzoneInputStream;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 
-import org.junit.After;
-import org.junit.Assert;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.Assert.fail;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.ozone.client.rpc.TestOzoneRpcClientWithKeyLatestVersion.assertKeyContent;
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.configureFSOptimizedPaths;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-
-import org.junit.rules.ExpectedException;
-
-/**
- * Test read retries from multiple nodes in the pipeline.
- */
-@RunWith(Parameterized.class)
-public class TestReadRetries {
+@Timeout(300)
+class TestReadRetries {
 
   /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
-
-  @Rule
-  public ExpectedException thrown = ExpectedException.none();
-
-  private MiniOzoneCluster cluster = null;
-  private OzoneClient ozClient = null;
-  private ObjectStore store = null;
-  private OzoneManager ozoneManager;
-  private StorageContainerLocationProtocolClientSideTranslatorPB
-      storageContainerLocationClient;
-
-  private static final String SCM_ID = UUID.randomUUID().toString();
-  private String bucketLayout;
-
-  public TestReadRetries(String bucketLayout) {
-    this.bucketLayout = bucketLayout;
-  }
-
-  @Parameterized.Parameters
-  public static Collection<Object[]> data() {
-    return Arrays.asList(
-        new Object[]{OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT},
-        new Object[]{OMConfigKeys.
-              OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED});
-  }
-
-  /**
-   * Create a MiniOzoneCluster for testing.
-   * @throws Exception
+   * Test read retries from multiple nodes in the pipeline.
    */
-  @Before
-  public void init() throws Exception {
+  @Test
+  void testPutKeyAndGetKeyThreeNodes() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
-    OMRequestTestUtils.configureFSOptimizedPaths(conf,
-            true, BucketLayout.fromString(bucketLayout));
-    cluster = MiniOzoneCluster.newBuilder(conf)
+    configureFSOptimizedPaths(conf, true, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    try (MiniOzoneCluster cluster = newCluster(conf)) {
+      cluster.waitForClusterToBeReady();
+      cluster.waitForPipelineTobeReady(THREE, 180000);
+
+      try (OzoneClient client = cluster.newClient()) {
+        ObjectStore store = client.getObjectStore();
+
+        String volumeName = UUID.randomUUID().toString();
+        store.createVolume(volumeName);
+        OzoneVolume volume = store.getVolume(volumeName);
+
+        String bucketName = UUID.randomUUID().toString();
+        volume.createBucket(bucketName);
+        OzoneBucket bucket = volume.getBucket(bucketName);
+
+        String keyName = "a/b/c/" + UUID.randomUUID();
+        byte[] content = RandomUtils.nextBytes(128);
+        try (OutputStream out = bucket.createKey(keyName, content.length,
+            RatisReplicationConfig.getInstance(THREE), new HashMap<>())) {
+          out.write(content);
+        }
+
+        // First, confirm the key info from the client matches the info in OM.
+        OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .setKeyName(keyName)
+            .build();
+        OmKeyLocationInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs)
+            .getKeyLocationVersions().get(0)
+            .getBlocksLatestVersionOnly().get(0);
+        long containerID = keyInfo.getContainerID();
+
+        OzoneKeyDetails keyDetails = bucket.getKey(keyName);
+        assertEquals(keyName, keyDetails.getName());
+
+        List<OzoneKeyLocation> keyLocations = keyDetails.getOzoneKeyLocations();
+        assertEquals(1, keyLocations.size());
+        assertEquals(containerID, keyLocations.get(0).getContainerID());
+        assertEquals(keyInfo.getLocalID(), keyLocations.get(0).getLocalID());
+
+        // Make sure that the data size matched.
+        assertEquals(content.length, keyLocations.get(0).getLength());
+
+        StorageContainerManager scm = cluster.getStorageContainerManager();
+        ContainerInfo container = scm.getContainerManager()
+            .getContainer(ContainerID.valueOf(containerID));
+        Pipeline pipeline = scm.getPipelineManager()
+            .getPipeline(container.getPipelineID());
+        List<DatanodeDetails> datanodes = pipeline.getNodes();
+        assertEquals(3, datanodes.size());
+
+        // shutdown the datanode
+        cluster.shutdownHddsDatanode(datanodes.get(0));
+        // try to read, this should be successful
+        assertKeyContent(bucket, keyName, content);
+
+        // shutdown the second datanode
+        cluster.shutdownHddsDatanode(datanodes.get(1));
+        // we still should be able to read
+        assertKeyContent(bucket, keyName, content);
+
+        // shutdown the 3rd datanode
+        cluster.shutdownHddsDatanode(datanodes.get(2));
+        // no longer can read it
+        assertThrows(IOException.class,
+            () -> assertKeyContent(bucket, keyName, content));
+
+        // read intermediate directory
+        verifyIntermediateDir(bucket, "a/b/c");
+      }
+    }
+  }
+
+  private static MiniOzoneCluster newCluster(OzoneConfiguration conf)
+      throws IOException {
+    return MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
-        .setScmId(SCM_ID)
         .build();
-    cluster.waitForClusterToBeReady();
-    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
-            180000);
-    ozClient = OzoneClientFactory.getRpcClient(conf);
-    store = ozClient.getObjectStore();
-    storageContainerLocationClient =
-        cluster.getStorageContainerLocationClient();
-    ozoneManager = cluster.getOzoneManager();
   }
 
-
-  /**
-   * Close OzoneClient and shutdown MiniOzoneCluster.
-   */
-  @After
-  public void shutdown() throws IOException {
-    if (ozClient != null) {
-      ozClient.close();
-    }
-
-    if (storageContainerLocationClient != null) {
-      storageContainerLocationClient.close();
-    }
-
-    if (cluster != null) {
-      cluster.shutdown();
-    }
-  }
-
-
-  @Test
-  public void testPutKeyAndGetKeyThreeNodes()
-      throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-
-    String value = "sample value";
-    store.createVolume(volumeName);
-    OzoneVolume volume = store.getVolume(volumeName);
-    volume.createBucket(bucketName);
-    OzoneBucket bucket = volume.getBucket(bucketName);
-
-    String keyName = "a/b/c/" + UUID.randomUUID().toString();
-
-    OzoneOutputStream out = bucket
-        .createKey(keyName, value.getBytes(UTF_8).length, ReplicationType.RATIS,
-            ReplicationFactor.THREE, new HashMap<>());
-    KeyOutputStream groupOutputStream =
-        (KeyOutputStream) out.getOutputStream();
-    XceiverClientFactory factory = groupOutputStream.getXceiverClientFactory();
-    out.write(value.getBytes(UTF_8));
-    out.close();
-    // First, confirm the key info from the client matches the info in OM.
-    OmKeyArgs.Builder builder = new OmKeyArgs.Builder();
-    builder.setVolumeName(volumeName).setBucketName(bucketName)
-        .setKeyName(keyName);
-    OmKeyLocationInfo keyInfo = ozoneManager.lookupKey(builder.build()).
-        getKeyLocationVersions().get(0).getBlocksLatestVersionOnly().get(0);
-    long containerID = keyInfo.getContainerID();
-    long localID = keyInfo.getLocalID();
-    OzoneKeyDetails keyDetails = bucket.getKey(keyName);
-    Assert.assertEquals(keyName, keyDetails.getName());
-
-    List<OzoneKeyLocation> keyLocations = keyDetails.getOzoneKeyLocations();
-    Assert.assertEquals(1, keyLocations.size());
-    Assert.assertEquals(containerID, keyLocations.get(0).getContainerID());
-    Assert.assertEquals(localID, keyLocations.get(0).getLocalID());
-
-    // Make sure that the data size matched.
-    Assert.assertEquals(value.getBytes(UTF_8).length,
-        keyLocations.get(0).getLength());
-
-    ContainerInfo container = cluster.getStorageContainerManager()
-        .getContainerManager().getContainer(ContainerID.valueOf(containerID));
-    Pipeline pipeline = cluster.getStorageContainerManager()
-        .getPipelineManager().getPipeline(container.getPipelineID());
-    List<DatanodeDetails> datanodes = pipeline.getNodes();
-
-    DatanodeDetails datanodeDetails = datanodes.get(0);
-    Assert.assertNotNull(datanodeDetails);
-
-    XceiverClientSpi clientSpi = factory.acquireClient(pipeline);
-    Assert.assertTrue(clientSpi instanceof XceiverClientRatis);
-    XceiverClientRatis ratisClient = (XceiverClientRatis)clientSpi;
-
-    ratisClient.watchForCommit(keyInfo.getBlockCommitSequenceId());
-    // shutdown the datanode
-    cluster.shutdownHddsDatanode(datanodeDetails);
-    // try to read, this should be successful
-    readKey(bucket, keyName, value);
-
-    // read intermediate directory
-    verifyIntermediateDir(bucket, "a/b/c");
-
-    // shutdown the second datanode
-    datanodeDetails = datanodes.get(1);
-    cluster.shutdownHddsDatanode(datanodeDetails);
-
-    // we still should be able to read via Standalone protocol
-    // try to read
-    readKey(bucket, keyName, value);
-
-    // shutdown the 3rd datanode
-    datanodeDetails = datanodes.get(2);
-    cluster.shutdownHddsDatanode(datanodeDetails);
-    try {
-      // try to read
-      readKey(bucket, keyName, value);
-      fail("Expected exception not thrown");
-    } catch (IOException e) {
-      // it should throw an ioException as none of the servers
-      // are available
-    }
-    factory.releaseClient(clientSpi, false);
-  }
-
-  private void verifyIntermediateDir(OzoneBucket bucket, String dir)
+  private static void verifyIntermediateDir(OzoneBucket bucket, String dir)
       throws IOException {
     OzoneFileStatus fileStatus = bucket.getFileStatus(dir);
-    Assert.assertTrue(fileStatus.isDirectory());
-    Assert.assertEquals(dir, fileStatus.getTrimmedName());
-  }
-
-  private void readKey(OzoneBucket bucket, String keyName, String data)
-      throws IOException {
-    OzoneKey key = bucket.getKey(keyName);
-    Assert.assertEquals(keyName, key.getName());
-    OzoneInputStream is = bucket.readKey(keyName);
-    byte[] fileContent = new byte[data.getBytes(UTF_8).length];
-    is.read(fileContent);
-    is.close();
+    assertTrue(fileStatus.isDirectory());
+    assertEquals(dir, fileStatus.getTrimmedName());
   }
 }

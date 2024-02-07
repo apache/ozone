@@ -51,7 +51,7 @@ import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadAbortReq
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3MultipartUploadAbortRequestWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -294,7 +294,7 @@ public final class BucketLayoutAwareOMKeyRequestFactory {
    * @throws InvocationTargetException if the request class constructor throws
    *                                   an exception.
    */
-  @NotNull
+  @Nonnull
   static OMKeyRequest getRequestInstanceFromMap(OMRequest omRequest,
                                                 String classKey,
                                                 BucketLayout bucketLayout)

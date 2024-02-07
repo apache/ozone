@@ -25,9 +25,8 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeyVerifierClient;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,10 +38,9 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.hamcrest.CoreMatchers.containsString;
-import static org.hamcrest.MatcherAssert.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -120,7 +118,7 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
 
     Instant past = Instant.now().minus(Duration.ofHours(1));
     ManagedSecretKey expiredSecretKey = new ManagedSecretKey(UUID.randomUUID(),
-        past, past, Mockito.mock(SecretKey.class));
+        past, past, mock(SecretKey.class));
 
     when(secretKeyClient.getSecretKey(SECRET_KEY_ID))
         .thenReturn(expiredSecretKey);
@@ -133,7 +131,7 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
     Token<T> token = secretManager.generateToken(tokenId);
     BlockTokenException ex = assertThrows(BlockTokenException.class, () ->
         subject.verify("anyUser", token, cmd));
-    assertThat(ex.getMessage(), containsString("expired secret key"));
+    assertThat(ex.getMessage()).contains("expired secret key");
   }
 
   @Test
@@ -152,8 +150,8 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
     Token<T> token = secretManager.generateToken(tokenId);
     BlockTokenException ex = assertThrows(BlockTokenException.class, () ->
         subject.verify("anyUser", token, cmd));
-    assertThat(ex.getMessage(),
-        containsString("Can't find the signing secret key"));
+    assertThat(ex.getMessage())
+        .contains("Can't find the signing secret key");
   }
 
   @Test
@@ -172,16 +170,16 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
     BlockTokenException ex =
         assertThrows(BlockTokenException.class, () ->
             subject.verify("anyUser", invalidToken, cmd));
-    assertThat(ex.getMessage(),
-        containsString("Invalid token for user"));
+    assertThat(ex.getMessage())
+        .contains("Invalid token for user");
   }
 
-  @NotNull
+  @Nonnull
   private SecretKeyVerifierClient mockSecretKeyClient(boolean validSignature)
       throws IOException {
     SecretKeyVerifierClient secretKeyClient =
         mock(SecretKeyVerifierClient.class);
-    ManagedSecretKey validSecretKey = Mockito.mock(ManagedSecretKey.class);
+    ManagedSecretKey validSecretKey = mock(ManagedSecretKey.class);
     when(secretKeyClient.getSecretKey(SECRET_KEY_ID))
         .thenReturn(validSecretKey);
     when(validSecretKey.isValidSignature((TokenIdentifier) any(), any()))
@@ -204,8 +202,8 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
     BlockTokenException ex =
         assertThrows(BlockTokenException.class, () ->
             subject.verify("anyUser", token, cmd));
-    assertThat(ex.getMessage(),
-        containsString("Expired token for user"));
+    assertThat(ex.getMessage())
+        .contains("Expired token for user");
   }
 
   @Test
@@ -259,7 +257,7 @@ public abstract class TokenVerifierTests<T extends ShortLivedTokenIdentifier> {
 
     MockTokenManager() {
       super(TimeUnit.HOURS.toMillis(1),
-          Mockito.mock(SecretKeySignerClient.class));
+          mock(SecretKeySignerClient.class));
     }
 
     @Override

@@ -17,8 +17,9 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.protobuf.ByteString;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,15 +31,15 @@ public final class TestCodecRegistry {
   static final Logger LOG = LoggerFactory.getLogger(TestCodecRegistry.class);
 
   private final CodecRegistry registry = CodecRegistry.newBuilder()
-      .addCodec(ByteString.class, ByteStringCodec.getInstance())
+      .addCodec(ByteString.class, ByteStringCodec.get())
       .build();
 
   <T> void assertGetCodec(Class<?> expectedCodecClass, T object) {
     final Codec<T> codec = registry.getCodec(object);
     LOG.info("object {}", object.getClass());
     LOG.info("codec {}", codec.getClass());
-    Assertions.assertTrue(expectedCodecClass.isInstance(codec));
-    Assertions.assertSame(expectedCodecClass, codec.getClass());
+    assertTrue(expectedCodecClass.isInstance(codec));
+    assertSame(expectedCodecClass, codec.getClass());
   }
 
   @Test
@@ -55,7 +56,7 @@ public final class TestCodecRegistry {
     final Codec<T> codec = registry.getCodecFromClass(format);
     LOG.info("format {}", format);
     LOG.info("codec {}", codec.getClass());
-    Assertions.assertSame(expectedCodecClass, codec.getClass());
+    assertSame(expectedCodecClass, codec.getClass());
   }
 
   @Test

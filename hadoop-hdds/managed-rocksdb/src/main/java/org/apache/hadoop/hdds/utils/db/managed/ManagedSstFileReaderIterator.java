@@ -23,17 +23,10 @@ import org.rocksdb.SstFileReaderIterator;
 /**
  * Managed SstFileReaderIterator.
  */
-public class ManagedSstFileReaderIterator
-    extends ManagedObject<SstFileReaderIterator> {
+public class ManagedSstFileReaderIterator extends ManagedObject<SstFileReaderIterator> {
 
   ManagedSstFileReaderIterator(SstFileReaderIterator original) {
     super(original);
-  }
-
-  @Override
-  protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
-    super.finalize();
   }
 
   public static ManagedSstFileReaderIterator managed(

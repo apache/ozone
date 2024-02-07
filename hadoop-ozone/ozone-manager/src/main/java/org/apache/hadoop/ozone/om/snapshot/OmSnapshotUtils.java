@@ -40,6 +40,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
  */
 public final class OmSnapshotUtils {
 
+  public static final String DATA_PREFIX = "data";
+  public static final String DATA_SUFFIX = "txt";
+
   private OmSnapshotUtils() { }
 
   /**
@@ -80,7 +83,7 @@ public final class OmSnapshotUtils {
   public static Path createHardLinkList(int truncateLength,
                                         Map<Path, Path> hardLinkFiles)
       throws IOException {
-    Path data = Files.createTempFile("data", "txt");
+    Path data = Files.createTempFile(DATA_PREFIX, DATA_SUFFIX);
     StringBuilder sb = new StringBuilder();
     for (Map.Entry<Path, Path> entry : hardLinkFiles.entrySet()) {
       String fixedFile = truncateFileName(truncateLength, entry.getValue());

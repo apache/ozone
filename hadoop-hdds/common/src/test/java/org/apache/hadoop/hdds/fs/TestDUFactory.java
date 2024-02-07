@@ -22,8 +22,8 @@ import java.time.Duration;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
-import static org.apache.ozone.test.GenericTestUtils.getTestDir;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
@@ -38,8 +38,7 @@ public class TestDUFactory {
   }
 
   @Test
-  public void testParams() {
-    File dir = getTestDir(getClass().getSimpleName());
+  public void testParams(@TempDir File dir) {
     Duration refresh = Duration.ofHours(1);
 
     OzoneConfiguration conf = new OzoneConfiguration();

@@ -129,20 +129,20 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
           LOG.info("Finalization is complete.");
         }
       } else {
-        String msgStart = "";
-        if (layoutFeature.layoutVersion() <= metadataLayoutVersion) {
-          msgStart = "Finalize attempt on a layoutFeature which has already "
-              + "been finalized.";
-        } else {
-          msgStart =
-              "Finalize attempt on a layoutFeature that is newer than the " +
-                  "next feature to be finalized.";
-        }
+        String versionMsg = "Software layout version: " + softwareLayoutVersion
+            + ", Metadata layout version: " + metadataLayoutVersion
+            + ", Feature Layout version: " + layoutFeature.layoutVersion()
+            + ".";
 
-        throw new IllegalArgumentException(
-            msgStart + " Software layout version: " + softwareLayoutVersion
-                + " Metadata layout version: " + metadataLayoutVersion
-                + " Feature Layout version: " + layoutFeature.layoutVersion());
+        if (layoutFeature.layoutVersion() <= metadataLayoutVersion) {
+          LOG.info("Finalize attempt on a layoutFeature which has already "
+              + "been finalized. " + versionMsg + " This can happen when " +
+              "Raft Log is replayed during service restart.");
+        } else {
+          throw new IllegalArgumentException(
+              "Finalize attempt on a layoutFeature that is newer than the " +
+                  "next feature to be finalized. " + versionMsg);
+        }
       }
     } finally {
       lock.writeLock().unlock();
@@ -221,6 +221,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
     }
   }
 
+  @Override
   public void close() {
     if (mBean != null) {
       MBeans.unregister(mBean);

@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#suite:secure
+#suite:misc
 
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
@@ -28,4 +28,5 @@ export COMPOSE_FILE=docker-compose.yaml:vault.yaml
 
 start_docker_env
 
-execute_robot_test scm s3
+## Exclude virtual-host tests. This is tested separately as it requires additional config.
+execute_robot_test scm --exclude virtual-host s3

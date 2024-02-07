@@ -19,20 +19,18 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
-import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Test for SCMContext.
  */
 public class TestSCMContext {
   @Test
-  public void testRaftOperations() {
+  void testRaftOperations() throws Exception {
     // start as follower
     SCMContext scmContext = new SCMContext.Builder()
         .setLeader(false).setTerm(0).buildMaybeInvalid();
@@ -44,11 +42,8 @@ public class TestSCMContext {
     scmContext.setLeaderReady();
     assertTrue(scmContext.isLeader());
     assertTrue(scmContext.isLeaderReady());
-    try {
-      assertEquals(scmContext.getTermOfLeader(), 10);
-    } catch (NotLeaderException e) {
-      fail("Should not throw nle.");
-    }
+    assertEquals(scmContext.getTermOfLeader(), 10);
+
 
     // step down
     scmContext.updateLeaderAndTerm(false, 0);

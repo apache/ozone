@@ -53,8 +53,7 @@ public class OMPrepareResponse extends OMClientResponse {
     if (prepareIndex != -1) {
       omMetadataManager.getTransactionInfoTable().putWithBatch(batchOperation,
           PREPARE_MARKER_KEY,
-          new TransactionInfo.Builder()
-              .setTransactionIndex(prepareIndex).build());
+          TransactionInfo.valueOf(TransactionInfo.DEFAULT_VALUE.getTerm(), prepareIndex));
     }
   }
 }

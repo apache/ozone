@@ -22,14 +22,15 @@ import java.io.FileNotFoundException;
 import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Test the ConfigFileGenerator.
  * <p>
  * ConfigFileGenerator is an annotation processor and activated for the
- * testCompile. Therefore in the unit test we can check the content of the
+ * testCompile. Therefore, in the unit test we can check the content of the
  * generated ozone-default-generated.xml
  */
 public class TestConfigFileGenerator {
@@ -42,21 +43,19 @@ public class TestConfigFileGenerator {
             .useDelimiter("//Z")
             .next();
 
-    Assert.assertTrue(
-        "Generated config should have entry based on the annotation",
-        generatedXml.contains("<name>ozone.scm.client.bind.host</name>"));
+    assertThat(generatedXml)
+        .as("annotation in ConfigurationExample")
+        .contains("<name>ozone.scm.client.bind.host</name>");
 
-    Assert.assertTrue(
-        "Generated config should have entry based on the annotation from the "
-            + "parent class",
-        generatedXml.contains("<name>ozone.scm.client.secure</name>"));
+    assertThat(generatedXml)
+        .as("annotation in ConfigurationExampleParent")
+        .contains("<name>ozone.scm.client.secure</name>");
 
-    Assert.assertTrue(
-        "Generated config should have entry based on the annotation from the "
-            + "grand-parent class.",
-        generatedXml.contains("<name>ozone.scm.client.number</name>"));
+    assertThat(generatedXml)
+        .as("annotation in ConfigurationExampleGrandParent")
+        .contains("<name>ozone.scm.client.number</name>");
 
-    Assert.assertTrue("Generated config should contain tags",
-        generatedXml.contains("<tag>MANAGEMENT</tag>"));
+    assertThat(generatedXml)
+        .contains("<tag>MANAGEMENT</tag>");
   }
 }

@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -57,6 +56,7 @@ import java.util.stream.Collectors;
 
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.writeDBCheckpointToStream;
 import static org.apache.hadoop.hdds.utils.db.TestRDBStore.newRDBStore;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -81,13 +81,15 @@ public class TestRDBSnapshotProvider {
   private Set<TableConfig> configSet;
   private RDBSnapshotProvider rdbSnapshotProvider;
   private File testDir;
-  private final int numUsedCF = 3;
-  private final String leaderId = "leaderNode-1";
+  private static final int NUM_USED_CF = 3;
+  private static final String LEADER_ID = "leaderNode-1";
   private final AtomicReference<DBCheckpoint> latestCK =
       new AtomicReference<>(null);
 
   @BeforeEach
   public void init(@TempDir File tempDir) throws Exception {
+    CodecBuffer.enableLeakDetection();
+
     options = getNewDBOptions();
     configSet = new HashSet<>();
     for (String name : families) {
@@ -107,7 +109,7 @@ public class TestRDBSnapshotProvider {
       public void downloadSnapshot(String leaderNodeID, File targetFile)
           throws IOException {
         for (int i = 0; i < 10; i++) {
-          insertDataToDB(numUsedCF);
+          insertDataToDB(NUM_USED_CF);
         }
         DBCheckpoint dbCheckpoint = rdbStore.getCheckpoint(true);
         latestCK.set(dbCheckpoint);
@@ -149,30 +151,30 @@ public class TestRDBSnapshotProvider {
     assertEquals(0, before);
 
     // Get first snapshot
-    checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(leaderId);
+    checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(LEADER_ID);
     File checkpointDir = checkpoint.getCheckpointLocation().toFile();
     assertEquals(candidateDir, checkpointDir);
     int first = HAUtils.getExistingSstFiles(
         rdbSnapshotProvider.getCandidateDir()).size();
 
     // Get second snapshot
-    checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(leaderId);
+    checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(LEADER_ID);
     int second = HAUtils.getExistingSstFiles(
         rdbSnapshotProvider.getCandidateDir()).size();
-    assertTrue(second > first, "The second snapshot should" +
-        " have more SST files");
+    assertThat(second).withFailMessage("The second snapshot should have more SST files")
+        .isGreaterThan(first);
     DBCheckpoint latestCheckpoint = latestCK.get();
     compareDB(latestCheckpoint.getCheckpointLocation().toFile(),
-        checkpoint.getCheckpointLocation().toFile(), numUsedCF);
+        checkpoint.getCheckpointLocation().toFile(), NUM_USED_CF);
 
     // Get third snapshot
-    checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(leaderId);
+    checkpoint = rdbSnapshotProvider.downloadDBSnapshotFromLeader(LEADER_ID);
     int third = HAUtils.getExistingSstFiles(
         rdbSnapshotProvider.getCandidateDir()).size();
-    assertTrue(third > second, "The third snapshot should" +
-        " have more SST files");
+    assertThat(third).withFailMessage("The third snapshot should have more SST files")
+        .isGreaterThan(second);
     compareDB(latestCK.get().getCheckpointLocation().toFile(),
-        checkpoint.getCheckpointLocation().toFile(), numUsedCF);
+        checkpoint.getCheckpointLocation().toFile(), NUM_USED_CF);
 
     // Test cleanup candidateDB
     rdbSnapshotProvider.init();
@@ -226,7 +228,7 @@ public class TestRDBSnapshotProvider {
       throws IOException {
     try (Table<byte[], byte[]> firstTable = dbStore.getTable(families.
         get(familyIndex))) {
-      Assertions.assertNotNull(firstTable, "Table cannot be null");
+      assertNotNull(firstTable, "Table cannot be null");
       for (int x = 0; x < 100; x++) {
         byte[] key =
             RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);

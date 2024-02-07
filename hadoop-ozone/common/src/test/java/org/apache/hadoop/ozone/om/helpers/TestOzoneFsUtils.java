@@ -18,8 +18,10 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Test OzoneFsUtils.
@@ -28,12 +30,12 @@ public class TestOzoneFsUtils {
 
   @Test
   public void testPaths() {
-    Assert.assertTrue(OzoneFSUtils.isValidName("/a/b"));
-    Assert.assertFalse(OzoneFSUtils.isValidName("../../../a/b"));
-    Assert.assertFalse(OzoneFSUtils.isValidName("/./."));
-    Assert.assertFalse(OzoneFSUtils.isValidName("/:/"));
-    Assert.assertFalse(OzoneFSUtils.isValidName("a/b"));
-    Assert.assertFalse(OzoneFSUtils.isValidName("/a:/b"));
-    Assert.assertFalse(OzoneFSUtils.isValidName("/a//b"));
+    assertTrue(OzoneFSUtils.isValidName("/a/b"));
+    assertFalse(OzoneFSUtils.isValidName("../../../a/b"));
+    assertFalse(OzoneFSUtils.isValidName("/./."));
+    assertFalse(OzoneFSUtils.isValidName("/:/"));
+    assertFalse(OzoneFSUtils.isValidName("a/b"));
+    assertFalse(OzoneFSUtils.isValidName("/a:/b"));
+    assertFalse(OzoneFSUtils.isValidName("/a//b"));
   }
 }

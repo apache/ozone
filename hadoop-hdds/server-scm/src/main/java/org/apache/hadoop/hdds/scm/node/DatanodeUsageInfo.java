@@ -205,6 +205,8 @@ public class DatanodeUsageInfo {
       builder.setCapacity(scmNodeStat.getCapacity().get());
       builder.setUsed(scmNodeStat.getScmUsed().get());
       builder.setRemaining(scmNodeStat.getRemaining().get());
+      builder.setCommitted(scmNodeStat.getCommitted().get());
+      builder.setFreeSpaceToSpare(scmNodeStat.getFreeSpaceToSpare().get());
     }
 
     builder.setContainerCount(containerCount);

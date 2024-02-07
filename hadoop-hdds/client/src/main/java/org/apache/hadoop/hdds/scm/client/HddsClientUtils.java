@@ -18,11 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.client;
 
-import java.text.ParseException;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -72,37 +67,6 @@ public final class HddsClientUtils {
           .add(NotReplicatedException.class)
           .build();
 
-  /**
-   * Date format that used in ozone. Here the format is thread safe to use.
-   */
-  private static final ThreadLocal<DateTimeFormatter> DATE_FORMAT =
-      ThreadLocal.withInitial(() -> {
-        DateTimeFormatter format =
-            DateTimeFormatter.ofPattern(OzoneConsts.OZONE_DATE_FORMAT);
-        return format.withZone(ZoneId.of(OzoneConsts.OZONE_TIME_ZONE));
-      });
-
-
-  /**
-   * Convert time in millisecond to a human readable format required in ozone.
-   * @return a human readable string for the input time
-   */
-  public static String formatDateTime(long millis) {
-    ZonedDateTime dateTime = ZonedDateTime.ofInstant(
-        Instant.ofEpochMilli(millis), DATE_FORMAT.get().getZone());
-    return DATE_FORMAT.get().format(dateTime);
-  }
-
-  /**
-   * Convert time in ozone date format to millisecond.
-   * @return time in milliseconds
-   */
-  public static long formatDateTime(String date) throws ParseException {
-    Preconditions.checkNotNull(date, "Date string should not be null.");
-    return ZonedDateTime.parse(date, DATE_FORMAT.get())
-        .toInstant().toEpochMilli();
-  }
-
   private static void doNameChecks(String resName) {
     if (resName == null) {
       throw new IllegalArgumentException("Bucket or Volume name is null");
@@ -132,9 +96,16 @@ public final class HddsClientUtils {
     // ozone allows namespace to follow other volume/bucket naming convention,
     // for example, here supports '_',
     // which is a valid character in POSIX-compliant system, like HDFS.
-    return (c == '.' || c == '-' ||
-        Character.isLowerCase(c) || Character.isDigit(c)) ||
-        (c == '_' && !isStrictS3);
+    if (c >= '0' && c <= '9') {
+      return true;
+    } else if (c >= 'a' && c <= 'z') {
+      return true;
+    } else if (c == '-' || c == '.') {
+      return true;
+    } else if (c == '_' && !isStrictS3) {
+      return true;
+    }
+    return false;
   }
 
   private static void doCharacterChecks(char currChar, char prev,
@@ -198,17 +169,6 @@ public final class HddsClientUtils {
     if (isIPv4) {
       throw new IllegalArgumentException(
           "Bucket or Volume name cannot be an IPv4 address or all numeric");
-    }
-  }
-
-  /**
-   * verifies that bucket / volume name is a valid DNS name.
-   *
-   * @param resourceNames Array of bucket / volume names to be verified.
-   */
-  public static void verifyResourceName(String... resourceNames) {
-    for (String resourceName : resourceNames) {
-      HddsClientUtils.verifyResourceName(resourceName);
     }
   }
 
@@ -287,6 +247,20 @@ public final class HddsClientUtils {
       t = t.getCause();
     }
     return t;
+  }
+
+  // This will return the underlying expected exception if it exists
+  // in an exception trace. Otherwise, returns null.
+  public static Throwable containsException(Exception e,
+            Class<? extends Exception> expectedExceptionClass) {
+    Throwable t = e;
+    while (t != null) {
+      if (expectedExceptionClass.isInstance(t)) {
+        return t;
+      }
+      t = t.getCause();
+    }
+    return null;
   }
 
   public static RetryPolicy createRetryPolicy(int maxRetryCount,

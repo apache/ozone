@@ -65,11 +65,6 @@ public class MockXceiverClientSpi extends XceiverClientSpi {
   }
 
   @Override
-  public void connect(String encodedToken) throws Exception {
-
-  }
-
-  @Override
   public void close() {
 
   }

@@ -36,7 +36,7 @@ public class TestChunkBufferImplWithByteBufferList {
   @Test
   public void rejectsNullList() {
     List<ByteBuffer> list = null;
-    assertThrows(IllegalArgumentException.class, () -> ChunkBuffer.wrap(list));
+    assertThrows(NullPointerException.class, () -> ChunkBuffer.wrap(list));
   }
 
   @Test

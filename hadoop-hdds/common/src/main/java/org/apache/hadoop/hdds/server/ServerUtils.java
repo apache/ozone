@@ -35,7 +35,6 @@ import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.security.UserGroupInformation;
 
-import org.apache.http.client.methods.HttpRequestBase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -125,17 +124,6 @@ public final class ServerUtils {
     conf.set(addressKey,
         addr.getHostString() + ":" + listenAddr.getPort());
     return updatedAddr;
-  }
-
-
-  /**
-   * Releases a http connection if the request is not null.
-   * @param request
-   */
-  public static void releaseConnection(HttpRequestBase request) {
-    if (request != null) {
-      request.releaseConnection();
-    }
   }
 
   /**

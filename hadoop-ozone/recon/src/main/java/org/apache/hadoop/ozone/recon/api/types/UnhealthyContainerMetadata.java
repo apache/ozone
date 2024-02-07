@@ -76,6 +76,10 @@ public class UnhealthyContainerMetadata {
     this.keys = keyCount;
   }
 
+  // Default constructor, used by jackson lib for object deserialization.
+  public UnhealthyContainerMetadata() {
+  }
+
   public long getContainerID() {
     return containerID;
   }

@@ -68,6 +68,9 @@ public class MismatchedReplicasHandler extends AbstractCheck {
     LOG.debug("Checking container {} in MismatchedReplicasHandler",
         containerInfo);
 
+    if (request.isReadOnly()) {
+      return false;
+    }
     // close replica if needed
     for (ContainerReplica replica : replicas) {
       if (shouldBeClosed(containerInfo, replica)) {

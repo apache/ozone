@@ -29,8 +29,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY
 import static org.apache.hadoop.hdds.scm.node.NodeStatus.inServiceDead;
 import static org.apache.hadoop.hdds.scm.node.NodeStatus.inServiceHealthy;
 import static org.apache.hadoop.hdds.scm.node.NodeStatus.inServiceStale;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for {@link NodeStatus}.
@@ -46,21 +46,21 @@ class TestNodeStatus {
 
   @Test
   void healthyFirst() {
-    assertTrue(0 > inServiceHealthy().compareTo(inServiceStale()));
-    assertTrue(0 < inServiceDead().compareTo(inServiceHealthy()));
-    assertTrue(0 > new NodeStatus(ENTERING_MAINTENANCE, HEALTHY).compareTo(
+    assertThat(0).isGreaterThan(inServiceHealthy().compareTo(inServiceStale()));
+    assertThat(0).isLessThan(inServiceDead().compareTo(inServiceHealthy()));
+    assertThat(0).isGreaterThan(new NodeStatus(ENTERING_MAINTENANCE, HEALTHY).compareTo(
         inServiceStale()
     ));
-    assertTrue(0 < inServiceStale().compareTo(
+    assertThat(0).isLessThan(inServiceStale().compareTo(
         new NodeStatus(DECOMMISSIONING, HEALTHY)
     ));
   }
 
   @Test
   void inServiceFirst() {
-    assertTrue(0 > inServiceHealthy().compareTo(
+    assertThat(0).isGreaterThan(inServiceHealthy().compareTo(
         new NodeStatus(ENTERING_MAINTENANCE, HEALTHY)));
-    assertTrue(0 < new NodeStatus(DECOMMISSIONING, HEALTHY).compareTo(
+    assertThat(0).isLessThan(new NodeStatus(DECOMMISSIONING, HEALTHY).compareTo(
         inServiceHealthy()
     ));
   }

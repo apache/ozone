@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.freon;
 import com.codahale.metrics.Timer;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.ozone.container.stream.DirectoryServerDestination;
 import org.apache.hadoop.ozone.container.stream.DirectoryServerSource;
 import org.apache.hadoop.ozone.container.stream.StreamingClient;
@@ -61,9 +62,11 @@ public class StreamingGenerator extends BaseFreonGenerator
   private int numberOfFiles;
 
   @CommandLine.Option(names = {"--size"},
-      description = "Size of the generated files.",
-      defaultValue = "104857600")
-  private long fileSize;
+      description = "Size of the generated files. " +
+          StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
+      defaultValue = "100MB",
+      converter = StorageSizeConverter.class)
+  private StorageSize fileSize;
 
   private static final String SUB_DIR_NAME = "dir1";
 
@@ -91,8 +94,8 @@ public class StreamingGenerator extends BaseFreonGenerator
       }
       Path subDir = sourceDir.resolve(SUB_DIR_NAME);
       Files.createDirectories(subDir);
-      ContentGenerator contentGenerator = new ContentGenerator(fileSize,
-          1024);
+      ContentGenerator contentGenerator =
+          new ContentGenerator(fileSize.toBytes(), 1024);
 
       for (int i = 0; i < numberOfFiles; i++) {
         try (FileOutputStream out = new FileOutputStream(

@@ -19,15 +19,19 @@
 package org.apache.hadoop.ozone.om.request.bucket;
 
 import java.io.IOException;
+import java.nio.file.InvalidPathException;
 import java.util.List;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.common.BekInfoUtils;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
+import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
@@ -86,6 +90,18 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
         .getSetBucketPropertyRequest().toBuilder()
         .setModificationTime(modificationTime);
 
+    BucketArgs bucketArgs =
+        getOmRequest().getSetBucketPropertyRequest().getBucketArgs();
+
+    if (bucketArgs.hasBekInfo()) {
+      KeyProviderCryptoExtension kmsProvider = ozoneManager.getKmsProvider();
+      BucketArgs.Builder bucketArgsBuilder =
+          setBucketPropertyRequestBuilder.getBucketArgsBuilder();
+      bucketArgsBuilder.setBekInfo(
+          BekInfoUtils.getBekInfo(kmsProvider, bucketArgs.getBekInfo()));
+      setBucketPropertyRequestBuilder.setBucketArgs(bucketArgsBuilder.build());
+    }
+
     return getOmRequest().toBuilder()
         .setSetBucketPropertyRequest(setBucketPropertyRequestBuilder)
         .setUserInfo(getUserInfo())
@@ -94,9 +110,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-      long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+    final long transactionLogIndex = termIndex.getIndex();
 
     SetBucketPropertyRequest setBucketPropertyRequest =
         getOmRequest().getSetBucketPropertyRequest();
@@ -118,7 +133,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
     AuditLogger auditLogger = ozoneManager.getAuditLogger();
     OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
-    IOException exception = null;
+    Exception exception = null;
     boolean acquiredBucketLock = false, success = true;
     OMClientResponse omClientResponse = null;
     try {
@@ -128,8 +143,9 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       }
 
       // acquire lock.
-      acquiredBucketLock =  omMetadataManager.getLock().acquireWriteLock(
-          BUCKET_LOCK, volumeName, bucketName);
+      mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
+          BUCKET_LOCK, volumeName, bucketName));
+      acquiredBucketLock = getOmLockDetails().isLockAcquired();
 
       String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
       OmBucketInfo dbBucketInfo =
@@ -189,6 +205,11 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
         bucketInfoBuilder.setDefaultReplicationConfig(defaultReplicationConfig);
       }
 
+      BucketEncryptionKeyInfo bek = omBucketArgs.getBucketEncryptionKeyInfo();
+      if (bek != null && bek.getKeyName() != null) {
+        bucketInfoBuilder.setBucketEncryptionKey(bek);
+      }
+
       omBucketInfo = bucketInfoBuilder.build();
 
       // Update table cache.
@@ -200,17 +221,18 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
           SetBucketPropertyResponse.newBuilder().build());
       omClientResponse = new OMBucketSetPropertyResponse(
           omResponse.build(), omBucketInfo);
-    } catch (IOException ex) {
+    } catch (IOException | InvalidPathException ex) {
       success = false;
       exception = ex;
       omClientResponse = new OMBucketSetPropertyResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
       if (acquiredBucketLock) {
-        omMetadataManager.getLock().releaseWriteLock(BUCKET_LOCK, volumeName,
-            bucketName);
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName));
+      }
+      if (omClientResponse != null) {
+        omClientResponse.setOmLockDetails(getOmLockDetails());
       }
     }
 

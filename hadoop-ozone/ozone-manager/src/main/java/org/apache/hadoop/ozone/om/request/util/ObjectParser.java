@@ -48,15 +48,11 @@ public class ObjectParser {
     } else if (objectType == ObjectType.BUCKET && tokens.length == 2) {
       volume = tokens[0];
       bucket = tokens[1];
-    } else if (objectType == ObjectType.KEY && tokens.length == 3) {
+    } else if ((objectType == ObjectType.KEY ||
+        objectType == ObjectType.PREFIX) && tokens.length == 3) {
       volume = tokens[0];
       bucket = tokens[1];
       key = tokens[2];
-    } else if (objectType == ObjectType.PREFIX && tokens.length >= 1) {
-      volume = tokens[0];
-      if (tokens.length >= 2) {
-        bucket = tokens[1];
-      }
     } else {
       throw new OMException("Illegal path " + path,
           OMException.ResultCodes.INVALID_PATH_IN_ACL_REQUEST);

@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotCreateResponse;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotPurgeResponse;
@@ -50,7 +49,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.Mockito;
 
 import java.io.File;
 import java.io.IOException;
@@ -71,8 +69,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -94,18 +92,14 @@ public class TestOMSnapshotPurgeRequestAndResponse {
   private String bucketName;
   private String keyName;
 
-  // Just setting ozoneManagerDoubleBuffer which does nothing.
-  private static final OzoneManagerDoubleBufferHelper
-      DOUBLE_BUFFER_HELPER = ((response, transactionIndex) -> null);
-
   @BeforeEach
   void setup(@TempDir File testDir) throws Exception {
-    ozoneManager = Mockito.mock(OzoneManager.class);
+    ozoneManager = mock(OzoneManager.class);
     OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
     when(lvm.isAllowed(anyString())).thenReturn(true);
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
     when(ozoneManager.isRatisEnabled()).thenReturn(true);
-    auditLogger = Mockito.mock(AuditLogger.class);
+    auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     omMetrics = OMMetrics.create();
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
@@ -122,7 +116,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
     when(ozoneManager.isFilesystemSnapshotEnabled()).thenReturn(true);
 
     ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmMetadataReader =
-        Mockito.mock(ReferenceCounted.class);
+        mock(ReferenceCounted.class);
     when(ozoneManager.getOmMetadataReader()).thenReturn(rcOmMetadataReader);
     omSnapshotManager = new OmSnapshotManager(ozoneManager);
     when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
@@ -193,8 +187,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
 
     // validateAndUpdateCache OMSnapshotCreateResponse.
     OMSnapshotCreateResponse omClientResponse = (OMSnapshotCreateResponse)
-        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1,
-            DOUBLE_BUFFER_HELPER);
+        omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1);
     // Add to batch and commit to DB.
     omClientResponse.addToDBBatch(omMetadataManager, batchOperation);
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
@@ -231,8 +224,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
 
     // validateAndUpdateCache for OMSnapshotPurgeRequest.
     OMSnapshotPurgeResponse omSnapshotPurgeResponse = (OMSnapshotPurgeResponse)
-        omSnapshotPurgeRequest.validateAndUpdateCache(ozoneManager, 200L,
-            DOUBLE_BUFFER_HELPER);
+        omSnapshotPurgeRequest.validateAndUpdateCache(ozoneManager, 200L);
 
     // Commit to DB.
     batchOperation = omMetadataManager.getStore().initBatchOperation();
@@ -452,7 +444,7 @@ public class TestOMSnapshotPurgeRequestAndResponse {
 
   private void validateSnapshotOrderInSnapshotInfoTableAndSnapshotChain(
       List<SnapshotInfo> snapshotInfoList
-  ) {
+  ) throws IOException {
     if (snapshotInfoList.isEmpty()) {
       return;
     }

@@ -49,7 +49,8 @@ import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_DOMAIN_NA
 @Priority(VirtualHostStyleFilter.PRIORITY)
 public class VirtualHostStyleFilter implements ContainerRequestFilter {
 
-  public static final int PRIORITY = 100;
+  public static final int PRIORITY = AuthorizationFilter.PRIORITY +
+      S3GatewayHttpServer.FILTER_PRIORITY_DO_AFTER;
 
   private static final Logger LOG = LoggerFactory.getLogger(
       VirtualHostStyleFilter.class);
@@ -62,6 +63,12 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
   @Override
   public void filter(ContainerRequestContext requestContext) throws
       IOException {
+    // Skip this filter if the uri is hitting S3Secret generation or
+    // revocation endpoint.
+    if (requestContext.getUriInfo().getRequestUri().getPath()
+        .startsWith("/secret")) {
+      return;
+    }
 
     domains = conf.getTrimmedStrings(OZONE_S3G_DOMAIN_NAME);
 
@@ -103,12 +110,12 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
       URI baseURI = requestContext.getUriInfo().getBaseUri();
       String currentPath = requestContext.getUriInfo().getPath();
       String newPath = bucketName;
-      if (currentPath != null) {
-        newPath += String.format("%s", currentPath);
-      }
       MultivaluedMap<String, String> queryParams = requestContext.getUriInfo()
           .getQueryParameters();
       UriBuilder requestAddrBuilder = UriBuilder.fromUri(baseURI).path(newPath);
+      if (currentPath != null) {
+        requestAddrBuilder.path(currentPath);
+      }
       queryParams.forEach((k, v) -> requestAddrBuilder.queryParam(k,
           v.toArray()));
       URI requestAddr = requestAddrBuilder.build();

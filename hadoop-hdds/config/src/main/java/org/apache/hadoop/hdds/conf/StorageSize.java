@@ -91,6 +91,14 @@ public class StorageSize {
 
   }
 
+  public static StorageSize parse(String value, StorageUnit defaultUnit) {
+    try {
+      return parse(value);
+    } catch (IllegalArgumentException e) {
+      return new StorageSize(defaultUnit, Double.parseDouble(value));
+    }
+  }
+
   public StorageUnit getUnit() {
     return unit;
   }
@@ -99,4 +107,7 @@ public class StorageSize {
     return value;
   }
 
+  public long toBytes() {
+    return (long) unit.toBytes(value);
+  }
 }

@@ -232,7 +232,8 @@ public final class KeyValueContainerUtil {
       LOG.error("Container DB file is missing for ContainerID {}. " +
           "Skipping loading of this container.", containerID);
       // Don't further process this container, as it is missing db file.
-      return;
+      throw new IOException("Container DB file is missing for containerID "
+          + containerID);
     }
     kvContainerData.setDbFile(dbFile);
 

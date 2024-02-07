@@ -30,15 +30,16 @@ const {Sider} = Layout;
 interface INavBarProps extends RouteComponentProps<object> {
   collapsed: boolean;
   onCollapse: (arg: boolean) => void;
-  isHeatmapAvailable: boolean;
+  isHeatmapEnabled: boolean;
   isLoading: boolean;
+  location: object
 }
 
 class NavBar extends React.Component<INavBarProps> {
   constructor(props = {}) {
     super(props);
     this.state = {
-      isHeatmapAvailable: false,
+      isHeatmapEnabled: false,
       isLoading: false
     };
   }
@@ -61,7 +62,7 @@ class NavBar extends React.Component<INavBarProps> {
       // If disabledFeaturesFlag is true then disable Heatmap Feature in Ozone Recon
       this.setState({
         isLoading: false,
-        isHeatmapAvailable: !disabledFeaturesFlag
+        isHeatmapEnabled: !disabledFeaturesFlag
       });
     }).catch(error => {
       this.setState({
@@ -71,14 +72,9 @@ class NavBar extends React.Component<INavBarProps> {
     });
   };
 
-  refresh = () => {
-    console.log("refresh");
-    this.props.history.push('/Heatmap');
-    window.location.reload();
-    }
-
   render() {
     const {location} = this.props;
+    const { isHeatmapEnabled } = this.state;
     return (
       <Sider
         collapsible
@@ -101,6 +97,16 @@ class NavBar extends React.Component<INavBarProps> {
             <Icon type='dashboard'/>
             <span>Overview</span>
             <Link to='/Overview'/>
+          </Menu.Item>
+          <Menu.Item key='/Volumes'>
+            <Icon type='inbox'/>
+            <span>Volumes</span>
+            <Link to='/Volumes'/>.
+          </Menu.Item>
+          <Menu.Item key='/Buckets'>
+            <Icon type='folder-open'/>
+            <span>Buckets</span>
+            <Link to='/Buckets'/>.
           </Menu.Item>
           <Menu.Item key='/Datanodes'>
             <Icon type='cluster'/>
@@ -140,12 +146,17 @@ class NavBar extends React.Component<INavBarProps> {
             <Link to='/DiskUsage'/>
           </Menu.Item>
           {
-            this.state.isHeatmapAvailable ?
+            isHeatmapEnabled ?
               <Menu.Item key='/Heatmap'>
                 <Icon type='bar-chart' />
                 <span>Heatmap</span>
-                <Link to='/Heatmap' onClick={this.refresh}/>
-              </Menu.Item> : ""
+                <Link to={{
+                  pathname: '/Heatmap',
+                  state: { isHeatmapEnabled: true}
+                }}
+                />
+              </Menu.Item>
+              : ""
           }
         </Menu>
       </Sider>

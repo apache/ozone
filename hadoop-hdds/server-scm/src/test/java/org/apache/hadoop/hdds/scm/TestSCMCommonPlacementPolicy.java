@@ -24,30 +24,44 @@ import com.google.common.collect.Sets;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.Node;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
-import org.mockito.Mockito;
-
+import java.io.File;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto.DISK;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -60,9 +74,9 @@ public class TestSCMCommonPlacementPolicy {
   private OzoneConfiguration conf;
 
   @BeforeEach
-  public void setup() {
+  void setup(@TempDir File testDir) {
     nodeManager = new MockNodeManager(true, 10);
-    conf = SCMTestUtils.getConf();
+    conf = SCMTestUtils.getConf(testDir);
   }
 
   @Test
@@ -72,7 +86,7 @@ public class TestSCMCommonPlacementPolicy {
     List<DatanodeDetails> list = nodeManager.getAllNodes();
     List<DatanodeDetails> result = dummyPlacementPolicy.getResultSet(3, list);
     Set<DatanodeDetails> resultSet = new HashSet<>(result);
-    Assertions.assertNotEquals(1, resultSet.size());
+    assertNotEquals(1, resultSet.size());
   }
 
   private Set<ContainerReplica> testReplicasToFixMisreplication(
@@ -93,7 +107,7 @@ public class TestSCMCommonPlacementPolicy {
           Map<Node, Integer> expectedNumberOfCopyOperationFromRack) {
     Set<ContainerReplica> replicasToCopy = placementPolicy
             .replicasToCopyToFixMisreplication(replicas);
-    Assertions.assertEquals(expectedNumberOfReplicasToCopy,
+    assertEquals(expectedNumberOfReplicasToCopy,
             replicasToCopy.size());
     Map<Node, Long> rackCopyMap =
             replicasToCopy.stream().collect(Collectors.groupingBy(
@@ -105,7 +119,7 @@ public class TestSCMCommonPlacementPolicy {
             .map(placementPolicy::getPlacementGroup)
             .collect(Collectors.toSet());
     for (Node rack: racks) {
-      Assertions.assertEquals(
+      assertEquals(
               expectedNumberOfCopyOperationFromRack.getOrDefault(rack, 0),
               rackCopyMap.getOrDefault(rack, 0L).intValue());
     }
@@ -267,7 +281,7 @@ public class TestSCMCommonPlacementPolicy {
     Map<ContainerReplica, Boolean> replicaMap = replicas.stream().distinct()
             .collect(Collectors.toMap(Function.identity(), r -> false));
     replicaMap.put(replicas.get(0), true);
-    Assertions.assertEquals(testReplicasToFixMisreplication(replicaMap,
+    assertEquals(testReplicasToFixMisreplication(replicaMap,
             dummyPlacementPolicy, 1,
             ImmutableMap.of(racks.get(0), 1)),
             Sets.newHashSet(replicas.get(0)));
@@ -287,7 +301,7 @@ public class TestSCMCommonPlacementPolicy {
                     .collect(Collectors.toMap(Function.identity(), r -> true));
     Set<ContainerReplica> replicasToCopy = dummyPlacementPolicy
             .replicasToCopyToFixMisreplication(replicas);
-    Assertions.assertEquals(0, replicasToCopy.size());
+    assertEquals(0, replicasToCopy.size());
   }
 
   @Test
@@ -307,8 +321,8 @@ public class TestSCMCommonPlacementPolicy {
 
     Set<ContainerReplica> replicasToRemove = dummyPlacementPolicy
             .replicasToRemoveToFixOverreplication(replicas, 1);
-    Assertions.assertEquals(replicasToRemove.size(), 1);
-    Assertions.assertEquals(replicasToRemove.toArray()[0], replica);
+    assertEquals(1, replicasToRemove.size());
+    assertEquals(replicasToRemove.toArray()[0], replica);
   }
 
   @Test
@@ -328,8 +342,8 @@ public class TestSCMCommonPlacementPolicy {
 
     Set<ContainerReplica> replicasToRemove = dummyPlacementPolicy
             .replicasToRemoveToFixOverreplication(replicas, 1);
-    Assertions.assertEquals(replicasToRemove.size(), 2);
-    Assertions.assertEquals(replicasToRemove, replicasToBeRemoved);
+    assertEquals(2, replicasToRemove.size());
+    assertEquals(replicasToRemove, replicasToBeRemoved);
   }
 
   @Test
@@ -354,8 +368,8 @@ public class TestSCMCommonPlacementPolicy {
 
     Set<ContainerReplica> replicasToRemove = dummyPlacementPolicy
             .replicasToRemoveToFixOverreplication(replicas, 2);
-    Assertions.assertEquals(replicasToRemove.size(), 2);
-    Assertions.assertEquals(replicasToRemove, replicasToBeRemoved);
+    assertEquals(2, replicasToRemove.size());
+    assertEquals(replicasToRemove, replicasToBeRemoved);
   }
 
   @Test
@@ -369,10 +383,10 @@ public class TestSCMCommonPlacementPolicy {
 
     Set<ContainerReplica> replicasToRemove = dummyPlacementPolicy
             .replicasToRemoveToFixOverreplication(replicas, 3);
-    Assertions.assertEquals(replicasToRemove.size(), 2);
+    assertEquals(2, replicasToRemove.size());
     Set<Node> racksToBeRemoved = Arrays.asList(0, 1).stream()
             .map(dummyPlacementPolicy.racks::get).collect(Collectors.toSet());
-    Assertions.assertEquals(replicasToRemove.stream()
+    assertEquals(replicasToRemove.stream()
             .map(ContainerReplica::getDatanodeDetails)
             .map(dummyPlacementPolicy::getPlacementGroup)
             .collect(Collectors.toSet()), racksToBeRemoved);
@@ -408,10 +422,10 @@ public class TestSCMCommonPlacementPolicy {
             .map(dummyPlacementPolicy::getPlacementGroup)
             .collect(Collectors.groupingBy(Function.identity(),
                     Collectors.counting()));
-    Assertions.assertEquals(replicasToRemove.size(), 2);
-    Assertions.assertTrue(Sets.newHashSet(1L, 2L).contains(
-            removedReplicasRackCntMap.get(dummyPlacementPolicy.racks.get(0))));
-    Assertions.assertEquals(
+    assertEquals(2, replicasToRemove.size());
+    assertThat(Sets.newHashSet(1L, 2L)).contains(
+            removedReplicasRackCntMap.get(dummyPlacementPolicy.racks.get(0)));
+    assertEquals(
             removedReplicasRackCntMap.get(dummyPlacementPolicy.racks.get(1)),
             removedReplicasRackCntMap.get(dummyPlacementPolicy.racks.get(0))
                     == 2 ? 0 : 1);
@@ -428,7 +442,7 @@ public class TestSCMCommonPlacementPolicy {
 
     Set<ContainerReplica> replicasToRemove = dummyPlacementPolicy
             .replicasToRemoveToFixOverreplication(replicas, 1);
-    Assertions.assertEquals(replicasToRemove.size(), 0);
+    assertEquals(replicasToRemove.size(), 0);
   }
 
   @Test
@@ -448,9 +462,64 @@ public class TestSCMCommonPlacementPolicy {
           }
         };
     dummyPlacementPolicy.chooseDatanodes(null, null, 1, 1, 1);
-    Assertions.assertFalse(usedNodesIdentity.get());
+    assertFalse(usedNodesIdentity.get());
     dummyPlacementPolicy.chooseDatanodes(null, null, null, 1, 1, 1);
-    Assertions.assertTrue(usedNodesIdentity.get());
+    assertTrue(usedNodesIdentity.get());
+  }
+
+  @Test
+  public void testDatanodeIsInvalidInCaseOfIncreasingCommittedBytes() {
+    NodeManager nodeMngr = mock(NodeManager.class);
+    UUID datanodeUuid = UUID.randomUUID();
+    DummyPlacementPolicy placementPolicy =
+        new DummyPlacementPolicy(nodeMngr, conf, 1);
+    DatanodeDetails datanodeDetails = mock(DatanodeDetails.class);
+    when(datanodeDetails.getUuid()).thenReturn(datanodeUuid);
+
+    DatanodeInfo datanodeInfo = mock(DatanodeInfo.class);
+    NodeStatus nodeStatus = mock(NodeStatus.class);
+    when(nodeStatus.isNodeWritable()).thenReturn(true);
+    when(datanodeInfo.getNodeStatus()).thenReturn(nodeStatus);
+    when(nodeMngr.getNodeByUuid(eq(datanodeUuid))).thenReturn(datanodeInfo);
+
+    // capacity = 200000, used = 90000, remaining = 101000, committed = 500
+    StorageContainerDatanodeProtocolProtos.StorageReportProto storageReport1 =
+        HddsTestUtils.createStorageReport(UUID.randomUUID(), "/data/hdds",
+                200000, 90000, 101000, DISK).toBuilder()
+            .setCommitted(500)
+            .setFreeSpaceToSpare(10000)
+            .build();
+    // capacity = 200000, used = 90000, remaining = 101000, committed = 1000
+    StorageContainerDatanodeProtocolProtos.StorageReportProto storageReport2 =
+        HddsTestUtils.createStorageReport(UUID.randomUUID(), "/data/hdds",
+                200000, 90000, 101000, DISK).toBuilder()
+            .setCommitted(1000)
+            .setFreeSpaceToSpare(100000)
+            .build();
+    StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto
+        metaReport = HddsTestUtils.createMetadataStorageReport("/data/metadata",
+          200);
+    when(datanodeInfo.getStorageReports())
+        .thenReturn(Collections.singletonList(storageReport1))
+        .thenReturn(Collections.singletonList(storageReport2));
+    when(datanodeInfo.getMetadataStorageReports())
+        .thenReturn(Collections.singletonList(metaReport));
+
+
+    // 500 committed bytes:
+    //
+    //   101000       500
+    //     |           |
+    // (remaining - committed) > Math.max(4000, freeSpaceToSpare)
+    //                                                    |
+    //                                                  100000
+    //
+    // Summary: 101000 - 500 > 100000 == true
+    assertTrue(placementPolicy.isValidNode(datanodeDetails, 100, 4000));
+
+    // 1000 committed bytes:
+    // Summary: 101000 - 1000 > 100000 == false
+    assertFalse(placementPolicy.isValidNode(datanodeDetails, 100, 4000));
   }
 
   private static class DummyPlacementPolicy extends SCMCommonPlacementPolicy {
@@ -485,7 +554,7 @@ public class TestSCMCommonPlacementPolicy {
       super(nodeManager, conf);
       this.rackCnt = rackCnt;
       this.racks = IntStream.range(0, rackCnt)
-      .mapToObj(i -> Mockito.mock(Node.class)).collect(Collectors.toList());
+      .mapToObj(i -> mock(Node.class)).collect(Collectors.toList());
       List<DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
       rackMap = datanodeRackMap.entrySet().stream()
               .collect(Collectors.toMap(

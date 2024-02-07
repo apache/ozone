@@ -43,11 +43,9 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.Assert;
 import org.junit.jupiter.api.BeforeAll;
-import org.apache.ozone.test.tag.Flaky;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -60,11 +58,14 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test container closing.
  */
-@Flaky("HDDS-3263")
 public class TestCloseContainerByPipeline {
 
   private static MiniOzoneCluster cluster;
@@ -133,12 +134,11 @@ public class TestCloseContainerByPipeline {
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipeline(container.getPipelineID());
     List<DatanodeDetails> datanodes = pipeline.getNodes();
-    Assert.assertEquals(datanodes.size(), 1);
+    assertEquals(1, datanodes.size());
 
     DatanodeDetails datanodeDetails = datanodes.get(0);
     HddsDatanodeService datanodeService = null;
-    Assert
-        .assertFalse(isContainerClosed(cluster, containerID, datanodeDetails));
+    assertFalse(isContainerClosed(cluster, containerID, datanodeDetails));
     for (HddsDatanodeService datanodeServiceItr : cluster.getHddsDatanodes()) {
       if (datanodeDetails.equals(datanodeServiceItr.getDatanodeDetails())) {
         datanodeService = datanodeServiceItr;
@@ -160,8 +160,7 @@ public class TestCloseContainerByPipeline {
         .waitFor(() -> isContainerClosed(cluster, containerID, datanodeDetails),
             500, 5 * 1000);
     // Make sure the closeContainerCommandHandler is Invoked
-    Assert.assertTrue(
-        closeContainerHandler.getInvocationCount() > lastInvocationCount);
+    assertThat(closeContainerHandler.getInvocationCount()).isGreaterThan(lastInvocationCount);
   }
 
   @Test
@@ -192,11 +191,10 @@ public class TestCloseContainerByPipeline {
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipeline(container.getPipelineID());
     List<DatanodeDetails> datanodes = pipeline.getNodes();
-    Assert.assertEquals(datanodes.size(), 1);
+    assertEquals(1, datanodes.size());
 
     DatanodeDetails datanodeDetails = datanodes.get(0);
-    Assert
-        .assertFalse(isContainerClosed(cluster, containerID, datanodeDetails));
+    assertFalse(isContainerClosed(cluster, containerID, datanodeDetails));
 
     // Send the order to close the container, give random pipeline id so that
     // the container will not be closed via RATIS
@@ -213,13 +211,13 @@ public class TestCloseContainerByPipeline {
     GenericTestUtils
         .waitFor(() -> isContainerClosed(cluster, containerID, datanodeDetails),
             500, 5 * 1000);
-    Assert.assertTrue(isContainerClosed(cluster, containerID, datanodeDetails));
+    assertTrue(isContainerClosed(cluster, containerID, datanodeDetails));
 
     cluster.getStorageContainerManager().getPipelineManager()
         .closePipeline(pipeline, false);
     Thread.sleep(5000);
     // Pipeline close should not affect a container in CLOSED state
-    Assert.assertTrue(isContainerClosed(cluster, containerID, datanodeDetails));
+    assertTrue(isContainerClosed(cluster, containerID, datanodeDetails));
   }
 
   @Test
@@ -249,11 +247,11 @@ public class TestCloseContainerByPipeline {
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipeline(container.getPipelineID());
     List<DatanodeDetails> datanodes = pipeline.getNodes();
-    Assert.assertEquals(3, datanodes.size());
+    assertEquals(3, datanodes.size());
 
     List<DBHandle> metadataStores = new ArrayList<>(datanodes.size());
     for (DatanodeDetails details : datanodes) {
-      Assert.assertFalse(isContainerClosed(cluster, containerID, details));
+      assertFalse(isContainerClosed(cluster, containerID, details));
       //send the order to close the container
       SCMCommand<?> command = new CloseContainerCommand(
           containerID, pipeline.getId());
@@ -272,8 +270,7 @@ public class TestCloseContainerByPipeline {
     }
 
     // There should be as many rocks db as the number of datanodes in pipeline.
-    Assert.assertEquals(datanodes.size(),
-        metadataStores.stream().distinct().count());
+    assertEquals(datanodes.size(), metadataStores.stream().distinct().count());
 
     // Make sure that it is CLOSED
     for (DatanodeDetails datanodeDetails : datanodes) {
@@ -281,12 +278,11 @@ public class TestCloseContainerByPipeline {
           () -> isContainerClosed(cluster, containerID, datanodeDetails), 500,
           15 * 1000);
       //double check if it's really closed (waitFor also throws an exception)
-      Assert.assertTrue(isContainerClosed(cluster,
-          containerID, datanodeDetails));
+      assertTrue(isContainerClosed(cluster, containerID, datanodeDetails));
     }
   }
 
-  @Disabled("Failing with timeout")
+  @Unhealthy("Failing with timeout")
   @Test
   public void testQuasiCloseTransitionViaRatis()
       throws IOException, TimeoutException, InterruptedException {
@@ -315,11 +311,10 @@ public class TestCloseContainerByPipeline {
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipeline(container.getPipelineID());
     List<DatanodeDetails> datanodes = pipeline.getNodes();
-    Assert.assertEquals(datanodes.size(), 1);
+    assertEquals(1, datanodes.size());
 
     DatanodeDetails datanodeDetails = datanodes.get(0);
-    Assert
-        .assertFalse(isContainerClosed(cluster, containerID, datanodeDetails));
+    assertFalse(isContainerClosed(cluster, containerID, datanodeDetails));
 
     // close the pipeline
     cluster.getStorageContainerManager()
@@ -330,7 +325,7 @@ public class TestCloseContainerByPipeline {
     GenericTestUtils.waitFor(
         () -> isContainerQuasiClosed(cluster, containerID, datanodeDetails),
         500, 5 * 1000);
-    Assert.assertTrue(
+    assertTrue(
         isContainerQuasiClosed(cluster, containerID, datanodeDetails));
 
     // Send close container command from SCM to datanode with forced flag as
@@ -344,8 +339,7 @@ public class TestCloseContainerByPipeline {
     GenericTestUtils
         .waitFor(() -> isContainerClosed(
             cluster, containerID, datanodeDetails), 500, 5 * 1000);
-    Assert.assertTrue(
-        isContainerClosed(cluster, containerID, datanodeDetails));
+    assertTrue(isContainerClosed(cluster, containerID, datanodeDetails));
   }
 
   private Boolean isContainerClosed(MiniOzoneCluster ozoneCluster,

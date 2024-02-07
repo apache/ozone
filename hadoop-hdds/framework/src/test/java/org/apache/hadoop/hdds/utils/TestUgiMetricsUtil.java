@@ -18,9 +18,11 @@
 
 package org.apache.hadoop.hdds.utils;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Optional;
 import org.apache.hadoop.metrics2.MetricsTag;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -39,7 +41,7 @@ class TestUgiMetricsUtil {
         UgiMetricsUtil.createServernameTag(key, servername);
 
     // THEN
-    Assertions.assertFalse(optionalMetricsTag.isPresent());
+    assertFalse(optionalMetricsTag.isPresent());
   }
 
   @Test
@@ -53,10 +55,10 @@ class TestUgiMetricsUtil {
         UgiMetricsUtil.createServernameTag(key, servername);
 
     // THEN
-    Assertions.assertTrue(optionalMetricsTag.isPresent());
-    Assertions.assertEquals(servername, optionalMetricsTag.get().value());
-    Assertions.assertEquals(servername, optionalMetricsTag.get().name());
-    Assertions.assertEquals("name of the server",
+    assertTrue(optionalMetricsTag.isPresent());
+    assertEquals(servername, optionalMetricsTag.get().value());
+    assertEquals(servername, optionalMetricsTag.get().name());
+    assertEquals("name of the server",
         optionalMetricsTag.get().description());
   }
 

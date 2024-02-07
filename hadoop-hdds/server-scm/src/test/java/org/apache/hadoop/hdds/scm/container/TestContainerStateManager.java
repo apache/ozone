@@ -23,10 +23,8 @@ import java.time.Clock;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -46,13 +44,14 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
+import org.junit.jupiter.api.io.TempDir;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.when;
 
 /**
@@ -63,6 +62,7 @@ public class TestContainerStateManager {
   private ContainerStateManager containerStateManager;
   private PipelineManager pipelineManager;
   private SCMHAManager scmhaManager;
+  @TempDir
   private File testDir;
   private DBStore dbStore;
   private Pipeline pipeline;
@@ -71,12 +71,10 @@ public class TestContainerStateManager {
   public void init() throws IOException, TimeoutException {
     OzoneConfiguration conf = new OzoneConfiguration();
     scmhaManager = SCMHAManagerStub.getInstance(true);
-    testDir = GenericTestUtils.getTestDir(
-        TestContainerStateManager.class.getSimpleName() + UUID.randomUUID());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
-    pipelineManager = Mockito.mock(PipelineManager.class);
+    pipelineManager = mock(PipelineManager.class);
     pipeline = Pipeline.newBuilder().setState(Pipeline.PipelineState.CLOSED)
             .setId(PipelineID.randomId())
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(
@@ -84,8 +82,7 @@ public class TestContainerStateManager {
             .setNodes(new ArrayList<>()).build();
     when(pipelineManager.createPipeline(StandaloneReplicationConfig.getInstance(
         ReplicationFactor.THREE))).thenReturn(pipeline);
-    when(pipelineManager.containsPipeline(Mockito.any(PipelineID.class)))
-        .thenReturn(true);
+    when(pipelineManager.containsPipeline(any(PipelineID.class))).thenReturn(true);
 
 
     containerStateManager = ContainerStateManagerImpl.newBuilder()
@@ -106,8 +103,6 @@ public class TestContainerStateManager {
     if (dbStore != null) {
       dbStore.close();
     }
-
-    FileUtil.fullyDelete(testDir);
   }
 
   @Test
@@ -129,7 +124,7 @@ public class TestContainerStateManager {
         .getContainerReplicas(c1.containerID());
 
     //THEN
-    Assertions.assertEquals(3, replicas.size());
+    assertEquals(3, replicas.size());
   }
 
   @Test
@@ -149,8 +144,8 @@ public class TestContainerStateManager {
     Set<ContainerReplica> replicas = containerStateManager
         .getContainerReplicas(c1.containerID());
 
-    Assertions.assertEquals(2, replicas.size());
-    Assertions.assertEquals(3, c1.getReplicationConfig().getRequiredNodes());
+    assertEquals(2, replicas.size());
+    assertEquals(3, c1.getReplicationConfig().getRequiredNodes());
   }
 
   private void addReplica(ContainerInfo cont, DatanodeDetails node) {

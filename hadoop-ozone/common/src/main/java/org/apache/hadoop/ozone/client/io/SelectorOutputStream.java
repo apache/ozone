@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.client.io;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.ratis.util.function.CheckedFunction;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Objects;

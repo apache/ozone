@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import java.io.InputStream;
 import java.io.OutputStream;
-import org.junit.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,6 +39,9 @@ import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Bucket to perform read/write & delete ops.
@@ -174,11 +176,10 @@ public class LoadBucket {
     void doFsOp(Path p) throws IOException {
       if (readDir) {
         FileStatus status = fs.getFileStatus(p);
-        Assert.assertTrue(status.isDirectory());
-        Assert.assertEquals(p,
-            Path.getPathWithoutSchemeAndAuthority(status.getPath()));
+        assertTrue(status.isDirectory());
+        assertEquals(p, Path.getPathWithoutSchemeAndAuthority(status.getPath()));
       } else {
-        Assert.assertTrue(fs.mkdirs(p));
+        assertTrue(fs.mkdirs(p));
       }
     }
 

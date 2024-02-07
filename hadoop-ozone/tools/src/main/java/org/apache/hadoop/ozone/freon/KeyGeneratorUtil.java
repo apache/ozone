@@ -38,7 +38,7 @@ public class KeyGeneratorUtil {
     return number -> String.valueOf(number);
   }
 
-  public String generateMd5KeyName(int number) {
+  public String generateMd5KeyName(long number) {
     String encodedStr = DigestUtils.md5Hex(String.valueOf(number));
     return encodedStr.substring(0, 7);
   }

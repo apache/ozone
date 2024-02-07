@@ -18,10 +18,9 @@
 package org.apache.hadoop.hdds.fs;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.fs.FileUtil;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
@@ -30,7 +29,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.OptionalLong;
 
-import static org.apache.ozone.test.GenericTestUtils.getTestDir;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -41,8 +39,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 public class TestSaveSpaceUsageToFile {
 
-  private static final File DIR =
-      getTestDir(TestSaveSpaceUsageToFile.class.getSimpleName());
+  @TempDir
+  private File dir;
 
   private static final Duration LONG_EXPIRY = Duration.ofMinutes(15);
 
@@ -53,14 +51,7 @@ public class TestSaveSpaceUsageToFile {
 
   @BeforeEach
   public void setup() {
-    FileUtil.fullyDelete(DIR);
-    assertTrue(DIR.mkdirs());
-    file = new File(DIR, "space_usage.txt");
-  }
-
-  @AfterEach
-  public void cleanup() {
-    FileUtil.fullyDelete(DIR);
+    file = new File(dir, "space_usage.txt");
   }
 
   @Test

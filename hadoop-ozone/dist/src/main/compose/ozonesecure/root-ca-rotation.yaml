@@ -36,7 +36,7 @@ x-root-cert-rotation-config:
     - OZONE-SITE.XML_ozone.scm.ha.ratis.request.timeout=2s
     - OZONE-SITE.XML_ozone.http.filter.initializers=org.apache.hadoop.security.HttpCrossOriginFilterInitializer
     - OZONE-SITE.XML_hdds.x509.ca.rotation.enabled=true
-    - OZONE-SITE.XML_hdds.x509.expired.certificate.check.interval=PT15s
+    - OZONE-SITE.XML_hdds.x509.expired.certificate.check.interval=PT30s
 services:
   datanode:
     <<: *root-cert-rotation-config

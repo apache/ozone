@@ -22,7 +22,10 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
+import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 
 import java.io.IOException;
@@ -58,6 +61,24 @@ public interface IOmMetadataReader {
    * @return list of file status
    */
   List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
+                                   String startKey, long numEntries,
+                                   boolean allowPartialPrefixes)
+      throws IOException;
+
+  /**
+   * Lightweight listStatus API.
+   *
+   * @param args    Key args
+   * @param recursive  For a directory if true all the descendants of a
+   *                   particular directory are listed
+   * @param startKey   Key from which listing needs to start. If startKey exists
+   *                   its status is included in the final list.
+   * @param numEntries Number of entries to list from the start key
+   * @param allowPartialPrefixes if partial prefixes should be allowed,
+   *                             this is needed in context of ListKeys
+   * @return list of file status
+   */
+  List<OzoneFileStatusLight> listStatusLight(OmKeyArgs args, boolean recursive,
                                    String startKey, long numEntries,
                                    boolean allowPartialPrefixes)
       throws IOException;
@@ -109,8 +130,32 @@ public interface IOmMetadataReader {
    *   the size of the result will not exceed this limit.
    * @return a list of keys.
    */
-  List<OmKeyInfo> listKeys(String volumeName, String bucketName,
-                           String startKey, String keyPrefix, int maxKeys)
+  ListKeysResult listKeys(String volumeName, String bucketName,
+                          String startKey, String keyPrefix, int maxKeys)
+      throws IOException;
+
+  /**
+   * Lightweight listKeys implementation.
+   *
+   * @param volumeName
+   *   the name of the volume.
+   * @param bucketName
+   *   the name of the bucket.
+   * @param startKey
+   *   the start key name, only the keys whose name is
+   *   after this value will be included in the result.
+   * @param keyPrefix
+   *   key name prefix, only the keys whose name has
+   *   this prefix will be included in the result.
+   * @param maxKeys
+   *   the maximum number of keys to return. It ensures
+   *   the size of the result will not exceed this limit.
+   * @return a list of keys.
+   * @throws IOException
+   */
+  ListKeysLightResult listKeysLight(String volumeName, String bucketName,
+                                     String startKey, String keyPrefix,
+                                     int maxKeys)
       throws IOException;
 
   /**

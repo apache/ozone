@@ -20,6 +20,7 @@
 package org.apache.hadoop.ozone.dn.scanner;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -45,26 +46,23 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -73,17 +71,18 @@ import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import static org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class tests the data scanner functionality.
  */
+@Timeout(300)
 public abstract class TestContainerScannerIntegrationAbstract {
 
-  /**
-   * Set a timeout for each test.
-   */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
   private static MiniOzoneCluster cluster;
   private static OzoneClient ozClient = null;
   private static ObjectStore store = null;
@@ -118,8 +117,17 @@ public abstract class TestContainerScannerIntegrationAbstract {
     bucket = volume.getBucket(bucketName);
   }
 
-  @AfterClass
-  public static void shutdown() throws IOException {
+  void pauseScanner() {
+    getOzoneContainer().pauseContainerScrub();
+  }
+
+  void resumeScanner() {
+    getOzoneContainer().resumeContainerScrub();
+  }
+
+
+  @AfterAll
+  static void shutdown() throws IOException {
     if (ozClient != null) {
       ozClient.close();
     }
@@ -145,11 +153,14 @@ public abstract class TestContainerScannerIntegrationAbstract {
             != HddsProtos.LifeCycleState.OPEN);
   }
 
-  protected Container<?> getDnContainer(long containerID) {
-    Assert.assertEquals(1, cluster.getHddsDatanodes().size());
+  private static OzoneContainer getOzoneContainer() {
+    assertEquals(1, cluster.getHddsDatanodes().size());
     HddsDatanodeService dn = cluster.getHddsDatanodes().get(0);
-    OzoneContainer oc = dn.getDatanodeStateMachine().getContainer();
-    return oc.getContainerSet().getContainer(containerID);
+    return dn.getDatanodeStateMachine().getContainer();
+  }
+
+  protected Container<?> getDnContainer(long containerID) {
+    return getOzoneContainer().getContainerSet().getContainer(containerID);
   }
 
   protected long writeDataThenCloseContainer() throws Exception {
@@ -200,7 +211,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
         ContainerID.valueOf(
             containerId));
     // Only using a single datanode cluster.
-    Assert.assertEquals(1, containerReplicas.size());
+    assertEquals(1, containerReplicas.size());
     return containerReplicas.iterator().next();
   }
 
@@ -208,7 +219,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
   @SuppressWarnings("ResultOfMethodCallIgnored")
   protected void readFromCorruptedKey(String keyName) throws IOException {
     try (OzoneInputStream key = bucket.readKey(keyName)) {
-      Assert.assertThrows(IOException.class, key::read);
+      assertThrows(IOException.class, key::read);
     }
   }
 
@@ -231,7 +242,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
         // Fail the test.
         throw new UncheckedIOException(ex);
       }
-      Assert.assertFalse(chunksDir.exists());
+      assertFalse(chunksDir.exists());
     }, ScanResult.FailureType.MISSING_CHUNKS_DIR),
 
     MISSING_METADATA_DIR(container -> {
@@ -244,13 +255,13 @@ public abstract class TestContainerScannerIntegrationAbstract {
         // Fail the test.
         throw new UncheckedIOException(ex);
       }
-      Assert.assertFalse(metadataDir.exists());
+      assertFalse(metadataDir.exists());
     }, ScanResult.FailureType.MISSING_METADATA_DIR),
 
     MISSING_CONTAINER_FILE(container -> {
       File containerFile = container.getContainerFile();
-      Assert.assertTrue(containerFile.delete());
-      Assert.assertFalse(containerFile.exists());
+      assertTrue(containerFile.delete());
+      assertFalse(containerFile.exists());
     }, ScanResult.FailureType.MISSING_CONTAINER_FILE),
 
     MISSING_CONTAINER_DIR(container -> {
@@ -262,7 +273,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
         // Fail the test.
         throw new UncheckedIOException(ex);
       }
-      Assert.assertFalse(containerDir.exists());
+      assertFalse(containerDir.exists());
     }, ScanResult.FailureType.MISSING_CONTAINER_DIR),
 
     MISSING_BLOCK(container -> {
@@ -295,7 +306,7 @@ public abstract class TestContainerScannerIntegrationAbstract {
       Optional<File> blockFile = Arrays.stream(Objects.requireNonNull(
               chunksDir.listFiles((dir, name) -> name.endsWith(".block"))))
           .findFirst();
-      Assert.assertTrue(blockFile.isPresent());
+      assertTrue(blockFile.isPresent());
       corruptFile(blockFile.get());
     }, ScanResult.FailureType.CORRUPT_CHUNK),
 
@@ -305,13 +316,12 @@ public abstract class TestContainerScannerIntegrationAbstract {
       Optional<File> blockFile = Arrays.stream(Objects.requireNonNull(
               chunksDir.listFiles((dir, name) -> name.endsWith(".block"))))
           .findFirst();
-      Assert.assertTrue(blockFile.isPresent());
+      assertTrue(blockFile.isPresent());
       truncateFile(blockFile.get());
     }, ScanResult.FailureType.INCONSISTENT_CHUNK_LENGTH);
 
     private final Consumer<Container<?>> corruption;
     private final ScanResult.FailureType expectedResult;
-    private static final Random RANDOM = new Random();
 
     ContainerCorruptions(Consumer<Container<?>> corruption,
                          ScanResult.FailureType expectedResult) {
@@ -328,38 +338,41 @@ public abstract class TestContainerScannerIntegrationAbstract {
      * Check that the correct corruption type was written to the container log.
      */
     public void assertLogged(LogCapturer logCapturer) {
-      Assert.assertTrue(logCapturer.getOutput()
-          .contains(expectedResult.toString()));
+      assertThat(logCapturer.getOutput())
+          .contains(expectedResult.toString());
     }
 
     /**
      * Get all container corruption types as parameters for junit 4
      * parameterized tests, except the ones specified.
      */
-    public static Collection<Object[]> getAllParamsExcept(
+    public static Set<ContainerCorruptions> getAllParamsExcept(
         ContainerCorruptions... exclude) {
-      Collection<Object[]> params = new ArrayList<>();
       Set<ContainerCorruptions> includeSet =
           EnumSet.allOf(ContainerCorruptions.class);
       Arrays.asList(exclude).forEach(includeSet::remove);
-
-      for (ContainerCorruptions c: values()) {
-        if (includeSet.contains(c)) {
-          params.add(new Object[]{c});
-        }
-      }
-      return params;
+      return includeSet;
     }
 
     /**
      * Overwrite the file with random bytes.
      */
     private static void corruptFile(File file) {
-      byte[] corruptedBytes = new byte[(int)file.length()];
-      RANDOM.nextBytes(corruptedBytes);
       try {
-        Files.write(file.toPath(), corruptedBytes,
-            StandardOpenOption.TRUNCATE_EXISTING);
+        final int length = (int) file.length();
+
+        Path path = file.toPath();
+        final byte[] original = IOUtils.readFully(Files.newInputStream(path), length);
+
+        final byte[] corruptedBytes = new byte[length];
+        ThreadLocalRandom.current().nextBytes(corruptedBytes);
+
+        Files.write(path, corruptedBytes,
+            StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
+
+        assertThat(IOUtils.readFully(Files.newInputStream(path), length))
+            .isEqualTo(corruptedBytes)
+            .isNotEqualTo(original);
       } catch (IOException ex) {
         // Fail the test.
         throw new UncheckedIOException(ex);
@@ -371,8 +384,10 @@ public abstract class TestContainerScannerIntegrationAbstract {
      */
     private static void truncateFile(File file) {
       try {
-        Files.write(file.toPath(), new byte[]{},
-            StandardOpenOption.TRUNCATE_EXISTING);
+        Files.write(file.toPath(), new byte[0],
+            StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
+
+        assertEquals(0, file.length());
       } catch (IOException ex) {
         // Fail the test.
         throw new UncheckedIOException(ex);

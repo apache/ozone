@@ -21,7 +21,7 @@ import com.bettercloud.vault.Vault;
 import com.bettercloud.vault.VaultConfig;
 import com.bettercloud.vault.VaultException;
 import com.bettercloud.vault.response.AuthResponse;
-import javax.annotation.Nullable;
+import jakarta.annotation.Nullable;
 
 /**
  * Authentication method via app role.

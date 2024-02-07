@@ -23,6 +23,9 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.ratis.util.MemoizedSupplier;
+
+import java.util.function.Supplier;
 
 /**
  * This class is for maintaining Snapshot Manager statistics.
@@ -36,16 +39,16 @@ public final class OmSnapshotMetrics implements OmMetadataReaderMetrics {
   private OmSnapshotMetrics() {
   }
 
-  private static OmSnapshotMetrics instance;
+  private static final Supplier<OmSnapshotMetrics> SUPPLIER =
+      MemoizedSupplier.valueOf(() -> {
+        MetricsSystem ms = DefaultMetricsSystem.instance();
+        return ms.register(SOURCE_NAME,
+            "Snapshot Manager Metrics",
+            new OmSnapshotMetrics());
+      });
+
   public static OmSnapshotMetrics getInstance() {
-    if (instance != null) {
-      return instance;
-    }
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    instance = ms.register(SOURCE_NAME,
-        "Snapshot Manager Metrics",
-        new OmSnapshotMetrics());
-    return instance;
+    return SUPPLIER.get();
   }
 
   private @Metric

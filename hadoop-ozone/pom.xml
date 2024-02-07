@@ -16,18 +16,16 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone-main</artifactId>
-    <version>1.4.0-SNAPSHOT</version>
+    <version>1.5.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone</artifactId>
-  <version>1.4.0-SNAPSHOT</version>
+  <version>1.5.0-SNAPSHOT</version>
   <description>Apache Ozone Project</description>
   <name>Apache Ozone</name>
   <packaging>pom</packaging>
 
   <properties>
     <docker.image>apache/ozone:${project.version}</docker.image>
-    <spring.version>5.3.27</spring.version>
-    <jooq.version>3.11.10</jooq.version>
   </properties>
   <modules>
     <module>interface-client</module>
@@ -63,6 +61,12 @@
         <groupId>org.apache.ozone</groupId>
         <artifactId>ozone-common</artifactId>
         <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>ozone-common</artifactId>
+        <version>${ozone.version}</version>
+        <type>test-jar</type>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
@@ -268,11 +272,6 @@
         <artifactId>hdds-server-scm</artifactId>
         <type>test-jar</type>
         <version>${hdds.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.bouncycastle</groupId>
-        <artifactId>bcprov-jdk15on</artifactId>
-        <version>${bouncycastle.version}</version>
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>

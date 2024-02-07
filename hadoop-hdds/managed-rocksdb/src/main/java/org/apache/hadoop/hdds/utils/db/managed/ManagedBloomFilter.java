@@ -18,16 +18,23 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.BloomFilter;
+
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * Managed BloomFilter.
  */
 public class ManagedBloomFilter extends BloomFilter {
+  private final UncheckedAutoCloseable leakTracker = track(this);
 
   @Override
-  protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
-    super.finalize();
+  public void close() {
+    try {
+      super.close();
+    } finally {
+      leakTracker.close();
+    }
   }
 }

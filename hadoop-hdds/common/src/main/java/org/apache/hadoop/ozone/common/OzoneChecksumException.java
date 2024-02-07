@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.common;
 
 import java.io.IOException;
-import java.security.NoSuchAlgorithmException;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -44,17 +43,6 @@ public class OzoneChecksumException extends IOException {
       ContainerProtos.ChecksumType unrecognizedChecksumType) {
     super(String.format("Unrecognized ChecksumType: %s",
         unrecognizedChecksumType));
-  }
-
-  /**
-   * OzoneChecksumException to wrap around NoSuchAlgorithmException.
-   * @param algorithm name of algorithm
-   * @param ex original exception thrown
-   */
-  public OzoneChecksumException(
-      String algorithm, NoSuchAlgorithmException ex) {
-    super(String.format("NoSuchAlgorithmException thrown while computing " +
-        "SHA-256 checksum using algorithm %s", algorithm), ex);
   }
 
   /**

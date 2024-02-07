@@ -19,13 +19,13 @@ package org.apache.hadoop.ozone.client.rpc;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test class for {@link OzoneKMSUtil}.
@@ -33,7 +33,7 @@ import static org.junit.Assert.fail;
 public class TestOzoneKMSUtil {
   private OzoneConfiguration config;
 
-  @Before
+  @BeforeEach
   public void setUp() {
     config = new OzoneConfiguration();
     config.setBoolean(OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY, true);
@@ -41,12 +41,8 @@ public class TestOzoneKMSUtil {
 
   @Test
   public void getKeyProvider() {
-    try {
-      OzoneKMSUtil.getKeyProvider(config, null);
-      fail("Expected IOException.");
-    } catch (IOException ioe) {
-      assertEquals(ioe.getMessage(), "KMS serverProviderUri is " +
-          "not configured.");
-    }
+    IOException ioe =
+        assertThrows(IOException.class, () -> OzoneKMSUtil.getKeyProvider(config, null));
+    assertEquals(ioe.getMessage(), "KMS serverProviderUri is " + "not configured.");
   }
 }

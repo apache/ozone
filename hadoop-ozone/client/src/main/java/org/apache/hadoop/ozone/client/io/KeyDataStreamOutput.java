@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.AbstractDataStreamOutput;
+import org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -43,6 +44,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -54,7 +56,8 @@ import java.util.UUID;
  *
  * TODO : currently not support multi-thread access.
  */
-public class KeyDataStreamOutput extends AbstractDataStreamOutput {
+public class KeyDataStreamOutput extends AbstractDataStreamOutput
+    implements KeyMetadataAware {
 
   private OzoneClientConfig config;
 
@@ -78,6 +81,14 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput {
   private final BlockDataStreamOutputEntryPool blockDataStreamOutputEntryPool;
 
   private long clientID;
+
+  /**
+   * Indicates if an atomic write is required. When set to true,
+   * the amount of data written must match the declared size during the commit.
+   * A mismatch will prevent the commit from succeeding.
+   * This is essential for operations like S3 put to ensure atomicity.
+   */
+  private boolean atomicKeyCreation;
 
   @VisibleForTesting
   public List<BlockDataStreamOutputEntry> getStreamEntries() {
@@ -107,7 +118,8 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput {
       OzoneManagerProtocol omClient, int chunkSize,
       String requestId, ReplicationConfig replicationConfig,
       String uploadID, int partNumber, boolean isMultipart,
-      boolean unsafeByteBufferConversion
+      boolean unsafeByteBufferConversion,
+      boolean atomicKeyCreation
   ) {
     super(HddsClientUtils.getRetryPolicyByException(
         config.getMaxRetryCount(), config.getRetryInterval()));
@@ -128,6 +140,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput {
     // encrypted bucket.
     this.writeOffset = 0;
     this.clientID = handler.getId();
+    this.atomicKeyCreation = atomicKeyCreation;
   }
 
   /**
@@ -248,6 +261,23 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput {
     long containerId = streamEntry.getBlockID().getContainerID();
     Collection<DatanodeDetails> failedServers = streamEntry.getFailedServers();
     Preconditions.checkNotNull(failedServers);
+    if (!containerExclusionException) {
+      BlockDataStreamOutputEntry currentStreamEntry =
+          blockDataStreamOutputEntryPool.getCurrentStreamEntry();
+      if (currentStreamEntry != null) {
+        try {
+          BlockDataStreamOutput blockDataStreamOutput =
+              (BlockDataStreamOutput) currentStreamEntry
+                  .getByteBufStreamOutput();
+          blockDataStreamOutput.executePutBlock(false, false);
+          blockDataStreamOutput.watchForCommit(false);
+        } catch (IOException e) {
+          LOG.error(
+              "Failed to execute putBlock/watchForCommit. " +
+                  "Continuing to write chunks" + "in new block", e);
+        }
+      }
+    }
     ExcludeList excludeList = blockDataStreamOutputEntryPool.getExcludeList();
     long bufferedDataLen = blockDataStreamOutputEntryPool.computeBufferData();
     if (!failedServers.isEmpty()) {
@@ -385,6 +415,12 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput {
       if (!isException()) {
         Preconditions.checkArgument(writeOffset == offset);
       }
+      if (atomicKeyCreation) {
+        long expectedSize = blockDataStreamOutputEntryPool.getDataSize();
+        Preconditions.checkArgument(expectedSize == offset,
+            String.format("Expected: %d and actual %d write sizes do not match",
+                expectedSize, offset));
+      }
       blockDataStreamOutputEntryPool.commitKey(offset);
     } finally {
       blockDataStreamOutputEntryPool.cleanup();
@@ -398,6 +434,11 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput {
   @VisibleForTesting
   public ExcludeList getExcludeList() {
     return blockDataStreamOutputEntryPool.getExcludeList();
+  }
+
+  @Override
+  public Map<String, String> getMetadata() {
+    return this.blockDataStreamOutputEntryPool.getMetadata();
   }
 
   /**
@@ -415,6 +456,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput {
     private boolean unsafeByteBufferConversion;
     private OzoneClientConfig clientConfig;
     private ReplicationConfig replicationConfig;
+    private boolean atomicKeyCreation = false;
 
     public Builder setMultipartUploadID(String uploadID) {
       this.multipartUploadID = uploadID;
@@ -467,6 +509,11 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput {
       return this;
     }
 
+    public Builder setAtomicKeyCreation(boolean atomicKey) {
+      this.atomicKeyCreation = atomicKey;
+      return this;
+    }
+
     public KeyDataStreamOutput build() {
       return new KeyDataStreamOutput(
           clientConfig,
@@ -479,7 +526,8 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput {
           multipartUploadID,
           multipartNumber,
           isMultipartKey,
-          unsafeByteBufferConversion);
+          unsafeByteBufferConversion,
+          atomicKeyCreation);
     }
 
   }

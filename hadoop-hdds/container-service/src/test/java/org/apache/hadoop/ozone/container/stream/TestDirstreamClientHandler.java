@@ -19,35 +19,25 @@ package org.apache.hadoop.ozone.container.stream;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import org.apache.commons.io.FileUtils;
-import org.apache.ozone.test.GenericTestUtils;
-import org.jetbrains.annotations.NotNull;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 /**
  * Test streaming client.
  */
 public class TestDirstreamClientHandler {
 
+  @TempDir
   private Path tmpDir;
-
-  @BeforeEach
-  public void init() {
-    tmpDir = GenericTestUtils.getRandomizedTestDir().toPath();
-  }
-
-  @AfterEach
-  public void destroy() throws IOException {
-    FileUtils.deleteDirectory(tmpDir.toFile());
-  }
 
   @Test
   public void oneFileStream() throws IOException {
@@ -58,8 +48,8 @@ public class TestDirstreamClientHandler {
 
     handler.doRead(null, wrap("4 asd.txt\nxxxx0 END"));
 
-    Assertions.assertEquals("xxxx", getContent("asd.txt"));
-    Assertions.assertTrue(handler.isAtTheEnd());
+    assertEquals("xxxx", getContent("asd.txt"));
+    assertTrue(handler.isAtTheEnd());
 
   }
 
@@ -77,8 +67,8 @@ public class TestDirstreamClientHandler {
     handler.doRead(null, wrap("1230 "));
     handler.doRead(null, wrap("END"));
 
-    Assertions.assertEquals("1234", getContent("asd.txt"));
-    Assertions.assertTrue(handler.isAtTheEnd());
+    assertEquals("1234", getContent("asd.txt"));
+    assertTrue(handler.isAtTheEnd());
   }
 
   @Test
@@ -91,8 +81,8 @@ public class TestDirstreamClientHandler {
     handler.doRead(null, wrap("4 asd."));
     handler.doRead(null, wrap("txt\nxxxx0 END"));
 
-    Assertions.assertEquals("xxxx", getContent("asd.txt"));
-    Assertions.assertTrue(handler.isAtTheEnd());
+    assertEquals("xxxx", getContent("asd.txt"));
+    assertTrue(handler.isAtTheEnd());
 
   }
 
@@ -107,9 +97,9 @@ public class TestDirstreamClientHandler {
     handler.doRead(null, wrap("4 asd.txt\nxxxx3"));
     handler.doRead(null, wrap(" bsd.txt\nyyy0 END"));
 
-    Assertions.assertEquals("xxxx", getContent("asd.txt"));
-    Assertions.assertEquals("yyy", getContent("bsd.txt"));
-    Assertions.assertTrue(handler.isAtTheEnd());
+    assertEquals("xxxx", getContent("asd.txt"));
+    assertEquals("yyy", getContent("bsd.txt"));
+    assertTrue(handler.isAtTheEnd());
   }
 
 
@@ -123,11 +113,11 @@ public class TestDirstreamClientHandler {
     handler.doRead(null, wrap("4 asd.txt\nxx"));
     handler.doRead(null, wrap("xx3 bsd.txt\nyyy\nEND"));
 
-    Assertions.assertEquals("xxxx", getContent("asd.txt"));
-    Assertions.assertEquals("yyy", getContent("bsd.txt"));
+    assertEquals("xxxx", getContent("asd.txt"));
+    assertEquals("yyy", getContent("bsd.txt"));
   }
 
-  @NotNull
+  @Nonnull
   private String getContent(String name) throws IOException {
     return new String(Files.readAllBytes(tmpDir.resolve(name)),
         StandardCharsets.UTF_8);

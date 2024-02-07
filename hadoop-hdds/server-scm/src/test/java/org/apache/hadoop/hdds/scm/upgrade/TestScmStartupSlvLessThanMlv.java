@@ -24,13 +24,16 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeTestUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests that SCM will throw an exception on creation when it reads in a
@@ -45,7 +48,7 @@ public class TestScmStartupSlvLessThanMlv {
     // Add subdirectories under the temporary folder where the version file
     // will be placed.
     File scmSubdir = tempDir.resolve("scm").resolve("current").toFile();
-    Assertions.assertTrue(scmSubdir.mkdirs());
+    assertTrue(scmSubdir.mkdirs());
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.OZONE_SCM_DB_DIRS,
@@ -62,11 +65,11 @@ public class TestScmStartupSlvLessThanMlv {
     // construction.
     UpgradeTestUtils.createVersionFile(scmSubdir, HddsProtos.NodeType.SCM, mlv);
 
-    Throwable t = Assertions.assertThrows(IOException.class,
+    Throwable t = assertThrows(IOException.class,
         () -> new StorageContainerManager(conf));
     String expectedMessage = String.format("Cannot initialize VersionManager." +
             " Metadata layout version (%s) > software layout version (%s)",
         mlv, largestSlv);
-    Assertions.assertEquals(expectedMessage, t.getMessage());
+    assertEquals(expectedMessage, t.getMessage());
   }
 }

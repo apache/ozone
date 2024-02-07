@@ -144,17 +144,6 @@ public final class ContainerCommandResponseBuilders {
         .build();
   }
 
-  /**
-   * Returns successful blockResponse.
-   * @param msg - Request.
-   * @return Response.
-   */
-  public static ContainerCommandResponseProto getBlockResponseSuccess(
-      ContainerCommandRequestProto msg) {
-
-    return getSuccessResponse(msg);
-  }
-
   public static ContainerCommandResponseProto getBlockDataResponse(
       ContainerCommandRequestProto msg, BlockData data) {
 

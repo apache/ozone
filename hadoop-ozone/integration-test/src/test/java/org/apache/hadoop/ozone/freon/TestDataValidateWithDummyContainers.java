@@ -21,31 +21,28 @@ package org.apache.hadoop.ozone.freon;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.TimeUnit;
 
 
 /**
  * Tests Freon with MiniOzoneCluster and ChunkManagerDummyImpl.
  * Data validation is disabled in RandomKeyGenerator.
  */
+
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
 public class TestDataValidateWithDummyContainers
     extends TestDataValidate {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
   private static final Logger LOG =
       LoggerFactory.getLogger(TestDataValidateWithDummyContainers.class);
 
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA, false);
@@ -65,7 +62,7 @@ public class TestDataValidateWithDummyContainers
     LOG.info("Skipping validateWriteTest for non-persistent containers.");
   }
 
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     shutdownCluster();
   }

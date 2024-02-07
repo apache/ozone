@@ -26,28 +26,27 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RocksDBConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test RocksDB logging for Ozone Manager.
  */
+@Timeout(100)
 public class TestOzoneManagerRocksDBLogging {
   private MiniOzoneCluster cluster = null;
   private OzoneConfiguration conf;
   private RocksDBConfiguration dbConf;
 
-  @Rule
-  public Timeout timeout = Timeout.seconds(100);
-
   private static GenericTestUtils.LogCapturer logCapturer =
       GenericTestUtils.LogCapturer.captureLogs(DBStoreBuilder.ROCKS_DB_LOGGER);
 
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
     dbConf = conf.getObject(RocksDBConfiguration.class);
@@ -60,7 +59,7 @@ public class TestOzoneManagerRocksDBLogging {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -69,12 +68,8 @@ public class TestOzoneManagerRocksDBLogging {
 
   @Test
   public void testOMRocksDBLoggingEnabled() throws Exception {
-    try {
-      waitForRocksDbLog();
-      Assert.fail("Unexpected RocksDB log: " + logCapturer.getOutput());
-    } catch (TimeoutException ex) {
-      Assert.assertTrue(ex.getMessage().contains("Timed out"));
-    }
+    Exception ex = assertThrows(TimeoutException.class, () -> waitForRocksDbLog());
+    assertThat(ex.getMessage()).contains("Timed out");
 
     enableRocksDbLogging(true);
     cluster.restartOzoneManager();

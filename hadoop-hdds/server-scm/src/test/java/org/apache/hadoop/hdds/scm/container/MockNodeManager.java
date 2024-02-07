@@ -227,7 +227,7 @@ public class MockNodeManager implements NodeManager {
         NODES[x % NODES.length].capacity - NODES[x % NODES.length].used;
     newStat.set(
         (NODES[x % NODES.length].capacity),
-        (NODES[x % NODES.length].used), remaining);
+        (NODES[x % NODES.length].used), remaining, 0, 100000);
     this.nodeMetricMap.put(datanodeDetails, newStat);
     aggregateStat.add(newStat);
 
@@ -772,13 +772,11 @@ public class MockNodeManager implements NodeManager {
    * Send heartbeat to indicate the datanode is alive and doing well.
    *
    * @param datanodeDetails - Datanode ID.
-   * @param layoutInfo - DataNode Layout info
    * @param commandQueueReportProto - Command Queue Report Proto
    * @return SCMheartbeat response list
    */
   @Override
   public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
-      LayoutVersionProto layoutInfo,
       CommandQueueReportProto commandQueueReportProto) {
     return null;
   }
@@ -786,7 +784,7 @@ public class MockNodeManager implements NodeManager {
   @Override
   public Boolean isNodeRegistered(
       DatanodeDetails datanodeDetails) {
-    return false;
+    return healthyNodes.contains(datanodeDetails);
   }
 
   @Override
@@ -920,6 +918,11 @@ public class MockNodeManager implements NodeManager {
   public int minPipelineLimit(List<DatanodeDetails> dn) {
     // by default 1 single node pipeline and 1 three node pipeline
     return numPipelinePerDatanode;
+  }
+
+  @Override
+  public long getLastHeartbeat(DatanodeDetails datanodeDetails) {
+    return -1;
   }
 
   public void setNumPipelinePerDatanode(int value) {

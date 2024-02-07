@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.common;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -29,6 +31,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Function;
 
 /**
@@ -37,7 +40,8 @@ import java.util.function.Function;
  */
 public class ChunkBufferImplWithByteBufferList implements ChunkBuffer {
 
-  private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
+  private static final List<ByteBuffer> EMPTY_BUFFER
+      = Collections.singletonList(ByteBuffer.allocate(0));
 
   /** Buffer list backing the ChunkBuffer. */
   private final List<ByteBuffer> buffers;
@@ -47,10 +51,9 @@ public class ChunkBufferImplWithByteBufferList implements ChunkBuffer {
   private int currentIndex;
 
   ChunkBufferImplWithByteBufferList(List<ByteBuffer> buffers) {
-    Preconditions.checkArgument(buffers != null, "buffer == null");
-
+    Objects.requireNonNull(buffers, "buffers == null");
     this.buffers = !buffers.isEmpty() ? ImmutableList.copyOf(buffers) :
-        ImmutableList.of(EMPTY_BUFFER);
+        EMPTY_BUFFER;
     this.limit = buffers.stream().mapToInt(ByteBuffer::limit).sum();
 
     findCurrent();
@@ -177,10 +180,10 @@ public class ChunkBufferImplWithByteBufferList implements ChunkBuffer {
     return new ChunkBufferImplWithByteBufferList(duplicates);
   }
 
-  @Override
   /**
    * Returns the next buffer in the list irrespective of the bufferSize.
    */
+  @Override
   public Iterable<ByteBuffer> iterate(int bufferSize) {
     return () -> new Iterator<ByteBuffer>() {
       @Override

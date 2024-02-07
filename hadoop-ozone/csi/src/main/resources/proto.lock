@@ -204,12 +204,14 @@
               {
                 "id": 1,
                 "name": "service",
-                "type": "Service"
+                "type": "Service",
+                "oneof_parent": "type"
               },
               {
                 "id": 2,
                 "name": "volume_expansion",
-                "type": "VolumeExpansion"
+                "type": "VolumeExpansion",
+                "oneof_parent": "type"
               }
             ],
             "messages": [
@@ -302,12 +304,14 @@
               {
                 "id": 1,
                 "name": "snapshot",
-                "type": "SnapshotSource"
+                "type": "SnapshotSource",
+                "oneof_parent": "type"
               },
               {
                 "id": 2,
                 "name": "volume",
-                "type": "VolumeSource"
+                "type": "VolumeSource",
+                "oneof_parent": "type"
               }
             ],
             "messages": [
@@ -349,12 +353,14 @@
               {
                 "id": 1,
                 "name": "block",
-                "type": "BlockVolume"
+                "type": "BlockVolume",
+                "oneof_parent": "access_type"
               },
               {
                 "id": 2,
                 "name": "mount",
-                "type": "MountVolume"
+                "type": "MountVolume",
+                "oneof_parent": "access_type"
               },
               {
                 "id": 3,
@@ -793,7 +799,8 @@
               {
                 "id": 1,
                 "name": "rpc",
-                "type": "RPC"
+                "type": "RPC",
+                "oneof_parent": "type"
               }
             ],
             "messages": [
@@ -1243,7 +1250,8 @@
               {
                 "id": 1,
                 "name": "rpc",
-                "type": "RPC"
+                "type": "RPC",
+                "oneof_parent": "type"
               }
             ],
             "messages": [

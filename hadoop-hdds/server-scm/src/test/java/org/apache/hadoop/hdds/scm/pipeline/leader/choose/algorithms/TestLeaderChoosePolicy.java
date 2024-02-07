@@ -24,11 +24,12 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineStateManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.RatisPipelineProvider;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Unit tests for {@link LeaderChoosePolicy}.
@@ -50,7 +51,7 @@ public class TestLeaderChoosePolicy {
         conf,
         mock(EventPublisher.class),
         SCMContext.emptyContext());
-    Assertions.assertSame(
+    assertSame(
         ratisPipelineProvider.getLeaderChoosePolicy().getClass(),
         MinLeaderCountChoosePolicy.class);
   }
@@ -61,7 +62,7 @@ public class TestLeaderChoosePolicy {
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_LEADER_CHOOSING_POLICY,
         "org.apache.hadoop.hdds.scm.pipeline.leader.choose.algorithms" +
             ".HelloWorld");
-    Assertions.assertThrows(RuntimeException.class, () ->
+    assertThrows(RuntimeException.class, () ->
         new RatisPipelineProvider(
             mock(NodeManager.class),
             mock(PipelineStateManagerImpl.class),

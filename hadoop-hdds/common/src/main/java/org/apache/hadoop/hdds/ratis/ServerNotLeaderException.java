@@ -28,7 +28,6 @@ import java.util.regex.Pattern;
  * Exception thrown when a server is not a leader for Ratis group.
  */
 public class ServerNotLeaderException extends IOException {
-  private final String currentPeerId;
   private final String leader;
   private static final Pattern CURRENT_PEER_ID_PATTERN =
       Pattern.compile("Server:(.*) is not the leader[.]+.*", Pattern.DOTALL);
@@ -39,7 +38,6 @@ public class ServerNotLeaderException extends IOException {
   public ServerNotLeaderException(RaftPeerId currentPeerId) {
     super("Server:" + currentPeerId + " is not the leader. Could not " +
         "determine the leader node.");
-    this.currentPeerId = currentPeerId.toString();
     this.leader = null;
   }
 
@@ -47,16 +45,15 @@ public class ServerNotLeaderException extends IOException {
       String suggestedLeader) {
     super("Server:" + currentPeerId + " is not the leader. Suggested leader is"
         + " Server:" + suggestedLeader + ".");
-    this.currentPeerId = currentPeerId.toString();
     this.leader = suggestedLeader;
   }
 
+  // required for creation by RemoteException#unwrapRemoteException
   public ServerNotLeaderException(String message) {
     super(message);
 
     Matcher currentLeaderMatcher = CURRENT_PEER_ID_PATTERN.matcher(message);
     if (currentLeaderMatcher.matches()) {
-      this.currentPeerId = currentLeaderMatcher.group(1);
 
       Matcher suggestedLeaderMatcher =
           SUGGESTED_LEADER_PATTERN.matcher(message);
@@ -76,7 +73,6 @@ public class ServerNotLeaderException extends IOException {
         this.leader = null;
       }
     } else {
-      this.currentPeerId = null;
       this.leader = null;
     }
   }

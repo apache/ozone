@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.io.InputStream;
 
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 /**
  * An {@link ByteReaderStrategy} implementation which supports byte[] as the
@@ -35,8 +34,6 @@ public class ByteArrayReader implements ByteReaderStrategy {
   private int offset;
   private int targetLen;
 
-  @SuppressFBWarnings(value = "EI_EXPOSE_REP2",
-      justification = "Deep copy byte[] has bad impact on performance")
   public ByteArrayReader(byte[] b, int off, int len) {
     if (b == null) {
       throw new NullPointerException();

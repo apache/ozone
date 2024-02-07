@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import org.rocksdb.Checkpoint;
 
 /**
- * Managed RocksIterator.
+ * Managed {@link Checkpoint}.
  */
 public class ManagedCheckpoint extends ManagedObject<Checkpoint> {
   public ManagedCheckpoint(Checkpoint original) {

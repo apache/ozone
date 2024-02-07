@@ -142,4 +142,9 @@ public class VolumeInfoMetrics {
     return (getUsed() + getAvailable() + getReserved());
   }
 
+  @Metric("Returns the Committed bytes of the Volume")
+  public long getCommitted() {
+    return volume.getCommittedBytes();
+  }
+
 }

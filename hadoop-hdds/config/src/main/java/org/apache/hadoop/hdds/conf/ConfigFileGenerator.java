@@ -127,13 +127,20 @@ public class ConfigFileGenerator extends AbstractProcessor {
   private void writeConfigAnnotations(ConfigGroup configGroup,
       ConfigFileAppender appender,
       TypeElement typeElement) {
-    //check if any of the setters are annotated with @Config
     for (Element element : typeElement.getEnclosedElements()) {
       if (element.getKind() == ElementKind.FIELD) {
         if (element.getAnnotation(Config.class) != null) {
 
-          //update the ozone-site-generated.xml
           Config configAnnotation = element.getAnnotation(Config.class);
+
+          if (configAnnotation.key().startsWith(configGroup.prefix())) {
+            String msg = String.format(
+                "@%s(key = \"%s\") should not duplicate prefix from @%s(\"%s\")",
+                Config.class.getSimpleName(), configAnnotation.key(),
+                ConfigGroup.class.getSimpleName(), configGroup.prefix());
+            processingEnv.getMessager().printMessage(Kind.ERROR, msg, element);
+            continue;
+          }
 
           String key = configGroup.prefix() + "."
               + configAnnotation.key();

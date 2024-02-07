@@ -33,7 +33,6 @@ import org.jooq.DSLContext;
 import org.jooq.Record3;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.AdditionalAnswers;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -47,8 +46,9 @@ import static org.hadoop.ozone.recon.schema.tables.FileCountBySizeTable.FILE_COU
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.AdditionalAnswers.returnsElementsOf;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 /**
@@ -59,6 +59,10 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
   private FileCountBySizeDao fileCountBySizeDao;
   private FileSizeCountTask fileSizeCountTask;
   private DSLContext dslContext;
+
+  public TestFileSizeCountTask() {
+    super();
+  }
 
   @BeforeEach
   public void setUp() {
@@ -309,16 +313,16 @@ public class TestFileSizeCountTask extends AbstractReconSqlDBTest {
         .thenReturn(keyTableFso);
 
     when(mockKeyIterLegacy.hasNext())
-        .thenAnswer(AdditionalAnswers.returnsElementsOf(hasNextAnswer));
+        .thenAnswer(returnsElementsOf(hasNextAnswer));
     when(mockKeyIterFso.hasNext())
-        .thenAnswer(AdditionalAnswers.returnsElementsOf(hasNextAnswer));
+        .thenAnswer(returnsElementsOf(hasNextAnswer));
     when(mockKeyIterLegacy.next()).thenReturn(mockKeyValueLegacy);
     when(mockKeyIterFso.next()).thenReturn(mockKeyValueFso);
 
     when(mockKeyValueLegacy.getValue())
-        .thenAnswer(AdditionalAnswers.returnsElementsOf(omKeyInfoList));
+        .thenAnswer(returnsElementsOf(omKeyInfoList));
     when(mockKeyValueFso.getValue())
-        .thenAnswer(AdditionalAnswers.returnsElementsOf(omKeyInfoList));
+        .thenAnswer(returnsElementsOf(omKeyInfoList));
 
     Pair<String, Boolean> result =
         fileSizeCountTask.reprocess(omMetadataManager);

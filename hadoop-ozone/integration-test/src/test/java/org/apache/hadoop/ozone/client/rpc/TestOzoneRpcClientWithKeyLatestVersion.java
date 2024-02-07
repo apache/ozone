@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -18,9 +18,11 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -28,183 +30,126 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.io.OzoneInputStream;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
-import java.util.Arrays;
-import java.util.Collection;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 
 /**
  * Main purpose of this test is with OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION
  * set/unset key create/read works properly or not for buckets
- * with/with out versioning.
+ * with/without versioning.
+ * TODO: can be merged with other test class
  */
-@RunWith(Parameterized.class)
-public class TestOzoneRpcClientWithKeyLatestVersion {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class TestOzoneRpcClientWithKeyLatestVersion {
 
-  private static MiniOzoneCluster cluster;
+  private MiniOzoneCluster cluster;
 
-  private ObjectStore objectStore;
-
-  private OzoneClient ozClient;
-
-  private final boolean getLatestVersion;
-
-  @Parameterized.Parameters
-  public static Collection<Object> data() {
-    return Arrays.asList(true, false);
-  }
-
-  public TestOzoneRpcClientWithKeyLatestVersion(boolean latestVersion) {
-    getLatestVersion = latestVersion;
-  }
-
-  @BeforeClass
-  public static void setup() throws Exception {
+  @BeforeAll
+  void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
-        .setScmId(UUID.randomUUID().toString())
-        .setClusterId(UUID.randomUUID().toString())
         .build();
     cluster.waitForClusterToBeReady();
   }
 
-  @AfterClass
-  public static void tearDown() throws Exception {
+  @AfterAll
+  void tearDown() {
     if (cluster != null) {
       cluster.shutdown();
     }
   }
 
-  @Before
-  public void setupClient() throws Exception {
-    OzoneConfiguration conf = cluster.getConf();
-    conf.setBoolean(OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION, getLatestVersion);
-    ozClient = OzoneClientFactory.getRpcClient(conf);
-    objectStore = ozClient.getObjectStore();
-  }
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testWithGetLatestVersion(boolean getLatestVersionOnly) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration(cluster.getConf());
+    conf.setBoolean(OZONE_CLIENT_KEY_LATEST_VERSION_LOCATION,
+        getLatestVersionOnly);
 
-  @After
-  public void closeClient() throws Exception {
-    if (ozClient != null) {
-      ozClient.close();
+    try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
+      String volumeName = UUID.randomUUID().toString();
+      ObjectStore objectStore = client.getObjectStore();
+      objectStore.createVolume(volumeName);
+      OzoneVolume volume = objectStore.getVolume(volumeName);
+
+      for (boolean versioning : new boolean[] {false, true}) {
+        String bucketName = UUID.randomUUID().toString();
+        volume.createBucket(bucketName,
+            BucketArgs.newBuilder()
+                .setVersioning(versioning)
+                .build());
+
+        OzoneBucket bucket = volume.getBucket(bucketName);
+        String keyName = UUID.randomUUID().toString();
+        byte[] content = RandomUtils.nextBytes(128);
+        int versions = RandomUtils.nextInt(2, 5);
+
+        createAndOverwriteKey(bucket, keyName, versions, content);
+
+        assertKeyContent(bucket, keyName, content);
+
+        int expectedVersionCount =
+            versioning && !getLatestVersionOnly ? versions : 1;
+        assertListStatus(bucket, keyName, expectedVersionCount);
+      }
     }
   }
 
-
-  @Test
-  public void testWithGetLatestVersion() throws Exception {
-    testOverrideAndReadKey();
-  }
-
-
-
-  public void testOverrideAndReadKey() throws Exception {
-    String volumeName = UUID.randomUUID().toString();
-    String bucketName = UUID.randomUUID().toString();
-    String keyName = UUID.randomUUID().toString();
-
-    // Test checks key override and read are working with
-    // bucket versioning false.
-    String value = "sample value";
-    createRequiredForVersioningTest(volumeName, bucketName, keyName,
-        false, value);
-
-    // read key and test
-    testReadKey(volumeName, bucketName, keyName, value);
-
-    testListStatus(volumeName, bucketName, keyName, false);
-
-
-    // Bucket versioning turned on
-    volumeName = UUID.randomUUID().toString();
-    bucketName = UUID.randomUUID().toString();
-    keyName = UUID.randomUUID().toString();
-
-    // Test checks key override and read are working with
-    // bucket versioning true.
-    createRequiredForVersioningTest(volumeName, bucketName, keyName,
-        true, value);
-
-    // read key and test
-    testReadKey(volumeName, bucketName, keyName, value);
-
-
-    testListStatus(volumeName, bucketName, keyName, true);
-  }
-
-  private void createRequiredForVersioningTest(String volumeName,
-      String bucketName, String keyName, boolean versioning,
-      String value) throws Exception {
-
-    ReplicationConfig replicationConfig = ReplicationConfig
-        .fromProtoTypeAndFactor(RATIS, HddsProtos.ReplicationFactor.THREE);
-
-    objectStore.createVolume(volumeName);
-    OzoneVolume volume = objectStore.getVolume(volumeName);
-
-    // Bucket created with versioning false.
-    volume.createBucket(bucketName,
-        BucketArgs.newBuilder().setVersioning(versioning).build());
-    OzoneBucket bucket = volume.getBucket(bucketName);
-
-    OzoneOutputStream out = bucket.createKey(keyName,
-        value.getBytes(UTF_8).length, replicationConfig, new HashMap<>());
-    out.write(value.getBytes(UTF_8));
-    out.close();
-
-    // Override key
-    out = bucket.createKey(keyName,
-        value.getBytes(UTF_8).length, replicationConfig, new HashMap<>());
-    out.write(value.getBytes(UTF_8));
-    out.close();
-  }
-
-  private void testReadKey(String volumeName, String bucketName,
-      String keyName, String value) throws Exception {
-    OzoneVolume volume = objectStore.getVolume(volumeName);
-    OzoneBucket ozoneBucket = volume.getBucket(bucketName);
-    byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-    try (OzoneInputStream is = ozoneBucket.readKey(keyName)) {
-      is.read(fileContent);
+  /** Repeatedly write {@code key}, first some random data, then
+   * {@code content}. */
+  private void createAndOverwriteKey(OzoneBucket bucket, String key,
+      int versions, byte[] content) throws IOException {
+    ReplicationConfig replication = RatisReplicationConfig.getInstance(THREE);
+    for (int i = 1; i < versions; i++) {
+      writeKey(bucket, key, RandomUtils.nextBytes(content.length), replication);
     }
-    Assert.assertEquals(value, new String(fileContent, UTF_8));
+    // overwrite it
+    writeKey(bucket, key, content, replication);
   }
 
-  private void testListStatus(String volumeName, String bucketName,
-      String keyName, boolean versioning) throws Exception {
-    OzoneVolume volume = objectStore.getVolume(volumeName);
-    OzoneBucket ozoneBucket = volume.getBucket(bucketName);
-    List<OzoneFileStatus> ozoneFileStatusList = ozoneBucket.listStatus(keyName,
-        false, "", 1);
-    Assert.assertNotNull(ozoneFileStatusList);
-    Assert.assertEquals(1, ozoneFileStatusList.size());
-    if (!getLatestVersion && versioning) {
-      Assert.assertEquals(2, ozoneFileStatusList.get(0).getKeyInfo()
-          .getKeyLocationVersions().size());
-    } else {
-      Assert.assertEquals(1, ozoneFileStatusList.get(0).getKeyInfo()
-          .getKeyLocationVersions().size());
+  private static void writeKey(OzoneBucket bucket, String key, byte[] content,
+      ReplicationConfig replication) throws IOException {
+    try (OutputStream out = bucket.createKey(key, content.length, replication,
+        new HashMap<>())) {
+      out.write(content);
     }
+  }
+
+  public static void assertKeyContent(OzoneBucket bucket, String key,
+      byte[] expected) throws Exception {
+    try (InputStream in = bucket.readKey(key)) {
+      assertArrayEquals(expected, IOUtils.readFully(in, expected.length));
+    }
+  }
+
+  private void assertListStatus(OzoneBucket bucket, String keyName,
+      int expectedVersionCount) throws Exception {
+    List<OzoneFileStatus> files = bucket.listStatus(keyName, false, "", 1);
+
+    assertNotNull(files);
+    assertEquals(1, files.size());
+
+    List<?> versions = files.get(0).getKeyInfo().getKeyLocationVersions();
+    assertEquals(expectedVersionCount, versions.size());
   }
 }

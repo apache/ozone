@@ -20,44 +20,43 @@
 package org.apache.hadoop.ozone.dn.scanner;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.ozoneimpl.BackgroundContainerMetadataScanner;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.time.Duration;
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Integration tests for the background container metadata scanner. This
  * scanner does a quick check of container metadata to find obvious failures
  * faster than a full data scan.
  */
-@RunWith(Parameterized.class)
-public class TestBackgroundContainerMetadataScannerIntegration
+class TestBackgroundContainerMetadataScannerIntegration
     extends TestContainerScannerIntegrationAbstract {
 
-  private final ContainerCorruptions corruption;
-  private final GenericTestUtils.LogCapturer logCapturer;
+  private final GenericTestUtils.LogCapturer logCapturer =
+      GenericTestUtils.LogCapturer.log4j2(ContainerLogger.LOG_NAME);
 
-  @Parameterized.Parameters(name = "{0}")
-  public static Collection<Object[]> supportedCorruptionTypes() {
+  static Collection<ContainerCorruptions> supportedCorruptionTypes() {
     return ContainerCorruptions.getAllParamsExcept(
         ContainerCorruptions.MISSING_BLOCK,
         ContainerCorruptions.CORRUPT_BLOCK,
         ContainerCorruptions.TRUNCATED_BLOCK);
   }
 
-  @BeforeClass
-  public static void init() throws Exception {
+  @BeforeAll
+  static void init() throws Exception {
     OzoneConfiguration ozoneConfig = new OzoneConfiguration();
     // Speed up SCM closing of open container when an unhealthy replica is
     // reported.
@@ -80,42 +79,39 @@ public class TestBackgroundContainerMetadataScannerIntegration
     buildCluster(ozoneConfig);
   }
 
-  public TestBackgroundContainerMetadataScannerIntegration(
-      ContainerCorruptions corruption) {
-    this.corruption = corruption;
-    logCapturer = GenericTestUtils.LogCapturer.log4j2(ContainerLogger.LOG_NAME);
-  }
-
   /**
    * {@link BackgroundContainerMetadataScanner} should detect corrupted metadata
    * in open or closed containers without client interaction.
    */
-  @Test
-  public void testCorruptionDetected() throws Exception {
+  @ParameterizedTest
+  @MethodSource("supportedCorruptionTypes")
+  void testCorruptionDetected(ContainerCorruptions corruption)
+      throws Exception {
     // Write data to an open and closed container.
     long closedContainerID = writeDataThenCloseContainer();
-    Assert.assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
-        getDnContainer(closedContainerID).getContainerState());
+    Container<?> closedContainer = getDnContainer(closedContainerID);
+    assertEquals(State.CLOSED, closedContainer.getContainerState());
+
     long openContainerID = writeDataToOpenContainer();
-    Assert.assertEquals(ContainerProtos.ContainerDataProto.State.OPEN,
-        getDnContainer(openContainerID).getContainerState());
+    Container<?> openContainer = getDnContainer(openContainerID);
+    assertEquals(State.OPEN, openContainer.getContainerState());
 
     // Corrupt both containers.
-    corruption.applyTo(getDnContainer(closedContainerID));
-    corruption.applyTo(getDnContainer(openContainerID));
+    corruption.applyTo(closedContainer);
+    corruption.applyTo(openContainer);
+
     // Wait for the scanner to detect corruption.
-    GenericTestUtils.waitFor(() ->
-            getDnContainer(closedContainerID).getContainerState() ==
-                ContainerProtos.ContainerDataProto.State.UNHEALTHY,
+    GenericTestUtils.waitFor(
+        () -> closedContainer.getContainerState() == State.UNHEALTHY,
         500, 5000);
-    GenericTestUtils.waitFor(() ->
-            getDnContainer(openContainerID).getContainerState() ==
-                ContainerProtos.ContainerDataProto.State.UNHEALTHY,
+    GenericTestUtils.waitFor(
+        () -> openContainer.getContainerState() == State.UNHEALTHY,
         500, 5000);
 
     // Wait for SCM to get reports of the unhealthy replicas.
     waitForScmToSeeUnhealthyReplica(closedContainerID);
     waitForScmToSeeUnhealthyReplica(openContainerID);
+
     // Once the unhealthy replica is reported, the open container's lifecycle
     // state in SCM should move to closed.
     waitForScmToCloseContainer(openContainerID);

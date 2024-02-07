@@ -47,10 +47,6 @@ public final class CommandDispatcher {
   private final CommandHandlerMetrics commandHandlerMetrics;
 
   /**
-   * Constructs a command Dispatcher.
-   * @param context - Context.
-   */
-  /**
    * Constructs a command dispatcher.
    *
    * @param container - Ozone Container
@@ -100,7 +96,11 @@ public final class CommandDispatcher {
     CommandHandler handler = handlerMap.get(command.getType());
     if (handler != null) {
       commandHandlerMetrics.increaseCommandCount(command.getType());
-      handler.handle(command, container, context, connectionManager);
+      try {
+        handler.handle(command, container, context, connectionManager);
+      } catch (Exception ex) {
+        LOG.error("Exception while handle command, ", ex);
+      }
     } else {
       LOG.error("Unknown SCM Command queued. There is no handler for this " +
           "command. Command: {}", command.getType().getDescriptorForType()

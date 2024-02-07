@@ -18,9 +18,9 @@
 package org.apache.hadoop.ozone.s3.util;
 
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.junit.jupiter.api.Test;
 
-import org.junit.Assert;
-import org.junit.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test encode/decode of the continue token.
@@ -34,7 +34,7 @@ public class TestContinueToken {
     ContinueToken parsedToken =
         ContinueToken.decodeFromString(ct.encodeToString());
 
-    Assert.assertEquals(ct, parsedToken);
+    assertEquals(ct, parsedToken);
   }
 
   @Test
@@ -44,7 +44,7 @@ public class TestContinueToken {
     ContinueToken parsedToken =
         ContinueToken.decodeFromString(ct.encodeToString());
 
-    Assert.assertEquals(ct, parsedToken);
+    assertEquals(ct, parsedToken);
   }
 
   @Test
@@ -54,7 +54,7 @@ public class TestContinueToken {
     ContinueToken parsedToken =
         ContinueToken.decodeFromString(ct.encodeToString());
 
-    Assert.assertEquals(ct, parsedToken);
+    assertEquals(ct, parsedToken);
   }
 
   @Test
@@ -64,7 +64,7 @@ public class TestContinueToken {
     ContinueToken parsedToken =
         ContinueToken.decodeFromString(ct.encodeToString());
 
-    Assert.assertEquals(ct, parsedToken);
+    assertEquals(ct, parsedToken);
   }
 
 }

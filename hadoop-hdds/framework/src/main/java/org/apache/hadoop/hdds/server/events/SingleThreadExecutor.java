@@ -60,9 +60,10 @@ public class SingleThreadExecutor<P> implements EventExecutor<P> {
   /**
    * Create SingleThreadExecutor.
    *
+   * @param threadNamePrefix prefix prepended to thread names
    * @param name Unique name used in monitoring and metrics.
    */
-  public SingleThreadExecutor(String name) {
+  public SingleThreadExecutor(String name, String threadNamePrefix) {
     this.name = name;
     MetricsUtil.registerDynamic(this, EVENT_QUEUE + name,
         "Event Executor metrics ", "EventQueue");
@@ -70,7 +71,7 @@ public class SingleThreadExecutor<P> implements EventExecutor<P> {
     executor = Executors.newSingleThreadExecutor(
         runnable -> {
           Thread thread = new Thread(runnable);
-          thread.setName(EVENT_QUEUE + "-" + name);
+          thread.setName(threadNamePrefix + EVENT_QUEUE + "-" + name);
           return thread;
         });
   }

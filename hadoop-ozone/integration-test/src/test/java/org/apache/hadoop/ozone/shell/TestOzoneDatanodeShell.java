@@ -17,22 +17,17 @@
  */
 package org.apache.hadoop.ozone.shell;
 
-import static org.junit.Assert.fail;
-
 import java.util.Arrays;
 import java.util.List;
 
 import org.apache.hadoop.ozone.HddsDatanodeService;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Strings;
-
-import org.junit.Rule;
-import org.junit.rules.Timeout;
 import picocli.CommandLine;
 import picocli.CommandLine.ExecutionException;
 import picocli.CommandLine.IExceptionHandler2;
@@ -40,16 +35,14 @@ import picocli.CommandLine.ParameterException;
 import picocli.CommandLine.ParseResult;
 import picocli.CommandLine.RunLast;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 /**
  * This test class specified for testing Ozone datanode shell command.
  */
+@Timeout(300)
 public class TestOzoneDatanodeShell {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneDatanodeShell.class);
@@ -61,7 +54,7 @@ public class TestOzoneDatanodeShell {
    *
    * @throws Exception
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() {
     datanode = new TestHddsDatanodeService(new String[] {});
   }
@@ -97,23 +90,13 @@ public class TestOzoneDatanodeShell {
     if (Strings.isNullOrEmpty(expectedError)) {
       executeDatanode(hdds, args);
     } else {
-      try {
-        executeDatanode(hdds, args);
-        fail("Exception is expected from command execution " + Arrays
-            .asList(args));
-      } catch (Exception ex) {
-        if (!Strings.isNullOrEmpty(expectedError)) {
-          Throwable exceptionToCheck = ex;
-          if (exceptionToCheck.getCause() != null) {
-            exceptionToCheck = exceptionToCheck.getCause();
-          }
-          Assert.assertTrue(
-              String.format(
-                  "Error of shell code doesn't contain the " +
-                      "exception [%s] in [%s]",
-                  expectedError, exceptionToCheck.getMessage()),
-              exceptionToCheck.getMessage().contains(expectedError));
+      Exception ex = assertThrows(Exception.class, () -> executeDatanode(hdds, args));
+      if (!Strings.isNullOrEmpty(expectedError)) {
+        Throwable exceptionToCheck = ex;
+        if (exceptionToCheck.getCause() != null) {
+          exceptionToCheck = exceptionToCheck.getCause();
         }
+        assertThat(exceptionToCheck.getMessage()).contains(expectedError);
       }
     }
   }

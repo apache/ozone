@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
 import java.io.File;
 import java.io.IOException;
@@ -51,13 +52,14 @@ import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Slow;
+import org.apache.ozone.test.tag.Unhealthy;
+import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ozone.test.tag.Flaky;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,7 +85,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneManagerPrepare.class);
 
-  public void setup() throws Exception {
+  private void initInstanceVariables() {
     cluster = getCluster();
     store = getObjectStore();
     clientProtocol = store.getClientProxy();
@@ -91,16 +93,25 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
 
   /**
    * Make sure OM is out of Prepare state before executing individual tests.
-   * @throws Exception
    */
   @BeforeEach
-  public void initOM() throws Exception {
-    setup();
+  void setup() throws Exception {
+    initInstanceVariables();
+
     LOG.info("Waiting for OM leader election");
-    GenericTestUtils.waitFor(() -> cluster.getOMLeader() != null,
-        1000, 120_000);
+    waitForLeaderToBeReady();
     submitCancelPrepareRequest();
     assertClusterNotPrepared();
+  }
+
+  /**
+   * Reset cluster between tests.
+   */
+  @AfterEach
+  void resetCluster() throws Exception {
+    if (cluster != null) {
+      cluster.restartOzoneManager();
+    }
   }
 
   /**
@@ -141,7 +152,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
    * @throws Exception
    */
   @Test
-  @Disabled("RATIS-1481") // until upgrade to Ratis 2.3.0
+  @Unhealthy("RATIS-1481") // until upgrade to Ratis 2.3.0
   public void testPrepareDownedOM() throws Exception {
     // Index of the OM that will be shut down during this test.
     final int shutdownOMIndex = 2;
@@ -202,7 +213,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
     // modified cluster.
     shutdown();
     init();
-    setup();
+    initInstanceVariables();
 
     String volumeName = VOLUME + UUID.randomUUID().toString();
     writeKeysAndWaitForLogs(volumeName, 10);
@@ -286,11 +297,8 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
               .stream()
               .anyMatch((vol) -> vol.getName().equals(volumeName)));
         } catch (ExecutionException ex) {
-          Throwable cause = ex.getCause();
-          assertTrue(cause instanceof OMException);
-          assertEquals(
-              NOT_SUPPORTED_OPERATION_WHEN_PREPARED,
-              ((OMException) cause).getResult());
+          OMException cause = assertInstanceOf(OMException.class, ex.getCause());
+          assertEquals(NOT_SUPPORTED_OPERATION_WHEN_PREPARED, cause.getResult());
         }
       }
     }
@@ -331,11 +339,9 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
   }
 
   private boolean logFilesPresentInRatisPeer(OzoneManager om) {
-    String ratisDir = om.getOmRatisServer().getServer().getProperties()
-        .get("raft.server.storage.dir");
-    String groupIdDirName =
-        om.getOmRatisServer().getServer().getGroupIds().iterator()
-            .next().getUuid().toString();
+    final RaftServer.Division server = om.getOmRatisServer().getServerDivision();
+    final String ratisDir = server.getRaftServer().getProperties().get("raft.server.storage.dir");
+    final String groupIdDirName = server.getGroup().getGroupId().getUuid().toString();
     File logDir = Paths.get(ratisDir, groupIdDirName, "current")
         .toFile();
 
@@ -411,7 +417,7 @@ public class TestOzoneManagerPrepare extends TestOzoneManagerHA {
       // Wait for a potentially slow follower to apply all key writes.
       LambdaTestUtils.await(WAIT_TIMEOUT_MILLIS, 1000, () -> {
         List<OmKeyInfo> keys = om.getMetadataManager().listKeys(volumeName,
-            BUCKET, null, KEY_PREFIX, 100);
+            BUCKET, null, KEY_PREFIX, 100).getKeys();
 
         boolean allKeysFound = (expectedKeys.size() == keys.size());
         if (!allKeysFound) {

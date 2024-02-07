@@ -18,54 +18,111 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineInfo;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineActionsProto;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.PipelineActionsFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
-import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
+import java.io.IOException;
 
-import java.util.UUID;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.any;
 
 /**
  * Test-cases to verify the functionality of PipelineActionHandler.
  */
 public class TestPipelineActionHandler {
 
+
   @Test
-  public void testCloseActionForMissingPipeline()
-      throws PipelineNotFoundException, NotLeaderException {
-    final PipelineManager manager = Mockito.mock(PipelineManager.class);
-    final EventQueue queue = Mockito.mock(EventQueue.class);
+  public void testPipelineActionHandlerForValidPipeline() throws IOException {
 
-    Mockito.when(manager.getPipeline(Mockito.any(PipelineID.class)))
-        .thenThrow(new PipelineNotFoundException());
+    final PipelineManager manager = mock(PipelineManager.class);
+    final EventQueue queue = mock(EventQueue.class);
+    final PipelineActionHandler actionHandler = new PipelineActionHandler(
+        manager, SCMContext.emptyContext(), null);
+    final Pipeline pipeline = HddsTestUtils.getRandomPipeline();
 
-    final PipelineActionHandler actionHandler =
-        new PipelineActionHandler(manager, SCMContext.emptyContext(), null);
+    actionHandler.onMessage(getPipelineActionsFromDatanode(
+        pipeline.getId()), queue);
+    verify(manager, times(1)).closePipeline(pipeline.getId());
+  }
 
+  @Test
+  public void testPipelineActionHandlerForValidPipelineInFollower()
+      throws IOException {
+    final PipelineManager manager = mock(PipelineManager.class);
+    final EventQueue queue = mock(EventQueue.class);
+    final SCMContext context = SCMContext.emptyContext();
+    final PipelineActionHandler actionHandler = new PipelineActionHandler(
+        manager, context, null);
+    final Pipeline pipeline = HddsTestUtils.getRandomPipeline();
+
+    context.updateLeaderAndTerm(false, 1);
+    actionHandler.onMessage(getPipelineActionsFromDatanode(
+        pipeline.getId()), queue);
+    verify(manager, times(0)).closePipeline(pipeline.getId());
+    verify(queue, times(0)).fireEvent(eq(SCMEvents.DATANODE_COMMAND),
+        any(CommandForDatanode.class));
+  }
+
+  @Test
+  public void testPipelineActionHandlerForUnknownPipeline() throws IOException {
+    final PipelineManager manager = mock(PipelineManager.class);
+    final EventQueue queue = mock(EventQueue.class);
+    final PipelineActionHandler actionHandler = new PipelineActionHandler(
+        manager, SCMContext.emptyContext(), null);
+    final Pipeline pipeline = HddsTestUtils.getRandomPipeline();
+
+    doThrow(new PipelineNotFoundException())
+        .when(manager).closePipeline(pipeline.getId());
+    actionHandler.onMessage(getPipelineActionsFromDatanode(
+        pipeline.getId()), queue);
+    verify(queue, times(1)).fireEvent(eq(SCMEvents.DATANODE_COMMAND),
+        any(CommandForDatanode.class));
+  }
+
+  @Test
+  public void testPipelineActionHandlerForUnknownPipelineInFollower()
+      throws IOException {
+
+    final PipelineManager manager = mock(PipelineManager.class);
+    final EventQueue queue = mock(EventQueue.class);
+    final SCMContext context = SCMContext.emptyContext();
+    final PipelineActionHandler actionHandler = new PipelineActionHandler(
+        manager, context, null);
+    final Pipeline pipeline = HddsTestUtils.getRandomPipeline();
+
+    context.updateLeaderAndTerm(false, 1);
+    doThrow(new PipelineNotFoundException())
+        .when(manager).closePipeline(pipeline.getId());
+    actionHandler.onMessage(getPipelineActionsFromDatanode(
+        pipeline.getId()), queue);
+    verify(queue, times(0)).fireEvent(eq(SCMEvents.DATANODE_COMMAND),
+        any(CommandForDatanode.class));
+
+  }
+
+  private PipelineActionsFromDatanode getPipelineActionsFromDatanode(
+      PipelineID pipelineID) {
     final PipelineActionsProto actionsProto = PipelineActionsProto.newBuilder()
         .addPipelineActions(PipelineAction.newBuilder()
-        .setClosePipeline(ClosePipelineInfo.newBuilder()
-            .setPipelineID(HddsProtos.PipelineID.newBuilder()
-                .setId(UUID.randomUUID().toString()).build())
-            .setReason(ClosePipelineInfo.Reason.PIPELINE_FAILED))
+            .setClosePipeline(ClosePipelineInfo.newBuilder()
+                .setPipelineID(pipelineID.getProtobuf())
+                .setReason(ClosePipelineInfo.Reason.PIPELINE_FAILED))
             .setAction(PipelineAction.Action.CLOSE).build())
         .build();
-    final PipelineActionsFromDatanode pipelineActions =
-        new PipelineActionsFromDatanode(
-            MockDatanodeDetails.randomDatanodeDetails(), actionsProto);
-
-    actionHandler.onMessage(pipelineActions, queue);
-
-    Mockito.verify(queue, Mockito.times(1))
-        .fireEvent(Mockito.any(), Mockito.any(CommandForDatanode.class));
-
+    return new PipelineActionsFromDatanode(
+        MockDatanodeDetails.randomDatanodeDetails(), actionsProto);
   }
 
 }

@@ -18,16 +18,23 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.FlushOptions;
+
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * Managed FlushOptions.
  */
 public class ManagedFlushOptions extends FlushOptions {
+  private final UncheckedAutoCloseable leakTracker = track(this);
 
   @Override
-  protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
-    super.finalize();
+  public void close() {
+    try {
+      super.close();
+    } finally {
+      leakTracker.close();
+    }
   }
 }

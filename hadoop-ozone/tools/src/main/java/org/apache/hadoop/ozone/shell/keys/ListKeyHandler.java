@@ -77,10 +77,13 @@ public class ListKeyHandler extends VolumeBucketHandler {
 
     OzoneVolume vol = client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = vol.getBucket(bucketName);
+    int maxKeyLimit = listOptions.getLimit();
+    if (maxKeyLimit < bucket.getListCacheSize()) {
+      bucket.setListCacheSize(maxKeyLimit);
+    }
     Iterator<? extends OzoneKey> keyIterator = bucket.listKeys(
         keyPrefix, listOptions.getStartItem());
 
-    int maxKeyLimit = listOptions.getLimit();
     int counter = printAsJsonArray(keyIterator, maxKeyLimit);
 
     // More keys were returned notify about max length

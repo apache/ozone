@@ -102,11 +102,13 @@ public class ClosedWithUnhealthyReplicasHandler extends AbstractCheck {
         }
 
         foundUnhealthy = true;
-        sendDeleteCommand(containerInfo, replica);
+        if (!request.isReadOnly()) {
+          sendDeleteCommand(containerInfo, replica);
+        }
       }
     }
 
-    // some unhealthy replicas were found so the container must be over
+    // some unhealthy replicas were found so the container must be
     // over replicated due to unhealthy replicas.
     if (foundUnhealthy) {
       request.getReport().incrementAndSample(

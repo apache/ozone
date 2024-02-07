@@ -35,7 +35,7 @@ import java.util.Set;
 public final class OmDBUserPrincipalInfo {
   private static final Codec<OmDBUserPrincipalInfo> CODEC
       = new DelegatedCodec<>(
-          Proto2Codec.get(TenantUserPrincipalInfo.class),
+          Proto2Codec.get(TenantUserPrincipalInfo.getDefaultInstance()),
           OmDBUserPrincipalInfo::getFromProtobuf,
           OmDBUserPrincipalInfo::getProtobuf);
 

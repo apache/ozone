@@ -17,6 +17,10 @@
  */
 package org.apache.hadoop.hdds.conf;
 
+import java.time.Duration;
+import java.util.concurrent.TimeUnit;
+
+import static org.apache.hadoop.hdds.conf.TimeDurationUtil.getDuration;
 import static org.apache.hadoop.hdds.conf.TimeDurationUtil.getTimeDurationHelper;
 
 /**
@@ -32,6 +36,11 @@ public enum ConfigType {
       throw new UnsupportedOperationException();
     }
 
+    @Override
+    void set(ConfigurationTarget target, String key, Object value,
+        Config config) {
+      throw new UnsupportedOperationException();
+    }
   },
   STRING {
     @Override
@@ -39,6 +48,11 @@ public enum ConfigType {
       return value;
     }
 
+    @Override
+    void set(ConfigurationTarget target, String key, Object value,
+        Config config) {
+      target.set(key, String.valueOf(value));
+    }
   },
   BOOLEAN {
     @Override
@@ -46,6 +60,11 @@ public enum ConfigType {
       return Boolean.parseBoolean(value);
     }
 
+    @Override
+    void set(ConfigurationTarget target, String key, Object value,
+        Config config) {
+      target.setBoolean(key, (boolean) value);
+    }
   },
   INT {
     @Override
@@ -53,6 +72,11 @@ public enum ConfigType {
       return Integer.parseInt(value);
     }
 
+    @Override
+    void set(ConfigurationTarget target, String key, Object value,
+        Config config) {
+      target.setInt(key, (int) value);
+    }
   },
   LONG {
     @Override
@@ -60,13 +84,36 @@ public enum ConfigType {
       return Long.parseLong(value);
     }
 
+    @Override
+    void set(ConfigurationTarget target, String key, Object value,
+        Config config) {
+      target.setLong(key, (long) value);
+    }
   },
   TIME {
     @Override
-    Long parse(String value, Config config, Class<?> type, String key) {
+    Object parse(String value, Config config, Class<?> type, String key) {
+      if (type == Duration.class) {
+        return getDuration(key, value, config.timeUnit());
+      }
       return getTimeDurationHelper(key, value, config.timeUnit());
     }
 
+    @Override
+    void set(ConfigurationTarget target, String key, Object value,
+        Config config) {
+      if (value instanceof Duration) {
+        final Duration duration = (Duration) value;
+        if (duration.getNano() % 1_000_000 > 0) {
+          target.setTimeDuration(key, duration.toNanos(), TimeUnit.NANOSECONDS);
+        } else {
+          final long millis = duration.toMillis();
+          target.setTimeDuration(key, millis, TimeUnit.MILLISECONDS);
+        }
+      } else {
+        target.setTimeDuration(key, (long) value, config.timeUnit());
+      }
+    }
   },
   SIZE {
     @Override
@@ -79,6 +126,18 @@ public enum ConfigType {
       return val;
     }
 
+    @Override
+    void set(ConfigurationTarget target, String key, Object value,
+        Config config) {
+      if (value instanceof Long) {
+        target.setStorageSize(key, (long) value, StorageUnit.BYTES);
+      } else if (value instanceof Integer) {
+        target.setStorageSize(key, (int) value, StorageUnit.BYTES);
+      } else {
+        throw new ConfigurationException("Unsupported type " + value.getClass()
+            + " for " + key);
+      }
+    }
   },
   CLASS {
     @Override
@@ -87,6 +146,16 @@ public enum ConfigType {
       return Class.forName(value);
     }
 
+    @Override
+    void set(ConfigurationTarget target, String key, Object value,
+        Config config) {
+      if (value instanceof Class<?>) {
+        target.set(key, ((Class<?>) value).getName());
+      } else {
+        throw new ConfigurationException("Unsupported type " + value.getClass()
+            + " for " + key);
+      }
+    }
   },
   DOUBLE {
     @Override
@@ -94,8 +163,16 @@ public enum ConfigType {
       return Double.parseDouble(value);
     }
 
+    @Override
+    void set(ConfigurationTarget target, String key, Object value,
+        Config config) {
+      target.setDouble(key, (double) value);
+    }
   };
 
   abstract Object parse(String value, Config config, Class<?> type, String key)
       throws Exception;
+
+  abstract void set(ConfigurationTarget target, String key, Object value,
+      Config config);
 }

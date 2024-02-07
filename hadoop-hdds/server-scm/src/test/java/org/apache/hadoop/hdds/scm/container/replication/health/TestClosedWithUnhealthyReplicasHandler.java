@@ -34,8 +34,6 @@ import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
-
 import java.util.Collections;
 import java.util.Set;
 
@@ -44,6 +42,12 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CL
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.any;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -60,7 +64,7 @@ public class TestClosedWithUnhealthyReplicasHandler {
   @BeforeEach
   public void setup() {
     ecReplicationConfig = new ECReplicationConfig(3, 2);
-    replicationManager = Mockito.mock(ReplicationManager.class);
+    replicationManager = mock(ReplicationManager.class);
     handler = new ClosedWithUnhealthyReplicasHandler(replicationManager);
     requestBuilder = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
@@ -137,15 +141,27 @@ public class TestClosedWithUnhealthyReplicasHandler {
         .setContainerInfo(container)
         .build();
 
+    ContainerCheckRequest readRequest = requestBuilder
+        .setContainerReplicas(containerReplicas)
+        .setContainerInfo(container)
+        .setReadOnly(true)
+        .build();
+
     assertTrue(handler.handle(request));
     assertEquals(1, request.getReport().getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
 
+    assertTrue(handler.handle(readRequest));
+    // Same report object is incremented again
+    assertEquals(2, request.getReport().getStat(
+        ReplicationManagerReport.HealthState.OVER_REPLICATED));
+
+    // Only a single delete should be sent, as the read request should not have
+    // triggered one.
     ArgumentCaptor<Integer> replicaIndexCaptor =
         ArgumentCaptor.forClass(Integer.class);
-    Mockito.verify(replicationManager, Mockito.times(2))
-        .sendDeleteCommand(Mockito.eq(container), Mockito.anyInt(), Mockito.any(
-            DatanodeDetails.class), Mockito.eq(true));
+    verify(replicationManager, times(2)).sendDeleteCommand(eq(container), anyInt(), any(
+            DatanodeDetails.class), eq(true));
     // replica index that delete was sent for should either be 2 or 5
     replicaIndexCaptor.getAllValues()
         .forEach(index -> assertTrue(index == 2 || index == 5));

@@ -20,26 +20,7 @@
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
-# shellcheck source=/dev/null
-source "$COMPOSE_DIR/../testlib.sh"
-
 export SECURITY_ENABLED=true
+export SCM=scm
 
-start_docker_env
-
-execute_robot_test om kinit.robot
-
-execute_robot_test om createmrenv.robot
-
-# reinitialize the directories to use
-export OZONE_DIR=/opt/ozone
-
-# shellcheck source=/dev/null
-source "$COMPOSE_DIR/../testlib.sh"
-
-execute_robot_test rm kinit-hadoop.robot
-
-for scheme in o3fs ofs; do
-  execute_robot_test rm -v "SCHEME:${scheme}" -N "hadoopfs-${scheme}" ozonefs/hadoopo3fs.robot
-  execute_robot_test rm -v "SCHEME:${scheme}" -N "mapreduce-${scheme}" mapreduce.robot
-done
+source "$COMPOSE_DIR/../common/hadoop-test.sh"

@@ -19,7 +19,7 @@
 package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
@@ -67,15 +67,12 @@ public class TestCpuMetrics {
     String metricsResponseBodyContent = metricsResponse.body().string();
 
     // then
-    assertTrue(metricsResponseBodyContent
-        .contains("jvm_metrics_cpu_available_processors"),
-          metricsResponseBodyContent);
-    assertTrue(metricsResponseBodyContent
-        .contains("jvm_metrics_cpu_system_load"),
-          metricsResponseBodyContent);
-    assertTrue(metricsResponseBodyContent
-        .contains("jvm_metrics_cpu_jvm_load"),
-          metricsResponseBodyContent);
+    assertThat(metricsResponseBodyContent)
+        .contains("jvm_metrics_cpu_available_processors");
+    assertThat(metricsResponseBodyContent)
+        .contains("jvm_metrics_cpu_system_load");
+    assertThat(metricsResponseBodyContent)
+        .contains("jvm_metrics_cpu_jvm_load");
   }
 
 }

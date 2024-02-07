@@ -27,19 +27,24 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.Map;
+import java.util.HashMap;
 
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.PrefixManager;
+import org.apache.hadoop.ozone.om.PrefixManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -51,8 +56,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
@@ -63,17 +67,21 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAndBucketToDB;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.fail;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
 /**
- * Tests OMCreateKeyRequest class.
+ * This class tests the OM Key Create Request.
  */
-@RunWith(Parameterized.class)
 public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
-  @Parameterized.Parameters
   public static Collection<Object[]> data() {
     return Arrays.asList(
         new Object[]{true, true},
@@ -81,22 +89,6 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         new Object[]{false, true},
         new Object[]{false, false});
   }
-
-  public TestOMKeyCreateRequest(boolean setKeyPathLock,
-                                boolean setFileSystemPaths) {
-    // Ignored. Actual init done in initParam().
-    // This empty constructor is still required to avoid argument exception.
-  }
-
-  @Parameterized.BeforeParam
-  public static void initParam(boolean setKeyPathLock,
-                               boolean setFileSystemPaths) {
-    keyPathLockEnabled = setKeyPathLock;
-    enableFileSystemPaths = setFileSystemPaths;
-  }
-
-  private static boolean keyPathLockEnabled;
-  private static boolean enableFileSystemPaths;
 
   @Test
   public void testPreExecuteWithNormalKey() throws Exception {
@@ -119,7 +111,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   }
 
   private void preExecuteTest(boolean isMultipartKey, int partNumber,
-      ReplicationConfig repConfig) throws Exception {
+                              ReplicationConfig repConfig) throws Exception {
     long scmBlockSize = ozoneManager.getScmBlockSize();
     for (int i = 0; i <= repConfig.getRequiredNodes(); i++) {
       doPreExecute(createKeyRequest(isMultipartKey, partNumber,
@@ -135,14 +127,15 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     OMException e = assertThrows(OMException.class,
         () -> preExecuteTest(false, 0, invalidReplication));
 
-    Assert.assertEquals(OMException.ResultCodes.INVALID_REQUEST,
-        e.getResult());
+    assertEquals(OMException.ResultCodes.INVALID_REQUEST, e.getResult());
   }
 
-  @Test
-  public void testValidateAndUpdateCache() throws Exception {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testValidateAndUpdateCache(
+      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
-        new OzoneLockProvider(keyPathLockEnabled, enableFileSystemPaths));
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
 
     OMRequest modifiedOmRequest =
         doPreExecute(createKeyRequest(false, 0));
@@ -164,21 +157,20 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
                 omKeyCreateRequest.getBucketLayout())
             .get(openKey);
 
-    Assert.assertNull(omKeyInfo);
+    assertNull(omKeyInfo);
 
     OMClientResponse omKeyCreateResponse =
-        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
 
     checkResponse(modifiedOmRequest, omKeyCreateResponse, id, false,
         omKeyCreateRequest.getBucketLayout());
 
     // Network returns only latest version.
-    Assert.assertEquals(1, omKeyCreateResponse.getOMResponse()
+    assertEquals(1, omKeyCreateResponse.getOMResponse()
         .getCreateKeyResponse().getKeyInfo().getKeyLocationListCount());
 
     // Disk should have 1 version, as it is fresh key create.
-    Assert.assertEquals(1,
+    assertEquals(1,
         omMetadataManager.getOpenKeyTable(
                 omKeyCreateRequest.getBucketLayout())
             .get(openKey).getKeyLocationVersions().size());
@@ -201,35 +193,35 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         omMetadataManager.getOpenKeyTable(
                 omKeyCreateRequest.getBucketLayout())
             .get(openKey);
-    Assert.assertNull(omKeyInfo);
+    assertNull(omKeyInfo);
 
     omKeyCreateRequest =
         getOMKeyCreateRequest(modifiedOmRequest);
 
     omKeyCreateResponse =
-        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 101L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 101L);
 
     checkResponse(modifiedOmRequest, omKeyCreateResponse, id, true,
         omKeyCreateRequest.getBucketLayout());
 
     // Network returns only latest version
-    Assert.assertEquals(1, omKeyCreateResponse.getOMResponse()
+    assertEquals(1, omKeyCreateResponse.getOMResponse()
         .getCreateKeyResponse().getKeyInfo().getKeyLocationListCount());
 
     // Disk should have 1 versions when bucket versioning is off.
-    Assert.assertEquals(1,
+    assertEquals(1,
         omMetadataManager.getOpenKeyTable(
                 omKeyCreateRequest.getBucketLayout())
             .get(openKey).getKeyLocationVersions().size());
 
   }
 
-  @Test
-  public void testValidateAndUpdateCacheWithNamespaceQuotaExceeded()
-      throws Exception {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testValidateAndUpdateCacheWithNamespaceQuotaExceeded(
+      boolean setKeyPathLock, boolean setFileSystemPaths)throws Exception {
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
-        new OzoneLockProvider(keyPathLockEnabled, enableFileSystemPaths));
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
     OMRequest modifiedOmRequest =
         doPreExecute(createKeyRequest(false, 0, "test/" + keyName));
 
@@ -245,18 +237,16 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
             .setQuotaInNamespace(1));
 
     OMClientResponse omKeyCreateResponse =
-        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
-    Assert.assertTrue(omKeyCreateResponse.getOMResponse().getStatus()
-        == OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertSame(omKeyCreateResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
   }
 
-  private void checkResponse(OMRequest modifiedOmRequest,
-      OMClientResponse omKeyCreateResponse, long id, boolean override,
-      BucketLayout bucketLayout) throws Exception {
+  private void checkResponse(
+      OMRequest modifiedOmRequest, OMClientResponse omKeyCreateResponse,
+      long id, boolean override, BucketLayout bucketLayout) throws Exception {
 
-    Assert.assertEquals(OK,
-        omKeyCreateResponse.getOMResponse().getStatus());
+    assertEquals(OK, omKeyCreateResponse.getOMResponse().getStatus());
 
     String openKey = getOpenKey(id);
 
@@ -265,26 +255,26 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     OmKeyInfo omKeyInfo =
         omMetadataManager.getOpenKeyTable(bucketLayout).get(openKey);
 
-    Assert.assertNotNull(omKeyInfo);
-    Assert.assertNotNull(omKeyInfo.getLatestVersionLocations());
+    assertNotNull(omKeyInfo);
+    assertNotNull(omKeyInfo.getLatestVersionLocations());
 
     // As our data size is 100, and scmBlockSize is default to 1000, so we
     // shall have only one block.
     List<OmKeyLocationInfo> omKeyLocationInfoList =
         omKeyInfo.getLatestVersionLocations().getLocationList();
-    Assert.assertEquals(1, omKeyLocationInfoList.size());
+    assertEquals(1, omKeyLocationInfoList.size());
 
     OmKeyLocationInfo omKeyLocationInfo = omKeyLocationInfoList.get(0);
 
     // Check modification time
-    Assert.assertEquals(modifiedOmRequest.getCreateKeyRequest()
+    assertEquals(modifiedOmRequest.getCreateKeyRequest()
         .getKeyArgs().getModificationTime(), omKeyInfo.getModificationTime());
 
     if (!override) {
-      Assert.assertEquals(omKeyInfo.getModificationTime(),
+      assertEquals(omKeyInfo.getModificationTime(),
           omKeyInfo.getCreationTime());
     } else {
-      Assert.assertNotEquals(omKeyInfo.getModificationTime(),
+      assertNotEquals(omKeyInfo.getModificationTime(),
           omKeyInfo.getCreationTime());
     }
 
@@ -292,23 +282,24 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     OzoneManagerProtocolProtos.KeyLocation keyLocation =
         modifiedOmRequest.getCreateKeyRequest().getKeyArgs().getKeyLocations(0);
 
-    Assert.assertEquals(keyLocation.getBlockID().getContainerBlockID()
+    assertEquals(keyLocation.getBlockID().getContainerBlockID()
         .getContainerID(), omKeyLocationInfo.getContainerID());
-    Assert.assertEquals(keyLocation.getBlockID().getContainerBlockID()
+    assertEquals(keyLocation.getBlockID().getContainerBlockID()
         .getLocalID(), omKeyLocationInfo.getLocalID());
   }
 
-  @Test
-  public void testValidateAndUpdateCacheWithNoSuchMultipartUploadError()
-      throws Exception {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testValidateAndUpdateCacheWithNoSuchMultipartUploadError(
+      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
-        new OzoneLockProvider(keyPathLockEnabled, enableFileSystemPaths));
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
     int partNumber = 1;
     OMRequest modifiedOmRequest =
         doPreExecute(createKeyRequest(true, partNumber));
 
     OMKeyCreateRequest omKeyCreateRequest =
-            getOMKeyCreateRequest(modifiedOmRequest);
+        getOMKeyCreateRequest(modifiedOmRequest);
 
     // Add volume and bucket entries to DB.
     addVolumeAndBucketToDB(volumeName, bucketName,
@@ -323,13 +314,12 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     OmKeyInfo omKeyInfo =
         omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
 
-    Assert.assertNull(omKeyInfo);
+    assertNull(omKeyInfo);
 
     OMClientResponse omKeyCreateResponse =
-        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
 
-    Assert.assertEquals(
+    assertEquals(
         OzoneManagerProtocolProtos.Status.NO_SUCH_MULTIPART_UPLOAD_ERROR,
         omKeyCreateResponse.getOMResponse().getStatus());
 
@@ -338,20 +328,22 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     omKeyInfo =
         omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
 
-    Assert.assertNull(omKeyInfo);
+    assertNull(omKeyInfo);
   }
 
 
 
-  @Test
-  public void testValidateAndUpdateCacheWithVolumeNotFound() throws Exception {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testValidateAndUpdateCacheWithVolumeNotFound(
+      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
-        new OzoneLockProvider(keyPathLockEnabled, enableFileSystemPaths));
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
     OMRequest modifiedOmRequest =
         doPreExecute(createKeyRequest(false, 0));
 
     OMKeyCreateRequest omKeyCreateRequest =
-            getOMKeyCreateRequest(modifiedOmRequest);
+        getOMKeyCreateRequest(modifiedOmRequest);
 
 
     long id = modifiedOmRequest.getCreateKeyRequest().getClientID();
@@ -364,13 +356,12 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     OmKeyInfo omKeyInfo =
         omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
 
-    Assert.assertNull(omKeyInfo);
+    assertNull(omKeyInfo);
 
     OMClientResponse omKeyCreateResponse =
-        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
+    assertEquals(OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND,
         omKeyCreateResponse.getOMResponse().getStatus());
 
 
@@ -378,21 +369,23 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     omKeyInfo =
         omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
 
-    Assert.assertNull(omKeyInfo);
+    assertNull(omKeyInfo);
 
   }
 
 
-  @Test
-  public void testValidateAndUpdateCacheWithBucketNotFound() throws Exception {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testValidateAndUpdateCacheWithBucketNotFound(
+      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
-        new OzoneLockProvider(keyPathLockEnabled, enableFileSystemPaths));
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
     OMRequest modifiedOmRequest =
         doPreExecute(createKeyRequest(
             false, 0));
 
     OMKeyCreateRequest omKeyCreateRequest =
-            getOMKeyCreateRequest(modifiedOmRequest);
+        getOMKeyCreateRequest(modifiedOmRequest);
 
 
     long id = modifiedOmRequest.getCreateKeyRequest().getClientID();
@@ -406,13 +399,12 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     OmKeyInfo omKeyInfo =
         omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
 
-    Assert.assertNull(omKeyInfo);
+    assertNull(omKeyInfo);
 
     OMClientResponse omKeyCreateResponse =
-        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
 
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
+    assertEquals(OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND,
         omKeyCreateResponse.getOMResponse().getStatus());
 
 
@@ -420,10 +412,57 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     omKeyInfo =
         omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
 
-    Assert.assertNull(omKeyInfo);
+    assertNull(omKeyInfo);
 
   }
 
+
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testValidateAndUpdateCacheWithInvalidPath(
+      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+    PrefixManager prefixManager = new PrefixManagerImpl(
+        ozoneManager.getMetadataManager(), true);
+    when(ozoneManager.getPrefixManager()).thenReturn(prefixManager);
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+    OMRequest modifiedOmRequest =
+        doPreExecute(createKeyRequest(
+            false, 0, String.valueOf('\u0000')));
+
+    OMKeyCreateRequest omKeyCreateRequest =
+        getOMKeyCreateRequest(modifiedOmRequest);
+
+
+    long id = modifiedOmRequest.getCreateKeyRequest().getClientID();
+
+    String openKey = getOpenKey(id);
+
+    // Add volume and bucket entries to DB.
+    addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+
+    // Before calling
+    OmKeyInfo omKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
+
+    assertNull(omKeyInfo);
+
+    OMClientResponse omKeyCreateResponse =
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.INVALID_PATH,
+        omKeyCreateResponse.getOMResponse().getStatus());
+
+
+
+    // As We got an error, openKey Table should not have entry.
+    omKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
+
+    assertNull(omKeyInfo);
+
+  }
   /**
    * This method calls preExecute and verify the modified request.
    * @param originalOMRequest
@@ -433,17 +472,15 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   private OMRequest doPreExecute(OMRequest originalOMRequest) throws Exception {
 
     OMKeyCreateRequest omKeyCreateRequest =
-            getOMKeyCreateRequest(originalOMRequest);
+        getOMKeyCreateRequest(originalOMRequest);
 
     OMRequest modifiedOmRequest =
         omKeyCreateRequest.preExecute(ozoneManager);
 
-    Assert.assertEquals(originalOMRequest.getCmdType(),
-        modifiedOmRequest.getCmdType());
-    Assert.assertEquals(originalOMRequest.getClientId(),
-        modifiedOmRequest.getClientId());
+    assertEquals(originalOMRequest.getCmdType(), modifiedOmRequest.getCmdType());
+    assertEquals(originalOMRequest.getClientId(), modifiedOmRequest.getClientId());
 
-    Assert.assertTrue(modifiedOmRequest.hasCreateKeyRequest());
+    assertTrue(modifiedOmRequest.hasCreateKeyRequest());
 
     CreateKeyRequest createKeyRequest =
         modifiedOmRequest.getCreateKeyRequest();
@@ -456,12 +493,12 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         (keyArgs.getDataSize() - 1) / (blockSize * dataGroupSize) + 1);
 
     // Time should be set
-    Assert.assertTrue(keyArgs.getModificationTime() > 0);
+    assertThat(keyArgs.getModificationTime()).isGreaterThan(0);
 
 
     // Client ID should be set.
-    Assert.assertTrue(createKeyRequest.hasClientID());
-    Assert.assertTrue(createKeyRequest.getClientID() > 0);
+    assertTrue(createKeyRequest.hasClientID());
+    assertThat(createKeyRequest.getClientID()).isGreaterThan(0);
 
 
     if (!originalOMRequest.getCreateKeyRequest().getKeyArgs()
@@ -470,21 +507,21 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
       List<OzoneManagerProtocolProtos.KeyLocation> keyLocations =
           keyArgs.getKeyLocationsList();
       // KeyLocation should be set.
-      Assert.assertEquals(preAllocatedBlocks, keyLocations.size());
-      Assert.assertEquals(CONTAINER_ID,
+      assertEquals(preAllocatedBlocks, keyLocations.size());
+      assertEquals(CONTAINER_ID,
           keyLocations.get(0).getBlockID().getContainerBlockID()
               .getContainerID());
-      Assert.assertEquals(LOCAL_ID,
+      assertEquals(LOCAL_ID,
           keyLocations.get(0).getBlockID().getContainerBlockID()
               .getLocalID());
-      Assert.assertTrue(keyLocations.get(0).hasPipeline());
+      assertTrue(keyLocations.get(0).hasPipeline());
 
-      Assert.assertEquals(0, keyLocations.get(0).getOffset());
+      assertEquals(0, keyLocations.get(0).getOffset());
 
-      Assert.assertEquals(scmBlockSize, keyLocations.get(0).getLength());
+      assertEquals(scmBlockSize, keyLocations.get(0).getLength());
     } else {
       // We don't create blocks for multipart key in createKey preExecute.
-      Assert.assertEquals(0, keyArgs.getKeyLocationsList().size());
+      assertEquals(0, keyArgs.getKeyLocationsList().size());
     }
 
     return modifiedOmRequest;
@@ -504,7 +541,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   }
 
   private OMRequest createKeyRequest(boolean isMultipartKey, int partNumber,
-      String keyName) {
+                                     String keyName) {
 
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
@@ -525,8 +562,9 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         .setCreateKeyRequest(createKeyRequest).build();
   }
 
-  private OMRequest createKeyRequest(boolean isMultipartKey, int partNumber,
-      long keyLength, ReplicationConfig repConfig) {
+  private OMRequest createKeyRequest(
+      boolean isMultipartKey, int partNumber, long keyLength,
+      ReplicationConfig repConfig) {
 
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
@@ -555,15 +593,16 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         .setCreateKeyRequest(createKeyRequest).build();
   }
 
-  @Test
-  public void testKeyCreateWithFileSystemPathsEnabled() throws Exception {
-
+  @ParameterizedTest
+  @ValueSource(booleans =  {true, false})
+  public void testKeyCreateWithFileSystemPathsEnabled(
+      boolean setKeyPathLock) throws Exception {
     OzoneConfiguration configuration = getOzoneConfiguration();
     configuration.setBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
     when(ozoneManager.getConfiguration()).thenReturn(configuration);
     when(ozoneManager.getEnableFileSystemPaths()).thenReturn(true);
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
-        new OzoneLockProvider(keyPathLockEnabled, true));
+        new OzoneLockProvider(setKeyPathLock, true));
 
     // Add volume and bucket entries to DB.
     addVolumeAndBucketToDB(volumeName, bucketName,
@@ -641,31 +680,51 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   @Test
   public void testPreExecuteWithInvalidKeyPrefix() throws Exception {
-    KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
-        .setVolumeName(volumeName).setBucketName(bucketName)
-        .setKeyName(OzoneConsts.OM_SNAPSHOT_INDICATOR + "/" + keyName);
+    Map<String, String> invalidKeyScenarios = new HashMap<String, String>() {
+      {
+        put(OM_SNAPSHOT_INDICATOR + "/" + keyName,
+            "Cannot create key under path reserved for snapshot: "
+                + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
+        put(OM_SNAPSHOT_INDICATOR + "/a/" + keyName,
+            "Cannot create key under path reserved for snapshot: "
+                + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
+        put(OM_SNAPSHOT_INDICATOR + "/a/b" + keyName,
+            "Cannot create key under path reserved for snapshot: "
+                + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
+        put(OM_SNAPSHOT_INDICATOR,
+            "Cannot create key with reserved name: " + OM_SNAPSHOT_INDICATOR);
+      }
+    };
 
-    OzoneManagerProtocolProtos.CreateKeyRequest createKeyRequest =
-        CreateKeyRequest.newBuilder().setKeyArgs(keyArgs).build();
+    for (Map.Entry<String, String> entry : invalidKeyScenarios.entrySet()) {
+      String invalidKeyName = entry.getKey();
+      String expectedErrorMessage = entry.getValue();
 
-    OMRequest omRequest = OMRequest.newBuilder()
-        .setCmdType(OzoneManagerProtocolProtos.Type.CreateKey)
-        .setClientId(UUID.randomUUID().toString())
-        .setCreateKeyRequest(createKeyRequest).build();
+      KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
+          .setVolumeName(volumeName).setBucketName(bucketName)
+          .setKeyName(invalidKeyName);
 
-    OMException ex = Assert.assertThrows(OMException.class,
-        () -> getOMKeyCreateRequest(omRequest).preExecute(ozoneManager)
-    );
-    Assert.assertTrue(ex.getMessage().contains(
-        "Cannot create key under path reserved for snapshot: "
-            + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX));
+      OzoneManagerProtocolProtos.CreateKeyRequest createKeyRequest =
+          CreateKeyRequest.newBuilder().setKeyArgs(keyArgs).build();
+
+      OMRequest omRequest = OMRequest.newBuilder()
+          .setCmdType(OzoneManagerProtocolProtos.Type.CreateKey)
+          .setClientId(UUID.randomUUID().toString())
+          .setCreateKeyRequest(createKeyRequest).build();
+
+      OMException ex = assertThrows(OMException.class,
+          () -> getOMKeyCreateRequest(omRequest).preExecute(ozoneManager)
+      );
+      assertThat(ex.getMessage()).contains(expectedErrorMessage);
+    }
   }
 
-  @Test
-  public void testKeyCreateInheritParentDefaultAcls()
-      throws Exception {
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testKeyCreateInheritParentDefaultAcls(
+      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
-        new OzoneLockProvider(keyPathLockEnabled, enableFileSystemPaths));
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
 
     List<OzoneAcl> acls = new ArrayList<>();
     acls.add(OzoneAcl.parseAcl("user:newUser:rw[DEFAULT]"));
@@ -683,7 +742,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     List<OzoneAcl> bucketAcls = omMetadataManager.getBucketTable()
         .get(bucketKey).getAcls();
-    Assert.assertEquals(acls, bucketAcls);
+    assertEquals(acls, bucketAcls);
 
     // create file inherit bucket DEFAULT acls
     OMRequest modifiedOmRequest =
@@ -696,8 +755,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     String openKey = getOpenKey(id);
 
     OMClientResponse omKeyCreateResponse =
-        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
     checkResponse(modifiedOmRequest, omKeyCreateResponse, id, false,
         omKeyCreateRequest.getBucketLayout());
 
@@ -713,7 +771,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
    * from parent DEFAULT acls.
    */
   private void verifyKeyInheritAcls(List<OzoneAcl> keyAcls,
-      List<OzoneAcl> bucketAcls) {
+                                    List<OzoneAcl> bucketAcls) {
 
     List<OzoneAcl> parentDefaultAcl = bucketAcls.stream()
         .filter(acl -> acl.getAclScope() == OzoneAcl.AclScope.DEFAULT)
@@ -724,13 +782,13 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         .findAny().orElse(null);
 
     // Should inherit parent DEFAULT Acls
-    Assert.assertEquals("Failed to inherit parent DEFAULT acls!,",
-        parentDefaultAcl.stream()
+    assertEquals(parentDefaultAcl.stream()
             .map(acl -> acl.setAclScope(OzoneAcl.AclScope.ACCESS))
-            .collect(Collectors.toList()), keyAcls);
+            .collect(Collectors.toList()), keyAcls,
+        "Failed to inherit parent DEFAULT acls!,");
 
     // Should not inherit parent ACCESS Acls
-    Assert.assertFalse(keyAcls.contains(parentAccessAcl));
+    assertThat(keyAcls).doesNotContain(parentAccessAcl);
   }
 
   protected void addToKeyTable(String keyName) throws Exception {
@@ -742,19 +800,13 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   private void checkNotAValidPath(String keyName) {
     OMRequest omRequest = createKeyRequest(false, 0, keyName);
     OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
-
-    try {
-      omKeyCreateRequest.preExecute(ozoneManager);
-      fail("checkNotAValidPath failed for path" + keyName);
-    } catch (IOException ex) {
-      Assert.assertTrue(ex instanceof OMException);
-      OMException omException = (OMException) ex;
-      Assert.assertEquals(OMException.ResultCodes.INVALID_KEY_NAME,
-          omException.getResult());
-    }
-
-
+    OMException ex =
+        assertThrows(OMException.class, () -> omKeyCreateRequest.preExecute(ozoneManager),
+            "checkNotAValidPath failed for path" + keyName);
+    assertEquals(OMException.ResultCodes.INVALID_KEY_NAME,
+        ex.getResult());
   }
+
   private void checkNotAFile(String keyName) throws Exception {
     OMRequest omRequest = createKeyRequest(false, 0, keyName);
 
@@ -765,11 +817,9 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
 
     OMClientResponse omClientResponse =
-        omKeyCreateRequest.validateAndUpdateCache(ozoneManager,
-            101L, ozoneManagerDoubleBufferHelper);
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 101L);
 
-    Assert.assertEquals(NOT_A_FILE,
-        omClientResponse.getOMResponse().getStatus());
+    assertEquals(NOT_A_FILE, omClientResponse.getOMResponse().getStatus());
   }
 
 
@@ -783,16 +833,16 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
 
     OMClientResponse omClientResponse =
-        omKeyCreateRequest.validateAndUpdateCache(ozoneManager,
-            101L, ozoneManagerDoubleBufferHelper);
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 101L);
 
-    Assert.assertEquals(OK, omClientResponse.getOMResponse().getStatus());
+    assertEquals(OK, omClientResponse.getOMResponse().getStatus());
 
     checkCreatedPaths(omKeyCreateRequest, omRequest, keyName);
   }
 
-  protected void checkCreatedPaths(OMKeyCreateRequest omKeyCreateRequest,
-      OMRequest omRequest, String keyName) throws Exception {
+  protected void checkCreatedPaths(
+      OMKeyCreateRequest omKeyCreateRequest, OMRequest omRequest,
+      String keyName) throws Exception {
     keyName = omKeyCreateRequest.validateAndNormalizeKey(true, keyName);
     // Check intermediate directories created or not.
     Path keyPath = Paths.get(keyName);
@@ -804,16 +854,16 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     OmKeyInfo omKeyInfo =
         omMetadataManager.getOpenKeyTable(omKeyCreateRequest.getBucketLayout())
             .get(openKey);
-    Assert.assertNotNull(omKeyInfo);
+    assertNotNull(omKeyInfo);
   }
 
   protected long checkIntermediatePaths(Path keyPath) throws Exception {
     // Check intermediate paths are created
     keyPath = keyPath.getParent();
     while (keyPath != null) {
-      Assert.assertNotNull(omMetadataManager.getKeyTable(getBucketLayout()).get(
-          omMetadataManager
-              .getOzoneDirKey(volumeName, bucketName, keyPath.toString())));
+      assertNotNull(omMetadataManager.getKeyTable(getBucketLayout())
+          .get(omMetadataManager.getOzoneDirKey(
+              volumeName, bucketName, keyPath.toString())));
       keyPath = keyPath.getParent();
     }
     return -1;
@@ -821,7 +871,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
   protected String getOpenKey(long id) throws IOException {
     return omMetadataManager.getOpenKey(volumeName, bucketName,
-            keyName, id);
+        keyName, id);
   }
 
   protected String getOzoneKey() throws IOException {
@@ -837,11 +887,4 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     return new OMKeyCreateRequest(omRequest, layout);
   }
 
-  protected boolean getKeyPathLockEnabled() {
-    return keyPathLockEnabled;
-  }
-
-  protected boolean getEnableFileSystemPaths() {
-    return enableFileSystemPaths;
-  }
 }

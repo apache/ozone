@@ -36,6 +36,7 @@ public class OmMultipartUploadCompleteInfo {
     this.hash = md5;
   }
 
+  @Deprecated
   public String getVolume() {
     return volume;
   }
@@ -44,6 +45,7 @@ public class OmMultipartUploadCompleteInfo {
     this.volume = volume;
   }
 
+  @Deprecated
   public String getBucket() {
     return bucket;
   }
@@ -52,6 +54,7 @@ public class OmMultipartUploadCompleteInfo {
     this.bucket = bucket;
   }
 
+  @Deprecated
   public String getKey() {
     return key;
   }

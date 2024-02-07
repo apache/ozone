@@ -18,7 +18,6 @@
  */
 package org.apache.hadoop.hdds.utils.db;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.log4j.Level;
@@ -36,10 +35,11 @@ import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentCaptor.forClass;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -98,7 +98,7 @@ public class TestRDBStoreByteArrayIterator {
     iter.forEachRemaining(consumerStub);
 
     ArgumentCaptor<RawKeyValue.ByteArray> capture =
-        ArgumentCaptor.forClass(RawKeyValue.ByteArray.class);
+        forClass(RawKeyValue.ByteArray.class);
     verify(consumerStub, times(3)).accept(capture.capture());
     assertArrayEquals(
         new byte[]{0x00}, capture.getAllValues().get(0).getKey());
@@ -295,39 +295,10 @@ public class TestRDBStoreByteArrayIterator {
     assertTrue(iter.hasNext());
     verify(rocksDBIteratorMock, times(1)).isValid();
     verify(rocksDBIteratorMock, times(1)).key();
-
-    try {
-      iter.seekToLast();
-      fail("Prefixed iterator does not support seekToLast");
-    } catch (Exception e) {
-      assertTrue(e instanceof UnsupportedOperationException);
-    }
+    Exception e =
+        assertThrows(Exception.class, () -> iter.seekToLast(), "Prefixed iterator does not support seekToLast");
+    assertInstanceOf(UnsupportedOperationException.class, e);
 
     iter.close();
-  }
-
-  @Test
-  @SuppressFBWarnings("RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT")
-  public void testGetStackTrace() {
-    ManagedRocksIterator iterator = mock(ManagedRocksIterator.class);
-    RocksIterator mock = mock(RocksIterator.class);
-    when(iterator.get()).thenReturn(mock);
-    when(mock.isOwningHandle()).thenReturn(true);
-    ManagedRocksObjectUtils.assertClosed(iterator);
-    verify(iterator, times(1)).getStackTrace();
-
-    iterator = new ManagedRocksIterator(rocksDBIteratorMock);
-
-    // construct the expected trace.
-    StackTraceElement[] traceElements = Thread.currentThread().getStackTrace();
-    StringBuilder sb = new StringBuilder();
-    // first 2 lines will differ.
-    for (int i = 2; i < traceElements.length; i++) {
-      sb.append(traceElements[i]);
-      sb.append("\n");
-    }
-    String expectedTrace = sb.toString();
-    String fromObjectInit = iterator.getStackTrace();
-    assertTrue(fromObjectInit.contains(expectedTrace));
   }
 }

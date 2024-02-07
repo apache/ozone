@@ -27,7 +27,7 @@ import java.net.InetSocketAddress;
  */
 public abstract class NodeDetails {
   private String serviceId;
-  private String nodeId;
+  private final String nodeId;
   private String hostAddress;
   private int rpcPort;
   private int ratisPort;
@@ -76,6 +76,10 @@ public abstract class NodeDetails {
     return nodeId;
   }
 
+  public String threadNamePrefix() {
+    return HddsUtils.threadNamePrefix(nodeId);
+  }
+
   public InetSocketAddress getRpcAddress() {
     if (rpcAddress == null) {
       rpcAddress = NetUtils.createSocketAddr(hostAddress, rpcPort);
@@ -106,15 +110,6 @@ public abstract class NodeDetails {
         .append(ratisPort);
     return hostPort.toString();
   }
-
-  public String getRatisAddressPortStr() {
-    StringBuilder hostPort = new StringBuilder();
-    hostPort.append(getInetAddress().getHostAddress())
-        .append(":")
-        .append(ratisPort);
-    return hostPort.toString();
-  }
-
 
   public int getRatisPort() {
     return ratisPort;

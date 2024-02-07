@@ -18,8 +18,8 @@
 package org.apache.hadoop.hdds.scm.server;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
@@ -28,17 +28,19 @@ import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
-
-import org.junit.Assert;
-import org.junit.jupiter.api.Test;
-
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.mockito.Mockito;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.File;
 import java.io.IOException;
+
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
+import static org.mockito.Mockito.mock;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Unit tests to validate the SCMClientProtocolServer
@@ -51,8 +53,8 @@ public class TestSCMClientProtocolServer {
   private StorageContainerLocationProtocolServerSideTranslatorPB service;
 
   @BeforeEach
-  void setUp() throws Exception {
-    config = SCMTestUtils.getConf();
+  void setUp(@TempDir File testDir) throws Exception {
+    config = SCMTestUtils.getConf(testDir);
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
     configurator.setScmContext(SCMContext.emptyContext());
@@ -63,7 +65,7 @@ public class TestSCMClientProtocolServer {
 
     server = scm.getClientProtocolServer();
     service = new StorageContainerLocationProtocolServerSideTranslatorPB(server,
-        scm, Mockito.mock(ProtocolMessageMetrics.class));
+        scm, mock(ProtocolMessageMetrics.class));
   }
 
   @AfterEach
@@ -92,8 +94,7 @@ public class TestSCMClientProtocolServer {
 
     // should have optional error message set in response
     assertTrue(resp.hasErrorMsg());
-    assertTrue(resp.getErrorMsg()
-        .equals(err));
+    assertEquals(err, resp.getErrorMsg());
   }
 
   @Test
@@ -105,7 +106,7 @@ public class TestSCMClientProtocolServer {
       // read operator
       server.getScm().checkAdminAccess(testUser, true);
       // write operator
-      Assert.assertThrows(AccessControlException.class,
+      assertThrows(AccessControlException.class,
           () -> server.getScm().checkAdminAccess(testUser, false));
     } finally {
       UserGroupInformation.reset();

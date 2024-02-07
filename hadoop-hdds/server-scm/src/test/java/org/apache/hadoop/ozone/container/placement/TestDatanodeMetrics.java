@@ -31,13 +31,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class TestDatanodeMetrics {
   @Test
   public void testSCMNodeMetric() {
-    SCMNodeStat stat = new SCMNodeStat(100L, 10L, 90L);
+    SCMNodeStat stat = new SCMNodeStat(100L, 10L, 90L, 0, 80);
     assertEquals((long) stat.getCapacity().get(), 100L);
     assertEquals(10L, (long) stat.getScmUsed().get());
     assertEquals(90L, (long) stat.getRemaining().get());
     SCMNodeMetric metric = new SCMNodeMetric(stat);
 
-    SCMNodeStat newStat = new SCMNodeStat(100L, 10L, 90L);
+    SCMNodeStat newStat = new SCMNodeStat(100L, 10L, 90L, 0, 80);
     assertEquals(100L, (long) stat.getCapacity().get());
     assertEquals(10L, (long) stat.getScmUsed().get());
     assertEquals(90L, (long) stat.getRemaining().get());
@@ -52,5 +52,9 @@ public class TestDatanodeMetrics {
     // Assert we can handle zero capacity.
     assertTrue(metric.isGreater(zeroMetric.get()));
 
+    // Another case when nodes have similar weight
+    SCMNodeStat stat1 = new SCMNodeStat(10000000L, 50L, 9999950L, 0, 100000);
+    SCMNodeStat stat2 = new SCMNodeStat(10000000L, 51L, 9999949L, 0, 100000);
+    assertTrue(new SCMNodeMetric(stat2).isGreater(stat1));
   }
 }

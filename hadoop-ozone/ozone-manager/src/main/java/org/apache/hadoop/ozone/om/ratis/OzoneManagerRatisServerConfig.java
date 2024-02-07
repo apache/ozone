@@ -27,6 +27,7 @@ import java.time.Duration;
 
 import static org.apache.hadoop.hdds.conf.ConfigTag.OM;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
+import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.RATIS;
 
 /**
@@ -35,6 +36,22 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.RATIS;
 @ConfigGroup(prefix = OMConfigKeys.OZONE_OM_HA_PREFIX + "."
     + RaftServerConfigKeys.PREFIX)
 public class OzoneManagerRatisServerConfig {
+  /** @see RaftServerConfigKeys.Log.Appender#WAIT_TIME_MIN_KEY */
+  @Config(key = "log.appender.wait-time.min",
+      defaultValue = "0ms",
+      type = ConfigType.TIME,
+      tags = {OZONE, OM, RATIS, PERFORMANCE},
+      description = "Minimum wait time between two appendEntries calls."
+  )
+  private long logAppenderWaitTimeMin;
+
+  public long getLogAppenderWaitTimeMin() {
+    return logAppenderWaitTimeMin;
+  }
+
+  public void setLogAppenderWaitTimeMin(long logAppenderWaitTimeMin) {
+    this.logAppenderWaitTimeMin = logAppenderWaitTimeMin;
+  }
 
   @Config(key = "retrycache.expirytime",
       defaultValue = "300s",

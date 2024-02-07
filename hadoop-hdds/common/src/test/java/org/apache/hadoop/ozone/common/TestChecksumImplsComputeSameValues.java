@@ -28,7 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.CRC32;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests to verify that different checksum implementations compute the same
@@ -52,7 +52,7 @@ public class TestChecksumImplsComputeSameValues {
       if (NativeCRC32Wrapper.isAvailable()) {
         impls.add(new ChecksumByteBufferImpl(new NativeCheckSumCRC32(1, bpc)));
       }
-      assertEquals(true, validateImpls(data, impls, bpc));
+      assertTrue(validateImpls(data, impls, bpc));
     }
   }
 
@@ -74,7 +74,7 @@ public class TestChecksumImplsComputeSameValues {
       if (NativeCRC32Wrapper.isAvailable()) {
         impls.add(new ChecksumByteBufferImpl(new NativeCheckSumCRC32(2, bpc)));
       }
-      assertEquals(true, validateImpls(data, impls, bpc));
+      assertTrue(validateImpls(data, impls, bpc));
     }
   }
 

@@ -26,21 +26,18 @@ import java.time.Instant;
 import java.util.Map;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
-import org.apache.hadoop.hdds.scm.container.common.helpers
-    .StorageContainerException;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
-import org.apache.hadoop.hdfs.util.RwLock;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 
 /**
  * Interface for Container Operations.
  */
-public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
+public interface Container<CONTAINERDATA extends ContainerData> {
   /**
    * Encapsulates the result of a container scan.
    */
@@ -59,7 +56,8 @@ public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
       CORRUPT_CHUNK,
       INCONSISTENT_CHUNK_LENGTH,
       INACCESSIBLE_DB,
-      WRITE_FAILURE
+      WRITE_FAILURE,
+      DELETED_CONTAINER
     }
 
     private final boolean healthy;
@@ -261,4 +259,28 @@ public interface Container<CONTAINERDATA extends ContainerData> extends RwLock {
    */
   ScanResult scanData(DataTransferThrottler throttler, Canceler canceler)
       throws InterruptedException;
+
+  /** Acquire read lock. */
+  void readLock();
+
+  /** Acquire read lock, unless interrupted while waiting. */
+  void readLockInterruptibly() throws InterruptedException;
+
+  /** Release read lock. */
+  void readUnlock();
+
+  /** Check if the current thread holds read lock. */
+  boolean hasReadLock();
+
+  /** Acquire write lock. */
+  void writeLock();
+
+  /** Acquire write lock, unless interrupted while waiting. */
+  void writeLockInterruptibly() throws InterruptedException;
+
+  /** Release write lock. */
+  void writeUnlock();
+
+  /** Check if the current thread holds write lock. */
+  boolean hasWriteLock();
 }

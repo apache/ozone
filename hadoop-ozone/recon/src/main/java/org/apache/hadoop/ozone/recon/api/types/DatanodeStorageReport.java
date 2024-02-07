@@ -24,11 +24,14 @@ public class DatanodeStorageReport {
   private long capacity;
   private long used;
   private long remaining;
+  private long committed;
 
-  public DatanodeStorageReport(long capacity, long used, long remaining) {
+  public DatanodeStorageReport(long capacity, long used, long remaining,
+                               long committed) {
     this.capacity = capacity;
     this.used = used;
     this.remaining = remaining;
+    this.committed = committed;
   }
 
   public long getCapacity() {
@@ -41,5 +44,9 @@ public class DatanodeStorageReport {
 
   public long getRemaining() {
     return remaining;
+  }
+
+  public long getCommitted() {
+    return committed;
   }
 }

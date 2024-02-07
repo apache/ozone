@@ -49,7 +49,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 
 /**
  * The Grpc s3gateway om transport failover proxy provider implementation
- * extending the ozone client OM failover proxy provider.  This implmentation
+ * extending the ozone client OM failover proxy provider.  This implementation
  * allows the Grpc OMTransport reuse OM failover retry policies and
  * getRetryAction methods.  In case of OM failover, client can try
  * connecting to another OM node from the list of proxies.
@@ -123,7 +123,7 @@ public class GrpcOMFailoverProxyProvider<T> extends
 
   /**
    * Get the proxy object which should be used until the next failover event
-   * occurs. RPC proxy object is intialized lazily.
+   * occurs. RPC proxy object is initialized lazily.
    * @return the OM proxy object to invoke methods upon
    */
   @Override

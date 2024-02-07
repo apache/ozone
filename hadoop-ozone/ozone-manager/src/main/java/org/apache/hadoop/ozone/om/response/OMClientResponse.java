@@ -24,23 +24,20 @@ import java.util.concurrent.CompletableFuture;
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
+import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Interface for OM Responses, each OM response should implement this interface.
  */
 public abstract class OMClientResponse {
 
-  private OMResponse omResponse;
+  private final OMResponse omResponse;
+  /** Used only for non-Ratis. */
   private CompletableFuture<Void> flushFuture = null;
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OMClientResponse.class);
+  private OMLockDetails omLockDetails;
 
   public OMClientResponse(OMResponse omResponse) {
     Preconditions.checkNotNull(omResponse);
@@ -55,21 +52,17 @@ public abstract class OMClientResponse {
    * For error case, check that the status of omResponse is not OK.
    */
   public void checkStatusNotOK() {
-    Preconditions.checkArgument(!omResponse.getStatus().equals(
-        OzoneManagerProtocolProtos.Status.OK));
+    Preconditions.checkArgument(!omResponse.getStatus().equals(Status.OK));
   }
 
   /**
    * Check if omResponse status is OK. If yes, add to DB.
    * For OmResponse with failure, this should do nothing. This method is not
    * called in failure scenario in OM code.
-   * @param omMetadataManager
-   * @param batchOperation
-   * @throws IOException
    */
   public void checkAndUpdateDB(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException {
-    if (omResponse.getStatus() == OzoneManagerProtocolProtos.Status.OK) {
+    if (omResponse.getStatus() == Status.OK) {
       addToDBBatch(omMetadataManager, batchOperation);
     }
   }
@@ -77,9 +70,6 @@ public abstract class OMClientResponse {
   /**
    * Implement logic to add the response to batch. This function should be
    * called from checkAndUpdateDB only.
-   * @param omMetadataManager
-   * @param batchOperation
-   * @throws IOException
    */
   protected abstract void addToDBBatch(OMMetadataManager omMetadataManager,
       BatchOperation batchOperation) throws IOException;
@@ -100,5 +90,14 @@ public abstract class OMClientResponse {
     return flushFuture;
   }
 
+
+  public OMLockDetails getOmLockDetails() {
+    return omLockDetails;
+  }
+
+  public void setOmLockDetails(
+      OMLockDetails omLockDetails) {
+    this.omLockDetails = omLockDetails;
+  }
 }
 

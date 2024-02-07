@@ -35,7 +35,7 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.util.StringUtils;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -204,7 +204,7 @@ public final class ScmUtils {
             ScmConfigKeys.OZONE_SCM_DATANODE_DISALLOW_SAME_PEERS_DEFAULT));
   }
 
-  @NotNull
+  @Nonnull
   public static List<BlockingQueue<ContainerReport>> initContainerReportQueue(
       OzoneConfiguration configuration) {
     int threadPoolSize = configuration.getInt(getContainerReportConfPrefix()

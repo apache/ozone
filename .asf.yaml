@@ -22,6 +22,11 @@ github:
     - big-data
     - s3
     - kubernetes
+  autolink_jira:
+    - HADOOP
+    - HDDS
+    - HDFS
+    - RATIS
   enabled_merge_buttons:
     squash:  true
     merge:   false

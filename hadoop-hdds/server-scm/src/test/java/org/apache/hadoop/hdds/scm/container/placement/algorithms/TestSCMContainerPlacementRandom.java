@@ -34,13 +34,13 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import org.mockito.Mockito;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -85,7 +85,7 @@ public class TestSCMContainerPlacementRandom {
     datanodes.get(2).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage2)));
 
-    NodeManager mockNodeManager = Mockito.mock(NodeManager.class);
+    NodeManager mockNodeManager = mock(NodeManager.class);
     when(mockNodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
 
@@ -103,17 +103,14 @@ public class TestSCMContainerPlacementRandom {
           .chooseDatanodes(existingNodes, null, 1, 15, 15);
 
       //then
-      Assertions.assertEquals(1, datanodeDetails.size());
+      assertEquals(1, datanodeDetails.size());
       DatanodeDetails datanode0Details = datanodeDetails.get(0);
 
-      Assertions.assertNotEquals(
-          datanodes.get(0), datanode0Details,
+      assertNotEquals(datanodes.get(0), datanode0Details,
           "Datanode 0 should not been selected: excluded by parameter");
-      Assertions.assertNotEquals(
-          datanodes.get(1), datanode0Details,
+      assertNotEquals(datanodes.get(1), datanode0Details,
           "Datanode 1 should not been selected: excluded by parameter");
-      Assertions.assertNotEquals(
-          datanodes.get(2), datanode0Details,
+      assertNotEquals(datanodes.get(2), datanode0Details,
           "Datanode 2 should not been selected: not enough space there");
 
     }
@@ -131,7 +128,7 @@ public class TestSCMContainerPlacementRandom {
       datanodes.add(MockDatanodeDetails.randomDatanodeDetails());
     }
 
-    NodeManager mockNodeManager = Mockito.mock(NodeManager.class);
+    NodeManager mockNodeManager = mock(NodeManager.class);
     SCMContainerPlacementRandom scmContainerPlacementRandom =
         new SCMContainerPlacementRandom(mockNodeManager, conf, null, true,
             null);
@@ -201,7 +198,7 @@ public class TestSCMContainerPlacementRandom {
     datanodes.get(2).updateMetaDataStorageReports(
         new ArrayList<>(Arrays.asList(metaStorage2)));
 
-    NodeManager mockNodeManager = Mockito.mock(NodeManager.class);
+    NodeManager mockNodeManager = mock(NodeManager.class);
     when(mockNodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
     when(mockNodeManager.getNodeByUuid(datanodes.get(0).getUuid()))
@@ -215,11 +212,11 @@ public class TestSCMContainerPlacementRandom {
         new SCMContainerPlacementRandom(mockNodeManager, conf, null, true,
             null);
 
-    Assertions.assertTrue(
+    assertTrue(
         scmContainerPlacementRandom.isValidNode(datanodes.get(0), 15L, 15L));
-    Assertions.assertFalse(
+    assertFalse(
         scmContainerPlacementRandom.isValidNode(datanodes.get(1), 15L, 15L));
-    Assertions.assertFalse(
+    assertFalse(
         scmContainerPlacementRandom.isValidNode(datanodes.get(2), 15L, 15L));
 
   }

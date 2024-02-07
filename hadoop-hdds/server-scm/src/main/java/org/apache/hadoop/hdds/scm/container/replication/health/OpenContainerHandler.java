@@ -53,17 +53,26 @@ public class OpenContainerHandler extends AbstractCheck {
     if (containerInfo.getState() == HddsProtos.LifeCycleState.OPEN) {
       LOG.debug("Checking open container {} in OpenContainerHandler",
           containerInfo);
-      if (!isOpenContainerHealthy(
-          containerInfo, request.getContainerReplicas())) {
-        // This is an unhealthy open container, so we need to trigger the
-        // close process on it.
-        LOG.debug("Container {} is open but unhealthy. Triggering close.",
-            containerInfo);
-        request.getReport().incrementAndSample(
-            ReplicationManagerReport.HealthState.OPEN_UNHEALTHY,
+      final boolean noPipeline = !replicationManager.hasHealthyPipeline(containerInfo);
+      // Minor optimization. If noPipeline is true, isOpenContainerHealthy will not
+      // be called.
+      final boolean unhealthy = noPipeline || !isOpenContainerHealthy(containerInfo,
+          request.getContainerReplicas());
+      if (unhealthy) {
+        // For an OPEN container, we close the container
+        // if the container has no Pipeline or if the container is unhealthy.
+        LOG.info("Container {} is open but {}. Triggering close.",
+            containerInfo, noPipeline ? "has no Pipeline" : "unhealthy");
+
+        request.getReport().incrementAndSample(noPipeline ?
+                ReplicationManagerReport.HealthState.OPEN_WITHOUT_PIPELINE :
+                ReplicationManagerReport.HealthState.OPEN_UNHEALTHY,
             containerInfo.containerID());
-        replicationManager.sendCloseContainerEvent(containerInfo.containerID());
-        return true;
+
+        if (!request.isReadOnly()) {
+          replicationManager
+              .sendCloseContainerEvent(containerInfo.containerID());
+        }
       }
       // For open containers we do not want to do any further processing in RM
       // so return true to stop the command chain.

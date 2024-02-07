@@ -74,13 +74,19 @@ public class ECReplicationCheckHandler extends AbstractCheck {
           report.incrementAndSample(
               ReplicationManagerReport.HealthState.UNHEALTHY, containerID);
         }
+        // An EC container can be both unrecoverable and have offline replicas. In this case, we need
+        // to report both states as the decommission monitor needs to wait for an extra copy to be
+        // made of the offline replica before decommission can complete.
+        if (underHealth.hasUnreplicatedOfflineIndexes()) {
+          report.incrementAndSample(ReplicationManagerReport.HealthState.UNDER_REPLICATED, containerID);
+        }
       } else {
         report.incrementAndSample(
             ReplicationManagerReport.HealthState.UNDER_REPLICATED, containerID);
       }
       if (!underHealth.isReplicatedOkAfterPending() &&
           (!underHealth.isUnrecoverable()
-              || underHealth.hasUnreplicatedOfflineIndexes())) {
+              || (underHealth.hasUnreplicatedOfflineIndexes() && !underHealth.offlineIndexesOkAfterPending()))) {
         request.getReplicationQueue().enqueue(underHealth);
       }
       LOG.debug("Container {} is Under Replicated. isReplicatedOkAfterPending "
@@ -131,7 +137,7 @@ public class ECReplicationCheckHandler extends AbstractCheck {
         // via an EC reconstruction command. Note that it may also have some
         // replicas in decommission / maintenance states, but as the under
         // replication is not caused only by decommission, we say it is not
-        // due to decommission/
+        // due to decommission
         dueToOutOfService = false;
         remainingRedundancy = repConfig.getParity() - missingIndexes.size();
       }
@@ -140,9 +146,17 @@ public class ECReplicationCheckHandler extends AbstractCheck {
               container, remainingRedundancy, dueToOutOfService,
               replicaCount.isSufficientlyReplicated(true),
               replicaCount.isUnrecoverable());
-      if (replicaCount.decommissioningOnlyIndexes(true).size() > 0
-          || replicaCount.maintenanceOnlyIndexes(true).size() > 0) {
+      // If the container has a pending add to correct the under replication caused by decommission
+      // then we need to wait for that to complete before we can say the container is replicated OK.
+      // Therefore we should set the setHasUnReplicatedOfflineIndexes based on not considering
+      // pending.
+      if (!replicaCount.decommissioningOnlyIndexes(false).isEmpty()
+          || !replicaCount.maintenanceOnlyIndexes(false).isEmpty()) {
         result.setHasUnReplicatedOfflineIndexes(true);
+        if (replicaCount.decommissioningOnlyIndexes(true).isEmpty()
+            && replicaCount.maintenanceOnlyIndexes(true).isEmpty()) {
+          result.setOfflineIndexesOkAfterPending(true);
+        }
       }
       result.setIsMissing(replicaCount.isMissing());
       return result;

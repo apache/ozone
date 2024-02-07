@@ -264,6 +264,7 @@ export class Pipelines extends React.Component<Record<string, object>, IPipeline
                 }, [])}
                 loading={activeLoading} pagination={paginationConfig} rowKey='pipelineId'
                 scroll={{x: true, y: false, scrollToFirstRowOnChange: true}}
+                locale={{filterTitle: ""}}
                 />
             </TabPane>
 

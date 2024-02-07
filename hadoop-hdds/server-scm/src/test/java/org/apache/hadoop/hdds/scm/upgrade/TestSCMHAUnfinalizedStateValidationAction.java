@@ -29,7 +29,6 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.ratis.util.ExitUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -37,6 +36,10 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 import java.nio.file.Path;
 import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests that the SCM HA pre-finalize validation action is only triggered in
@@ -78,7 +81,7 @@ public class TestSCMHAUnfinalizedStateValidationAction {
     // This init should always succeed, since SCM is not pre-finalized yet.
     DefaultConfigManager.clearDefaultConfigs();
     boolean initResult1 = StorageContainerManager.scmInit(conf, CLUSTER_ID);
-    Assertions.assertTrue(initResult1);
+    assertTrue(initResult1);
 
     // Set up new pre-finalized SCM.
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY,
@@ -87,29 +90,34 @@ public class TestSCMHAUnfinalizedStateValidationAction {
        Ratis SCM -> Non Ratis SCM not supported
      */
     if (haEnabledPreFinalized != haEnabledBefore) {
-      Assertions.assertThrows(ConfigurationException.class,
-              () -> StorageContainerManager.scmInit(conf, CLUSTER_ID));
+      if (haEnabledBefore) {
+        assertThrows(ConfigurationException.class,
+            () -> StorageContainerManager.scmInit(conf, CLUSTER_ID));
+      } else {
+        assertThrows(UpgradeException.class,
+            () -> StorageContainerManager.scmInit(conf, CLUSTER_ID));
+      }
       return;
     }
     StorageContainerManager scm = HddsTestUtils.getScm(conf);
 
-    Assertions.assertEquals(UpgradeFinalizer.Status.FINALIZATION_REQUIRED,
+    assertEquals(UpgradeFinalizer.Status.FINALIZATION_REQUIRED,
         scm.getFinalizationManager().getUpgradeFinalizer().getStatus());
 
     final boolean shouldFail = !haEnabledBefore && haEnabledPreFinalized;
     DefaultConfigManager.clearDefaultConfigs();
     if (shouldFail) {
       // Start on its own should fail.
-      Assertions.assertThrows(UpgradeException.class, scm::start);
+      assertThrows(UpgradeException.class, scm::start);
 
       // Init followed by start should both fail.
       // Init is not necessary here, but is allowed to be run.
-      Assertions.assertThrows(UpgradeException.class,
+      assertThrows(UpgradeException.class,
           () -> StorageContainerManager.scmInit(conf, CLUSTER_ID));
-      Assertions.assertThrows(UpgradeException.class, scm::start);
+      assertThrows(UpgradeException.class, scm::start);
     } else {
       boolean initResult2 = StorageContainerManager.scmInit(conf, CLUSTER_ID);
-      Assertions.assertTrue(initResult2);
+      assertTrue(initResult2);
       scm.start();
       scm.stop();
     }

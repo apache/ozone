@@ -53,11 +53,16 @@ public class DefaultSecretKeySignerClient implements SecretKeySignerClient {
   private final SecretKeyProtocol secretKeyProtocol;
   private final AtomicReference<ManagedSecretKey> cache =
       new AtomicReference<>();
+  private final ThreadFactory threadFactory;
   private ScheduledExecutorService executorService;
 
   public DefaultSecretKeySignerClient(
-      SecretKeyProtocol secretKeyProtocol) {
+      SecretKeyProtocol secretKeyProtocol, String threadNamePrefix) {
     this.secretKeyProtocol = secretKeyProtocol;
+    threadFactory = new ThreadFactoryBuilder()
+        .setNameFormat(threadNamePrefix + "SecretKeyPoller")
+        .setDaemon(true)
+        .build();
   }
 
   @Override
@@ -138,10 +143,6 @@ public class DefaultSecretKeySignerClient implements SecretKeySignerClient {
                                        Instant initialCreation) {
     Duration rotateDuration = SecretKeyConfig.parseRotateDuration(conf);
     Instant nextRotate = initialCreation.plus(rotateDuration);
-    ThreadFactory threadFactory = new ThreadFactoryBuilder()
-        .setNameFormat("SecretKeyPoller")
-        .setDaemon(true)
-        .build();
     executorService = Executors.newScheduledThreadPool(1, threadFactory);
     Duration interval = SecretKeyConfig.parseRotateCheckDuration(conf);
     Duration initialDelay = Duration.between(Instant.now(), nextRotate);

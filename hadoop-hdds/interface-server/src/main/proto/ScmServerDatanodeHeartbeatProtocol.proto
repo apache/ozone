@@ -179,6 +179,8 @@ message StorageReportProto {
   optional uint64 remaining = 5 [default = 0];
   optional StorageTypeProto storageType = 6 [default = DISK];
   optional bool failed = 7 [default = false];
+  optional uint64 committed = 8 [default = 0];
+  optional uint64 freeSpaceToSpare = 9 [default = 0];
 }
 
 message MetadataStorageReportProto {

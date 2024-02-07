@@ -23,8 +23,9 @@ import java.time.Duration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 
 import static org.apache.hadoop.hdds.fs.DedicatedDiskSpaceUsageFactory.Conf.configKeyForRefreshPeriod;
-import static org.apache.ozone.test.GenericTestUtils.getTestDir;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
@@ -40,10 +41,9 @@ public class TestDedicatedDiskSpaceUsageFactory {
   }
 
   @Test
-  public void testParams() {
+  public void testParams(@TempDir File dir) {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(configKeyForRefreshPeriod(), "2m");
-    File dir = getTestDir(getClass().getSimpleName());
 
     SpaceUsageCheckParams params = new DedicatedDiskSpaceUsageFactory()
         .setConfiguration(conf)

@@ -33,13 +33,11 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.apache.ozone.test.TestClock;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -48,11 +46,21 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.CLOSE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.QUASI_CLOSE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.anyBoolean;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.any;
 
 /**
  * Tests for {@link ClosingContainerHandler}.
@@ -73,9 +81,8 @@ public class TestClosingContainerHandler {
 
   @BeforeEach
   public void setup() {
-    replicationManager = Mockito.mock(ReplicationManager.class);
-    Mockito.when(replicationManager.getConfig())
-        .thenReturn(rmConf);
+    replicationManager = mock(ReplicationManager.class);
+    when(replicationManager.getConfig()).thenReturn(rmConf);
     subject = new ClosingContainerHandler(replicationManager, clock);
   }
 
@@ -190,15 +197,19 @@ public class TestClosingContainerHandler {
 
     ReplicationManagerReport report = new ReplicationManagerReport();
 
-    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+    ContainerCheckRequest.Builder builder = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
         .setReport(report)
         .setContainerInfo(containerInfo)
-        .setContainerReplicas(containerReplicas)
-        .build();
+        .setContainerReplicas(containerReplicas);
+    ContainerCheckRequest request = builder.build();
 
+    builder.setReadOnly(true);
+    ContainerCheckRequest readRequest = builder.build();
+
+    assertAndVerify(readRequest, true, 0);
     assertAndVerify(request, true, 3);
-    report.getStats().forEach((k, v) -> Assertions.assertEquals(0L, v));
+    report.getStats().forEach((k, v) -> assertEquals(0L, v));
   }
 
   @Test
@@ -217,9 +228,9 @@ public class TestClosingContainerHandler {
     assertAndVerify(request, true, 0);
     report.getStats().forEach((k, v) -> {
       if (k.equals("MISSING")) {
-        Assertions.assertEquals(1L, v);
+        assertEquals(1L, v);
       } else {
-        Assertions.assertEquals(0L, v);
+        assertEquals(0L, v);
       }
     });
   }
@@ -251,14 +262,82 @@ public class TestClosingContainerHandler {
     Duration notEnoughTime = replicationInterval.multipliedBy(3).plusMillis(1);
     clock.fastForward(notEnoughTime);
     assertAndVerify(request, true, 0);
-    Mockito.verify(replicationManager, never())
+    verify(replicationManager, never())
         .updateContainerState(containerInfo.containerID(), CLOSE);
 
     // wait time has elapsed (3x + 2x + a bit)
     Duration moreTime = replicationInterval.multipliedBy(2);
     clock.fastForward(moreTime);
     assertAndVerify(request, true, 0);
-    Mockito.verify(replicationManager, Mockito.times(1))
+    verify(replicationManager, times(1))
+        .updateContainerState(containerInfo.containerID(), CLOSE);
+  }
+
+  @Test
+  public void testClosingRatisWithUnhealthyReplicas() {
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        RATIS_REPLICATION_CONFIG, 1, CLOSING);
+    Set<ContainerReplica> containerReplicas = ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            ContainerReplicaProto.State.UNHEALTHY, 0, 0, 0);
+
+    ReplicationManagerReport report = new ReplicationManagerReport();
+
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(report)
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .build();
+    subject.handle(request);
+
+    verify(replicationManager, times(1))
+        .updateContainerState(containerInfo.containerID(), QUASI_CLOSE);
+
+    clearInvocations(replicationManager);
+
+    // Now add an open container. This time, the container should not move to
+    // quasi-closed, and a close should be sent for the open replica.
+    containerReplicas.addAll(ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            ContainerReplicaProto.State.OPEN, 0));
+
+    assertAndVerify(request, true, 1);
+    verify(replicationManager, times(0))
+        .updateContainerState(containerInfo.containerID(), QUASI_CLOSE);
+  }
+
+  @Test
+  public void testClosingECWithUnhealthyReplicas() {
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        EC_REPLICATION_CONFIG, 1, CLOSING);
+    Set<ContainerReplica> containerReplicas = ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            ContainerReplicaProto.State.UNHEALTHY, 1, 2, 3, 4, 5);
+
+    ReplicationManagerReport report = new ReplicationManagerReport();
+
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(report)
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .build();
+    subject.handle(request);
+
+    verify(replicationManager, times(1))
+        .updateContainerState(containerInfo.containerID(), CLOSE);
+
+    clearInvocations(replicationManager);
+
+    // Now add an open container. This time, the container should not move to
+    // quasi-closed, and a close should be sent for the open replica.
+    containerReplicas.addAll(ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            ContainerReplicaProto.State.OPEN, 1));
+
+    assertAndVerify(request, true, 1);
+    verify(replicationManager, times(0))
         .updateContainerState(containerInfo.containerID(), CLOSE);
   }
 
@@ -306,19 +385,19 @@ public class TestClosingContainerHandler {
 
     ArgumentCaptor<Boolean> forceCaptor =
         ArgumentCaptor.forClass(Boolean.class);
-    Assertions.assertTrue(subject.handle(request));
-    Mockito.verify(replicationManager, Mockito.times(replicas))
-        .sendCloseContainerReplicaCommand(Mockito.any(ContainerInfo.class),
-            Mockito.any(DatanodeDetails.class), forceCaptor.capture());
+    assertTrue(subject.handle(request));
+    verify(replicationManager, times(replicas))
+        .sendCloseContainerReplicaCommand(any(ContainerInfo.class),
+            any(DatanodeDetails.class), forceCaptor.capture());
     forceCaptor.getAllValues()
-        .forEach(f -> Assertions.assertEquals(force, f));
+        .forEach(f -> assertEquals(force, f));
   }
 
   private void assertAndVerify(ContainerCheckRequest request,
       boolean assertion, int times) {
-    Assertions.assertEquals(assertion, subject.handle(request));
-    Mockito.verify(replicationManager, Mockito.times(times))
-        .sendCloseContainerReplicaCommand(Mockito.any(ContainerInfo.class),
-            Mockito.any(DatanodeDetails.class), Mockito.anyBoolean());
+    assertEquals(assertion, subject.handle(request));
+    verify(replicationManager, times(times))
+        .sendCloseContainerReplicaCommand(any(ContainerInfo.class),
+            any(DatanodeDetails.class), anyBoolean());
   }
 }

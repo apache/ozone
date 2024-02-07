@@ -18,6 +18,10 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,8 +41,6 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.junit.Assert;
-import org.junit.Test;
 
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -51,28 +53,21 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OpenKeyBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
     .OMRequest;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
- * Tests OMOpenKeysDeleteRequest.
+ * This class tests the OM Open Keys Delete Request.
  */
-@RunWith(Parameterized.class)
 public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
 
-  private final BucketLayout bucketLayout;
-
-  public TestOMOpenKeysDeleteRequest(BucketLayout bucketLayout) {
-    this.bucketLayout = bucketLayout;
-  }
+  private BucketLayout bucketLayout;
 
   @Override
   public BucketLayout getBucketLayout() {
     return bucketLayout;
   }
 
-  @Parameters
   public static Collection<BucketLayout> bucketLayouts() {
     return Arrays.asList(
         BucketLayout.DEFAULT,
@@ -90,8 +85,11 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
    * the open key table.
    * @throws Exception
    */
-  @Test
-  public void testDeleteOpenKeysNotInTable() throws Exception {
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testDeleteOpenKeysNotInTable(
+      BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
             omMetadataManager, getBucketLayout());
     List<Pair<Long, OmKeyInfo>> openKeys =
@@ -108,8 +106,11 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
    * buckets.
    * @throws Exception
    */
-  @Test
-  public void testDeleteSubsetOfOpenKeys() throws Exception {
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testDeleteSubsetOfOpenKeys(
+      BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     final String volume1 = UUID.randomUUID().toString();
     final String volume2 = UUID.randomUUID().toString();
     final String bucket1 = UUID.randomUUID().toString();
@@ -170,8 +171,11 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
    * name, but different client IDs.
    * @throws Exception
    */
-  @Test
-  public void testDeleteSameKeyNameDifferentClient() throws Exception {
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testDeleteSameKeyNameDifferentClient(
+      BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     final String volume = UUID.randomUUID().toString();
     final String bucket = UUID.randomUUID().toString();
     final String key = UUID.randomUUID().toString();
@@ -199,8 +203,11 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
    *
    * @throws Exception
    */
-  @Test
-  public void testDeleteKeyWithHigherUpdateID() throws Exception {
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testDeleteKeyWithHigherUpdateID(
+      BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     final String volume = UUID.randomUUID().toString();
     final String bucket = UUID.randomUUID().toString();
 
@@ -246,11 +253,9 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
         new OMOpenKeysDeleteRequest(omRequest, getBucketLayout());
 
     OMClientResponse omClientResponse =
-        openKeyDeleteRequest.validateAndUpdateCache(ozoneManager,
-            transactionId, ozoneManagerDoubleBufferHelper);
+        openKeyDeleteRequest.validateAndUpdateCache(ozoneManager, transactionId);
 
-    Assert.assertEquals(Status.OK,
-        omClientResponse.getOMResponse().getStatus());
+    assertEquals(Status.OK, omClientResponse.getOMResponse().getStatus());
 
     assertInOpenKeyTable(keysWithHigherUpdateID);
     assertNotInOpenKeyTable(keysWithSameUpdateID);
@@ -263,8 +268,10 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
    * that were submitted for deletion versus those that were actually deleted.
    * @throws Exception
    */
-  @Test
-  public void testMetrics() throws Exception {
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testMetrics(BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
     final String volume = UUID.randomUUID().toString();
     final String bucket = UUID.randomUUID().toString();
     final String key = UUID.randomUUID().toString();
@@ -275,10 +282,10 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
             omMetadataManager, getBucketLayout());
 
     OMMetrics metrics = ozoneManager.getMetrics();
-    Assert.assertEquals(metrics.getNumOpenKeyDeleteRequests(), 0);
-    Assert.assertEquals(metrics.getNumOpenKeyDeleteRequestFails(), 0);
-    Assert.assertEquals(metrics.getNumOpenKeysSubmittedForDeletion(), 0);
-    Assert.assertEquals(metrics.getNumOpenKeysDeleted(), 0);
+    assertEquals(metrics.getNumOpenKeyDeleteRequests(), 0);
+    assertEquals(metrics.getNumOpenKeyDeleteRequestFails(), 0);
+    assertEquals(metrics.getNumOpenKeysSubmittedForDeletion(), 0);
+    assertEquals(metrics.getNumOpenKeysDeleted(), 0);
 
     List<Pair<Long, OmKeyInfo>> existentKeys =
         makeOpenKeys(volume, bucket, key, numExistentKeys);
@@ -291,11 +298,11 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     assertNotInOpenKeyTable(existentKeys);
     assertNotInOpenKeyTable(nonExistentKeys);
 
-    Assert.assertEquals(1, metrics.getNumOpenKeyDeleteRequests());
-    Assert.assertEquals(0, metrics.getNumOpenKeyDeleteRequestFails());
-    Assert.assertEquals(numExistentKeys + numNonExistentKeys,
+    assertEquals(1, metrics.getNumOpenKeyDeleteRequests());
+    assertEquals(0, metrics.getNumOpenKeyDeleteRequestFails());
+    assertEquals(numExistentKeys + numNonExistentKeys,
         metrics.getNumOpenKeysSubmittedForDeletion());
-    Assert.assertEquals(numExistentKeys, metrics.getNumOpenKeysDeleted());
+    assertEquals(numExistentKeys, metrics.getNumOpenKeysDeleted());
   }
 
   /**
@@ -323,10 +330,9 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
         new OMOpenKeysDeleteRequest(omRequest, getBucketLayout());
 
     OMClientResponse omClientResponse =
-        openKeyDeleteRequest.validateAndUpdateCache(ozoneManager,
-            100L, ozoneManagerDoubleBufferHelper);
+        openKeyDeleteRequest.validateAndUpdateCache(ozoneManager, 100L);
 
-    Assert.assertEquals(Status.OK,
+    assertEquals(Status.OK,
         omClientResponse.getOMResponse().getStatus());
   }
 
@@ -415,8 +421,7 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
       throws Exception {
 
     for (String keyName : getDBKeyNames(openKeys)) {
-      Assert.assertTrue(omMetadataManager.getOpenKeyTable(getBucketLayout())
-          .isExist(keyName));
+      assertTrue(omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(keyName));
     }
   }
 
@@ -432,8 +437,8 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
       throws Exception {
 
     for (String keyName : getDBKeyNames(openKeys)) {
-      Assert.assertFalse(omMetadataManager.getOpenKeyTable(getBucketLayout())
-          .isExist(keyName));
+      assertFalse(omMetadataManager.getOpenKeyTable(
+          getBucketLayout()).isExist(keyName));
     }
   }
 
@@ -477,7 +482,7 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
         omOpenKeysDeleteRequest.preExecute(ozoneManager);
 
     // Will not be equal, as UserInfo will be set.
-    Assert.assertNotEquals(originalOmRequest, modifiedOmRequest);
+    assertNotEquals(originalOmRequest, modifiedOmRequest);
 
     return modifiedOmRequest;
   }

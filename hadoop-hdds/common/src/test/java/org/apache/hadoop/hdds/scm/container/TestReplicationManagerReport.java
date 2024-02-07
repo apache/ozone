@@ -31,24 +31,24 @@ import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static com.fasterxml.jackson.databind.node.JsonNodeType.ARRAY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests for the ReplicationManagerReport class.
  */
-public class TestReplicationManagerReport {
+class TestReplicationManagerReport {
 
   private ReplicationManagerReport report;
 
   @BeforeEach
-  public void setup() {
+  void setup() {
     report = new ReplicationManagerReport();
   }
 
   @Test
-  public void testMetricCanBeIncremented() {
+  void testMetricCanBeIncremented() {
     report.increment(ReplicationManagerReport.HealthState.UNDER_REPLICATED);
     report.increment(ReplicationManagerReport.HealthState.UNDER_REPLICATED);
     report.increment(ReplicationManagerReport.HealthState.OVER_REPLICATED);
@@ -74,7 +74,7 @@ public class TestReplicationManagerReport {
 
 
   @Test
-  public void testJsonOutput() throws IOException {
+  void testJsonOutput() throws IOException {
     report.increment(HddsProtos.LifeCycleState.OPEN);
     report.increment(HddsProtos.LifeCycleState.CLOSED);
     report.increment(HddsProtos.LifeCycleState.CLOSED);
@@ -95,7 +95,7 @@ public class TestReplicationManagerReport {
     ObjectMapper mapper = new ObjectMapper();
     JsonNode json = mapper.readTree(jsonString);
 
-    assertTrue(json.get("reportTimeStamp").longValue() > 0);
+    assertThat(json.get("reportTimeStamp").longValue()).isPositive();
     JsonNode stats = json.get("stats");
     assertEquals(1, stats.get("OPEN").longValue());
     assertEquals(0, stats.get("CLOSING").longValue());
@@ -112,6 +112,7 @@ public class TestReplicationManagerReport {
     assertEquals(0, stats.get("EMPTY").longValue());
     assertEquals(0, stats.get("OPEN_UNHEALTHY").longValue());
     assertEquals(0, stats.get("QUASI_CLOSED_STUCK").longValue());
+    assertEquals(0, stats.get("OPEN_WITHOUT_PIPELINE").longValue());
 
     JsonNode samples = json.get("samples");
     assertEquals(ARRAY, samples.get("UNDER_REPLICATED").getNodeType());
@@ -121,7 +122,7 @@ public class TestReplicationManagerReport {
   }
 
   @Test
-  public void testContainerIDsCanBeSampled() {
+  void testContainerIDsCanBeSampled() {
     report.incrementAndSample(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED,
         new ContainerID(1));
@@ -156,7 +157,7 @@ public class TestReplicationManagerReport {
   }
 
   @Test
-  public void testSamplesAreLimited() {
+  void testSamplesAreLimited() {
     for (int i = 0; i < ReplicationManagerReport.SAMPLE_LIMIT * 2; i++) {
       report.incrementAndSample(
           ReplicationManagerReport.HealthState.UNDER_REPLICATED,
@@ -171,7 +172,7 @@ public class TestReplicationManagerReport {
   }
 
   @Test
-  public void testSerializeToProtoAndBack() {
+  void testSerializeToProtoAndBack() {
     report.setTimestamp(12345);
     Random rand = ThreadLocalRandom.current();
     for (HddsProtos.LifeCycleState s : HddsProtos.LifeCycleState.values()) {
@@ -203,7 +204,7 @@ public class TestReplicationManagerReport {
   }
 
   @Test
-  public void testDeSerializeCanHandleUnknownMetric() {
+  void testDeSerializeCanHandleUnknownMetric() {
     HddsProtos.ReplicationManagerReportProto.Builder proto =
         HddsProtos.ReplicationManagerReportProto.newBuilder();
     proto.setTimestamp(12345);
@@ -232,14 +233,14 @@ public class TestReplicationManagerReport {
   }
 
   @Test
-  public void testStatCannotBeSetTwice() {
+  void testStatCannotBeSetTwice() {
     report.setStat(HddsProtos.LifeCycleState.CLOSED.toString(), 10);
     assertThrows(IllegalStateException.class, () -> report
         .setStat(HddsProtos.LifeCycleState.CLOSED.toString(), 10));
   }
 
   @Test
-  public void testSampleCannotBeSetTwice() {
+  void testSampleCannotBeSetTwice() {
     List<ContainerID> containers = new ArrayList<>();
     containers.add(ContainerID.valueOf(1));
     report.setSample(HddsProtos.LifeCycleState.CLOSED.toString(), containers);

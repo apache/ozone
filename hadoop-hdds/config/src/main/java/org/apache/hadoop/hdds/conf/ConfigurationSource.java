@@ -285,6 +285,17 @@ public interface ConfigurationSource {
     }
   }
 
+  default int getBufferSize(String name, String defaultValue) {
+    final double size = getStorageSize(name, defaultValue, StorageUnit.BYTES);
+    if (size <= 0) {
+      throw new IllegalArgumentException(name + " <= 0");
+    } else if (size > Integer.MAX_VALUE) {
+      throw new IllegalArgumentException(
+          name + " > Integer.MAX_VALUE = " + Integer.MAX_VALUE);
+    }
+    return (int) size;
+  }
+
   default double getStorageSize(String name, String defaultValue,
       StorageUnit targetUnit) {
     String vString = get(name);

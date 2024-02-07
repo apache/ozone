@@ -39,7 +39,7 @@ ozone.acl.authorizer.class| org.apache.ranger.authorization.ozone.authorizer.Ran
 
 为了使用 RangerOzoneAuthorizer，还需要在 ozone-env.sh 中增加下面环境变量：
 ```bash
-export OZONE_CLASSPATH="${OZONE_HOME}/share/ozone/lib/libext/*"
+export OZONE_MANAGER_CLASSPATH="${OZONE_HOME}/share/ozone/lib/libext/*"
 ```
 * ranger-ozone-plugin jars 具体路径取决于 Ranger Ozone plugin 安装配置。
 * 如果 ranger-ozone-plugin jars 安装在其他节点，需要拷贝到 Ozone 安装目录。

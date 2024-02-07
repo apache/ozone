@@ -31,7 +31,6 @@ import com.fasterxml.jackson.databind.SequenceWriter;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.databind.type.CollectionType;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 /**
@@ -72,22 +71,6 @@ public final class JsonUtils {
 
   public static ObjectNode createObjectNode(Object next) {
     return MAPPER.valueToTree(next);
-  }
-
-  /**
-   * Deserialize a list of elements from a given string,
-   * each element in the list is in the given type.
-   *
-   * @param str json string.
-   * @param elementType element type.
-   * @return List of elements of type elementType
-   * @throws IOException
-   */
-  public static List<?> toJsonList(String str, Class<?> elementType)
-      throws IOException {
-    CollectionType type = MAPPER.getTypeFactory()
-        .constructCollectionType(List.class, elementType);
-    return MAPPER.readValue(str, type);
   }
 
   /**

@@ -17,11 +17,12 @@
  */
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import java.io.IOException;
 import java.util.UUID;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -51,14 +52,14 @@ public class TestOMSetTimesRequest extends TestOMKeyRequest {
     long keyMtime =
         omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey)
             .getModificationTime();
-    Assert.assertEquals(mtime, keyMtime);
+    assertEquals(mtime, keyMtime);
 
     long newMtime = -1;
     executeAndReturn(newMtime);
     keyMtime =
         omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey)
             .getModificationTime();
-    Assert.assertEquals(mtime, keyMtime);
+    assertEquals(mtime, keyMtime);
   }
 
   protected void executeAndReturn(long mtime)
@@ -71,11 +72,10 @@ public class TestOMSetTimesRequest extends TestOMKeyRequest {
     omKeySetTimesRequest = getOmKeySetTimesRequest(preExecuteRequest);
 
     OMClientResponse omClientResponse = omKeySetTimesRequest
-        .validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
+        .validateAndUpdateCache(ozoneManager, 100L);
     OMResponse omSetTimesResponse = omClientResponse.getOMResponse();
-    Assert.assertNotNull(omSetTimesResponse.getSetTimesResponse());
-    Assert.assertEquals(OzoneManagerProtocolProtos.Status.OK,
+    assertNotNull(omSetTimesResponse.getSetTimesResponse());
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
         omSetTimesResponse.getStatus());
   }
 

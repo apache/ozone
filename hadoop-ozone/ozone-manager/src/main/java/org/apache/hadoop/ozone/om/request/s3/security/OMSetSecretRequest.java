@@ -19,6 +19,7 @@
 package org.apache.hadoop.ozone.om.request.s3.security;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -26,7 +27,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -100,9 +100,7 @@ public class OMSetSecretRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager,
-         long transactionLogIndex,
-         OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
@@ -115,24 +113,19 @@ public class OMSetSecretRequest extends OMClientRequest {
     try {
       omClientResponse = ozoneManager.getS3SecretManager()
           .doUnderLock(accessId, s3SecretManager -> {
-            // Intentionally set to final so they can only be set once.
-            final S3SecretValue newS3SecretValue;
 
             // Update legacy S3SecretTable, if the accessId entry exists
-            if (s3SecretManager.hasS3Secret(accessId)) {
-              // accessId found in S3SecretTable. Update S3SecretTable
-              LOG.debug("Updating S3SecretTable cache entry");
-              // Update S3SecretTable cache entry in this case
-              newS3SecretValue = new S3SecretValue(accessId, secretKey);
-
-              s3SecretManager
-                  .updateCache(accessId, newS3SecretValue);
-            } else {
+            if (!s3SecretManager.hasS3Secret(accessId)) {
               // If S3SecretTable is not updated,
               // throw ACCESS_ID_NOT_FOUND exception.
               throw new OMException("accessId '" + accessId + "' not found.",
                   OMException.ResultCodes.ACCESS_ID_NOT_FOUND);
             }
+
+            // Update S3SecretTable cache entry in this case
+            // Set the transactionLogIndex to be used for updating.
+            final S3SecretValue newS3SecretValue = S3SecretValue.of(accessId, secretKey, termIndex.getIndex());
+            s3SecretManager.updateCache(accessId, newS3SecretValue);
 
             // Compose response
             final SetS3SecretResponse.Builder setSecretResponse =
@@ -148,9 +141,6 @@ public class OMSetSecretRequest extends OMClientRequest {
       exception = ex;
       omClientResponse = new OMSetSecretResponse(
           createErrorOMResponse(omResponse, ex));
-    } finally {
-      addResponseToDoubleBuffer(transactionLogIndex, omClientResponse,
-          ozoneManagerDoubleBufferHelper);
     }
 
     final Map<String, String> auditMap = new HashMap<>();

@@ -23,7 +23,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.security.GDPRSymmetricKey;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -196,7 +196,7 @@ public final class OmKeyArgs implements Auditable {
         .setForceUpdateContainerCacheFromSCM(forceUpdateContainerCacheFromSCM);
   }
 
-  @NotNull
+  @Nonnull
   public KeyArgs toProtobuf() {
     return KeyArgs.newBuilder()
         .setVolumeName(getVolumeName())

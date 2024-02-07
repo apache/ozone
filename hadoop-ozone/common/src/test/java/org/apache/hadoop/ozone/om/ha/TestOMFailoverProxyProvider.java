@@ -27,9 +27,8 @@ import java.util.StringJoiner;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
-import org.junit.Assert;
-import org.junit.Test;
-import org.junit.Before;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -40,6 +39,9 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.
     OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.
     OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests OMFailoverProxyProvider failover behaviour.
@@ -53,7 +55,7 @@ public class TestOMFailoverProxyProvider {
   private int numNodes = 3;
   private OzoneConfiguration config;
 
-  @Before
+  @BeforeEach
   public void init() throws Exception {
     config = new OzoneConfiguration();
     waitBetweenRetries = config.getLong(
@@ -121,10 +123,10 @@ public class TestOMFailoverProxyProvider {
     Collection<String> allNodeIds = config.getTrimmedStringCollection(ConfUtils.
         addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID));
     allNodeIds.remove(provider.getCurrentProxyOMNodeId());
-    Assert.assertTrue("This test needs at least 2 OMs",
-        allNodeIds.size() > 0);
+    assertTrue(allNodeIds.size() > 0,
+        "This test needs at least 2 OMs");
     provider.setNextOmProxy(allNodeIds.iterator().next());
-    Assert.assertEquals(0, provider.getWaitTime());
+    assertEquals(0, provider.getWaitTime());
   }
 
   /**
@@ -147,10 +149,10 @@ public class TestOMFailoverProxyProvider {
    * Failover to next node and wait time should be same as waitTimeAfter.
    */
   private void failoverToNextNode(int numNextNodeFailoverTimes,
-      long waitTimeAfter) {
+                                  long waitTimeAfter) {
     for (int attempt = 0; attempt < numNextNodeFailoverTimes; attempt++) {
       provider.selectNextOmProxy();
-      Assert.assertEquals(waitTimeAfter, provider.getWaitTime());
+      assertEquals(waitTimeAfter, provider.getWaitTime());
       provider.performFailover(null);
     }
   }
@@ -162,7 +164,7 @@ public class TestOMFailoverProxyProvider {
     provider.performFailover(null);
     for (int attempt = 1; attempt <= numSameNodeFailoverTimes; attempt++) {
       provider.setNextOmProxy(provider.getCurrentProxyOMNodeId());
-      Assert.assertEquals(attempt * waitBetweenRetries,
+      assertEquals(attempt * waitBetweenRetries,
           provider.getWaitTime());
     }
   }
@@ -175,29 +177,29 @@ public class TestOMFailoverProxyProvider {
     OzoneConfiguration ozoneConf = new OzoneConfiguration();
     ArrayList<String> nodeAddrs = new ArrayList<>(
         Arrays.asList("4.3.2.1:9862", "2.1.0.5:9862", "3.2.1.0:9862"));
-    Assert.assertEquals(numNodes, nodeAddrs.size());
+    assertEquals(numNodes, nodeAddrs.size());
 
     StringJoiner allNodeIds = new StringJoiner(",");
     for (int i = 1; i <= numNodes; i++) {
       String nodeId = NODE_ID_BASE_STR + i;
       ozoneConf.set(
           ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, OM_SERVICE_ID,
-          nodeId), nodeAddrs.get(i - 1));
+              nodeId), nodeAddrs.get(i - 1));
       allNodeIds.add(nodeId);
     }
     ozoneConf.set(ConfUtils.addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID),
         allNodeIds.toString());
     HadoopRpcOMFailoverProxyProvider prov =
-            new HadoopRpcOMFailoverProxyProvider(ozoneConf,
-                    UserGroupInformation.getCurrentUser(),
-                    OM_SERVICE_ID,
-                    OzoneManagerProtocolPB.class);
+        new HadoopRpcOMFailoverProxyProvider(ozoneConf,
+            UserGroupInformation.getCurrentUser(),
+            OM_SERVICE_ID,
+            OzoneManagerProtocolPB.class);
 
     Text dtService = prov.getCurrentProxyDelegationToken();
 
     Collections.sort(nodeAddrs);
     String expectedDtService = String.join(",", nodeAddrs);
-    Assert.assertEquals(expectedDtService, dtService.toString());
+    assertEquals(expectedDtService, dtService.toString());
   }
 
 }

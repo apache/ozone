@@ -22,13 +22,12 @@ import com.google.protobuf.MessageLite;
 import com.google.protobuf.Parser;
 import org.apache.ratis.util.function.CheckedFunction;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.function.IntFunction;
 
 /**
  * Codecs to serialize/deserialize Protobuf v2 messages.
@@ -42,25 +41,16 @@ public final class Proto2Codec<M extends MessageLite>
   /**
    * @return the {@link Codec} for the given class.
    */
-  public static <T extends MessageLite> Codec<T> get(Class<T> clazz) {
-    final Codec<?> codec = CODECS.computeIfAbsent(clazz, Proto2Codec::new);
+  public static <T extends MessageLite> Codec<T> get(T t) {
+    final Codec<?> codec = CODECS.computeIfAbsent(t.getClass(),
+        key -> new Proto2Codec<>(t));
     return (Codec<T>) codec;
-  }
-
-  private static <T extends MessageLite> Parser<T> getParser(Class<T> clazz) {
-    final String name = "PARSER";
-    try {
-      return (Parser<T>) clazz.getField(name).get(null);
-    } catch (Exception e) {
-      throw new IllegalStateException(
-          "Failed to get " + name + " field from " + clazz, e);
-    }
   }
 
   private final Parser<M> parser;
 
-  private Proto2Codec(Class<M> clazz) {
-    this.parser = getParser(clazz);
+  private Proto2Codec(M m) {
+    this.parser = (Parser<M>) m.getParserForType();
   }
 
   @Override
@@ -70,7 +60,7 @@ public final class Proto2Codec<M extends MessageLite>
 
   @Override
   public CodecBuffer toCodecBuffer(@Nonnull M message,
-      IntFunction<CodecBuffer> allocator) throws IOException {
+      CodecBuffer.Allocator allocator) throws IOException {
     final int size = message.getSerializedSize();
     return allocator.apply(size).put(writeTo(message, size));
   }

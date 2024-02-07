@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import static org.junit.jupiter.api.Assertions.fail;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -28,7 +29,6 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -104,7 +104,7 @@ public class TestNodeFailure {
           }
         }, timeForFailure / 2, timeForFailure * 3);
       } catch (Exception e) {
-        Assertions.fail("Test Failed: " + e.getMessage());
+        fail("Test Failed: " + e.getMessage());
       }
     });
   }

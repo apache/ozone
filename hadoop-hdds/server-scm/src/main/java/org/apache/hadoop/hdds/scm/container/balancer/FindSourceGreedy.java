@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,7 +72,7 @@ public class FindSourceGreedy implements FindSourceStrategy {
    * {@inheritDoc}
    */
   public void resetPotentialSources(
-      @NotNull Collection<DatanodeDetails> sources) {
+      @Nonnull Collection<DatanodeDetails> sources) {
     List<DatanodeUsageInfo> usageInfos = new ArrayList<>(sources.size());
     sources.forEach(source -> usageInfos.add(nodeManager.getUsageInfo(source)));
     resetSources(usageInfos);

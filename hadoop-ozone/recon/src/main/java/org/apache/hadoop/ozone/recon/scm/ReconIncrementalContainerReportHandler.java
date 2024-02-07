@@ -24,8 +24,8 @@ import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -69,24 +69,33 @@ public class ReconIncrementalContainerReportHandler
 
     ReconContainerManager containerManager =
         (ReconContainerManager) getContainerManager();
+    try {
+      containerManager.checkAndAddNewContainerBatch(
+          report.getReport().getReportList());
+    } catch (Exception ioEx) {
+      LOG.error("Exception while checking and adding new container.", ioEx);
+      return;
+    }
     boolean success = true;
     for (ContainerReplicaProto replicaProto :
         report.getReport().getReportList()) {
+      ContainerID id = ContainerID.valueOf(replicaProto.getContainerID());
+      ContainerInfo container = null;
       try {
-        final ContainerID id = ContainerID.valueOf(
-            replicaProto.getContainerID());
         try {
-          containerManager.checkAndAddNewContainer(id, replicaProto.getState(),
-              report.getDatanodeDetails());
-        } catch (Exception ioEx) {
-          LOG.error("Exception while checking and adding new container.", ioEx);
-          return;
+          container = getContainerManager().getContainer(id);
+          // Ensure we reuse the same ContainerID instance in containerInfo
+          id = container.containerID();
+        } finally {
+          if (replicaProto.getState().equals(
+              ContainerReplicaProto.State.DELETED)) {
+            getNodeManager().removeContainer(dd, id);
+          } else {
+            getNodeManager().addContainer(dd, id);
+          }
         }
-        getNodeManager().addContainer(dd, id);
         processContainerReplica(dd, replicaProto, publisher);
-      } catch (ContainerNotFoundException e) {
-        success = false;
-        LOG.warn("Container {} not found!", replicaProto.getContainerID());
+        success = true;
       } catch (NodeNotFoundException ex) {
         success = false;
         LOG.error("Received ICR from unknown datanode {}.",

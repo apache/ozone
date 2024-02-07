@@ -23,6 +23,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.Time;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.UUID;
@@ -35,6 +36,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 public class TestOMKeysDeleteRequestWithFSO extends TestOMKeysDeleteRequest {
 
   @Override
+  @Test
   public void testKeysDeleteRequest() throws Exception {
 
     createPreRequisites();
@@ -46,6 +48,7 @@ public class TestOMKeysDeleteRequestWithFSO extends TestOMKeysDeleteRequest {
   }
 
   @Override
+  @Test
   public void testKeysDeleteRequestFail() throws Exception {
     createPreRequisites();
     setOmRequest(getOmRequest().toBuilder().setDeleteKeysRequest(

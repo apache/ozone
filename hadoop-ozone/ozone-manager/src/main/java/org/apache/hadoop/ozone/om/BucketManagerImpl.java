@@ -17,7 +17,6 @@
 package org.apache.hadoop.ozone.om;
 
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 
@@ -36,7 +35,6 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
@@ -61,6 +59,16 @@ public class BucketManagerImpl implements BucketManager {
     this.metadataManager = metadataManager;
   }
 
+  /**
+   * Retrieve bucket info.
+   * This method does not follow the bucket link and returns only
+   * this bucket properties.
+   *
+   * @param volumeName - Name of the Volume.
+   * @param bucketName - Name of the Bucket.
+   * @return Bucket Information.
+   * @throws IOException
+   */
   @Override
   public OmBucketInfo getBucketInfo(String volumeName, String bucketName)
       throws IOException {
@@ -69,27 +77,8 @@ public class BucketManagerImpl implements BucketManager {
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
-      String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
-      OmBucketInfo value = metadataManager.getBucketTable().get(bucketKey);
-      if (value == null) {
-        LOG.debug("bucket: {} not found in volume: {}.", bucketName,
-            volumeName);
-        // Check parent volume existence
-        final String dbVolumeKey = metadataManager.getVolumeKey(volumeName);
-        if (metadataManager.getVolumeTable().get(dbVolumeKey) == null) {
-          // Parent volume doesn't exist, throw VOLUME_NOT_FOUND
-          throw new OMException("Volume not found when getting bucket info",
-              VOLUME_NOT_FOUND);
-        } else {
-          // Parent volume exists, throw BUCKET_NOT_FOUND
-          throw new OMException("Bucket not found", BUCKET_NOT_FOUND);
-        }
-      }
-
-      value = OzoneManagerUtils.resolveLinkBucketLayout(value, metadataManager,
-          new HashSet<>());
-
-      return value;
+      return OzoneManagerUtils.getBucketInfo(metadataManager,
+          volumeName, bucketName);
     } catch (IOException ex) {
       if (!(ex instanceof OMException)) {
         LOG.error("Exception while getting bucket info for bucket: {}",

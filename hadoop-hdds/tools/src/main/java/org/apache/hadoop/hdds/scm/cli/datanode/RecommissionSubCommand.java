@@ -27,6 +27,7 @@ import picocli.CommandLine.Command;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Scanner;
 
 /**
  * Recommission one or more datanodes.
@@ -42,12 +43,26 @@ public class RecommissionSubCommand extends ScmSubcommand {
   @CommandLine.Spec
   private CommandLine.Model.CommandSpec spec;
 
-  @CommandLine.Parameters(description = "List of fully qualified host names")
-  private List<String> hosts = new ArrayList<>();
+  @CommandLine.Parameters(description = "One or more host names separated by spaces. " +
+          "To read from stdin, specify '-' and supply the host names " +
+          "separated by newlines.",
+          paramLabel = "<host name>")
+  private List<String> parameters = new ArrayList<>();
 
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    if (hosts.size() > 0) {
+    if (parameters.size() > 0) {
+      List<String> hosts;
+      // Whether to read from stdin
+      if (parameters.get(0).equals("-")) {
+        hosts = new ArrayList<>();
+        Scanner scanner = new Scanner(System.in, "UTF-8");
+        while (scanner.hasNextLine()) {
+          hosts.add(scanner.nextLine().trim());
+        }
+      } else {
+        hosts = parameters;
+      }
       List<DatanodeAdminError> errors = scmClient.recommissionNodes(hosts);
       System.out.println("Started recommissioning datanode(s):\n" +
           String.join("\n", hosts));

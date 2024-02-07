@@ -41,20 +41,19 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.erasurecode.rawcoder.RSRawErasureCoderFactory;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -66,6 +65,10 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 /**
  * Real unit test for OzoneECClient.
@@ -83,7 +86,7 @@ public class TestOzoneECClient {
   private String volumeName = UUID.randomUUID().toString();
   private String bucketName = UUID.randomUUID().toString();
   private byte[][] inputChunks = new byte[dataBlocks][chunkSize];
-  private final XceiverClientFactory factoryStub =
+  private final MockXceiverClientFactory factoryStub =
       new MockXceiverClientFactory();
   private OzoneConfiguration conf = createConfiguration();
   private MultiNodePipelineBlockAllocator allocator =
@@ -93,7 +96,7 @@ public class TestOzoneECClient {
       new RSRawErasureCoderFactory().createEncoder(
           new ECReplicationConfig(dataBlocks, parityBlocks));
 
-  @Before
+  @BeforeEach
   public void init() throws IOException {
     createNewClient(conf, transportStub);
   }
@@ -108,14 +111,13 @@ public class TestOzoneECClient {
     client = new OzoneClient(config, new RpcClient(config, null) {
 
       @Override
-      protected OmTransport createOmTransport(String omServiceId)
-          throws IOException {
+      protected OmTransport createOmTransport(String omServiceId) {
         return transport;
       }
 
       @Override
       protected XceiverClientFactory createXceiverClientFactory(
-          List<X509Certificate> x509Certificates) throws IOException {
+          ServiceInfoEx serviceInfo) {
         return factoryStub;
       }
     });
@@ -138,7 +140,7 @@ public class TestOzoneECClient {
     return builder.toString().getBytes(UTF_8);
   }
 
-  @After
+  @AfterEach
   public void close() throws IOException {
     client.close();
   }
@@ -147,18 +149,18 @@ public class TestOzoneECClient {
   public void testPutECKeyAndCheckDNStoredData() throws IOException {
     OzoneBucket bucket = writeIntoECKey(inputChunks, keyName, null);
     OzoneKey key = bucket.getKey(keyName);
-    Assert.assertEquals(keyName, key.getName());
+    assertEquals(keyName, key.getName());
     Map<DatanodeDetails, MockDatanodeStorage> storages =
-        ((MockXceiverClientFactory) factoryStub).getStorages();
+        factoryStub.getStorages();
     DatanodeDetails[] dnDetails =
         storages.keySet().toArray(new DatanodeDetails[storages.size()]);
     Arrays.sort(dnDetails);
     for (int i = 0; i < inputChunks.length; i++) {
       MockDatanodeStorage datanodeStorage = storages.get(dnDetails[i]);
-      Assert.assertEquals(1, datanodeStorage.getAllBlockData().size());
+      assertEquals(1, datanodeStorage.getAllBlockData().size());
       ByteString content =
           datanodeStorage.getAllBlockData().values().iterator().next();
-      Assert.assertEquals(new String(inputChunks[i], UTF_8),
+      assertEquals(new String(inputChunks[i], UTF_8),
           content.toStringUtf8());
     }
   }
@@ -176,19 +178,19 @@ public class TestOzoneECClient {
     }
     encoder.encode(dataBuffers, parityBuffers);
     OzoneKey key = bucket.getKey(keyName);
-    Assert.assertEquals(keyName, key.getName());
+    assertEquals(keyName, key.getName());
     Map<DatanodeDetails, MockDatanodeStorage> storages =
-        ((MockXceiverClientFactory) factoryStub).getStorages();
+        factoryStub.getStorages();
     DatanodeDetails[] dnDetails =
         storages.keySet().toArray(new DatanodeDetails[storages.size()]);
     Arrays.sort(dnDetails);
 
     for (int i = dataBlocks; i < parityBlocks + dataBlocks; i++) {
       MockDatanodeStorage datanodeStorage = storages.get(dnDetails[i]);
-      Assert.assertEquals(1, datanodeStorage.getAllBlockData().size());
+      assertEquals(1, datanodeStorage.getAllBlockData().size());
       ByteString content =
           datanodeStorage.getAllBlockData().values().iterator().next();
-      Assert.assertEquals(
+      assertEquals(
           new String(parityBuffers[i - dataBlocks].array(), UTF_8),
           content.toStringUtf8());
     }
@@ -199,15 +201,15 @@ public class TestOzoneECClient {
   public void testPutECKeyAndReadContent() throws IOException {
     OzoneBucket bucket = writeIntoECKey(inputChunks, keyName, null);
     OzoneKey key = bucket.getKey(keyName);
-    Assert.assertEquals(keyName, key.getName());
+    assertEquals(keyName, key.getName());
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] fileContent = new byte[chunkSize];
       for (int i = 0; i < dataBlocks; i++) {
-        Assert.assertEquals(inputChunks[i].length, is.read(fileContent));
-        Assert.assertTrue(Arrays.equals(inputChunks[i], fileContent));
+        assertEquals(inputChunks[i].length, is.read(fileContent));
+        assertArrayEquals(fileContent, inputChunks[i]);
       }
       // A further read should give EOF
-      Assert.assertEquals(-1, is.read(fileContent));
+      assertEquals(-1, is.read(fileContent));
     }
   }
 
@@ -222,7 +224,7 @@ public class TestOzoneECClient {
     // create key without mentioning replication config. Since we set EC
     // replication in bucket, key should be EC key.
     try (OzoneOutputStream out = bucket.createKey("mykey", inputSize)) {
-      Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
+      assertInstanceOf(ECKeyOutputStream.class, out.getOutputStream());
       for (int i = 0; i < inputChunks.length; i++) {
         out.write(inputChunks[i]);
       }
@@ -300,11 +302,11 @@ public class TestOzoneECClient {
   private void validateContent(int offset, int length, byte[] inputData,
                                OzoneBucket bucket,
       OzoneKey key) throws IOException {
-    Assert.assertEquals(keyName, key.getName());
+    assertEquals(keyName, key.getName());
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] fileContent = new byte[length];
-      Assert.assertEquals(length, is.read(fileContent));
-      Assert.assertEquals(new String(Arrays.copyOfRange(inputData, offset,
+      assertEquals(length, is.read(fileContent));
+      assertEquals(new String(Arrays.copyOfRange(inputData, offset,
                       offset + length),
                       UTF_8),
           new String(fileContent, UTF_8));
@@ -326,7 +328,7 @@ public class TestOzoneECClient {
             .getKeyLocationListList().get(0);
 
     Map<DatanodeDetails, MockDatanodeStorage> storages =
-        ((MockXceiverClientFactory) factoryStub).getStorages();
+        factoryStub.getStorages();
     OzoneManagerProtocolProtos.KeyLocation keyLocations =
         blockList.getKeyLocations(0);
 
@@ -342,7 +344,8 @@ public class TestOzoneECClient {
         keyLocations.getBlockID().getContainerBlockID().getContainerID(),
         keyLocations.getBlockID().getContainerBlockID().getLocalID()));
 
-    Assert.assertArrayEquals(firstSmallChunk, firstBlockData.getBytes(UTF_8));
+    assertArrayEquals(
+        firstSmallChunk, firstBlockData.getBytes(UTF_8));
 
     final ByteBuffer[] dataBuffers = new ByteBuffer[dataBlocks];
     dataBuffers[0] = ByteBuffer.wrap(firstSmallChunk);
@@ -365,8 +368,8 @@ public class TestOzoneECClient {
           keyLocations.getBlockID().getContainerBlockID().getLocalID()));
       String expected =
           new String(parityBuffers[i - dataBlocks].array(), UTF_8);
-      Assert.assertEquals(expected, parityBlockData);
-      Assert.assertEquals(expected.length(), parityBlockData.length());
+      assertEquals(expected, parityBlockData);
+      assertEquals(expected.length(), parityBlockData.length());
 
     }
   }
@@ -375,16 +378,16 @@ public class TestOzoneECClient {
   public void testPutBlockHasBlockGroupLen() throws IOException {
     OzoneBucket bucket = writeIntoECKey(inputChunks, keyName, null);
     OzoneKey key = bucket.getKey(keyName);
-    Assert.assertEquals(keyName, key.getName());
+    assertEquals(keyName, key.getName());
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] fileContent = new byte[chunkSize];
       for (int i = 0; i < dataBlocks; i++) {
-        Assert.assertEquals(inputChunks[i].length, is.read(fileContent));
-        Assert.assertTrue(Arrays.equals(inputChunks[i], fileContent));
+        assertEquals(inputChunks[i].length, is.read(fileContent));
+        assertArrayEquals(fileContent, inputChunks[i]);
       }
 
       Map<DatanodeDetails, MockDatanodeStorage> storages =
-          ((MockXceiverClientFactory) factoryStub).getStorages();
+          factoryStub.getStorages();
       OzoneManagerProtocolProtos.KeyLocationList blockList =
           transportStub.getKeys().get(volumeName).get(bucketName).get(keyName).
               getKeyLocationListList().get(0);
@@ -411,7 +414,7 @@ public class TestOzoneECClient {
                 .equals(OzoneConsts.BLOCK_GROUP_LEN_KEY_IN_PUT_BLOCK))
                 .collect(Collectors.toList());
 
-        Assert.assertEquals(3L * chunkSize,
+        assertEquals(3L * chunkSize,
             Long.parseLong(metadataList.get(0).getValue()));
       }
     }
@@ -463,7 +466,7 @@ public class TestOzoneECClient {
     // create key without mentioning replication config. Since we set EC
     // replication in bucket, key should be EC key.
     try (OzoneOutputStream out = bucket.createKey("mykey", 6 * inputSize)) {
-      Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
+      assertInstanceOf(ECKeyOutputStream.class, out.getOutputStream());
       // Block Size is 2kb, so to create 3 blocks we need 6 iterations here
       for (int j = 0; j < 6; j++) {
         for (int i = 0; i < inputChunks.length; i++) {
@@ -475,20 +478,20 @@ public class TestOzoneECClient {
         transportStub.getKeys().get(volumeName).get(bucketName).get("mykey")
             .getKeyLocationListList().get(0);
 
-    Assert.assertEquals(3, blockList.getKeyLocationsCount());
+    assertEquals(3, blockList.getKeyLocationsCount());
     // As the mock allocator allocates block with id's increasing sequentially
     // from 1. Therefore the block should be in the order with id starting 1, 2
     // and then 3.
     for (int i = 0; i < 3; i++) {
       long localId = blockList.getKeyLocationsList().get(i).getBlockID()
           .getContainerBlockID().getLocalID();
-      Assert.assertEquals(i + 1, localId);
+      assertEquals(i + 1, localId);
     }
 
-    Assert.assertEquals(1,
+    assertEquals(1,
         transportStub.getKeys().get(volumeName).get(bucketName).get("mykey")
             .getKeyLocationListCount());
-    Assert.assertEquals(inputChunks[0].length * 3 * 6,
+    assertEquals(inputChunks[0].length * 3 * 6,
         transportStub.getKeys().get(volumeName).get(bucketName).get("mykey")
             .getDataSize());
   }
@@ -560,14 +563,13 @@ public class TestOzoneECClient {
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] fileContent = new byte[chunkSize];
       for (int i = 0; i < 2; i++) {
-        Assert.assertEquals(inputChunks[i].length, is.read(fileContent));
-        Assert.assertTrue(Arrays.equals(inputChunks[i], fileContent));
+        assertEquals(inputChunks[i].length, is.read(fileContent));
+        assertArrayEquals(inputChunks[i], fileContent);
       }
-      Assert.assertEquals(lastChunk.length, is.read(fileContent));
-      Assert.assertTrue(Arrays.equals(lastChunk,
-          Arrays.copyOf(fileContent, lastChunk.length)));
+      assertEquals(lastChunk.length, is.read(fileContent));
+      assertArrayEquals(lastChunk, Arrays.copyOf(fileContent, lastChunk.length));
       // A further read should give EOF
-      Assert.assertEquals(-1, is.read(fileContent));
+      assertEquals(-1, is.read(fileContent));
     }
   }
 
@@ -601,9 +603,8 @@ public class TestOzoneECClient {
 
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] fileContent = new byte[chunkSize];
-      Assert.assertEquals(inSize, is.read(fileContent));
-      Assert.assertTrue(Arrays.equals(partialChunk,
-          Arrays.copyOf(fileContent, inSize)));
+      assertEquals(inSize, is.read(fileContent));
+      assertArrayEquals(partialChunk, Arrays.copyOf(fileContent, inSize));
     }
   }
 
@@ -648,8 +649,7 @@ public class TestOzoneECClient {
         nodesIndexesToMarkFailure);
     // It should have used 3rd block group also. So, total initialized nodes
     // count should be clusterSize.
-    Assert.assertTrue(((MockXceiverClientFactory) factoryStub).getStorages()
-        .size() == clusterSize);
+    assertEquals(clusterSize, factoryStub.getStorages().size());
   }
 
   @Test
@@ -669,13 +669,12 @@ public class TestOzoneECClient {
         nodesIndexesToMarkFailure);
     // It should have used 3rd block group also. So, total initialized nodes
     // count should be clusterSize.
-    Assert.assertTrue(((MockXceiverClientFactory) factoryStub).getStorages()
-        .size() == clusterSize);
+    assertEquals(clusterSize, factoryStub.getStorages().size());
   }
 
   // The mocked impl throws IllegalStateException when there are not enough
   // nodes in allocateBlock request.
-  @Test(expected = IllegalStateException.class)
+  @Test
   public void testStripeWriteRetriesOnAllNodeFailures() throws Exception {
     OzoneConfiguration con = createConfiguration();
 
@@ -687,8 +686,9 @@ public class TestOzoneECClient {
     }
     // Mocked MultiNodePipelineBlockAllocator#allocateBlock implementation can
     // not pick new block group as all nodes in cluster marked as bad.
-    testStripeWriteRetriesOnFailures(con, clusterSize,
-        nodesIndexesToMarkFailure);
+    assertThrows(IllegalStateException.class, () ->
+        testStripeWriteRetriesOnFailures(con, clusterSize,
+            nodesIndexesToMarkFailure));
   }
 
   @Test
@@ -705,19 +705,15 @@ public class TestOzoneECClient {
     nodesIndexesToMarkFailure[2] = 10;
     //To mark node failed in fourth block group.
     nodesIndexesToMarkFailure[3] = 15;
-    try {
-      // Mocked MultiNodePipelineBlockAllocator#allocateBlock implementation can
-      // pick good block group, but client retries should be limited
-      // OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES_ON_FAILURE(here it was
-      // configured as 3). So, it should fail as we have marked 3 nodes as bad.
-      testStripeWriteRetriesOnFailures(con, 20, nodesIndexesToMarkFailure);
-      Assert.fail(
-          "Expecting it to fail as retries should exceed the max allowed times:"
-              + " " + 3);
-    } catch (IOException e) {
-      Assert.assertEquals("Completed max allowed retries 3 on stripe failures.",
-          e.getMessage());
-    }
+    // Mocked MultiNodePipelineBlockAllocator#allocateBlock implementation can
+    // pick good block group, but client retries should be limited
+    // OZONE_CLIENT_MAX_EC_STRIPE_WRITE_RETRIES_ON_FAILURE(here it was
+    // configured as 3). So, it should fail as we have marked 3 nodes as bad.
+    IOException e = assertThrows(IOException.class,
+            () -> testStripeWriteRetriesOnFailures(con, 20, nodesIndexesToMarkFailure));
+    assertEquals(
+        "Completed max allowed retries 3 on stripe failures.",
+        e.getMessage());
   }
 
   public void testStripeWriteRetriesOnFailures(OzoneConfiguration con,
@@ -740,8 +736,7 @@ public class TestOzoneECClient {
         out.write(inputChunks[i]);
       }
       waitForFlushingThreadToFinish((ECKeyOutputStream) out.getOutputStream());
-      Assert.assertTrue(
-          ((MockXceiverClientFactory) factoryStub).getStorages().size() == 5);
+      assertEquals(5, factoryStub.getStorages().size());
       List<DatanodeDetails> failedDNs = new ArrayList<>();
       List<HddsProtos.DatanodeDetailsProto> dns = blkAllocator.getClusterDns();
 
@@ -751,7 +746,7 @@ public class TestOzoneECClient {
       }
 
       // First let's set storage as bad
-      ((MockXceiverClientFactory) factoryStub).setFailedStorages(failedDNs);
+      factoryStub.setFailedStorages(failedDNs);
 
       // Writer should be able to write by using 3rd block group.
       for (int i = 0; i < numChunksToWriteAfterFailure; i++) {
@@ -763,20 +758,16 @@ public class TestOzoneECClient {
     // failures after first stripe, the second stripe data should have been
     // written into new blockgroup. So, we should have 2 block groups. That
     // means two keyLocations.
-    Assert.assertEquals(2, key.getOzoneKeyLocations().size());
+    assertEquals(2, key.getOzoneKeyLocations().size());
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] fileContent = new byte[chunkSize];
       for (int i = 0; i < dataBlocks; i++) {
-        Assert.assertEquals(inputChunks[i].length, is.read(fileContent));
-        Assert.assertTrue("Expected: " + new String(inputChunks[i],
-                UTF_8) + " \n " + "Actual: " + new String(fileContent, UTF_8),
-            Arrays.equals(inputChunks[i], fileContent));
+        assertEquals(inputChunks[i].length, is.read(fileContent));
+        assertArrayEquals(inputChunks[i], fileContent);
       }
       for (int i = 0; i < numChunksToWriteAfterFailure; i++) {
-        Assert.assertEquals(inputChunks[i].length, is.read(fileContent));
-        Assert.assertTrue("Expected: " + new String(inputChunks[i],
-                UTF_8) + " \n " + "Actual: " + new String(fileContent, UTF_8),
-            Arrays.equals(inputChunks[i], fileContent));
+        assertEquals(inputChunks[i].length, is.read(fileContent));
+        assertArrayEquals(inputChunks[i], fileContent);
       }
     }
   }
@@ -806,7 +797,7 @@ public class TestOzoneECClient {
       }
 
       // First let's set storage as bad
-      ((MockXceiverClientFactory) factoryStub).setFailedStorages(failedDNs);
+      factoryStub.setFailedStorages(failedDNs);
 
       for (int i = 0; i < numChunksToWriteAfterFailure; i++) {
         out.write(inputChunks[i % dataBlocks]);
@@ -817,22 +808,17 @@ public class TestOzoneECClient {
     // failures after first stripe, the second stripe data should have been
     // written into new block group. So, we should have numExpectedBlockGrps.
     // That means two keyLocations.
-    Assert
-        .assertEquals(numExpectedBlockGrps, key.getOzoneKeyLocations().size());
+    assertEquals(numExpectedBlockGrps, key.getOzoneKeyLocations().size());
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] fileContent = new byte[chunkSize];
       for (int i = 0; i < dataBlocks; i++) {
-        Assert.assertEquals(inputChunks[i].length, is.read(fileContent));
-        Assert.assertTrue("Expected: " + new String(inputChunks[i],
-                UTF_8) + " \n " + "Actual: " + new String(fileContent, UTF_8),
-            Arrays.equals(inputChunks[i], fileContent));
+        assertEquals(inputChunks[i].length, is.read(fileContent));
+        assertArrayEquals(inputChunks[i], fileContent);
       }
       for (int i = 0; i < numChunksToWriteAfterFailure; i++) {
-        Assert.assertEquals(inputChunks[i % dataBlocks].length,
+        assertEquals(inputChunks[i % dataBlocks].length,
             is.read(fileContent));
-        Assert.assertTrue("Expected: " + new String(inputChunks[i % dataBlocks],
-                UTF_8) + " \n " + "Actual: " + new String(fileContent, UTF_8),
-            Arrays.equals(inputChunks[i % dataBlocks], fileContent));
+        assertArrayEquals(inputChunks[i % dataBlocks], fileContent);
       }
     }
   }
@@ -871,8 +857,7 @@ public class TestOzoneECClient {
     try (OzoneOutputStream out = bucket.createKey(keyName,
         2L * dataBlocks * chunkSize, repConfig, new HashMap<>())) {
 
-      Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
-      ECKeyOutputStream ecKeyOut = (ECKeyOutputStream) out.getOutputStream();
+      ECKeyOutputStream ecKeyOut = assertInstanceOf(ECKeyOutputStream.class, out.getOutputStream());
 
       List<HddsProtos.DatanodeDetailsProto> dns = blkAllocator.getClusterDns();
 
@@ -885,14 +870,14 @@ public class TestOzoneECClient {
       List<DatanodeDetails> closedDNs = closedDNIndex
           .mapToObj(i -> DatanodeDetails.getFromProtoBuf(dns.get(i)))
           .collect(Collectors.toList());
-      ((MockXceiverClientFactory) factoryStub).mockStorageFailure(closedDNs,
+      factoryStub.mockStorageFailure(closedDNs,
           new ContainerNotOpenException("Mocked"));
 
       // Then let's mark failed datanodes
       List<DatanodeDetails> failedDNs = failedDNIndex
           .mapToObj(i -> DatanodeDetails.getFromProtoBuf(dns.get(i)))
           .collect(Collectors.toList());
-      ((MockXceiverClientFactory) factoryStub).setFailedStorages(failedDNs);
+      factoryStub.setFailedStorages(failedDNs);
 
       for (int i = 0; i < dataBlocks; i++) {
         out.write(inputChunks[i % dataBlocks]);
@@ -900,7 +885,7 @@ public class TestOzoneECClient {
       waitForFlushingThreadToFinish((ECKeyOutputStream) out.getOutputStream());
 
       // Assert excludeList only includes failedDNs
-      Assert.assertArrayEquals(failedDNs.toArray(new DatanodeDetails[0]),
+      assertArrayEquals(failedDNs.toArray(new DatanodeDetails[0]),
           ecKeyOut.getExcludeList().getDatanodes()
               .toArray(new DatanodeDetails[0]));
     }
@@ -952,7 +937,7 @@ public class TestOzoneECClient {
       }
 
       // First let's set storage as bad
-      ((MockXceiverClientFactory) factoryStub).setFailedStorages(failedDNs);
+      factoryStub.setFailedStorages(failedDNs);
 
       for (int i = 0; i < numChunksToWriteAfterFailure; i++) {
         out.write(inputChunks[i % dataBlocks]);
@@ -964,25 +949,18 @@ public class TestOzoneECClient {
     // failures after first stripe, the second stripe data should have been
     // written into new block group. So, we should have numExpectedBlockGrps.
     // That means two keyLocations.
-    Assert
-        .assertEquals(numExpectedBlockGrps, key.getOzoneKeyLocations().size());
+    assertEquals(numExpectedBlockGrps, key.getOzoneKeyLocations().size());
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] fileContent = new byte[chunkSize];
       for (int i = 0; i < dataBlocks * numFullStripesBeforeFailure; i++) {
-        Assert.assertEquals(inputChunks[i % dataBlocks].length,
+        assertEquals(inputChunks[i % dataBlocks].length,
             is.read(fileContent));
-        Assert.assertTrue(
-            "Expected: " + new String(inputChunks[i % dataBlocks], UTF_8)
-                + " \n " + "Actual: " + new String(fileContent, UTF_8),
-            Arrays.equals(inputChunks[i % dataBlocks], fileContent));
+        assertArrayEquals(inputChunks[i % dataBlocks], fileContent);
       }
       for (int i = 0; i < numChunksToWriteAfterFailure; i++) {
-        Assert.assertEquals(inputChunks[i % dataBlocks].length,
+        assertEquals(inputChunks[i % dataBlocks].length,
             is.read(fileContent));
-        Assert.assertTrue(
-            "Expected: " + new String(inputChunks[i % dataBlocks],
-                UTF_8) + " \n " + "Actual: " + new String(fileContent, UTF_8),
-            Arrays.equals(inputChunks[i % dataBlocks], fileContent));
+        assertArrayEquals(inputChunks[i % dataBlocks], fileContent);
       }
     }
   }
@@ -1030,31 +1008,28 @@ public class TestOzoneECClient {
       }
 
       // First let's set storage as bad
-      ((MockXceiverClientFactory) factoryStub).setFailedStorages(failedDNs);
+      factoryStub.setFailedStorages(failedDNs);
 
     }
 
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] fileContent = new byte[chunkSize];
       for (int i = 0; i < numFullChunks; i++) {
-        Assert.assertEquals(inputChunks[i % dataBlocks].length,
+        assertEquals(inputChunks[i % dataBlocks].length,
             is.read(fileContent));
-        Assert.assertTrue("Expected: " + new String(inputChunks[i % dataBlocks],
-                UTF_8) + " \n " + "Actual: " + new String(fileContent, UTF_8),
-            Arrays.equals(inputChunks[i % dataBlocks], fileContent));
+        assertArrayEquals(inputChunks[i % dataBlocks], fileContent);
       }
 
       byte[] partialChunkToRead = new byte[partialChunkSize];
-      Assert
-          .assertEquals(partialChunkToRead.length, is.read(partialChunkToRead));
-      Assert.assertTrue(Arrays.equals(partialChunk, partialChunkToRead));
+      assertEquals(partialChunkToRead.length, is.read(partialChunkToRead));
+      assertArrayEquals(partialChunk, partialChunkToRead);
 
-      Assert.assertEquals(-1, is.read(partialChunkToRead));
+      assertEquals(-1, is.read(partialChunkToRead));
     }
   }
 
   @Test
-  public void testDiscardPreAllocatedBlocksPreventRetryExceeds()
+  void testDiscardPreAllocatedBlocksPreventRetryExceeds()
       throws Exception {
     close();
     OzoneConfiguration con = createConfiguration();
@@ -1083,10 +1058,9 @@ public class TestOzoneECClient {
         new ECReplicationConfig(dataBlocks, parityBlocks,
             ECReplicationConfig.EcCodec.RS,
             chunkSize), new HashMap<>())) {
-      Assert.assertTrue(out.getOutputStream() instanceof ECKeyOutputStream);
-      ECKeyOutputStream kos = (ECKeyOutputStream) out.getOutputStream();
+      ECKeyOutputStream kos = assertInstanceOf(ECKeyOutputStream.class, out.getOutputStream());
       List<OmKeyLocationInfo> blockInfos = getAllLocationInfoList(kos);
-      Assert.assertEquals(1, blockInfos.size());
+      assertEquals(1, blockInfos.size());
 
       // Mock some pre-allocated blocks to the key,
       // should be > maxRetries
@@ -1122,35 +1096,26 @@ public class TestOzoneECClient {
             .getFromProtoBuf(dns.get(nodesIndexesToMarkFailure[j])));
       }
       // First let's set storage as bad
-      ((MockXceiverClientFactory) factoryStub).setFailedStorages(failedDNs);
+      factoryStub.setFailedStorages(failedDNs);
 
       // Writes that will retry due to failed DNs
-      try {
-        for (int j = 0; j < numStripesAfterFailure; j++) {
-          for (int i = 0; i < dataBlocks; i++) {
-            out.write(inputChunks[i]);
-          }
+      for (int j = 0; j < numStripesAfterFailure; j++) {
+        for (int i = 0; i < dataBlocks; i++) {
+          out.write(inputChunks[i]);
         }
-      } catch (IOException e) {
-        // If we don't discard pre-allocated blocks,
-        // retries should exceed the maxRetries and write will fail.
-        Assert.fail("Max retries exceeded");
       }
     }
 
     final OzoneKeyDetails key = bucket.getKey(keyName);
-    Assert.assertEquals(numExpectedBlockGrps,
+    assertEquals(numExpectedBlockGrps,
         key.getOzoneKeyLocations().size());
 
     try (OzoneInputStream is = bucket.readKey(keyName)) {
       byte[] fileContent = new byte[chunkSize];
       for (int i = 0; i < dataBlocks * numStripesTotal; i++) {
-        Assert.assertEquals(inputChunks[i % dataBlocks].length,
+        assertEquals(inputChunks[i % dataBlocks].length,
             is.read(fileContent));
-        Assert.assertArrayEquals(
-            "Expected: " + new String(inputChunks[i % dataBlocks], UTF_8)
-                + " \n " + "Actual: " + new String(fileContent, UTF_8),
-            inputChunks[i % dataBlocks], fileContent);
+        assertArrayEquals(inputChunks[i % dataBlocks], fileContent);
       }
     }
   }

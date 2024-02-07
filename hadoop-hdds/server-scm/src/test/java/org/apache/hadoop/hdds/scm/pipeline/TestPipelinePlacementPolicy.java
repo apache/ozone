@@ -27,8 +27,6 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -58,11 +56,10 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 
@@ -75,6 +72,15 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_L
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 
 /**
  * Test for PipelinePlacementPolicy.
@@ -87,6 +93,7 @@ public class TestPipelinePlacementPolicy {
   private NetworkTopologyImpl cluster;
   private static final int PIPELINE_PLACEMENT_MAX_NODES_COUNT = 10;
   private static final int PIPELINE_LOAD_LIMIT = 5;
+  @TempDir
   private File testDir;
   private DBStore dbStore;
   private SCMHAManager scmhaManager;
@@ -100,14 +107,11 @@ public class TestPipelinePlacementPolicy {
     // start with nodes with rack awareness.
     nodeManager = new MockNodeManager(cluster, getNodesWithRackAwareness(),
         false, PIPELINE_PLACEMENT_MAX_NODES_COUNT);
-    conf = SCMTestUtils.getConf();
+    conf = SCMTestUtils.getConf(testDir);
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, PIPELINE_LOAD_LIMIT);
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         10, StorageUnit.MB);
     nodeManager.setNumPipelinePerDatanode(PIPELINE_LOAD_LIMIT);
-    testDir = GenericTestUtils.getTestDir(
-        TestPipelinePlacementPolicy.class.getSimpleName() + UUID.randomUUID());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
     scmhaManager = SCMHAManagerStub.getInstance(true);
@@ -126,8 +130,6 @@ public class TestPipelinePlacementPolicy {
     if (dbStore != null) {
       dbStore.close();
     }
-
-    FileUtil.fullyDelete(testDir);
   }
 
   private NetworkTopologyImpl initTopology() {
@@ -163,7 +165,7 @@ public class TestPipelinePlacementPolicy {
   public void testChooseNodeBasedOnNetworkTopology() {
     DatanodeDetails anchor = placementPolicy.chooseNode(nodesWithRackAwareness);
     // anchor should be removed from healthyNodes after being chosen.
-    Assertions.assertFalse(nodesWithRackAwareness.contains(anchor));
+    assertThat(nodesWithRackAwareness).doesNotContain(anchor);
 
     List<DatanodeDetails> excludedNodes =
         new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT);
@@ -173,12 +175,11 @@ public class TestPipelinePlacementPolicy {
         nodeManager.getClusterNetworkTopologyMap(), anchor);
     //DatanodeDetails nextNode = placementPolicy.chooseNodeFromNetworkTopology(
     //    nodeManager.getClusterNetworkTopologyMap(), anchor, excludedNodes);
-    Assertions.assertFalse(excludedNodes.contains(nextNode));
+    assertThat(excludedNodes).doesNotContain(nextNode);
     // next node should not be the same as anchor.
-    Assertions.assertNotSame(anchor.getUuid(), nextNode.getUuid());
+    assertNotSame(anchor.getUuid(), nextNode.getUuid());
     // next node should be on the same rack based on topology.
-    Assertions.assertEquals(anchor.getNetworkLocation(),
-        nextNode.getNetworkLocation());
+    assertEquals(anchor.getNetworkLocation(), nextNode.getNetworkLocation());
   }
 
   @Test
@@ -208,13 +209,13 @@ public class TestPipelinePlacementPolicy {
         new ArrayList<>(datanodes.size()),
         nodesRequired, 0, 0);
 
-    Assertions.assertEquals(nodesRequired, results.size());
+    assertEquals(nodesRequired, results.size());
     // 3 nodes should be on different racks.
-    Assertions.assertNotEquals(results.get(0).getNetworkLocation(),
+    assertNotEquals(results.get(0).getNetworkLocation(),
         results.get(1).getNetworkLocation());
-    Assertions.assertNotEquals(results.get(0).getNetworkLocation(),
+    assertNotEquals(results.get(0).getNetworkLocation(),
         results.get(2).getNetworkLocation());
-    Assertions.assertNotEquals(results.get(1).getNetworkLocation(),
+    assertNotEquals(results.get(1).getNetworkLocation(),
         results.get(2).getNetworkLocation());
   }
 
@@ -243,25 +244,19 @@ public class TestPipelinePlacementPolicy {
 
     String expectedMessageSubstring = "Unable to find enough nodes that meet " +
         "the space requirement";
-    try {
-      // A huge container size
-      localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
-          new ArrayList<>(datanodes.size()), nodesRequired,
-          0, 10 * OzoneConsts.TB);
-      Assertions.fail("SCMException should have been thrown.");
-    } catch (SCMException ex) {
-      Assertions.assertTrue(ex.getMessage().contains(expectedMessageSubstring));
-    }
 
-    try {
-      // a huge free space min configured
-      localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
-          new ArrayList<>(datanodes.size()), nodesRequired, 10 * OzoneConsts.TB,
-          0);
-      Assertions.fail("SCMException should have been thrown.");
-    } catch (SCMException ex) {
-      Assertions.assertTrue(ex.getMessage().contains(expectedMessageSubstring));
-    }
+    // A huge container size
+    SCMException ex =
+        assertThrows(SCMException.class,
+            () -> localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
+                new ArrayList<>(datanodes.size()), nodesRequired, 0, 10 * OzoneConsts.TB));
+    assertThat(ex.getMessage()).contains(expectedMessageSubstring);
+
+    // a huge free space min configured
+    ex = assertThrows(SCMException.class,
+        () -> localPlacementPolicy.chooseDatanodes(new ArrayList<>(datanodes.size()),
+            new ArrayList<>(datanodes.size()), nodesRequired, 10 * OzoneConsts.TB, 0));
+    assertThat(ex.getMessage()).contains(expectedMessageSubstring);
   }
 
   @Test
@@ -297,12 +292,12 @@ public class TestPipelinePlacementPolicy {
     int averageLoadOnNode = maxPipelineCount *
         HddsProtos.ReplicationFactor.THREE.getNumber() / healthyNodes.size();
     for (DatanodeDetails node : healthyNodes) {
-      Assertions.assertTrue(nodeManager.getPipelinesCount(node)
-          >= averageLoadOnNode);
+      assertThat(nodeManager.getPipelinesCount(node))
+          .isGreaterThanOrEqualTo(averageLoadOnNode);
     }
     
     // Should max out pipeline usage.
-    Assertions.assertEquals(maxPipelineCount,
+    assertEquals(maxPipelineCount,
         stateManager
             .getPipelines(RatisReplicationConfig
                 .getInstance(ReplicationFactor.THREE))
@@ -319,9 +314,9 @@ public class TestPipelinePlacementPolicy {
     DatanodeDetails nextNode = placementPolicy.chooseNodeBasedOnRackAwareness(
         healthyNodes, new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT),
         topologyWithDifRacks, anchor);
-    Assertions.assertNotNull(nextNode);
+    assertNotNull(nextNode);
     // next node should be on a different rack.
-    Assertions.assertNotEquals(anchor.getNetworkLocation(),
+    assertNotEquals(anchor.getNetworkLocation(),
         nextNode.getNetworkLocation());
   }
 
@@ -333,12 +328,12 @@ public class TestPipelinePlacementPolicy {
 
     // test no nodes are excluded
     node = placementPolicy.fallBackPickNodes(healthyNodes, null);
-    Assertions.assertNotNull(node);
+    assertNotNull(node);
 
     // when input nodeSet are all excluded.
     List<DatanodeDetails> exclude = healthyNodes;
     node = placementPolicy.fallBackPickNodes(healthyNodes, exclude);
-    Assertions.assertNull(node);
+    assertNull(node);
 
   }
 
@@ -349,8 +344,7 @@ public class TestPipelinePlacementPolicy {
     DatanodeDetails randomNode = placementPolicy
         .chooseNode(nodesWithOutRackAwareness);
     // rack awareness is not enabled.
-    Assertions.assertEquals(anchor.getNetworkLocation(),
-        randomNode.getNetworkLocation());
+    assertEquals(anchor.getNetworkLocation(), randomNode.getNetworkLocation());
 
     NetworkTopology topology =
         new NetworkTopologyImpl(new OzoneConfiguration());
@@ -358,19 +352,17 @@ public class TestPipelinePlacementPolicy {
         nodesWithOutRackAwareness, new ArrayList<>(
             PIPELINE_PLACEMENT_MAX_NODES_COUNT), topology, anchor);
     // RackAwareness should not be able to choose any node.
-    Assertions.assertNull(nextNode);
+    assertNull(nextNode);
 
     // PlacementPolicy should still be able to pick a set of 3 nodes.
     int numOfNodes = HddsProtos.ReplicationFactor.THREE.getNumber();
     List<DatanodeDetails> results = placementPolicy
         .getResultSet(numOfNodes, nodesWithOutRackAwareness);
     
-    Assertions.assertEquals(numOfNodes, results.size());
+    assertEquals(numOfNodes, results.size());
     // All nodes are on same rack.
-    Assertions.assertEquals(results.get(0).getNetworkLocation(),
-        results.get(1).getNetworkLocation());
-    Assertions.assertEquals(results.get(0).getNetworkLocation(),
-        results.get(2).getNetworkLocation());
+    assertEquals(results.get(0).getNetworkLocation(), results.get(1).getNetworkLocation());
+    assertEquals(results.get(0).getNetworkLocation(), results.get(2).getNetworkLocation());
   }
 
   private static final Node[] NODES = new NodeImpl[] {
@@ -439,15 +431,15 @@ public class TestPipelinePlacementPolicy {
     // modify node to pipeline mapping.
     insertHeavyNodesIntoNodeManager(healthyNodes, minorityHeavy);
     // NODES should be sufficient.
-    Assertions.assertEquals(nodesRequired, pickedNodes1.size());
+    assertEquals(nodesRequired, pickedNodes1.size());
     // make sure pipeline placement policy won't select duplicated NODES.
-    Assertions.assertTrue(checkDuplicateNodesUUID(pickedNodes1));
+    assertTrue(checkDuplicateNodesUUID(pickedNodes1));
 
     // majority of healthy NODES are heavily engaged in pipelines.
     int majorityHeavy = healthyNodes.size() / 2 + 2;
     insertHeavyNodesIntoNodeManager(healthyNodes, majorityHeavy);
     // NODES should NOT be sufficient and exception should be thrown.
-    Assertions.assertThrows(SCMException.class, () ->
+    assertThrows(SCMException.class, () ->
         placementPolicy.chooseDatanodes(
             new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT),
             new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT),
@@ -464,7 +456,7 @@ public class TestPipelinePlacementPolicy {
     int majorityHeavy = healthyNodes.size() / 2 + 2;
     insertHeavyNodesIntoNodeManager(healthyNodes, majorityHeavy);
     // NODES should NOT be sufficient and exception should be thrown.
-    Assertions.assertThrows(SCMException.class, () ->
+    assertThrows(SCMException.class, () ->
         placementPolicy.chooseDatanodes(
             new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT),
             new ArrayList<>(PIPELINE_PLACEMENT_MAX_NODES_COUNT),
@@ -491,8 +483,8 @@ public class TestPipelinePlacementPolicy {
     }
     ContainerPlacementStatus status =
         placementPolicy.validateContainerPlacement(dns, 3);
-    Assertions.assertTrue(status.isPolicySatisfied());
-    Assertions.assertEquals(0, status.misReplicationCount());
+    assertTrue(status.isPolicySatisfied());
+    assertEquals(0, status.misReplicationCount());
 
 
     List<DatanodeDetails> subSet = new ArrayList<>();
@@ -500,28 +492,28 @@ public class TestPipelinePlacementPolicy {
     subSet.add(dns.get(0));
     subSet.add(dns.get(2));
     status = placementPolicy.validateContainerPlacement(subSet, 3);
-    Assertions.assertTrue(status.isPolicySatisfied());
-    Assertions.assertEquals(0, status.misReplicationCount());
+    assertTrue(status.isPolicySatisfied());
+    assertEquals(0, status.misReplicationCount());
 
     // Cut it down to two nodes, one racks
     subSet = new ArrayList<>();
     subSet.add(dns.get(0));
     subSet.add(dns.get(1));
     status = placementPolicy.validateContainerPlacement(subSet, 3);
-    Assertions.assertFalse(status.isPolicySatisfied());
-    Assertions.assertEquals(1, status.misReplicationCount());
+    assertFalse(status.isPolicySatisfied());
+    assertEquals(1, status.misReplicationCount());
 
     // One node, but only one replica
     subSet = new ArrayList<>();
     subSet.add(dns.get(0));
     status = placementPolicy.validateContainerPlacement(subSet, 1);
-    Assertions.assertTrue(status.isPolicySatisfied());
+    assertTrue(status.isPolicySatisfied());
 
     // three nodes, one dead, one rack
     cluster.remove(dns.get(2));
     status = placementPolicy.validateContainerPlacement(dns, 3);
-    Assertions.assertFalse(status.isPolicySatisfied());
-    Assertions.assertEquals(1, status.misReplicationCount());
+    assertFalse(status.isPolicySatisfied());
+    assertEquals(1, status.misReplicationCount());
   }
 
   @Test
@@ -544,8 +536,8 @@ public class TestPipelinePlacementPolicy {
     }
     ContainerPlacementStatus status =
         placementPolicy.validateContainerPlacement(dns, 3);
-    Assertions.assertTrue(status.isPolicySatisfied());
-    Assertions.assertEquals(0, status.misReplicationCount());
+    assertTrue(status.isPolicySatisfied());
+    assertEquals(0, status.misReplicationCount());
   }
 
   @Test
@@ -562,10 +554,10 @@ public class TestPipelinePlacementPolicy {
     List<DatanodeDetails> pickedDns =  placementPolicy.chooseDatanodes(
         new ArrayList<>(), new ArrayList<>(), nodesRequired, 0, 0);
 
-    Assertions.assertEquals(3, pickedDns.size());
-    Assertions.assertTrue(pickedDns.contains(dns.get(1)));
-    Assertions.assertTrue(pickedDns.contains(dns.get(2)));
-    Assertions.assertTrue(pickedDns.contains(dns.get(3)));
+    assertEquals(3, pickedDns.size());
+    assertThat(pickedDns).contains(dns.get(1));
+    assertThat(pickedDns).contains(dns.get(2));
+    assertThat(pickedDns).contains(dns.get(3));
   }
 
   @Test
@@ -579,11 +571,10 @@ public class TestPipelinePlacementPolicy {
     insertHeavyNodesIntoNodeManager(dns, 1);
     int nodesRequired = HddsProtos.ReplicationFactor.THREE.getNumber();
 
-    Throwable t = Assertions.assertThrows(SCMException.class, () ->
+    Throwable t = assertThrows(SCMException.class, () ->
         placementPolicy.chooseDatanodes(
             new ArrayList<>(), new ArrayList<>(), nodesRequired, 0, 0));
-    Assertions.assertEquals(PipelinePlacementPolicy.MULTIPLE_RACK_PIPELINE_MSG,
-        t.getMessage());
+    assertEquals(PipelinePlacementPolicy.MULTIPLE_RACK_PIPELINE_MSG, t.getMessage());
   }
 
   @Test
@@ -599,11 +590,10 @@ public class TestPipelinePlacementPolicy {
 
     List<DatanodeDetails> excluded = new ArrayList<>();
     excluded.add(dns.get(0));
-    Throwable t = Assertions.assertThrows(SCMException.class, () ->
+    Throwable t = assertThrows(SCMException.class, () ->
         placementPolicy.chooseDatanodes(
             excluded, new ArrayList<>(), nodesRequired, 0, 0));
-    Assertions.assertEquals(PipelinePlacementPolicy.MULTIPLE_RACK_PIPELINE_MSG,
-        t.getMessage());
+    assertEquals(PipelinePlacementPolicy.MULTIPLE_RACK_PIPELINE_MSG, t.getMessage());
   }
 
   private List<DatanodeDetails> setupSkewedRacks() {
@@ -699,7 +689,7 @@ public class TestPipelinePlacementPolicy {
     pipelineCount
         = placementPolicy.currentRatisThreePipelineCount(nodeManager,
         stateManager, healthyNodes.get(0));
-    Assertions.assertEquals(pipelineCount, 0);
+    assertEquals(pipelineCount, 0);
 
     // Check datanode with one RATIS/ONE pipeline
     List<DatanodeDetails> ratisOneDn = new ArrayList<>();
@@ -709,7 +699,7 @@ public class TestPipelinePlacementPolicy {
     pipelineCount
         = placementPolicy.currentRatisThreePipelineCount(nodeManager,
         stateManager, healthyNodes.get(1));
-    Assertions.assertEquals(pipelineCount, 0);
+    assertEquals(pipelineCount, 0);
 
     // Check datanode with one RATIS/THREE pipeline
     List<DatanodeDetails> ratisThreeDn = new ArrayList<>();
@@ -721,7 +711,7 @@ public class TestPipelinePlacementPolicy {
     pipelineCount
         = placementPolicy.currentRatisThreePipelineCount(nodeManager,
         stateManager, healthyNodes.get(2));
-    Assertions.assertEquals(pipelineCount, 1);
+    assertEquals(pipelineCount, 1);
 
     // Check datanode with one RATIS/ONE and one STANDALONE/ONE pipeline
     standaloneOneDn = new ArrayList<>();
@@ -731,7 +721,7 @@ public class TestPipelinePlacementPolicy {
     pipelineCount
         = placementPolicy.currentRatisThreePipelineCount(nodeManager,
         stateManager, healthyNodes.get(1));
-    Assertions.assertEquals(pipelineCount, 0);
+    assertEquals(pipelineCount, 0);
 
     // Check datanode with one RATIS/ONE and one STANDALONE/ONE pipeline and
     // two RATIS/THREE pipelines
@@ -745,7 +735,7 @@ public class TestPipelinePlacementPolicy {
     pipelineCount
         = placementPolicy.currentRatisThreePipelineCount(nodeManager,
         stateManager, healthyNodes.get(1));
-    Assertions.assertEquals(pipelineCount, 2);
+    assertEquals(pipelineCount, 2);
   }
 
   private void createPipelineWithReplicationConfig(List<DatanodeDetails> dnList,

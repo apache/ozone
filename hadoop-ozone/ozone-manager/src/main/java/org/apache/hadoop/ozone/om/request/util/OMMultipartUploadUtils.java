@@ -20,8 +20,11 @@ package org.apache.hadoop.ozone.om.request.util;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.UniqueId;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 
+import java.io.IOException;
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -77,6 +80,21 @@ public final class OMMultipartUploadUtils {
     }
 
     return uploadId;
+  }
+
+  /**
+   * Get the multipart open key based on the bucket layout.
+   * @throws IOException
+   */
+  public static String getMultipartOpenKey(String volumeName,
+       String bucketName, String keyName, String multipartUploadId,
+       OMMetadataManager omMetadataManager, BucketLayout bucketLayout)
+      throws IOException {
+    if (bucketLayout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+      return omMetadataManager.getMultipartKeyFSO(volumeName, bucketName, keyName, multipartUploadId);
+    } else {
+      return omMetadataManager.getMultipartKey(volumeName, bucketName, keyName, multipartUploadId);
+    }
   }
 
 

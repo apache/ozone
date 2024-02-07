@@ -89,7 +89,8 @@ public class ECReplicationConfig implements ReplicationConfig {
    *     XOR-10-4-4096K
    * IllegalArgumentException will be thrown if the passed string does not
    * match the defined pattern.
-   * @param string
+   * @param string Parameters used to create ECReplicationConfig instances.
+   *       Format: &lt;codec&gt;-&lt;data&gt;-&lt;parity&gt;-&lt;chunksize&gt;
    */
   public ECReplicationConfig(String string) {
     final Matcher matcher = STRING_FORMAT.matcher(string);

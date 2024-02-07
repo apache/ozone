@@ -21,8 +21,10 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 
-import java.time.Duration;
-import java.time.temporal.TemporalUnit;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * S3 secret cache implementation based on in-memory cache.
@@ -30,15 +32,9 @@ import java.time.temporal.TemporalUnit;
 public class S3InMemoryCache implements S3SecretCache {
   private final Cache<String, S3SecretValue> cache;
 
-  public S3InMemoryCache(Duration expireTime, long maxSize) {
+  public S3InMemoryCache() {
     cache = CacheBuilder.newBuilder()
-        .expireAfterWrite(expireTime)
-        .maximumSize(maxSize)
         .build();
-  }
-
-  public static S3InMemoryCacheBuilder builder() {
-    return new S3InMemoryCacheBuilder();
   }
 
   @Override
@@ -48,35 +44,46 @@ public class S3InMemoryCache implements S3SecretCache {
 
   @Override
   public void invalidate(String id) {
-    cache.invalidate(id);
+    cache.asMap().computeIfPresent(id, (k, secret) -> secret.deleted());
+  }
+
+  /**
+   * Clears the cache by removing entries that correspond to transactions
+   * flushed by the doubleBuffer.
+   *
+   * @param flushedTransactionIds A list of transaction IDs that have been
+   *                              flushed and should be used to identify and
+   *                              remove corresponding cache entries.
+   */
+  @Override
+  public void clearCache(List<Long> flushedTransactionIds) {
+    // Create a map to store transactionLogIndex-to-cacheKey mappings
+    Map<Long, String> transactionIdToCacheKeys = new HashMap<>();
+
+    // Populate the mapping based on transactionLogIndex to kerberosId.
+    // So that we do not have to do nested iteration for every transactionId.
+    Set<String> cacheKeys = cache.asMap().keySet();
+    for (String cacheKey : cacheKeys) {
+      S3SecretValue secretValue = cache.getIfPresent(cacheKey);
+      if (secretValue != null) {
+        transactionIdToCacheKeys.put(secretValue.getTransactionLogIndex(),
+            cacheKey);
+      }
+    }
+
+    // Iterate over the provided transactionIds
+    for (Long transactionId : flushedTransactionIds) {
+      // Get the cache key associated with this transactionId
+      String cacheKey = transactionIdToCacheKeys.get(transactionId);
+      if (cacheKey != null) {
+        // Remove the cache entry for this cacheKey.
+        cache.invalidate(cacheKey);
+      }
+    }
   }
 
   @Override
   public S3SecretValue get(String id) {
     return cache.getIfPresent(id);
-  }
-
-  /**
-   * Builder for {@link S3InMemoryCache}.
-   */
-  public static class S3InMemoryCacheBuilder {
-    private Duration expireTime;
-    private long maxSize;
-
-    @SuppressWarnings("checkstyle:HiddenField")
-    public S3InMemoryCacheBuilder setExpireTime(long expireTime,
-                                                TemporalUnit unit) {
-      this.expireTime = Duration.of(expireTime, unit);
-      return this;
-    }
-
-    public S3InMemoryCacheBuilder setMaxSize(long maxSize) {
-      this.maxSize = maxSize;
-      return this;
-    }
-
-    public S3InMemoryCache build() {
-      return new S3InMemoryCache(expireTime, maxSize);
-    }
   }
 }

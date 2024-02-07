@@ -126,9 +126,9 @@ export default class HeatMapConfiguration extends React.Component<IHeatmapConfig
     `;}
     if (params.datum.label !== "") {
       tooltipContent += `<br/>
-          File Name:
-          ${params.datum.label ? params.datum.label.split("/").slice(-1) : ""}
-        `;
+        Entity Name:
+        ${params.datum.label ? params.datum.label.split("/").slice(-1) : ""}
+      `;
     }
     tooltipContent += '</span>';
     return tooltipContent;

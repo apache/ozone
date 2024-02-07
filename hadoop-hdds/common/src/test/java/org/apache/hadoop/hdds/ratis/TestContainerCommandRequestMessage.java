@@ -36,8 +36,9 @@ import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /** Testing {@link ContainerCommandRequestMessage}. */
 public class TestContainerCommandRequestMessage {
@@ -150,6 +151,6 @@ public class TestContainerCommandRequestMessage {
         = ContainerCommandRequestMessage.toMessage(original, null);
     final ContainerCommandRequestProto computed
         = ContainerCommandRequestMessage.toProto(message.getContent(), null);
-    Assertions.assertEquals(original, computed);
+    assertEquals(original, computed);
   }
 }

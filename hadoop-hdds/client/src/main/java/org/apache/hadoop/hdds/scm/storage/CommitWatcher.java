@@ -24,226 +24,57 @@
  */
 package org.apache.hadoop.hdds.scm.storage;
 
-import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
-
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
-import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * This class executes watchForCommit on ratis pipeline and releases
  * buffers once data successfully gets replicated.
  */
-public class CommitWatcher {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(CommitWatcher.class);
-
+class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
   // A reference to the pool of buffers holding the data
-  private BufferPool bufferPool;
-
-  // The map should maintain the keys (logIndexes) in order so that while
-  // removing we always end up updating incremented data flushed length.
-  // Also, corresponding to the logIndex, the corresponding list of buffers will
-  // be released from the buffer pool.
-  private Map<Long, List<ChunkBuffer>> commitIndex2flushedDataMap;
+  private final BufferPool bufferPool;
 
   // future Map to hold up all putBlock futures
-  private ConcurrentHashMap<Long,
-      CompletableFuture<ContainerProtos.ContainerCommandResponseProto>>
-      futureMap;
+  private final ConcurrentMap<Long, CompletableFuture<
+      ContainerCommandResponseProto>> futureMap = new ConcurrentHashMap<>();
 
-  private XceiverClientSpi xceiverClient;
-
-  // total data which has been successfully flushed and acknowledged
-  // by all servers
-  private long totalAckDataLength;
-
-  public CommitWatcher(BufferPool bufferPool, XceiverClientSpi xceiverClient) {
+  CommitWatcher(BufferPool bufferPool, XceiverClientSpi xceiverClient) {
+    super(xceiverClient);
     this.bufferPool = bufferPool;
-    this.xceiverClient = xceiverClient;
-    commitIndex2flushedDataMap = new ConcurrentSkipListMap<>();
-    totalAckDataLength = 0;
-    futureMap = new ConcurrentHashMap<>();
   }
 
-  /**
-   * just update the totalAckDataLength. In case of failure,
-   * we will read the data starting from totalAckDataLength.
-   */
-  private long releaseBuffers(List<Long> indexes) {
-    Preconditions.checkArgument(!commitIndex2flushedDataMap.isEmpty());
-    for (long index : indexes) {
-      Preconditions.checkState(commitIndex2flushedDataMap.containsKey(index));
-      final List<ChunkBuffer> buffers
-          = commitIndex2flushedDataMap.remove(index);
-      long length = buffers.stream().mapToLong(ChunkBuffer::position).sum();
-      totalAckDataLength += length;
-      // clear the future object from the future Map
-      final CompletableFuture<ContainerCommandResponseProto> remove =
-          futureMap.remove(totalAckDataLength);
-      if (remove == null) {
-        LOG.error("Couldn't find required future for " + totalAckDataLength);
-        for (Long key : futureMap.keySet()) {
-          LOG.error("Existing acknowledged data: " + key);
-        }
-      }
-      Preconditions.checkNotNull(remove);
-      for (ChunkBuffer byteBuffer : buffers) {
-        bufferPool.releaseBuffer(byteBuffer);
-      }
+  @Override
+  void releaseBuffers(long index) {
+    long acked = 0;
+    for (ChunkBuffer buffer : remove(index)) {
+      acked += buffer.position();
+      bufferPool.releaseBuffer(buffer);
     }
-    return totalAckDataLength;
+    final long totalLength = addAckDataLength(acked);
+    // When putBlock is called, a future is added.
+    // When putBlock is replied, the future is removed below.
+    // Therefore, the removed future should not be null.
+    final CompletableFuture<ContainerCommandResponseProto> removed =
+        futureMap.remove(totalLength);
+    Objects.requireNonNull(removed, () -> "Future not found for "
+        + totalLength + ": existing = " + futureMap.keySet());
   }
 
-  public void updateCommitInfoMap(long index, List<ChunkBuffer> buffers) {
-    commitIndex2flushedDataMap.computeIfAbsent(index, k -> new LinkedList<>())
-        .addAll(buffers);
-  }
-
-  int getCommitInfoMapSize() {
-    return commitIndex2flushedDataMap.size();
-  }
-
-  /**
-   * Calls watch for commit for the first index in commitIndex2flushedDataMap to
-   * the Ratis client.
-   * @return reply reply from raft client
-   * @throws IOException in case watchForCommit fails
-   */
-  public XceiverClientReply watchOnFirstIndex() throws IOException {
-    if (!commitIndex2flushedDataMap.isEmpty()) {
-      // wait for the  first commit index in the commitIndex2flushedDataMap
-      // to get committed to all or majority of nodes in case timeout
-      // happens.
-      long index =
-          commitIndex2flushedDataMap.keySet().stream().mapToLong(v -> v).min()
-              .getAsLong();
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("waiting for first index {} to catch up", index);
-      }
-      return watchForCommit(index);
-    } else {
-      return null;
-    }
-  }
-
-  /**
-   * Calls watch for commit for the first index in commitIndex2flushedDataMap to
-   * the Ratis client.
-   * @return reply reply from raft client
-   * @throws IOException in case watchForCommit fails
-   */
-  public XceiverClientReply watchOnLastIndex()
-      throws IOException {
-    if (!commitIndex2flushedDataMap.isEmpty()) {
-      // wait for the  commit index in the commitIndex2flushedDataMap
-      // to get committed to all or majority of nodes in case timeout
-      // happens.
-      long index =
-          commitIndex2flushedDataMap.keySet().stream().mapToLong(v -> v).max()
-              .getAsLong();
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("waiting for last flush Index {} to catch up", index);
-      }
-      return watchForCommit(index);
-    } else {
-      return null;
-    }
-  }
-
-  private void adjustBuffers(long commitIndex) {
-    List<Long> keyList = commitIndex2flushedDataMap.keySet().stream()
-        .filter(p -> p <= commitIndex).collect(Collectors.toList());
-    if (!keyList.isEmpty()) {
-      releaseBuffers(keyList);
-    }
-  }
-
-  // It may happen that once the exception is encountered , we still might
-  // have successfully flushed up to a certain index. Make sure the buffers
-  // only contain data which have not been sufficiently replicated
-  void releaseBuffersOnException() {
-    adjustBuffers(xceiverClient.getReplicatedMinCommitIndex());
-  }
-
-  /**
-   * calls watchForCommit API of the Ratis Client. For Standalone client,
-   * it is a no op.
-   * @param commitIndex log index to watch for
-   * @return minimum commit index replicated to all nodes
-   * @throws IOException IOException in case watch gets timed out
-   */
-  public XceiverClientReply watchForCommit(long commitIndex)
-      throws IOException {
-    long index;
-    try {
-      XceiverClientReply reply =
-          xceiverClient.watchForCommit(commitIndex);
-      if (reply == null) {
-        index = 0;
-      } else {
-        index = reply.getLogIndex();
-      }
-      adjustBuffers(index);
-      return reply;
-    } catch (InterruptedException e) {
-      // Re-interrupt the thread while catching InterruptedException
-      Thread.currentThread().interrupt();
-      throw getIOExceptionForWatchForCommit(commitIndex, e);
-    } catch (TimeoutException | ExecutionException e) {
-      throw getIOExceptionForWatchForCommit(commitIndex, e);
-    }
-  }
-
-  private IOException getIOExceptionForWatchForCommit(long commitIndex,
-                                                       Exception e) {
-    LOG.warn("watchForCommit failed for index {}", commitIndex, e);
-    IOException ioException = new IOException(
-        "Unexpected Storage Container Exception: " + e.toString(), e);
-    releaseBuffersOnException();
-    return ioException;
-  }
-
-  @VisibleForTesting
-  public Map<Long, List<ChunkBuffer>> getCommitIndex2flushedDataMap() {
-    return commitIndex2flushedDataMap;
-  }
-
-  public ConcurrentMap<Long,
-        CompletableFuture<ContainerProtos.
-            ContainerCommandResponseProto>> getFutureMap() {
+  ConcurrentMap<Long, CompletableFuture<
+      ContainerCommandResponseProto>> getFutureMap() {
     return futureMap;
   }
 
-  public long getTotalAckDataLength() {
-    return totalAckDataLength;
-  }
-
+  @Override
   public void cleanup() {
-    if (commitIndex2flushedDataMap != null) {
-      commitIndex2flushedDataMap.clear();
-    }
-    if (futureMap != null) {
-      futureMap.clear();
-    }
-    commitIndex2flushedDataMap = null;
+    super.cleanup();
+    futureMap.clear();
   }
 }

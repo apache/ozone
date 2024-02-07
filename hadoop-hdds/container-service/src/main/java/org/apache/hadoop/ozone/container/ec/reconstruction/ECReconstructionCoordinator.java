@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -69,6 +70,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -110,21 +112,28 @@ public class ECReconstructionCoordinator implements Closeable {
   private final ContainerClientMetrics clientMetrics;
   private final ECReconstructionMetrics metrics;
   private final StateContext context;
+  private final OzoneClientConfig ozoneClientConfig;
 
   public ECReconstructionCoordinator(
       ConfigurationSource conf, CertificateClient certificateClient,
       SecretKeySignerClient secretKeyClient, StateContext context,
-      ECReconstructionMetrics metrics) throws IOException {
+      ECReconstructionMetrics metrics,
+      String threadNamePrefix) throws IOException {
     this.context = context;
     this.containerOperationClient = new ECContainerOperationClient(conf,
         certificateClient);
     this.byteBufferPool = new ElasticByteBufferPool();
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setNameFormat(threadNamePrefix + "ec-reconstruct-reader-TID-%d")
+        .build();
+    ozoneClientConfig = conf.getObject(OzoneClientConfig.class);
     this.ecReconstructExecutor =
         new ThreadPoolExecutor(EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE,
-            conf.getObject(OzoneClientConfig.class)
-                .getEcReconstructStripeReadPoolLimit(), 60, TimeUnit.SECONDS,
-            new SynchronousQueue<>(), new ThreadFactoryBuilder()
-            .setNameFormat("ec-reconstruct-reader-TID-%d").build(),
+            ozoneClientConfig.getEcReconstructStripeReadPoolLimit(),
+            60,
+            TimeUnit.SECONDS,
+            new SynchronousQueue<>(),
+            threadFactory,
             new ThreadPoolExecutor.CallerRunsPolicy());
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
         .getInstance(byteBufferPool, () -> ecReconstructExecutor);
@@ -214,15 +223,16 @@ public class ECReconstructionCoordinator implements Closeable {
 
   private ECBlockOutputStream getECBlockOutputStream(
       BlockLocationInfo blockLocationInfo, DatanodeDetails datanodeDetails,
-      ECReplicationConfig repConfig, int replicaIndex,
-      OzoneClientConfig configuration) throws IOException {
+      ECReplicationConfig repConfig, int replicaIndex) throws IOException {
+    StreamBufferArgs streamBufferArgs =
+        StreamBufferArgs.getDefaultStreamBufferArgs(repConfig, ozoneClientConfig);
     return new ECBlockOutputStream(
         blockLocationInfo.getBlockID(),
         containerOperationClient.getXceiverClientManager(),
         containerOperationClient.singleNodePipeline(datanodeDetails,
             repConfig, replicaIndex),
-        BufferPool.empty(), configuration,
-        blockLocationInfo.getToken(), clientMetrics);
+        BufferPool.empty(), ozoneClientConfig,
+        blockLocationInfo.getToken(), clientMetrics, streamBufferArgs);
   }
 
   @VisibleForTesting
@@ -267,15 +277,14 @@ public class ECReconstructionCoordinator implements Closeable {
       ECBlockOutputStream[] targetBlockStreams =
           new ECBlockOutputStream[toReconstructIndexes.size()];
       ByteBuffer[] bufs = new ByteBuffer[toReconstructIndexes.size()];
-      OzoneClientConfig configuration = new OzoneClientConfig();
       try {
         for (int i = 0; i < toReconstructIndexes.size(); i++) {
           int replicaIndex = toReconstructIndexes.get(i);
           DatanodeDetails datanodeDetails =
               targetMap.get(replicaIndex);
           targetBlockStreams[i] = getECBlockOutputStream(blockLocationInfo,
-              datanodeDetails, repConfig, replicaIndex,
-              configuration);
+              datanodeDetails, repConfig, replicaIndex
+          );
           bufs[i] = byteBufferPool.getBuffer(false, repConfig.getEcChunkSize());
           // Make sure it's clean. Don't want to reuse the erroneously returned
           // buffers from the pool.

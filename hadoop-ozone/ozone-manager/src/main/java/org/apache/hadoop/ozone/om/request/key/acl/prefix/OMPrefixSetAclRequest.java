@@ -88,13 +88,13 @@ public class OMPrefixSetAclRequest extends OMPrefixAclRequest {
 
   @Override
   OMClientResponse onFailure(OMResponse.Builder omResponse,
-      IOException exception) {
+      Exception exception) {
     return new OMPrefixAclResponse(createErrorOMResponse(omResponse,
         exception));
   }
 
   @Override
-  void onComplete(boolean operationResult, IOException exception,
+  void onComplete(boolean operationResult, Exception exception,
       OMMetrics omMetrics, Result result, long trxnLogIndex,
       AuditLogger auditLogger, Map<String, String> auditMap) {
     switch (result) {

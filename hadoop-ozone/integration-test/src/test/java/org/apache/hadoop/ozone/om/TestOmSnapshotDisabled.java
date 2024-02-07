@@ -29,15 +29,14 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-import java.util.UUID;
-
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Integration test to verify Ozone snapshot RPCs throw exception when called.
@@ -52,8 +51,6 @@ public class TestOmSnapshotDisabled {
   @Timeout(60)
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    String clusterId = UUID.randomUUID().toString();
-    String scmId = UUID.randomUUID().toString();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         BucketLayout.LEGACY.name());
     conf.setEnum(HDDS_DB_PROFILE, DBProfile.TEST);
@@ -61,8 +58,6 @@ public class TestOmSnapshotDisabled {
     conf.setBoolean(OMConfigKeys.OZONE_FILESYSTEM_SNAPSHOT_ENABLED_KEY, false);
 
     cluster = MiniOzoneCluster.newOMHABuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
         .setOMServiceId("om-service-test1")
         .setNumOfOzoneManagers(3)
         .build();
@@ -95,12 +90,12 @@ public class TestOmSnapshotDisabled {
     volume.createBucket(bucketName);
 
     // create snapshot should throw
-    OMException omException = Assertions.assertThrows(OMException.class,
+    OMException omException = assertThrows(OMException.class,
         () -> store.createSnapshot(volumeName, bucketName, snapshotName));
-    Assertions.assertEquals(FEATURE_NOT_ENABLED, omException.getResult());
+    assertEquals(FEATURE_NOT_ENABLED, omException.getResult());
     // delete snapshot should throw
-    omException = Assertions.assertThrows(OMException.class,
+    omException = assertThrows(OMException.class,
         () -> store.deleteSnapshot(volumeName, bucketName, snapshotName));
-    Assertions.assertEquals(FEATURE_NOT_ENABLED, omException.getResult());
+    assertEquals(FEATURE_NOT_ENABLED, omException.getResult());
   }
 }

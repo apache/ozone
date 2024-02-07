@@ -17,15 +17,13 @@
  */
 package org.apache.hadoop.hdds.fs;
 
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.util.Shell;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.apache.hadoop.ozone.OzoneConsts.KB;
-import static org.apache.ozone.test.GenericTestUtils.getTestDir;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -39,18 +37,12 @@ import java.util.Random;
  */
 public class TestDU {
 
-  private static final File DIR = getTestDir(TestDU.class.getSimpleName());
+  @TempDir
+  private File dir;
 
   @BeforeEach
-  public void setUp() {
+  void setUp() {
     assumeFalse(Shell.WINDOWS);
-    FileUtil.fullyDelete(DIR);
-    assertTrue(DIR.mkdirs());
-  }
-
-  @AfterEach
-  public void tearDown() throws IOException {
-    FileUtil.fullyDelete(DIR);
   }
 
   static void createFile(File newFile, int size) throws IOException {
@@ -77,9 +69,9 @@ public class TestDU {
    * This is true for most file systems.
    */
   @Test
-  public void testGetUsed() throws Exception {
+  void testGetUsed() throws Exception {
     final long writtenSize = 32 * KB;
-    File file = new File(DIR, "data");
+    File file = new File(dir, "data");
     createFile(file, (int) writtenSize);
 
     SpaceUsageSource du = new DU(file);
@@ -89,10 +81,10 @@ public class TestDU {
   }
 
   @Test
-  public void testExcludePattern() throws IOException {
-    createFile(new File(DIR, "include.txt"), (int) (4 * KB));
-    createFile(new File(DIR, "exclude.tmp"), (int) (100 * KB));
-    SpaceUsageSource du = new DU(DIR, "*.tmp");
+  void testExcludePattern() throws IOException {
+    createFile(new File(dir, "include.txt"), (int) (4 * KB));
+    createFile(new File(dir, "exclude.tmp"), (int) (100 * KB));
+    SpaceUsageSource du = new DU(dir, "*.tmp");
 
     long usedSpace = du.getUsedSpace();
 
@@ -103,10 +95,9 @@ public class TestDU {
     // Allow for extra 8K on-disk slack for local file systems
     // that may store additional file metadata (eg ext attrs).
     final long max = expected + 8 * KB;
-    assertTrue(expected <= actual && actual <= max, () ->
-        String.format(
-            "Invalid on-disk size: %d, expected to be in [%d, %d]",
-            actual, expected, max));
+    assertThat(actual)
+        .isGreaterThanOrEqualTo(expected)
+        .isLessThanOrEqualTo(max);
   }
 
 }

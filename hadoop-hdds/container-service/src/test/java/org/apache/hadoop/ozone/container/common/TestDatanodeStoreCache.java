@@ -22,27 +22,32 @@ import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.RawDB;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 /**
  * Test DatanodeStoreCache.
  */
 public class TestDatanodeStoreCache {
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   private OzoneConfiguration conf = new OzoneConfiguration();
 
   @Test
-  public void testBasicOperations() throws IOException {
+  void testBasicOperations() throws IOException {
     DatanodeStoreCache cache = DatanodeStoreCache.getInstance();
-    String dbPath1 = folder.newFolder("basic1").getAbsolutePath();
-    String dbPath2 = folder.newFolder("basic2").getAbsolutePath();
+    String dbPath1 = Files.createDirectory(folder.resolve("basic1"))
+        .toFile().toString();
+    String dbPath2 = Files.createDirectory(folder.resolve("basic2"))
+        .toFile().toString();
     DatanodeStore store1 = new DatanodeStoreSchemaThreeImpl(conf, dbPath1,
         false);
     DatanodeStore store2 = new DatanodeStoreSchemaThreeImpl(conf, dbPath2,
@@ -51,28 +56,24 @@ public class TestDatanodeStoreCache {
     // test normal add
     cache.addDB(dbPath1, new RawDB(store1, dbPath1));
     cache.addDB(dbPath2, new RawDB(store2, dbPath2));
-    Assert.assertEquals(2, cache.size());
+    assertEquals(2, cache.size());
 
     // test duplicate add
     cache.addDB(dbPath1, new RawDB(store1, dbPath1));
-    Assert.assertEquals(2, cache.size());
+    assertEquals(2, cache.size());
 
     // test get, test reference the same object using ==
-    Assert.assertTrue(store1 == cache.getDB(dbPath1, conf).getStore());
+    assertSame(store1, cache.getDB(dbPath1, conf).getStore());
 
     // test remove
     cache.removeDB(dbPath1);
-    Assert.assertEquals(1, cache.size());
+    assertEquals(1, cache.size());
 
     // test remove non-exist
-    try {
-      cache.removeDB(dbPath1);
-    } catch (Exception e) {
-      Assert.fail("Should not throw " + e);
-    }
+    cache.removeDB(dbPath1);
 
     // test shutdown
     cache.shutdownCache();
-    Assert.assertEquals(0, cache.size());
+    assertEquals(0, cache.size());
   }
 }

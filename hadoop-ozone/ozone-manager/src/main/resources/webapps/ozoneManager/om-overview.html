@@ -27,10 +27,6 @@
         <td>{{$ctrl.role.Id}}</td>
     </tr>
     <tr>
-        <td>OM Roles (HA)	</td>
-        <td>{{$ctrl.overview.jmx.RatisRoles}}</td>
-    </tr>
-    <tr>
         <td>Current-Role</td>
         <td>{{$ctrl.role.Role}}</td>
     </tr>
@@ -48,6 +44,36 @@
     </tr>
     </tbody>
 </table>
+
+<h2>OM Roles (HA)</h2>
+<h4 ng-show="$ctrl.overview.jmx.RatisRoles.length == 1 && $ctrl.overview.jmx.RatisRoles[0].length == 1">{{$ctrl.overview.jmx.RatisRoles[0][0]}}</h4>
+<div ng-show="$ctrl.overview.jmx.RatisRoles.length > 1">
+    <table class="table table-striped table-bordered" class="col-md-6">
+        <thead>
+        <tr>
+            <th>Host Name</th>
+            <th>Node ID</th>
+            <th>Ratis Port</th>
+            <th>Role</th>
+        </tr>
+        </thead>
+        <tbody ng-repeat="roles in $ctrl.overview.jmx.RatisRoles">
+        <tr class="om-roles-background" ng-if="$ctrl.role.Id == roles[1]">
+            <td>{{roles[0]}}</td>
+            <td>{{roles[1]}}</td>
+            <td>{{roles[2]}}</td>
+            <td>{{roles[3]}}</td>
+        </tr>
+        <tr ng-if="$ctrl.role.Id != roles[1]">
+            <td>{{roles[0]}}</td>
+            <td>{{roles[1]}}</td>
+            <td>{{roles[2]}}</td>
+            <td>{{roles[3]}}</td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+
 
 <h2>Meta-Data Volume Information</h2>
 <table class="table table-bordered table-striped" class="col-md-6">

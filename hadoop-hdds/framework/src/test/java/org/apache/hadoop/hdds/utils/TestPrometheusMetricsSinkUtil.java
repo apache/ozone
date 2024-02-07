@@ -17,12 +17,15 @@
  */
 package org.apache.hadoop.hdds.utils;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.metrics2.MetricsTag;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -49,7 +52,7 @@ class TestPrometheusMetricsSinkUtil {
         username, servername, unmodifiableMetricTags);
 
     // THEN
-    Assertions.assertFalse(metricsTags.stream()
+    assertFalse(metricsTags.stream()
         .anyMatch(metricsTag -> metricsTag.name().equals(USERNAME_TAG_NAME) ||
             metricsTag.description().equals(USERNAME_TAG_DESCRIPTION)));
   }
@@ -68,7 +71,7 @@ class TestPrometheusMetricsSinkUtil {
         username, servername, unmodifiableMetricTags);
 
     // THEN
-    Assertions.assertFalse(metricsTags.stream()
+    assertFalse(metricsTags.stream()
         .anyMatch(metricsTag -> metricsTag.name().equals(USERNAME_TAG_NAME) ||
             metricsTag.description().equals(USERNAME_TAG_DESCRIPTION)));
   }
@@ -87,7 +90,7 @@ class TestPrometheusMetricsSinkUtil {
         username, servername, unmodifiableMetricTags);
 
     // THEN
-    Assertions.assertTrue(metricsTags.stream()
+    assertTrue(metricsTags.stream()
         .anyMatch(metricsTag -> metricsTag.name().equals(USERNAME_TAG_NAME) &&
             metricsTag.description().equals(USERNAME_TAG_DESCRIPTION)));
   }
@@ -106,7 +109,7 @@ class TestPrometheusMetricsSinkUtil {
         username, servername, unmodifiableMetricTags);
 
     // THEN
-    Assertions.assertFalse(metricsTags.stream()
+    assertFalse(metricsTags.stream()
         .anyMatch(metricsTag -> metricsTag.name().equals(SERVERNAME_TAG_NAME) ||
             metricsTag.description().equals(SERVERNAME_TAG_DESCRIPTION)));
   }
@@ -125,7 +128,7 @@ class TestPrometheusMetricsSinkUtil {
         username, servername, unmodifiableMetricTags);
 
     // THEN
-    Assertions.assertTrue(metricsTags.stream()
+    assertTrue(metricsTags.stream()
         .anyMatch(metricsTag -> metricsTag.name().equals(SERVERNAME_TAG_NAME) &&
             metricsTag.description().equals(SERVERNAME_TAG_DESCRIPTION)));
   }
@@ -144,22 +147,22 @@ class TestPrometheusMetricsSinkUtil {
         username, servername, unmodifiableMetricTags);
 
     // THEN
-    Assertions.assertTrue(metricsTags.stream()
+    assertTrue(metricsTags.stream()
         .anyMatch(metricsTag -> metricsTag.name().equals(USERNAME_TAG_NAME)));
-    Assertions.assertTrue(metricsTags.stream()
+    assertTrue(metricsTags.stream()
         .anyMatch(metricsTag -> metricsTag.name().equals(SERVERNAME_TAG_NAME)));
   }
 
   @Test
   void testNamingCamelCase() {
     //THEN
-    Assertions.assertEquals("rpc_time_some_metrics",
+    assertEquals("rpc_time_some_metrics",
         PrometheusMetricsSinkUtil.prometheusName("RpcTime", "SomeMetrics"));
 
-    Assertions.assertEquals("om_rpc_time_om_info_keys",
+    assertEquals("om_rpc_time_om_info_keys",
         PrometheusMetricsSinkUtil.prometheusName("OMRpcTime", "OMInfoKeys"));
 
-    Assertions.assertEquals("rpc_time_small",
+    assertEquals("rpc_time_small",
         PrometheusMetricsSinkUtil.prometheusName("RpcTime", "small"));
   }
 
@@ -167,7 +170,7 @@ class TestPrometheusMetricsSinkUtil {
   void testNamingRocksDB() {
     //RocksDB metrics are handled differently.
     // THEN
-    Assertions.assertEquals("rocksdb_om_db_num_open_connections",
+    assertEquals("rocksdb_om_db_num_open_connections",
         PrometheusMetricsSinkUtil.prometheusName("Rocksdb_om.db",
             "num_open_connections"));
   }
@@ -180,7 +183,7 @@ class TestPrometheusMetricsSinkUtil {
         + "RATIS-THREE-47659e3d-40c9-43b3-9792-4982fc279aba";
 
     // THEN
-    Assertions.assertEquals(
+    assertEquals(
         "scm_pipeline_metrics_" + "num_blocks_allocated_"
             + "ratis_three_47659e3d_40c9_43b3_9792_4982fc279aba",
         PrometheusMetricsSinkUtil.prometheusName(recordName, metricName));
@@ -193,7 +196,7 @@ class TestPrometheusMetricsSinkUtil {
     String metricName = "GcTimeMillisG1 Young Generation";
 
     // THEN
-    Assertions.assertEquals(
+    assertEquals(
         "jvm_metrics_gc_time_millis_g1_young_generation",
         PrometheusMetricsSinkUtil.prometheusName(recordName, metricName));
   }
@@ -209,7 +212,7 @@ class TestPrometheusMetricsSinkUtil {
         metricName);
 
     // THEN
-    Assertions.assertEquals(metricName, newMetricName);
+    assertEquals(metricName, newMetricName);
   }
 
   @Test
@@ -223,7 +226,7 @@ class TestPrometheusMetricsSinkUtil {
         metricName);
 
     // THEN
-    Assertions.assertNull(username);
+    assertNull(username);
   }
 
 }

@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON
 import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.VALIDATE_IN_PREFINALIZE;
 import static org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_2;
 import static org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_3;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -99,8 +100,8 @@ public class TestUpgradeFinalizerActions {
 
     UpgradeException upgradeException = assertThrows(UpgradeException.class,
         () -> uF.runPrefinalizeStateActions(storage, mockObj));
-    assertTrue(upgradeException.getMessage()
-        .contains("Exception while running pre finalize state validation"));
+    assertThat(upgradeException)
+        .hasMessageContaining("Exception while running pre finalize state validation");
   }
 
   private Storage newStorage(File f) throws IOException {

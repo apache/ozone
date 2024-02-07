@@ -50,7 +50,7 @@ public abstract class Storage {
   private static final Logger LOG = LoggerFactory.getLogger(Storage.class);
 
   public static final String STORAGE_DIR_CURRENT = "current";
-  protected static final String STORAGE_FILE_VERSION = "VERSION";
+  public static final String STORAGE_FILE_VERSION = "VERSION";
   public static final String CONTAINER_DIR = "containerDir";
 
   private final NodeType nodeType;

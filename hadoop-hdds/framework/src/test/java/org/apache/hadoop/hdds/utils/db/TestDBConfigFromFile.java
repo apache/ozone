@@ -21,7 +21,6 @@ package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -42,6 +41,9 @@ import java.util.List;
 import org.apache.hadoop.hdds.StringUtils;
 
 import static org.apache.hadoop.hdds.utils.db.DBConfigFromFile.getOptionsFileNameFromDB;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * DBConf tests.
@@ -84,10 +86,10 @@ public class TestDBConfigFromFile {
 
     // Some Random Values Defined in the test.db.ini, we verify that we are
     // able to get values that are defined in the test.db.ini.
-    Assertions.assertNotNull(options);
-    Assertions.assertEquals(551615L, options.maxManifestFileSize());
-    Assertions.assertEquals(1000L, options.keepLogFileNum());
-    Assertions.assertEquals(1048576, options.writableFileMaxBufferSize());
+    assertNotNull(options);
+    assertEquals(551615L, options.maxManifestFileSize());
+    assertEquals(1000L, options.keepLogFileNum());
+    assertEquals(1048576, options.writableFileMaxBufferSize());
   }
 
   @Test
@@ -109,6 +111,6 @@ public class TestDBConfigFromFile {
         columnFamilyDescriptors);
 
     // This has to return a Null, since we have config defined for badfile.db
-    Assertions.assertNull(options);
+    assertNull(options);
   }
 }

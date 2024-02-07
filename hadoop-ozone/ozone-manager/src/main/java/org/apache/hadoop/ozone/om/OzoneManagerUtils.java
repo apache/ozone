@@ -62,11 +62,33 @@ public final class OzoneManagerUtils {
    * omMetadataManager().getBucketTable().get(buckKey)
    */
 
-  private static OmBucketInfo getOmBucketInfo(OMMetadataManager metaMgr,
-      String volName, String buckName) throws IOException {
+  public static OmBucketInfo getBucketInfo(OMMetadataManager metaMgr,
+                                           String volName,
+                                           String buckName)
+      throws IOException {
     String buckKey = metaMgr.getBucketKey(volName, buckName);
-    return metaMgr.getBucketTable().get(buckKey);
+    OmBucketInfo bucketInfo = metaMgr.getBucketTable().get(buckKey);
+    if (bucketInfo == null) {
+      reportNotFound(metaMgr, volName, buckName);
+    }
+    return bucketInfo;
   }
+
+  private static void reportNotFound(OMMetadataManager metaMgr,
+                                     String volName,
+                                     String buckName)
+      throws IOException {
+    if (!metaMgr.getVolumeTable()
+        .isExist(metaMgr.getVolumeKey(volName))) {
+      throw new OMException("Volume not found: " + volName,
+          OMException.ResultCodes.VOLUME_NOT_FOUND);
+    }
+
+    throw new OMException("Bucket not found: " + volName + "/" + buckName,
+        OMException.ResultCodes.BUCKET_NOT_FOUND);
+  }
+
+
 
   /**
    * Get bucket layout for the given volume and bucket name.
@@ -81,122 +103,75 @@ public final class OzoneManagerUtils {
                                              String volName,
                                              String buckName)
       throws IOException {
-    return getBucketLayout(metadataManager, volName, buckName, new HashSet<>());
+    return getResolvedBucketInfo(metadataManager, volName, buckName)
+        .getBucketLayout();
   }
 
   /**
-   * Get bucket layout for the given volume and bucket name.
+   * Get bucket info for the given volume and bucket name.
    *
    * @param metadataManager metadata manager
    * @param volName         volume name
    * @param buckName        bucket name
-   * @return bucket layout
+   * @return bucket info
    * @throws IOException
    */
-  private static BucketLayout getBucketLayout(OMMetadataManager metadataManager,
-                                              String volName,
-                                              String buckName,
-                                              Set<Pair<String, String>> visited)
+  public static OmBucketInfo getResolvedBucketInfo(
+      OMMetadataManager metadataManager,
+      String volName,
+      String buckName)
       throws IOException {
-
-    OmBucketInfo buckInfo = getOmBucketInfo(metadataManager, volName, buckName);
-
-    if (buckInfo != null) {
-      // If this is a link bucket, we fetch the BucketLayout from the
-      // source bucket.
-      if (buckInfo.isLink()) {
-        // Check if this bucket was already visited - to avoid loops
-        if (!visited.add(Pair.of(volName, buckName))) {
-          throw new OMException("Detected loop in bucket links. Bucket name: " +
-              buckName + ", Volume name: " + volName,
-              DETECTED_LOOP_IN_BUCKET_LINKS);
-        }
-        OmBucketInfo sourceBuckInfo =
-            getOmBucketInfo(metadataManager, buckInfo.getSourceVolume(),
-                buckInfo.getSourceBucket());
-        if (sourceBuckInfo != null) {
-          /** If the source bucket is again a link, we recursively resolve the
-           * link bucket.
-           *
-           * For example:
-           * buck-link1 -> buck-link2 -> buck-link3 -> buck-src
-           * buck-src has the actual BucketLayout that will be used by the
-           * links.
-           */
-          if (sourceBuckInfo.isLink()) {
-            return getBucketLayout(metadataManager,
-                sourceBuckInfo.getVolumeName(),
-                sourceBuckInfo.getBucketName(), visited);
-          }
-          return sourceBuckInfo.getBucketLayout();
-        }
-      }
-      return buckInfo.getBucketLayout();
-    }
-
-    if (!metadataManager.getVolumeTable()
-        .isExist(metadataManager.getVolumeKey(volName))) {
-      throw new OMException("Volume not found: " + volName,
-          OMException.ResultCodes.VOLUME_NOT_FOUND);
-    }
-
-    throw new OMException("Bucket not found: " + volName + "/" + buckName,
-        OMException.ResultCodes.BUCKET_NOT_FOUND);
+    return resolveBucketInfoLink(metadataManager, volName, buckName,
+        new HashSet<>());
   }
 
   /**
-   * Resolve bucket layout for a given link bucket's OmBucketInfo.
+   * Get bucket info for the given volume and bucket name, following all links
+   * and returns the last bucket in the chain.
    *
-   * @param bucketInfo
-   * @return {@code OmBucketInfo} with
-   * @throws IOException
+   * @param metadataManager metadata manager
+   * @param volName         volume name
+   * @param buckName        bucket name
+   * @return bucket info. If the bucket is a linked one,
+   * returns the info of the last one in the chain.
+   * @throws IOException if the bucket does not exist, if it is a link and
+   * there is a loop or the link is pointing to a missing bucket.
    */
-  public static OmBucketInfo resolveLinkBucketLayout(OmBucketInfo bucketInfo,
-                                                     OMMetadataManager
-                                                         metadataManager,
-                                                     Set<Pair<String,
-                                                         String>> visited)
+  private static OmBucketInfo resolveBucketInfoLink(
+      OMMetadataManager metadataManager,
+      String volName,
+      String buckName,
+      Set<Pair<String, String>> visited)
       throws IOException {
 
-    if (bucketInfo.isLink()) {
-      if (!visited.add(Pair.of(bucketInfo.getVolumeName(),
-          bucketInfo.getBucketName()))) {
+    OmBucketInfo buckInfo =
+        getBucketInfo(metadataManager, volName, buckName);
+
+    // If this is a link bucket, we fetch the BucketLayout from the
+    // source bucket.
+    if (buckInfo.isLink()) {
+      // Check if this bucket was already visited - to avoid loops
+      if (!visited.add(Pair.of(volName, buckName))) {
         throw new OMException("Detected loop in bucket links. Bucket name: " +
-            bucketInfo.getBucketName() + ", Volume name: " +
-            bucketInfo.getVolumeName(),
+            buckName + ", Volume name: " + volName,
             DETECTED_LOOP_IN_BUCKET_LINKS);
       }
-      String sourceBucketKey = metadataManager
-          .getBucketKey(bucketInfo.getSourceVolume(),
-              bucketInfo.getSourceBucket());
-      OmBucketInfo sourceBucketInfo =
-          metadataManager.getBucketTable().get(sourceBucketKey);
-
-      // If the Link Bucket's source bucket exists, we get its layout.
-      if (sourceBucketInfo != null) {
-
-        /** If the source bucket is again a link, we recursively resolve the
-         * link bucket.
-         *
-         * For example:
-         * buck-link1 -> buck-link2 -> buck-link3 -> buck-src
-         * buck-src has the actual BucketLayout that will be used by the links.
-         *
-         * Finally - we return buck-link1's OmBucketInfo, with buck-src's
-         * bucket layout.
-         */
-        if (sourceBucketInfo.isLink()) {
-          sourceBucketInfo =
-              resolveLinkBucketLayout(sourceBucketInfo, metadataManager,
-                  visited);
-        }
-
-        OmBucketInfo.Builder buckInfoBuilder = bucketInfo.toBuilder();
-        buckInfoBuilder.setBucketLayout(sourceBucketInfo.getBucketLayout());
-        bucketInfo = buckInfoBuilder.build();
+      /* If the source bucket is again a link, we recursively resolve the
+       * link bucket.
+       *
+       * For example:
+       * buck-link1 -> buck-link2 -> buck-link3 -> buck-src
+       * buck-src has the actual BucketLayout that will be used by the
+       * links.
+       */
+      try {
+        return resolveBucketInfoLink(metadataManager,
+            buckInfo.getSourceVolume(), buckInfo.getSourceBucket(), visited);
+      } catch (IOException e) {
+        throw e;
       }
     }
-    return bucketInfo;
+    return buckInfo;
   }
 
   /**

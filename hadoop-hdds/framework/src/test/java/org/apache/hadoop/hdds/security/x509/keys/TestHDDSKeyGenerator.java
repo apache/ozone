@@ -20,6 +20,9 @@
 package org.apache.hadoop.hdds.security.x509.keys;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.io.File;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
@@ -28,21 +31,22 @@ import java.security.interfaces.RSAPublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test class for HDDS Key Generator.
  */
 public class TestHDDSKeyGenerator {
   private SecurityConfig config;
+  @TempDir
+  private File tempPath;
 
   @BeforeEach
   public void init() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_METADATA_DIRS,  GenericTestUtils.getTempPath("testpath"));
+    conf.set(OZONE_METADATA_DIRS,  tempPath.getPath());
     config = new SecurityConfig(conf);
   }
   /**
@@ -58,11 +62,10 @@ public class TestHDDSKeyGenerator {
       throws NoSuchProviderException, NoSuchAlgorithmException {
     HDDSKeyGenerator keyGen = new HDDSKeyGenerator(config);
     KeyPair keyPair = keyGen.generateKey();
-    Assertions.assertEquals(config.getKeyAlgo(),
-        keyPair.getPrivate().getAlgorithm());
+    assertEquals(config.getKeyAlgo(), keyPair.getPrivate().getAlgorithm());
     PKCS8EncodedKeySpec keySpec =
         new PKCS8EncodedKeySpec(keyPair.getPrivate().getEncoded());
-    Assertions.assertEquals("PKCS#8", keySpec.getFormat());
+    assertEquals("PKCS#8", keySpec.getFormat());
   }
 
   /**
@@ -80,8 +83,7 @@ public class TestHDDSKeyGenerator {
     KeyPair keyPair = keyGen.generateKey(4096);
     PublicKey publicKey = keyPair.getPublic();
     if (publicKey instanceof RSAPublicKey) {
-      Assertions.assertEquals(4096,
-          ((RSAPublicKey)(publicKey)).getModulus().bitLength());
+      assertEquals(4096, ((RSAPublicKey)(publicKey)).getModulus().bitLength());
     }
   }
 }

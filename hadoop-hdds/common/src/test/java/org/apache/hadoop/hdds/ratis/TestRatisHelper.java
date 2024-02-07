@@ -20,8 +20,10 @@ package org.apache.hadoop.hdds.ratis;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.ratis.conf.RaftProperties;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * Test RatisHelper class.
@@ -32,22 +34,16 @@ public class TestRatisHelper {
   public void testCreateRaftClientProperties() {
 
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
-    ozoneConfiguration.set("hdds.ratis.raft.client.rpc.watch" +
-        ".request.timeout", "30s");
-    ozoneConfiguration.set("hdds.ratis.raft.client.rpc.request" +
-        ".timeout", "30s");
-    ozoneConfiguration.set(
-        "hdds.ratis.raft.server.rpc.watch.request.timeout", "30s");
+    ozoneConfiguration.set("hdds.ratis.raft.client.rpc.watch.request.timeout", "30s");
+    ozoneConfiguration.set("hdds.ratis.raft.client.rpc.request.timeout", "30s");
+    ozoneConfiguration.set("hdds.ratis.raft.server.rpc.watch.request.timeout", "30s");
 
     RaftProperties raftProperties = new RaftProperties();
     RatisHelper.createRaftClientProperties(ozoneConfiguration, raftProperties);
 
-    Assertions.assertEquals("30s",
-        raftProperties.get("raft.client.rpc.watch.request.timeout"));
-    Assertions.assertEquals("30s",
-        raftProperties.get("raft.client.rpc.request.timeout"));
-    Assertions.assertNull(
-        raftProperties.get("raft.server.rpc.watch.request.timeout"));
+    assertEquals("30s", raftProperties.get("raft.client.rpc.watch.request.timeout"));
+    assertEquals("30s", raftProperties.get("raft.client.rpc.request.timeout"));
+    assertNull(raftProperties.get("raft.server.rpc.watch.request.timeout"));
 
   }
 
@@ -67,17 +63,17 @@ public class TestRatisHelper {
     RaftProperties raftProperties = new RaftProperties();
     RatisHelper.createRaftClientProperties(ozoneConfiguration, raftProperties);
 
-    Assertions.assertEquals("30MB",
+    assertEquals("30MB",
         raftProperties.get("raft.grpc.message.size.max"));
-    Assertions.assertEquals("1MB",
+    assertEquals("1MB",
         raftProperties.get("raft.grpc.flow.control.window"));
 
     // As we dont match tls and server raft.grpc properties. So they should
     // be null.
-    Assertions.assertNull(raftProperties.get("raft.grpc.tls.set"));
-    Assertions.assertNull(
+    assertNull(raftProperties.get("raft.grpc.tls.set"));
+    assertNull(
         raftProperties.get("raft.grpc.tls.mutual_authn.enabled"));
-    Assertions.assertNull(raftProperties.get("raft.grpc.server.port"));
+    assertNull(raftProperties.get("raft.grpc.server.port"));
 
   }
 
@@ -101,16 +97,11 @@ public class TestRatisHelper {
     RatisHelper.createRaftServerProperties(ozoneConfiguration,
         raftProperties);
 
-    Assertions.assertEquals("30MB",
-        raftProperties.get("raft.grpc.message.size.max"));
-    Assertions.assertEquals("1MB",
-        raftProperties.get("raft.grpc.flow.control.window"));
-    Assertions.assertEquals("true",
-        raftProperties.get("raft.grpc.tls.enabled"));
-    Assertions.assertEquals("true",
-        raftProperties.get("raft.grpc.tls.mutual_authn.enabled"));
-    Assertions.assertEquals("100",
-        raftProperties.get("raft.grpc.server.port"));
+    assertEquals("30MB", raftProperties.get("raft.grpc.message.size.max"));
+    assertEquals("1MB", raftProperties.get("raft.grpc.flow.control.window"));
+    assertEquals("true", raftProperties.get("raft.grpc.tls.enabled"));
+    assertEquals("true", raftProperties.get("raft.grpc.tls.mutual_authn.enabled"));
+    assertEquals("100", raftProperties.get("raft.grpc.server.port"));
 
   }
 
@@ -128,12 +119,9 @@ public class TestRatisHelper {
     RaftProperties raftProperties = new RaftProperties();
     RatisHelper.createRaftServerProperties(ozoneConfiguration, raftProperties);
 
-    Assertions.assertEquals("30s",
-        raftProperties.get("raft.server.rpc.watch.request.timeout"));
-    Assertions.assertEquals("30s",
-        raftProperties.get("raft.server.rpc.request.timeout"));
-    Assertions.assertNull(
-        raftProperties.get("raft.client.rpc.request.timeout"));
+    assertEquals("30s", raftProperties.get("raft.server.rpc.watch.request.timeout"));
+    assertEquals("30s", raftProperties.get("raft.server.rpc.request.timeout"));
+    assertNull(raftProperties.get("raft.client.rpc.request.timeout"));
 
   }
 }

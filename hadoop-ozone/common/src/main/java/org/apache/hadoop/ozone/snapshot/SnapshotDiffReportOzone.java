@@ -44,7 +44,7 @@ public class SnapshotDiffReportOzone
     extends org.apache.hadoop.hdfs.protocol.SnapshotDiffReport {
 
   private static final Codec<DiffReportEntry> CODEC = new DelegatedCodec<>(
-      Proto2Codec.get(DiffReportEntryProto.class),
+      Proto2Codec.get(DiffReportEntryProto.getDefaultInstance()),
       SnapshotDiffReportOzone::fromProtobufDiffReportEntry,
       SnapshotDiffReportOzone::toProtobufDiffReportEntry,
       DelegatedCodec.CopyType.SHALLOW);
@@ -101,13 +101,16 @@ public class SnapshotDiffReportOzone
         .append(" and snapshot: ")
         .append(getLaterSnapshotName())
         .append(LINE_SEPARATOR);
-    for (DiffReportEntry entry : getDiffList()) {
-      str.append(entry.toString()).append(LINE_SEPARATOR);
-    }
-    if (StringUtils.isNotEmpty(token)) {
-      str.append("Next token: ")
-          .append(token)
-          .append(LINE_SEPARATOR);
+    if (!getDiffList().isEmpty()) {
+      for (DiffReportEntry entry : getDiffList()) {
+        str.append(entry.toString()).append(LINE_SEPARATOR);
+      }
+      if (StringUtils.isNotEmpty(token)) {
+        str.append("Next token: ")
+            .append(token);
+      }
+    } else {
+      str.append("No diff or no more diff for the request parameters.");
     }
     return str.toString();
   }

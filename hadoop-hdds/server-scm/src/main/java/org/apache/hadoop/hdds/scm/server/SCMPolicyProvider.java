@@ -17,7 +17,6 @@
 package org.apache.hadoop.hdds.scm.server;
 
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience.Private;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
@@ -31,8 +30,11 @@ import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.ozone.protocol.StorageContainerDatanodeProtocol;
 import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.security.authorize.Service;
+import org.apache.ratis.util.MemoizedSupplier;
 
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Supplier;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_CLIENT_DATANODE_CONTAINER_PROTOCOL_ACL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_CLIENT_SCM_BLOCK_PROTOCOL_ACL;
@@ -49,8 +51,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_CLIENT_SCM_SEC
 @InterfaceStability.Unstable
 public final class SCMPolicyProvider extends PolicyProvider {
 
-  private static AtomicReference<SCMPolicyProvider> atomicReference =
-      new AtomicReference<>();
+  private static final Supplier<SCMPolicyProvider> SUPPLIER =
+      MemoizedSupplier.valueOf(SCMPolicyProvider::new);
 
   private SCMPolicyProvider() {
   }
@@ -58,14 +60,11 @@ public final class SCMPolicyProvider extends PolicyProvider {
   @Private
   @Unstable
   public static SCMPolicyProvider getInstance() {
-    if (atomicReference.get() == null) {
-      atomicReference.compareAndSet(null, new SCMPolicyProvider());
-    }
-    return atomicReference.get();
+    return SUPPLIER.get();
   }
 
-  private static final Service[] SCM_SERVICES =
-      new Service[]{
+  private static final List<Service> SCM_SERVICES =
+      Arrays.asList(
           new Service(
               HDDS_SECURITY_CLIENT_DATANODE_CONTAINER_PROTOCOL_ACL,
               StorageContainerDatanodeProtocol.class),
@@ -87,12 +86,11 @@ public final class SCMPolicyProvider extends PolicyProvider {
           new Service(
               HDDS_SECURITY_CLIENT_SCM_SECRET_KEY_DATANODE_PROTOCOL_ACL,
               SecretKeyProtocolDatanode.class)
-      };
+      );
 
-  @SuppressFBWarnings("EI_EXPOSE_REP")
   @Override
   public Service[] getServices() {
-    return SCM_SERVICES;
+    return SCM_SERVICES.toArray(new Service[0]);
   }
 
 }

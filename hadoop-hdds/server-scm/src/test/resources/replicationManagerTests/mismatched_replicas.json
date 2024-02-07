@@ -1,0 +1,15 @@
+[
+  { "description": "Mis-matched replicas", "containerState": "CLOSED", "replicationConfig": "RATIS:THREE", "sequenceId": 12,
+    "replicas": [
+      { "state": "OPEN", "index": 0,   "datanode": "d1", "sequenceId": 12, "isEmpty": false, "origin": "o1"},
+      { "state": "OPEN", "index": 0,   "datanode": "d2", "sequenceId": 12, "isEmpty": false, "origin": "o2"},
+      { "state": "CLOSED", "index": 0, "datanode": "d3", "sequenceId": 12, "isEmpty": false, "origin": "o3"}
+    ],
+    "expectation": { "overReplicated": 0, "overReplicatedQueue":  0},
+    "checkCommands": [
+      { "type":  "closeContainerCommand", "datanode": "d1"},
+      { "type":  "closeContainerCommand", "datanode": "d2"}
+    ],
+    "commands": []
+  }
+]

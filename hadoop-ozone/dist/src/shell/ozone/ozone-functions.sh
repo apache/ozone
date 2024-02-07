@@ -1288,9 +1288,9 @@ function ozone_add_ldlibpath
 ## @replaceable  yes
 function ozone_add_to_classpath_userpath
 {
-  # Add the user-specified OZONE_CLASSPATH to the
-  # official CLASSPATH env var if OZONE_USE_CLIENT_CLASSLOADER
-  # is not set.
+  # Add the classpath definition from argument (or OZONE_CLASSPATH if no
+  # argument specified) to the official CLASSPATH env var if
+  # OZONE_USE_CLIENT_CLASSLOADER is not set.
   # Add it first or last depending on if user has
   # set env-var OZONE_USER_CLASSPATH_FIRST
   # we'll also dedupe it, because we're cool like that.
@@ -1300,10 +1300,11 @@ function ozone_add_to_classpath_userpath
   declare -i j
   declare -i i
   declare idx
+  local userpath="${1:-${OZONE_CLASSPATH}}"
 
-  if [[ -n "${OZONE_CLASSPATH}" ]]; then
+  if [[ -n "${userpath}" ]]; then
     # I wonder if Java runs on VMS.
-    for idx in $(echo "${OZONE_CLASSPATH}" | tr : '\n'); do
+    for idx in $(echo "${userpath}" | tr : '\n'); do
       array[${c}]=${idx}
       ((c=c+1))
     done
@@ -1404,6 +1405,36 @@ function ozone_java_setup
   if [[ ! -x "$JAVA" ]]; then
     ozone_error "ERROR: $JAVA is not executable."
     exit 1
+  fi
+
+  # Get the version string
+  JAVA_VERSION_STRING=$(${JAVA} -version 2>&1 | head -n 1)
+
+  # Extract the major version number
+  JAVA_MAJOR_VERSION=$(echo "$JAVA_VERSION_STRING" | sed -E -n 's/.* version "([^.-]*).*"/\1/p' | cut -d' ' -f1)
+
+  ozone_set_module_access_args
+}
+
+## @description  Set OZONE_MODULE_ACCESS_ARGS based on Java version
+## @audience     private
+## @stability    evolving
+## @replaceable  yes
+function ozone_set_module_access_args
+{
+  if [[ -z "${JAVA_MAJOR_VERSION}" ]]; then
+    return
+  fi
+
+  # populate JVM args based on java version
+  if [[ "${JAVA_MAJOR_VERSION}" -ge 17 ]]; then
+    OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --add-opens java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED"
+    OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --add-exports java.management/com.sun.jmx.mbeanserver=ALL-UNNAMED"
+  fi
+  if [[ "${JAVA_MAJOR_VERSION}" -ge 9 ]]; then
+    OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --add-opens java.base/java.nio=ALL-UNNAMED"
+    OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --add-opens java.base/java.lang=ALL-UNNAMED"
+    OZONE_MODULE_ACCESS_ARGS="${OZONE_MODULE_ACCESS_ARGS} --add-opens java.base/java.lang.reflect=ALL-UNNAMED"
   fi
 }
 

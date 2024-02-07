@@ -20,8 +20,10 @@ package org.apache.hadoop.ozone.om.exceptions;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test code mappping.
@@ -30,15 +32,16 @@ public class TestResultCodes {
 
   @Test
   public void codeMapping() {
-    Assert.assertEquals(ResultCodes.values().length, Status.values().length);
+    assertEquals(ResultCodes.values().length,
+        Status.values().length);
     for (int i = 0; i < ResultCodes.values().length; i++) {
       ResultCodes codeValue = ResultCodes.values()[i];
       Status protoBufValue = Status.values()[i];
-      Assert.assertTrue(String
-          .format("Protobuf/Enum constant name mismatch %s %s", codeValue,
-              protoBufValue), sameName(codeValue.name(), protoBufValue.name()));
+      assertTrue(sameName(codeValue.name(), protoBufValue.name()),
+          String.format("Protobuf/Enum constant name mismatch %s %s", codeValue,
+              protoBufValue));
       ResultCodes converted = ResultCodes.values()[protoBufValue.ordinal()];
-      Assert.assertEquals(codeValue, converted);
+      assertEquals(codeValue, converted);
     }
   }
 

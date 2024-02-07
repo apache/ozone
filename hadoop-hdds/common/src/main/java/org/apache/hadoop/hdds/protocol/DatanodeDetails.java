@@ -21,17 +21,18 @@ package org.apache.hadoop.hdds.protocol;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hdds.DatanodeVersion;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtendedDatanodeDetailsProto;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
 
@@ -68,7 +69,7 @@ public class DatanodeDetails extends NodeImpl implements
       LoggerFactory.getLogger(DatanodeDetails.class);
 
   private static final Codec<DatanodeDetails> CODEC = new DelegatedCodec<>(
-      Proto2Codec.get(HddsProtos.ExtendedDatanodeDetailsProto.class),
+      Proto2Codec.get(ExtendedDatanodeDetailsProto.getDefaultInstance()),
       DatanodeDetails::getFromProtoBuf,
       DatanodeDetails::getExtendedProtoBufMessage);
 
@@ -81,6 +82,7 @@ public class DatanodeDetails extends NodeImpl implements
    */
   private final UUID uuid;
   private final String uuidString;
+  private final String threadNamePrefix;
 
   private String ipAddress;
   private String hostName;
@@ -122,6 +124,7 @@ public class DatanodeDetails extends NodeImpl implements
     super(hostName, networkLocation, NetConstants.NODE_COST_DEFAULT);
     this.uuid = uuid;
     this.uuidString = uuid.toString();
+    threadNamePrefix = HddsUtils.threadNamePrefix(uuidString);
     this.ipAddress = ipAddress;
     this.hostName = hostName;
     this.ports = ports;
@@ -138,9 +141,11 @@ public class DatanodeDetails extends NodeImpl implements
 
   public DatanodeDetails(DatanodeDetails datanodeDetails) {
     super(datanodeDetails.getHostName(), datanodeDetails.getNetworkLocation(),
+        datanodeDetails.getParent(), datanodeDetails.getLevel(),
         datanodeDetails.getCost());
     this.uuid = datanodeDetails.uuid;
     this.uuidString = uuid.toString();
+    threadNamePrefix = HddsUtils.threadNamePrefix(uuidString);
     this.ipAddress = datanodeDetails.ipAddress;
     this.hostName = datanodeDetails.hostName;
     this.ports = datanodeDetails.ports;
@@ -387,7 +392,7 @@ public class DatanodeDetails extends NodeImpl implements
    * @return DatanodeDetails
    */
   public static DatanodeDetails getFromProtoBuf(
-      HddsProtos.ExtendedDatanodeDetailsProto extendedDetailsProto) {
+      ExtendedDatanodeDetailsProto extendedDetailsProto) {
     DatanodeDetails.Builder builder;
     if (extendedDetailsProto.hasDatanodeDetails()) {
       builder = newBuilder(extendedDetailsProto.getDatanodeDetails());
@@ -475,12 +480,12 @@ public class DatanodeDetails extends NodeImpl implements
 
   /**
    * Returns a ExtendedDatanodeDetails protobuf message from a datanode ID.
-   * @return HddsProtos.ExtendedDatanodeDetailsProto
+   * @return ExtendedDatanodeDetailsProto
    */
   @JsonIgnore
-  public HddsProtos.ExtendedDatanodeDetailsProto getExtendedProtoBufMessage() {
-    HddsProtos.ExtendedDatanodeDetailsProto.Builder extendedBuilder =
-        HddsProtos.ExtendedDatanodeDetailsProto.newBuilder()
+  public ExtendedDatanodeDetailsProto getExtendedProtoBufMessage() {
+    final ExtendedDatanodeDetailsProto.Builder extendedBuilder
+        = ExtendedDatanodeDetailsProto.newBuilder()
             .setDatanodeDetails(getProtoBufMessage());
 
     if (!Strings.isNullOrEmpty(getVersion())) {
@@ -557,14 +562,6 @@ public class DatanodeDetails extends NodeImpl implements
     return uuid.hashCode();
   }
 
-  // Skip The OpStates which may change in Runtime.
-  public int getSignature() {
-    return Objects
-        .hash(uuid, uuidString, ipAddress, hostName, ports,
-            certSerialId, version, setupTime, revision, buildDate,
-            initialVersion, currentVersion);
-  }
-
   /**
    * Returns DatanodeDetails.Builder instance.
    *
@@ -572,6 +569,11 @@ public class DatanodeDetails extends NodeImpl implements
    */
   public static Builder newBuilder() {
     return new Builder();
+  }
+
+  @JsonIgnore
+  public String threadNamePrefix() {
+    return threadNamePrefix;
   }
 
   /**

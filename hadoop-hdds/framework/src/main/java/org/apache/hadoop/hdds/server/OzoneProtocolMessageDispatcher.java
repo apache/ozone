@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 
 import com.google.protobuf.ServiceException;
 import io.opentracing.Span;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 
@@ -82,12 +83,11 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
             serviceName, type);
       }
 
-      long startTime = System.currentTimeMillis();
-
-      RESPONSE response = methodCall.apply(request);
-
-      protocolMessageMetrics.increment(type,
-          System.currentTimeMillis() - startTime);
+      RESPONSE response;
+      try (UncheckedAutoCloseable ignored =
+               protocolMessageMetrics.measure(type)) {
+        response = methodCall.apply(request);
+      }
 
       if (logger.isTraceEnabled()) {
         logger.trace(

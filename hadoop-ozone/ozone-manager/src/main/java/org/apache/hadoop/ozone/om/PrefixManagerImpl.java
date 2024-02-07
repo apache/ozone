@@ -16,6 +16,7 @@
  */
 package org.apache.hadoop.ozone.om;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -113,6 +114,26 @@ public class PrefixManagerImpl implements PrefixManager {
       metadataManager.getLock().releaseReadLock(PREFIX_LOCK, prefixPath);
     }
     return EMPTY_ACL_LIST;
+  }
+
+  @VisibleForTesting
+  public OmPrefixInfo getPrefixInfo(OzoneObj obj) throws IOException {
+    validateOzoneObj(obj);
+    String prefixPath = obj.getPath();
+    metadataManager.getLock().acquireReadLock(PREFIX_LOCK, prefixPath);
+    try {
+      String longestPrefix = prefixTree.getLongestPrefix(prefixPath);
+      if (prefixPath.equals(longestPrefix)) {
+        RadixNode<OmPrefixInfo> lastNode =
+            prefixTree.getLastNodeInPrefixPath(prefixPath);
+        if (lastNode != null && lastNode.getValue() != null) {
+          return lastNode.getValue();
+        }
+      }
+    } finally {
+      metadataManager.getLock().releaseReadLock(PREFIX_LOCK, prefixPath);
+    }
+    return null;
   }
 
   /**
@@ -222,40 +243,39 @@ public class PrefixManagerImpl implements PrefixManager {
     }
 
     boolean changed = prefixInfo.addAcl(ozoneAcl);
-    if (changed) {
-      if (newPrefix) {
-        inheritParentAcl(ozoneObj, prefixInfo);
-      }
-      // update the in-memory prefix tree
-      prefixTree.insert(ozoneObj.getPath(), prefixInfo);
+    // Update the in-memory prefix tree regardless whether the ACL is changed.
+    // Under OM HA, update ID of the prefix info is updated for every request.
+    if (newPrefix) {
+      inheritParentAcl(ozoneObj, prefixInfo);
+    }
+    // update the in-memory prefix tree
+    prefixTree.insert(ozoneObj.getPath(), prefixInfo);
 
-      if (!isRatisEnabled) {
-        metadataManager.getPrefixTable().put(ozoneObj.getPath(), prefixInfo);
-      }
+    if (!isRatisEnabled) {
+      metadataManager.getPrefixTable().put(ozoneObj.getPath(), prefixInfo);
     }
     return new OMPrefixAclOpResult(prefixInfo, changed);
   }
 
   public OMPrefixAclOpResult removeAcl(OzoneObj ozoneObj, OzoneAcl ozoneAcl,
       OmPrefixInfo prefixInfo) throws IOException {
-    boolean removed = false;
-    if (prefixInfo != null) {
-      removed = prefixInfo.removeAcl(ozoneAcl);
+    if (prefixInfo == null) {
+      return new OMPrefixAclOpResult(null, false);
     }
 
-    // Nothing is matching to remove.
-    if (removed) {
-      // Update in-memory prefix tree.
-      if (prefixInfo.getAcls().isEmpty()) {
-        prefixTree.removePrefixPath(ozoneObj.getPath());
-        if (!isRatisEnabled) {
-          metadataManager.getPrefixTable().delete(ozoneObj.getPath());
-        }
-      } else {
-        prefixTree.insert(ozoneObj.getPath(), prefixInfo);
-        if (!isRatisEnabled) {
-          metadataManager.getPrefixTable().put(ozoneObj.getPath(), prefixInfo);
-        }
+    boolean removed = prefixInfo.removeAcl(ozoneAcl);
+
+    // Update in-memory prefix tree regardless whether the ACL is changed.
+    // Under OM HA, update ID of the prefix info is updated for every request.
+    if (prefixInfo.getAcls().isEmpty()) {
+      prefixTree.removePrefixPath(ozoneObj.getPath());
+      if (!isRatisEnabled) {
+        metadataManager.getPrefixTable().delete(ozoneObj.getPath());
+      }
+    } else {
+      prefixTree.insert(ozoneObj.getPath(), prefixInfo);
+      if (!isRatisEnabled) {
+        metadataManager.getPrefixTable().put(ozoneObj.getPath(), prefixInfo);
       }
     }
     return new OMPrefixAclOpResult(prefixInfo, removed);
@@ -305,12 +325,10 @@ public class PrefixManagerImpl implements PrefixManager {
     }
 
     boolean changed = prefixInfo.setAcls(ozoneAcls);
-    if (changed) {
-      inheritParentAcl(ozoneObj, prefixInfo);
-      prefixTree.insert(ozoneObj.getPath(), prefixInfo);
-      if (!isRatisEnabled) {
-        metadataManager.getPrefixTable().put(ozoneObj.getPath(), prefixInfo);
-      }
+    inheritParentAcl(ozoneObj, prefixInfo);
+    prefixTree.insert(ozoneObj.getPath(), prefixInfo);
+    if (!isRatisEnabled) {
+      metadataManager.getPrefixTable().put(ozoneObj.getPath(), prefixInfo);
     }
     return new OMPrefixAclOpResult(prefixInfo, changed);
   }

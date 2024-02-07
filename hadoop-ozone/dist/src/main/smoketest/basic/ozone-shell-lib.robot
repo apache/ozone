@@ -92,7 +92,7 @@ Test ozone shell
 Test ozone shell errors
     [arguments]     ${protocol}         ${server}       ${volume}
     ${result} =     Execute and checkrc    ozone sh volume create ${protocol}${server}/${volume} --space-quota invalid      255
-                    Should contain      ${result}       Invalid
+                    Should contain      ${result}       invalid
                     Execute and checkrc    ozone sh volume create ${protocol}${server}/${volume}                            0
     ${result} =     Execute and checkrc    ozone sh bucket create ${protocol}${server}/${volume}/bucket_1                   255
                     Should contain      ${result}       INVALID_BUCKET_NAME

@@ -32,14 +32,12 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
 import org.rocksdb.InfoLogLevel;
-import org.rocksdb.StatsLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,9 +47,6 @@ import java.util.NoSuchElementException;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF;
 
 /**
  * Implementation of the {@link DatanodeStore} interface that contains
@@ -111,16 +106,6 @@ public abstract class AbstractDatanodeStore implements DatanodeStore {
           this.dbDef instanceof DatanodeSchemaTwoDBDefinition) {
         long maxWalSize = DBProfile.toLong(StorageUnit.MB.toBytes(2));
         options.setMaxTotalWalSize(maxWalSize);
-      }
-
-      String rocksDbStat = config.getTrimmed(
-          OZONE_METADATA_STORE_ROCKSDB_STATISTICS,
-          OZONE_METADATA_STORE_ROCKSDB_STATISTICS_DEFAULT);
-
-      if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
-        ManagedStatistics statistics = new ManagedStatistics();
-        statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
-        options.setStatistics(statistics);
       }
 
       DatanodeConfiguration dc =

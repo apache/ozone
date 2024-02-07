@@ -23,22 +23,23 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.UUID;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
-import static org.powermock.api.mockito.PowerMockito.when;
+import static org.mockito.Mockito.when;
 
 /**
  * Unit tests for {@link DbVolume}.
@@ -52,13 +53,13 @@ public class TestDbVolume {
   private DbVolume.Builder volumeBuilder;
   private File versionFile;
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
-    File rootDir = new File(folder.getRoot(), DbVolume.DB_VOLUME_DIR);
-    volumeBuilder = new DbVolume.Builder(folder.getRoot().getPath())
+    File rootDir = new File(folder.toFile(), DbVolume.DB_VOLUME_DIR);
+    volumeBuilder = new DbVolume.Builder(folder.toString())
         .datanodeUuid(DATANODE_UUID)
         .conf(CONF)
         .usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
@@ -76,16 +77,16 @@ public class TestDbVolume {
     assertEquals(StorageType.DEFAULT, volume.getStorageType());
     assertEquals(HddsVolume.VolumeState.NOT_FORMATTED,
         volume.getStorageState());
-    assertFalse("Version file should not be created when clusterID is not " +
-        "known.", versionFile.exists());
+    assertFalse(versionFile.exists(), "Version file should not be created " +
+        "when clusterID is not known.");
 
     // Format the volume with clusterID.
     volume.format(CLUSTER_ID);
 
     // The state of HddsVolume after formatting with clusterID should be
     // NORMAL and the version file should exist.
-    assertTrue("Volume format should create Version file",
-        versionFile.exists());
+    assertTrue(versionFile.exists(),
+        "Volume format should create Version file");
     assertEquals(CLUSTER_ID, volume.getClusterID());
     assertEquals(HddsVolume.VolumeState.NORMAL, volume.getStorageState());
     assertEquals(0, volume.getHddsVolumeIDs().size());
@@ -102,8 +103,8 @@ public class TestDbVolume {
     assertEquals(StorageType.DEFAULT, volume.getStorageType());
     assertEquals(HddsVolume.VolumeState.NOT_FORMATTED,
         volume.getStorageState());
-    assertFalse("Version file should not be created when clusterID is not " +
-        "known.", versionFile.exists());
+    assertFalse(versionFile.exists(), "Version file should not be created " +
+        "when clusterID is not known.");
 
     // Format the volume with clusterID.
     volume.format(CLUSTER_ID);
@@ -161,7 +162,8 @@ public class TestDbVolume {
     File[] hddsVolumeDirs = new File[volumeNum];
     StringBuilder hddsDirs = new StringBuilder();
     for (int i = 0; i < volumeNum; i++) {
-      hddsVolumeDirs[i] = folder.newFolder();
+      hddsVolumeDirs[i] =
+          Files.createDirectory(folder.resolve("volumeDir" + i)).toFile();
       hddsDirs.append(hddsVolumeDirs[i]).append(",");
     }
     CONF.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, hddsDirs.toString());

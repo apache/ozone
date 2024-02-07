@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
+import org.apache.ozone.compaction.log.CompactionLogEntry;
 
 import java.util.Map;
 
@@ -61,13 +62,12 @@ public class OMDBDefinition extends DBDefinition.WithMap {
                     RepeatedOmKeyInfo.getCodec(true));
 
   public static final DBColumnFamilyDefinition<String, PersistedUserVolumeInfo>
-            USER_TABLE =
-            new DBColumnFamilyDefinition<>(
-                    OmMetadataManagerImpl.USER_TABLE,
-                    String.class,
-                    StringCodec.get(),
-                    PersistedUserVolumeInfo.class,
-                    Proto2Codec.get(PersistedUserVolumeInfo.class));
+      USER_TABLE = new DBColumnFamilyDefinition<>(
+          OmMetadataManagerImpl.USER_TABLE,
+          String.class,
+          StringCodec.get(),
+          PersistedUserVolumeInfo.class,
+          Proto2Codec.get(PersistedUserVolumeInfo.getDefaultInstance()));
 
   public static final DBColumnFamilyDefinition<String, OmVolumeArgs>
             VOLUME_TABLE =
@@ -231,6 +231,15 @@ public class OMDBDefinition extends DBDefinition.WithMap {
           SnapshotInfo.class,
           SnapshotInfo.getCodec());
 
+  public static final DBColumnFamilyDefinition<String, CompactionLogEntry>
+      COMPACTION_LOG_TABLE =
+      new DBColumnFamilyDefinition<>(
+          OmMetadataManagerImpl.COMPACTION_LOG_TABLE,
+          String.class,
+          StringCodec.get(),
+          CompactionLogEntry.class,
+          CompactionLogEntry.getCodec());
+
   /**
    * SnapshotRenamedTable that complements the keyTable (or fileTable)
    * and dirTable entries of the immediately previous snapshot in the
@@ -268,6 +277,7 @@ public class OMDBDefinition extends DBDefinition.WithMap {
           S3_SECRET_TABLE,
           SNAPSHOT_INFO_TABLE,
           SNAPSHOT_RENAMED_TABLE,
+          COMPACTION_LOG_TABLE,
           TENANT_ACCESS_ID_TABLE,
           TENANT_STATE_TABLE,
           TRANSACTION_INFO_TABLE,

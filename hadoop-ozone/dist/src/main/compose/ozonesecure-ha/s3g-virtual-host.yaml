@@ -1,0 +1,47 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+version: "3.8"
+
+x-s3g-virtual-host-config:
+  &s3g-virtual-host-config
+  environment:
+    - OZONE-SITE.XML_ozone.s3g.domain.name=s3g.internal
+services:
+  datanode1:
+    <<: *s3g-virtual-host-config
+  datanode2:
+    <<: *s3g-virtual-host-config
+  datanode3:
+    <<: *s3g-virtual-host-config
+  om1:
+    <<: *s3g-virtual-host-config
+  om2:
+    <<: *s3g-virtual-host-config
+  om3:
+    <<: *s3g-virtual-host-config
+  scm1.org:
+    <<: *s3g-virtual-host-config
+  scm2.org:
+    <<: *s3g-virtual-host-config
+  scm3.org:
+    <<: *s3g-virtual-host-config
+  s3g:
+    <<: *s3g-virtual-host-config
+    extra_hosts:
+      - "bucket1.s3g.internal: 172.25.0.114"
+  recon:
+    <<: *s3g-virtual-host-config

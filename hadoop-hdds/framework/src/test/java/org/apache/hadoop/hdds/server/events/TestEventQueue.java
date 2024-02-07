@@ -17,10 +17,11 @@
  */
 package org.apache.hadoop.hdds.server.events;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -67,7 +68,7 @@ public class TestEventQueue {
 
     queue.fireEvent(EVENT1, 11L);
     queue.processAll(1000);
-    Assertions.assertEquals(11, result[0]);
+    assertEquals(11, result[0]);
 
   }
 
@@ -105,20 +106,20 @@ public class TestEventQueue {
 
     // As it is fixed threadpool executor with 10 threads, all should be
     // scheduled.
-    Assertions.assertEquals(11, eventExecutor.queuedEvents());
+    assertEquals(11, eventExecutor.queuedEvents());
     Thread.currentThread().sleep(500);
 
     // As we don't see all 10 events scheduled.
-    Assertions.assertTrue(eventExecutor.scheduledEvents() >= 1 &&
-        eventExecutor.scheduledEvents() <= 10);
+    assertThat(eventExecutor.scheduledEvents()).isGreaterThanOrEqualTo(1)
+        .isLessThanOrEqualTo(10);
 
     queue.processAll(60000);
 
-    Assertions.assertEquals(11, eventExecutor.scheduledEvents());
+    assertEquals(11, eventExecutor.scheduledEvents());
 
-    Assertions.assertEquals(166, eventTotal.intValue());
+    assertEquals(166, eventTotal.intValue());
 
-    Assertions.assertEquals(11, eventExecutor.successfulEvents());
+    assertEquals(11, eventExecutor.successfulEvents());
     eventTotal.set(0);
     eventExecutor.close();
   }
@@ -147,8 +148,8 @@ public class TestEventQueue {
 
     queue.fireEvent(EVENT2, 23L);
     queue.processAll(1000);
-    Assertions.assertEquals(23, result[0]);
-    Assertions.assertEquals(23, result[1]);
+    assertEquals(23, result[0]);
+    assertEquals(23, result[1]);
 
   }
 }

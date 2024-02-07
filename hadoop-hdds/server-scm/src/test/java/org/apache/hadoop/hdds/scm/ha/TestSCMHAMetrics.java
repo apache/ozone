@@ -20,8 +20,9 @@ package org.apache.hadoop.hdds.scm.ha;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests for {@link SCMHAMetrics}.
@@ -50,7 +51,7 @@ class TestSCMHAMetrics {
     scmhaMetrics.getMetrics(METRICS_COLLECTOR, true);
 
     // THEN
-    Assertions.assertEquals(1, scmhaMetrics.getSCMHAMetricsInfoLeaderState());
+    assertEquals(1, scmhaMetrics.getSCMHAMetricsInfoLeaderState());
   }
 
   @Test
@@ -63,7 +64,7 @@ class TestSCMHAMetrics {
     scmhaMetrics.getMetrics(METRICS_COLLECTOR, true);
 
     // THEN
-    Assertions.assertEquals(0, scmhaMetrics.getSCMHAMetricsInfoLeaderState());
+    assertEquals(0, scmhaMetrics.getSCMHAMetricsInfoLeaderState());
   }
 
 }

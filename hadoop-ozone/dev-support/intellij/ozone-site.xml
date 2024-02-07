@@ -17,7 +17,7 @@
 <configuration>
   <property>
     <name>ozone.default.bucket.layout</name>
-    <value>LEGACY</value>
+    <value>FILE_SYSTEM_OPTIMIZED</value>
   </property>
   <property>
     <name>hdds.profiler.endpoint.enabled</name>

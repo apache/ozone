@@ -35,15 +35,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Map;
 
 /**
  * This class manages the stream entries list and handles block allocation
  * from OzoneManager.
  */
-public class BlockDataStreamOutputEntryPool {
+public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(BlockDataStreamOutputEntryPool.class);
@@ -79,10 +82,11 @@ public class BlockDataStreamOutputEntryPool {
         .setBucketName(info.getBucketName()).setKeyName(info.getKeyName())
         .setReplicationConfig(replicationConfig).setDataSize(info.getDataSize())
         .setIsMultipartKey(isMultipart).setMultipartUploadID(uploadID)
-        .setMultipartUploadPartNumber(partNumber).build();
+        .setMultipartUploadPartNumber(partNumber)
+        .setSortDatanodesInPipeline(true).build();
     this.requestID = requestId;
     this.openID = openID;
-    this.excludeList = new ExcludeList();
+    this.excludeList = createExcludeList();
     this.bufferList = new ArrayList<>();
   }
 
@@ -286,5 +290,23 @@ public class BlockDataStreamOutputEntryPool {
       totalDataLen += b.position();
     }
     return totalDataLen;
+  }
+
+  OzoneClientConfig getConfig() {
+    return config;
+  }
+
+  ExcludeList createExcludeList() {
+    return new ExcludeList(getConfig().getExcludeNodesExpiryTime(),
+        Clock.system(ZoneOffset.UTC));
+  }
+
+  public long getDataSize() {
+    return keyArgs.getDataSize();
+  }
+
+  @Override
+  public Map<String, String> getMetadata() {
+    return this.keyArgs.getMetadata();
   }
 }

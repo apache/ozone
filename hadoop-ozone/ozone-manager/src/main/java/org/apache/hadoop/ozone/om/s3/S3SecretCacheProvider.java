@@ -22,13 +22,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.ozone.om.S3InMemoryCache;
 import org.apache.hadoop.ozone.om.S3SecretCache;
 
-import java.time.temporal.ChronoUnit;
-
-import static org.apache.hadoop.ozone.om.s3.S3SecretStoreConfigurationKeys.CACHE_LIFETIME;
-import static org.apache.hadoop.ozone.om.s3.S3SecretStoreConfigurationKeys.CACHE_MAX_SIZE;
-import static org.apache.hadoop.ozone.om.s3.S3SecretStoreConfigurationKeys.DEFAULT_CACHE_LIFETIME;
-import static org.apache.hadoop.ozone.om.s3.S3SecretStoreConfigurationKeys.DEFAULT_CACHE_MAX_SIZE;
-
 /**
  * Provider of {@link S3SecretCache}.
  */
@@ -46,12 +39,6 @@ public interface S3SecretCacheProvider {
    * In-memory cache implementation.
    */
   S3SecretCacheProvider IN_MEMORY = conf -> {
-    long expireTime = conf
-        .getLong(CACHE_LIFETIME, DEFAULT_CACHE_LIFETIME);
-    return S3InMemoryCache.builder()
-        .setExpireTime(expireTime, ChronoUnit.SECONDS)
-        .setMaxSize(conf
-            .getLong(CACHE_MAX_SIZE, DEFAULT_CACHE_MAX_SIZE))
-        .build();
+    return new S3InMemoryCache();
   };
 }

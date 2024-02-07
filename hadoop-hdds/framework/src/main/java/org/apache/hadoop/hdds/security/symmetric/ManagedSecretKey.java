@@ -19,6 +19,8 @@
 package org.apache.hadoop.hdds.security.symmetric;
 
 import com.google.protobuf.ByteString;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.util.ProtobufUtils;
@@ -41,7 +43,7 @@ public final class ManagedSecretKey {
   private final Instant creationTime;
   private final Instant expiryTime;
   private final SecretKey secretKey;
-  private final ThreadLocal<Mac> macInstances;
+  private final Map<Long, Mac> macInstances = new ConcurrentHashMap();
 
   public ManagedSecretKey(UUID id,
                           Instant creationTime,
@@ -51,9 +53,12 @@ public final class ManagedSecretKey {
     this.creationTime = creationTime;
     this.expiryTime = expiryTime;
     this.secretKey = secretKey;
+  }
 
+  private Mac getMac() {
     // This help reuse Mac instances for the same thread.
-    macInstances = ThreadLocal.withInitial(() -> {
+    long threadId = Thread.currentThread().getId();
+    return macInstances.computeIfAbsent(threadId, k -> {
       try {
         return Mac.getInstance(secretKey.getAlgorithm());
       } catch (NoSuchAlgorithmException e) {
@@ -105,7 +110,7 @@ public final class ManagedSecretKey {
 
   public byte[] sign(byte[] data) {
     try {
-      Mac mac = macInstances.get();
+      Mac mac = getMac();
       mac.init(secretKey);
       return mac.doFinal(data);
     } catch (InvalidKeyException e) {

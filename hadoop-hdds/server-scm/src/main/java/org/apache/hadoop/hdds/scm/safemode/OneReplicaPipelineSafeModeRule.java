@@ -52,7 +52,7 @@ public class OneReplicaPipelineSafeModeRule extends
       LoggerFactory.getLogger(OneReplicaPipelineSafeModeRule.class);
 
   private int thresholdCount;
-  private Set<PipelineID> reportedPipelineIDSet = new HashSet<>();
+  private final Set<PipelineID> reportedPipelineIDSet = new HashSet<>();
   private Set<PipelineID> oldPipelineIDSet;
   private int currentReportedPipelineCount = 0;
   private PipelineManager pipelineManager;
@@ -142,12 +142,25 @@ public class OneReplicaPipelineSafeModeRule extends
 
   @Override
   public String getStatusText() {
-    return String
-        .format(
-            "reported Ratis/THREE pipelines with at least one datanode (=%d) "
-                + ">= threshold (=%d)",
-            getCurrentReportedPipelineCount(),
-            getThresholdCount());
+    String status = String.format(
+        "reported Ratis/THREE pipelines with at least one datanode (=%d) "
+            + ">= threshold (=%d)", getCurrentReportedPipelineCount(),
+        getThresholdCount());
+    status = updateStatusTextWithSamplePipelines(status);
+    return status;
+  }
+
+  private synchronized String updateStatusTextWithSamplePipelines(
+      String status) {
+    Set<PipelineID> samplePipelines = oldPipelineIDSet.stream()
+        .filter(element -> !reportedPipelineIDSet.contains(element))
+        .limit(SAMPLE_PIPELINE_DISPLAY_LIMIT).collect(Collectors.toSet());
+    if (!samplePipelines.isEmpty()) {
+      String samplePipelineText =
+          "Sample pipelines not satisfying the criteria : " + samplePipelines;
+      status = status.concat("\n").concat(samplePipelineText);
+    }
+    return status;
   }
 
   @Override

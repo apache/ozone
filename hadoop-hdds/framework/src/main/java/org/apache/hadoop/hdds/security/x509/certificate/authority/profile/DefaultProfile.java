@@ -46,7 +46,6 @@ import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.apache.hadoop.hdds.function.Predicates.yesBi;
 import static org.bouncycastle.asn1.x509.KeyPurposeId.id_kp_clientAuth;
 import static org.bouncycastle.asn1.x509.KeyPurposeId.id_kp_serverAuth;
 
@@ -61,9 +60,9 @@ public class DefaultProfile implements PKIProfile {
   private static final BiPredicate<Extension, PKIProfile>
       VALIDATE_KEY_USAGE = DefaultProfile::validateKeyUsage;
   private static final BiPredicate<Extension, PKIProfile>
-      VALIDATE_AUTHORITY_KEY_IDENTIFIER = yesBi();
-  private static final BiPredicate<Extension, PKIProfile> VALIDATE_LOGO_TYPE =
-      yesBi();
+      VALIDATE_AUTHORITY_KEY_IDENTIFIER = (t, u) -> true;
+  private static final BiPredicate<Extension, PKIProfile> VALIDATE_LOGO_TYPE
+      = (t, u) -> true;
   private static final Logger LOG =
       LoggerFactory.getLogger(DefaultProfile.class);
   private static final BiPredicate<Extension, PKIProfile>

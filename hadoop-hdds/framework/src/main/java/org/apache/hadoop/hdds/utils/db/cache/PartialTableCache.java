@@ -58,7 +58,7 @@ public class PartialTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
   private final CacheStatsRecorder statsRecorder;
 
 
-  public PartialTableCache() {
+  public PartialTableCache(String threadNamePrefix) {
     // We use concurrent Hash map for O(1) lookup for get API.
     // During list operation for partial cache we anyway merge between DB and
     // cache state. So entries in cache does not need to be in sorted order.
@@ -77,9 +77,11 @@ public class PartialTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
     epochEntries = new ConcurrentSkipListMap<>();
     // Created a singleThreadExecutor, so one cleanup will be running at a
     // time.
-    ThreadFactory build = new ThreadFactoryBuilder().setDaemon(true)
-        .setNameFormat("PartialTableCache Cleanup Thread - %d").build();
-    executorService = Executors.newSingleThreadExecutor(build);
+    ThreadFactory threadFactory = new ThreadFactoryBuilder()
+        .setDaemon(true)
+        .setNameFormat(threadNamePrefix + "PartialTableCache-Cleanup-%d")
+        .build();
+    executorService = Executors.newSingleThreadExecutor(threadFactory);
 
     statsRecorder = new CacheStatsRecorder();
   }
@@ -185,5 +187,10 @@ public class PartialTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
   @Override
   public CacheStats getStats() {
     return statsRecorder.snapshot();
+  }
+
+  @Override
+  public CacheType getCacheType() {
+    return CacheType.PARTIAL_CACHE;
   }
 }

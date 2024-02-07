@@ -55,8 +55,8 @@ public final class NodeDecommissionMetrics implements MetricsSource {
   @Metric("Number of containers under replicated in tracked nodes.")
   private MutableGaugeLong containersUnderReplicatedTotal;
 
-  @Metric("Number of containers unhealthy in tracked nodes.")
-  private MutableGaugeLong containersUnhealthyTotal;
+  @Metric("Number of containers not fully closed in tracked nodes.")
+  private MutableGaugeLong containersUnClosedTotal;
 
   @Metric("Number of containers sufficiently replicated in tracked nodes.")
   private MutableGaugeLong containersSufficientlyReplicatedTotal;
@@ -67,10 +67,11 @@ public final class NodeDecommissionMetrics implements MetricsSource {
    */
   public static final class ContainerStateInWorkflow {
     private long sufficientlyReplicated = 0;
-    private long unhealthyContainers = 0;
+    private long unclosedContainers = 0;
     private long underReplicatedContainers = 0;
     private String host = "";
     private long pipelinesWaitingToClose = 0;
+    private long startTime = 0;
 
     private static final MetricsInfo HOST_UNDER_REPLICATED = Interns.info(
         "UnderReplicatedDN",
@@ -91,23 +92,25 @@ public final class NodeDecommissionMetrics implements MetricsSource {
             + "for host in decommissioning and "
             + "maintenance mode");
 
-    private static final MetricsInfo HOST_UNHEALTHY_CONTAINERS = Interns.info(
-        "UnhealthyContainersDN",
-        "Number of unhealthy containers "
-            + "for host in decommissioning and "
-            + "maintenance mode");
+    private static final MetricsInfo HOST_UNCLOSED_CONTAINERS = Interns.info("UnclosedContainersDN",
+        "Number of containers not fully closed for host in decommissioning and maintenance mode");
+
+    private static final MetricsInfo HOST_START_TIME = Interns.info("StartTimeDN",
+        "Time at which decommissioning was started");
 
 
     public ContainerStateInWorkflow(String host,
                                     long sufficiently,
                                     long under,
-                                    long unhealthy,
-                                    long pipelinesToClose) {
+                                    long unclosed,
+                                    long pipelinesToClose,
+                                    long startTime) {
       this.host = host;
       sufficientlyReplicated = sufficiently;
       underReplicatedContainers = under;
-      unhealthyContainers = unhealthy;
+      unclosedContainers = unclosed;
       pipelinesWaitingToClose = pipelinesToClose;
+      this.startTime = startTime;
     }
 
     public String getHost() {
@@ -126,8 +129,12 @@ public final class NodeDecommissionMetrics implements MetricsSource {
       return underReplicatedContainers;
     }
 
-    public long getUnhealthyContainers() {
-      return unhealthyContainers;
+    public long getUnclosedContainers() {
+      return unclosedContainers;
+    }
+
+    public long getStartTime() {
+      return startTime;
     }
   }
 
@@ -166,7 +173,7 @@ public final class NodeDecommissionMetrics implements MetricsSource {
     recommissionNodesTotal.snapshot(builder, all);
     pipelinesWaitingToCloseTotal.snapshot(builder, all);
     containersUnderReplicatedTotal.snapshot(builder, all);
-    containersUnhealthyTotal.snapshot(builder, all);
+    containersUnClosedTotal.snapshot(builder, all);
     containersSufficientlyReplicatedTotal.snapshot(builder, all);
 
     MetricsRecordBuilder recordBuilder = builder;
@@ -182,8 +189,10 @@ public final class NodeDecommissionMetrics implements MetricsSource {
               e.getValue().getUnderReplicatedContainers())
           .addGauge(ContainerStateInWorkflow.HOST_SUFFICIENTLY_REPLICATED,
               e.getValue().getSufficientlyReplicated())
-          .addGauge(ContainerStateInWorkflow.HOST_UNHEALTHY_CONTAINERS,
-              e.getValue().getUnhealthyContainers());
+          .addGauge(ContainerStateInWorkflow.HOST_UNCLOSED_CONTAINERS,
+              e.getValue().getUnclosedContainers())
+          .addGauge(ContainerStateInWorkflow.HOST_START_TIME,
+              e.getValue().getStartTime());
     }
     recordBuilder.endRecord();
   }
@@ -218,10 +227,9 @@ public final class NodeDecommissionMetrics implements MetricsSource {
         .set(numTrackedUnderReplicated);
   }
 
-  public synchronized void setContainersUnhealthyTotal(
-          long numTrackedUnhealthy) {
-    containersUnhealthyTotal
-        .set(numTrackedUnhealthy);
+  public synchronized void setContainersUnClosedTotal(
+          long numTrackedUnclosed) {
+    containersUnClosedTotal.set(numTrackedUnclosed);
   }
 
   public synchronized void setContainersSufficientlyReplicatedTotal(
@@ -246,8 +254,8 @@ public final class NodeDecommissionMetrics implements MetricsSource {
     return containersUnderReplicatedTotal.value();
   }
 
-  public synchronized long getContainersUnhealthyTotal() {
-    return containersUnhealthyTotal.value();
+  public synchronized long getContainersUnClosedTotal() {
+    return containersUnClosedTotal.value();
   }
 
   public synchronized long getContainersSufficientlyReplicatedTotal() {
@@ -282,9 +290,9 @@ public final class NodeDecommissionMetrics implements MetricsSource {
   }
 
   @VisibleForTesting
-  public Long getUnhealthyContainersByHost(String host) {
+  public Long getUnClosedContainersByHost(String host) {
     ContainerStateInWorkflow workflowMetrics = metricsByHost.get(host);
     return workflowMetrics == null ? null :
-        workflowMetrics.getUnhealthyContainers();
+        workflowMetrics.getUnclosedContainers();
   }
 }

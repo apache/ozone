@@ -106,6 +106,11 @@ public interface TableCache<KEY, VALUE> {
   CacheStats getStats();
 
   /**
+   * Return the cache type.
+   */
+  CacheType getCacheType();
+
+  /**
    * Cache completeness.
    */
   enum CacheType {

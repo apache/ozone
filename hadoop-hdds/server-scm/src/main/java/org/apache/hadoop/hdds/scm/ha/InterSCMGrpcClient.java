@@ -92,7 +92,7 @@ public class InterSCMGrpcClient implements SCMSnapshotDownloader {
 
   @Override
   public CompletableFuture<Path> download(final Path outputPath) {
-    // By default on every checkpoint, the rocks db will be flushed
+    // By default, on every checkpoint, the rocks db will be flushed
     InterSCMProtocolProtos.CopyDBCheckpointRequestProto request =
         InterSCMProtocolProtos.CopyDBCheckpointRequestProto.newBuilder()
             .setFlush(true)

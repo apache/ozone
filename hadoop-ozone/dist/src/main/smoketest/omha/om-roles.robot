@@ -19,12 +19,37 @@ Resource            ../commonlib.robot
 Test Timeout        5 minutes
 Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 
-*** Test Cases ***
-List om roles
-    ${output} =         Execute          ozone admin om roles --service-id=omservice
-                        Should Match Regexp   ${output}  [om (: LEADER|)]
+*** Keywords ***
+Assert Leader Present
+     [Arguments]                     ${output}
+     Should Match Regexp             ${output}                      [om (: LEADER|)]
 
-List om roles as JSON
-    ${output} =         Execute          ozone admin om roles --service-id=omservice --json
-    ${leader} =         Execute          echo '${output}' | jq -r '.[] | select(.serverRole == "LEADER")'
-                        Should Not Be Equal       ${leader}       ${EMPTY}
+Assert Leader Present in JSON
+     [Arguments]                     ${output}
+     ${leader} =                     Execute                        echo '${output}' | jq '.[] | select(.[] | .serverRole == "LEADER")'
+                                     Should Not Be Equal            ${leader}       ${EMPTY}
+
+*** Test Cases ***
+List om roles with OM service ID passed
+    ${output_with_id_passed} =      Execute                         ozone admin om roles --service-id=omservice
+                                    Assert Leader Present           ${output_with_id_passed}
+    ${output_with_id_passed} =      Execute                         ozone admin --set=ozone.om.service.ids=omservice,omservice2 om roles --service-id=omservice
+                                    Assert Leader Present           ${output_with_id_passed}
+
+List om roles without OM service ID passed
+    ${output_without_id_passed} =   Execute                         ozone admin om roles
+                                    Assert Leader Present           ${output_without_id_passed}
+    ${output_without_id_passed} =   Execute And Ignore Error        ozone admin --set=ozone.om.service.ids=omservice,omservice2 om roles
+                                    Should Contain                  ${output_without_id_passed}      no Ozone Manager service ID specified
+
+List om roles as JSON with OM service ID passed
+    ${output_with_id_passed} =      Execute                         ozone admin om roles --service-id=omservice --json
+                                    Assert Leader Present in JSON   ${output_with_id_passed}
+    ${output_with_id_passed} =      Execute                         ozone admin --set=ozone.om.service.ids=omservice,omservice2 om roles --service-id=omservice --json
+                                    Assert Leader Present in JSON   ${output_with_id_passed}
+
+List om roles as JSON without OM service ID passed
+    ${output_without_id_passed} =   Execute                         ozone admin om roles --json
+                                    Assert Leader Present in JSON   ${output_without_id_passed}
+    ${output_without_id_passed} =   Execute And Ignore Error        ozone admin --set=ozone.om.service.ids=omservice,omservice2 om roles --json
+                                    Should Contain                  ${output_without_id_passed}      no Ozone Manager service ID specified

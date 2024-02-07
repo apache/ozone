@@ -25,9 +25,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.jetbrains.annotations.NotNull;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
@@ -44,8 +43,8 @@ public class OMKeySetTimesResponseWithFSO extends OMKeySetTimesResponse {
   private long bucketId;
 
   public OMKeySetTimesResponseWithFSO(
-      @NotNull OzoneManagerProtocolProtos.OMResponse omResponse,
-      @NotNull OmKeyInfo omKeyInfo, boolean isDirectory,
+      @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse,
+      @Nonnull OmKeyInfo omKeyInfo, boolean isDirectory,
       @Nonnull BucketLayout bucketLayout, @Nonnull long volumeId,
       @Nonnull long bucketId) {
     super(omResponse, omKeyInfo, bucketLayout);
@@ -61,7 +60,7 @@ public class OMKeySetTimesResponseWithFSO extends OMKeySetTimesResponse {
    * @param omResponse
    */
   public OMKeySetTimesResponseWithFSO(
-      @NotNull OzoneManagerProtocolProtos.OMResponse omResponse,
+      @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse,
       BucketLayout bucketLayout) {
     super(omResponse, bucketLayout);
   }

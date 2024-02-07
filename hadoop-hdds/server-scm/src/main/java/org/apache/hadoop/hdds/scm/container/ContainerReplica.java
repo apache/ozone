@@ -39,33 +39,21 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
   private final UUID placeOfBirth;
   private final int replicaIndex;
 
-  private Long sequenceId;
+  private final Long sequenceId;
   private final long keyCount;
   private final long bytesUsed;
   private final boolean isEmpty;
 
-  @SuppressWarnings("parameternumber")
-  private ContainerReplica(
-      final ContainerID containerID,
-      final ContainerReplicaProto.State state,
-      final int replicaIndex,
-      final DatanodeDetails datanode,
-      final UUID originNodeId,
-      long keyNum,
-      long dataSize,
-      boolean isEmpty) {
-    this.containerID = containerID;
-    this.state = state;
-    this.datanodeDetails = datanode;
-    this.placeOfBirth = originNodeId;
-    this.keyCount = keyNum;
-    this.bytesUsed = dataSize;
-    this.replicaIndex = replicaIndex;
-    this.isEmpty = isEmpty;
-  }
-
-  private void setSequenceId(Long seqId) {
-    sequenceId = seqId;
+  private ContainerReplica(ContainerReplicaBuilder b) {
+    containerID = b.containerID;
+    state = b.state;
+    datanodeDetails = b.datanode;
+    placeOfBirth = Optional.ofNullable(b.placeOfBirth).orElse(datanodeDetails.getUuid());
+    keyCount = b.keyCount;
+    bytesUsed = b.bytesUsed;
+    replicaIndex = b.replicaIndex;
+    isEmpty = b.isEmpty;
+    sequenceId = b.sequenceId;
   }
 
   /**
@@ -299,12 +287,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
           "Container state can't be null");
       Preconditions.checkNotNull(datanode,
           "DatanodeDetails can't be null");
-      ContainerReplica replica = new ContainerReplica(
-          containerID, state, replicaIndex, datanode,
-          Optional.ofNullable(placeOfBirth).orElse(datanode.getUuid()),
-          keyCount, bytesUsed, isEmpty);
-      Optional.ofNullable(sequenceId).ifPresent(replica::setSequenceId);
-      return replica;
+      return new ContainerReplica(this);
     }
   }
 

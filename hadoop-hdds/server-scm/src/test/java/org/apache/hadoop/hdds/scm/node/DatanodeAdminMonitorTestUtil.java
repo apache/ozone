@@ -27,13 +27,13 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.ECContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.RatisContainerReplicaCount;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.mockito.Mockito;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -42,6 +42,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.any;
 
 /**
  * Helper class to provide common methods used to test DatanodeAdminMonitor
@@ -151,15 +153,17 @@ public final class DatanodeAdminMonitorTestUtil {
    */
   public static void mockGetContainerReplicaCount(
       ReplicationManager repManager,
+      boolean underReplicated,
       HddsProtos.LifeCycleState containerState,
       HddsProtos.NodeOperationalState...replicaStates)
       throws ContainerNotFoundException {
     reset(repManager);
-    Mockito.when(repManager.getContainerReplicaCount(
-        Mockito.any(ContainerID.class)))
+    when(repManager.getContainerReplicaCount(
+        any(ContainerID.class)))
         .thenAnswer(invocation ->
             generateReplicaCount((ContainerID)invocation.getArguments()[0],
                 containerState, replicaStates));
+    mockCheckContainerState(repManager, underReplicated);
   }
 
   /**
@@ -175,17 +179,33 @@ public final class DatanodeAdminMonitorTestUtil {
    */
   public static void mockGetContainerReplicaCountForEC(
       ReplicationManager repManager,
+      boolean underReplicated,
       HddsProtos.LifeCycleState containerState,
       ECReplicationConfig repConfig,
       Triple<HddsProtos.NodeOperationalState, DatanodeDetails,
           Integer>...replicaStates)
       throws ContainerNotFoundException {
     reset(repManager);
-    Mockito.when(repManager.getContainerReplicaCount(
-            Mockito.any(ContainerID.class)))
+    when(repManager.getContainerReplicaCount(
+            any(ContainerID.class)))
         .thenAnswer(invocation ->
             generateECReplicaCount((ContainerID)invocation.getArguments()[0],
                 repConfig, containerState, replicaStates));
+    mockCheckContainerState(repManager, underReplicated);
+  }
+
+  static void mockCheckContainerState(ReplicationManager repManager, boolean underReplicated)
+      throws ContainerNotFoundException {
+    when(repManager.checkContainerStatus(any(ContainerInfo.class),
+            any(ReplicationManagerReport.class)))
+        .then(invocation -> {
+          ReplicationManagerReport report = invocation.getArgument(1);
+          if (underReplicated) {
+            report.increment(ReplicationManagerReport.HealthState.UNDER_REPLICATED);
+            return true;
+          }
+          return false;
+        });
   }
 
   /**

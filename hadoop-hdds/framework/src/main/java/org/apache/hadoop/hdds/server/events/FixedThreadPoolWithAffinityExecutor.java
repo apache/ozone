@@ -141,12 +141,18 @@ public class FixedThreadPoolWithAffinityExecutor<P, Q>
 
   public static <Q> List<ThreadPoolExecutor> initializeExecutorPool(
       List<BlockingQueue<Q>> workQueues) {
+    return initializeExecutorPool("", workQueues);
+  }
+
+  public static <Q> List<ThreadPoolExecutor> initializeExecutorPool(
+      String threadNamePrefix, List<BlockingQueue<Q>> workQueues) {
     List<ThreadPoolExecutor> executors = new ArrayList<>();
     for (int i = 0; i < workQueues.size(); ++i) {
       LinkedBlockingQueue<Runnable> poolQueue = new LinkedBlockingQueue<>(1);
       ThreadFactory threadFactory = new ThreadFactoryBuilder()
           .setDaemon(true)
-          .setNameFormat("FixedThreadPoolWithAffinityExecutor-" + i + "-%d")
+          .setNameFormat(threadNamePrefix
+              + "FixedThreadPoolWithAffinityExecutor-" + i + "-%d")
           .build();
       executors.add(new
           ThreadPoolExecutor(

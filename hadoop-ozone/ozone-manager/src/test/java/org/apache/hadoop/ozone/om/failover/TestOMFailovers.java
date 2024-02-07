@@ -38,9 +38,11 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.slf4j.event.Level;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests OM failover protocols using a Mock Failover provider and a Mock OM
@@ -68,26 +70,16 @@ public class TestOMFailovers {
             failoverProxyProvider.getRetryPolicy(
                 OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT));
 
-    try {
-      proxy.submitRequest(null, null);
-      Assert.fail("Request should fail with AccessControlException");
-    } catch (Exception ex) {
-      Assert.assertTrue(ex instanceof ServiceException);
+    ServiceException serviceException = assertThrows(ServiceException.class,
+        () -> proxy.submitRequest(null, null));
 
-      // Request should try all OMs one be one and fail when the last OM also
-      // throws AccessControlException.
-      GenericTestUtils.assertExceptionContains("ServiceException of " +
-          "type class org.apache.hadoop.security.AccessControlException for " +
-          "om3", ex);
-      Assert.assertTrue(ex.getCause() instanceof AccessControlException);
-
-      Assert.assertTrue(
-          logCapturer.getOutput().contains(getRetryProxyDebugMsg("om1")));
-      Assert.assertTrue(
-          logCapturer.getOutput().contains(getRetryProxyDebugMsg("om2")));
-      Assert.assertTrue(
-          logCapturer.getOutput().contains(getRetryProxyDebugMsg("om3")));
-    }
+    // Request should try all OMs one be one and fail when the last OM also
+    // throws AccessControlException.
+    assertThat(serviceException).hasCauseInstanceOf(AccessControlException.class)
+        .hasMessage("ServiceException of type class org.apache.hadoop.security.AccessControlException for om3");
+    assertThat(logCapturer.getOutput()).contains(getRetryProxyDebugMsg("om1"));
+    assertThat(logCapturer.getOutput()).contains(getRetryProxyDebugMsg("om2"));
+    assertThat(logCapturer.getOutput()).contains(getRetryProxyDebugMsg("om3"));
   }
 
   private String getRetryProxyDebugMsg(String omNodeId) {

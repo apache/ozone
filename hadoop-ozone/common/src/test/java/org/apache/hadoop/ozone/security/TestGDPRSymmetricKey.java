@@ -18,10 +18,12 @@ package org.apache.hadoop.ozone.security;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.security.SecureRandom;
+
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests GDPRSymmetricKey structure.
@@ -32,11 +34,11 @@ public class TestGDPRSymmetricKey {
   public void testKeyGenerationWithDefaults() throws Exception {
     GDPRSymmetricKey gkey = new GDPRSymmetricKey(new SecureRandom());
 
-    Assert.assertTrue(gkey.getCipher().getAlgorithm()
+    assertTrue(gkey.getCipher().getAlgorithm()
         .equalsIgnoreCase(OzoneConsts.GDPR_ALGORITHM_NAME));
 
     gkey.acceptKeyDetails(
-        (k, v) -> Assert.assertTrue(v.length() > 0));
+        (k, v) -> assertTrue(v.length() > 0));
   }
 
   @Test
@@ -45,22 +47,17 @@ public class TestGDPRSymmetricKey {
         RandomStringUtils.randomAlphabetic(16),
         OzoneConsts.GDPR_ALGORITHM_NAME);
 
-    Assert.assertTrue(gkey.getCipher().getAlgorithm()
+    assertTrue(gkey.getCipher().getAlgorithm()
         .equalsIgnoreCase(OzoneConsts.GDPR_ALGORITHM_NAME));
 
     gkey.acceptKeyDetails(
-        (k, v) -> Assert.assertTrue(v.length() > 0));
+        (k, v) -> assertTrue(v.length() > 0));
   }
 
   @Test
   public void testKeyGenerationWithInvalidInput() throws Exception {
-    try {
-      new GDPRSymmetricKey(RandomStringUtils.randomAlphabetic(5),
-          OzoneConsts.GDPR_ALGORITHM_NAME);
-      Assert.fail("Expect length mismatched");
-    } catch (IllegalArgumentException ex) {
-      Assert.assertTrue(ex.getMessage()
-          .equalsIgnoreCase("Secret must be exactly 16 characters"));
-    }
+    IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+        () -> new GDPRSymmetricKey(RandomStringUtils.randomAlphabetic(5), OzoneConsts.GDPR_ALGORITHM_NAME));
+    assertTrue(e.getMessage().equalsIgnoreCase("Secret must be exactly 16 characters"));
   }
 }

@@ -58,7 +58,7 @@ public class DNCertificateClient extends DefaultCertificateClient {
       Runnable shutdown
   ) {
     super(securityConfig, scmSecurityClient, LOG, certSerialId, COMPONENT_NAME,
-        saveCertId, shutdown);
+        datanodeDetails.threadNamePrefix(), saveCertId, shutdown);
     this.dn = datanodeDetails;
   }
 
@@ -72,9 +72,7 @@ public class DNCertificateClient extends DefaultCertificateClient {
   @Override
   public CertificateSignRequest.Builder getCSRBuilder()
       throws CertificateException {
-    CertificateSignRequest.Builder builder = super.getCSRBuilder()
-        .setDigitalEncryption(true)
-        .setDigitalSignature(true);
+    CertificateSignRequest.Builder builder = super.getCSRBuilder();
 
     try {
       String hostname = InetAddress.getLocalHost().getCanonicalHostName();

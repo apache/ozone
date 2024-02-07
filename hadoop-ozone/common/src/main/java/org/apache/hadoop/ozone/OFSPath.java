@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.http.ParseException;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -90,6 +91,11 @@ public class OFSPath {
     // Preserve '/' at the end of a key if any, as fs.Path(String) discards it
     final boolean endsWithSlash = pathStr.endsWith(OZONE_URI_DELIMITER);
     initOFSPath(fsPath.toUri(), endsWithSlash);
+  }
+
+  public static boolean isSharedTmpBucket(OzoneObjInfo objInfo) {
+    return OFS_MOUNT_TMP_VOLUMENAME.equals(objInfo.getVolumeName()) &&
+        OFS_SHARED_TMP_BUCKETNAME.equals(objInfo.getBucketName());
   }
 
   private void initOFSPath(URI uri, boolean endsWithSlash) {

@@ -118,6 +118,16 @@ public class ContainerSizeCountTask extends ReconScmTask {
     }
   }
 
+  private void process(ContainerInfo container,
+      Map<ContainerSizeCountKey, Long> map) {
+    final ContainerID id = container.containerID();
+    final long currentSize = container.getUsedBytes();
+    final Long previousSize = processedContainers.put(id, currentSize);
+    if (previousSize != null) {
+      decrementContainerSizeCount(previousSize, map);
+    }
+    incrementContainerSizeCount(currentSize, map);
+  }
 
   /**
    * The process() function is responsible for updating the counts of
@@ -144,30 +154,21 @@ public class ContainerSizeCountTask extends ReconScmTask {
   public void process(List<ContainerInfo> containers) {
     lock.writeLock().lock();
     try {
-      HashMap<ContainerSizeCountKey, Long> containerSizeCountMap =
-          new HashMap<>();
-      HashMap<ContainerID, Long> deletedContainers = new HashMap<>();
-      deletedContainers.putAll(processedContainers);
+      final Map<ContainerSizeCountKey, Long> containerSizeCountMap
+          = new HashMap<>();
+      final Map<ContainerID, Long> deletedContainers
+          = new HashMap<>(processedContainers);
 
       // Loop to handle container create and size-update operations
       for (ContainerInfo container : containers) {
         // The containers present in the cache hence it is not yet deleted
         deletedContainers.remove(container.containerID());
         // For New Container being created
-        if (!processedContainers.containsKey(container.containerID())) {
-          incrementContainerSizeCount(container.getUsedBytes(),
-              containerSizeCountMap);
-          processedContainers.put(container.containerID(),
-              container.getUsedBytes());
-        } else if (processedContainers.get(container.containerID()) !=
-            container.getUsedBytes()) { // If the Container Size is Updated
-          decrementContainerSizeCount(
-              processedContainers.get(container.containerID()),
-              containerSizeCountMap);
-          incrementContainerSizeCount(container.getUsedBytes(),
-              containerSizeCountMap);
-          processedContainers.put(container.containerID(),
-              container.getUsedBytes());
+        try {
+          process(container, containerSizeCountMap);
+        } catch (Exception e) {
+          // FIXME: it is a bug if there is an exception.
+          LOG.error("FIXME: Failed to process " + container, e);
         }
       }
 
@@ -281,12 +282,9 @@ public class ContainerSizeCountTask extends ReconScmTask {
    *
    * @param containerSize to calculate the upperSizeBound
    */
-  private void incrementContainerSizeCount(long containerSize,
+  private static void incrementContainerSizeCount(long containerSize,
                    Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
-    ContainerSizeCountKey key = getContainerSizeCountKey(containerSize);
-    Long count = containerSizeCountMap.containsKey(key) ?
-        containerSizeCountMap.get(key) + 1L : 1L;
-    containerSizeCountMap.put(key, count);
+    updateContainerSizeCount(containerSize, 1, containerSizeCountMap);
   }
 
   /**
@@ -305,12 +303,16 @@ public class ContainerSizeCountTask extends ReconScmTask {
    *
    * @param containerSize to calculate the upperSizeBound
    */
-  private void decrementContainerSizeCount(long containerSize,
+  private static void decrementContainerSizeCount(long containerSize,
                    Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
+    updateContainerSizeCount(containerSize, -1, containerSizeCountMap);
+  }
+
+  private static void updateContainerSizeCount(long containerSize, int delta,
+      Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
     ContainerSizeCountKey key = getContainerSizeCountKey(containerSize);
-    Long count = containerSizeCountMap.containsKey(key) ?
-        containerSizeCountMap.get(key) - 1L : -1L;
-    containerSizeCountMap.put(key, count);
+    containerSizeCountMap.compute(key,
+        (k, previous) -> previous != null ? previous + delta : delta);
   }
 
   /**
@@ -325,7 +327,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
    *
    * @param containerSize to calculate the upperSizeBound
    */
-  private ContainerSizeCountKey getContainerSizeCountKey(
+  private static ContainerSizeCountKey getContainerSizeCountKey(
       long containerSize) {
     return new ContainerSizeCountKey(
         ReconUtils.getContainerSizeUpperBound(containerSize));

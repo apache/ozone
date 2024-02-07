@@ -21,6 +21,7 @@ package org.apache.hadoop.hdds.security.x509.certificate.utils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -204,8 +205,8 @@ public class TestCRLCodec {
     // Verify header and footer of PEM encoded String
     String header = "-----BEGIN X509 CRL-----";
     String footer = "-----END X509 CRL-----";
-    assertTrue(pemEncodedString.contains(header));
-    assertTrue(pemEncodedString.contains(footer));
+    assertThat(pemEncodedString).contains(header);
+    assertThat(pemEncodedString).contains(footer);
   }
 
   @Test

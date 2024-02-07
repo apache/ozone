@@ -18,22 +18,30 @@
  */
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.EnvOptions;
 import org.rocksdb.Options;
 import org.rocksdb.SstFileWriter;
+
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 /**
  * Managed SstFileWriter.
  */
 public class ManagedSstFileWriter extends SstFileWriter {
+  private final UncheckedAutoCloseable leakTracker = track(this);
+
   public ManagedSstFileWriter(EnvOptions envOptions,
                               Options options) {
     super(envOptions, options);
   }
 
   @Override
-  protected void finalize() throws Throwable {
-    ManagedRocksObjectUtils.assertClosed(this);
-    super.finalize();
+  public void close() {
+    try {
+      super.close();
+    } finally {
+      leakTracker.close();
+    }
   }
 }

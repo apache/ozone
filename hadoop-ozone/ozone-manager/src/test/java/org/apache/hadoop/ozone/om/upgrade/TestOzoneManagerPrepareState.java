@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.ozone.om.upgrade;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
@@ -24,41 +27,40 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.nio.file.Path;
 import java.util.Random;
 
 /**
  * Class to test Ozone Manager prepare state maintenance.
  */
 public class TestOzoneManagerPrepareState {
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   private static final int TEST_INDEX = 5;
   private OzoneManagerPrepareState prepareState;
   private static final Random RANDOM = new Random();
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        folder.getRoot().getAbsolutePath());
+        folder.toAbsolutePath().toString());
 
     prepareState = new OzoneManagerPrepareState(conf);
   }
 
-  @After
+  @AfterEach
   public void tearDown() throws Exception {
     // Clean up marker file from previous runs.
     prepareState.cancelPrepare();
@@ -224,30 +226,31 @@ public class TestOzoneManagerPrepareState {
 
   private void assertPrepareNotStarted() {
     OzoneManagerPrepareState.State state = prepareState.getState();
-    Assert.assertEquals(PrepareStatus.NOT_PREPARED, state.getStatus());
-    Assert.assertEquals(OzoneManagerPrepareState.NO_PREPARE_INDEX,
+    assertEquals(PrepareStatus.NOT_PREPARED, state.getStatus());
+    assertEquals(OzoneManagerPrepareState.NO_PREPARE_INDEX,
         state.getIndex());
-    Assert.assertFalse(prepareState.getPrepareMarkerFile().exists());
+    assertFalse(prepareState.getPrepareMarkerFile().exists());
 
     assertPrepareGateDown();
   }
 
   private void assertPrepareInProgress() {
     OzoneManagerPrepareState.State state = prepareState.getState();
-    Assert.assertEquals(PrepareStatus.PREPARE_GATE_ENABLED, state.getStatus());
-    Assert.assertEquals(OzoneManagerPrepareState.NO_PREPARE_INDEX,
+    assertEquals(PrepareStatus.PREPARE_GATE_ENABLED,
+        state.getStatus());
+    assertEquals(OzoneManagerPrepareState.NO_PREPARE_INDEX,
         state.getIndex());
-    Assert.assertFalse(prepareState.getPrepareMarkerFile().exists());
+    assertFalse(prepareState.getPrepareMarkerFile().exists());
 
     assertPrepareGateUp();
   }
 
   private void assertPrepareCompleted(long index) throws Exception {
     OzoneManagerPrepareState.State state = prepareState.getState();
-    Assert.assertEquals(PrepareStatus.PREPARE_COMPLETED,
+    assertEquals(PrepareStatus.PREPARE_COMPLETED,
         state.getStatus());
-    Assert.assertEquals(index, state.getIndex());
-    Assert.assertEquals(index, readPrepareMarkerFile());
+    assertEquals(index, state.getIndex());
+    assertEquals(index, readPrepareMarkerFile());
 
     assertPrepareGateUp();
   }
@@ -257,16 +260,16 @@ public class TestOzoneManagerPrepareState {
     // allowed.
     for (Type cmdType: Type.values()) {
       if (cmdType == Type.Prepare || cmdType == Type.CancelPrepare) {
-        Assert.assertTrue(prepareState.requestAllowed(cmdType));
+        assertTrue(prepareState.requestAllowed(cmdType));
       } else {
-        Assert.assertFalse(prepareState.requestAllowed(cmdType));
+        assertFalse(prepareState.requestAllowed(cmdType));
       }
     }
   }
 
   private void assertPrepareGateDown() {
     for (Type cmdType: Type.values()) {
-      Assert.assertTrue(prepareState.requestAllowed(cmdType));
+      assertTrue(prepareState.requestAllowed(cmdType));
     }
   }
 

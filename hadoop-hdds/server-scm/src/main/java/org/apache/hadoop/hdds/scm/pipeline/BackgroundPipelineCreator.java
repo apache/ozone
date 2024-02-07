@@ -71,6 +71,7 @@ public class BackgroundPipelineCreator implements SCMService {
    *    no matter in safe mode or not.
    */
   private final Lock serviceLock = new ReentrantLock();
+  private final String threadName;
   private ServiceStatus serviceStatus = ServiceStatus.PAUSING;
   private final boolean createPipelineInSafeMode;
   private final long waitTimeInMillis;
@@ -109,6 +110,8 @@ public class BackgroundPipelineCreator implements SCMService {
         ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL,
         ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
+
+    threadName = scmContext.threadNamePrefix() + THREAD_NAME;
   }
 
   /**
@@ -117,18 +120,18 @@ public class BackgroundPipelineCreator implements SCMService {
   @Override
   public void start() {
     if (!running.compareAndSet(false, true)) {
-      LOG.warn("{} is already started, just ignore.", THREAD_NAME);
+      LOG.warn("{} is already started, just ignore.", threadName);
       return;
     }
 
-    LOG.info("Starting {}.", THREAD_NAME);
+    LOG.info("Starting {}.", threadName);
 
     thread = new ThreadFactoryBuilder()
         .setDaemon(false)
-        .setNameFormat(THREAD_NAME + " - %d")
+        .setNameFormat(threadName + "-%d")
         .setUncaughtExceptionHandler((Thread t, Throwable ex) -> {
           String message = "Terminate SCM, encounter uncaught exception"
-              + " in RatisPipelineUtilsThread";
+              + " in " + threadName;
           scmContext.getScm().shutDown(message);
         })
         .build()
@@ -142,11 +145,11 @@ public class BackgroundPipelineCreator implements SCMService {
    */
   public void stop() {
     if (!running.compareAndSet(true, false)) {
-      LOG.warn("{} is not running, just ignore.", THREAD_NAME);
+      LOG.warn("{} is not running, just ignore.", threadName);
       return;
     }
 
-    LOG.info("Stopping {}.", THREAD_NAME);
+    LOG.info("Stopping {}.", threadName);
 
     // in case RatisPipelineUtilsThread is sleeping
     thread.interrupt();
@@ -154,7 +157,7 @@ public class BackgroundPipelineCreator implements SCMService {
     try {
       thread.join();
     } catch (InterruptedException e) {
-      LOG.warn("Interrupted during join {}.", THREAD_NAME);
+      LOG.warn("Interrupted during join {}.", threadName);
       Thread.currentThread().interrupt();
     }
   }
@@ -177,7 +180,7 @@ public class BackgroundPipelineCreator implements SCMService {
           }
         }
       } catch (InterruptedException e) {
-        LOG.warn("{} is interrupted.", THREAD_NAME);
+        LOG.warn("{} is interrupted.", threadName);
         running.set(false);
         Thread.currentThread().interrupt();
       }
@@ -274,7 +277,7 @@ public class BackgroundPipelineCreator implements SCMService {
             || event == NODE_ADDRESS_UPDATE_HANDLER_TRIGGERED
             || event == UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED
             || event == PRE_CHECK_COMPLETED) {
-      LOG.info("trigger a one-shot run on {}.", THREAD_NAME);
+      LOG.info("trigger a one-shot run on {}.", threadName);
 
       serviceLock.lock();
       try {

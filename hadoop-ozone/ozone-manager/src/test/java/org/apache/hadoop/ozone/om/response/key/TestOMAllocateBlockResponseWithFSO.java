@@ -26,7 +26,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Time;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 
 import java.io.IOException;
 
@@ -66,7 +66,7 @@ public class TestOMAllocateBlockResponseWithFSO
             parentID, fileName, clientID);
   }
 
-  @NotNull
+  @Nonnull
   @Override
   protected OMAllocateBlockResponse getOmAllocateBlockResponse(
       OmKeyInfo omKeyInfo, OmBucketInfo omBucketInfo,

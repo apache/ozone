@@ -16,11 +16,12 @@
  */
 package org.apache.hadoop.ozone.freon.containergenerator;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.HashSet;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test datanode container generation placement.
@@ -64,7 +65,7 @@ public class TestGeneratorDatanode {
       int maxDatanodes,
       int overlap,
       Integer... expectations) {
-    Assert.assertEquals(
+    assertEquals(
         new HashSet<Integer>(Arrays.asList(expectations)),
         GeneratorDatanode.getPlacement(containerId, maxDatanodes, overlap));
   }

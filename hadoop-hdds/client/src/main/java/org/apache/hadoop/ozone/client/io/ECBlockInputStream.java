@@ -107,17 +107,6 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
     return count;
   }
 
-  protected int availableParityLocations() {
-    int count = 0;
-    for (int i = repConfig.getData();
-         i < repConfig.getData() + repConfig.getParity(); i++) {
-      if (dataLocations[i] != null) {
-        count++;
-      }
-    }
-    return count;
-  }
-
   public ECBlockInputStream(ECReplicationConfig repConfig,
       BlockLocationInfo blockInfo, boolean verifyChecksum,
       XceiverClientFactory xceiverClientFactory,

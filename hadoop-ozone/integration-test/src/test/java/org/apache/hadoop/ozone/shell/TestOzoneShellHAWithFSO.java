@@ -37,6 +37,7 @@ public class TestOzoneShellHAWithFSO extends TestOzoneShellHA {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
+    startKMS();
     startCluster(conf);
   }
 

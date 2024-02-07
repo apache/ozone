@@ -40,7 +40,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -49,6 +48,14 @@ import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
 
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * RDBStore Tests.
@@ -58,9 +65,9 @@ public class TestRDBStore {
       Set<TableConfig> families,
       long maxDbUpdatesSizeThreshold)
       throws IOException {
-    return new RDBStore(dbFile, options, new ManagedWriteOptions(), families,
+    return new RDBStore(dbFile, options, null, new ManagedWriteOptions(), families,
         CodecRegistry.newBuilder().build(), false, 1000, null, false,
-        maxDbUpdatesSizeThreshold, true, null);
+        maxDbUpdatesSizeThreshold, true, null, "");
   }
 
   public static final int MAX_DB_UPDATES_SIZE_THRESHOLD = 80;
@@ -75,6 +82,8 @@ public class TestRDBStore {
 
   @BeforeEach
   public void setUp(@TempDir File tempDir) throws Exception {
+    CodecBuffer.enableLeakDetection();
+
     options = new ManagedDBOptions();
     options.setCreateIfMissing(true);
     options.setCreateMissingColumnFamilies(true);
@@ -104,7 +113,7 @@ public class TestRDBStore {
       throws IOException {
     try (Table<byte[], byte[]> firstTable = dbStore.getTable(families.
         get(familyIndex))) {
-      Assertions.assertNotNull(firstTable, "Table cannot be null");
+      assertNotNull(firstTable, "Table cannot be null");
       for (int x = 0; x < 100; x++) {
         byte[] key =
           RandomStringUtils.random(10).getBytes(StandardCharsets.UTF_8);
@@ -119,7 +128,7 @@ public class TestRDBStore {
 
   @Test
   public void compactDB() throws Exception {
-    Assertions.assertNotNull(rdbStore, "DB Store cannot be null");
+    assertNotNull(rdbStore, "DB Store cannot be null");
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j <= 10; j++) {
         insertRandomData(rdbStore, i);
@@ -131,25 +140,25 @@ public class TestRDBStore {
     rdbStore.compactDB();
     int metaSizeAfterCompact = rdbStore.getDb().getLiveFilesMetaDataSize();
 
-    Assertions.assertTrue(metaSizeAfterCompact < metaSizeBeforeCompact);
-    Assertions.assertEquals(metaSizeAfterCompact, 2);
+    assertThat(metaSizeAfterCompact).isLessThan(metaSizeBeforeCompact);
+    assertEquals(metaSizeAfterCompact, 2);
 
   }
 
   @Test
   public void close() throws Exception {
-    Assertions.assertNotNull(rdbStore, "DBStore cannot be null");
+    assertNotNull(rdbStore, "DBStore cannot be null");
     // This test does not assert anything if there is any error this test
     // will throw and fail.
     rdbStore.close();
-    Assertions.assertTrue(rdbStore.isClosed());
+    assertTrue(rdbStore.isClosed());
   }
 
   @Test
   public void closeUnderlyingDB() throws Exception {
-    Assertions.assertNotNull(rdbStore, "DBStore cannot be null");
+    assertNotNull(rdbStore, "DBStore cannot be null");
     rdbStore.getDb().close();
-    Assertions.assertTrue(rdbStore.isClosed());
+    assertTrue(rdbStore.isClosed());
   }
 
   @Test
@@ -166,12 +175,12 @@ public class TestRDBStore {
         rdbStore.move(key, firstTable, secondTable);
         byte[] newvalue = secondTable.get(key);
         // Make sure we have value in the second table
-        Assertions.assertNotNull(newvalue);
+        assertNotNull(newvalue);
         //and it is same as what we wrote to the FirstTable
-        Assertions.assertArrayEquals(value, newvalue);
+        assertArrayEquals(value, newvalue);
       }
       // After move this key must not exist in the first table.
-      Assertions.assertNull(firstTable.get(key));
+      assertNull(firstTable.get(key));
     }
   }
 
@@ -191,10 +200,10 @@ public class TestRDBStore {
         rdbStore.move(key, nextValue, firstTable, secondTable);
         byte[] newvalue = secondTable.get(key);
         // Make sure we have value in the second table
-        Assertions.assertNotNull(newvalue);
+        assertNotNull(newvalue);
         //and it is not same as what we wrote to the FirstTable, and equals
         // the new value.
-        Assertions.assertArrayEquals(nextValue, newvalue);
+        assertArrayEquals(nextValue, newvalue);
       }
     }
 
@@ -202,7 +211,7 @@ public class TestRDBStore {
 
   @Test
   public void getEstimatedKeyCount() throws Exception {
-    Assertions.assertNotNull(rdbStore, "DB Store cannot be null");
+    assertNotNull(rdbStore, "DB Store cannot be null");
 
     // Write 100 keys to the first table.
     insertRandomData(rdbStore, 1);
@@ -211,7 +220,7 @@ public class TestRDBStore {
     insertRandomData(rdbStore, 2);
 
     // Let us make sure that our estimate is not off by 10%
-    Assertions.assertTrue(rdbStore.getEstimatedKeyCount() > 180
+    assertTrue(rdbStore.getEstimatedKeyCount() > 180
         || rdbStore.getEstimatedKeyCount() < 220);
   }
 
@@ -219,17 +228,17 @@ public class TestRDBStore {
   public void getTable() throws Exception {
     for (String tableName : families) {
       try (Table table = rdbStore.getTable(tableName)) {
-        Assertions.assertNotNull(table, tableName + "is null");
+        assertNotNull(table, tableName + "is null");
       }
     }
-    Assertions.assertThrows(IOException.class,
+    assertThrows(IOException.class,
         () -> rdbStore.getTable("ATableWithNoName"));
   }
 
   @Test
   public void listTables() throws Exception {
     List<Table> tableList = rdbStore.listTables();
-    Assertions.assertNotNull(tableList, "Table list cannot be null");
+    assertNotNull(tableList, "Table list cannot be null");
     Map<String, Table> hashTable = new HashMap<>();
 
     for (Table t : tableList) {
@@ -239,27 +248,27 @@ public class TestRDBStore {
     int count = families.size();
     // Assert that we have all the tables in the list and no more.
     for (String name : families) {
-      Assertions.assertTrue(hashTable.containsKey(name));
+      assertThat(hashTable).containsKey(name);
       count--;
     }
-    Assertions.assertEquals(0, count);
+    assertEquals(0, count);
   }
 
   @Test
   public void testRocksDBCheckpoint() throws Exception {
-    Assertions.assertNotNull(rdbStore, "DB Store cannot be null");
+    assertNotNull(rdbStore, "DB Store cannot be null");
 
     insertRandomData(rdbStore, 1);
     DBCheckpoint checkpoint =
         rdbStore.getCheckpoint(true);
-    Assertions.assertNotNull(checkpoint);
+    assertNotNull(checkpoint);
 
     RDBStore restoredStoreFromCheckPoint =
         newRDBStore(checkpoint.getCheckpointLocation().toFile(),
             options, configSet, MAX_DB_UPDATES_SIZE_THRESHOLD);
 
     // Let us make sure that our estimate is not off by 10%
-    Assertions.assertTrue(
+    assertTrue(
         restoredStoreFromCheckPoint.getEstimatedKeyCount() > 90
         || restoredStoreFromCheckPoint.getEstimatedKeyCount() < 110);
     checkpoint.cleanupCheckpoint();
@@ -267,17 +276,17 @@ public class TestRDBStore {
 
   @Test
   public void testRocksDBCheckpointCleanup() throws Exception {
-    Assertions.assertNotNull(rdbStore, "DB Store cannot be null");
+    assertNotNull(rdbStore, "DB Store cannot be null");
 
     insertRandomData(rdbStore, 1);
     DBCheckpoint checkpoint =
         rdbStore.getCheckpoint(true);
-    Assertions.assertNotNull(checkpoint);
+    assertNotNull(checkpoint);
 
-    Assertions.assertTrue(Files.exists(
+    assertTrue(Files.exists(
         checkpoint.getCheckpointLocation()));
     checkpoint.cleanupCheckpoint();
-    Assertions.assertFalse(Files.exists(
+    assertFalse(Files.exists(
         checkpoint.getCheckpointLocation()));
   }
 
@@ -294,10 +303,10 @@ public class TestRDBStore {
           org.apache.commons.codec.binary.StringUtils
               .getBytesUtf16("Value2"));
     }
-    Assertions.assertEquals(2, rdbStore.getDb().getLatestSequenceNumber());
+    assertEquals(2, rdbStore.getDb().getLatestSequenceNumber());
 
     DBUpdatesWrapper dbUpdatesSince = rdbStore.getUpdatesSince(0);
-    Assertions.assertEquals(2, dbUpdatesSince.getData().size());
+    assertEquals(2, dbUpdatesSince.getData().size());
   }
 
   @Test
@@ -325,11 +334,11 @@ public class TestRDBStore {
           org.apache.commons.codec.binary.StringUtils
               .getBytesUtf16("Value5"));
     }
-    Assertions.assertEquals(5, rdbStore.getDb().getLatestSequenceNumber());
+    assertEquals(5, rdbStore.getDb().getLatestSequenceNumber());
 
     DBUpdatesWrapper dbUpdatesSince = rdbStore.getUpdatesSince(0, 5);
-    Assertions.assertEquals(2, dbUpdatesSince.getData().size());
-    Assertions.assertEquals(2, dbUpdatesSince.getCurrentSequenceNumber());
+    assertEquals(2, dbUpdatesSince.getData().size());
+    assertEquals(2, dbUpdatesSince.getCurrentSequenceNumber());
   }
 
   @Test
@@ -363,9 +372,9 @@ public class TestRDBStore {
         MAX_DB_UPDATES_SIZE_THRESHOLD);
     for (String family : familiesMinusOne) {
       try (Table table = rdbStore.getTable(family)) {
-        Assertions.assertNotNull(table, family + "is null");
+        assertNotNull(table, family + "is null");
         Object val = table.get(family.getBytes(StandardCharsets.UTF_8));
-        Assertions.assertNotNull(val);
+        assertNotNull(val);
       }
     }
 
@@ -373,9 +382,9 @@ public class TestRDBStore {
     // we do not use it.
     String extraFamily = families.get(families.size() - 1);
     try (Table table = rdbStore.getTable(extraFamily)) {
-      Assertions.assertNotNull(table, extraFamily + "is null");
+      assertNotNull(table, extraFamily + "is null");
       Object val = table.get(extraFamily.getBytes(StandardCharsets.UTF_8));
-      Assertions.assertNotNull(val);
+      assertNotNull(val);
     }
   }
 
@@ -423,7 +432,7 @@ public class TestRDBStore {
       File fileInCk2 = new File(checkpoint2.getAbsoluteFile(), name);
       long length1 = fileInCk1.length();
       long length2 = fileInCk2.length();
-      Assertions.assertEquals(length1, length2, name);
+      assertEquals(length1, length2, name);
 
       try (InputStream fileStream1 = new FileInputStream(fileInCk1);
            InputStream fileStream2 = new FileInputStream(fileInCk2)) {
@@ -431,7 +440,7 @@ public class TestRDBStore {
         byte[] content2 = new byte[fileStream2.available()];
         fileStream1.read(content1);
         fileStream2.read(content2);
-        Assertions.assertArrayEquals(content1, content2);
+        assertArrayEquals(content1, content2);
       }
     }
   }

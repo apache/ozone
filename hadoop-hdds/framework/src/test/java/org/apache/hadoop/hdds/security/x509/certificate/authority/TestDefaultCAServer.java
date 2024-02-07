@@ -73,11 +73,11 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.OM;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_CERT_STORAGE_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_PATH;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests the Default CA Server.
@@ -123,15 +123,11 @@ public class TestDefaultCAServer {
         ((DefaultCAServer) testCA).processVerificationStatus(
             DefaultCAServer.VerificationStatus.MISSING_CERTIFICATE,
             CAType.ROOT);
-    try {
-
-      caInitializer.accept(securityConfig);
-      fail("code should not reach here, exception should have been thrown.");
-    } catch (IllegalStateException e) {
-      // This also is a runtime exception. Hence not caught by junit expected
-      // exception.
-      assertTrue(e.toString().contains("Missing Root Certs"));
-    }
+    IllegalStateException e =
+        assertThrows(IllegalStateException.class, () -> caInitializer.accept(securityConfig));
+    // This also is a runtime exception. Hence not caught by junit expected
+    // exception.
+    assertThat(e.toString()).contains("Missing Root Certs");
   }
 
   @Test
@@ -144,15 +140,11 @@ public class TestDefaultCAServer {
     Consumer<SecurityConfig> caInitializer =
         ((DefaultCAServer) testCA).processVerificationStatus(
             DefaultCAServer.VerificationStatus.MISSING_KEYS, CAType.ROOT);
-    try {
-
-      caInitializer.accept(securityConfig);
-      fail("code should not reach here, exception should have been thrown.");
-    } catch (IllegalStateException e) {
-      // This also is a runtime exception. Hence not caught by junit expected
-      // exception.
-      assertTrue(e.toString().contains("Missing Keys"));
-    }
+    IllegalStateException e =
+        assertThrows(IllegalStateException.class, () -> caInitializer.accept(securityConfig));
+    // This also is a runtime exception. Hence not caught by junit expected
+    // exception.
+    assertThat(e.toString()).contains("Missing Keys");
   }
 
   /**
@@ -185,9 +177,6 @@ public class TestDefaultCAServer {
         .setKey(keyPair)
         .build();
 
-    // Let us convert this to a string to mimic the common use case.
-    String csrString = CertificateSignRequest.getEncodedString(csr);
-
     CertificateServer testCA = new DefaultCAServer("testCA",
         clusterId, scmId, caStore,
         new DefaultProfile(),
@@ -195,7 +184,8 @@ public class TestDefaultCAServer {
     testCA.init(securityConfig, CAType.ROOT);
 
     Future<CertPath> holder = testCA.requestCertificate(
-        csrString, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM);
+        csr, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM,
+        String.valueOf(System.nanoTime()));
     // Right now our calls are synchronous. Eventually this will have to wait.
     assertTrue(holder.isDone());
     //Test that the cert path returned contains the CA certificate in proper
@@ -238,9 +228,6 @@ public class TestDefaultCAServer {
         .setKey(keyPair)
         .build();
 
-    // Let us convert this to a string to mimic the common use case.
-    String csrString = CertificateSignRequest.getEncodedString(csr);
-
     CertificateServer testCA = new DefaultCAServer("testCA",
         RandomStringUtils.randomAlphabetic(4),
         RandomStringUtils.randomAlphabetic(4), caStore,
@@ -249,7 +236,8 @@ public class TestDefaultCAServer {
     testCA.init(securityConfig, CAType.ROOT);
 
     Future<CertPath> holder = testCA.requestCertificate(
-        csrString, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
+        csr, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM,
+        String.valueOf(System.nanoTime()));
     // Right now our calls are synchronous. Eventually this will have to wait.
     assertTrue(holder.isDone());
     assertNotNull(CertificateCodec.firstCertificateFrom(holder.get()));
@@ -278,11 +266,9 @@ public class TestDefaultCAServer {
         .setKey(keyPair)
         .build();
 
-    // Let us convert this to a string to mimic the common use case.
-    String csrString = CertificateSignRequest.getEncodedString(csr);
-
     Future<CertPath> holder = testCA.requestCertificate(
-        csrString, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
+        csr, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM,
+        String.valueOf(System.nanoTime()));
 
     X509Certificate certificate =
         CertificateCodec.firstCertificateFrom(holder.get());
@@ -302,8 +288,8 @@ public class TestDefaultCAServer {
               CRLReason.lookup(CRLReason.keyCompromise), now);
           result.get();
         });
-    assertTrue(execution.getCause().getMessage()
-        .contains("Certificates cannot be null"));
+    assertThat(execution.getCause().getMessage())
+        .contains("Certificates cannot be null");
   }
 
   @Test
@@ -322,9 +308,6 @@ public class TestDefaultCAServer {
         .setKey(keyPair)
         .build();
 
-    // Let us convert this to a string to mimic the common use case.
-    String csrString = CertificateSignRequest.getEncodedString(csr);
-
     CertificateServer testCA = new DefaultCAServer("testCA",
         RandomStringUtils.randomAlphabetic(4),
         RandomStringUtils.randomAlphabetic(4), caStore,
@@ -335,12 +318,13 @@ public class TestDefaultCAServer {
     ExecutionException execution = assertThrows(ExecutionException.class,
         () -> {
           Future<CertPath> holder =
-              testCA.requestCertificate(csrString,
-                  CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM);
+              testCA.requestCertificate(csr,
+                  CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM,
+                  String.valueOf(System.nanoTime()));
           holder.get();
         });
-    assertTrue(execution.getCause().getMessage()
-        .contains("ScmId and ClusterId in CSR subject are incorrect"));
+    assertThat(execution.getCause().getMessage())
+        .contains("ScmId and ClusterId in CSR subject are incorrect");
   }
 
   @Test
@@ -440,7 +424,7 @@ public class TestDefaultCAServer {
       X509CertificateHolder signedCert = approver.sign(securityConfig,
           keyPair.getPrivate(), externalCert,
           java.sql.Date.valueOf(beginDate), java.sql.Date.valueOf(endDate), csr,
-          scmId, clusterId);
+          scmId, clusterId, String.valueOf(System.nanoTime()));
       CertificateFactory certFactory = new CertificateFactory();
       CertificateCodec certificateCodec = new CertificateCodec(securityConfig,
           scmCertificateClient.getComponentName());
@@ -464,7 +448,7 @@ public class TestDefaultCAServer {
   }
 
   @Test
-  public void testIntermediaryCA() throws Exception {
+  void testIntermediaryCA() throws Exception {
 
     conf.set(HddsConfigKeys.HDDS_X509_MAX_DURATION, "P3650D");
     securityConfig = new SecurityConfig(conf);
@@ -498,7 +482,8 @@ public class TestDefaultCAServer {
           .build();
 
       Future<CertPath> holder = rootCA.requestCertificate(csr,
-          CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM);
+          CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM,
+          String.valueOf(System.nanoTime()));
       assertTrue(holder.isDone());
       X509Certificate certificate =
           CertificateCodec.firstCertificateFrom(holder.get());
@@ -533,11 +518,8 @@ public class TestDefaultCAServer {
           clusterId, scmId, caStore, new DefaultProfile(),
           scmCertificateClient.getComponentName());
 
-      try {
-        scmCA.init(securityConfig, CAType.SUBORDINATE);
-      } catch (Exception e) {
-        fail("testIntermediaryCA failed during init");
-      }
+
+      scmCA.init(securityConfig, CAType.SUBORDINATE);
     }
   }
 

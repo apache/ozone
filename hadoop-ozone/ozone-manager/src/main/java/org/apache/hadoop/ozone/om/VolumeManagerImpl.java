@@ -78,7 +78,8 @@ public class VolumeManagerImpl implements VolumeManager {
       String prefix, String startKey, int maxKeys) throws IOException {
     boolean acquired = false;
     if (userName != null) {
-      acquired = metadataManager.getLock().acquireReadLock(USER_LOCK, userName);
+      acquired = metadataManager.getLock().acquireReadLock(USER_LOCK, userName)
+          .isLockAcquired();
     }
     try {
       return metadataManager.listVolumes(userName, prefix, startKey, maxKeys);

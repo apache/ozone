@@ -21,7 +21,6 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -30,6 +29,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 
 /**
@@ -61,7 +63,7 @@ public class TestStreamingServer {
     //THEN: compare the files
     final byte[] targetContent = Files
         .readAllBytes(destDir.resolve(SUBDIR).resolve("file1"));
-    Assertions.assertArrayEquals(CONTENT, targetContent);
+    assertArrayEquals(CONTENT, targetContent);
 
   }
 
@@ -105,7 +107,7 @@ public class TestStreamingServer {
     //THEN: compare the files
     final byte[] targetContent = Files
         .readAllBytes(destDir.resolve(SUBDIR).resolve("file1"));
-    Assertions.assertArrayEquals(CONTENT, targetContent);
+    assertArrayEquals(CONTENT, targetContent);
 
   }
   @Test
@@ -117,7 +119,7 @@ public class TestStreamingServer {
     Files.write(sourceDir.resolve(SUBDIR).resolve("file1"), CONTENT);
 
     //WHEN: stream subdir
-    Assertions.assertThrows(RuntimeException.class,
+    assertThrows(RuntimeException.class,
         () -> streamDir("NO_SUCH_ID"));
 
     //THEN: compare the files
@@ -148,7 +150,7 @@ public class TestStreamingServer {
                new StreamingClient("localhost", server.getPort(),
                    new DirectoryServerDestination(
                        destDir))) {
-        Assertions.assertThrows(RuntimeException.class, () ->
+        assertThrows(RuntimeException.class, () ->
             client.stream(SUBDIR, 1L, TimeUnit.SECONDS));
       }
     }

@@ -19,9 +19,8 @@ package org.apache.hadoop.hdds.utils.db;
 
 import org.apache.ratis.util.function.CheckedFunction;
 
-import javax.annotation.Nonnull;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
-import java.util.function.IntFunction;
 
 /**
  * A {@link Codec} to serialize/deserialize objects by delegation.
@@ -82,7 +81,7 @@ public class DelegatedCodec<T, DELEGATE> implements Codec<T> {
 
   @Override
   public final CodecBuffer toCodecBuffer(@Nonnull T message,
-      IntFunction<CodecBuffer> allocator) throws IOException {
+      CodecBuffer.Allocator allocator) throws IOException {
     return delegate.toCodecBuffer(backward.apply(message), allocator);
   }
 

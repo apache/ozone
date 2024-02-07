@@ -44,7 +44,7 @@ import com.google.common.base.Preconditions;
 public final class OmVolumeArgs extends WithObjectID
     implements CopyObject<OmVolumeArgs>, Auditable {
   private static final Codec<OmVolumeArgs> CODEC = new DelegatedCodec<>(
-      Proto2Codec.get(VolumeInfo.class),
+      Proto2Codec.get(VolumeInfo.getDefaultInstance()),
       OmVolumeArgs::getFromProtobuf,
       OmVolumeArgs::getProtobuf);
 

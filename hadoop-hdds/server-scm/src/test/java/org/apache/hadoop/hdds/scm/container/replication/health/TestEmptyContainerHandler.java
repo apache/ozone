@@ -31,16 +31,21 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
 
@@ -59,7 +64,7 @@ public class TestEmptyContainerHandler {
     ecReplicationConfig = new ECReplicationConfig(3, 2);
     ratisReplicationConfig = RatisReplicationConfig.getInstance(
         HddsProtos.ReplicationFactor.THREE);
-    replicationManager = Mockito.mock(ReplicationManager.class);
+    replicationManager = mock(ReplicationManager.class);
     emptyContainerHandler =
         new EmptyContainerHandler(replicationManager);
   }
@@ -87,6 +92,15 @@ public class TestEmptyContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
+    ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .setReadOnly(true)
+        .build();
+
+    assertAndVerify(readRequest, true, 0, 1);
     assertAndVerify(request, true, 5, 1);
   }
 
@@ -109,6 +123,15 @@ public class TestEmptyContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
+    ContainerCheckRequest readRequest = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .setReadOnly(true)
+        .build();
+
+    assertAndVerify(readRequest, true, 0, 1);
     assertAndVerify(request, true, 3, 1);
   }
 
@@ -169,6 +192,28 @@ public class TestEmptyContainerHandler {
   }
 
   /**
+   * This test exists to verify that the definition of an empty container is
+   * 0 key count. Number of used bytes are not considered.
+   */
+  @Test
+  public void testEmptyContainerWithNoReplicas()
+      throws IOException {
+    long keyCount = 0L;
+    long bytesUsed = 0L;
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        ratisReplicationConfig, 1, CLOSED, keyCount, bytesUsed);
+
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport())
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(Collections.emptySet())
+        .build();
+
+    assertAndVerify(request, true, 0, 1);
+  }
+
+  /**
    * Handler should return false when there is a non-empty replica.
    */
   @Test
@@ -212,17 +257,14 @@ public class TestEmptyContainerHandler {
   private void assertAndVerify(ContainerCheckRequest request,
       boolean assertion, int times, long numEmptyExpected)
       throws IOException {
-    Assertions.assertEquals(assertion, emptyContainerHandler.handle(request));
-    Mockito.verify(replicationManager, Mockito.times(times))
-        .sendDeleteCommand(Mockito.any(ContainerInfo.class), Mockito.anyInt(),
-            Mockito.any(DatanodeDetails.class), Mockito.eq(false));
-    Assertions.assertEquals(numEmptyExpected, request.getReport().getStat(
-        ReplicationManagerReport.HealthState.EMPTY));
+    assertEquals(assertion, emptyContainerHandler.handle(request));
+    verify(replicationManager, times(times)).sendDeleteCommand(any(ContainerInfo.class), anyInt(),
+        any(DatanodeDetails.class), eq(false));
+    assertEquals(numEmptyExpected, request.getReport().getStat(ReplicationManagerReport.HealthState.EMPTY));
 
     if (times > 0) {
-      Mockito.verify(replicationManager, Mockito.times(1))
-          .updateContainerState(Mockito.any(ContainerID.class),
-              Mockito.any(HddsProtos.LifeCycleEvent.class));
+      verify(replicationManager, times(1)).updateContainerState(any(ContainerID.class),
+          any(HddsProtos.LifeCycleEvent.class));
     }
   }
 

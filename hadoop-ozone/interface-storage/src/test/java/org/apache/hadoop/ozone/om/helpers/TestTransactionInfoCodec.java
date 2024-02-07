@@ -20,13 +20,13 @@ package org.apache.hadoop.ozone.om.helpers;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.Proto2CodecTestBase;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
 
-import static org.junit.Assert.fail;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test {@link TransactionInfo#getCodec()}.
@@ -40,25 +40,18 @@ public class TestTransactionInfoCodec
 
   @Test
   public void toAndFromPersistedFormat() throws Exception {
-    TransactionInfo transactionInfo =
-        new TransactionInfo.Builder().setTransactionIndex(100)
-            .setCurrentTerm(11).build();
-
+    final TransactionInfo transactionInfo = TransactionInfo.valueOf(11, 100);
     final Codec<TransactionInfo> codec = getCodec();
     TransactionInfo convertedTransactionInfo =
         codec.fromPersistedFormat(codec.toPersistedFormat(transactionInfo));
 
-    Assert.assertEquals(transactionInfo, convertedTransactionInfo);
+    assertEquals(transactionInfo, convertedTransactionInfo);
   }
 
   @Test
-  public void testInvalidProtocolBuffer() throws Exception {
-    try {
-      getCodec().fromPersistedFormat("random".getBytes(StandardCharsets.UTF_8));
-      fail("testInvalidProtocolBuffer failed");
-    } catch (IllegalArgumentException e) {
-      GenericTestUtils.assertExceptionContains(
-          "Incorrect TransactionInfo value", e);
-    }
+  public void testInvalidProtocolBuffer() {
+    IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+        () -> getCodec().fromPersistedFormat("random".getBytes(StandardCharsets.UTF_8)));
+    assertThat(ex).hasMessageContaining("Unexpected split length");
   }
 }

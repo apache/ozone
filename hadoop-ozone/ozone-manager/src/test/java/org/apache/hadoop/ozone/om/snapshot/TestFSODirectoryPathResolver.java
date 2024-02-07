@@ -20,13 +20,10 @@ package org.apache.hadoop.ozone.om.snapshot;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -39,6 +36,11 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Test class for FSODirectoryPathResolver.
@@ -47,9 +49,9 @@ public class TestFSODirectoryPathResolver {
 
   private Table<String, OmDirectoryInfo> getMockedDirectoryInfoTable(
       String prefix, Map<Integer, List<Integer>> dirMap) throws IOException {
-    Table<String, OmDirectoryInfo> dirInfos = Mockito.mock(Table.class);
+    Table<String, OmDirectoryInfo> dirInfos = mock(Table.class);
 
-    Mockito.when(dirInfos.iterator(Mockito.anyString()))
+    when(dirInfos.iterator(anyString()))
         .thenAnswer(i -> {
           int dirId = Integer.parseInt(((String)i.getArgument(0))
                .split(OM_KEY_PREFIX)[3]);
@@ -111,7 +113,6 @@ public class TestFSODirectoryPathResolver {
     return dirInfos;
   }
 
-  @SuppressFBWarnings("DMI_HARDCODED_ABSOLUTE_FILENAME")
   @Test
   public void testGetAbsolutePathForValidObjectIDs() throws IOException {
     Map<Integer, List<Integer>> dirMap = ImmutableMap.of(
@@ -127,10 +128,12 @@ public class TestFSODirectoryPathResolver {
         new FSODirectoryPathResolver(prefix, 1,
             getMockedDirectoryInfoTable(prefix, dirMap));
     Set<Long> objIds = Sets.newHashSet(17L, 9L, 10L, 15L, 4L, 3L, 1L);
+    Set<Long> invalidObjIds = Sets.newHashSet(17L, 9L, 10L, 15L, 4L, 3L, 1L,
+        19L);
     Map<Long, Path> absolutePathMap = fsoDirectoryPathResolver
         .getAbsolutePathForObjectIDs(Optional.of(objIds));
 
-    Assertions.assertEquals(ImmutableMap.of(
+    assertEquals(ImmutableMap.of(
         17L, Paths.get("/dir3/dir14/dir17"),
         9L, Paths.get("/dir2/dir9"),
         10L, Paths.get("/dir2/dir10"),
@@ -139,11 +142,11 @@ public class TestFSODirectoryPathResolver {
         3L, Paths.get("/dir3"),
         1L, Paths.get("/")
     ), absolutePathMap);
-    Assertions.assertEquals(objIds.size(), absolutePathMap.size());
+    assertEquals(objIds.size(), absolutePathMap.size());
     // Invalid Obj Id 19 with dirInfo dir19 which is not present in the bucket.
-    Assertions.assertThrows(IllegalArgumentException.class,
+    assertThrows(IllegalArgumentException.class,
         () -> fsoDirectoryPathResolver.getAbsolutePathForObjectIDs(
-            Optional.of(Sets.newHashSet(17L, 9L, 10L, 15L, 4L, 3L, 1L, 19L))),
+            Optional.of(invalidObjIds)),
         "Dir object Ids required but not found in bucket: [19]");
   }
 

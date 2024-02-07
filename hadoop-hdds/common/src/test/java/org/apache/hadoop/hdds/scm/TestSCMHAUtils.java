@@ -26,8 +26,8 @@ import java.util.Collection;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NODES_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NODE_ID_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Tests for {@code SCMHAUtils}.
@@ -49,6 +49,6 @@ class TestSCMHAUtils {
         SCMHAUtils.getSCMNodeIds(output, service);
 
     assertEquals(2, nodesWithoutSelf.size());
-    assertFalse(nodesWithoutSelf.contains(selfId));
+    assertThat(nodesWithoutSelf).doesNotContain(selfId);
   }
 }

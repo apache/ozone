@@ -18,7 +18,7 @@ package org.apache.hadoop.ozone.debug;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.gson.Gson;
+import com.fasterxml.jackson.databind.ObjectWriter;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -36,11 +36,11 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Named;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -61,6 +61,8 @@ import java.util.TreeMap;
 import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * This class tests `ozone debug ldb` CLI that reads from a RocksDB directory.
@@ -68,6 +70,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public class TestLDBCli {
   private static final String KEY_TABLE = "keyTable";
   private static final String BLOCK_DATA = "block_data";
+  public static final String PIPELINES = "pipelines";
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private OzoneConfiguration conf;
   private DBStore dbStore;
@@ -195,8 +198,8 @@ public class TestLDBCli {
   @ParameterizedTest
   @MethodSource("scanTestCases")
   void testLDBScan(
-      @NotNull Pair<String, Boolean> tableAndOption,
-      @NotNull Pair<Integer, String> expectedExitCodeStderrPair,
+      @Nonnull Pair<String, Boolean> tableAndOption,
+      @Nonnull Pair<Integer, String> expectedExitCodeStderrPair,
       List<String> scanArgs,
       Pair<String, String> dbMapRange) throws IOException {
 
@@ -216,7 +219,7 @@ public class TestLDBCli {
     int exitCode = cmd.execute(completeScanArgs.toArray(new String[0]));
     // Check exit code. Print stderr if not expected
     int expectedExitCode = expectedExitCodeStderrPair.getLeft();
-    Assertions.assertEquals(expectedExitCode, exitCode, stderr.toString());
+    assertEquals(expectedExitCode, exitCode, stderr.toString());
 
     // Construct expected result map given test param input
     Map<String, Map<String, ?>> expectedMap;
@@ -233,7 +236,29 @@ public class TestLDBCli {
 
     // Check stderr
     final String stderrShouldContain = expectedExitCodeStderrPair.getRight();
-    Assertions.assertTrue(stderr.toString().contains(stderrShouldContain));
+    assertThat(stderr.toString()).contains(stderrShouldContain);
+  }
+
+  @Test
+  void testScanOfPipelinesWhenNoData() throws IOException {
+    // Prepare dummy table
+    prepareTable(PIPELINES, false);
+
+    // Prepare scan args
+    List<String> completeScanArgs = new ArrayList<>(Arrays.asList(
+        "--db", dbStore.getDbLocation().getAbsolutePath(),
+        "scan",
+        "--column-family", PIPELINES));
+
+    int exitCode = cmd.execute(completeScanArgs.toArray(new String[0]));
+    // Check exit code. Print stderr if not expected
+    assertEquals(0, exitCode, stderr.toString());
+
+    // Check stdout
+    assertEquals("{  }\n", stdout.toString());
+
+    // Check stderr
+    assertEquals("", stderr.toString());
   }
 
   /**
@@ -247,7 +272,7 @@ public class TestLDBCli {
     Map<Object, ? extends Map<Object, ?>> actualMap = MAPPER.readValue(
         actualStr, new TypeReference<Map<Object, Map<Object, ?>>>() { });
 
-    Assertions.assertEquals(expected, actualMap);
+    assertEquals(expected, actualMap);
   }
 
   /**
@@ -315,16 +340,19 @@ public class TestLDBCli {
         }
       }
       break;
-
+    case PIPELINES:
+      // Empty table
+      dbStore = DBStoreBuilder.newBuilder(conf).setName("scm.db")
+          .setPath(tempDir.toPath()).addTable(PIPELINES).build();
+      break;
     default:
       throw new IllegalArgumentException("Unsupported table: " + tableName);
     }
   }
 
   private static Map<String, Object> toMap(Object obj) throws IOException {
-    // Have to use the same serializer (Gson) as DBScanner does.
-    // JsonUtils (ObjectMapper) parses object differently.
-    String json = new Gson().toJson(obj);
+    ObjectWriter objectWriter = DBScanner.JsonSerializationHelper.getWriter();
+    String json = objectWriter.writeValueAsString(obj);
     return MAPPER.readValue(json, new TypeReference<Map<String, Object>>() { });
   }
 

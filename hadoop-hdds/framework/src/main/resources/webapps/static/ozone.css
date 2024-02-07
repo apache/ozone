@@ -80,10 +80,14 @@ body {
      display: block;
      font-family: 'Glyphicons Halflings';
  }
-.nodeStausInfo {
+.nodeStatusInfo {
     position: relative;
  }
 .wrap-table{
     word-wrap: break-word;
     table-layout: fixed;
+}
+
+.om-roles-background {
+    background-color: #dcfbcd!important;
 }

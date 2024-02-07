@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.TokenIdentifier;
 
+import java.io.IOException;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -82,6 +83,8 @@ public abstract class ShortLivedTokenIdentifier extends TokenIdentifier {
   public UUID getSecretKeyId() {
     return secretKeyId;
   }
+
+  public abstract void readFromByteArray(byte[] bytes) throws IOException;
 
   @Override
   public boolean equals(Object o) {

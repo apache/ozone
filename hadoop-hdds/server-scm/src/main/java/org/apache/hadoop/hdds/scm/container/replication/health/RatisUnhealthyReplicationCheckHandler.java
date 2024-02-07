@@ -31,18 +31,17 @@ import org.slf4j.LoggerFactory;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 
 /**
- * This class handles UNHEALTHY RATIS replicas. Its responsibilities include:
- * <ul>
- *   <li>If only unhealthy replicas exist, check if there are replication
- *   factor number of replicas and queue them for under/over replication if
- *   needed.
- *   </li>
- *   <li>If there is a mixture of unhealthy and healthy containers this
- *   handler will only be called if there is no under or over replication after
- *   excluding the empty containers. If there is under or over replication the
- *   ECReplicationCheckHandler will take care of it first.
- *   </li>
- * </ul>
+ * This class handles RATIS containers which only have replicas in UNHEALTHY
+ * state, or CLOSED containers with replicas in QUASI_CLOSED state having
+ * less sequence ID. There are no other replicas. This class ensures that
+ * such containers have replication factor number of UNHEALTHY/QUASI_CLOSED
+ * replicas.
+ * <p>
+ * For example, if a CLOSED container with replication factor 3 has 4 UNHEALTHY
+ * replicas, then it's called over replicated and 1 UNHEALTHY replica must be
+ * deleted. On the other hand, if it has only 2 UNHEALTHY replicas, it's
+ * under replicated and 1 more replica should be created.
+ * </p>
  */
 public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
   public static final Logger LOG = LoggerFactory.getLogger(
@@ -57,24 +56,15 @@ public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
     ReplicationManagerReport report = request.getReport();
     ContainerInfo container = request.getContainerInfo();
 
-    /*
-    First, verify there's perfect replication without considering UNHEALTHY
-    replicas. If not, we return false. Replication issues without UNHEALTHY
-    replicas should be solved first.
-     */
-    if (!verifyPerfectReplication(request)) {
-      return false;
-    }
-
-    // Now, consider UNHEALTHY replicas when calculating replication status
     RatisContainerReplicaCount replicaCount = getReplicaCount(request);
-    if (replicaCount.getUnhealthyReplicaCount() == 0) {
-      LOG.debug("No UNHEALTHY replicas are present for container {} with " +
-          "replicas [{}].", container, request.getContainerReplicas());
+    if (replicaCount.getHealthyReplicaCount() > 0 ||
+        replicaCount.getUnhealthyReplicaCount() == 0) {
+      LOG.debug("Not handling container {} with replicas [{}].", container,
+          request.getContainerReplicas());
       return false;
     } else {
-      LOG.debug("Container {} has UNHEALTHY replicas. Checking its " +
-          "replication status.", container);
+      LOG.info("Container {} has unhealthy replicas [{}]. Checking its " +
+          "replication status.", container, replicaCount.getReplicas());
       report.incrementAndSample(ReplicationManagerReport.HealthState.UNHEALTHY,
           container.containerID());
     }
@@ -114,43 +104,13 @@ public class RatisUnhealthyReplicationCheckHandler extends AbstractCheck {
           overHealth.isReplicatedOkAfterPending(),
           overHealth.hasMismatchedReplicas());
 
-      if (!overHealth.isReplicatedOkAfterPending() &&
-          overHealth.isSafelyOverReplicated()) {
+      if (!overHealth.isReplicatedOkAfterPending()) {
         request.getReplicationQueue().enqueue(overHealth);
       }
       return true;
     }
 
     return false;
-  }
-
-  /**
-   * Verify there's no under or over replication if only healthy replicas are
-   * considered, or that there are no healthy replicas.
-   * @return true if there's no under/over replication considering healthy
-   * replicas
-   */
-  private boolean verifyPerfectReplication(ContainerCheckRequest request) {
-    RatisContainerReplicaCount replicaCountWithoutUnhealthy =
-        new RatisContainerReplicaCount(request.getContainerInfo(),
-            request.getContainerReplicas(), request.getPendingOps(),
-            request.getMaintenanceRedundancy(), false);
-
-    if (replicaCountWithoutUnhealthy.getHealthyReplicaCount() == 0) {
-      return true;
-    }
-    if (replicaCountWithoutUnhealthy.isUnderReplicated() ||
-        replicaCountWithoutUnhealthy.isOverReplicated()) {
-      LOG.debug("Checking replication for container {} without considering " +
-              "UNHEALTHY replicas. isUnderReplicated is [{}]. " +
-              "isOverReplicated is [{}]. Returning false because there should" +
-              " be perfect replication for this handler to work.",
-          request.getContainerInfo(),
-          replicaCountWithoutUnhealthy.isUnderReplicated(),
-          replicaCountWithoutUnhealthy.isOverReplicated());
-      return false;
-    }
-    return true;
   }
 
   /**

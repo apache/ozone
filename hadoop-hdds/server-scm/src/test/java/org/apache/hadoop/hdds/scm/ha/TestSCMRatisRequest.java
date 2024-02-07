@@ -22,13 +22,14 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.ratis.protocol.Message;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType.PIPELINE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test for SCMRatisRequest.
@@ -42,10 +43,8 @@ public class TestSCMRatisRequest {
     String operation = "test";
     SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, operation,
         new Class[]{pipelineID.getProtobuf().getClass()}, args);
-    Assertions.assertEquals(operation,
-        SCMRatisRequest.decode(request.encode()).getOperation());
-    Assertions.assertEquals(args[0],
-        SCMRatisRequest.decode(request.encode()).getArguments()[0]);
+    assertEquals(operation, SCMRatisRequest.decode(request.encode()).getOperation());
+    assertEquals(args[0], SCMRatisRequest.decode(request.encode()).getArguments()[0]);
   }
 
   @Test
@@ -56,7 +55,7 @@ public class TestSCMRatisRequest {
     SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, "test",
         new Class[]{pipelineID.getClass()}, args);
     // Should throw exception there.
-    Assertions.assertThrows(InvalidProtocolBufferException.class,
+    assertThrows(InvalidProtocolBufferException.class,
         request::encode);
   }
 
@@ -65,7 +64,7 @@ public class TestSCMRatisRequest {
     // Non proto message
     Message message = Message.valueOf("randomMessage");
     // Should throw exception there.
-    Assertions.assertThrows(InvalidProtocolBufferException.class,
+    assertThrows(InvalidProtocolBufferException.class,
         () -> SCMRatisRequest.decode(message));
   }
 
@@ -79,10 +78,8 @@ public class TestSCMRatisRequest {
     String operation = "test";
     SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, operation,
         new Class[]{pids.getClass()}, args);
-    Assertions.assertEquals(operation,
-        SCMRatisRequest.decode(request.encode()).getOperation());
-    Assertions.assertEquals(args[0],
-        SCMRatisRequest.decode(request.encode()).getArguments()[0]);
+    assertEquals(operation, SCMRatisRequest.decode(request.encode()).getOperation());
+    assertEquals(args[0], SCMRatisRequest.decode(request.encode()).getArguments()[0]);
   }
 
   @Test
@@ -91,9 +88,7 @@ public class TestSCMRatisRequest {
     String operation = "test";
     SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, operation,
         new Class[]{value.getClass()}, value);
-    Assertions.assertEquals(operation,
-        SCMRatisRequest.decode(request.encode()).getOperation());
-    Assertions.assertEquals(value,
-        SCMRatisRequest.decode(request.encode()).getArguments()[0]);
+    assertEquals(operation, SCMRatisRequest.decode(request.encode()).getOperation());
+    assertEquals(value, SCMRatisRequest.decode(request.encode()).getArguments()[0]);
   }
 }

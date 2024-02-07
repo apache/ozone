@@ -36,7 +36,7 @@ import java.util.ArrayList;
  */
 public class BlockData {
   private static final Codec<BlockData> CODEC = new DelegatedCodec<>(
-      Proto3Codec.get(ContainerProtos.BlockData.class),
+      Proto3Codec.get(ContainerProtos.BlockData.getDefaultInstance()),
       BlockData::getFromProtoBuf,
       BlockData::getProtoBufMessage);
 
@@ -144,22 +144,6 @@ public class BlockData {
 
   public synchronized Map<String, String> getMetadata() {
     return Collections.unmodifiableMap(this.metadata);
-  }
-
-  /**
-   * Returns value of a key.
-   */
-  public synchronized String getValue(String key) {
-    return metadata.get(key);
-  }
-
-  /**
-   * Deletes a metadata entry from the map.
-   *
-   * @param key - Key
-   */
-  public synchronized void deleteKey(String key) {
-    metadata.remove(key);
   }
 
   @SuppressWarnings("unchecked")

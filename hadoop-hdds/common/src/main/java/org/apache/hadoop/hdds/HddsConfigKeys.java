@@ -362,7 +362,7 @@ public final class HddsConfigKeys {
       "0.0.0.0";
   public static final String HDDS_DATANODE_CLIENT_PORT_KEY =
       "hdds.datanode.client.port";
-  public static final int HDDS_DATANODE_CLIENT_PORT_DEFAULT = 9864;
+  public static final int HDDS_DATANODE_CLIENT_PORT_DEFAULT = 19864;
   public static final String HDDS_DATANODE_HANDLER_COUNT_KEY =
       "hdds.datanode.handler.count";
   public static final int HDDS_DATANODE_HANDLER_COUNT_DEFAULT = 1;
@@ -392,4 +392,9 @@ public final class HddsConfigKeys {
 
   public static final String OZONE_AUDIT_LOG_DEBUG_CMD_LIST_DNAUDIT =
       "ozone.audit.log.debug.cmd.list.dnaudit";
+
+  public static final String HDDS_DATANODE_SLOW_OP_WARNING_THRESHOLD_KEY =
+      "hdds.datanode.slow.op.warning.threshold";
+  public static final String HDDS_DATANODE_SLOW_OP_WARNING_THRESHOLD_DEFAULT =
+      "500ms";
 }

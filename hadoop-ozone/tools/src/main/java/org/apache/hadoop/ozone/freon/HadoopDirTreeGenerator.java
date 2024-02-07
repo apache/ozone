@@ -23,6 +23,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageSize;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
@@ -67,11 +68,12 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
   private int fileCount;
 
   @Option(names = {"-g", "--file-size", "--fileSize"},
-      description = "Generated data size(in bytes) of each file to be " +
-          "written in each directory. Full name --fileSize will be removed " +
-          "in later versions.",
-      defaultValue = "4096")
-  private long fileSizeInBytes;
+      description = "Generated data size of each file to be " +
+          "written in each directory. " +
+          StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
+      defaultValue = "4KB",
+      converter = StorageSizeConverter.class)
+  private StorageSize fileSize;
 
   @Option(names = {"-b", "--buffer"},
           description = "Size of buffer used to generated the file content.",
@@ -113,7 +115,7 @@ public class HadoopDirTreeGenerator extends BaseFreonGenerator
       OzoneConfiguration configuration = createOzoneConfiguration();
       fileSystem = FileSystem.get(URI.create(rootPath), configuration);
 
-      contentGenerator = new ContentGenerator(fileSizeInBytes, bufferSize);
+      contentGenerator = new ContentGenerator(fileSize.toBytes(), bufferSize);
       timer = getMetrics().timer("file-create");
 
       runTests(this::createDir);

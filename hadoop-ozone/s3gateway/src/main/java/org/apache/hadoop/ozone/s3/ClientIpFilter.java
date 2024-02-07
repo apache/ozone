@@ -38,7 +38,8 @@ import java.io.IOException;
 @Priority(ClientIpFilter.PRIORITY)
 public class ClientIpFilter implements ContainerRequestFilter {
 
-  public static final int PRIORITY = 200;
+  public static final int PRIORITY = HeaderPreprocessor.PRIORITY +
+      S3GatewayHttpServer.FILTER_PRIORITY_DO_AFTER;
 
   public static final String CLIENT_IP_HEADER = "client_ip";
 

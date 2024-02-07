@@ -19,14 +19,14 @@
 
 package org.apache.hadoop.ozone.om.response.bucket;
 
+import static org.junit.jupiter.api.Assertions.assertNull;
+import java.nio.file.Path;
 import java.util.UUID;
 
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -48,23 +48,23 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
  */
 public class TestOMBucketDeleteResponse {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   private OMMetadataManager omMetadataManager;
   private BatchOperation batchOperation;
 
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        folder.newFolder().getAbsolutePath());
+        folder.toAbsolutePath().toString());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     if (batchOperation != null) {
       batchOperation.close();
@@ -99,7 +99,7 @@ public class TestOMBucketDeleteResponse {
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assert.assertNull(omMetadataManager.getBucketTable().get(
+    assertNull(omMetadataManager.getBucketTable().get(
             omMetadataManager.getBucketKey(volumeName, bucketName)));
   }
 

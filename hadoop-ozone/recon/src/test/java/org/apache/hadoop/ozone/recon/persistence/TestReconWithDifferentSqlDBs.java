@@ -17,68 +17,66 @@
 
 package org.apache.hadoop.ozone.recon.persistence;
 
-import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.ozone.recon.ReconControllerModule.ReconDaoBindingModule.RECON_DAO_LIST;
 import static org.hadoop.ozone.recon.codegen.SqlDbUtils.SQLITE_DRIVER_CLASS;
 import static org.hadoop.ozone.recon.schema.Tables.RECON_TASK_STATUS;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.stream.Stream;
 
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
 import org.jooq.SQLDialect;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import com.google.inject.Provider;
 
 /**
  * Test Recon schema with different DBs.
  */
-@RunWith(Parameterized.class)
-public class TestReconWithDifferentSqlDBs extends AbstractReconSqlDBTest {
-
-  public TestReconWithDifferentSqlDBs(
-      Provider<DataSourceConfiguration> provider) {
-    super(provider);
-  }
-
-  @Parameterized.Parameters(name = "{0}")
-  public static Iterable<Object[]> parameters() throws IOException {
-    TemporaryFolder temporaryFolder = new TemporaryFolder();
-    temporaryFolder.create();
+public class TestReconWithDifferentSqlDBs {
+  @TempDir
+  private static Path temporaryFolder;
+  public static Stream<Object> parametersSource() throws IOException {
     return Stream.of(
-        new DerbyDataSourceConfigurationProvider(temporaryFolder.newFolder()),
-        new SqliteDataSourceConfigurationProvider(temporaryFolder.newFolder()))
-        .map(each -> new Object[] {each})
-        .collect(toList());
+        new AbstractReconSqlDBTest.DerbyDataSourceConfigurationProvider(
+            Files.createDirectory(temporaryFolder.resolve("JunitDerbyDB"))
+                .toFile()),
+        new SqliteDataSourceConfigurationProvider(Files.createDirectory(
+            temporaryFolder.resolve("JunitSQLDS")).toFile()));
   }
 
   /**
    * Make sure schema was created correctly.
    * @throws SQLException
    */
-  @Test
-  public void testSchemaSetup() throws SQLException {
-    assertNotNull(getInjector());
-    assertNotNull(getConfiguration());
-    assertNotNull(getDslContext());
-    assertNotNull(getConnection());
+  @ParameterizedTest
+  @MethodSource("parametersSource")
+  public void testSchemaSetup(Provider<DataSourceConfiguration> provider)
+      throws SQLException, IOException {
+    AbstractReconSqlDBTest reconSqlDB = new AbstractReconSqlDBTest(provider);
+    reconSqlDB.createReconSchemaForTest(temporaryFolder);
+    assertNotNull(reconSqlDB.getInjector());
+    assertNotNull(reconSqlDB.getConfiguration());
+    assertNotNull(reconSqlDB.getDslContext());
+    assertNotNull(reconSqlDB.getConnection());
     RECON_DAO_LIST.forEach(dao -> {
-      assertNotNull(getDao(dao));
+      assertNotNull(reconSqlDB.getDao(dao));
     });
-    ReconTaskStatusDao dao = getDao(ReconTaskStatusDao.class);
+    ReconTaskStatusDao dao = reconSqlDB.getDao(ReconTaskStatusDao.class);
     dao.insert(new ReconTaskStatus("TestTask", 1L, 2L));
     assertEquals(1, dao.findAll().size());
 
-    int numRows = getDslContext().delete(RECON_TASK_STATUS).execute();
+    int numRows = reconSqlDB.getDslContext().
+        delete(RECON_TASK_STATUS).execute();
     assertEquals(1, numRows);
     assertEquals(0, dao.findAll().size());
   }

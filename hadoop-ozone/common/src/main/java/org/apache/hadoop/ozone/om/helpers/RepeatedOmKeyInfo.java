@@ -45,7 +45,7 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
 
   private static Codec<RepeatedOmKeyInfo> newCodec(boolean ignorePipeline) {
     return new DelegatedCodec<>(
-        Proto2Codec.get(RepeatedKeyInfo.class),
+        Proto2Codec.get(RepeatedKeyInfo.getDefaultInstance()),
         RepeatedOmKeyInfo::getFromProto,
         k -> k.getProto(ignorePipeline, ClientVersion.CURRENT_VERSION));
   }

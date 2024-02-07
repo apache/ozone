@@ -23,7 +23,8 @@ import com.google.common.base.Preconditions;
 /**
  * SCM Node Metric that is used in the placement classes.
  */
-public class SCMNodeMetric  implements DatanodeMetric<SCMNodeStat, Long> {
+public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
+    Comparable<SCMNodeMetric> {
   private SCMNodeStat stat;
 
   /**
@@ -36,22 +37,25 @@ public class SCMNodeMetric  implements DatanodeMetric<SCMNodeStat, Long> {
   }
 
   /**
-   * Set the capacity, used and remaining space on a datanode.
+   * Set the capacity, used, remaining and committed space on a datanode.
    *
-   * @param capacity in bytes
-   * @param used in bytes
+   * @param capacity  in bytes
+   * @param used      in bytes
    * @param remaining in bytes
+   * @param committed
+   * @paaram committed in bytes
    */
   @VisibleForTesting
-  public SCMNodeMetric(long capacity, long used, long remaining) {
+  public SCMNodeMetric(long capacity, long used, long remaining,
+                       long committed, long freeSpaceToSpare) {
     this.stat = new SCMNodeStat();
-    this.stat.set(capacity, used, remaining);
+    this.stat.set(capacity, used, remaining, committed, freeSpaceToSpare);
   }
 
   /**
    *
    * @param o - Other Object
-   * @return - True if *this* object is greater than argument.
+   * @return - True if *this* object used space weight is greater than argument.
    */
   @Override
   public boolean isGreater(SCMNodeStat o) {
@@ -73,16 +77,16 @@ public class SCMNodeMetric  implements DatanodeMetric<SCMNodeStat, Long> {
     if (Math.abs(thisNodeWeight - oNodeWeight) > 0.000001) {
       return thisNodeWeight > oNodeWeight;
     }
-    // if these nodes are have similar weight then return the node with more
-    // free space as the greater node.
-    return stat.getRemaining().isGreater(o.getRemaining().get());
+    // if these nodes have similar weight then return the node with more
+    // used space as the greater node.
+    return stat.getScmUsed().isGreater(o.getScmUsed().get());
   }
 
   /**
    * Inverse of isGreater.
    *
    * @param o - other object.
-   * @return True if *this* object is Lesser than argument.
+   * @return True if *this* object used space weight is Lesser than argument.
    */
   @Override
   public boolean isLess(SCMNodeStat o) {
@@ -105,8 +109,8 @@ public class SCMNodeMetric  implements DatanodeMetric<SCMNodeStat, Long> {
     }
 
     // if these nodes are have similar weight then return the node with less
-    // free space as the lesser node.
-    return stat.getRemaining().isLess(o.getRemaining().get());
+    // used space as the lesser node.
+    return stat.getScmUsed().isLess(o.getScmUsed().get());
   }
 
   /**
@@ -156,7 +160,8 @@ public class SCMNodeMetric  implements DatanodeMetric<SCMNodeStat, Long> {
   @Override
   public void set(SCMNodeStat value) {
     stat.set(value.getCapacity().get(), value.getScmUsed().get(),
-        value.getRemaining().get());
+        value.getRemaining().get(), value.getCommitted().get(),
+        value.getFreeSpaceToSpare().get());
   }
 
   /**
@@ -191,12 +196,12 @@ public class SCMNodeMetric  implements DatanodeMetric<SCMNodeStat, Long> {
    * @throws ClassCastException   if the specified object's type prevents it
    *                              from being compared to this object.
    */
-  //@Override
-  public int compareTo(SCMNodeStat o) {
-    if (isEqual(o)) {
+  @Override
+  public int compareTo(SCMNodeMetric o) {
+    if (isEqual(o.get())) {
       return 0;
     }
-    if (isGreater(o)) {
+    if (isGreater(o.get())) {
       return 1;
     } else {
       return -1;
@@ -220,5 +225,10 @@ public class SCMNodeMetric  implements DatanodeMetric<SCMNodeStat, Long> {
   @Override
   public int hashCode() {
     return stat != null ? stat.hashCode() : 0;
+  }
+
+  @Override
+  public String toString() {
+    return "SCMNodeMetric{" + stat.toString() + '}';
   }
 }

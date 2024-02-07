@@ -80,8 +80,7 @@ public class FileSizeDistSubCommand implements Callable {
     } else if (distResponse.get("status").equals("TYPE_NOT_APPLICABLE")) {
       printTypeNA("File Size Distribution");
     } else {
-      if (parent.isObjectStoreBucket(path) ||
-          !parent.bucketIsPresentInThePath(path)) {
+      if (parent.isNotValidBucketOrOBSBucket(path)) {
         printBucketReminder();
       }
 

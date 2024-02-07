@@ -31,7 +31,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_L
 public class RegularBucketLockStrategy implements OzoneLockStrategy {
 
   @Override
-  public boolean acquireWriteLock(OMMetadataManager omMetadataManager,
+  public OMLockDetails acquireWriteLock(OMMetadataManager omMetadataManager,
                                   String volumeName, String bucketName,
                                   String keyName) throws IOException {
     OMFileRequest.validateBucket(omMetadataManager, volumeName, bucketName);
@@ -40,15 +40,15 @@ public class RegularBucketLockStrategy implements OzoneLockStrategy {
   }
 
   @Override
-  public void releaseWriteLock(OMMetadataManager omMetadataManager,
+  public OMLockDetails releaseWriteLock(OMMetadataManager omMetadataManager,
                                String volumeName, String bucketName,
                                String keyName) {
-    omMetadataManager.getLock()
+    return omMetadataManager.getLock()
         .releaseWriteLock(BUCKET_LOCK, volumeName, bucketName);
   }
 
   @Override
-  public boolean acquireReadLock(OMMetadataManager omMetadataManager,
+  public OMLockDetails acquireReadLock(OMMetadataManager omMetadataManager,
                                  String volumeName, String bucketName,
                                  String keyName) throws IOException {
     OMFileRequest.validateBucket(omMetadataManager, volumeName, bucketName);
@@ -57,10 +57,10 @@ public class RegularBucketLockStrategy implements OzoneLockStrategy {
   }
 
   @Override
-  public void releaseReadLock(OMMetadataManager omMetadataManager,
+  public OMLockDetails releaseReadLock(OMMetadataManager omMetadataManager,
                               String volumeName, String bucketName,
                               String keyName) {
-    omMetadataManager.getLock()
+    return omMetadataManager.getLock()
         .releaseReadLock(BUCKET_LOCK, volumeName, bucketName);
   }
 }

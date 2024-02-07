@@ -24,7 +24,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.security.token.Token.TrivialRenewer;
 import org.apache.hadoop.util.ProtobufUtils;
 
 import java.io.DataInput;
@@ -133,6 +132,17 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
     }
     BlockTokenSecretProto token =
         BlockTokenSecretProto.parseFrom((DataInputStream) in);
+    readFromProto(token);
+  }
+
+  @Override
+  public void readFromByteArray(byte[] bytes) throws IOException {
+    BlockTokenSecretProto token =
+        BlockTokenSecretProto.parseFrom(bytes);
+    readFromProto(token);
+  }
+
+  private void readFromProto(BlockTokenSecretProto token) {
     setOwnerId(token.getOwnerId());
     setExpiry(Instant.ofEpochMilli(token.getExpiryDate()));
     setSecretKeyId(ProtobufUtils.fromProtobuf(token.getSecretKeyId()));
@@ -157,6 +167,11 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
 
   @Override
   public void write(DataOutput out) throws IOException {
+    out.write(getBytes());
+  }
+
+  @Override
+  public byte[] getBytes() {
     BlockTokenSecretProto.Builder builder = BlockTokenSecretProto.newBuilder()
         .setBlockId(blockId)
         .setOwnerId(getOwnerId())
@@ -167,19 +182,7 @@ public class OzoneBlockTokenIdentifier extends ShortLivedTokenIdentifier {
     for (AccessModeProto mode : modes) {
       builder.addModes(AccessModeProto.valueOf(mode.name()));
     }
-    out.write(builder.build().toByteArray());
-  }
-
-  /**
-   * Default TrivialRenewer.
-   */
-  @InterfaceAudience.Private
-  public static class Renewer extends TrivialRenewer {
-
-    @Override
-    protected Text getKind() {
-      return KIND_NAME;
-    }
+    return builder.build().toByteArray();
   }
 }
 

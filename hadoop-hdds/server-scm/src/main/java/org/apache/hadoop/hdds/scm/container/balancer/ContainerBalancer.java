@@ -271,10 +271,11 @@ public class ContainerBalancer extends StatefulService {
    */
   private void startBalancingThread(int nextIterationIndex,
       boolean delayStart) {
+    String prefix = scmContext.threadNamePrefix();
     task = new ContainerBalancerTask(scm, nextIterationIndex, this, metrics,
         config, delayStart);
     Thread thread = new Thread(task);
-    thread.setName("ContainerBalancerTask-" + ID.incrementAndGet());
+    thread.setName(prefix + "ContainerBalancerTask-" + ID.incrementAndGet());
     thread.setDaemon(true);
     thread.start();
     currentBalancingThread = thread;

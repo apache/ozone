@@ -24,25 +24,25 @@ import com.google.common.annotations.VisibleForTesting;
  */
 public interface IOzoneManagerLock {
 
-  boolean acquireReadLock(OzoneManagerLock.Resource resource,
-                          String... resources);
+  OMLockDetails acquireReadLock(OzoneManagerLock.Resource resource,
+                                String... resources);
 
-  boolean acquireWriteLock(OzoneManagerLock.Resource resource,
-                           String... resources);
+  OMLockDetails acquireWriteLock(OzoneManagerLock.Resource resource,
+                                 String... resources);
 
   boolean acquireMultiUserLock(String firstUser, String secondUser);
 
   void releaseMultiUserLock(String firstUser, String secondUser);
 
-  void releaseWriteLock(OzoneManagerLock.Resource resource,
+  OMLockDetails releaseWriteLock(OzoneManagerLock.Resource resource,
                         String... resources);
 
-  void releaseReadLock(OzoneManagerLock.Resource resource, String... resources);
+  OMLockDetails releaseReadLock(OzoneManagerLock.Resource resource,
+                                String... resources);
 
   @VisibleForTesting
   int getReadHoldCount(OzoneManagerLock.Resource resource,
       String... resources);
-
 
   @VisibleForTesting
   int getWriteHoldCount(OzoneManagerLock.Resource resource,

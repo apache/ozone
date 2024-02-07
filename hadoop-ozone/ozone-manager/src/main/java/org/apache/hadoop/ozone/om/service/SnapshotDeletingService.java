@@ -405,6 +405,12 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
         while (deletedDirIterator.hasNext()) {
           Table.KeyValue<String, OmKeyInfo> deletedDir =
               deletedDirIterator.next();
+          String deletedDirKey = deletedDir.getKey();
+
+          // Exit for dirs out of snapshot scope.
+          if (!deletedDirKey.startsWith(dbBucketKeyForDir)) {
+            break;
+          }
 
           if (isDirReclaimable(deletedDir, previousDirTable,
               renamedTable, renamedList)) {
@@ -444,7 +450,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
         remainNum = optimizeDirDeletesAndSubmitRequest(remainNum, dirNum,
             subDirNum, subFileNum, allSubDirList, purgePathRequestList,
-            snapInfo.getTableKey(), startTime, ratisByteLimit - consumedSize);
+            snapInfo.getTableKey(), startTime, ratisByteLimit - consumedSize,
+            omSnapshot.getKeyManager());
       } catch (IOException e) {
         LOG.error("Error while running delete directories and files for " +
             "snapshot " + snapInfo.getTableKey() + " in snapshot deleting " +

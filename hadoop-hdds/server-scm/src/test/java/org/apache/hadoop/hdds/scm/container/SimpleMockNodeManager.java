@@ -382,6 +382,11 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
+  public long getLastHeartbeat(DatanodeDetails datanodeDetails) {
+    return -1;
+  }
+
+  @Override
   public void close() throws IOException {
 
   }
@@ -423,7 +428,6 @@ public class SimpleMockNodeManager implements NodeManager {
 
   @Override
   public List<SCMCommand> processHeartbeat(DatanodeDetails datanodeDetails,
-      LayoutVersionProto layoutInfo,
       CommandQueueReportProto commandQueueReportProto) {
     return null;
   }

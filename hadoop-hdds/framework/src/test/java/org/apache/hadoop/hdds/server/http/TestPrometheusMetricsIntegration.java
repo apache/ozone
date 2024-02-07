@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.server.http;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -35,7 +37,6 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -101,11 +102,9 @@ public class TestPrometheusMetricsIntegration {
     String writtenMetrics = waitForMetricsToPublish("test_metrics_num");
 
     //THEN
-    Assertions.assertTrue(
-        writtenMetrics.contains(
-            "test_metrics_num_bucket_create_fails{context=\"dfs\""),
-        "The expected metric line is missing from prometheus metrics output"
-    );
+    assertThat(writtenMetrics)
+        .withFailMessage("The expected metric line is missing from prometheus metrics output")
+        .contains("test_metrics_num_bucket_create_fails{context=\"dfs\"");
 
     metrics.unregisterSource("TestMetrics");
   }
@@ -125,13 +124,13 @@ public class TestPrometheusMetricsIntegration {
     String writtenMetrics = waitForMetricsToPublish("rpc_metrics_counter");
 
     // THEN
-    Assertions.assertTrue(
-        writtenMetrics.contains("rpc_metrics_counter{port=\"2345\""),
-        "The expected metric line is missing from prometheus metrics output");
+    assertThat(writtenMetrics)
+        .withFailMessage("The expected metric line is missing from prometheus metrics output")
+        .contains("rpc_metrics_counter{port=\"2345\"");
 
-    Assertions.assertTrue(
-        writtenMetrics.contains("rpc_metrics_counter{port=\"1234\""),
-        "The expected metric line is missing from prometheus metrics output");
+    assertThat(writtenMetrics)
+        .withFailMessage("The expected metric line is missing from prometheus metrics output")
+        .contains("rpc_metrics_counter{port=\"1234\"");
 
     metrics.unregisterSource("FooBar");
   }
@@ -152,16 +151,16 @@ public class TestPrometheusMetricsIntegration {
     String writtenMetrics = waitForMetricsToPublish("same_name_counter");
 
     // THEN
-    Assertions.assertEquals(1, StringUtils.countMatches(writtenMetrics,
+    assertEquals(1, StringUtils.countMatches(writtenMetrics,
         "# TYPE same_name_counter"));
 
     // both metrics should be present
-    Assertions.assertTrue(
-        writtenMetrics.contains("same_name_counter{port=\"1234\""),
-        "The expected metric line is present in prometheus metrics output");
-    Assertions.assertTrue(
-        writtenMetrics.contains("same_name_counter{port=\"2345\""),
-        "The expected metric line is present in prometheus metrics output");
+    assertThat(writtenMetrics)
+        .withFailMessage("The expected metric line is present in prometheus metrics output")
+        .contains("same_name_counter{port=\"1234\"");
+    assertThat(writtenMetrics)
+        .withFailMessage("The expected metric line is present in prometheus metrics output")
+        .contains("same_name_counter{port=\"2345\"");
 
     metrics.unregisterSource("SameName");
   }
@@ -198,12 +197,12 @@ public class TestPrometheusMetricsIntegration {
 
     // THEN
     // The first metric shouldn't be present
-    Assertions.assertFalse(
-        writtenMetrics.contains("stale_metric_counter{port=\"1234\""),
-        "The expected metric line is present in prometheus metrics output");
-    Assertions.assertTrue(
-        writtenMetrics.contains("some_metric_counter{port=\"4321\""),
-        "The expected metric line is present in prometheus metrics output");
+    assertThat(writtenMetrics)
+        .withFailMessage("The expected metric line is present in prometheus metrics output")
+        .doesNotContain("stale_metric_counter{port=\"1234\"");
+    assertThat(writtenMetrics)
+        .withFailMessage("The expected metric line is present in prometheus metrics output")
+        .contains("some_metric_counter{port=\"4321\"");
 
     metrics.unregisterSource("SomeMetric");
   }

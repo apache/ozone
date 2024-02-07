@@ -48,6 +48,10 @@
     <Bug pattern="RV_RETURN_VALUE_IGNORED_BAD_PRACTICE" />
   </Match>
   <Match>
+    <Class name="~org.apache.hadoop.ozone.recon.tasks.TestNSSummaryTask.*"/>
+    <Bug pattern="SIC_INNER_SHOULD_BE_STATIC" /> <!-- Only non-static inner classes can be @Nested -->
+  </Match>
+  <Match>
     <Class name="org.apache.hadoop.ozone.recon.TestReconUtils"/>
     <Bug pattern="OBL_UNSATISFIED_OBLIGATION_EXCEPTION_EDGE" />
   </Match>

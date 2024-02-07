@@ -19,15 +19,15 @@
 
 package org.apache.hadoop.ozone.om.response.bucket;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import java.nio.file.Path;
 import java.util.UUID;
 
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -47,22 +47,22 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
  */
 public class TestOMBucketCreateResponse {
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
   private OMMetadataManager omMetadataManager;
   private BatchOperation batchOperation;
 
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        folder.newFolder().getAbsolutePath());
+        folder.toAbsolutePath().toString());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
 
-  @After
+  @AfterEach
   public void tearDown() {
     if (batchOperation != null) {
       batchOperation.close();
@@ -75,7 +75,7 @@ public class TestOMBucketCreateResponse {
     String bucketName = UUID.randomUUID().toString();
     OmBucketInfo omBucketInfo = TestOMResponseUtils.createBucket(
         volumeName, bucketName);
-    Assert.assertEquals(0,
+    assertEquals(0,
         omMetadataManager.countRowsInTable(omMetadataManager.getBucketTable()));
     OMBucketCreateResponse omBucketCreateResponse =
         new OMBucketCreateResponse(OMResponse.newBuilder()
@@ -90,15 +90,15 @@ public class TestOMBucketCreateResponse {
     // Do manual commit and see whether addToBatch is successful or not.
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
-    Assert.assertEquals(1,
+    assertEquals(1,
         omMetadataManager.countRowsInTable(omMetadataManager.getBucketTable()));
 
     Table.KeyValue<String, OmBucketInfo> keyValue =
         omMetadataManager.getBucketTable().iterator().next();
 
-    Assert.assertEquals(omMetadataManager.getBucketKey(volumeName,
+    assertEquals(omMetadataManager.getBucketKey(volumeName,
         bucketName), keyValue.getKey());
-    Assert.assertEquals(omBucketInfo, keyValue.getValue());
+    assertEquals(omBucketInfo, keyValue.getValue());
   }
 
 

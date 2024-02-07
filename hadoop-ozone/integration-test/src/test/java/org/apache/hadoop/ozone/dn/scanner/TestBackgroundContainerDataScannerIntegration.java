@@ -20,40 +20,33 @@
 package org.apache.hadoop.ozone.dn.scanner;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.ozoneimpl.BackgroundContainerDataScanner;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
-import java.util.Collection;
 import java.util.concurrent.TimeUnit;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Integration tests for the background container data scanner. This scanner
  * checks all data and metadata in the container.
  */
-@RunWith(Parameterized.class)
-public class TestBackgroundContainerDataScannerIntegration
+class TestBackgroundContainerDataScannerIntegration
     extends TestContainerScannerIntegrationAbstract {
 
-  private final ContainerCorruptions corruption;
-  private final LogCapturer logCapturer;
+  private final LogCapturer logCapturer =
+      LogCapturer.log4j2(ContainerLogger.LOG_NAME);
 
-  @Parameterized.Parameters(name = "{0}")
-  public static Collection<Object[]> supportedCorruptionTypes() {
-    // Background container data scanner should be able to detect all errors.
-    return ContainerCorruptions.getAllParamsExcept();
-  }
-
-  @BeforeClass
-  public static void init() throws Exception {
+  @BeforeAll
+  static void init() throws Exception {
     OzoneConfiguration ozoneConfig = new OzoneConfiguration();
     ozoneConfig.setBoolean(
         ContainerScannerConfiguration.HDDS_CONTAINER_SCRUB_ENABLED, true);
@@ -69,29 +62,30 @@ public class TestBackgroundContainerDataScannerIntegration
     buildCluster(ozoneConfig);
   }
 
-  public TestBackgroundContainerDataScannerIntegration(
-      ContainerCorruptions corruption) {
-    this.corruption = corruption;
-    logCapturer = GenericTestUtils.LogCapturer.log4j2(ContainerLogger.LOG_NAME);
-  }
-
   /**
    * {@link BackgroundContainerDataScanner} should detect corrupted blocks
    * in a closed container without client interaction.
    */
-  @Test
-  public void testCorruptionDetected() throws Exception {
+  @ParameterizedTest
+  // Background container data scanner should be able to detect all errors.
+  @EnumSource
+  void testCorruptionDetected(ContainerCorruptions corruption)
+      throws Exception {
+    pauseScanner();
+
     long containerID = writeDataThenCloseContainer();
     // Container corruption has not yet been introduced.
-    Assert.assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED,
-        getDnContainer(containerID).getContainerState());
+    Container<?> container = getDnContainer(containerID);
+    assertEquals(State.CLOSED, container.getContainerState());
 
-    corruption.applyTo(getDnContainer(containerID));
+    corruption.applyTo(container);
+
+    resumeScanner();
+
     // Wait for the scanner to detect corruption.
-    GenericTestUtils.waitFor(() ->
-            getDnContainer(containerID).getContainerState() ==
-                ContainerProtos.ContainerDataProto.State.UNHEALTHY,
-        500, 5000);
+    GenericTestUtils.waitFor(
+        () -> container.getContainerState() == State.UNHEALTHY,
+        500, 15_000);
 
     // Wait for SCM to get a report of the unhealthy replica.
     waitForScmToSeeUnhealthyReplica(containerID);

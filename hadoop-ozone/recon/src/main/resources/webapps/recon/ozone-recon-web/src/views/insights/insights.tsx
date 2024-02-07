@@ -95,7 +95,7 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
     // If there is only one volume, bucket selection dropdown should not be disabled.
     const isBucketSelectionDisabled = !selectedVolumes ||
         (selectedVolumes &&
-            (selectedVolumes.length > 2 &&
+            (selectedVolumes.length > 1 &&
                 (volumeBucketMap.size !== 1)));
     let bucketOptions: IOption[] = [];
     // When volume is changed and more than one volume is selected,

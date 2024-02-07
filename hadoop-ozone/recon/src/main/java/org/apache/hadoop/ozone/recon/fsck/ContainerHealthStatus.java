@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.recon.fsck;
 
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -24,6 +25,15 @@ import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaCount;
+import org.apache.hadoop.hdds.scm.container.replication.ECContainerReplicaCount;
+import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+
+import java.io.IOException;
+import org.apache.hadoop.hdds.scm.container.replication.RatisContainerReplicaCount;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -35,25 +45,46 @@ import java.util.stream.Collectors;
 
 public class ContainerHealthStatus {
 
-  private ContainerInfo container;
-  private int replicaDelta;
-  private Set<ContainerReplica> healthyReplicas;
-  private ContainerPlacementStatus placementStatus;
-  private int numReplicas;
+  private final ContainerInfo container;
+  private final int replicaDelta;
+  private final Set<ContainerReplica> healthyReplicas;
+  private final Set<ContainerReplica> healthyAvailReplicas;
+  private final ContainerPlacementStatus placementStatus;
+  private final ReconContainerMetadataManager reconContainerMetadataManager;
+  private final int numReplicas;
+  private final long numKeys;
+  private final ContainerReplicaCount containerReplicaCount;
 
   ContainerHealthStatus(ContainerInfo container,
-                        Set<ContainerReplica> healthyReplicas,
-                        PlacementPolicy placementPolicy) {
+                        Set<ContainerReplica> replicas,
+                        PlacementPolicy placementPolicy,
+                        ReconContainerMetadataManager
+                            reconContainerMetadataManager,
+                        OzoneConfiguration conf) {
+    this.reconContainerMetadataManager = reconContainerMetadataManager;
     this.container = container;
     int repFactor = container.getReplicationConfig().getRequiredNodes();
-    this.healthyReplicas = healthyReplicas
+    this.healthyReplicas = replicas
         .stream()
         .filter(r -> !r.getState()
             .equals((ContainerReplicaProto.State.UNHEALTHY)))
         .collect(Collectors.toSet());
-    this.replicaDelta = repFactor - this.healthyReplicas.size();
+    this.healthyAvailReplicas = replicas
+        .stream()
+        // Filter unhealthy replicas and
+        // replicas belonging to out-of-service nodes.
+        .filter(r ->
+            (!r.getDatanodeDetails().isDecommissioned() &&
+             !r.getDatanodeDetails().isMaintenance() &&
+             !r.getState().equals(ContainerReplicaProto.State.UNHEALTHY)))
+        .collect(Collectors.toSet());
+    this.replicaDelta = repFactor - this.healthyAvailReplicas.size();
     this.placementStatus = getPlacementStatus(placementPolicy, repFactor);
-    this.numReplicas = healthyReplicas.size();
+    this.numReplicas = replicas.size();
+    this.numKeys = getContainerKeyCount(container.getContainerID());
+
+    this.containerReplicaCount =
+        getContainerReplicaCountInstance(conf, replicas);
   }
 
   public long getContainerID() {
@@ -69,6 +100,14 @@ public class ContainerHealthStatus {
   }
 
   public boolean isHealthy() {
+    return containerReplicaCount.isHealthy();
+  }
+
+  public boolean isSufficientlyReplicated() {
+    return containerReplicaCount.isSufficientlyReplicated();
+  }
+
+  public boolean isHealthilyReplicated() {
     return replicaDelta == 0 && !isMisReplicated();
   }
 
@@ -78,11 +117,11 @@ public class ContainerHealthStatus {
   }
 
   public boolean isOverReplicated() {
-    return replicaDelta < 0;
+    return containerReplicaCount.isOverReplicated();
   }
 
   public boolean isUnderReplicated() {
-    return !isMissing() && replicaDelta > 0;
+    return !isMissing() && !containerReplicaCount.isSufficientlyReplicated();
   }
 
   public int replicaDelta() {
@@ -90,7 +129,7 @@ public class ContainerHealthStatus {
   }
 
   public int getReplicaCount() {
-    return healthyReplicas.size();
+    return healthyAvailReplicas.size();
   }
 
   public boolean isMisReplicated() {
@@ -117,11 +156,45 @@ public class ContainerHealthStatus {
     return numReplicas == 0;
   }
 
+  public boolean isEmpty() {
+    return numKeys == 0;
+  }
+
   private ContainerPlacementStatus getPlacementStatus(
       PlacementPolicy policy, int repFactor) {
     List<DatanodeDetails> dns = healthyReplicas.stream()
         .map(ContainerReplica::getDatanodeDetails)
         .collect(Collectors.toList());
     return policy.validateContainerPlacement(dns, repFactor);
+  }
+
+  private long getContainerKeyCount(long containerID) {
+    try {
+      return reconContainerMetadataManager.getKeyCountForContainer(
+          containerID);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public long getNumKeys() {
+    return numKeys;
+  }
+
+  private ContainerReplicaCount getContainerReplicaCountInstance(
+      OzoneConfiguration conf, Set<ContainerReplica> replicas) {
+    ReplicationManager.ReplicationManagerConfiguration rmConf = conf.getObject(
+        ReplicationManager.ReplicationManagerConfiguration.class);
+    boolean isEC = container.getReplicationConfig()
+                       .getReplicationType() == HddsProtos.ReplicationType.EC;
+    return isEC ?
+               new ECContainerReplicaCount(container,
+                   replicas, new ArrayList<>(),
+                   rmConf.getMaintenanceRemainingRedundancy()) :
+               // This class ignores unhealthy replicas,
+               // therefore set 'considerUnhealthy' to false.
+               new RatisContainerReplicaCount(container,
+                   replicas, new ArrayList<>(),
+                   rmConf.getMaintenanceReplicaMinimum(), false);
   }
 }

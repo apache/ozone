@@ -26,11 +26,10 @@ import java.util.Map;
 
 import org.apache.kerby.util.Hex;
 import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor.LowerCaseKeyStringMap;
+import org.junit.jupiter.api.Test;
 
-import org.junit.Assert;
-import org.junit.Test;
-
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests for {@link AuthorizationV4QueryParser}.
@@ -284,19 +283,19 @@ public class TestAuthorizationV4QueryParser {
         };
 
     final SignatureInfo signatureInfo = parser.parseSignature();
+    signatureInfo.setUnfilteredURI("/test.txt");
 
     LowerCaseKeyStringMap headers = new LowerCaseKeyStringMap();
     headers.put("host", "localhost");
 
     final String stringToSign =
         StringToSignProducer.createSignatureBase(signatureInfo, "https", "GET",
-            "/test.txt", headers,
-            queryParams);
+            headers, queryParams);
 
     MessageDigest md = MessageDigest.getInstance("SHA-256");
     md.update(canonicalRequest.getBytes(StandardCharsets.UTF_8));
 
-    Assert.assertEquals("AWS4-HMAC-SHA256\n"
+    assertEquals("AWS4-HMAC-SHA256\n"
         + DATETIME + "\n"
         + "20130524/us-east-1/s3/aws4_request\n"
         + Hex.encode(md.digest()).toLowerCase(),

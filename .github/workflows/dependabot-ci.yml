@@ -1,0 +1,78 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+name: dependabot-ci
+on:
+  pull_request:
+    types: [opened, synchronize]
+concurrency:
+  group: dependabot-ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  dependabot-check:
+    if: ${{ github.event_name == 'pull_request' && github.actor == 'dependabot[bot]' && startsWith(github.event.pull_request.title, '[Recon] Dependabot Package Upgrade') }}
+    runs-on: ubuntu-20.04
+    env:
+      CI_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      NODE_VERSION: 16.14.2
+      PNPM_VERSION: 7.33.6
+      cURL_LOC: /usr/bin/curl
+      cURL_ARGS: -fsSL
+      PNPM_URL: https://get.pnpm.io/install.sh
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Extract branch name
+        shell: bash
+        run: echo "branch_name=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
+        id: get_branch_name
+      - name: Checkout dependabot branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: ozone
+      - name: Delete the lockfile
+        working-directory: ozone
+        run: |
+          #Delete the lockfile created by dependabot
+          rm -rf hadoop-ozone/recon/src/main/resources/webapps/recon/ozone-recon-web/pnpm-lock.yaml
+      - name: Install NodeJS v${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install pnpm v${{ env.PNPM_VERSION }} and recreate lockfile
+        working-directory: ozone
+        shell: bash
+        run: |
+          # Install PNPM and recreate lockfile
+          echo "Fetching pnpm from $PNPM_URL with version $PNPM_VERSION"
+          $cURL_LOC $cURL_ARGS $PNPM_URL | env PNPM_VERSION=$PNPM_VERSION SHELL="$(which sh)" ENV="$HOME/.shrc" sh -
+          source /home/runner/.shrc
+          PNPM_EXEC=$(which pnpm)
+          echo "pnpm is present at: $PNPM_EXEC"
+          $PNPM_EXEC config set store-dir ~/.pnpm-store
+          cd hadoop-ozone/recon/src/main/resources/webapps/recon/ozone-recon-web/
+          $PNPM_EXEC install --lockfile-only
+      - name: Commit generated lockfile
+        working-directory: ozone
+        run: |
+          OZONE_SHA=$(git -C ./ rev-parse HEAD)
+          cd hadoop-ozone/recon/src/main/resources/webapps/recon/ozone-recon-web/
+          git add ./pnpm-lock.yaml
+          git status
+          git config --global user.name 'Github Actions'
+          git config --global user.email 'noreply@github.com'
+          git commit -m "[auto] Generated pnpm-lock from actions for $OZONE_SHA" || true
+          git push origin HEAD:${{ steps.get_branch_name.outputs.branch_name }}

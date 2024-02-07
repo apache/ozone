@@ -38,10 +38,10 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -62,6 +62,7 @@ public class TestRDBStoreCodecBufferIterator {
 
   @BeforeEach
   public void setup() {
+    CodecBuffer.enableLeakDetection();
     rocksIteratorMock = mock(RocksIterator.class);
     managedRocksIterator = newManagedRocksIterator();
     rdbTableMock = mock(RDBTable.class);
@@ -356,12 +357,9 @@ public class TestRDBStoreCodecBufferIterator {
       verify(rocksIteratorMock, times(1)).isValid();
       verify(rocksIteratorMock, times(1)).key(any());
 
-      try {
-        i.seekToLast();
-        fail("Prefixed iterator does not support seekToLast");
-      } catch (Exception e) {
-        assertTrue(e instanceof UnsupportedOperationException);
-      }
+      Exception e =
+          assertThrows(Exception.class, () -> i.seekToLast(), "Prefixed iterator does not support seekToLast");
+      assertInstanceOf(UnsupportedOperationException.class, e);
     }
 
     CodecTestUtil.gc();

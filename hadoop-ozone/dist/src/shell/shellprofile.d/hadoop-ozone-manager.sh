@@ -23,6 +23,6 @@ _ozone_manager_hadoop_finalize() {
      [[ -n ${OZONE_MANAGER_CLASSPATH} ]];
   then
     echo "Ozone Manager classpath extended by ${OZONE_MANAGER_CLASSPATH}"
-    ozone_add_classpath "${OZONE_MANAGER_CLASSPATH}"
+    ozone_add_to_classpath_userpath "${OZONE_MANAGER_CLASSPATH}"
   fi
 }

@@ -151,4 +151,7 @@ public class ExcludeList {
         '}';
   }
 
+  public long getExpiryTime() {
+    return expiryTime;
+  }
 }

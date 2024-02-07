@@ -45,7 +45,7 @@ import com.google.common.base.Preconditions;
  */
 public final class OmBucketInfo extends WithObjectID implements Auditable {
   private static final Codec<OmBucketInfo> CODEC = new DelegatedCodec<>(
-      Proto2Codec.get(BucketInfo.class),
+      Proto2Codec.get(BucketInfo.getDefaultInstance()),
       OmBucketInfo::getFromProtobuf,
       OmBucketInfo::getProtobuf);
 

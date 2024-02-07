@@ -47,6 +47,7 @@ public class OmMultipartInfo {
    * Return volume name.
    * @return volumeName
    */
+  @Deprecated
   public String getVolumeName() {
     return volumeName;
   }
@@ -55,6 +56,7 @@ public class OmMultipartInfo {
    * Return bucket name.
    * @return bucketName
    */
+  @Deprecated
   public String getBucketName() {
     return bucketName;
   }
@@ -63,6 +65,7 @@ public class OmMultipartInfo {
    * Return key name.
    * @return keyName
    */
+  @Deprecated
   public String getKeyName() {
     return keyName;
   }

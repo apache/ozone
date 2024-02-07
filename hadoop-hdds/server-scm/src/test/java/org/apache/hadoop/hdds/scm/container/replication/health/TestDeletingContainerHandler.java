@@ -33,10 +33,8 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -45,6 +43,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.DELETING;
 
@@ -64,11 +72,10 @@ public class TestDeletingContainerHandler {
     ecReplicationConfig = new ECReplicationConfig(3, 2);
     ratisReplicationConfig = RatisReplicationConfig.getInstance(
         HddsProtos.ReplicationFactor.THREE);
-    replicationManager = Mockito.mock(ReplicationManager.class);
+    replicationManager = mock(ReplicationManager.class);
 
-    Mockito.doNothing().when(replicationManager)
-        .updateContainerState(Mockito.any(ContainerID.class),
-            Mockito.any(HddsProtos.LifeCycleEvent.class));
+    doNothing().when(replicationManager).updateContainerState(any(ContainerID.class),
+        any(HddsProtos.LifeCycleEvent.class));
 
     deletingContainerHandler =
         new DeletingContainerHandler(replicationManager);
@@ -94,7 +101,7 @@ public class TestDeletingContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
-    Assertions.assertFalse(deletingContainerHandler.handle(request));
+    assertFalse(deletingContainerHandler.handle(request));
   }
 
   @Test
@@ -112,7 +119,7 @@ public class TestDeletingContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
-    Assertions.assertFalse(deletingContainerHandler.handle(request));
+    assertFalse(deletingContainerHandler.handle(request));
   }
 
   /**
@@ -126,29 +133,35 @@ public class TestDeletingContainerHandler {
         HddsProtos.ReplicationFactor.THREE), 1);
 
     //ec container
-    //since updateContainerState is called once when testing
-    //ratis container, so here should be 1+1 = 2 times
-    cleanupIfNoReplicaExist(ecReplicationConfig, 2);
+    cleanupIfNoReplicaExist(ecReplicationConfig, 1);
   }
 
 
   private void cleanupIfNoReplicaExist(
       ReplicationConfig replicationConfig, int times) {
+    clearInvocations(replicationManager);
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
         replicationConfig, 1, DELETING);
 
     Set<ContainerReplica> containerReplicas = new HashSet<>();
-    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+    ContainerCheckRequest.Builder builder = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
         .setReport(new ReplicationManagerReport())
         .setContainerInfo(containerInfo)
-        .setContainerReplicas(containerReplicas)
-        .build();
+        .setContainerReplicas(containerReplicas);
 
-    Assertions.assertTrue(deletingContainerHandler.handle(request));
-    Mockito.verify(replicationManager, Mockito.times(times))
-        .updateContainerState(Mockito.any(ContainerID.class),
-            Mockito.any(HddsProtos.LifeCycleEvent.class));
+    ContainerCheckRequest request = builder.build();
+
+    builder.setReadOnly(true);
+    ContainerCheckRequest readRequest = builder.build();
+
+    assertTrue(deletingContainerHandler.handle(readRequest));
+    verify(replicationManager, times(0)).updateContainerState(any(ContainerID.class),
+        any(HddsProtos.LifeCycleEvent.class));
+
+    assertTrue(deletingContainerHandler.handle(request));
+    verify(replicationManager, times(times)).updateContainerState(any(ContainerID.class),
+        any(HddsProtos.LifeCycleEvent.class));
   }
 
   /**
@@ -229,10 +242,9 @@ public class TestDeletingContainerHandler {
         .setContainerReplicas(containerReplicas)
         .build();
 
-    Assertions.assertTrue(deletingContainerHandler.handle(request));
+    assertTrue(deletingContainerHandler.handle(request));
 
-    Mockito.verify(replicationManager, Mockito.times(times))
-        .sendDeleteCommand(Mockito.any(ContainerInfo.class), Mockito.anyInt(),
-            Mockito.any(DatanodeDetails.class), Mockito.eq(false));
+    verify(replicationManager, times(times)).sendDeleteCommand(any(ContainerInfo.class), anyInt(),
+        any(DatanodeDetails.class), eq(false));
   }
 }

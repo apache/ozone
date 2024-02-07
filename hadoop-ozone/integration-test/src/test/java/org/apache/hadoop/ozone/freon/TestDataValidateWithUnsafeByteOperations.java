@@ -20,21 +20,16 @@ package org.apache.hadoop.ozone.freon;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Timeout;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Tests Freon, with MiniOzoneCluster and validate data.
  */
+@Timeout(value = 300, unit = TimeUnit.SECONDS)
 public class TestDataValidateWithUnsafeByteOperations extends TestDataValidate {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -42,7 +37,7 @@ public class TestDataValidateWithUnsafeByteOperations extends TestDataValidate {
    * Ozone is made active by setting OZONE_ENABLED = true
    *
    */
-  @BeforeClass
+  @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OzoneConfigKeys.OZONE_UNSAFEBYTEOPERATIONS_ENABLED,
@@ -53,7 +48,7 @@ public class TestDataValidateWithUnsafeByteOperations extends TestDataValidate {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @AfterClass
+  @AfterAll
   public static void shutdown() {
     shutdownCluster();
   }

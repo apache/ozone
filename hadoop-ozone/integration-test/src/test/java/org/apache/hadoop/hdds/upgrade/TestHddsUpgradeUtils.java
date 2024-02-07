@@ -34,7 +34,6 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,6 +49,11 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.ALREADY_FINALIZED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalizer.Status.FINALIZATION_DONE;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Helper methods for testing HDDS upgrade finalization in integration tests.
@@ -73,7 +77,7 @@ public final class TestHddsUpgradeUtils {
           .queryUpgradeFinalizationProgress(clientID, true, true)
           .status();
       LOG.info("Waiting for upgrade finalization to complete from client." +
-              " Current status is {}.", status);
+          " Current status is {}.", status);
       return status == FINALIZATION_DONE || status == ALREADY_FINALIZED;
     });
   }
@@ -84,11 +88,11 @@ public final class TestHddsUpgradeUtils {
   public static void testPreUpgradeConditionsSCM(
       List<StorageContainerManager> scms) {
     for (StorageContainerManager scm : scms) {
-      Assert.assertEquals(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion(),
+      assertEquals(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion(),
           scm.getLayoutVersionManager().getMetadataLayoutVersion());
       for (ContainerInfo ci : scm.getContainerManager()
           .getContainers()) {
-        Assert.assertEquals(HddsProtos.LifeCycleState.OPEN, ci.getState());
+        assertEquals(HddsProtos.LifeCycleState.OPEN, ci.getState());
       }
     }
   }
@@ -106,15 +110,15 @@ public final class TestHddsUpgradeUtils {
   }
 
   public static void testPostUpgradeConditionsSCM(StorageContainerManager scm,
-      int numContainers, int numDatanodes) {
+                                                  int numContainers, int numDatanodes) {
 
-    Assert.assertTrue(scm.getScmContext().getFinalizationCheckpoint()
+    assertTrue(scm.getScmContext().getFinalizationCheckpoint()
         .hasCrossed(FinalizationCheckpoint.FINALIZATION_COMPLETE));
 
     HDDSLayoutVersionManager scmVersionManager = scm.getLayoutVersionManager();
-    Assert.assertEquals(scmVersionManager.getSoftwareLayoutVersion(),
+    assertEquals(scmVersionManager.getSoftwareLayoutVersion(),
         scmVersionManager.getMetadataLayoutVersion());
-    Assert.assertTrue(scmVersionManager.getMetadataLayoutVersion() >= 1);
+    assertThat(scmVersionManager.getMetadataLayoutVersion()).isGreaterThanOrEqualTo(1);
 
     // SCM should not return from finalization until there is at least one
     // pipeline to use.
@@ -124,7 +128,7 @@ public final class TestHddsUpgradeUtils {
           () -> scmPipelineManager.getPipelines(RATIS_THREE, OPEN).size() >= 1,
           500, 60000);
     } catch (TimeoutException | InterruptedException e) {
-      Assert.fail("Timeout waiting for Upgrade to complete on SCM.");
+      fail("Timeout waiting for Upgrade to complete on SCM.");
     }
 
     // SCM will not return from finalization until there is at least one
@@ -137,26 +141,26 @@ public final class TestHddsUpgradeUtils {
       HddsProtos.LifeCycleState ciState = ci.getState();
       LOG.info("testPostUpgradeConditionsSCM: container state is {}",
           ciState.name());
-      Assert.assertTrue((ciState == HddsProtos.LifeCycleState.CLOSED) ||
+      assertTrue((ciState == HddsProtos.LifeCycleState.CLOSED) ||
           (ciState == HddsProtos.LifeCycleState.CLOSING) ||
           (ciState == HddsProtos.LifeCycleState.DELETING) ||
           (ciState == HddsProtos.LifeCycleState.DELETED) ||
           (ciState == HddsProtos.LifeCycleState.QUASI_CLOSED));
       countContainers++;
     }
-    Assert.assertTrue(countContainers >= numContainers);
+    assertThat(countContainers).isGreaterThanOrEqualTo(numContainers);
   }
 
   /*
    * Helper function to test Pre-Upgrade conditions on all the DataNodes.
    */
   public static void testPreUpgradeConditionsDataNodes(
-        List<HddsDatanodeService> datanodes) {
+      List<HddsDatanodeService> datanodes) {
     for (HddsDatanodeService dataNode : datanodes) {
       DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
       HDDSLayoutVersionManager dnVersionManager =
           dsm.getLayoutVersionManager();
-      Assert.assertEquals(0, dnVersionManager.getMetadataLayoutVersion());
+      assertEquals(0, dnVersionManager.getMetadataLayoutVersion());
     }
 
     int countContainers = 0;
@@ -165,12 +169,12 @@ public final class TestHddsUpgradeUtils {
       // Also verify that all the existing containers are open.
       for (Container<?> container :
           dsm.getContainer().getController().getContainers()) {
-        Assert.assertSame(container.getContainerState(),
+        assertSame(container.getContainerState(),
             ContainerProtos.ContainerDataProto.State.OPEN);
         countContainers++;
       }
     }
-    Assert.assertTrue(countContainers >= 1);
+    assertThat(countContainers).isGreaterThanOrEqualTo(1);
   }
 
   /*
@@ -204,7 +208,7 @@ public final class TestHddsUpgradeUtils {
         return true;
       }, 500, 60000);
     } catch (TimeoutException | InterruptedException e) {
-      Assert.fail("Timeout waiting for Upgrade to complete on Data Nodes.");
+      fail("Timeout waiting for Upgrade to complete on Data Nodes.");
     }
 
     int countContainers = 0;
@@ -212,21 +216,20 @@ public final class TestHddsUpgradeUtils {
       DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
       HDDSLayoutVersionManager dnVersionManager =
           dsm.getLayoutVersionManager();
-      Assert.assertEquals(dnVersionManager.getSoftwareLayoutVersion(),
+      assertEquals(dnVersionManager.getSoftwareLayoutVersion(),
           dnVersionManager.getMetadataLayoutVersion());
-      Assert.assertTrue(dnVersionManager.getMetadataLayoutVersion() >= 1);
+      assertThat(dnVersionManager.getMetadataLayoutVersion()).isGreaterThanOrEqualTo(1);
 
       // Also verify that all the existing containers are closed.
       for (Container<?> container :
-           dsm.getContainer().getController().getContainers()) {
-        Assert.assertTrue("Container had unexpected state " +
-                container.getContainerState(),
-            closeStates.stream().anyMatch(
-                state -> container.getContainerState().equals(state)));
+          dsm.getContainer().getController().getContainers()) {
+        assertTrue(closeStates.stream().anyMatch(
+                state -> container.getContainerState().equals(state)),
+            "Container had unexpected state " + container.getContainerState());
         countContainers++;
       }
     }
-    Assert.assertTrue(countContainers >= numContainers);
+    assertThat(countContainers).isGreaterThanOrEqualTo(numContainers);
   }
 
   public static void testDataNodesStateOnSCM(List<StorageContainerManager> scms,
@@ -251,14 +254,14 @@ public final class TestHddsUpgradeUtils {
       try {
         HddsProtos.NodeState dnState =
             scm.getScmNodeManager().getNodeStatus(dn).getHealth();
-        Assert.assertTrue((dnState == state) ||
+        assertTrue((dnState == state) ||
             (alternateState != null && dnState == alternateState));
       } catch (NodeNotFoundException e) {
         e.printStackTrace();
-        Assert.fail("Node not found");
+        fail("Node not found");
       }
       ++countNodes;
     }
-    Assert.assertEquals(expectedDatanodeCount, countNodes);
+    assertEquals(expectedDatanodeCount, countNodes);
   }
 }

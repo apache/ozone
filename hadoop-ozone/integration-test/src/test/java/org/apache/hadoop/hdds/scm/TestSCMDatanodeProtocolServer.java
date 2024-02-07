@@ -20,12 +20,13 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
-import org.junit.Assert;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
 
 /**
  * Test for StorageContainerDatanodeProtocolProtos.
@@ -36,7 +37,7 @@ public class TestSCMDatanodeProtocolServer {
   public void ensureTermAndDeadlineOnCommands()
       throws IOException, TimeoutException {
     OzoneStorageContainerManager scm =
-        Mockito.mock(OzoneStorageContainerManager.class);
+        mock(OzoneStorageContainerManager.class);
 
     ReplicateContainerCommand command = ReplicateContainerCommand.forTest(1);
     command.setTerm(5L);
@@ -44,9 +45,9 @@ public class TestSCMDatanodeProtocolServer {
     StorageContainerDatanodeProtocolProtos.SCMCommandProto proto =
         SCMDatanodeProtocolServer.getCommandResponse(command, scm);
 
-    Assert.assertEquals(StorageContainerDatanodeProtocolProtos.SCMCommandProto
+    assertEquals(StorageContainerDatanodeProtocolProtos.SCMCommandProto
         .Type.replicateContainerCommand, proto.getCommandType());
-    Assert.assertEquals(5L, proto.getTerm());
-    Assert.assertEquals(1234L, proto.getDeadlineMsSinceEpoch());
+    assertEquals(5L, proto.getTerm());
+    assertEquals(1234L, proto.getDeadlineMsSinceEpoch());
   }
 }

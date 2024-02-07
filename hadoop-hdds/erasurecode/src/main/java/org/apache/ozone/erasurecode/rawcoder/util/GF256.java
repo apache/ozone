@@ -17,7 +17,6 @@
  */
 package org.apache.ozone.erasurecode.rawcoder.util;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 
 /**
@@ -139,7 +138,6 @@ public final class GF256 {
       (byte) 0xaf
   };
 
-  @SuppressFBWarnings("MS_EXPOSE_REP")
   private static byte[][] theGfMulTab; // multiply result table in GF 256 space
 
   /**

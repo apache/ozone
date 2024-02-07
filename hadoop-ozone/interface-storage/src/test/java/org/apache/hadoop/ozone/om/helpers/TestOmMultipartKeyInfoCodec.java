@@ -22,14 +22,15 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.Proto2CodecTestBase;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Test {@link OmMultipartKeyInfo#getCodec()}.
@@ -58,7 +59,7 @@ public class TestOmMultipartKeyInfoCodec
     } catch (java.io.IOException e) {
       e.printStackTrace();
     }
-    Assert.assertNotNull(data);
+    assertNotNull(data);
 
     OmMultipartKeyInfo multipartKeyInfo = null;
     try {
@@ -66,17 +67,15 @@ public class TestOmMultipartKeyInfoCodec
     } catch (java.io.IOException e) {
       e.printStackTrace();
     }
-    Assert.assertEquals(omMultipartKeyInfo, multipartKeyInfo);
+    assertEquals(omMultipartKeyInfo, multipartKeyInfo);
 
     // When random byte data passed returns null.
     try {
       codec.fromPersistedFormat("random".getBytes(UTF_8));
     } catch (IllegalArgumentException ex) {
-      GenericTestUtils.assertExceptionContains("Can't encode the the raw " +
-          "data from the byte array", ex);
+      assertThat(ex).hasMessage("Can't encode the the raw data from the byte array");
     } catch (java.io.IOException e) {
       e.printStackTrace();
     }
-
   }
 }

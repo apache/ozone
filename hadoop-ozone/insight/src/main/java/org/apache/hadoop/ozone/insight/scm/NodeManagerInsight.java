@@ -27,6 +27,8 @@ import org.apache.hadoop.ozone.insight.Component.Type;
 import org.apache.hadoop.ozone.insight.LoggerSource;
 import org.apache.hadoop.ozone.insight.MetricDisplay;
 import org.apache.hadoop.ozone.insight.MetricGroupDisplay;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 
 /**
  * Insight definition to check node manager / node report events.
@@ -50,11 +52,15 @@ public class NodeManagerInsight extends BaseInsightPoint {
     MetricGroupDisplay nodes =
         new MetricGroupDisplay(Type.SCM, "Node counters");
 
-    nodes.addMetrics(
-        new MetricDisplay("Healthy Nodes", "scm_node_manager_healthy_nodes"));
-    nodes.addMetrics(
-        new MetricDisplay("Dead Nodes", "scm_node_manager_dead_nodes"));
-
+    for (NodeOperationalState opState : NodeOperationalState.values()) {
+      for (NodeState healthState : NodeState.values()) {
+        String metricId = String.format("scm_node_manager_%s_%s_nodes",
+            opState, healthState).toLowerCase();
+        String metricDescription = String.format("%s %s Nodes",
+            opState, healthState);
+        nodes.addMetrics(new MetricDisplay(metricDescription, metricId));
+      }
+    }
     display.add(nodes);
 
     MetricGroupDisplay hb =

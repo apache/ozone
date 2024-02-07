@@ -20,10 +20,8 @@ package org.apache.hadoop.ozone.om;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -35,57 +33,46 @@ import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
-import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.util.LifeCycle;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
+
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Tests OM related configurations.
  */
+@Timeout(300)
 public class TestOzoneManagerConfiguration {
-
-  /**
-    * Set a timeout for each test.
-    */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
 
   private OzoneConfiguration conf;
   private MiniOzoneCluster cluster;
-  private String omId;
-  private String clusterId;
-  private String scmId;
   private OzoneManager om;
   private OzoneManagerRatisServer omRatisServer;
 
   private static final long RATIS_RPC_TIMEOUT = 500L;
 
-  @Before
-  public void init() throws IOException {
+  @BeforeEach
+  void init(@TempDir Path metaDirPath) throws IOException {
     conf = new OzoneConfiguration();
-    omId = UUID.randomUUID().toString();
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
-    final String path = GenericTestUtils.getTempPath(omId);
-    Path metaDirPath = Paths.get(path, "om-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
     conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
     conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
         RATIS_RPC_TIMEOUT, TimeUnit.MILLISECONDS);
-    OMStorage omStore = new OMStorage(conf);
-    omStore.setClusterId("testClusterId");
-    // writes the version file properties
-    omStore.initialize();
   }
 
-  @After
+  @AfterEach
   public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
@@ -94,9 +81,6 @@ public class TestOzoneManagerConfiguration {
 
   private void startCluster() throws Exception {
     cluster =  MiniOzoneCluster.newBuilder(conf)
-      .setClusterId(clusterId)
-      .setScmId(scmId)
-      .setOmId(omId)
       .withoutDatanodes()
       .build();
     cluster.waitForClusterToBeReady();
@@ -111,7 +95,7 @@ public class TestOzoneManagerConfiguration {
     startCluster();
     om = cluster.getOzoneManager();
 
-    Assert.assertTrue(NetUtils.isLocalAddress(
+    assertTrue(NetUtils.isLocalAddress(
         om.getOmRpcServerAddr().getAddress()));
   }
 
@@ -142,16 +126,16 @@ public class TestOzoneManagerConfiguration {
 
     startCluster();
     om = cluster.getOzoneManager();
-    Assert.assertEquals("0.0.0.0",
+    assertEquals("0.0.0.0",
         om.getOmRpcServerAddr().getHostName());
-    Assert.assertEquals(OMConfigKeys.OZONE_OM_PORT_DEFAULT,
+    assertEquals(OMConfigKeys.OZONE_OM_PORT_DEFAULT,
         om.getOmRpcServerAddr().getPort());
 
     // Verify that the 2nd OMs address stored in the current OM also has the
     // default port as the port is not specified
     InetSocketAddress omNode2Addr = om.getPeerNodes().get(0).getRpcAddress();
-    Assert.assertEquals("122.0.0.122", omNode2Addr.getHostString());
-    Assert.assertEquals(OMConfigKeys.OZONE_OM_PORT_DEFAULT,
+    assertEquals("122.0.0.122", omNode2Addr.getHostString());
+    assertEquals(OMConfigKeys.OZONE_OM_PORT_DEFAULT,
         omNode2Addr.getPort());
 
   }
@@ -167,14 +151,14 @@ public class TestOzoneManagerConfiguration {
     om = cluster.getOzoneManager();
     omRatisServer = om.getOmRatisServer();
 
-    Assert.assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
+    assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
     // OM's Ratis server should have only 1 peer (itself) in its RaftGroup
     Collection<RaftPeer> peers = omRatisServer.getRaftGroup().getPeers();
-    Assert.assertEquals(1, peers.size());
+    assertEquals(1, peers.size());
 
     // The RaftPeer id should match OM_DEFAULT_NODE_ID
     RaftPeer raftPeer = peers.toArray(new RaftPeer[1])[0];
-    Assert.assertEquals(OzoneConsts.OM_DEFAULT_NODE_ID,
+    assertEquals(OzoneConsts.OM_DEFAULT_NODE_ID,
         raftPeer.getId().toString());
   }
 
@@ -218,15 +202,15 @@ public class TestOzoneManagerConfiguration {
     om = cluster.getOzoneManager();
     omRatisServer = om.getOmRatisServer();
 
-    Assert.assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
+    assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
 
     // OM's Ratis server should have 3 peers in its RaftGroup
     Collection<RaftPeer> peers = omRatisServer.getRaftGroup().getPeers();
-    Assert.assertEquals(3, peers.size());
+    assertEquals(3, peers.size());
 
     // Ratis server RaftPeerId should match with omNode2 ID as node2 is the
     // localhost
-    Assert.assertEquals(omNode2Id, omRatisServer.getRaftPeerId().toString());
+    assertEquals(omNode2Id, omRatisServer.getRaftPeerId().toString());
 
     // Verify peer details
     for (RaftPeer peer : peers) {
@@ -245,9 +229,9 @@ public class TestOzoneManagerConfiguration {
         // Ratis port is not set for node3. So it should take the default port
         expectedPeerAddress = "124.0.0.124:9898";
         break;
-      default : Assert.fail("Unrecognized RaftPeerId");
+      default : fail("Unrecognized RaftPeerId");
       }
-      Assert.assertEquals(expectedPeerAddress, peer.getAddress());
+      assertEquals(expectedPeerAddress, peer.getAddress());
     }
   }
 
@@ -296,19 +280,19 @@ public class TestOzoneManagerConfiguration {
     // Verify Peer details
     List<OMNodeDetails> peerNodes = om.getPeerNodes();
     for (OMNodeDetails peerNode : peerNodes) {
-      Assert.assertTrue(peerNode.isHostUnresolved());
-      Assert.assertNull(peerNode.getInetAddress());
+      assertTrue(peerNode.isHostUnresolved());
+      assertNull(peerNode.getInetAddress());
     }
 
-    Assert.assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
+    assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
 
     // OM's Ratis server should have 3 peers in its RaftGroup
     Collection<RaftPeer> peers = omRatisServer.getRaftGroup().getPeers();
-    Assert.assertEquals(3, peers.size());
+    assertEquals(3, peers.size());
 
     // Ratis server RaftPeerId should match with omNode2 ID as node2 is the
     // localhost
-    Assert.assertEquals(omNode2Id, omRatisServer.getRaftPeerId().toString());
+    assertEquals(omNode2Id, omRatisServer.getRaftPeerId().toString());
 
     // Verify peer details
     for (RaftPeer peer : peers) {
@@ -328,19 +312,18 @@ public class TestOzoneManagerConfiguration {
         // Ratis port is not set for node3. So it should take the default port
         expectedPeerAddress = node3Hostname + ":9898";
         break;
-      default : Assert.fail("Unrecognized RaftPeerId");
+      default : fail("Unrecognized RaftPeerId");
       }
-      Assert.assertEquals(expectedPeerAddress, peer.getAddress());
+      assertEquals(expectedPeerAddress, peer.getAddress());
     }
   }
 
   /**
    * Test a wrong configuration for OM HA. A configuration with none of the
    * OM addresses matching the local address should throw an error.
-   * @throws Exception
    */
   @Test
-  public void testWrongConfiguration() throws Exception {
+  public void testWrongConfiguration() {
     String omServiceId = "om-service-test1";
 
     String omNode1Id = "omNode1";
@@ -362,14 +345,9 @@ public class TestOzoneManagerConfiguration {
     conf.set(omNode2RpcAddrKey, "125.0.0.2:9862");
     conf.set(omNode3RpcAddrKey, "124.0.0.124:9862");
 
-    try {
-      startCluster();
-      Assert.fail("Wrong Configuration. OM initialization should have failed.");
-    } catch (OzoneIllegalArgumentException e) {
-      GenericTestUtils.assertExceptionContains("Configuration has no " +
-          OMConfigKeys.OZONE_OM_ADDRESS_KEY + " address that matches local " +
-          "node's address.", e);
-    }
+    OzoneIllegalArgumentException exception = assertThrows(OzoneIllegalArgumentException.class, this::startCluster);
+    assertThat(exception).hasMessage(
+        "Configuration has no " + OZONE_OM_ADDRESS_KEY + " address that matches local node's address.");
   }
 
   /**
@@ -382,15 +360,10 @@ public class TestOzoneManagerConfiguration {
     String omServiceId = "service1";
     conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, omServiceId);
     // Deliberately skip OZONE_OM_NODES_KEY and OZONE_OM_ADDRESS_KEY config
-
-    try {
-      startCluster();
-      Assert.fail("Should have failed to start the cluster!");
-    } catch (OzoneIllegalArgumentException e) {
-      // Expect error message
-      Assert.assertTrue(e.getMessage().contains(
-          "List of OM Node ID's should be specified"));
-    }
+    OzoneIllegalArgumentException e =
+        assertThrows(OzoneIllegalArgumentException.class, () -> startCluster());
+    // Expect error message
+    assertTrue(e.getMessage().contains("List of OM Node ID's should be specified"));
   }
 
   /**
@@ -412,15 +385,9 @@ public class TestOzoneManagerConfiguration {
     conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, omServiceId);
     conf.set(omNodesKey, omNodesKeyValue);
     // Deliberately skip OZONE_OM_ADDRESS_KEY config
-
-    try {
-      startCluster();
-      Assert.fail("Should have failed to start the cluster!");
-    } catch (OzoneIllegalArgumentException e) {
-      // Expect error message
-      Assert.assertTrue(e.getMessage().contains(
-          "OM RPC Address should be set for all node"));
-    }
+    OzoneIllegalArgumentException e = assertThrows(OzoneIllegalArgumentException.class, () -> startCluster());
+    // Expect error message
+    assertTrue(e.getMessage().contains("OM RPC Address should be set for all node"));
   }
 
   /**
@@ -468,20 +435,20 @@ public class TestOzoneManagerConfiguration {
     om = cluster.getOzoneManager();
     omRatisServer = om.getOmRatisServer();
 
-    Assert.assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
+    assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
 
     // OM's Ratis server should have 3 peers in its RaftGroup
     Collection<RaftPeer> peers = omRatisServer.getRaftGroup().getPeers();
-    Assert.assertEquals(3, peers.size());
+    assertEquals(3, peers.size());
 
     // Verify that the serviceId and nodeId match the node with the localhost
     // address - om-service-test2 and omNode2
-    Assert.assertEquals(om2ServiceId, om.getOMServiceId());
-    Assert.assertEquals(omNode2Id, omRatisServer.getRaftPeerId().toString());
+    assertEquals(om2ServiceId, om.getOMServiceId());
+    assertEquals(omNode2Id, omRatisServer.getRaftPeerId().toString());
   }
 
   private String getOMAddrKeyWithSuffix(String serviceId, String nodeId) {
-    return ConfUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_ADDRESS_KEY,
+    return ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY,
         serviceId, nodeId);
   }
 }

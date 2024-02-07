@@ -24,7 +24,6 @@ import java.net.InetSocketAddress;
 import java.net.URL;
 import java.net.URLConnection;
 
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManagerHttpServer;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
@@ -33,20 +32,21 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
-import org.apache.ozone.test.GenericTestUtils;
 
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test http server os SCM with various HTTP option.
  */
 public class TestStorageContainerManagerHttpServer {
-  private static final String BASEDIR = GenericTestUtils
-      .getTempPath(TestStorageContainerManagerHttpServer.class.getSimpleName());
+  @TempDir
+  private static File baseDir;
   private static String keystoresDir;
   private static String sslConfDir;
   private static OzoneConfiguration conf;
@@ -54,12 +54,10 @@ public class TestStorageContainerManagerHttpServer {
 
   @BeforeAll
   public static void setUp() throws Exception {
-    File base = new File(BASEDIR);
-    FileUtil.fullyDelete(base);
-    File ozoneMetadataDirectory = new File(BASEDIR, "metadata");
+    File ozoneMetadataDirectory = new File(baseDir, "metadata");
     ozoneMetadataDirectory.mkdirs();
     conf = new OzoneConfiguration();
-    keystoresDir = new File(BASEDIR).getAbsolutePath();
+    keystoresDir = baseDir.getAbsolutePath();
     sslConfDir = KeyStoreTestUtil.getClasspathDir(
         TestStorageContainerManagerHttpServer.class);
     KeyStoreTestUtil.setupSSLConfig(keystoresDir, sslConfDir, conf, false);
@@ -76,7 +74,6 @@ public class TestStorageContainerManagerHttpServer {
   @AfterAll
   public static void tearDown() throws Exception {
     connectionFactory.destroy();
-    FileUtil.fullyDelete(new File(BASEDIR));
     KeyStoreTestUtil.cleanupSSLConfig(keystoresDir, sslConfDir);
   }
 
@@ -95,15 +92,15 @@ public class TestStorageContainerManagerHttpServer {
       server = new StorageContainerManagerHttpServer(conf, null);
       server.start();
 
-      Assertions.assertTrue(implies(policy.isHttpEnabled(),
+      assertTrue(implies(policy.isHttpEnabled(),
           canAccess("http", server.getHttpAddress())));
-      Assertions.assertTrue(implies(policy.isHttpEnabled() &&
+      assertTrue(implies(policy.isHttpEnabled() &&
               !policy.isHttpsEnabled(),
           !canAccess("https", server.getHttpsAddress())));
 
-      Assertions.assertTrue(implies(policy.isHttpsEnabled(),
+      assertTrue(implies(policy.isHttpsEnabled(),
           canAccess("https", server.getHttpsAddress())));
-      Assertions.assertTrue(implies(policy.isHttpsEnabled() &&
+      assertTrue(implies(policy.isHttpsEnabled() &&
               !policy.isHttpEnabled(),
           !canAccess("http", server.getHttpAddress())));
 

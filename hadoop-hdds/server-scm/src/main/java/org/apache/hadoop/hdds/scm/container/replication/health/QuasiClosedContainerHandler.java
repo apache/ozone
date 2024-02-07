@@ -36,6 +36,9 @@ import java.util.stream.Collectors;
  * Class for handling containers that are in QUASI_CLOSED state. This will
  * send commands to Datanodes to force close these containers if they satisfy
  * the requirements to be force closed. Only meant for RATIS containers.
+ *
+ * Note - this handler always returns false so further handlers can can for
+ * under and over replication etc.
  */
 public class QuasiClosedContainerHandler extends AbstractCheck {
   public static final Logger LOG =
@@ -69,8 +72,9 @@ public class QuasiClosedContainerHandler extends AbstractCheck {
 
     Set<ContainerReplica> replicas = request.getContainerReplicas();
     if (canForceCloseContainer(containerInfo, replicas)) {
-      forceCloseContainer(containerInfo, replicas);
-      return true;
+      if (!request.isReadOnly()) {
+        forceCloseContainer(containerInfo, replicas);
+      }
     } else {
       LOG.debug("Container {} cannot be force closed and is stuck in " +
               "QUASI_CLOSED", containerInfo);
@@ -78,6 +82,8 @@ public class QuasiClosedContainerHandler extends AbstractCheck {
           ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK,
           containerInfo.containerID());
     }
+    // Always return false, even if commands were sent. That way, under and
+    // over replication handlers can to check for other issues in the container.
     return false;
   }
 

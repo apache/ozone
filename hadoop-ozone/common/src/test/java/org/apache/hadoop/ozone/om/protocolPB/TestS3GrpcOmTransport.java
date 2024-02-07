@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.protocolPB;
 
 import static org.apache.hadoop.ozone.ClientVersion.CURRENT_VERSION;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.Mockito.mock;
 
@@ -37,10 +38,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.junit.Assert;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.Before;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
@@ -48,7 +47,7 @@ import java.io.IOException;
 import com.google.protobuf.ServiceException;
 import org.apache.ratis.protocol.RaftPeerId;
 
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.apache.hadoop.ozone.om.OMConfigKeys
     .OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH;
 
@@ -56,21 +55,20 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys
  * Tests for GrpcOmTransport client.
  */
 public class TestS3GrpcOmTransport {
-  @Rule
-  public final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
+  private final GrpcCleanupRule grpcCleanup = new GrpcCleanupRule();
 
   private static final Logger LOG =
       LoggerFactory.getLogger(TestS3GrpcOmTransport.class);
 
-  private final String leaderOMNodeId = "TestOM";
+  private static final String LEADER_OM_NODE_ID = "TestOM";
 
   private final OMResponse omResponse = OMResponse.newBuilder()
-                  .setSuccess(true)
-                  .setStatus(org.apache.hadoop.ozone.protocol
-                      .proto.OzoneManagerProtocolProtos.Status.OK)
-                  .setLeaderOMNodeId(leaderOMNodeId)
-                  .setCmdType(Type.AllocateBlock)
-                  .build();
+      .setSuccess(true)
+      .setStatus(org.apache.hadoop.ozone.protocol
+          .proto.OzoneManagerProtocolProtos.Status.OK)
+      .setLeaderOMNodeId(LEADER_OM_NODE_ID)
+      .setCmdType(Type.AllocateBlock)
+      .build();
 
   private boolean doFailover = false;
 
@@ -96,8 +94,8 @@ public class TestS3GrpcOmTransport {
 
   private final OzoneManagerServiceGrpc.OzoneManagerServiceImplBase
       serviceImpl =
-        mock(OzoneManagerServiceGrpc.OzoneManagerServiceImplBase.class,
-            delegatesTo(
+      mock(OzoneManagerServiceGrpc.OzoneManagerServiceImplBase.class,
+          delegatesTo(
               new OzoneManagerServiceGrpc.OzoneManagerServiceImplBase() {
                 @Override
                 public void submitRequest(org.apache.hadoop.ozone.protocol.proto
@@ -107,7 +105,7 @@ public class TestS3GrpcOmTransport {
                                               .hadoop.ozone.protocol.proto
                                               .OzoneManagerProtocolProtos
                                               .OMResponse>
-                                          responseObserver) {
+                                              responseObserver) {
                   try {
                     if (doFailover) {
                       doFailover = false;
@@ -128,7 +126,7 @@ public class TestS3GrpcOmTransport {
 
   private GrpcOmTransport client;
 
-  @Before
+  @BeforeEach
   public void setUp() throws Exception {
     // Generate a unique in-process server name.
     serverName = InProcessServerBuilder.generateName();
@@ -167,9 +165,9 @@ public class TestS3GrpcOmTransport {
     client.startClient(channel);
 
     final OMResponse resp = client.submitRequest(omRequest);
-    Assert.assertEquals(resp.getStatus(), org.apache.hadoop.ozone.protocol
+    assertEquals(resp.getStatus(), org.apache.hadoop.ozone.protocol
         .proto.OzoneManagerProtocolProtos.Status.OK);
-    Assert.assertEquals(resp.getLeaderOMNodeId(), leaderOMNodeId);
+    assertEquals(resp.getLeaderOMNodeId(), LEADER_OM_NODE_ID);
   }
 
   @Test
@@ -191,9 +189,9 @@ public class TestS3GrpcOmTransport {
     // failover is performed and request is internally retried
     // second invocation request to server succeeds
     final OMResponse resp = client.submitRequest(omRequest);
-    Assert.assertEquals(resp.getStatus(), org.apache.hadoop.ozone.protocol
+    assertEquals(resp.getStatus(), org.apache.hadoop.ozone.protocol
         .proto.OzoneManagerProtocolProtos.Status.OK);
-    Assert.assertEquals(resp.getLeaderOMNodeId(), leaderOMNodeId);
+    assertEquals(resp.getLeaderOMNodeId(), LEADER_OM_NODE_ID);
   }
 
   @Test
@@ -217,12 +215,7 @@ public class TestS3GrpcOmTransport {
     // OMFailoverProvider returns Fail retry due to #attempts >
     // max failovers
 
-    try {
-      final OMResponse resp = client.submitRequest(omRequest);
-      fail();
-    } catch (Exception e) {
-      Assert.assertTrue(true);
-    }
+    assertThrows(Exception.class, () -> client.submitRequest(omRequest));
   }
 
   @Test
@@ -252,11 +245,6 @@ public class TestS3GrpcOmTransport {
     // len > 0, causing RESOURCE_EXHAUSTED exception.
     // This exception should cause failover to NOT retry,
     // rather to fail.
-    try {
-      final OMResponse resp = client.submitRequest(omRequest);
-      fail();
-    } catch (Exception e) {
-      Assert.assertTrue(true);
-    }
+    assertThrows(Exception.class, () -> client.submitRequest(omRequest));
   }
 }

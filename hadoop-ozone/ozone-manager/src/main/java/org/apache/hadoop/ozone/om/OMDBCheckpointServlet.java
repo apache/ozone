@@ -36,7 +36,8 @@ import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 
-import org.jetbrains.annotations.NotNull;
+import com.google.common.base.Preconditions;
+import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -241,9 +242,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     long startTime = System.currentTimeMillis();
     long pauseCounter = PAUSE_COUNTER.incrementAndGet();
 
-    // Pause compactions, Copy/link files and get checkpoint.
     try {
       LOG.info("Compaction pausing {} started.", pauseCounter);
+      // Pause compactions, Copy/link files and get checkpoint.
       differ.incrementTarballRequestCount();
       FileUtils.copyDirectory(compactionLogDir.getOriginalDir(),
           compactionLogDir.getTmpDir());
@@ -252,13 +253,9 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
       checkpoint = getDbStore().getCheckpoint(flush);
     } finally {
       // Unpause the compaction threads.
-      synchronized (getDbStore().getRocksDBCheckpointDiffer()) {
-        differ.decrementTarballRequestCount();
-        differ.notifyAll();
-        long elapsedTime = System.currentTimeMillis() - startTime;
-        LOG.info("Compaction pausing {} ended. Elapsed ms: {}",
-            pauseCounter, elapsedTime);
-      }
+      differ.decrementTarballRequestCountAndNotify();
+      long elapsedTime = System.currentTimeMillis() - startTime;
+      LOG.info("Compaction pausing {} ended. Elapsed ms: {}", pauseCounter, elapsedTime);
     }
     return checkpoint;
   }
@@ -594,16 +591,28 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
     if (completed) {
       // Only create the hard link list for the last tarball.
       if (!hardLinkFiles.isEmpty()) {
-        Path hardLinkFile = createHardLinkList(truncateLength, hardLinkFiles);
-        includeFile(hardLinkFile.toFile(), OmSnapshotManager.OM_HARDLINK_FILE,
-            archiveOutputStream);
+        Path hardLinkFile = null;
+        try {
+          hardLinkFile = createHardLinkList(truncateLength, hardLinkFiles);
+          includeFile(hardLinkFile.toFile(), OmSnapshotManager.OM_HARDLINK_FILE,
+              archiveOutputStream);
+        } finally {
+          if (Objects.nonNull(hardLinkFile)) {
+            try {
+              Files.delete(hardLinkFile);
+            } catch (Exception e) {
+              LOG.error("Exception during hard link file: {} deletion",
+                  hardLinkFile, e);
+            }
+          }
+        }
       }
       // Mark tarball completed.
       includeRatisSnapshotCompleteFlag(archiveOutputStream);
     }
   }
 
-  @NotNull
+  @Nonnull
   private static Path getMetaDirPath(Path checkpointLocation) {
     // This check is done to take care of findbugs else below getParent()
     // should not be null.
@@ -632,41 +641,44 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
   }
 
   static class Lock extends BootstrapStateHandler.Lock {
-    private final BootstrapStateHandler keyDeletingService;
-    private final BootstrapStateHandler sstFilteringService;
-    private final BootstrapStateHandler rocksDbCheckpointDiffer;
-    private final BootstrapStateHandler snapshotDeletingService;
+    private final List<BootstrapStateHandler.Lock> locks;
     private final OzoneManager om;
 
     Lock(OzoneManager om) {
+      Preconditions.checkNotNull(om);
+      Preconditions.checkNotNull(om.getKeyManager());
+      Preconditions.checkNotNull(om.getMetadataManager());
+      Preconditions.checkNotNull(om.getMetadataManager().getStore());
+
       this.om = om;
-      keyDeletingService = om.getKeyManager().getDeletingService();
-      sstFilteringService = om.getKeyManager().getSnapshotSstFilteringService();
-      rocksDbCheckpointDiffer = om.getMetadataManager().getStore()
-          .getRocksDBCheckpointDiffer();
-      snapshotDeletingService = om.getKeyManager().getSnapshotDeletingService();
+
+      locks = Stream.of(
+          om.getKeyManager().getDeletingService(),
+          om.getKeyManager().getSnapshotSstFilteringService(),
+          om.getMetadataManager().getStore().getRocksDBCheckpointDiffer(),
+          om.getKeyManager().getSnapshotDeletingService()
+      )
+          .filter(Objects::nonNull)
+          .map(BootstrapStateHandler::getBootstrapStateLock)
+          .collect(Collectors.toList());
     }
 
     @Override
     public BootstrapStateHandler.Lock lock()
         throws InterruptedException {
       // First lock all the handlers.
-      keyDeletingService.getBootstrapStateLock().lock();
-      sstFilteringService.getBootstrapStateLock().lock();
-      rocksDbCheckpointDiffer.getBootstrapStateLock().lock();
-      snapshotDeletingService.getBootstrapStateLock().lock();
+      for (BootstrapStateHandler.Lock lock : locks) {
+        lock.lock();
+      }
 
       // Then wait for the double buffer to be flushed.
-      om.getOmRatisServer().getOmStateMachine().awaitDoubleBufferFlush();
+      om.awaitDoubleBufferFlush();
       return this;
     }
 
     @Override
     public void unlock() {
-      snapshotDeletingService.getBootstrapStateLock().unlock();
-      rocksDbCheckpointDiffer.getBootstrapStateLock().unlock();
-      sstFilteringService.getBootstrapStateLock().unlock();
-      keyDeletingService.getBootstrapStateLock().unlock();
+      locks.forEach(BootstrapStateHandler.Lock::unlock);
     }
   }
 }

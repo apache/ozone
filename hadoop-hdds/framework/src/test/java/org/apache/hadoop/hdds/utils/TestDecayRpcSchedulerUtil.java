@@ -21,11 +21,12 @@ package org.apache.hadoop.hdds.utils;
 
 import java.util.Optional;
 import org.apache.hadoop.metrics2.MetricsTag;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test class for DecayRpcSchedulerUtil.
@@ -86,7 +87,7 @@ public class TestDecayRpcSchedulerUtil {
         DecayRpcSchedulerUtil.createUsernameTag(username);
 
     // THEN
-    Assertions.assertFalse(optionalMetricsTag.isPresent());
+    assertFalse(optionalMetricsTag.isPresent());
   }
 
   @Test
@@ -99,10 +100,10 @@ public class TestDecayRpcSchedulerUtil {
         DecayRpcSchedulerUtil.createUsernameTag(username);
 
     // THEN
-    Assertions.assertTrue(optionalMetricsTag.isPresent());
-    Assertions.assertEquals(username, optionalMetricsTag.get().value());
-    Assertions.assertEquals(username, optionalMetricsTag.get().name());
-    Assertions.assertEquals("caller username",
+    assertTrue(optionalMetricsTag.isPresent());
+    assertEquals(username, optionalMetricsTag.get().value());
+    assertEquals(username, optionalMetricsTag.get().name());
+    assertEquals("caller username",
         optionalMetricsTag.get().description());
   }
 }

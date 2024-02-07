@@ -18,6 +18,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,10 +30,10 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.util.ClosableIterator;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -44,7 +45,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * Test persistent list backed by RocksDB.
  */
 public class TestRocksDbPersistentList {
-  private static File file;
+  @TempDir
+  private static Path tempDir;
   private static ManagedRocksDB db;
   private static ManagedDBOptions dbOptions;
   private static ManagedColumnFamilyOptions columnFamilyOptions;
@@ -55,7 +57,7 @@ public class TestRocksDbPersistentList {
     dbOptions.setCreateIfMissing(true);
     columnFamilyOptions = new ManagedColumnFamilyOptions();
 
-    file = new File("./test-persistent-list");
+    File file = tempDir.resolve("./test-persistent-list").toFile();
     if (!file.mkdirs() && !file.exists()) {
       throw new IllegalArgumentException("Unable to create directory " +
           file);
@@ -86,8 +88,6 @@ public class TestRocksDbPersistentList {
     if (db != null) {
       db.close();
     }
-
-    GenericTestUtils.deleteDirectory(file);
   }
 
   @Test

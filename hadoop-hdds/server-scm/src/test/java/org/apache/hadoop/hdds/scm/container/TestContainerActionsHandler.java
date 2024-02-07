@@ -25,8 +25,8 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerActionsFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -39,7 +39,7 @@ public class TestContainerActionsHandler {
   public void testCloseContainerAction() {
     EventQueue queue = new EventQueue();
     ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
-    CloseContainerEventHandler closeContainerEventHandler = Mockito.mock(
+    CloseContainerEventHandler closeContainerEventHandler = mock(
         CloseContainerEventHandler.class);
     queue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerEventHandler);
     queue.addHandler(SCMEvents.CONTAINER_ACTIONS, actionsHandler);

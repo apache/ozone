@@ -36,11 +36,8 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.ozone.test.TestClock;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
-import org.mockito.Mockito;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -51,15 +48,37 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.scm.container.balancer.MoveManager.MoveResult.COMPLETED;
+import static org.apache.hadoop.hdds.scm.container.balancer.MoveManager.MoveResult.DELETE_FAIL_POLICY;
+import static org.apache.hadoop.hdds.scm.container.balancer.MoveManager.MoveResult.DELETION_FAIL_NODE_NOT_IN_SERVICE;
+import static org.apache.hadoop.hdds.scm.container.balancer.MoveManager.MoveResult.DELETION_FAIL_NODE_UNHEALTHY;
+import static org.apache.hadoop.hdds.scm.container.balancer.MoveManager.MoveResult.DELETION_FAIL_TIME_OUT;
+import static org.apache.hadoop.hdds.scm.container.balancer.MoveManager.MoveResult.FAIL_CONTAINER_ALREADY_BEING_MOVED;
+import static org.apache.hadoop.hdds.scm.container.balancer.MoveManager.MoveResult.FAIL_UNEXPECTED_ERROR;
+import static org.apache.hadoop.hdds.scm.container.balancer.MoveManager.MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED;
+import static org.apache.hadoop.hdds.scm.container.balancer.MoveManager.MoveResult.REPLICATION_FAIL_EXIST_IN_TARGET;
+import static org.apache.hadoop.hdds.scm.container.balancer.MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_DELETION;
+import static org.apache.hadoop.hdds.scm.container.balancer.MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_REPLICATION;
+import static org.apache.hadoop.hdds.scm.container.balancer.MoveManager.MoveResult.REPLICATION_FAIL_NODE_NOT_IN_SERVICE;
+import static org.apache.hadoop.hdds.scm.container.balancer.MoveManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY;
+import static org.apache.hadoop.hdds.scm.container.balancer.MoveManager.MoveResult.REPLICATION_FAIL_NOT_EXIST_IN_SOURCE;
+import static org.apache.hadoop.hdds.scm.container.balancer.MoveManager.MoveResult.REPLICATION_FAIL_TIME_OUT;
+import static org.apache.hadoop.hdds.scm.container.balancer.MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE;
+import static org.apache.hadoop.hdds.scm.container.balancer.MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_BEFORE_MOVE;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
 
 /**
  * Tests for the MoveManager class.
@@ -77,7 +96,7 @@ public class TestMoveManager {
   private DatanodeDetails src;
   private DatanodeDetails tgt;
 
-  @Before
+  @BeforeEach
   public void setup() throws ContainerNotFoundException,
       NodeNotFoundException {
     clock = TestClock.newInstance();
@@ -92,20 +111,20 @@ public class TestMoveManager {
 
   private void setupMocks() throws ContainerNotFoundException,
       NodeNotFoundException {
-    replicationManager = Mockito.mock(ReplicationManager.class);
-    containerManager = Mockito.mock(ContainerManager.class);
-    Mockito.when(containerManager.getContainer(eq(containerInfo.containerID())))
+    replicationManager = mock(ReplicationManager.class);
+    containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainer(eq(containerInfo.containerID())))
         .thenReturn(containerInfo);
-    Mockito.when(containerManager.getContainerReplicas(
+    when(containerManager.getContainerReplicas(
         containerInfo.containerID()))
         .thenReturn(replicas);
-    Mockito.when(replicationManager.getNodeStatus(any()))
+    when(replicationManager.getNodeStatus(any()))
         .thenAnswer(i -> nodes.get(i.getArgument(0)));
-    Mockito.when(replicationManager.getPendingReplicationOps(any()))
+    when(replicationManager.getPendingReplicationOps(any()))
         .thenReturn(pendingOps);
-    Mockito.when(replicationManager.getContainerReplicationHealth(any(), any()))
+    when(replicationManager.getContainerReplicationHealth(any(), any()))
         .thenReturn(new ContainerHealthResult.HealthyResult(containerInfo));
-    Mockito.when(replicationManager.getClock()).thenReturn(clock);
+    when(replicationManager.getClock()).thenReturn(clock);
 
     moveManager = new MoveManager(replicationManager, containerManager);
   }
@@ -113,7 +132,7 @@ public class TestMoveManager {
   @Test
   public void testMoveSourceOrDestNotInService() throws NodeNotFoundException,
       ContainerReplicaNotFoundException, ContainerNotFoundException,
-      TimeoutException, ExecutionException, InterruptedException {
+      ExecutionException, InterruptedException {
     replicas.addAll(ReplicationTestUtil
         .createReplicas(containerInfo.containerID(), 0, 0, 0));
     Iterator<ContainerReplica> iterator = replicas.iterator();
@@ -122,28 +141,26 @@ public class TestMoveManager {
 
     nodes.put(src, NodeStatus.inServiceStale());
     nodes.put(tgt, NodeStatus.inServiceHealthy());
-    assertMoveFailsWith(MoveManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY,
+    assertMoveFailsWith(REPLICATION_FAIL_NODE_UNHEALTHY,
         containerInfo.containerID());
 
     nodes.put(src, NodeStatus.inServiceHealthy());
     nodes.put(tgt, NodeStatus.inServiceStale());
-    assertMoveFailsWith(MoveManager.MoveResult.REPLICATION_FAIL_NODE_UNHEALTHY,
+    assertMoveFailsWith(REPLICATION_FAIL_NODE_UNHEALTHY,
         containerInfo.containerID());
 
     nodes.put(src, new NodeStatus(
         HddsProtos.NodeOperationalState.DECOMMISSIONING,
         HddsProtos.NodeState.HEALTHY));
     nodes.put(tgt, NodeStatus.inServiceHealthy());
-    assertMoveFailsWith(
-        MoveManager.MoveResult.REPLICATION_FAIL_NODE_NOT_IN_SERVICE,
+    assertMoveFailsWith(REPLICATION_FAIL_NODE_NOT_IN_SERVICE,
         containerInfo.containerID());
 
     nodes.put(src, NodeStatus.inServiceHealthy());
     nodes.put(tgt, new NodeStatus(
         HddsProtos.NodeOperationalState.DECOMMISSIONING,
         HddsProtos.NodeState.HEALTHY));
-    assertMoveFailsWith(
-        MoveManager.MoveResult.REPLICATION_FAIL_NODE_NOT_IN_SERVICE,
+    assertMoveFailsWith(REPLICATION_FAIL_NODE_NOT_IN_SERVICE,
         containerInfo.containerID());
   }
 
@@ -154,8 +171,7 @@ public class TestMoveManager {
     nodes.put(src, NodeStatus.inServiceHealthy());
     nodes.put(tgt, NodeStatus.inServiceHealthy());
 
-    assertMoveFailsWith(
-        MoveManager.MoveResult.REPLICATION_FAIL_NOT_EXIST_IN_SOURCE,
+    assertMoveFailsWith(REPLICATION_FAIL_NOT_EXIST_IN_SOURCE,
         containerInfo.containerID());
   }
 
@@ -169,8 +185,7 @@ public class TestMoveManager {
     nodes.put(src, NodeStatus.inServiceHealthy());
     nodes.put(tgt, NodeStatus.inServiceHealthy());
 
-    assertMoveFailsWith(
-        MoveManager.MoveResult.REPLICATION_FAIL_EXIST_IN_TARGET,
+    assertMoveFailsWith(REPLICATION_FAIL_EXIST_IN_TARGET,
         containerInfo.containerID());
   }
 
@@ -186,14 +201,12 @@ public class TestMoveManager {
 
     pendingOps.add(new ContainerReplicaOp(ADD, tgt, 0, clock.millis()));
 
-    assertMoveFailsWith(
-        MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_REPLICATION,
+    assertMoveFailsWith(REPLICATION_FAIL_INFLIGHT_REPLICATION,
         containerInfo.containerID());
 
     pendingOps.clear();
     pendingOps.add(new ContainerReplicaOp(DELETE, src, 0, clock.millis()));
-    assertMoveFailsWith(
-        MoveManager.MoveResult.REPLICATION_FAIL_INFLIGHT_DELETION,
+    assertMoveFailsWith(REPLICATION_FAIL_INFLIGHT_DELETION,
         containerInfo.containerID());
   }
 
@@ -211,8 +224,7 @@ public class TestMoveManager {
     nodes.put(src, NodeStatus.inServiceHealthy());
     nodes.put(tgt, NodeStatus.inServiceHealthy());
 
-    assertMoveFailsWith(
-        MoveManager.MoveResult.REPLICATION_FAIL_CONTAINER_NOT_CLOSED,
+    assertMoveFailsWith(REPLICATION_FAIL_CONTAINER_NOT_CLOSED,
         containerInfo.containerID());
   }
 
@@ -233,7 +245,7 @@ public class TestMoveManager {
     nodes.put(tgt, NodeStatus.inServiceHealthy());
 
     // Return healthy before move but mis replicated after move
-    Mockito.when(replicationManager.getContainerReplicationHealth(any(), any()))
+    when(replicationManager.getContainerReplicationHealth(any(), any()))
         .thenAnswer(invocationOnMock -> {
           Set<ContainerReplica> replicasBeingChecked =
               invocationOnMock.getArgument(1);
@@ -247,8 +259,7 @@ public class TestMoveManager {
           }
         });
 
-    assertMoveFailsWith(
-        MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_AFTER_MOVE,
+    assertMoveFailsWith(REPLICATION_NOT_HEALTHY_AFTER_MOVE,
         containerInfo.containerID());
   }
 
@@ -259,7 +270,7 @@ public class TestMoveManager {
   @Test
   public void testContainerIsNotHealthyBeforeMove() throws Exception {
     // return an under replicated health result from replication manager
-    Mockito.when(replicationManager.getContainerReplicationHealth(any(), any()))
+    when(replicationManager.getContainerReplicationHealth(any(), any()))
         .thenReturn(new ContainerHealthResult.UnderReplicatedHealthResult(
             containerInfo, 1, false, false,
             false));
@@ -271,8 +282,7 @@ public class TestMoveManager {
     tgt = MockDatanodeDetails.randomDatanodeDetails();
     nodes.put(src, NodeStatus.inServiceHealthy());
     nodes.put(tgt, NodeStatus.inServiceHealthy());
-    assertMoveFailsWith(
-        MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_BEFORE_MOVE,
+    assertMoveFailsWith(REPLICATION_NOT_HEALTHY_BEFORE_MOVE,
         containerInfo.containerID());
 
     // check for an under replicated EC container
@@ -285,8 +295,7 @@ public class TestMoveManager {
         1, 2, 3, 4));
     src = replicas.iterator().next().getDatanodeDetails();
     nodes.put(src, NodeStatus.inServiceHealthy());
-    assertMoveFailsWith(
-        MoveManager.MoveResult.REPLICATION_NOT_HEALTHY_BEFORE_MOVE,
+    assertMoveFailsWith(REPLICATION_NOT_HEALTHY_BEFORE_MOVE,
         containerInfo.containerID());
   }
 
@@ -296,25 +305,23 @@ public class TestMoveManager {
     // Try to make the same move again
     CompletableFuture<MoveManager.MoveResult> res =
         moveManager.move(containerInfo.containerID(), src, tgt);
-    Assert.assertEquals(
-        MoveManager.MoveResult.FAIL_CONTAINER_ALREADY_BEING_MOVED, res.get());
+    assertEquals(FAIL_CONTAINER_ALREADY_BEING_MOVED, res.get());
   }
 
   @Test
   public void testReplicationCommandFails() throws Exception {
-    Mockito.doThrow(new RuntimeException("test")).when(replicationManager)
+    doThrow(new RuntimeException("test")).when(replicationManager)
             .sendLowPriorityReplicateContainerCommand(
         any(), anyInt(), any(), any(), anyLong());
     CompletableFuture<MoveManager.MoveResult> res = setupSuccessfulMove();
-    Assert.assertEquals(
-        MoveManager.MoveResult.FAIL_UNEXPECTED_ERROR, res.get());
+    assertEquals(FAIL_UNEXPECTED_ERROR, res.get());
   }
 
   @Test
   public void testDeleteCommandFails() throws Exception {
     CompletableFuture<MoveManager.MoveResult> res = setupSuccessfulMove();
 
-    Mockito.doThrow(new ContainerNotFoundException("test"))
+    doThrow(new ContainerNotFoundException("test"))
         .when(containerManager).getContainer(any(ContainerID.class));
 
     ContainerReplicaOp op = new ContainerReplicaOp(
@@ -322,8 +329,7 @@ public class TestMoveManager {
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     MoveManager.MoveResult moveResult = res.get();
-    Assert.assertEquals(MoveManager.MoveResult.FAIL_UNEXPECTED_ERROR,
-        moveResult);
+    assertEquals(FAIL_UNEXPECTED_ERROR, moveResult);
   }
 
   @Test
@@ -334,7 +340,7 @@ public class TestMoveManager {
         ADD, tgt, 0, clock.millis() + 1000);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
-    Mockito.verify(replicationManager).sendDeleteCommand(
+    verify(replicationManager).sendDeleteCommand(
         eq(containerInfo), eq(0), eq(src), eq(true), anyLong());
 
     op = new ContainerReplicaOp(
@@ -342,7 +348,7 @@ public class TestMoveManager {
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     MoveManager.MoveResult finalResult = res.get();
-    Assertions.assertEquals(MoveManager.MoveResult.COMPLETED, finalResult);
+    assertEquals(COMPLETED, finalResult);
   }
 
   @Test
@@ -363,7 +369,7 @@ public class TestMoveManager {
     CompletableFuture<MoveManager.MoveResult> res =
         moveManager.move(containerInfo.containerID(), src, tgt);
 
-    Mockito.verify(replicationManager).sendLowPriorityReplicateContainerCommand(
+    verify(replicationManager).sendLowPriorityReplicateContainerCommand(
         eq(containerInfo), eq(srcReplica.getReplicaIndex()), eq(src), eq(tgt),
         anyLong());
 
@@ -371,7 +377,7 @@ public class TestMoveManager {
         ADD, tgt, srcReplica.getReplicaIndex(), clock.millis() + 1000);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
-    Mockito.verify(replicationManager).sendDeleteCommand(
+    verify(replicationManager).sendDeleteCommand(
         eq(containerInfo), eq(srcReplica.getReplicaIndex()), eq(src),
         eq(true), anyLong());
 
@@ -380,7 +386,7 @@ public class TestMoveManager {
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     MoveManager.MoveResult finalResult = res.get();
-    Assertions.assertEquals(MoveManager.MoveResult.COMPLETED, finalResult);
+    assertEquals(COMPLETED, finalResult);
   }
 
   @Test
@@ -392,8 +398,7 @@ public class TestMoveManager {
     moveManager.opCompleted(op, containerInfo.containerID(), true);
 
     MoveManager.MoveResult finalResult = res.get();
-    Assertions.assertEquals(MoveManager.MoveResult.REPLICATION_FAIL_TIME_OUT,
-        finalResult);
+    assertEquals(REPLICATION_FAIL_TIME_OUT, finalResult);
   }
 
   @Test
@@ -404,7 +409,7 @@ public class TestMoveManager {
         ADD, tgt, 0, clock.millis() + 1000);
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
-    Mockito.verify(replicationManager).sendDeleteCommand(
+    verify(replicationManager).sendDeleteCommand(
         eq(containerInfo), eq(0), eq(src), eq(true), anyLong());
 
     op = new ContainerReplicaOp(
@@ -412,8 +417,7 @@ public class TestMoveManager {
     moveManager.opCompleted(op, containerInfo.containerID(), true);
 
     MoveManager.MoveResult finalResult = res.get();
-    Assertions.assertEquals(MoveManager.MoveResult.DELETION_FAIL_TIME_OUT,
-        finalResult);
+    assertEquals(DELETION_FAIL_TIME_OUT, finalResult);
   }
 
   @Test
@@ -434,9 +438,9 @@ public class TestMoveManager {
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     MoveManager.MoveResult finalResult = res.get();
-    Assertions.assertEquals(MoveManager.MoveResult.COMPLETED, finalResult);
+    assertEquals(COMPLETED, finalResult);
 
-    Mockito.verify(replicationManager, Mockito.times(0))
+    verify(replicationManager, times(0))
         .sendDeleteCommand(eq(containerInfo), eq(0), eq(src), eq(true));
   }
 
@@ -450,10 +454,9 @@ public class TestMoveManager {
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     MoveManager.MoveResult finalResult = res.get();
-    Assertions.assertEquals(MoveManager.MoveResult.DELETION_FAIL_NODE_UNHEALTHY,
-        finalResult);
+    assertEquals(DELETION_FAIL_NODE_UNHEALTHY, finalResult);
 
-    Mockito.verify(replicationManager, Mockito.times(0))
+    verify(replicationManager, times(0))
         .sendDeleteCommand(eq(containerInfo), eq(0), eq(src), eq(true));
   }
 
@@ -469,10 +472,9 @@ public class TestMoveManager {
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     MoveManager.MoveResult finalResult = res.get();
-    Assertions.assertEquals(
-        MoveManager.MoveResult.DELETION_FAIL_NODE_NOT_IN_SERVICE, finalResult);
+    assertEquals(DELETION_FAIL_NODE_NOT_IN_SERVICE, finalResult);
 
-    Mockito.verify(replicationManager, Mockito.times(0))
+    verify(replicationManager, times(0))
         .sendDeleteCommand(eq(containerInfo), eq(0), eq(src), eq(true));
   }
 
@@ -480,7 +482,7 @@ public class TestMoveManager {
   public void testMoveCompleteFutureReplicasUnhealthy() throws Exception {
     CompletableFuture<MoveManager.MoveResult> res = setupSuccessfulMove();
 
-    Mockito.when(replicationManager.getContainerReplicationHealth(any(), any()))
+    when(replicationManager.getContainerReplicationHealth(any(), any()))
         .thenReturn(new ContainerHealthResult
             .MisReplicatedHealthResult(containerInfo, false, null));
 
@@ -489,10 +491,9 @@ public class TestMoveManager {
     moveManager.opCompleted(op, containerInfo.containerID(), false);
 
     MoveManager.MoveResult finalResult = res.get();
-    Assertions.assertEquals(
-        MoveManager.MoveResult.DELETE_FAIL_POLICY, finalResult);
+    assertEquals(DELETE_FAIL_POLICY, finalResult);
 
-    Mockito.verify(replicationManager, Mockito.times(0))
+    verify(replicationManager, times(0))
         .sendDeleteCommand(eq(containerInfo), eq(0), eq(src), eq(true));
   }
 
@@ -509,20 +510,20 @@ public class TestMoveManager {
     CompletableFuture<MoveManager.MoveResult> res =
         moveManager.move(containerInfo.containerID(), src, tgt);
 
-    Mockito.verify(replicationManager).sendLowPriorityReplicateContainerCommand(
+    verify(replicationManager).sendLowPriorityReplicateContainerCommand(
         eq(containerInfo), eq(0), eq(src), eq(tgt), anyLong());
 
     return res;
   }
 
   private void assertMoveFailsWith(MoveManager.MoveResult expectedResult,
-      ContainerID containerId) throws
+                                   ContainerID containerId) throws
       NodeNotFoundException, ContainerReplicaNotFoundException,
-      ContainerNotFoundException, TimeoutException, ExecutionException,
+      ContainerNotFoundException, ExecutionException,
       InterruptedException {
     CompletableFuture<MoveManager.MoveResult> res = moveManager.move(
         containerId, src, tgt);
     MoveManager.MoveResult actualResult = res.get();
-    Assertions.assertEquals(expectedResult, actualResult);
+    assertEquals(expectedResult, actualResult);
   }
 }

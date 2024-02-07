@@ -45,6 +45,9 @@ public class SecretKeyManagerService implements SCMService, Runnable {
   public static final Logger LOG =
       LoggerFactory.getLogger(SecretKeyManagerService.class);
 
+  private static final String SERVICE_NAME =
+      SecretKeyManagerService.class.getSimpleName();
+
   private final SCMContext scmContext;
   private final SecretKeyManager secretKeyManager;
   private final SecretKeyConfig secretKeyConfig;
@@ -58,7 +61,6 @@ public class SecretKeyManagerService implements SCMService, Runnable {
 
   private final ScheduledExecutorService scheduler;
 
-  @SuppressWarnings("parameternumber")
   public SecretKeyManagerService(SCMContext scmContext,
                                  ConfigurationSource conf,
                                  SCMRatisServer ratisServer) {
@@ -77,7 +79,7 @@ public class SecretKeyManagerService implements SCMService, Runnable {
 
     scheduler = Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder().setDaemon(true)
-            .setNameFormat(getServiceName())
+            .setNameFormat(scmContext.threadNamePrefix() + getServiceName())
             .build());
 
     start();
@@ -134,7 +136,7 @@ public class SecretKeyManagerService implements SCMService, Runnable {
 
   @Override
   public String getServiceName() {
-    return SecretKeyManagerService.class.getSimpleName();
+    return SERVICE_NAME;
   }
 
   @Override

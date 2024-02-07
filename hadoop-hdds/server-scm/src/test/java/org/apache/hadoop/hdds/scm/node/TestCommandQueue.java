@@ -26,13 +26,14 @@ import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.junit.Assert;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test for the CommandQueue class.
@@ -74,56 +75,56 @@ public class TestCommandQueue {
     commandQueue.addCommand(datanode2UUID, createPipelineCommand);
 
     // Check zero returned for unknown DN
-    Assert.assertEquals(0, commandQueue.getDatanodeCommandCount(
+    assertEquals(0, commandQueue.getDatanodeCommandCount(
         UUID.randomUUID(), SCMCommandProto.Type.closeContainerCommand));
 
-    Assert.assertEquals(2, commandQueue.getDatanodeCommandCount(
+    assertEquals(2, commandQueue.getDatanodeCommandCount(
         datanode1UUID, SCMCommandProto.Type.closeContainerCommand));
-    Assert.assertEquals(1, commandQueue.getDatanodeCommandCount(
+    assertEquals(1, commandQueue.getDatanodeCommandCount(
         datanode1UUID, SCMCommandProto.Type.createPipelineCommand));
-    Assert.assertEquals(0, commandQueue.getDatanodeCommandCount(
+    assertEquals(0, commandQueue.getDatanodeCommandCount(
         datanode1UUID, SCMCommandProto.Type.closePipelineCommand));
-    Assert.assertEquals(1, commandQueue.getDatanodeCommandCount(
+    assertEquals(1, commandQueue.getDatanodeCommandCount(
         datanode1UUID, SCMCommandProto.Type.replicateContainerCommand));
 
     Map<SCMCommandProto.Type, Integer> commandSummary =
         commandQueue.getDatanodeCommandSummary(datanode1UUID);
-    Assert.assertEquals(3, commandSummary.size());
-    Assert.assertEquals(Integer.valueOf(2),
+    assertEquals(3, commandSummary.size());
+    assertEquals(Integer.valueOf(2),
         commandSummary.get(SCMCommandProto.Type.closeContainerCommand));
-    Assert.assertEquals(Integer.valueOf(1),
+    assertEquals(Integer.valueOf(1),
         commandSummary.get(SCMCommandProto.Type.createPipelineCommand));
-    Assert.assertEquals(Integer.valueOf(1),
+    assertEquals(Integer.valueOf(1),
         commandSummary.get(SCMCommandProto.Type.replicateContainerCommand));
 
-    Assert.assertEquals(1, commandQueue.getDatanodeCommandCount(
+    assertEquals(1, commandQueue.getDatanodeCommandCount(
         datanode2UUID, SCMCommandProto.Type.closeContainerCommand));
-    Assert.assertEquals(2, commandQueue.getDatanodeCommandCount(
+    assertEquals(2, commandQueue.getDatanodeCommandCount(
         datanode2UUID, SCMCommandProto.Type.createPipelineCommand));
 
     // Ensure the counts are cleared when the commands are retrieved
     List<SCMCommand> cmds = commandQueue.getCommand(datanode1UUID);
-    Assert.assertEquals(5, cmds.size());
+    assertEquals(5, cmds.size());
 
-    Assert.assertEquals(0, commandQueue.getDatanodeCommandCount(
+    assertEquals(0, commandQueue.getDatanodeCommandCount(
         datanode1UUID, SCMCommandProto.Type.closeContainerCommand));
-    Assert.assertEquals(0, commandQueue.getDatanodeCommandCount(
+    assertEquals(0, commandQueue.getDatanodeCommandCount(
         datanode1UUID, SCMCommandProto.Type.createPipelineCommand));
-    Assert.assertEquals(0, commandQueue.getDatanodeCommandCount(
+    assertEquals(0, commandQueue.getDatanodeCommandCount(
         datanode1UUID, SCMCommandProto.Type.closePipelineCommand));
-    Assert.assertEquals(0, commandQueue.getDatanodeCommandCount(
+    assertEquals(0, commandQueue.getDatanodeCommandCount(
         datanode1UUID, SCMCommandProto.Type.replicateContainerCommand));
 
-    Assert.assertEquals(1, commandQueue.getDatanodeCommandCount(
+    assertEquals(1, commandQueue.getDatanodeCommandCount(
         datanode2UUID, SCMCommandProto.Type.closeContainerCommand));
-    Assert.assertEquals(2, commandQueue.getDatanodeCommandCount(
+    assertEquals(2, commandQueue.getDatanodeCommandCount(
         datanode2UUID, SCMCommandProto.Type.createPipelineCommand));
 
     // Ensure the commands are zeroed when the queue is cleared
     commandQueue.clear();
-    Assert.assertEquals(0, commandQueue.getDatanodeCommandCount(
+    assertEquals(0, commandQueue.getDatanodeCommandCount(
         datanode2UUID, SCMCommandProto.Type.closeContainerCommand));
-    Assert.assertEquals(0, commandQueue.getDatanodeCommandCount(
+    assertEquals(0, commandQueue.getDatanodeCommandCount(
         datanode2UUID, SCMCommandProto.Type.createPipelineCommand));
   }
 

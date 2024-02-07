@@ -36,9 +36,19 @@ List pipelines
     ${output} =         Execute          ozone admin pipeline list
                         Should contain   ${output}   STANDALONE/ONE
 
+List pipeline with json option
+    ${output} =         Execute          ozone admin pipeline list --json | jq 'map(.replicationConfig) | contains([{"replicationFactor": "ONE", "replicationType": "STANDALONE"}])'
+
+    Should be true      $output
+
 List pipelines with explicit host
     ${output} =         Execute          ozone admin pipeline list --scm ${SCM}
                         Should contain   ${output}   STANDALONE/ONE
+
+List pipelines with explicit host and json option
+    ${output} =         Execute   ozone admin pipeline list --scm ${SCM} --json | jq 'map(.replicationConfig) | contains([{"replicationFactor": "ONE", "replicationType": "STANDALONE"}])'
+
+    Should be true      $output
 
 Deactivate pipeline
                         Execute          ozone admin pipeline deactivate "${PIPELINE}"

@@ -20,21 +20,22 @@ package org.apache.hadoop.ozone.container.common.helpers;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
 import org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.TemporaryFolder;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Properties;
 import java.util.UUID;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This class tests {@link DatanodeVersionFile}.
@@ -51,12 +52,13 @@ public class TestDatanodeVersionFile {
   private long cTime;
   private int lv;
 
-  @Rule
-  public TemporaryFolder folder = new TemporaryFolder();
+  @TempDir
+  private Path folder;
 
-  @Before
+  @BeforeEach
   public void setup() throws IOException {
-    versionFile = folder.newFile("Version");
+    versionFile = Files.createFile(
+        folder.resolve("VersionFile")).toFile();
     storageID = UUID.randomUUID().toString();
     clusterID = UUID.randomUUID().toString();
     datanodeUUID = UUID.randomUUID().toString();
@@ -90,15 +92,11 @@ public class TestDatanodeVersionFile {
   }
 
   @Test
-  public void testIncorrectClusterId() throws IOException {
-    try {
-      String randomClusterID = UUID.randomUUID().toString();
-      StorageVolumeUtil.getClusterID(properties, versionFile,
-          randomClusterID);
-      fail("Test failure in testIncorrectClusterId");
-    } catch (InconsistentStorageStateException ex) {
-      GenericTestUtils.assertExceptionContains("Mismatched ClusterIDs", ex);
-    }
+  public void testIncorrectClusterId() {
+    String randomClusterID = UUID.randomUUID().toString();
+    InconsistentStorageStateException exception = assertThrows(InconsistentStorageStateException.class,
+        () -> StorageVolumeUtil.getClusterID(properties, versionFile, randomClusterID));
+    assertThat(exception).hasMessageContaining("Mismatched ClusterIDs");
   }
 
   @Test
@@ -109,13 +107,9 @@ public class TestDatanodeVersionFile {
     dnVersionFile.createVersionFile(versionFile);
     properties = dnVersionFile.readFrom(versionFile);
 
-    try {
-      StorageVolumeUtil.getCreationTime(properties, versionFile);
-      fail("Test failure in testVerifyCTime");
-    } catch (InconsistentStorageStateException ex) {
-      GenericTestUtils.assertExceptionContains("Invalid Creation time in " +
-          "Version File : " + versionFile, ex);
-    }
+    InconsistentStorageStateException exception = assertThrows(InconsistentStorageStateException.class,
+        () -> StorageVolumeUtil.getCreationTime(properties, versionFile));
+    assertThat(exception).hasMessageContaining("Invalid Creation time in Version File : " + versionFile);
   }
 
   @Test
@@ -125,12 +119,8 @@ public class TestDatanodeVersionFile {
         storageID, clusterID, datanodeUUID, cTime, invalidLayOutVersion);
     dnVersionFile.createVersionFile(versionFile);
     Properties props = dnVersionFile.readFrom(versionFile);
-
-    try {
-      StorageVolumeUtil.getLayOutVersion(props, versionFile);
-      fail("Test failure in testVerifyLayOut");
-    } catch (InconsistentStorageStateException ex) {
-      GenericTestUtils.assertExceptionContains("Invalid layOutVersion.", ex);
-    }
+    InconsistentStorageStateException exception = assertThrows(InconsistentStorageStateException.class,
+        () -> StorageVolumeUtil.getLayOutVersion(props, versionFile));
+    assertThat(exception).hasMessageContaining("Invalid layOutVersion.");
   }
 }

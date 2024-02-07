@@ -17,10 +17,10 @@
  */
 package org.apache.hadoop.hdds.server.http;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.apache.hadoop.hdds.server.http.ProfileServlet.Event;
 import org.apache.hadoop.hdds.server.http.ProfileServlet.Output;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -41,22 +41,22 @@ public class TestProfileServlet {
 
   @Test
   public void testNameValidationWithNewLine() {
-    Assertions.assertThrows(IllegalArgumentException.class,
+    assertThrows(IllegalArgumentException.class,
         () -> ProfileServlet.validateFileName("test\n" +
             ProfileServlet.generateFileName(1, Output.FLAMEGRAPH,
                 Event.ALLOC)));
-    Assertions.assertThrows(IllegalArgumentException.class,
+    assertThrows(IllegalArgumentException.class,
         () -> ProfileServlet.validateFileName("test\n" +
             ProfileServlet.generateFileName(1, Output.SVG, Event.ALLOC)));
   }
 
   @Test
   public void testNameValidationWithSlash() {
-    Assertions.assertThrows(IllegalArgumentException.class,
+    assertThrows(IllegalArgumentException.class,
         () -> ProfileServlet.validateFileName("../" +
             ProfileServlet.generateFileName(1, Output.FLAMEGRAPH,
                 Event.ALLOC)));
-    Assertions.assertThrows(IllegalArgumentException.class,
+    assertThrows(IllegalArgumentException.class,
         () -> ProfileServlet.validateFileName("../" +
             ProfileServlet.generateFileName(1, Output.SVG, Event.ALLOC)));
   }

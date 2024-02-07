@@ -23,13 +23,15 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
 /**
  * OzoneOutputStream is used to write data into Ozone.
  */
-public class OzoneOutputStream extends ByteArrayStreamOutput {
+public class OzoneOutputStream extends ByteArrayStreamOutput
+    implements KeyMetadataAware {
 
   private final OutputStream outputStream;
   private final Syncable syncable;
@@ -121,14 +123,9 @@ public class OzoneOutputStream extends ByteArrayStreamOutput {
   }
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
-    if (outputStream instanceof KeyOutputStream) {
-      return ((KeyOutputStream) outputStream).getCommitUploadPartInfo();
-    } else  if (outputStream instanceof CryptoOutputStream) {
-      OutputStream wrappedStream =
-          ((CryptoOutputStream) outputStream).getWrappedStream();
-      if (wrappedStream instanceof KeyOutputStream) {
-        return ((KeyOutputStream) wrappedStream).getCommitUploadPartInfo();
-      }
+    KeyOutputStream keyOutputStream = getKeyOutputStream();
+    if (keyOutputStream != null) {
+      return keyOutputStream.getCommitUploadPartInfo();
     }
     // Otherwise return null.
     return null;
@@ -136,5 +133,37 @@ public class OzoneOutputStream extends ByteArrayStreamOutput {
 
   public OutputStream getOutputStream() {
     return outputStream;
+  }
+
+  public KeyOutputStream getKeyOutputStream() {
+    if (outputStream instanceof KeyOutputStream) {
+      return ((KeyOutputStream) outputStream);
+    } else  if (outputStream instanceof CryptoOutputStream) {
+      OutputStream wrappedStream =
+          ((CryptoOutputStream) outputStream).getWrappedStream();
+      if (wrappedStream instanceof KeyOutputStream) {
+        return ((KeyOutputStream) wrappedStream);
+      }
+    } else if (outputStream instanceof CipherOutputStreamOzone) {
+      OutputStream wrappedStream =
+          ((CipherOutputStreamOzone) outputStream).getWrappedStream();
+      if (wrappedStream instanceof KeyOutputStream) {
+        return ((KeyOutputStream)wrappedStream);
+      }
+    }
+    // Otherwise return null.
+    return null;
+  }
+
+  @Override
+  public Map<String, String> getMetadata() {
+    if (outputStream instanceof CryptoOutputStream) {
+      return ((KeyMetadataAware)((CryptoOutputStream) outputStream)
+          .getWrappedStream()).getMetadata();
+    } else if (outputStream instanceof CipherOutputStreamOzone) {
+      return ((KeyMetadataAware)((CipherOutputStreamOzone) outputStream)
+          .getWrappedStream()).getMetadata();
+    }
+    return ((KeyMetadataAware) outputStream).getMetadata();
   }
 }

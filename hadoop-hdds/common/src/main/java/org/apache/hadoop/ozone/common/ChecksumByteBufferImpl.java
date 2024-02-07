@@ -17,6 +17,10 @@
  */
 package org.apache.hadoop.ozone.common;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.util.zip.Checksum;
 
@@ -25,7 +29,24 @@ import java.util.zip.Checksum;
  */
 public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
 
-  private Checksum checksum;
+  private static final Logger LOG =
+      LoggerFactory.getLogger(ChecksumByteBufferImpl.class);
+
+  private final Checksum checksum;
+
+  private static final Field IS_READY_ONLY_FIELD;
+
+  static {
+    Field f = null;
+    try {
+      f = ByteBuffer.class
+          .getDeclaredField("isReadOnly");
+      f.setAccessible(true);
+    } catch (NoSuchFieldException e) {
+      LOG.error("No isReadOnly field in ByteBuffer", e);
+    }
+    IS_READY_ONLY_FIELD = f;
+  }
 
   public ChecksumByteBufferImpl(Checksum impl) {
     this.checksum = impl;
@@ -36,6 +57,15 @@ public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
   //        should be refactored to simply call checksum.update(buffer), as the
   //        Checksum interface has been enhanced to allow this since Java 9.
   public void update(ByteBuffer buffer) {
+    // this is a hack to not do memory copy.
+    if (IS_READY_ONLY_FIELD != null) {
+      try {
+        IS_READY_ONLY_FIELD.setBoolean(buffer, false);
+      } catch (IllegalAccessException e) {
+        LOG.error("Cannot access isReadOnly in ByteBuffer", e);
+      }
+    }
+
     if (buffer.hasArray()) {
       checksum.update(buffer.array(), buffer.position() + buffer.arrayOffset(),
           buffer.remaining());

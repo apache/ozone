@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.hdds.conf;
 
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalUnit;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
@@ -44,6 +47,11 @@ public final class TimeDurationUtil {
    */
   public static long getTimeDurationHelper(String name, String vStr,
       TimeUnit unit) {
+    final long millis = getDuration(name, vStr, unit).toMillis();
+    return unit.convert(millis, TimeUnit.MILLISECONDS);
+  }
+
+  public static Duration getDuration(String name, String vStr, TimeUnit unit) {
     vStr = vStr.trim();
     vStr = vStr.toLowerCase();
     ParsedTimeDuration vUnit = ParsedTimeDuration.unitFor(vStr);
@@ -58,12 +66,7 @@ public final class TimeDurationUtil {
     }
 
     long raw = Long.parseLong(vStr);
-    long converted = unit.convert(raw, vUnit.unit());
-    if (vUnit.unit().convert(converted, unit) < raw) {
-      LOG.warn("Possible loss of precision converting " + vStr
-          + vUnit.suffix() + " to " + unit + " for " + name);
-    }
-    return converted;
+    return Duration.of(raw, vUnit.temporalUnit());
   }
 
   enum ParsedTimeDuration {
@@ -77,6 +80,11 @@ public final class TimeDurationUtil {
       String suffix() {
         return "ns";
       }
+
+      @Override
+      TemporalUnit temporalUnit() {
+        return ChronoUnit.NANOS;
+      }
     },
     US {
       @Override
@@ -87,6 +95,11 @@ public final class TimeDurationUtil {
       @Override
       String suffix() {
         return "us";
+      }
+
+      @Override
+      TemporalUnit temporalUnit() {
+        return ChronoUnit.MICROS;
       }
     },
     MS {
@@ -99,6 +112,11 @@ public final class TimeDurationUtil {
       String suffix() {
         return "ms";
       }
+
+      @Override
+      TemporalUnit temporalUnit() {
+        return ChronoUnit.MILLIS;
+      }
     },
     S {
       @Override
@@ -109,6 +127,11 @@ public final class TimeDurationUtil {
       @Override
       String suffix() {
         return "s";
+      }
+
+      @Override
+      TemporalUnit temporalUnit() {
+        return ChronoUnit.SECONDS;
       }
     },
     M {
@@ -121,6 +144,11 @@ public final class TimeDurationUtil {
       String suffix() {
         return "m";
       }
+
+      @Override
+      TemporalUnit temporalUnit() {
+        return ChronoUnit.MINUTES;
+      }
     },
     H {
       @Override
@@ -131,6 +159,11 @@ public final class TimeDurationUtil {
       @Override
       String suffix() {
         return "h";
+      }
+
+      @Override
+      TemporalUnit temporalUnit() {
+        return ChronoUnit.HOURS;
       }
     },
     D {
@@ -143,11 +176,18 @@ public final class TimeDurationUtil {
       String suffix() {
         return "d";
       }
+
+      @Override
+      TemporalUnit temporalUnit() {
+        return ChronoUnit.DAYS;
+      }
     };
 
     abstract TimeUnit unit();
 
     abstract String suffix();
+
+    abstract TemporalUnit temporalUnit();
 
     static ParsedTimeDuration unitFor(String s) {
       for (ParsedTimeDuration ptd : values()) {

@@ -21,11 +21,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -45,13 +42,17 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
+import org.junit.jupiter.api.io.TempDir;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.OPEN;
@@ -62,6 +63,7 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
  */
 public class TestContainerManagerImpl {
 
+  @TempDir
   private File testDir;
   private DBStore dbStore;
   private ContainerManager containerManager;
@@ -71,11 +73,8 @@ public class TestContainerManagerImpl {
   private ContainerReplicaPendingOps pendingOpsMock;
 
   @BeforeEach
-  public void setUp() throws Exception {
-    final OzoneConfiguration conf = SCMTestUtils.getConf();
-    testDir = GenericTestUtils.getTestDir(
-        TestContainerManagerImpl.class.getSimpleName() + UUID.randomUUID());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+  void setUp() throws Exception {
+    final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
     scmhaManager = SCMHAManagerStub.getInstance(true);
@@ -86,7 +85,7 @@ public class TestContainerManagerImpl {
         new MockPipelineManager(dbStore, scmhaManager, nodeManager);
     pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
         ReplicationFactor.THREE));
-    pendingOpsMock = Mockito.mock(ContainerReplicaPendingOps.class);
+    pendingOpsMock = mock(ContainerReplicaPendingOps.class);
     containerManager = new ContainerManagerImpl(conf,
         scmhaManager, sequenceIdGen, pipelineManager,
         SCMDBDefinition.CONTAINERS.getTable(dbStore), pendingOpsMock);
@@ -101,19 +100,17 @@ public class TestContainerManagerImpl {
     if (dbStore != null) {
       dbStore.close();
     }
-
-    FileUtil.fullyDelete(testDir);
   }
 
   @Test
   void testAllocateContainer() throws Exception {
-    Assertions.assertTrue(
+    assertTrue(
         containerManager.getContainers().isEmpty());
     final ContainerInfo container = containerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), "admin");
-    Assertions.assertEquals(1, containerManager.getContainers().size());
-    Assertions.assertNotNull(containerManager.getContainer(
+    assertEquals(1, containerManager.getContainers().size());
+    assertNotNull(containerManager.getContainer(
         container.containerID()));
   }
 
@@ -123,25 +120,21 @@ public class TestContainerManagerImpl {
         RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), "admin");
     final ContainerID cid = container.containerID();
-    Assertions.assertEquals(LifeCycleState.OPEN,
-        containerManager.getContainer(cid).getState());
+    assertEquals(LifeCycleState.OPEN, containerManager.getContainer(cid).getState());
     containerManager.updateContainerState(cid,
         HddsProtos.LifeCycleEvent.FINALIZE);
-    Assertions.assertEquals(LifeCycleState.CLOSING,
-        containerManager.getContainer(cid).getState());
+    assertEquals(LifeCycleState.CLOSING, containerManager.getContainer(cid).getState());
     containerManager.updateContainerState(cid,
         HddsProtos.LifeCycleEvent.QUASI_CLOSE);
-    Assertions.assertEquals(LifeCycleState.QUASI_CLOSED,
-        containerManager.getContainer(cid).getState());
+    assertEquals(LifeCycleState.QUASI_CLOSED, containerManager.getContainer(cid).getState());
     containerManager.updateContainerState(cid,
         HddsProtos.LifeCycleEvent.FORCE_CLOSE);
-    Assertions.assertEquals(LifeCycleState.CLOSED,
-        containerManager.getContainer(cid).getState());
+    assertEquals(LifeCycleState.CLOSED, containerManager.getContainer(cid).getState());
   }
 
   @Test
   void testGetContainers() throws Exception {
-    Assertions.assertEquals(emptyList(), containerManager.getContainers());
+    assertEquals(emptyList(), containerManager.getContainers());
 
     List<ContainerID> ids = new ArrayList<>();
     for (int i = 0; i < 10; i++) {
@@ -182,13 +175,13 @@ public class TestContainerManagerImpl {
         HddsProtos.LifeCycleEvent.FINALIZE);
     containerManager.updateContainerState(ids.get(2),
         HddsProtos.LifeCycleEvent.CLOSE);
-    Assertions.assertEquals(7, containerManager.
+    assertEquals(7, containerManager.
         getContainerStateCount(LifeCycleState.OPEN));
-    Assertions.assertEquals(1, containerManager
+    assertEquals(1, containerManager
         .getContainerStateCount(LifeCycleState.CLOSING));
-    Assertions.assertEquals(1, containerManager
+    assertEquals(1, containerManager
         .getContainerStateCount(LifeCycleState.QUASI_CLOSED));
-    Assertions.assertEquals(1, containerManager
+    assertEquals(1, containerManager
         .getContainerStateCount(LifeCycleState.CLOSED));
   }
 
@@ -196,7 +189,7 @@ public class TestContainerManagerImpl {
       List<ContainerID> expected,
       List<ContainerInfo> containers
   ) {
-    Assertions.assertEquals(expected, containers.stream()
+    assertEquals(expected, containers.stream()
         .map(ContainerInfo::containerID)
         .collect(toList()));
   }
@@ -205,8 +198,8 @@ public class TestContainerManagerImpl {
   void testAllocateContainersWithECReplicationConfig() throws Exception {
     final ContainerInfo admin = containerManager
         .allocateContainer(new ECReplicationConfig(3, 2), "admin");
-    Assertions.assertEquals(1, containerManager.getContainers().size());
-    Assertions.assertNotNull(
+    assertEquals(1, containerManager.getContainers().size());
+    assertNotNull(
         containerManager.getContainer(admin.containerID()));
   }
 
@@ -227,8 +220,7 @@ public class TestContainerManagerImpl {
             .setBytesUsed(1234)
             .setKeyCount(123)
             .build());
-    Mockito.verify(pendingOpsMock, Mockito.times(1))
-        .completeAddReplica(container.containerID(), dn, 0);
+    verify(pendingOpsMock, times(1)).completeAddReplica(container.containerID(), dn, 0);
   }
 
   @Test
@@ -248,8 +240,7 @@ public class TestContainerManagerImpl {
             .setBytesUsed(1234)
             .setKeyCount(123)
             .build());
-    Mockito.verify(pendingOpsMock, Mockito.times(1))
-        .completeDeleteReplica(container.containerID(), dn, 0);
+    verify(pendingOpsMock, times(1)).completeDeleteReplica(container.containerID(), dn, 0);
   }
 
 }

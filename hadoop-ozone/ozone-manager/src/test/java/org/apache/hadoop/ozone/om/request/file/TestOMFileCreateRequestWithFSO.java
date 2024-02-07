@@ -29,12 +29,16 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.fail;
+
 /**
  * Tests OMFileCreateRequest - prefix layout.
  */
@@ -44,7 +48,7 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
   public void testValidateAndUpdateCacheWithNonRecursive() throws Exception {
     testNonRecursivePath(UUID.randomUUID().toString(), false, false, false);
     testNonRecursivePath("a/b", false, false, true);
-    Assert.assertEquals("Invalid metrics value", 0, omMetrics.getNumKeys());
+    assertEquals(0, omMetrics.getNumKeys(), "Invalid metrics value");
 
     // Create parent dirs for the path
     OMRequestTestUtils.addParentsToDirTable(volumeName, bucketName,
@@ -59,7 +63,7 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
 
     // Delete child key but retain path "a/b/ in the key table
     OmDirectoryInfo dirPathC = getDirInfo("a/b/c");
-    Assert.assertNotNull("Failed to find dir path: a/b/c", dirPathC);
+    assertNotNull(dirPathC, "Failed to find dir path: a/b/c");
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omMetadataManager.getBucketId(volumeName,
             bucketName);
@@ -91,10 +95,9 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
 
     omFileCreateRequest = getOMFileCreateRequest(modifiedOmRequest);
     OMClientResponse omFileCreateResponse =
-        omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L,
-            ozoneManagerDoubleBufferHelper);
-    Assert.assertTrue(omFileCreateResponse.getOMResponse().getStatus()
-        == OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
+        omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertSame(omFileCreateResponse.getOMResponse().getStatus(),
+        OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
   }
 
   @Test
@@ -103,8 +106,8 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     String key = "c/d/e/f";
     // Should be able to create file even if parent directories does not exist
     testNonRecursivePath(key, false, true, false);
-    Assert.assertEquals("Invalid metrics value", 3, omMetrics.getNumKeys());
-    Assert.assertEquals(omMetadataManager.getBucketTable().get(
+    assertEquals(3, omMetrics.getNumKeys(), "Invalid metrics value");
+    assertEquals(omMetadataManager.getBucketTable().get(
         omMetadataManager.getBucketKey(volumeName, bucketName))
         .getUsedNamespace(), omMetrics.getNumKeys());
 
@@ -194,7 +197,7 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
             omMetadataManager.getOpenKeyTable(getBucketLayout())
                 .get(dbOpenFileName);
         if (doAssert) {
-          Assert.assertNotNull("Invalid key!", omKeyInfo);
+          assertNotNull(omKeyInfo, "Invalid key!");
         }
         return omKeyInfo;
       } else {
@@ -207,7 +210,7 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
       }
     }
     if (doAssert) {
-      Assert.fail("Invalid key!");
+      fail("Invalid key!");
     }
     return null;
   }

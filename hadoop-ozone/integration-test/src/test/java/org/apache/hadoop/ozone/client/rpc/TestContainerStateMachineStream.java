@@ -17,14 +17,15 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
-import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -36,12 +37,10 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.Timeout;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -54,18 +53,13 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Tests the containerStateMachine stream handling.
  */
+@Timeout(300)
 public class TestContainerStateMachineStream {
-
-  /**
-   * Set a timeout for each test.
-   */
-  @Rule
-  public Timeout timeout = Timeout.seconds(300);
-
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
   private OzoneClient client;
@@ -83,7 +77,7 @@ public class TestContainerStateMachineStream {
    *
    * @throws IOException
    */
-  @Before
+  @BeforeEach
   public void setup() throws Exception {
     conf = new OzoneConfiguration();
 
@@ -119,18 +113,20 @@ public class TestContainerStateMachineStream {
     raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(10));
     conf.setFromObject(raftClientConfig);
 
+    ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
+        .setDataStreamMinPacketSize(1024)
+        .setBlockSize(BLOCK_SIZE)
+        .setChunkSize(CHUNK_SIZE)
+        .setStreamBufferFlushSize(FLUSH_SIZE)
+        .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
+        .applyTo(conf);
+
     conf.setLong(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);
     conf.setQuietMode(false);
     cluster =
         MiniOzoneCluster.newBuilder(conf)
             .setNumDatanodes(3)
             .setHbInterval(200)
-            .setDataStreamMinPacketSize(1024)
-            .setBlockSize(BLOCK_SIZE)
-            .setChunkSize(CHUNK_SIZE)
-            .setStreamBufferFlushSize(FLUSH_SIZE)
-            .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
-            .setStreamBufferSizeUnit(StorageUnit.BYTES)
             .build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 60000);
@@ -148,7 +144,7 @@ public class TestContainerStateMachineStream {
   /**
    * Shutdown MiniDFSCluster.
    */
-  @After
+  @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -182,9 +178,9 @@ public class TestContainerStateMachineStream {
     long bytesUsed = dn.getDatanodeStateMachine()
         .getContainer().getContainerSet()
         .getContainer(omKeyLocationInfo.getContainerID()).
-            getContainerData().getBytesUsed();
+        getContainerData().getBytesUsed();
 
-    Assert.assertTrue(bytesUsed == size);
+    assertEquals(bytesUsed, size);
   }
 
 
@@ -213,9 +209,9 @@ public class TestContainerStateMachineStream {
     long bytesUsed = dn.getDatanodeStateMachine()
         .getContainer().getContainerSet()
         .getContainer(omKeyLocationInfo.getContainerID()).
-            getContainerData().getBytesUsed();
+        getContainerData().getBytesUsed();
 
-    Assert.assertTrue(bytesUsed == size);
+    assertEquals(bytesUsed, size);
   }
 
 }

@@ -28,12 +28,13 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
-import static org.junit.Assert.assertNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -47,15 +48,16 @@ public class TestOzoneClientUtils {
   private ReplicationConfig ratis1ReplicationConfig =
       RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
 
-  @Test(expected = IllegalArgumentException.class)
+  @Test()
   public void testNegativeLength() throws IOException {
     OzoneVolume volume = mock(OzoneVolume.class);
     OzoneBucket bucket = mock(OzoneBucket.class);
     String keyName = "dummy";
     ClientProtocol clientProtocol = mock(ClientProtocol.class);
-    OzoneClientUtils.getFileChecksumWithCombineMode(volume, bucket, keyName,
-        -1, OzoneClientConfig.ChecksumCombineMode.MD5MD5CRC, clientProtocol);
-
+    assertThrows(IllegalArgumentException.class, () ->
+        OzoneClientUtils.getFileChecksumWithCombineMode(volume, bucket, keyName,
+        -1, OzoneClientConfig.ChecksumCombineMode.MD5MD5CRC,
+        clientProtocol));
   }
 
   @Test
@@ -79,7 +81,7 @@ public class TestOzoneClientUtils {
             (short) 3, null,
             ecReplicationConfig, new OzoneConfiguration());
     // Bucket default is EC.
-    Assert.assertEquals(ecReplicationConfig, replicationConfig);
+    assertEquals(ecReplicationConfig, replicationConfig);
   }
 
   /**
@@ -92,7 +94,7 @@ public class TestOzoneClientUtils {
             (short) 3, null, null,
             new OzoneConfiguration());
     // Passed replication is 3 - Ozone mapped replication is ratis THREE
-    Assert.assertEquals(ratis3ReplicationConfig, replicationConfig);
+    assertEquals(ratis3ReplicationConfig, replicationConfig);
   }
 
   /**
@@ -107,7 +109,7 @@ public class TestOzoneClientUtils {
             new OzoneConfiguration());
     // client configured value also null.
     // This API caller should leave the decision to server.
-    Assert.assertNull(replicationConfig);
+    assertNull(replicationConfig);
   }
 
   /**
@@ -121,7 +123,7 @@ public class TestOzoneClientUtils {
             (short) -1, null, ratis3ReplicationConfig,
             new OzoneConfiguration());
     // Configured client config also null.
-    Assert.assertNull(replicationConfig);
+    assertNull(replicationConfig);
   }
 
   /**
@@ -135,7 +137,7 @@ public class TestOzoneClientUtils {
             (short) 1, null, ratis3ReplicationConfig,
             new OzoneConfiguration());
     // Passed value is replication one - Ozone mapped value is ratis ONE
-    Assert.assertEquals(ratis1ReplicationConfig, replicationConfig);
+    assertEquals(ratis1ReplicationConfig, replicationConfig);
   }
 
   /**
@@ -149,7 +151,7 @@ public class TestOzoneClientUtils {
             (short) 3, ratis3ReplicationConfig,
             ecReplicationConfig, new OzoneConfiguration());
     // Bucket default is EC
-    Assert.assertEquals(ecReplicationConfig, replicationConfig);
+    assertEquals(ecReplicationConfig, replicationConfig);
   }
 
   /**
@@ -163,7 +165,7 @@ public class TestOzoneClientUtils {
             (short) -1, ratis3ReplicationConfig, ratis1ReplicationConfig,
             new OzoneConfiguration());
     // Configured value is ratis THREE
-    Assert.assertEquals(ratis3ReplicationConfig, replicationConfig);
+    assertEquals(ratis3ReplicationConfig, replicationConfig);
   }
 
   /**
@@ -176,7 +178,7 @@ public class TestOzoneClientUtils {
         .validateAndGetClientReplicationConfig(ReplicationType.RATIS, "1",
             new OzoneConfiguration());
     // Configured value is ratis ONE
-    Assert.assertEquals(ratis1ReplicationConfig, replicationConfig);
+    assertEquals(ratis1ReplicationConfig, replicationConfig);
   }
 
   /**
@@ -187,7 +189,7 @@ public class TestOzoneClientUtils {
     ReplicationConfig replicationConfig = OzoneClientUtils
         .validateAndGetClientReplicationConfig(null, null,
             new OzoneConfiguration());
-    Assert.assertNull(replicationConfig);
+    assertNull(replicationConfig);
   }
 
   /**
@@ -201,7 +203,7 @@ public class TestOzoneClientUtils {
     clientSideConfig.set(OzoneConfigKeys.OZONE_REPLICATION, "rs-3-2-1024K");
     ReplicationConfig replicationConfig = OzoneClientUtils
         .validateAndGetClientReplicationConfig(null, null, clientSideConfig);
-    Assert.assertEquals(ecReplicationConfig, replicationConfig);
+    assertEquals(ecReplicationConfig, replicationConfig);
   }
 
   /**
@@ -213,7 +215,7 @@ public class TestOzoneClientUtils {
     ReplicationConfig replicationConfig = OzoneClientUtils
         .validateAndGetClientReplicationConfig(null, "3",
             new OzoneConfiguration());
-    Assert.assertNull(replicationConfig);
+    assertNull(replicationConfig);
   }
 
   /**
@@ -225,7 +227,7 @@ public class TestOzoneClientUtils {
     ReplicationConfig replicationConfig = OzoneClientUtils
         .validateAndGetClientReplicationConfig(ReplicationType.EC, null,
             new OzoneConfiguration());
-    Assert.assertNull(replicationConfig);
+    assertNull(replicationConfig);
   }
 
   /**
@@ -240,7 +242,7 @@ public class TestOzoneClientUtils {
     // null.
     ReplicationConfig replicationConfig = OzoneClientUtils
         .validateAndGetClientReplicationConfig(null, null, clientSideConfig);
-    Assert.assertNull(replicationConfig);
+    assertNull(replicationConfig);
   }
 
   /**
@@ -255,7 +257,7 @@ public class TestOzoneClientUtils {
     // as null.
     ReplicationConfig replicationConfig = OzoneClientUtils
         .validateAndGetClientReplicationConfig(null, null, clientSideConfig);
-    Assert.assertNull(replicationConfig);
+    assertNull(replicationConfig);
   }
 
 }

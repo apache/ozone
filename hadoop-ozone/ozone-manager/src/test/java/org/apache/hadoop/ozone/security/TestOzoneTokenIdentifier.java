@@ -17,6 +17,7 @@
  */
 package org.apache.hadoop.ozone.security;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
@@ -27,6 +28,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.KeyPair;
@@ -43,24 +45,17 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.codec.TokenIdentifierCodec;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
-import org.apache.hadoop.security.ssl.TestSSLFactory;
 import org.apache.hadoop.security.token.Token;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.Time;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
-import org.junit.AfterClass;
-import org.junit.Assert;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,11 +66,6 @@ public class TestOzoneTokenIdentifier {
 
   private static final Logger LOG = LoggerFactory
       .getLogger(TestOzoneTokenIdentifier.class);
-  private static final String BASEDIR = GenericTestUtils
-      .getTempPath(TestOzoneTokenIdentifier.class.getSimpleName());
-  private static final String KEYSTORES_DIR =
-      new File(BASEDIR).getAbsolutePath();
-  private static File base;
   private static String sslConfsDir;
   private static final String EXCLUDE_CIPHERS =
       "TLS_ECDHE_RSA_WITH_RC4_128_SHA,"
@@ -86,35 +76,11 @@ public class TestOzoneTokenIdentifier {
           + "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA,"
           + "SSL_RSA_WITH_RC4_128_MD5";
 
-  @BeforeClass
-  public static void setUp() throws Exception {
-    base = new File(BASEDIR);
-    FileUtil.fullyDelete(base);
-    base.mkdirs();
-  }
-
-  private ConfigurationSource createConfiguration(boolean clientCert,
-      boolean trustStore)
-      throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    KeyStoreTestUtil.setupSSLConfig(KEYSTORES_DIR, sslConfsDir, conf,
-        clientCert, trustStore, EXCLUDE_CIPHERS);
-    sslConfsDir = KeyStoreTestUtil.getClasspathDir(TestSSLFactory.class);
-    return conf;
-  }
-
-  @AfterClass
-  public static void cleanUp() throws Exception {
-    FileUtil.fullyDelete(base);
-    KeyStoreTestUtil.cleanupSSLConfig(KEYSTORES_DIR, sslConfsDir);
-  }
 
   @Test
-  public void testSignToken() throws GeneralSecurityException, IOException {
-    String keystore = new File(KEYSTORES_DIR, "keystore.jks")
-        .getAbsolutePath();
-    String truststore = new File(KEYSTORES_DIR, "truststore.jks")
-        .getAbsolutePath();
+  public void testSignToken(@TempDir Path baseDir) throws GeneralSecurityException, IOException {
+    String keystore = baseDir.resolve("keystore.jks").toFile().getAbsolutePath();
+    String truststore = baseDir.resolve("truststore.jks").toFile().getAbsolutePath();
     String trustPassword = "trustPass";
     String keyStorePassword = "keyStorePass";
     String keyPassword = "keyPass";
@@ -281,9 +247,9 @@ public class TestOzoneTokenIdentifier {
    * Test serialization/deserialization of OzoneTokenIdentifier.
    */
   @Test
-  public void testReadWriteInProtobuf() throws IOException {
+  public void testReadWriteInProtobuf(@TempDir Path baseDir) throws IOException {
     OzoneTokenIdentifier id = getIdentifierInst();
-    File idFile = new File(BASEDIR + "/tokenFile");
+    File idFile = baseDir.resolve("tokenFile").toFile();
 
     FileOutputStream fop = new FileOutputStream(idFile);
     DataOutputStream dataOutputStream = new DataOutputStream(fop);
@@ -295,7 +261,7 @@ public class TestOzoneTokenIdentifier {
     OzoneTokenIdentifier id2 = new OzoneTokenIdentifier();
 
     id2.readFields(dis);
-    Assert.assertEquals(id, id2);
+    assertEquals(id, id2);
   }
 
 
@@ -327,11 +293,11 @@ public class TestOzoneTokenIdentifier {
     DataInputStream in = new DataInputStream(buf);
     OzoneTokenIdentifier idDecode = new OzoneTokenIdentifier();
     idDecode.readFields(in);
-    Assert.assertEquals(idEncode, idDecode);
+    assertEquals(idEncode, idDecode);
   }
 
   @Test
-  public void testTokenPersistence() throws IOException {
+  void testTokenPersistence() throws IOException {
     OzoneTokenIdentifier idWrite = getIdentifierInst();
     idWrite.setOmServiceId("defaultServiceId");
 
@@ -339,12 +305,8 @@ public class TestOzoneTokenIdentifier {
     Codec<OzoneTokenIdentifier> idCodec = TokenIdentifierCodec.get();
 
     OzoneTokenIdentifier idRead = null;
-    try {
-      idRead =  idCodec.fromPersistedFormat(oldIdBytes);
-    } catch (IOException ex) {
-      Assert.fail("Should not fail to load old token format");
-    }
-    Assert.assertEquals("Deserialize Serialized Token should equal.",
-        idWrite, idRead);
+    idRead =  idCodec.fromPersistedFormat(oldIdBytes);
+    assertEquals(idWrite, idRead,
+        "Deserialize Serialized Token should equal.");
   }
 }

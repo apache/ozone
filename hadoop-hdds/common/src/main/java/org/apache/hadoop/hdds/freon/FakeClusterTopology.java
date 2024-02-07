@@ -52,7 +52,7 @@ public class FakeClusterTopology {
   public FakeClusterTopology() {
     try {
       for (int i = 0; i < 9; i++) {
-        datanodes.add(createDatanode(i));
+        datanodes.add(createDatanode());
         if ((i + 1) % 3 == 0) {
           pipelines.add(Pipeline.newBuilder()
               .setId(PipelineID.randomId().getProtobuf())
@@ -69,7 +69,7 @@ public class FakeClusterTopology {
     }
   }
 
-  private DatanodeDetailsProto createDatanode(int index) {
+  private DatanodeDetailsProto createDatanode() {
     return DatanodeDetailsProto.newBuilder()
         .setUuid(UUID.randomUUID().toString())
         .setHostName("localhost")

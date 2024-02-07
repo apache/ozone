@@ -69,14 +69,10 @@ public class DedicatedDiskSpaceUsageFactory implements SpaceUsageCheckFactory {
         description = "Disk space usage information will be refreshed with the"
             + "specified period following the completion of the last check."
     )
-    private long refreshPeriod;
-
-    public void setRefreshPeriod(long millis) {
-      refreshPeriod = millis;
-    }
+    private Duration refreshPeriod;
 
     public Duration getRefreshPeriod() {
-      return Duration.ofMillis(refreshPeriod);
+      return refreshPeriod;
     }
 
     static String configKeyForRefreshPeriod() {

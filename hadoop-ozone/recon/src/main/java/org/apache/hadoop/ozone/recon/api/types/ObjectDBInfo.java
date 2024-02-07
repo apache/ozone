@@ -19,7 +19,6 @@
 package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 
@@ -52,7 +51,7 @@ public class ObjectDBInfo {
   private long modificationTime;
 
   @JsonProperty("acls")
-  private List<OzoneAcl> acls;
+  private List<AclMetadata> acls;
 
   public ObjectDBInfo() {
 
@@ -62,13 +61,13 @@ public class ObjectDBInfo {
     this.setName(omDirectoryInfo.getName());
     this.setCreationTime(omDirectoryInfo.getCreationTime());
     this.setModificationTime(omDirectoryInfo.getModificationTime());
-    this.setAcls(omDirectoryInfo.getAcls());
+    this.setAcls(AclMetadata.fromOzoneAcls(omDirectoryInfo.getAcls()));
     this.setMetadata(omDirectoryInfo.getMetadata());
   }
 
   public ObjectDBInfo(OmPrefixInfo omPrefixInfo) {
     this.setName(omPrefixInfo.getName());
-    this.setAcls(omPrefixInfo.getAcls());
+    this.setAcls(AclMetadata.fromOzoneAcls(omPrefixInfo.getAcls()));
     this.setMetadata(omPrefixInfo.getMetadata());
   }
 
@@ -129,11 +128,11 @@ public class ObjectDBInfo {
     this.modificationTime = modificationTime;
   }
 
-  public List<OzoneAcl> getAcls() {
+  public List<AclMetadata> getAcls() {
     return acls;
   }
 
-  public void setAcls(List<OzoneAcl> acls) {
+  public void setAcls(List<AclMetadata> acls) {
     this.acls = acls;
   }
 

@@ -110,7 +110,7 @@ public class IncrementalContainerReportHandler extends
               replicaProto.getContainerID());
         } catch (SCMException ex) {
           if (ex.getResult() == SCMException.ResultCodes.SCM_NOT_LEADER) {
-            LOG.warn("Failed to process {} container {}: {}",
+            LOG.info("Failed to process {} container {}: {}",
                 replicaProto.getState(), id, ex.getMessage());
           } else {
             LOG.error("Exception while processing ICR for container {}",

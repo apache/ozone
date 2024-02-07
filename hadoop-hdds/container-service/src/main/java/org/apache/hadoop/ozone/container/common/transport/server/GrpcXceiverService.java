@@ -17,18 +17,24 @@
  */
 
 package org.apache.hadoop.ozone.container.common.transport.server;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerCommandResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto
-    .XceiverClientProtocolServiceGrpc;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.ratis.grpc.util.ZeroCopyMessageMarshaller;
+import org.apache.ratis.thirdparty.com.google.protobuf.MessageLite;
+import org.apache.ratis.thirdparty.io.grpc.MethodDescriptor;
+import org.apache.ratis.thirdparty.io.grpc.ServerCallHandler;
+import org.apache.ratis.thirdparty.io.grpc.ServerServiceDefinition;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.InputStream;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import static org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc.getSendMethod;
 
 /**
  * Grpc Service for handling Container Commands on datanode.
@@ -39,9 +45,58 @@ public class GrpcXceiverService extends
       LOG = LoggerFactory.getLogger(GrpcXceiverService.class);
 
   private final ContainerDispatcher dispatcher;
+  private final boolean zeroCopyEnabled;
+  private final ZeroCopyMessageMarshaller<ContainerCommandRequestProto>
+      zeroCopyMessageMarshaller = new ZeroCopyMessageMarshaller<>(
+          ContainerCommandRequestProto.getDefaultInstance());
 
-  public GrpcXceiverService(ContainerDispatcher dispatcher) {
+  public GrpcXceiverService(ContainerDispatcher dispatcher,
+      boolean zeroCopyEnabled) {
     this.dispatcher = dispatcher;
+    this.zeroCopyEnabled = zeroCopyEnabled;
+  }
+
+  /**
+   * Bind service with zerocopy marshaller equipped for the `send` API if
+   * zerocopy is enabled.
+   * @return  service definition.
+   */
+  public ServerServiceDefinition bindServiceWithZeroCopy() {
+    ServerServiceDefinition orig = super.bindService();
+    if (!zeroCopyEnabled) {
+      LOG.info("Zerocopy is not enabled.");
+      return orig;
+    }
+
+    ServerServiceDefinition.Builder builder =
+        ServerServiceDefinition.builder(orig.getServiceDescriptor().getName());
+    // Add `send` method with zerocopy marshaller.
+    addZeroCopyMethod(orig, builder, getSendMethod(),
+        zeroCopyMessageMarshaller);
+    // Add other methods as is.
+    orig.getMethods().stream().filter(
+        x -> !x.getMethodDescriptor().getFullMethodName().equals(
+            getSendMethod().getFullMethodName())
+    ).forEach(
+        builder::addMethod
+    );
+
+    return builder.build();
+  }
+
+  private static <Req extends MessageLite, Resp> void addZeroCopyMethod(
+      ServerServiceDefinition orig,
+      ServerServiceDefinition.Builder newServiceBuilder,
+      MethodDescriptor<Req, Resp> origMethod,
+      ZeroCopyMessageMarshaller<Req> zeroCopyMarshaller) {
+    MethodDescriptor<Req, Resp> newMethod = origMethod.toBuilder()
+        .setRequestMarshaller(zeroCopyMarshaller)
+        .build();
+    @SuppressWarnings("unchecked")
+    ServerCallHandler<Req, Resp> serverCallHandler =
+        (ServerCallHandler<Req, Resp>) orig.getMethod(
+            newMethod.getFullMethodName()).getServerCallHandler();
+    newServiceBuilder.addMethod(newMethod, serverCallHandler);
   }
 
   @Override
@@ -61,6 +116,11 @@ public class GrpcXceiverService extends
                     + " ContainerCommandRequestProto {}", request, e);
           isClosed.set(true);
           responseObserver.onError(e);
+        } finally {
+          InputStream popStream = zeroCopyMessageMarshaller.popStream(request);
+          if (popStream != null) {
+            IOUtils.close(LOG, popStream);
+          }
         }
       }
 

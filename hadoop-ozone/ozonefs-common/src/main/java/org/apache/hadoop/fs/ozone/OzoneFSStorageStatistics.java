@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.fs.StorageStatistics;
@@ -25,6 +26,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.EnumMap;
@@ -121,6 +123,13 @@ public class OzoneFSStorageStatistics extends StorageStatistics
     for (AtomicLong value : opsCount.values()) {
       value.set(0);
     }
+  }
+
+  @VisibleForTesting
+  Map<String, Long> snapshot() {
+    Map<String, Long> snapshot = new HashMap<>();
+    opsCount.forEach((k, v) -> snapshot.put(k.getSymbol(), v.longValue()));
+    return snapshot;
   }
 
 }

@@ -18,13 +18,13 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.google.inject.AbstractModule;
 import com.google.inject.Injector;
 
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.hadoop.ozone.recon.schema.tables.daos.ReconTaskStatusDao;
 import org.hadoop.ozone.recon.schema.tables.pojos.ReconTaskStatus;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -38,6 +38,10 @@ import java.util.List;
  */
 public class TestTaskStatusService extends AbstractReconSqlDBTest {
   private TaskStatusService taskStatusService;
+
+  public TestTaskStatusService() {
+    super();
+  }
 
   @BeforeEach
   public void setUp() {
@@ -67,11 +71,10 @@ public class TestTaskStatusService extends AbstractReconSqlDBTest {
     List<ReconTaskStatus> responseList = (List<ReconTaskStatus>)
         response.getEntity();
 
-    Assertions.assertEquals(resultList.size(), responseList.size());
+    assertEquals(resultList.size(), responseList.size());
     for (ReconTaskStatus r : responseList) {
-      Assertions.assertEquals(reconTaskStatusRecord.getTaskName(),
-          r.getTaskName());
-      Assertions.assertEquals(reconTaskStatusRecord.getLastUpdatedTimestamp(),
+      assertEquals(reconTaskStatusRecord.getTaskName(), r.getTaskName());
+      assertEquals(reconTaskStatusRecord.getLastUpdatedTimestamp(),
           r.getLastUpdatedTimestamp());
     }
   }

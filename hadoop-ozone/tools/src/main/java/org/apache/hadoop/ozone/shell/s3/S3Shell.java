@@ -37,7 +37,8 @@ public class S3Shell extends Shell {
   @Override
   public int execute(String[] argv) {
     TracingUtil.initTracing("s3shell", createOzoneConfiguration());
-    return TracingUtil.executeInNewSpan("s3shell",
+    String spanName = "ozone s3 " + String.join(" ", argv);
+    return TracingUtil.executeInNewSpan(spanName,
         () -> super.execute(argv));
   }
 

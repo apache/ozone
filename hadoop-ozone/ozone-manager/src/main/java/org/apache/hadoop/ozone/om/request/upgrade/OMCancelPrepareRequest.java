@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.ozone.om.request.upgrade;
 
+import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerDoubleBufferHelper;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -49,12 +49,9 @@ public class OMCancelPrepareRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(
-      OzoneManager ozoneManager, long transactionLogIndex,
-      OzoneManagerDoubleBufferHelper ozoneManagerDoubleBufferHelper) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
 
-    LOG.info("OM {} Received cancel prepare request with log index {}",
-        ozoneManager.getOMNodeId(), transactionLogIndex);
+    LOG.info("OM {} Received cancel prepare request with log {}", ozoneManager.getOMNodeId(), termIndex);
 
     OMRequest omRequest = getOmRequest();
     OMResponse.Builder responseBuilder =
@@ -81,11 +78,9 @@ public class OMCancelPrepareRequest extends OMClientRequest {
       // Deletes on disk marker file, does not update DB and therefore does
       // not update cache.
       ozoneManager.getPrepareState().cancelPrepare();
-      ozoneManagerDoubleBufferHelper.add(response, transactionLogIndex);
 
-      LOG.info("OM {} prepare state cancelled at log index {}. Returning " +
-              "response {}",
-          ozoneManager.getOMNodeId(), transactionLogIndex, omResponse);
+      LOG.info("OM {} prepare state cancelled at log {}. Returning response {}",
+          ozoneManager.getOMNodeId(), termIndex, omResponse);
     } catch (IOException e) {
       LOG.error("Cancel Prepare Request apply failed in {}. ",
           ozoneManager.getOMNodeId(), e);

@@ -40,6 +40,8 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
 
 /**
  * Utility to help to generate test data.
@@ -51,8 +53,7 @@ public final class TestDataUtil {
 
   public static OzoneBucket createVolumeAndBucket(OzoneClient client,
       String volumeName, String bucketName) throws IOException {
-    return createVolumeAndBucket(client, volumeName, bucketName,
-        BucketLayout.LEGACY);
+    return createVolumeAndBucket(client, volumeName, bucketName, getDefaultBucketLayout(client));
   }
 
   public static OzoneBucket createVolumeAndBucket(OzoneClient client,
@@ -71,22 +72,28 @@ public final class TestDataUtil {
   }
 
   public static OzoneBucket createVolumeAndBucket(OzoneClient client,
-      String volumeName, String bucketName,
-      BucketArgs omBucketArgs) throws IOException {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-
-    VolumeArgs volumeArgs =
-        VolumeArgs.newBuilder().setAdmin(adminName).setOwner(userName).build();
-
-    ObjectStore objectStore = client.getObjectStore();
-
-    objectStore.createVolume(volumeName, volumeArgs);
-
-    OzoneVolume volume = objectStore.getVolume(volumeName);
-
+                                                  String volumeName,
+                                                  String bucketName,
+                                                  BucketArgs omBucketArgs)
+      throws IOException {
+    OzoneVolume volume = createVolume(client, volumeName);
     volume.createBucket(bucketName, omBucketArgs);
     return volume.getBucket(bucketName);
+
+  }
+
+  public static OzoneVolume createVolume(OzoneClient client,
+                                         String volumeName) throws IOException {
+    String userName = "user" + RandomStringUtils.randomNumeric(5);
+    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
+    VolumeArgs volumeArgs = VolumeArgs.newBuilder()
+        .setAdmin(adminName)
+        .setOwner(userName)
+        .build();
+
+    ObjectStore objectStore = client.getObjectStore();
+    objectStore.createVolume(volumeName, volumeArgs);
+    return objectStore.getVolume(volumeName);
 
   }
 
@@ -135,7 +142,13 @@ public final class TestDataUtil {
 
   public static OzoneBucket createVolumeAndBucket(OzoneClient client)
       throws IOException {
-    return createVolumeAndBucket(client, BucketLayout.LEGACY);
+    return createVolumeAndBucket(client, getDefaultBucketLayout(client));
+  }
+
+  private static BucketLayout getDefaultBucketLayout(OzoneClient client) {
+    return BucketLayout.fromString(client
+        .getConfiguration()
+        .get(OZONE_DEFAULT_BUCKET_LAYOUT, OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT));
   }
 
   public static OzoneBucket createBucket(OzoneClient client,

@@ -61,10 +61,10 @@ public class DefaultSecretKeyClient implements SecretKeyClient {
   }
 
   public static SecretKeyClient create(ConfigurationSource conf,
-      SecretKeyProtocol secretKeyProtocol)
+      SecretKeyProtocol secretKeyProtocol, String threadNamePrefix)
       throws IOException {
     SecretKeySignerClient singerClient =
-        new DefaultSecretKeySignerClient(secretKeyProtocol);
+        new DefaultSecretKeySignerClient(secretKeyProtocol, threadNamePrefix);
     SecretKeyVerifierClient verifierClient =
         new DefaultSecretKeyVerifierClient(secretKeyProtocol, conf);
     return new DefaultSecretKeyClient(singerClient, verifierClient);
