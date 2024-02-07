@@ -59,6 +59,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -628,7 +629,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
         = omMetadataManager.getDeletedTable().getRangeKVs(null, 100, deletedKey);
     assertThat(rangeKVs.size()).isGreaterThan(0);
     assertEquals(1, rangeKVs.get(0).getValue().getOmKeyInfoList().size());
-    assertTrue(!rangeKVs.get(0).getKey().endsWith(rangeKVs.get(0).getValue().getOmKeyInfoList().get(0).getObjectID()
+    assertFalse(rangeKVs.get(0).getKey().endsWith(rangeKVs.get(0).getValue().getOmKeyInfoList().get(0).getObjectID()
         + ""));
   }
 

@@ -270,7 +270,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
             keyToDelete, trxnLogIndex, ozoneManager.isRatisEnabled());
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
             correctedSpace);
-        // using pseutoObjId as objectId can be same in case of overwrite key
+        // using pseudoObjId as objectId can be same in case of overwrite key
         long pseudoObjId = ozoneManager.getObjectIdFromTxId(trxnLogIndex);
         String delKeyName = omMetadataManager.getOzoneDeletePathKey(
             pseudoObjId, dbOzoneKey);
