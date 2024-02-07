@@ -41,6 +41,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -411,7 +412,8 @@ public abstract class OMFailoverProxyProviderBase<T> implements
   }
 
   protected synchronized void setOmNodeIDList(List<String> omNodeIDList) {
-    this.omNodeIDList = omNodeIDList;
+    Collections.shuffle(omNodeIDList);
+    this.omNodeIDList = Collections.unmodifiableList(omNodeIDList);
   }
 
   protected synchronized List<String> getOmNodeIDList() {
