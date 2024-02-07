@@ -25,6 +25,7 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 
@@ -48,6 +49,14 @@ class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
   CommitWatcher(BufferPool bufferPool, XceiverClientSpi xceiverClient) {
     super(xceiverClient);
     this.bufferPool = bufferPool;
+  }
+
+  @Override
+  XceiverClientReply watchForCommit(long commitIndex) {
+    // No need to actually call client.watchForCommit since Ratis client send() call
+    // alone should suffice with RATIS-1994
+    adjustBuffers(commitIndex);
+    return null;
   }
 
   @Override
