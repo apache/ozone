@@ -71,7 +71,7 @@ public class DiskBalancerCommandHandler implements CommandHandler {
         diskBalancerCommand.getDiskBalancerConfiguration();
 
     DiskBalancerInfo diskBalancerInfo = ozoneContainer.getDiskBalancerInfo();
-
+    LOG.info("Processing {}", diskBalancerCommand);
     try {
       switch (opType) {
       case START:
