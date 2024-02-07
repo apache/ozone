@@ -199,18 +199,29 @@ public abstract class OMKeyRequest extends OMClientRequest {
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
     String remoteUser = getRemoteUser().getShortUserName();
     List<AllocatedBlock> allocatedBlocks;
-    try {
-      allocatedBlocks = scmClient.getBlockClient()
-          .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
-              excludeList, clientMachine);
-    } catch (SCMException ex) {
-      omMetrics.incNumBlockAllocateCallFails();
-      if (ex.getResult()
-          .equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION)) {
-        throw new OMException(ex.getMessage(),
-            OMException.ResultCodes.SCM_IN_SAFE_MODE);
+    int retryCount = 5;
+    while (true) {
+      try {
+        allocatedBlocks = scmClient.getBlockClient()
+            .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
+                excludeList, clientMachine);
+      } catch (SCMException ex) {
+        omMetrics.incNumBlockAllocateCallFails();
+        if (ex.getResult().equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION) && retryCount > 0) {
+          retryCount--;
+          // SCM is in safe mode, retry again
+          try {
+            Thread.sleep(3000);
+            continue;
+          } catch (InterruptedException e) {
+            throw new OMException(ex.getMessage(), OMException.ResultCodes.SCM_IN_SAFE_MODE);
+          }
+        } else if (ex.getResult().equals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION) && retryCount == 0) {
+          throw new OMException(ex.getMessage(), OMException.ResultCodes.SCM_IN_SAFE_MODE);
+        }
+        throw ex;
       }
-      throw ex;
+      break;
     }
     for (AllocatedBlock allocatedBlock : allocatedBlocks) {
       BlockID blockID = new BlockID(allocatedBlock.getBlockID());
