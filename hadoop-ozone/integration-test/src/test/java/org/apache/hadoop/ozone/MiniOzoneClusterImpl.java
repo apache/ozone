@@ -140,10 +140,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   private final Set<AutoCloseable> clients = ConcurrentHashMap.newKeySet();
   private SecretKeyClient secretKeyClient;
 
-  // TODO: Get rid of Optional, just use null
-  private Optional<int[]> dnInitialVersion = Optional.empty();
-  private Optional<int[]> dnCurrentVersion = Optional.empty();
-
   /**
    * Creates a new MiniOzoneCluster with Recon.
    *
@@ -334,14 +330,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         "Not able to find datanode with datanode Id " + dn.getUuid());
   }
 
-  public int getDatanodeInitialVersion(int dnIdx) {
-    return dnInitialVersion.map(v -> v[dnIdx]).orElse(-1);
-  }
-
-  public int getDatanodeCurrentVersion(int dnIdx) {
-    return dnCurrentVersion.map(v -> v[dnIdx]).orElse(-1);
-  }
-
   @Override
   public OzoneClient newClient() throws IOException {
     OzoneClient client = createClient();
@@ -431,7 +419,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     HddsDatanodeService service = new HddsDatanodeService(args);
     service.setConfiguration(config);
     hddsDatanodes.add(i, service);
-    startHddsDatanode(service, i);
+    startHddsDatanode(service);
     if (waitForDatanode) {
       // wait for the node to be identified as a healthy node again.
       waitForClusterToBeReady();
@@ -492,7 +480,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     scm.start();
   }
 
-  public void startHddsDatanode(HddsDatanodeService datanode, int dnIdx) {
+  public void startHddsDatanode(HddsDatanodeService datanode) {
     try {
       datanode.setCertificateClient(getCAClient());
     } catch (IOException e) {
@@ -507,9 +495,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
    */
   @Override
   public void startHddsDatanodes() {
-    for (int i = 0; i < hddsDatanodes.size(); i++) {
-      startHddsDatanode(hddsDatanodes.get(i), i);
-    }
+    hddsDatanodes.forEach(this::startHddsDatanode);
   }
 
   @Override
