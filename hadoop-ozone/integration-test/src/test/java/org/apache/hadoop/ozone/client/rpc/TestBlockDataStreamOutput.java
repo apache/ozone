@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -72,8 +73,8 @@ public class TestBlockDataStreamOutput {
   private static String volumeName;
   private static String bucketName;
   private static String keyString;
-  private static final int[] DN_INITIAL_VERSION = new int[] {0, 0, 0, 0, 1};
-  private static final int[] DN_CURRENT_VERSION = new int[] {0, 0, 0, 1, 1};
+  private static final int DN_INITIAL_VERSION = DatanodeVersion.DEFAULT_VERSION.toProtoValue();
+  private static final int DN_CURRENT_VERSION = DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE.toProtoValue();
 
   /**
    * Create a MiniDFSCluster for testing.
@@ -276,30 +277,24 @@ public class TestBlockDataStreamOutput {
 
   @Test
   public void testDatanodeVersion() throws Exception {
-
-    // First verify DNs has their respective versions set correctly
+    // Verify all DNs internally have versions set correctly
     List<HddsDatanodeService> dns = cluster.getHddsDatanodes();
-    for (int i = 0; i < dns.size(); i++) {
-      HddsDatanodeService dn = dns.get(i);
-      assertEquals(DN_INITIAL_VERSION[i], dn.getDefaultInitialVersion());
-      assertEquals(DN_CURRENT_VERSION[i], dn.getDefaultCurrentVersion());
-
+    for (HddsDatanodeService dn : dns) {
       DatanodeDetails details = dn.getDatanodeDetails();
-      assertEquals(dn.getDefaultInitialVersion(), details.getInitialVersion());
-      assertEquals(dn.getDefaultCurrentVersion(), details.getCurrentVersion());
+      assertEquals(DN_INITIAL_VERSION, details.getInitialVersion());
+      assertEquals(DN_CURRENT_VERSION, details.getCurrentVersion());
     }
 
     String keyName = getKeyName();
     OzoneDataStreamOutput key = createKey(keyName, ReplicationType.RATIS, 0);
     KeyDataStreamOutput keyDataStreamOutput = (KeyDataStreamOutput) key.getByteBufStreamOutput();
     BlockDataStreamOutputEntry stream = keyDataStreamOutput.getStreamEntries().get(0);
-    // Now check 3 DNs in a random pipeline have the correct DN versions
+
+    // Now check 3 DNs in a random pipeline returns the correct DN versions
     List<DatanodeDetails> streamDnDetails = stream.getPipeline().getNodes();
     for (DatanodeDetails details : streamDnDetails) {
-      int dnIdx = cluster.getHddsDatanodeIndex(details);
-
-      assertEquals(DN_INITIAL_VERSION[dnIdx], details.getInitialVersion());
-      assertEquals(DN_CURRENT_VERSION[dnIdx], details.getCurrentVersion());
+      assertEquals(DN_INITIAL_VERSION, details.getInitialVersion());
+      assertEquals(DN_CURRENT_VERSION, details.getCurrentVersion());
     }
   }
 

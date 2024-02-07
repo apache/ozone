@@ -106,6 +106,8 @@ import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
 
 import org.hadoop.ozone.recon.codegen.ReconSqlDbConfig;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -153,17 +155,13 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
                        OzoneManager ozoneManager,
                        StorageContainerManager scm,
                        List<HddsDatanodeService> hddsDatanodes,
-                       ReconServer reconServer,
-                       Optional<int[]> dnInitialVersion,
-                       Optional<int[]> dnCurrentVersion) {
+                       ReconServer reconServer) {
     this.conf = conf;
     this.ozoneManager = ozoneManager;
     this.scm = scm;
     this.hddsDatanodes = hddsDatanodes;
     this.reconServer = reconServer;
     this.scmConfigurator = scmConfigurator;
-    this.dnInitialVersion = dnInitialVersion;
-    this.dnCurrentVersion = dnCurrentVersion;
   }
 
   /**
@@ -501,12 +499,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       LOG.error("Exception while setting certificate client to DataNode.", e);
     }
     datanode.setSecretKeyClient(secretKeyClient);
-    if (dnInitialVersion.isPresent()) {
-      datanode.setDefaultInitialVersion(getDatanodeInitialVersion(dnIdx));
-    }
-    if (dnCurrentVersion.isPresent()) {
-      datanode.setDefaultCurrentVersion(getDatanodeCurrentVersion(dnIdx));
-    }
     datanode.start();
   }
 
@@ -642,8 +634,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
         MiniOzoneClusterImpl cluster = new MiniOzoneClusterImpl(conf,
             scmConfigurator, om, scm,
-            hddsDatanodes, reconServer,
-            dnInitialVersion, dnCurrentVersion);
+            hddsDatanodes, reconServer);
 
         cluster.setCAClient(certClient);
         cluster.setSecretKeyClient(secretKeyClient);
@@ -870,13 +861,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, scmAddress);
       List<HddsDatanodeService> hddsDatanodes = new ArrayList<>();
 
-      // Sanity check
-      if (dnInitialVersion.isPresent() && dnInitialVersion.get().length != numOfDatanodes) {
-        throw new IllegalArgumentException("Number of initial versions should be equal to number of datanodes");
-      }
-      if (dnCurrentVersion.isPresent() && dnCurrentVersion.get().length != numOfDatanodes) {
-        throw new IllegalArgumentException("Number of current versions should be equal to number of datanodes");
-      }
+      // Override default datanode initial and current version
+      MockedStatic mocked = Mockito.mockStatic(HddsDatanodeService.class);
+      mocked.when(HddsDatanodeService::getDefaultInitialVersion).thenReturn(dnInitialVersion);
+      mocked.when(HddsDatanodeService::getDefaultCurrentVersion).thenReturn(dnCurrentVersion);
 
       for (int i = 0; i < numOfDatanodes; i++) {
         OzoneConfiguration dnConf = new OzoneConfiguration(conf);
