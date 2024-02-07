@@ -49,9 +49,11 @@ import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.assertj.core.util.Lists;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -125,7 +127,7 @@ public class TestECUnderReplicationHandler {
       = new AtomicBoolean(false);
 
   @BeforeEach
-  public void setup() throws NodeNotFoundException,
+  void setup(@TempDir File testDir) throws NodeNotFoundException,
       CommandTargetOverloadedException, NotLeaderException {
     nodeManager = new MockNodeManager(true, 10) {
       @Override
@@ -159,7 +161,7 @@ public class TestECUnderReplicationHandler {
         replicationManager, commandsSent,
         throwOverloadedExceptionOnReconstruction);
 
-    conf = SCMTestUtils.getConf();
+    conf = SCMTestUtils.getConf(testDir);
     repConfig = new ECReplicationConfig(DATA, PARITY);
     container = createContainer(HddsProtos.LifeCycleState.CLOSED, repConfig);
     policy = ReplicationTestUtil

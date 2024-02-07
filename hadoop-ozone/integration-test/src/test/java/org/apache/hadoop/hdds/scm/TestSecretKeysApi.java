@@ -40,6 +40,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,14 +92,13 @@ public final class TestSecretKeysApi {
       .getLogger(TestSecretKeysApi.class);
   private MiniKdc miniKdc;
   private OzoneConfiguration conf;
+  @TempDir
   private File workDir;
   private File ozoneKeytab;
   private File spnegoKeytab;
   private File testUserKeytab;
   private String testUserPrincipal;
   private String ozonePrincipal;
-  private String clusterId;
-  private String scmId;
   private MiniOzoneHAClusterImpl cluster;
 
   @BeforeEach
@@ -108,10 +108,6 @@ public final class TestSecretKeysApi {
 
     ExitUtils.disableSystemExit();
     ExitUtil.disableSystemExit();
-
-    workDir = GenericTestUtils.getTestDir(getClass().getSimpleName());
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
 
     startMiniKdc();
     setSecureConfig();
@@ -331,9 +327,7 @@ public final class TestSecretKeysApi {
       throws IOException, TimeoutException, InterruptedException {
     OzoneManager.setTestSecureOmFlag(true);
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newHABuilder(conf)
-        .setClusterId(clusterId)
         .setSCMServiceId("TestSecretKey")
-        .setScmId(scmId)
         .setNumDatanodes(3)
         .setNumOfStorageContainerManagers(numSCMs)
         .setNumOfOzoneManagers(1);

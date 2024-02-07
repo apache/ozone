@@ -18,8 +18,6 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -34,16 +32,15 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -55,16 +52,14 @@ public class TestSimplePipelineProvider {
   private NodeManager nodeManager;
   private PipelineProvider provider;
   private PipelineStateManager stateManager;
+  @TempDir
   private File testDir;
   private DBStore dbStore;
 
   @BeforeEach
   public void init() throws Exception {
     nodeManager = new MockNodeManager(true, 10);
-    final OzoneConfiguration conf = SCMTestUtils.getConf();
-    testDir = GenericTestUtils.getTestDir(
-        TestSimplePipelineProvider.class.getSimpleName() + UUID.randomUUID());
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     dbStore = DBStoreBuilder.createDBStore(
         conf, new SCMDBDefinition());
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
@@ -82,8 +77,6 @@ public class TestSimplePipelineProvider {
     if (dbStore != null) {
       dbStore.close();
     }
-
-    FileUtil.fullyDelete(testDir);
   }
 
   @Test

@@ -19,8 +19,6 @@
 package org.apache.hadoop.hdds.client;
 
 import com.google.common.base.Strings;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.OzoneConsts.KB;
@@ -33,8 +31,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.TB;
  * a storage volume.
  */
 public final class OzoneQuota {
-  public static final Logger LOG =
-      LoggerFactory.getLogger(OzoneQuota.class);
 
   public static final String OZONE_QUOTA_B = "B";
   public static final String OZONE_QUOTA_KB = "KB";
@@ -142,16 +138,6 @@ public final class OzoneQuota {
     this.quotaInNamespace = quotaInNamespace;
     this.rawQuotaInBytes = rawQuotaInBytes;
     this.quotaInBytes = rawQuotaInBytes.sizeInBytes();
-  }
-
-  /**
-   * Formats a quota as a string.
-   *
-   * @param quota the quota to format
-   * @return string representation of quota
-   */
-  public static String formatQuota(OzoneQuota quota) {
-    return String.valueOf(quota.getRawSize()) + quota.getUnit();
   }
 
   /**

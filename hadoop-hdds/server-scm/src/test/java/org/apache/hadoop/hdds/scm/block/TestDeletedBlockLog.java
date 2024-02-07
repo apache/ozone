@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.block;
 
 import org.apache.commons.lang3.RandomUtils;
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -55,10 +54,10 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
@@ -95,6 +94,7 @@ public class TestDeletedBlockLog {
   private  DeletedBlockLogImpl deletedBlockLog;
   private static final int BLOCKS_PER_TXN = 5;
   private OzoneConfiguration conf;
+  @TempDir
   private File testDir;
   private ContainerManager containerManager;
   private Table<ContainerID, ContainerInfo> containerTable;
@@ -111,8 +111,6 @@ public class TestDeletedBlockLog {
 
   @BeforeEach
   public void setup() throws Exception {
-    testDir = GenericTestUtils.getTestDir(
-        TestDeletedBlockLog.class.getSimpleName());
     conf = new OzoneConfiguration();
     conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
     conf.setInt(OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 20);
@@ -128,12 +126,9 @@ public class TestDeletedBlockLog {
         new SCMHADBTransactionBufferStub(scm.getScmMetadataStore().getStore());
     metrics = mock(ScmBlockDeletingServiceMetrics.class);
     deletedBlockLog = new DeletedBlockLogImpl(conf,
+        scm,
         containerManager,
-        scm.getScmHAManager().getRatisServer(),
-        scm.getScmMetadataStore().getDeletedBlocksTXTable(),
         scmHADBTransactionBuffer,
-        scm.getScmContext(),
-        scm.getSequenceIdGen(),
         metrics);
     dnList = new ArrayList<>(3);
     setupContainerManager();
@@ -208,7 +203,6 @@ public class TestDeletedBlockLog {
     deletedBlockLog.close();
     scm.stop();
     scm.join();
-    FileUtils.deleteDirectory(testDir);
   }
 
   private Map<Long, List<Long>> generateData(int dataSize) throws IOException {
@@ -734,12 +728,9 @@ public class TestDeletedBlockLog {
     // transactions are stored persistently.
     deletedBlockLog.close();
     deletedBlockLog = new DeletedBlockLogImpl(conf,
+        scm,
         containerManager,
-        scm.getScmHAManager().getRatisServer(),
-        scm.getScmMetadataStore().getDeletedBlocksTXTable(),
         scmHADBTransactionBuffer,
-        scm.getScmContext(),
-        scm.getSequenceIdGen(),
         metrics);
     List<DeletedBlocksTransaction> blocks =
         getTransactions(10 * BLOCKS_PER_TXN * THREE);
@@ -753,12 +744,9 @@ public class TestDeletedBlockLog {
     // currentTxnID = 50
     deletedBlockLog.close();
     new DeletedBlockLogImpl(conf,
+        scm,
         containerManager,
-        scm.getScmHAManager().getRatisServer(),
-        scm.getScmMetadataStore().getDeletedBlocksTXTable(),
         scmHADBTransactionBuffer,
-        scm.getScmContext(),
-        scm.getSequenceIdGen(),
         metrics);
     blocks = getTransactions(40 * BLOCKS_PER_TXN * THREE);
     assertEquals(0, blocks.size());

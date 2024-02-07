@@ -48,10 +48,6 @@ public class ChunkInfoList {
     this.chunks = Collections.unmodifiableList(chunks);
   }
 
-  public List<ContainerProtos.ChunkInfo> asList() {
-    return chunks;
-  }
-
   /**
    * @return A new {@link ChunkInfoList} created from protobuf data.
    */

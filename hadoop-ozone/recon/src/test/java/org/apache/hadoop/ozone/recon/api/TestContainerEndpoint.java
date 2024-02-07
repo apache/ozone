@@ -103,8 +103,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -930,12 +930,9 @@ public class TestContainerEndpoint {
 
   @Test
   public void testUnhealthyContainersInvalidState() {
-    try {
-      containerEndpoint.getUnhealthyContainers("invalid", 1000, 1);
-      fail("Expected exception to be raised");
-    } catch (WebApplicationException e) {
-      assertEquals("HTTP 400 Bad Request", e.getMessage());
-    }
+    WebApplicationException e = assertThrows(WebApplicationException.class,
+        () -> containerEndpoint.getUnhealthyContainers("invalid", 1000, 1));
+    assertEquals("HTTP 400 Bad Request", e.getMessage());
   }
 
   @Test

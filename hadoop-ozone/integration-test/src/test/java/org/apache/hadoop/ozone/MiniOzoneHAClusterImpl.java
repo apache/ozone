@@ -427,7 +427,6 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
     protected void initOMRatisConf() {
       conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
-      conf.setInt(OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY, numOfOmHandlers);
 
       // If test change the following config values we will respect,
       // otherwise we will set lower timeout values.

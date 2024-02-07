@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om;
 
 import java.util.HashMap;
-import java.util.UUID;
 
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -56,22 +55,13 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY;
 public class TestOMEpochForNonRatis {
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
-  private static String clusterId;
-  private static String scmId;
-  private static String omId;
   private static OzoneClient client;
 
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
-    omId = UUID.randomUUID().toString();
     conf.setBoolean(OZONE_OM_RATIS_ENABLE_KEY, false);
     cluster =  MiniOzoneCluster.newBuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
-        .setOmId(omId)
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();

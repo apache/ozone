@@ -95,6 +95,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -376,7 +377,7 @@ public class TestContainerStateMachineFailures {
     int index = cluster.getHddsDatanodeIndex(dn.getDatanodeDetails());
     // restart the hdds datanode and see if the container is listed in the
     // in the missing container set and not in the regular set
-    cluster.restartHddsDatanode(dn.getDatanodeDetails(), false);
+    cluster.restartHddsDatanode(dn.getDatanodeDetails(), true);
     // make sure the container state is still marked unhealthy after restart
     keyValueContainerData = (KeyValueContainerData) ContainerDataYaml
         .readContainerFile(containerFile);
@@ -459,10 +460,7 @@ public class TestContainerStateMachineFailures {
     // a pipeline close action
 
     try {
-      xceiverClient.sendCommand(request.build());
-      fail("Expected exception not thrown");
-    } catch (IOException e) {
-      // Exception should be thrown
+      assertThrows(IOException.class, () -> xceiverClient.sendCommand(request.build()));
     } finally {
       xceiverClientManager.releaseClient(xceiverClient, false);
     }
@@ -494,7 +492,7 @@ public class TestContainerStateMachineFailures {
 
   @Test
   @Flaky("HDDS-6115")
-  public void testApplyTransactionIdempotencyWithClosedContainer()
+  void testApplyTransactionIdempotencyWithClosedContainer()
       throws Exception {
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
@@ -543,11 +541,7 @@ public class TestContainerStateMachineFailures {
     request.setContainerID(containerID);
     request.setCloseContainer(
         ContainerProtos.CloseContainerRequestProto.getDefaultInstance());
-    try {
-      xceiverClient.sendCommand(request.build());
-    } catch (IOException e) {
-      fail("Exception should not be thrown");
-    }
+    xceiverClient.sendCommand(request.build());
     assertSame(
         TestHelper.getDatanodeService(omKeyLocationInfo, cluster)
             .getDatanodeStateMachine()
@@ -557,8 +551,6 @@ public class TestContainerStateMachineFailures {
     assertTrue(stateMachine.isStateMachineHealthy());
     try {
       stateMachine.takeSnapshot();
-    } catch (IOException ioe) {
-      fail("Exception should not be thrown");
     } finally {
       xceiverClientManager.releaseClient(xceiverClient, false);
     }
@@ -585,7 +577,7 @@ public class TestContainerStateMachineFailures {
   // not be marked unhealthy and pipeline should not fail if container gets
   // closed here.
   @Test
-  public void testWriteStateMachineDataIdempotencyWithClosedContainer()
+  void testWriteStateMachineDataIdempotencyWithClosedContainer()
       throws Exception {
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
@@ -699,11 +691,7 @@ public class TestContainerStateMachineFailures {
               .getContainerState(),
           ContainerProtos.ContainerDataProto.State.CLOSED);
       assertTrue(stateMachine.isStateMachineHealthy());
-      try {
-        stateMachine.takeSnapshot();
-      } catch (IOException ioe) {
-        fail("Exception should not be thrown");
-      }
+      stateMachine.takeSnapshot();
 
       final FileInfo latestSnapshot = getSnapshotFileInfo(storage);
       assertNotEquals(snapshot.getPath(), latestSnapshot.getPath());
@@ -715,43 +703,37 @@ public class TestContainerStateMachineFailures {
   }
 
   @Test
-  public void testContainerStateMachineSingleFailureRetry()
+  void testContainerStateMachineSingleFailureRetry()
       throws Exception {
-    OzoneOutputStream key =
-        objectStore.getVolume(volumeName).getBucket(bucketName)
-            .createKey("ratis1", 1024,
-                ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
-                    ReplicationFactor.THREE), new HashMap<>());
+    try (OzoneOutputStream key = objectStore.getVolume(volumeName).getBucket(bucketName)
+        .createKey("ratis1", 1024,
+            ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+                ReplicationFactor.THREE), new HashMap<>())) {
 
-    key.write("ratis".getBytes(UTF_8));
-    key.flush();
-    key.write("ratis".getBytes(UTF_8));
-    key.write("ratis".getBytes(UTF_8));
+      key.write("ratis".getBytes(UTF_8));
+      key.flush();
+      key.write("ratis".getBytes(UTF_8));
+      key.write("ratis".getBytes(UTF_8));
 
-    KeyOutputStream groupOutputStream = (KeyOutputStream) key.
-        getOutputStream();
-    List<OmKeyLocationInfo> locationInfoList =
-        groupOutputStream.getLocationInfoList();
-    assertEquals(1, locationInfoList.size());
+      KeyOutputStream groupOutputStream = (KeyOutputStream) key.
+          getOutputStream();
+      List<OmKeyLocationInfo> locationInfoList =
+          groupOutputStream.getLocationInfoList();
+      assertEquals(1, locationInfoList.size());
 
-    OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
+      OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
 
-    induceFollowerFailure(omKeyLocationInfo, 2);
-
-    try {
+      induceFollowerFailure(omKeyLocationInfo, 2);
       key.flush();
       key.write("ratis".getBytes(UTF_8));
       key.flush();
-      key.close();
-    } catch (Exception ioe) {
-      // Should not fail..
-      fail("Exception " + ioe.getMessage());
     }
+
     validateData("ratis1", 2, "ratisratisratisratis");
   }
 
   @Test
-  public void testContainerStateMachineDualFailureRetry()
+  void testContainerStateMachineDualFailureRetry()
       throws Exception {
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
@@ -774,15 +756,10 @@ public class TestContainerStateMachineFailures {
 
     induceFollowerFailure(omKeyLocationInfo, 1);
 
-    try {
-      key.flush();
-      key.write("ratis".getBytes(UTF_8));
-      key.flush();
-      key.close();
-    } catch (Exception ioe) {
-      // Should not fail..
-      fail("Exception " + ioe.getMessage());
-    }
+    key.flush();
+    key.write("ratis".getBytes(UTF_8));
+    key.flush();
+    key.close();
     validateData("ratis1", 2, "ratisratisratisratis");
   }
 
@@ -819,31 +796,24 @@ public class TestContainerStateMachineFailures {
     }
   }
 
-  private void validateData(String key, int locationCount, String payload) {
+  private void validateData(String key, int locationCount, String payload) throws Exception {
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(key)
         .build();
-    OmKeyInfo keyInfo = null;
-    try {
-      keyInfo = cluster.getOzoneManager().lookupKey(omKeyArgs);
+    OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(omKeyArgs);
 
-      assertEquals(locationCount,
-          keyInfo.getLatestVersionLocations().getLocationListCount());
-      byte[] buffer = new byte[1024];
-      try (OzoneInputStream o = objectStore.getVolume(volumeName)
-          .getBucket(bucketName).readKey(key)) {
-        o.read(buffer, 0, 1024);
-      }
-      int end = ArrayUtils.indexOf(buffer, (byte) 0);
-      String response = new String(buffer, 0,
-          end,
-          StandardCharsets.UTF_8);
-      assertEquals(payload, response);
-    } catch (IOException e) {
-      fail("Exception not expected " + e.getMessage());
+    assertEquals(locationCount,
+        keyInfo.getLatestVersionLocations().getLocationListCount());
+    byte[] buffer = new byte[1024];
+    try (OzoneInputStream o = objectStore.getVolume(volumeName)
+        .getBucket(bucketName).readKey(key)) {
+      o.read(buffer, 0, 1024);
     }
+    int end = ArrayUtils.indexOf(buffer, (byte) 0);
+    String response = new String(buffer, 0, end, StandardCharsets.UTF_8);
+    assertEquals(payload, response);
   }
 
   static FileInfo getSnapshotFileInfo(SimpleStateMachineStorage storage)

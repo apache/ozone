@@ -104,8 +104,6 @@ class TestOMUpgradeFinalization {
   private static MiniOzoneHAClusterImpl newCluster(OzoneConfiguration conf)
       throws IOException {
     return (MiniOzoneHAClusterImpl) MiniOzoneCluster.newOMHABuilder(conf)
-        .setClusterId(UUID.randomUUID().toString())
-        .setScmId(UUID.randomUUID().toString())
         .setOMServiceId(UUID.randomUUID().toString())
         .setNumOfOzoneManagers(3)
         .setNumDatanodes(1)

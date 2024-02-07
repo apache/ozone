@@ -218,10 +218,6 @@ public abstract class GenericTestUtils {
     setLogLevel(toLog4j(logger), Level.toLevel(level.toString()));
   }
 
-  public static void setRootLogLevel(org.slf4j.event.Level level) {
-    setLogLevel(LogManager.getRootLogger(), Level.toLevel(level.toString()));
-  }
-
   public static <T> T mockFieldReflection(Object object, String fieldName)
           throws NoSuchFieldException, IllegalAccessException {
     Field field = object.getClass().getDeclaredField(fieldName);

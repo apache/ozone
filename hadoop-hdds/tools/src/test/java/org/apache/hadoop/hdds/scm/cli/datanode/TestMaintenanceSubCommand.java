@@ -35,8 +35,8 @@ import java.util.regex.Pattern;
 
 import picocli.CommandLine;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.mock;
@@ -134,12 +134,7 @@ public class TestMaintenanceSubCommand {
 
     CommandLine c = new CommandLine(cmd);
     c.parseArgs("host1", "host2");
-    try {
-      cmd.execute(scmClient);
-      fail("Should not succeed without an exception");
-    } catch (IOException e) {
-      // Expected
-    }
+    assertThrows(IOException.class, () -> cmd.execute(scmClient));
 
     Pattern p = Pattern.compile(
         "^Entering\\smaintenance\\smode\\son\\sdatanode\\(s\\)",

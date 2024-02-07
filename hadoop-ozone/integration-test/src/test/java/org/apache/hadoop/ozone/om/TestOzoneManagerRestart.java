@@ -21,7 +21,6 @@ package org.apache.hadoop.ozone.om;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -63,9 +62,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 public class TestOzoneManagerRestart {
   private static MiniOzoneCluster cluster = null;
   private static OzoneConfiguration conf;
-  private static String clusterId;
-  private static String scmId;
-  private static String omId;
   private static OzoneClient client;
 
   /**
@@ -78,9 +74,6 @@ public class TestOzoneManagerRestart {
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
-    clusterId = UUID.randomUUID().toString();
-    scmId = UUID.randomUUID().toString();
-    omId = UUID.randomUUID().toString();
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
     conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
@@ -88,9 +81,6 @@ public class TestOzoneManagerRestart {
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         BucketLayout.OBJECT_STORE.name());
     cluster =  MiniOzoneCluster.newBuilder(conf)
-        .setClusterId(clusterId)
-        .setScmId(scmId)
-        .setOmId(omId)
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();

@@ -47,6 +47,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -199,45 +200,35 @@ public class TestRootCertificate {
     }
 
     // Now try with Blank Subject.
-    try {
+    assertThrows(IllegalArgumentException.class, () -> {
       builder.setSubject("");
       builder.build();
-      fail("Null/Blank Subject should have thrown.");
-    } catch (IllegalArgumentException e) {
-      builder.setSubject(subject);
-    }
+    });
+    builder.setSubject(subject);
 
     // Now try with blank/null SCM ID
-    try {
+    assertThrows(IllegalArgumentException.class, () -> {
       builder.setScmID(null);
       builder.build();
-      fail("Null/Blank SCM ID should have thrown.");
-    } catch (IllegalArgumentException e) {
-      builder.setScmID(scmID);
-    }
-
+    });
+    builder.setScmID(scmID);
 
     // Now try with blank/null SCM ID
-    try {
+    assertThrows(IllegalArgumentException.class, () -> {
       builder.setClusterID(null);
       builder.build();
-      fail("Null/Blank Cluster ID should have thrown.");
-    } catch (IllegalArgumentException e) {
-      builder.setClusterID(clusterID);
-    }
-
+    });
+    builder.setClusterID(clusterID);
 
     // Swap the Begin and End Date and verify that we cannot create a
     // certificate like that.
-    try {
+    assertThrows(IllegalArgumentException.class, () -> {
       builder.setBeginDate(notAfter);
       builder.setEndDate(notBefore);
       builder.build();
-      fail("Illegal dates should have thrown.");
-    } catch (IllegalArgumentException e) {
-      builder.setBeginDate(notBefore);
-      builder.setEndDate(notAfter);
-    }
+    });
+    builder.setBeginDate(notBefore);
+    builder.setEndDate(notAfter);
 
     try {
       KeyPair newKey = keyGen.generateKey();

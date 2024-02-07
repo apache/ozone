@@ -59,7 +59,7 @@ import java.util.function.LongSupplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
@@ -547,13 +547,8 @@ public class TestDirectoryDeletingServiceWithFSO {
   }
 
   private void checkPath(Path path) {
-    try {
-      fs.getFileStatus(path);
-      fail("testRecursiveDelete failed");
-    } catch (IOException ex) {
-      assertInstanceOf(FileNotFoundException.class, ex);
-      assertThat(ex.getMessage()).contains("No such file or directory");
-    }
+    FileNotFoundException ex = assertThrows(FileNotFoundException.class, () -> fs.getFileStatus(path));
+    assertThat(ex.getMessage()).contains("No such file or directory");
   }
 
   private static BucketLayout getFSOBucketLayout() {

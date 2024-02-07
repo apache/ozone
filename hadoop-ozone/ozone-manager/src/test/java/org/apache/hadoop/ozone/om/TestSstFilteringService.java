@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
-import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -87,7 +86,7 @@ public class TestSstFilteringService {
   }
 
   @BeforeEach
-  public void init() throws AuthenticationException, IOException {
+  void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(OZONE_METADATA_DIRS, folder.getAbsolutePath());
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
