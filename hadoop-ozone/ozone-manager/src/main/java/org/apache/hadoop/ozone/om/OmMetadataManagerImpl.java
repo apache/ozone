@@ -350,19 +350,19 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
             "ozone.om.ignore.pipeline", Boolean.TRUE);
     start(conf);
   }
-private void init(OzoneConfiguration conf,
-                  OzoneManager ozoneManager){
-  this.ozoneManager = ozoneManager;
+  private void init(OzoneConfiguration conf,
+                    OzoneManager ozoneManager) {
+    this.ozoneManager = ozoneManager;
   // TODO: This is a temporary check. Once fully implemented, all OM state
   //  change should go through Ratis - be it standalone (for non-HA) or
   //  replicated (for HA).
-  isRatisEnabled = conf.getBoolean(
+    isRatisEnabled = conf.getBoolean(
       OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY,
       OMConfigKeys.OZONE_OM_RATIS_ENABLE_DEFAULT);
   // For test purpose only
-  ignorePipelineinKey = conf.getBoolean(
+    ignorePipelineinKey = conf.getBoolean(
       "ozone.om.ignore.pipeline", Boolean.TRUE);
-}
+  }
   /**
    * For subclass overriding.
    */
@@ -1318,7 +1318,7 @@ private void init(OzoneConfiguration conf,
       }
     }
     boolean isTruncated = cacheKeyMap.size() > maxKeys;
-    if (perfMetrics!=null) {
+    if (perfMetrics != null) {
       long averagePagination;
       if (isTruncated) {
         averagePagination = maxKeys;

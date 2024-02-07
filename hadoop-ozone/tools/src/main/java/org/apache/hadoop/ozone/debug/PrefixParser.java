@@ -131,14 +131,11 @@ public class PrefixParser implements Callable<Void>, SubcommandWithParent {
     conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, db);
     OmMetadataManagerImpl metadataManager;
 
-if (perfMetrics!= null) {
-  metadataManager =
-      new OmMetadataManagerImpl(conf, null, perfMetrics);
-}
-else {
-  metadataManager =
-      new OmMetadataManagerImpl(conf, null);
-}
+    if (perfMetrics != null) {
+      metadataManager = new OmMetadataManagerImpl(conf, null, perfMetrics);
+    } else {
+      metadataManager = new OmMetadataManagerImpl(conf, null);
+    }
 
     metadataManager.start(conf);
 

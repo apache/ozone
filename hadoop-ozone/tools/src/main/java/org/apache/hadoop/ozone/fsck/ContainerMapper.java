@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -85,7 +84,7 @@ public class ContainerMapper {
   }
 
   public Map<Long, List<Map<Long, BlockIdDetails>>>
-  parseOmDB(OzoneConfiguration configuration, OMPerformanceMetrics perfMetrics) throws IOException {
+      parseOmDB(OzoneConfiguration configuration, OMPerformanceMetrics perfMetrics) throws IOException {
     String path = configuration.get(OZONE_OM_DB_DIRS);
     if (path == null || path.isEmpty()) {
       throw new IOException(OZONE_OM_DB_DIRS + "should be set ");
@@ -95,7 +94,6 @@ public class ContainerMapper {
     return getBlockIdDetailsUtils(metadataManager);
   }
 
-  @NotNull
   private static Map<Long, List<Map<Long, BlockIdDetails>>> getBlockIdDetailsUtils(
       OmMetadataManagerImpl metadataManager) throws IOException {
     try {
