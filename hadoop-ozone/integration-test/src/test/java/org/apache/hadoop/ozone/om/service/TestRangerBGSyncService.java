@@ -80,7 +80,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
@@ -279,7 +278,7 @@ public class TestRangerBGSyncService {
     rolesCreated.add(0, role.getName());
   }
 
-  private void createRolesAndPoliciesInRanger(boolean populateDB) {
+  private void createRolesAndPoliciesInRanger(boolean populateDB) throws IOException {
 
     policiesCreated.clear();
     rolesCreated.clear();
@@ -301,102 +300,75 @@ public class TestRangerBGSyncService {
     // Add tenant entry in OM DB
     if (populateDB) {
       LOG.info("Creating OM DB tenant entries");
-      try {
-        // Tenant State entry
-        omMetadataManager.getTenantStateTable().put(tenantId,
-            new OmDBTenantState(
-                tenantId, volumeName, userRoleName, adminRoleName,
-                bucketNamespacePolicyName, bucketPolicyName));
-        // Access ID entry for alice
-        final String aliceAccessId = OMMultiTenantManager.getDefaultAccessId(
-            tenantId, USER_ALICE_SHORT);
-        omMetadataManager.getTenantAccessIdTable().put(aliceAccessId,
-            new OmDBAccessIdInfo.Builder()
-                .setTenantId(tenantId)
-                .setUserPrincipal(USER_ALICE_SHORT)
-                .setIsAdmin(false)
-                .setIsDelegatedAdmin(false)
-                .build());
-        // Access ID entry for bob
-        final String bobAccessId = OMMultiTenantManager.getDefaultAccessId(
-            tenantId, USER_BOB_SHORT);
-        omMetadataManager.getTenantAccessIdTable().put(bobAccessId,
-            new OmDBAccessIdInfo.Builder()
-                .setTenantId(tenantId)
-                .setUserPrincipal(USER_BOB_SHORT)
-                .setIsAdmin(false)
-                .setIsDelegatedAdmin(false)
-                .build());
-      } catch (IOException e) {
-        fail(e.getMessage());
-      }
+      // Tenant State entry
+      omMetadataManager.getTenantStateTable().put(tenantId,
+          new OmDBTenantState(
+              tenantId, volumeName, userRoleName, adminRoleName,
+              bucketNamespacePolicyName, bucketPolicyName));
+      // Access ID entry for alice
+      final String aliceAccessId = OMMultiTenantManager.getDefaultAccessId(
+          tenantId, USER_ALICE_SHORT);
+      omMetadataManager.getTenantAccessIdTable().put(aliceAccessId,
+          new OmDBAccessIdInfo.Builder()
+              .setTenantId(tenantId)
+              .setUserPrincipal(USER_ALICE_SHORT)
+              .setIsAdmin(false)
+              .setIsDelegatedAdmin(false)
+              .build());
+      // Access ID entry for bob
+      final String bobAccessId = OMMultiTenantManager.getDefaultAccessId(
+          tenantId, USER_BOB_SHORT);
+      omMetadataManager.getTenantAccessIdTable().put(bobAccessId,
+          new OmDBAccessIdInfo.Builder()
+              .setTenantId(tenantId)
+              .setUserPrincipal(USER_BOB_SHORT)
+              .setIsAdmin(false)
+              .setIsDelegatedAdmin(false)
+              .build());
     }
 
-    try {
-      LOG.info("Creating user in Ranger: {}", USER_ALICE_SHORT);
-      rangerUserRequest.createUser(USER_ALICE_SHORT, "Password12");
-      usersCreated.add(USER_ALICE_SHORT);
-    } catch (IOException e) {
-      fail(e.getMessage());
-    }
 
-    try {
-      LOG.info("Creating user in Ranger: {}", USER_BOB_SHORT);
-      rangerUserRequest.createUser(USER_BOB_SHORT, "Password12");
-      usersCreated.add(USER_BOB_SHORT);
-    } catch (IOException e) {
-      fail(e.getMessage());
-    }
+    LOG.info("Creating user in Ranger: {}", USER_ALICE_SHORT);
+    rangerUserRequest.createUser(USER_ALICE_SHORT, "Password12");
+    usersCreated.add(USER_ALICE_SHORT);
 
-    try {
-      LOG.info("Creating admin role in Ranger: {}", adminRoleName);
-      // Create empty admin role first
-      Role adminRole = new Role.Builder()
-          .setName(adminRoleName)
-          .setDescription(OZONE_TENANT_RANGER_ROLE_DESCRIPTION)
-          .build();
-      createRoleHelper(adminRole);
-    } catch (IOException e) {
-      fail(e.getMessage());
-    }
+    LOG.info("Creating user in Ranger: {}", USER_BOB_SHORT);
+    rangerUserRequest.createUser(USER_BOB_SHORT, "Password12");
+    usersCreated.add(USER_BOB_SHORT);
 
-    try {
-      LOG.info("Creating user role in Ranger: {}", userRoleName);
-      Role userRole = new Role.Builder()
-          .setName(userRoleName)
-          .setDescription(OZONE_TENANT_RANGER_ROLE_DESCRIPTION)
-          .addRole(adminRoleName, true)
-          // Add alice and bob to the user role
-          .addUsers(Arrays.asList(USER_ALICE_SHORT, USER_BOB_SHORT))
-          .build();
-      createRoleHelper(userRole);
-    } catch (IOException e) {
-      fail(e.getMessage());
-    }
+    LOG.info("Creating admin role in Ranger: {}", adminRoleName);
+    // Create empty admin role first
+    Role adminRole = new Role.Builder()
+        .setName(adminRoleName)
+        .setDescription(OZONE_TENANT_RANGER_ROLE_DESCRIPTION)
+        .build();
+    createRoleHelper(adminRole);
 
-    try {
-      Policy tenant1VolumeAccessPolicy =
-          OMMultiTenantManager.getDefaultVolumeAccessPolicy(
-              tenantId, volumeName, userRoleName, adminRoleName);
-      LOG.info("Creating VolumeAccess policy in Ranger: {}",
-          tenant1VolumeAccessPolicy.getName());
-      accessController.createPolicy(tenant1VolumeAccessPolicy);
-      policiesCreated.add(tenant1VolumeAccessPolicy.getName());
-    } catch (IOException e) {
-      fail(e.getMessage());
-    }
+    LOG.info("Creating user role in Ranger: {}", userRoleName);
+    Role userRole = new Role.Builder()
+        .setName(userRoleName)
+        .setDescription(OZONE_TENANT_RANGER_ROLE_DESCRIPTION)
+        .addRole(adminRoleName, true)
+        // Add alice and bob to the user role
+        .addUsers(Arrays.asList(USER_ALICE_SHORT, USER_BOB_SHORT))
+        .build();
+    createRoleHelper(userRole);
 
-    try {
-      Policy tenant1BucketCreatePolicy =
-          OMMultiTenantManager.getDefaultBucketAccessPolicy(
-              tenantId, volumeName, userRoleName);
-      LOG.info("Creating BucketAccess policy in Ranger: {}",
-          tenant1BucketCreatePolicy.getName());
-      accessController.createPolicy(tenant1BucketCreatePolicy);
-      policiesCreated.add(tenant1BucketCreatePolicy.getName());
-    } catch (IOException e) {
-      fail(e.getMessage());
-    }
+    Policy tenant1VolumeAccessPolicy =
+        OMMultiTenantManager.getDefaultVolumeAccessPolicy(
+            tenantId, volumeName, userRoleName, adminRoleName);
+    LOG.info("Creating VolumeAccess policy in Ranger: {}",
+        tenant1VolumeAccessPolicy.getName());
+    accessController.createPolicy(tenant1VolumeAccessPolicy);
+    policiesCreated.add(tenant1VolumeAccessPolicy.getName());
+
+    Policy tenant1BucketCreatePolicy =
+        OMMultiTenantManager.getDefaultBucketAccessPolicy(
+            tenantId, volumeName, userRoleName);
+    LOG.info("Creating BucketAccess policy in Ranger: {}",
+        tenant1BucketCreatePolicy.getName());
+    accessController.createPolicy(tenant1BucketCreatePolicy);
+    policiesCreated.add(tenant1BucketCreatePolicy.getName());
   }
 
   public void cleanupPolicies() {
@@ -507,7 +479,7 @@ public class TestRangerBGSyncService {
    * Expect sync service to check Ranger state but write nothing to Ranger.
    */
   @Test
-  public void testConsistentState() throws Exception {
+  void testConsistentState() throws Exception {
     long startingRangerVersion = initBGSync();
 
     // Create roles and policies in ranger that are
@@ -535,23 +507,13 @@ public class TestRangerBGSyncService {
     }
 
     for (String policyName : policiesCreated) {
-      try {
-        final Policy policyRead = accessController.getPolicy(policyName);
-        assertEquals(policyName, policyRead.getName());
-      } catch (Exception e) {
-        e.printStackTrace();
-        fail(e.getMessage());
-      }
+      final Policy policyRead = accessController.getPolicy(policyName);
+      assertEquals(policyName, policyRead.getName());
     }
 
     for (String roleName : rolesCreated) {
-      try {
-        final Role roleResponse = accessController.getRole(roleName);
-        assertEquals(roleName, roleResponse.getName());
-      } catch (Exception e) {
-        e.printStackTrace();
-        fail(e.getMessage());
-      }
+      final Role roleResponse = accessController.getRole(roleName);
+      assertEquals(roleName, roleResponse.getName());
     }
   }
 
@@ -627,7 +589,7 @@ public class TestRangerBGSyncService {
    * Expect sync service to recover both policies to their default states.
    */
   @Test
-  public void testRecreateDeletedRangerPolicy() throws Exception {
+  void testRecreateDeletedRangerPolicy() throws Exception {
     long startingRangerVersion = initBGSync();
 
     // Create roles and policies in ranger that are
@@ -662,23 +624,13 @@ public class TestRangerBGSyncService {
     assertThat(rangerSvcVersionAfter).isGreaterThan(rangerSvcVersionBefore);
 
     for (String policyName : policiesCreated) {
-      try {
-        final Policy policyRead = accessController.getPolicy(policyName);
-        assertEquals(policyName, policyRead.getName());
-      } catch (Exception e) {
-        e.printStackTrace();
-        fail(e.getMessage());
-      }
+      final Policy policyRead = accessController.getPolicy(policyName);
+      assertEquals(policyName, policyRead.getName());
     }
 
     for (String roleName : rolesCreated) {
-      try {
-        final Role roleRead = accessController.getRole(roleName);
-        assertEquals(roleName, roleRead.getName());
-      } catch (Exception e) {
-        e.printStackTrace();
-        fail(e.getMessage());
-      }
+      final Role roleRead = accessController.getRole(roleName);
+      assertEquals(roleName, roleRead.getName());
     }
   }
 

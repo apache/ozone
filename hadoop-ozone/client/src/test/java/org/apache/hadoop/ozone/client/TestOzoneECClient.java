@@ -66,7 +66,6 @@ import java.util.stream.IntStream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -1030,7 +1029,7 @@ public class TestOzoneECClient {
   }
 
   @Test
-  public void testDiscardPreAllocatedBlocksPreventRetryExceeds()
+  void testDiscardPreAllocatedBlocksPreventRetryExceeds()
       throws Exception {
     close();
     OzoneConfiguration con = createConfiguration();
@@ -1100,16 +1099,10 @@ public class TestOzoneECClient {
       factoryStub.setFailedStorages(failedDNs);
 
       // Writes that will retry due to failed DNs
-      try {
-        for (int j = 0; j < numStripesAfterFailure; j++) {
-          for (int i = 0; i < dataBlocks; i++) {
-            out.write(inputChunks[i]);
-          }
+      for (int j = 0; j < numStripesAfterFailure; j++) {
+        for (int i = 0; i < dataBlocks; i++) {
+          out.write(inputChunks[i]);
         }
-      } catch (IOException e) {
-        // If we don't discard pre-allocated blocks,
-        // retries should exceed the maxRetries and write will fail.
-        fail("Max retries exceeded");
       }
     }
 
