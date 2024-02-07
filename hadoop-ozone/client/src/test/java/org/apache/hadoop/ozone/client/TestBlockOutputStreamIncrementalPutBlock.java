@@ -25,9 +25,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.UUID;
 
+import jakarta.annotation.Nonnull;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
-import org.jetbrains.annotations.NotNull;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -86,7 +86,7 @@ public class TestBlockOutputStreamIncrementalPutBlock {
         return new MockOmTransport();
       }
 
-      @NotNull
+      @Nonnull
       @Override
       protected XceiverClientFactory createXceiverClientFactory(
           ServiceInfoEx serviceInfo) throws IOException {

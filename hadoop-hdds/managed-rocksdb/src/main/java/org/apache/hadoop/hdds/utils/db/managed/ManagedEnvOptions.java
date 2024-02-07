@@ -31,7 +31,10 @@ public class ManagedEnvOptions extends EnvOptions {
 
   @Override
   public void close() {
-    super.close();
-    leakTracker.close();
+    try {
+      super.close();
+    } finally {
+      leakTracker.close();
+    }
   }
 }

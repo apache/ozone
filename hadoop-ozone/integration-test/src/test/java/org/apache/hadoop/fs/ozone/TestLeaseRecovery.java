@@ -18,7 +18,6 @@
 package org.apache.hadoop.fs.ozone;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -26,6 +25,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneTestUtils;
@@ -118,17 +119,19 @@ public class TestLeaseRecovery {
     conf.set(OzoneConfigKeys.OZONE_OM_LEASE_SOFT_LIMIT, "0s");
     // make sure flush will write data to DN
     conf.setBoolean("ozone.client.stream.buffer.flush.delay", false);
+    ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
+        .setBlockSize(blockSize)
+        .setChunkSize(chunkSize)
+        .setStreamBufferFlushSize(flushSize)
+        .setStreamBufferMaxSize(maxFlushSize)
+        .setDataStreamBufferFlushSize(maxFlushSize)
+        .setDataStreamMinPacketSize(chunkSize)
+        .setDataStreamWindowSize(5 * chunkSize)
+        .applyTo(conf);
+
     cluster = MiniOzoneCluster.newBuilder(conf)
       .setNumDatanodes(3)
       .setTotalPipelineNumLimit(10)
-      .setBlockSize(blockSize)
-      .setChunkSize(chunkSize)
-      .setStreamBufferFlushSize(flushSize)
-      .setStreamBufferMaxSize(maxFlushSize)
-      .setDataStreamBufferFlushize(maxFlushSize)
-      .setStreamBufferSizeUnit(StorageUnit.BYTES)
-      .setDataStreamMinPacketSize(chunkSize)
-      .setDataStreamStreamWindowSize(5 * chunkSize)
       .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();

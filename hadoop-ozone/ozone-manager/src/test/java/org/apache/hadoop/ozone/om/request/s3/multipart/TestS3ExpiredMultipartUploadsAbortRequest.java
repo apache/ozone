@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import com.google.common.base.Optional;
+
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -658,7 +658,7 @@ public class TestS3ExpiredMultipartUploadsAbortRequest
     for (String mpuOpenKey: mpuOpenKeys) {
       omMetadataManager.getOpenKeyTable(getBucketLayout())
           .addCacheEntry(new CacheKey<>(mpuOpenKey),
-              new CacheValue<>(Optional.absent(), 100L));
+              CacheValue.get(100L));
       omMetadataManager.getOpenKeyTable(getBucketLayout())
           .delete(mpuOpenKey);
     }

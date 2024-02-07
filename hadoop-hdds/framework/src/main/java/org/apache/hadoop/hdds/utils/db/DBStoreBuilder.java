@@ -83,6 +83,9 @@ public final class DBStoreBuilder {
   // The column family options that will be used for any column families
   // added by name only (without specifying options).
   private ManagedColumnFamilyOptions defaultCfOptions;
+  // Initialize the Statistics instance if ROCKSDB_STATISTICS enabled
+  private ManagedStatistics statistics;
+
   private String dbname;
   private Path dbPath;
   private String dbJmxBeanNameName;
@@ -188,6 +191,11 @@ public final class DBStoreBuilder {
     if (maxNumberOfOpenFiles != null) {
       dbOptions.setMaxOpenFiles(maxNumberOfOpenFiles);
     }
+    if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
+      statistics = new ManagedStatistics();
+      statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
+      dbOptions.setStatistics(statistics);
+    }
   }
 
   /**
@@ -217,7 +225,7 @@ public final class DBStoreBuilder {
         throw new IOException("The DB destination directory should exist.");
       }
 
-      return new RDBStore(dbFile, rocksDBOption, writeOptions, tableConfigs,
+      return new RDBStore(dbFile, rocksDBOption, statistics, writeOptions, tableConfigs,
           registry.build(), openReadOnly, maxFSSnapshots, dbJmxBeanNameName,
           enableCompactionDag, maxDbUpdatesSizeThreshold, createCheckpointDirs,
           configuration, threadNamePrefix);
@@ -412,13 +420,6 @@ public final class DBStoreBuilder {
     // Apply WAL settings.
     dbOptions.setWalTtlSeconds(rocksDBConfiguration.getWalTTL());
     dbOptions.setWalSizeLimitMB(rocksDBConfiguration.getWalSizeLimit());
-
-    // Create statistics.
-    if (!rocksDbStat.equals(OZONE_METADATA_STORE_ROCKSDB_STATISTICS_OFF)) {
-      ManagedStatistics statistics = new ManagedStatistics();
-      statistics.setStatsLevel(StatsLevel.valueOf(rocksDbStat));
-      dbOptions.setStatistics(statistics);
-    }
 
     return dbOptions;
   }

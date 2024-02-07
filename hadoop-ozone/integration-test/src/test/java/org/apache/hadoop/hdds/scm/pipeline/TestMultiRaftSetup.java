@@ -17,10 +17,9 @@
  */
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -150,10 +149,10 @@ public class  TestMultiRaftSetup {
   private void assertNotSamePeers() {
     nodeManager.getAllNodes().forEach((dn) -> {
       Collection<DatanodeDetails> peers = nodeManager.getPeerList(dn);
-      assertFalse(peers.contains(dn));
+      assertThat(peers).doesNotContain(dn);
       List<DatanodeDetails> trimList = nodeManager.getAllNodes();
       trimList.remove(dn);
-      assertTrue(peers.containsAll(trimList));
+      assertThat(peers).containsAll(trimList);
     });
   }
 

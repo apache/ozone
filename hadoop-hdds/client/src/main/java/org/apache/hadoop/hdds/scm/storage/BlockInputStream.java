@@ -594,8 +594,4 @@ public class BlockInputStream extends BlockExtendedInputStream {
     return chunkStreams;
   }
 
-  @VisibleForTesting
-  public static Logger getLog() {
-    return LOG;
-  }
 }

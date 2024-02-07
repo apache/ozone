@@ -71,10 +71,9 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTRO
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
@@ -201,7 +200,7 @@ public class TestDeleteWithInAdequateDN {
    * data is not deleted from any of the nodes which have the closed replica.
    */
   @Test
-  public void testDeleteKeyWithInAdequateDN() throws Exception {
+  void testDeleteKeyWithInAdequateDN() throws Exception {
     String keyName = "ratis";
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
@@ -289,14 +288,11 @@ public class TestDeleteWithInAdequateDN {
         deleteKey("ratis");
     // make sure the chunk was never deleted on the leader even though
     // deleteBlock handler is invoked
-    try {
-      for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
-        keyValueHandler.getChunkManager()
-            .readChunk(container, blockID, ChunkInfo.getFromProtoBuf(chunkInfo),
-                null);
-      }
-    } catch (IOException ioe) {
-      fail("Exception should not be thrown.");
+
+    for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
+      keyValueHandler.getChunkManager()
+          .readChunk(container, blockID, ChunkInfo.getFromProtoBuf(chunkInfo),
+              null);
     }
     long numReadStateMachineOps =
         stateMachine.getMetrics().getNumReadStateMachineOps();
@@ -319,16 +315,14 @@ public class TestDeleteWithInAdequateDN {
               .getDispatcher()
               .getHandler(ContainerProtos.ContainerType.KeyValueContainer);
       // make sure the chunk is now deleted on the all dns
-      try {
+      KeyValueHandler finalKeyValueHandler = keyValueHandler;
+      StorageContainerException e = assertThrows(StorageContainerException.class, () -> {
         for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
-          keyValueHandler.getChunkManager().readChunk(container, blockID,
-              ChunkInfo.getFromProtoBuf(chunkInfo), null);
+          finalKeyValueHandler.getChunkManager().readChunk(container, blockID,
+                  ChunkInfo.getFromProtoBuf(chunkInfo), null);
         }
-        fail("Expected exception is not thrown");
-      } catch (IOException ioe) {
-        StorageContainerException e = assertInstanceOf(StorageContainerException.class, ioe);
-        assertSame(ContainerProtos.Result.UNABLE_TO_FIND_CHUNK, e.getResult());
-      }
+      });
+      assertSame(ContainerProtos.Result.UNABLE_TO_FIND_CHUNK, e.getResult());
     }
   }
 }

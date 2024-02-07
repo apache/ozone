@@ -37,7 +37,7 @@ import static org.apache.hadoop.ozone.container.ContainerTestHelper.getChunk;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.setDataChecksum;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Test for FilePerBlockStrategy.
@@ -48,7 +48,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
   public void testDeletePartialChunkWithOffsetUnsupportedRequest() {
     // GIVEN
     ChunkManager chunkManager = createTestSubject();
-    try {
+    StorageContainerException e = assertThrows(StorageContainerException.class, () -> {
       KeyValueContainer container = getKeyValueContainer();
       BlockID blockID = getBlockID();
       chunkManager.writeChunk(container, blockID,
@@ -58,12 +58,8 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
 
       // WHEN
       chunkManager.deleteChunk(container, blockID, chunkInfo);
-
-      // THEN
-      fail("testDeleteChunkUnsupportedRequest");
-    } catch (StorageContainerException ex) {
-      assertEquals(ContainerProtos.Result.UNSUPPORTED_REQUEST, ex.getResult());
-    }
+    });
+    assertEquals(ContainerProtos.Result.UNSUPPORTED_REQUEST, e.getResult());
   }
 
   /**

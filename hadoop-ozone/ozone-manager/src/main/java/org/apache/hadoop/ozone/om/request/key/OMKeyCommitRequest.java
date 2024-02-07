@@ -50,7 +50,7 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -395,7 +395,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
-  @NotNull
+  @Nonnull
   protected List<OmKeyLocationInfo> getOmKeyLocationInfos(
       OzoneManager ozoneManager, KeyArgs commitKeyArgs) {
     List<OmKeyLocationInfo> locationInfoList = new ArrayList<>();

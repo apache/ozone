@@ -46,21 +46,24 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Module;
 import com.google.inject.Provider;
+import org.junit.jupiter.api.io.TempDir;
+import org.springframework.util.FileSystemUtils;
 
 /**
  * Class that provides a Recon SQL DB with all the tables created, and APIs
  * to access the DAOs easily.
  */
 public class AbstractReconSqlDBTest {
-  private Path temporaryFolder;
-
   private Injector injector;
   private DSLContext dslContext;
   private Provider<DataSourceConfiguration> configurationProvider;
 
   public AbstractReconSqlDBTest() {
+  }
+
+  public void init(Path temporaryFolder) {
     try {
-      temporaryFolder = Files.createTempDirectory("JunitConfig");
+      FileSystemUtils.deleteRecursively(temporaryFolder.resolve("Config"));
       configurationProvider =
           new DerbyDataSourceConfigurationProvider(Files.createDirectory(
               temporaryFolder.resolve("Config")).toFile());
@@ -69,12 +72,17 @@ public class AbstractReconSqlDBTest {
     }
   }
 
+  public AbstractReconSqlDBTest(Path temporaryFolder) {
+    init(temporaryFolder);
+  }
+
   protected AbstractReconSqlDBTest(Provider<DataSourceConfiguration> provider) {
     configurationProvider = provider;
   }
 
   @BeforeEach
-  public void createReconSchemaForTest() throws IOException {
+  public void createReconSchemaForTest(@TempDir Path temporaryFolder) throws IOException {
+    init(temporaryFolder);
     injector = Guice.createInjector(getReconSqlDBModules());
     dslContext = DSL.using(new DefaultConfiguration().set(
         injector.getInstance(DataSource.class)));

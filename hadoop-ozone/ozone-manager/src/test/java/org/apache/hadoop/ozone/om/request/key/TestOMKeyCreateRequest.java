@@ -69,14 +69,12 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.when;
 
 /**
@@ -802,18 +800,13 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   private void checkNotAValidPath(String keyName) {
     OMRequest omRequest = createKeyRequest(false, 0, keyName);
     OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
-
-    try {
-      omKeyCreateRequest.preExecute(ozoneManager);
-      fail("checkNotAValidPath failed for path" + keyName);
-    } catch (IOException ex) {
-      OMException omException = assertInstanceOf(OMException.class, ex);
-      assertEquals(OMException.ResultCodes.INVALID_KEY_NAME,
-          omException.getResult());
-    }
-
-
+    OMException ex =
+        assertThrows(OMException.class, () -> omKeyCreateRequest.preExecute(ozoneManager),
+            "checkNotAValidPath failed for path" + keyName);
+    assertEquals(OMException.ResultCodes.INVALID_KEY_NAME,
+        ex.getResult());
   }
+
   private void checkNotAFile(String keyName) throws Exception {
     OMRequest omRequest = createKeyRequest(false, 0, keyName);
 

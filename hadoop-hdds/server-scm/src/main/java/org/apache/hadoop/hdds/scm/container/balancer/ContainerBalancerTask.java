@@ -50,7 +50,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -692,11 +691,10 @@ public class ContainerBalancerTask implements Runnable {
    * @return ContainerMoveSelection containing the selected target and container
    */
   private ContainerMoveSelection matchSourceWithTarget(DatanodeDetails source) {
-    NavigableSet<ContainerID> candidateContainers =
-        selectionCriteria.getCandidateContainers(source,
-            sizeScheduledForMoveInLatestIteration);
+    Set<ContainerID> sourceContainerIDSet =
+        selectionCriteria.getContainerIDSet(source);
 
-    if (candidateContainers.isEmpty()) {
+    if (sourceContainerIDSet.isEmpty()) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("ContainerBalancer could not find any candidate containers " +
             "for datanode {}", source.getUuidString());
@@ -708,9 +706,23 @@ public class ContainerBalancerTask implements Runnable {
       LOG.debug("ContainerBalancer is finding suitable target for source " +
           "datanode {}", source.getUuidString());
     }
-    ContainerMoveSelection moveSelection =
-        findTargetStrategy.findTargetForContainerMove(
-            source, candidateContainers);
+
+    ContainerMoveSelection moveSelection = null;
+    Set<ContainerID> toRemoveContainerIds = new HashSet<>();
+    for (ContainerID containerId: sourceContainerIDSet) {
+      if (selectionCriteria.shouldBeExcluded(containerId, source,
+          sizeScheduledForMoveInLatestIteration)) {
+        toRemoveContainerIds.add(containerId);
+        continue;
+      }
+      moveSelection = findTargetStrategy.findTargetForContainerMove(source,
+          containerId);
+      if (moveSelection != null) {
+        break;
+      }
+    }
+    // Update cached containerIDSet in setMap
+    sourceContainerIDSet.removeAll(toRemoveContainerIds);
 
     if (moveSelection == null) {
       if (LOG.isDebugEnabled()) {

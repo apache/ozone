@@ -254,10 +254,6 @@ public class BlockOutputStream extends OutputStream {
     return ioException.get();
   }
 
-  XceiverClientSpi getXceiverClientSpi() {
-    return this.xceiverClient;
-  }
-
   public BlockData.Builder getContainerBlockData() {
     return this.containerBlockData;
   }
@@ -344,10 +340,6 @@ public class BlockOutputStream extends OutputStream {
 
   private void updateFlushLength() {
     totalDataFlushedLength = writtenDataLength;
-  }
-
-  private boolean isBufferPoolFull() {
-    return bufferPool.computeBufferData() == streamBufferArgs.getStreamBufferMaxSize();
   }
 
   /**
