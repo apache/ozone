@@ -382,14 +382,14 @@ public final class HddsServerUtil {
    * @return port number.
    */
   public static int getContainerPort(ConfigurationSource conf) {
-    return conf.getInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
+    return conf.getInt(OzoneConfigKeys.OZONE_CONTAINER_IPC_PORT,
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
   }
 
   public static Collection<String> getOzoneDatanodeRatisDirectory(
       ConfigurationSource conf) {
     Collection<String> rawLocations = conf.getTrimmedStringCollection(
-            OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR);
+            OzoneConfigKeys.OZONE_CONTAINER_RATIS_DATANODE_STORAGE_DIR);
 
     if (rawLocations.isEmpty()) {
       rawLocations = new ArrayList<>(1);

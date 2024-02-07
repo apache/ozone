@@ -264,7 +264,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
               .DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_KEY,
           4);
       conf.setInt(
-          OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY,
+          OzoneConfigKeys.OZONE_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY,
           2);
       conf.setInt(OzoneConfigKeys.OZONE_CONTAINER_CACHE_SIZE, 2);
       ReplicationManagerConfiguration replicationConf =
@@ -273,7 +273,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
       replicationConf.setEventTimeout(Duration.ofSeconds(20));
       replicationConf.setDatanodeTimeoutOffset(0);
       conf.setFromObject(replicationConf);
-      conf.setInt(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY, 100);
+      conf.setInt(OzoneConfigKeys.OZONE_RATIS_SNAPSHOT_THRESHOLD_KEY, 100);
       conf.setInt(OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_PURGE_GAP, 100);
       conf.setInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, 100);
 

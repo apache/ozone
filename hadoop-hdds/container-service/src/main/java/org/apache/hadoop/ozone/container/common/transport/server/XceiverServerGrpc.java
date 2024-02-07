@@ -99,10 +99,10 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
 
     this.id = datanodeDetails.getUuid();
     this.datanodeDetails = datanodeDetails;
-    this.port = conf.getInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
+    this.port = conf.getInt(OzoneConfigKeys.OZONE_CONTAINER_IPC_PORT,
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
 
-    if (conf.getBoolean(OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT,
+    if (conf.getBoolean(OzoneConfigKeys.OZONE_CONTAINER_IPC_RANDOM_PORT,
         OzoneConfigKeys.DFS_CONTAINER_IPC_RANDOM_PORT_DEFAULT)) {
       this.port = 0;
     }

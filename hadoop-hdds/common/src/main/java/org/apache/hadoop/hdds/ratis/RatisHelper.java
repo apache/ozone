@@ -234,7 +234,7 @@ public final class RatisHelper {
 
   private static RpcType getRpcType(ConfigurationSource conf) {
     return SupportedRpcType.valueOfIgnoreCase(conf.get(
-        ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY,
+        ScmConfigKeys.OZONE_CONTAINER_RATIS_RPC_TYPE_KEY,
         ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT));
   }
 

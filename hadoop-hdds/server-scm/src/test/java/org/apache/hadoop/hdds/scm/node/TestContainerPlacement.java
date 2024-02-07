@@ -186,7 +186,7 @@ public class TestContainerPlacement {
         testDir.getAbsolutePath());
     conf.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY,
         SCMContainerPlacementCapacity.class, PlacementPolicy.class);
-    conf.setBoolean(ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY, true);
+    conf.setBoolean(ScmConfigKeys.OZONE_CONTAINER_RATIS_ENABLED_KEY, true);
 
     SCMNodeManager scmNodeManager = createNodeManager(conf);
     containerManager = createContainerManager();

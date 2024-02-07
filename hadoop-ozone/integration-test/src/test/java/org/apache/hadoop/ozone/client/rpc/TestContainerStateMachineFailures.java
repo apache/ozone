@@ -166,7 +166,7 @@ public class TestContainerStateMachineFailures {
     raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(20));
     conf.setFromObject(raftClientConfig);
 
-    conf.setLong(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);
+    conf.setLong(OzoneConfigKeys.OZONE_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);
     conf.setQuietMode(false);
     cluster =
         MiniOzoneCluster.newBuilder(conf).setNumDatanodes(10).setHbInterval(200)
@@ -307,9 +307,9 @@ public class TestContainerStateMachineFailures {
     // restart the hdds datanode, container should not in the regular set
     OzoneConfiguration config = dn.getConf();
     final String dir = config.get(OzoneConfigKeys.
-        DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR)
+        OZONE_CONTAINER_RATIS_DATANODE_STORAGE_DIR)
         + UUID.randomUUID();
-    config.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
+    config.set(OzoneConfigKeys.OZONE_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
     int index = cluster.getHddsDatanodeIndex(dn.getDatanodeDetails());
     cluster.restartHddsDatanode(dn.getDatanodeDetails(), false);
     ozoneContainer = cluster.getHddsDatanodes().get(index)
@@ -371,9 +371,9 @@ public class TestContainerStateMachineFailures {
 
     OzoneConfiguration config = dn.getConf();
     final String dir = config.get(OzoneConfigKeys.
-        DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR)
+        OZONE_CONTAINER_RATIS_DATANODE_STORAGE_DIR)
         + UUID.randomUUID();
-    config.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
+    config.set(OzoneConfigKeys.OZONE_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
     int index = cluster.getHddsDatanodeIndex(dn.getDatanodeDetails());
     // restart the hdds datanode and see if the container is listed in the
     // in the missing container set and not in the regular set

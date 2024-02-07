@@ -69,7 +69,7 @@ public class TestOzoneContainer {
       Pipeline pipeline = MockPipeline.createSingleNodePipeline();
       conf.set(OZONE_METADATA_DIRS, ozoneMetaDir.getPath());
       conf.set(HDDS_DATANODE_DIR_KEY, hddsNodeDir.getPath());
-      conf.setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
+      conf.setInt(OzoneConfigKeys.OZONE_CONTAINER_IPC_PORT,
           pipeline.getFirstNode()
               .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue());
 
@@ -100,7 +100,7 @@ public class TestOzoneContainer {
       Pipeline pipeline = MockPipeline.createSingleNodePipeline();
       conf.set(OZONE_METADATA_DIRS, ozoneMetaDir.getPath());
       conf.set(HDDS_DATANODE_DIR_KEY, hddsNodeDir.getPath());
-      conf.setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
+      conf.setInt(OzoneConfigKeys.OZONE_CONTAINER_IPC_PORT,
           pipeline.getFirstNode()
               .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue());
 

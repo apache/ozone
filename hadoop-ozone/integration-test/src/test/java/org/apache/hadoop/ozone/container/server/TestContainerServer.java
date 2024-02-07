@@ -104,7 +104,7 @@ public class TestContainerServer {
   public void testClientServer() throws Exception {
     DatanodeDetails datanodeDetails = randomDatanodeDetails();
     runTestClientServer(1, (pipeline, conf) -> conf
-            .setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
+            .setInt(OzoneConfigKeys.OZONE_CONTAINER_IPC_PORT,
                 pipeline.getFirstNode()
                     .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue()),
         XceiverClientGrpc::new,
@@ -121,10 +121,10 @@ public class TestContainerServer {
 
   static XceiverServerRatis newXceiverServerRatis(
       DatanodeDetails dn, OzoneConfiguration conf) throws IOException {
-    conf.setInt(OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT,
+    conf.setInt(OzoneConfigKeys.OZONE_CONTAINER_RATIS_IPC_PORT,
         dn.getPort(DatanodeDetails.Port.Name.RATIS).getValue());
     final String dir = TEST_DIR + dn.getUuid();
-    conf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
+    conf.set(OzoneConfigKeys.OZONE_CONTAINER_RATIS_DATANODE_STORAGE_DIR, dir);
 
     final ContainerDispatcher dispatcher = new TestContainerDispatcher();
     return XceiverServerRatis.newXceiverServerRatis(dn, conf, dispatcher,
@@ -216,7 +216,7 @@ public class TestContainerServer {
     HddsDispatcher hddsDispatcher = createDispatcher(dd,
         UUID.randomUUID(), CONF);
     runTestClientServer(1, (pipeline, conf) -> conf
-            .setInt(OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
+            .setInt(OzoneConfigKeys.OZONE_CONTAINER_IPC_PORT,
                 pipeline.getFirstNode()
                     .getPort(DatanodeDetails.Port.Name.STANDALONE).getValue()),
         XceiverClientGrpc::new,

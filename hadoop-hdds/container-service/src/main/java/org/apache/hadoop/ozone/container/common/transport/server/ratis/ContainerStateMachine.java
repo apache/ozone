@@ -238,7 +238,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     this.container2BCSIDMap = new ConcurrentHashMap<>();
 
     final int numContainerOpExecutors = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY,
+        OzoneConfigKeys.OZONE_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_DEFAULT);
     int maxPendingApplyTransactions = conf.getInt(
         ScmConfigKeys.

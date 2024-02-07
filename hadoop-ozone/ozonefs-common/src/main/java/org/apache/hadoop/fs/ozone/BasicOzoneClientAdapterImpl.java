@@ -190,7 +190,7 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
 
     this.configuredDnPort = conf.getInt(
-        OzoneConfigKeys.DFS_CONTAINER_IPC_PORT,
+        OzoneConfigKeys.OZONE_CONTAINER_IPC_PORT,
         OzoneConfigKeys.DFS_CONTAINER_IPC_PORT_DEFAULT);
     this.config = conf;
   }

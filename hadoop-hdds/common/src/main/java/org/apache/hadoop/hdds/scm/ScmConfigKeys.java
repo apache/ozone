@@ -41,12 +41,12 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_DB_DIRS_PERMISSIONS =
       "ozone.scm.db.dirs.permissions";
 
-  public static final String DFS_CONTAINER_RATIS_ENABLED_KEY
-      = "dfs.container.ratis.enabled";
+  public static final String OZONE_CONTAINER_RATIS_ENABLED_KEY
+      = "ozone.container.ratis.enabled";
   public static final boolean DFS_CONTAINER_RATIS_ENABLED_DEFAULT
       = false;
-  public static final String DFS_CONTAINER_RATIS_RPC_TYPE_KEY
-      = "dfs.container.ratis.rpc.type";
+  public static final String OZONE_CONTAINER_RATIS_RPC_TYPE_KEY
+      = "ozone.container.ratis.rpc.type";
   public static final String DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT
       = "GRPC";
   public static final String
@@ -55,25 +55,25 @@ public final class ScmConfigKeys {
   public static final int
       DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT
       = 10;
-  public static final String DFS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY
-      = "dfs.container.ratis.replication.level";
+  public static final String OZONE_CONTAINER_RATIS_REPLICATION_LEVEL_KEY
+      = "ozone.container.ratis.replication.level";
   public static final ReplicationLevel
       DFS_CONTAINER_RATIS_REPLICATION_LEVEL_DEFAULT = ReplicationLevel.MAJORITY;
-  public static final String DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY
-      = "dfs.container.ratis.num.container.op.executors";
+  public static final String OZONE_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY
+      = "ozone.container.ratis.num.container.op.executors";
   public static final int DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_DEFAULT
       = 10;
-  public static final String DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY =
-      "dfs.container.ratis.segment.size";
+  public static final String OZONE_CONTAINER_RATIS_SEGMENT_SIZE_KEY =
+      "ozone.container.ratis.segment.size";
   public static final String DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT =
       "64MB";
-  public static final String DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY =
-      "dfs.container.ratis.segment.preallocated.size";
+  public static final String OZONE_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY =
+      "ozone.container.ratis.segment.preallocated.size";
   public static final String
       DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT = "4MB";
   public static final String
-      DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT =
-      "dfs.container.ratis.statemachinedata.sync.timeout";
+      OZONE_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT =
+      "ozone.container.ratis.statemachinedata.sync.timeout";
   public static final TimeDuration
       DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT =
       TimeDuration.valueOf(10, TimeUnit.SECONDS);
@@ -121,14 +121,14 @@ public final class ScmConfigKeys {
       DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_DEFAULT =
       TimeDuration.valueOf(600000, TimeUnit.MILLISECONDS);
   public static final String
-      DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY =
-      "dfs.ratis.leader.election.minimum.timeout.duration";
+      OZONE_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY =
+      "ozone.ratis.leader.election.minimum.timeout.duration ";
   public static final TimeDuration
       DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT =
       TimeDuration.valueOf(5, TimeUnit.SECONDS);
 
-  public static final String DFS_RATIS_SNAPSHOT_THRESHOLD_KEY =
-      "dfs.ratis.snapshot.threshold";
+  public static final String OZONE_RATIS_SNAPSHOT_THRESHOLD_KEY =
+      "ozone.ratis.snapshot.threshold";
   public static final long DFS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT = 100000;
 
   // TODO : this is copied from OzoneConsts, may need to move to a better place

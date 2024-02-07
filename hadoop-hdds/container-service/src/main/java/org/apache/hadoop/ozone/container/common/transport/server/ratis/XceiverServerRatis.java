@@ -115,7 +115,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_AP
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CONTAINER_RATIS_SEGMENT_SIZE_KEY;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 
 /**
@@ -217,7 +217,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private void assignPorts() {
     clientPort = determinePort(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT,
+        OzoneConfigKeys.OZONE_CONTAINER_RATIS_IPC_PORT,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT_DEFAULT);
 
     if (DatanodeVersion.fromProtoValue(datanodeDetails.getInitialVersion())
@@ -236,8 +236,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private int determinePort(String key, int defaultValue) {
     boolean randomPort = conf.getBoolean(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT,
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT);
+        OzoneConfigKeys.OZONE_CONTAINER_RATIS_IPC_RANDOM_PORT,
+        OzoneConfigKeys.OZONE_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT);
     return randomPort ? 0 : conf.getInt(key, defaultValue);
   }
 
@@ -327,7 +327,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     }
 
     long snapshotThreshold =
-        conf.getLong(OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY,
+        conf.getLong(OzoneConfigKeys.OZONE_RATIS_SNAPSHOT_THRESHOLD_KEY,
             OzoneConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT);
     RaftServerConfigKeys.Snapshot.
       setAutoTriggerEnabled(properties, true);
@@ -378,7 +378,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
             DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT
             .getUnit();
     duration = conf.getTimeDuration(
-        OzoneConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
+        OzoneConfigKeys.OZONE_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY,
         OzoneConfigKeys.
             DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT
             .getDuration(), leaderElectionMinTimeoutUnit);
@@ -410,7 +410,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private long setRaftSegmentPreallocatedSize(RaftProperties properties) {
     final long raftSegmentPreallocatedSize = (long) conf.getStorageSize(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY,
+        OzoneConfigKeys.OZONE_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT,
         StorageUnit.BYTES);
     RaftServerConfigKeys.Log.setPreallocatedSize(properties,
@@ -428,7 +428,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         StorageUnit.BYTES);
 
     final long raftSegmentSize = (long) conf.getStorageSize(
-        DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY,
+        OZONE_CONTAINER_RATIS_SEGMENT_SIZE_KEY,
         DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT,
         StorageUnit.BYTES);
     final long raftSegmentBufferSize = logAppenderQueueByteLimit + 8;
@@ -436,7 +436,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     assertTrue(raftSegmentBufferSize <= raftSegmentSize,
         () -> DFS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT + " = "
             + logAppenderQueueByteLimit
-            + " must be <= (" + DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY + " - 8"
+            + " must be <= (" + OZONE_CONTAINER_RATIS_SEGMENT_SIZE_KEY + " - 8"
             + " = " + (raftSegmentSize - 8) + ")");
 
     RaftServerConfigKeys.Log.Appender.setBufferElementLimit(properties,
@@ -456,7 +456,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     TimeUnit timeUnit = OzoneConfigKeys.
         DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT.getUnit();
     long duration = conf.getTimeDuration(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT,
+        OzoneConfigKeys.OZONE_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT,
         OzoneConfigKeys.
             DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT
             .getDuration(), timeUnit);
@@ -507,7 +507,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private RpcType setRpcType(RaftProperties properties) {
     final String rpcType = conf.get(
-        OzoneConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY,
+        OzoneConfigKeys.OZONE_CONTAINER_RATIS_RPC_TYPE_KEY,
         OzoneConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT);
     final RpcType rpc = SupportedRpcType.valueOfIgnoreCase(rpcType);
     RatisHelper.setRpcType(properties, rpc);

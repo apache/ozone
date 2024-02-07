@@ -36,8 +36,8 @@ import java.util.concurrent.TimeUnit;
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
 public final class OzoneConfigKeys {
-  public static final String DFS_CONTAINER_IPC_PORT =
-      "dfs.container.ipc";
+  public static final String OZONE_CONTAINER_IPC_PORT =
+      "ozone.container.ipc.port";
   public static final int DFS_CONTAINER_IPC_PORT_DEFAULT = 9859;
 
   public static final String OZONE_METADATA_DIRS = "ozone.metadata.dirs";
@@ -56,11 +56,11 @@ public final class OzoneConfigKeys {
    * so that a mini cluster is able to launch multiple containers on a node.
    *
    * When set to false (default), the container port will be specified as
-   * {@link #DFS_CONTAINER_IPC_PORT} and the default value will be specified
+   * {@link #OZONE_CONTAINER_IPC_PORT} and the default value will be specified
    * as {@link #DFS_CONTAINER_IPC_PORT_DEFAULT}.
    */
-  public static final String DFS_CONTAINER_IPC_RANDOM_PORT =
-      "dfs.container.ipc.random.port";
+  public static final String OZONE_CONTAINER_IPC_RANDOM_PORT =
+      "ozone.container.ipc.random.port";
   public static final boolean DFS_CONTAINER_IPC_RANDOM_PORT_DEFAULT =
       false;
 
@@ -76,8 +76,8 @@ public final class OzoneConfigKeys {
   /**
    * Ratis Port where containers listen to.
    */
-  public static final String DFS_CONTAINER_RATIS_IPC_PORT =
-      "dfs.container.ratis.ipc";
+  public static final String OZONE_CONTAINER_RATIS_IPC_PORT =
+      "ozone.container.ratis.ipc";
   public static final int DFS_CONTAINER_RATIS_IPC_PORT_DEFAULT = 9858;
   /**
    * Ratis Port where containers listen to admin requests.
@@ -133,9 +133,9 @@ public final class OzoneConfigKeys {
    * When set to true, allocate a random free port for ozone container, so that
    * a mini cluster is able to launch multiple containers on a node.
    */
-  public static final String DFS_CONTAINER_RATIS_IPC_RANDOM_PORT =
-      "dfs.container.ratis.ipc.random.port";
-  public static final boolean DFS_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT =
+  public static final String OZONE_CONTAINER_RATIS_IPC_RANDOM_PORT =
+      "ozone.container.ratis.ipc.random.port";
+  public static final boolean OZONE_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT =
       false;
 
   public static final String OZONE_METADATA_STORE_ROCKSDB_STATISTICS =
@@ -325,12 +325,12 @@ public final class OzoneConfigKeys {
   public static final int
       OZONE_BLOCK_DELETING_CONTAINER_LIMIT_PER_INTERVAL_DEFAULT = 10;
 
-  public static final String DFS_CONTAINER_RATIS_ENABLED_KEY
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_KEY;
+  public static final String OZONE_CONTAINER_RATIS_ENABLED_KEY
+      = ScmConfigKeys.OZONE_CONTAINER_RATIS_ENABLED_KEY;
   public static final boolean DFS_CONTAINER_RATIS_ENABLED_DEFAULT
       = ScmConfigKeys.DFS_CONTAINER_RATIS_ENABLED_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_RPC_TYPE_KEY
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY;
+  public static final String OZONE_CONTAINER_RATIS_RPC_TYPE_KEY
+      = ScmConfigKeys.OZONE_CONTAINER_RATIS_RPC_TYPE_KEY;
   public static final String DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT
       = ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT;
   public static final String
@@ -340,35 +340,35 @@ public final class OzoneConfigKeys {
       DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT
       = ScmConfigKeys.
       DFS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY;
+  public static final String OZONE_CONTAINER_RATIS_REPLICATION_LEVEL_KEY
+      = ScmConfigKeys.OZONE_CONTAINER_RATIS_REPLICATION_LEVEL_KEY;
   public static final ReplicationLevel
       DFS_CONTAINER_RATIS_REPLICATION_LEVEL_DEFAULT
       = ScmConfigKeys.DFS_CONTAINER_RATIS_REPLICATION_LEVEL_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY;
+  public static final String OZONE_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY
+      = ScmConfigKeys.OZONE_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY;
   public static final int DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_DEFAULT
       = ScmConfigKeys.DFS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_KEY;
+  public static final String OZONE_CONTAINER_RATIS_SEGMENT_SIZE_KEY
+      = ScmConfigKeys.OZONE_CONTAINER_RATIS_SEGMENT_SIZE_KEY;
   public static final String DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT
       = ScmConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_SIZE_DEFAULT;
-  public static final String DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY
-      = ScmConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY;
+  public static final String OZONE_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY
+      = ScmConfigKeys.OZONE_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY;
   public static final String
       DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT =
       ScmConfigKeys.DFS_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_DEFAULT;
 
   // config settings to enable stateMachineData write timeout
   public static final String
-      DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT =
-      ScmConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT;
+      OZONE_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT =
+      ScmConfigKeys.OZONE_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT;
   public static final TimeDuration
       DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT =
       ScmConfigKeys.DFS_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT_DEFAULT;
 
-  public static final String DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR =
-      "dfs.container.ratis.datanode.storage.dir";
+  public static final String OZONE_CONTAINER_RATIS_DATANODE_STORAGE_DIR =
+      "ozone.container.ratis.datanode.storage.dir";
 
   public static final String DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY =
       ScmConfigKeys.DFS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY;
@@ -407,13 +407,13 @@ public final class OzoneConfigKeys {
       DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT =
       ScmConfigKeys.DFS_CONTAINER_RATIS_LEADER_PENDING_BYTES_LIMIT_DEFAULT;
   public static final String
-      DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY =
-      ScmConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY;
+      OZONE_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY =
+      ScmConfigKeys.OZONE_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY;
   public static final TimeDuration
       DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT =
       ScmConfigKeys.DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT;
-  public static final String DFS_RATIS_SNAPSHOT_THRESHOLD_KEY =
-      ScmConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_KEY;
+  public static final String OZONE_RATIS_SNAPSHOT_THRESHOLD_KEY =
+      ScmConfigKeys.OZONE_RATIS_SNAPSHOT_THRESHOLD_KEY;
   public static final long DFS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT =
       ScmConfigKeys.DFS_RATIS_SNAPSHOT_THRESHOLD_DEFAULT;
 

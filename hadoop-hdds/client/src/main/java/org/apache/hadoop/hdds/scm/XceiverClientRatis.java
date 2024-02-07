@@ -83,7 +83,7 @@ public final class XceiverClientRatis extends XceiverClientSpi {
       org.apache.hadoop.hdds.scm.pipeline.Pipeline pipeline,
       ConfigurationSource ozoneConf, ClientTrustManager trustManager) {
     final String rpcType = ozoneConf
-        .get(ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_KEY,
+        .get(ScmConfigKeys.OZONE_CONTAINER_RATIS_RPC_TYPE_KEY,
             ScmConfigKeys.DFS_CONTAINER_RATIS_RPC_TYPE_DEFAULT);
     final RetryPolicy retryPolicy = RatisHelper.createRetryPolicy(ozoneConf);
     final GrpcTlsConfig tlsConfig = RatisHelper.createTlsClientConfig(new
