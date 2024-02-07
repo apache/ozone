@@ -66,7 +66,7 @@ public class TestQuotaRepairTask extends TestOMKeyRequest {
                   RatisReplicationConfig.getInstance(ONE))
               .setObjectID(parentId + 1 + i)
               .setParentObjectID(parentId)
-              .setUpdateID(100L)
+              .setUpdateID(100L + i)
               .build();
       omKeyInfo.setKeyName(fileName);
       OMRequestTestUtils.addFileToKeyTable(false, false,
