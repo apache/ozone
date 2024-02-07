@@ -114,12 +114,12 @@ public class TestContainerStateMachineStream {
     conf.setFromObject(raftClientConfig);
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
-            .setDataStreamMinPacketSize(1024)
-            .setBlockSize(BLOCK_SIZE)
-            .setChunkSize(CHUNK_SIZE)
-            .setStreamBufferFlushSize(FLUSH_SIZE)
-            .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
-            .applyTo(conf);
+        .setDataStreamMinPacketSize(1024)
+        .setBlockSize(BLOCK_SIZE)
+        .setChunkSize(CHUNK_SIZE)
+        .setStreamBufferFlushSize(FLUSH_SIZE)
+        .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
+        .applyTo(conf);
 
     conf.setLong(OzoneConfigKeys.OZONE_RATIS_SNAPSHOT_THRESHOLD_KEY, 1);
     conf.setQuietMode(false);
