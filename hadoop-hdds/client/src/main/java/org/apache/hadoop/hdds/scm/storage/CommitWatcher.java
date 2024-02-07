@@ -53,8 +53,8 @@ class CommitWatcher extends AbstractCommitWatcher<ChunkBuffer> {
 
   @Override
   XceiverClientReply watchForCommit(long commitIndex) {
-    // No need to actually call client.watchForCommit since Ratis client send() call
-    // alone should suffice with RATIS-1994
+    // No need to call actual client.watchForCommit() because Ratis client
+    // send() call alone now would suffice with the API improvement in RATIS-1994
     adjustBuffers(commitIndex);
     return null;
   }
