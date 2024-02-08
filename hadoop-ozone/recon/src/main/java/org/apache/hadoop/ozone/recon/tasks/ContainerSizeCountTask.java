@@ -256,10 +256,10 @@ public class ContainerSizeCountTask extends ReconScmTask {
 
   /**
    *
-   * The handleContainerDeleteOperations() function loops through the entries
-   * in the deletedContainers map and calls the handleDeleteKeyEvent() function
-   * for each one. This will decrement the size counts of those containers by
-   * one which are no longer present in the cluster
+   * Handles the deletion of containers by updating the tracking of processed containers
+   * and adjusting the count of containers based on their sizes. When a container is deleted,
+   * it is removed from the tracking of processed containers, and the count of containers
+   * corresponding to its size is decremented in the container size count map.
    *
    * Used by process()
    *
@@ -325,7 +325,7 @@ public class ContainerSizeCountTask extends ReconScmTask {
       Map<ContainerSizeCountKey, Long> containerSizeCountMap) {
     ContainerSizeCountKey key = getContainerSizeCountKey(containerSize);
     containerSizeCountMap.compute(key,
-        (k, previous) -> previous != null ? previous + delta : delta);
+        (k, previous) -> previous != null ? previous + delta : 0);
   }
 
   /**
