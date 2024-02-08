@@ -135,7 +135,7 @@ public final class OzoneConfigKeys {
    */
   public static final String OZONE_CONTAINER_RATIS_IPC_RANDOM_PORT =
       "ozone.container.ratis.ipc.random.port";
-  public static final boolean OZONE_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT =
+  public static final boolean DFS_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT =
       false;
 
   public static final String OZONE_METADATA_STORE_ROCKSDB_STATISTICS =

@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 
 import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.ratis.server.RaftServerConfigKeys;
 
 import static java.util.Collections.unmodifiableSortedSet;
@@ -323,7 +324,35 @@ public class OzoneConfiguration extends Configuration
         new DeprecationDelta("ozone.scm.chunk.layout",
             ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY),
         new DeprecationDelta("hdds.datanode.replication.work.dir",
-            OZONE_CONTAINER_COPY_WORKDIR)
+            OZONE_CONTAINER_COPY_WORKDIR),
+        new DeprecationDelta("dfs.container.ratis.enabled",
+            ScmConfigKeys.OZONE_CONTAINER_RATIS_ENABLED_KEY),
+        new DeprecationDelta("dfs.container.ratis.rpc.type",
+            ScmConfigKeys.OZONE_CONTAINER_RATIS_RPC_TYPE_KEY),
+        new DeprecationDelta("dfs.container.ratis.replication.level",
+            ScmConfigKeys.OZONE_CONTAINER_RATIS_REPLICATION_LEVEL_KEY),
+        new DeprecationDelta("dfs.container.ratis.num.container.op.executors",
+            ScmConfigKeys.OZONE_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY),
+        new DeprecationDelta("dfs.container.ratis.segment.size",
+            ScmConfigKeys.OZONE_CONTAINER_RATIS_SEGMENT_SIZE_KEY),
+        new DeprecationDelta("dfs.container.ratis.segment.preallocated.size",
+            ScmConfigKeys.OZONE_CONTAINER_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY),
+        new DeprecationDelta("dfs.container.ratis.statemachinedata.sync.timeout",
+            ScmConfigKeys.OZONE_CONTAINER_RATIS_STATEMACHINEDATA_SYNC_TIMEOUT),
+        new DeprecationDelta("dfs.ratis.leader.election.minimum.timeout.duration",
+            ScmConfigKeys.OZONE_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY),
+        new DeprecationDelta("dfs.ratis.snapshot.threshold",
+            ScmConfigKeys.OZONE_RATIS_SNAPSHOT_THRESHOLD_KEY),
+        new DeprecationDelta("dfs.container.ipc",
+            OzoneConfigKeys.OZONE_CONTAINER_IPC_PORT),
+        new DeprecationDelta("dfs.container.ipc.random.port",
+            OzoneConfigKeys.OZONE_CONTAINER_IPC_RANDOM_PORT),
+        new DeprecationDelta("dfs.container.ratis.ipc",
+            OzoneConfigKeys.OZONE_CONTAINER_RATIS_IPC_PORT),
+        new DeprecationDelta("dfs.container.ratis.ipc.random.port",
+            OzoneConfigKeys.OZONE_CONTAINER_RATIS_IPC_RANDOM_PORT),
+        new DeprecationDelta("dfs.container.ratis.datanode.storage.dir",
+            OzoneConfigKeys.OZONE_CONTAINER_RATIS_DATANODE_STORAGE_DIR)
     });
   }
 

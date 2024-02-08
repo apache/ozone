@@ -237,7 +237,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private int determinePort(String key, int defaultValue) {
     boolean randomPort = conf.getBoolean(
         OzoneConfigKeys.OZONE_CONTAINER_RATIS_IPC_RANDOM_PORT,
-        OzoneConfigKeys.OZONE_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT);
+        OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_RANDOM_PORT_DEFAULT);
     return randomPort ? 0 : conf.getInt(key, defaultValue);
   }
 
