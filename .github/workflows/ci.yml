@@ -434,11 +434,12 @@ jobs:
       matrix:
         profile:
           - client
-          - contract
+          - container
           - filesystem
           - hdds
           - om
           - ozone
+          - recon
           - shell
           - snapshot
           - flaky
