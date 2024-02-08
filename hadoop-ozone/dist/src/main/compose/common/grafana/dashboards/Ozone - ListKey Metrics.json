@@ -1,51 +1,9 @@
 {
-  "__inputs": [
-    {
-      "name": "DS_PROMETHEUS-1",
-      "label": "Prometheus-1",
-      "description": "",
-      "type": "datasource",
-      "pluginId": "prometheus",
-      "pluginName": "Prometheus"
-    },
-    {
-      "name": "DS_PROMETHEUS-0",
-      "label": "Prometheus-0",
-      "description": "",
-      "type": "datasource",
-      "pluginId": "prometheus",
-      "pluginName": "Prometheus"
-    }
-  ],
-  "__elements": {},
-  "__requires": [
-    {
-      "type": "grafana",
-      "id": "grafana",
-      "name": "Grafana",
-      "version": "10.1.1"
-    },
-    {
-      "type": "datasource",
-      "id": "prometheus",
-      "name": "Prometheus",
-      "version": "1.0.0"
-    },
-    {
-      "type": "panel",
-      "id": "timeseries",
-      "name": "Time series",
-      "version": ""
-    }
-  ],
   "annotations": {
     "list": [
       {
         "builtIn": 1,
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
+        "datasource": "-- Grafana --",
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
@@ -76,8 +34,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS-1}"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -138,7 +95,6 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "mus-test2-1.mus-test2.root.hwx.site"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -179,8 +135,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS-1}"
+            "type": "prometheus"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -212,8 +167,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS-1}"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -290,8 +244,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS-1}"
+            "type": "prometheus"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -306,8 +259,7 @@
         },
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS-1}"
+            "type": "prometheus"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -327,8 +279,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS-0}"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -406,8 +357,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS-0}"
+            "type": "prometheus"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -426,8 +376,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS-1}"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -488,7 +437,6 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "mus-test2-1.mus-test2.root.hwx.site:9875"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -529,12 +477,11 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS-1}"
+            "type": "prometheus"
           },
           "disableTextWrap": false,
-          "editorMode": "builder",
-          "expr": "om_performance_metrics_list_keys_ops_per_sec_num_ops",
+          "editorMode": "code",
+          "expr": "rate(om_performance_metrics_list_keys_latency_ns_num_ops[60s])",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -549,8 +496,7 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS-1}"
+        "type": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -611,7 +557,6 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "mus-test2-1.mus-test2.root.hwx.site:9875"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -652,8 +597,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS-1}"
+            "type": "prometheus"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -685,7 +629,6 @@
   "timepicker": {},
   "timezone": "",
   "title": "ListKey Dashboard",
-  "uid": "cac0d75b-49a2-41f2-b8bf-57f9c86bfa8c",
   "version": 14,
   "weekStart": ""
 }
