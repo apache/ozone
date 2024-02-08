@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -39,10 +38,7 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.hadoop.util.ServicePlugin;
-
-import org.junit.jupiter.api.AfterEach;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
@@ -57,6 +53,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
@@ -68,6 +65,7 @@ import org.slf4j.LoggerFactory;
 
 public class TestHddsDatanodeService {
 
+  @TempDir
   private File testDir;
   private static final Logger LOG =
       LoggerFactory.getLogger(TestHddsDatanodeService.class);
@@ -92,7 +90,6 @@ public class TestHddsDatanodeService {
     conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES,
         serverAddresses.toArray(new String[0]));
 
-    testDir = GenericTestUtils.getRandomizedTestDir();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getPath());
     conf.set(OZONE_SCM_NAMES, "localhost");
     conf.setClass(OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY, MockService.class,
@@ -107,11 +104,6 @@ public class TestHddsDatanodeService {
 
     String volumeDir = testDir + OZONE_URI_DELIMITER + "disk1";
     conf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, volumeDir);
-  }
-
-  @AfterEach
-  public void tearDown() {
-    FileUtil.fullyDelete(testDir);
   }
 
   @Test

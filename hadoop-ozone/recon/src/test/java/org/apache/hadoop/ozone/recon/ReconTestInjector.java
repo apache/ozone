@@ -203,7 +203,7 @@ public class ReconTestInjector {
     }
 
     if (withReconSqlDb) {
-      reconSqlDB = new AbstractReconSqlDBTest();
+      reconSqlDB = new AbstractReconSqlDBTest(tmpDir.toPath());
       modules.addAll(reconSqlDB.getReconSqlDBModules());
     }
 

@@ -21,7 +21,7 @@ package org.apache.hadoop.ozone.om.response.key;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 import org.junit.jupiter.api.Test;
 
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -98,7 +98,7 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
 
   }
 
-  @NotNull
+  @Nonnull
   protected OMKeyCreateResponse getOmKeyCreateResponse(OmKeyInfo keyInfo,
       OmBucketInfo bucketInfo, OMResponse response) throws IOException {
 

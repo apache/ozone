@@ -45,9 +45,10 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -117,7 +118,7 @@ public class TestCloseContainerHandler {
     Pipeline pipeline = cluster.getStorageContainerManager()
         .getPipelineManager().getPipeline(container.getPipelineID());
 
-    Assertions.assertFalse(isContainerClosed(cluster, containerId.getId()));
+    assertFalse(isContainerClosed(cluster, containerId.getId()));
 
     DatanodeDetails datanodeDetails =
         cluster.getHddsDatanodes().get(0).getDatanodeDetails();
@@ -135,7 +136,7 @@ public class TestCloseContainerHandler {
             5 * 1000);
 
     //double check if it's really closed (waitFor also throws an exception)
-    Assertions.assertTrue(isContainerClosed(cluster, containerId.getId()));
+    assertTrue(isContainerClosed(cluster, containerId.getId()));
   }
 
   private static Boolean isContainerClosed(MiniOzoneCluster cluster,

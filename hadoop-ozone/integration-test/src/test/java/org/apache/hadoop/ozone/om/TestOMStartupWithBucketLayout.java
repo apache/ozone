@@ -28,8 +28,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-import java.util.UUID;
-
 /**
  * Verifies OM startup with different layout.
  */
@@ -41,11 +39,8 @@ public class TestOMStartupWithBucketLayout {
 
   public static void startCluster(OzoneConfiguration conf)
       throws Exception {
-    String clusterId = UUID.randomUUID().toString();
-    String scmId = UUID.randomUUID().toString();
-    String omId = UUID.randomUUID().toString();
-    cluster = MiniOzoneCluster.newBuilder(conf).setClusterId(clusterId)
-        .setScmId(scmId).setOmId(omId).withoutDatanodes().build();
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .withoutDatanodes().build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
   }

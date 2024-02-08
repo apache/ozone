@@ -45,6 +45,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_CHUNK_LIST_INCREMENTAL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
@@ -83,6 +84,7 @@ public class TestBlockManagerImpl {
     this.schemaVersion = versionInfo.getSchemaVersion();
     this.config = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, config);
+    config.setBoolean(OZONE_CHUNK_LIST_INCREMENTAL, true);
     initilaze();
   }
 

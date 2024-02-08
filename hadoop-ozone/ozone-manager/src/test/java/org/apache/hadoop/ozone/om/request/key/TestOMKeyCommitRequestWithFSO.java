@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.util.Time;
-import org.jetbrains.annotations.NotNull;
+import jakarta.annotation.Nonnull;
 
 import java.io.IOException;
 import java.util.List;
@@ -90,7 +90,7 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
 
   }
 
-  @NotNull
+  @Nonnull
   protected OMKeyCommitRequest getOmKeyCommitRequest(OMRequest omRequest) {
     return new OMKeyCommitRequestWithFSO(omRequest,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);

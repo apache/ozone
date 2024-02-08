@@ -406,7 +406,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     OMClientRequest omClientRequest =
         OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
     return captureLatencyNs(
-        impl.getPerfMetrics().getValidateAndUpdateCacneLatencyNs(),
+        impl.getPerfMetrics().getValidateAndUpdateCacheLatencyNs(),
         () -> {
           OMClientResponse omClientResponse =
               omClientRequest.validateAndUpdateCache(getOzoneManager(), termIndex);

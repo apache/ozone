@@ -54,9 +54,9 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
@@ -234,7 +234,7 @@ class TestManagedSSTDumpIterator {
             ManagedSSTDumpIterator.KeyValue r = iterator.next();
             String key = new String(r.getKey(), StandardCharsets.UTF_8);
             Pair<String, Integer> recordKey = Pair.of(key, r.getType());
-            assertTrue(expectedKeys.containsKey(recordKey));
+            assertThat(expectedKeys).containsKey(recordKey);
             assertEquals(Optional.ofNullable(expectedKeys
                     .get(recordKey)).orElse(""),
                 new String(r.getValue(), StandardCharsets.UTF_8));

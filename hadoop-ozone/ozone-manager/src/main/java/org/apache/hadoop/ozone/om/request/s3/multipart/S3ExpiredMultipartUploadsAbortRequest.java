@@ -19,7 +19,6 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
-import com.google.common.base.Optional;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -312,11 +311,11 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
               .isExist(multipartOpenKey)) {
             omMetadataManager.getOpenKeyTable(bucketLayout)
                 .addCacheEntry(new CacheKey<>(multipartOpenKey),
-                    new CacheValue<>(Optional.absent(), trxnLogIndex));
+                    CacheValue.get(trxnLogIndex));
           }
           omMetadataManager.getMultipartInfoTable()
               .addCacheEntry(new CacheKey<>(expiredMPUKeyName),
-                  new CacheValue<>(Optional.absent(), trxnLogIndex));
+                  CacheValue.get(trxnLogIndex));
 
           long numParts = omMultipartKeyInfo.getPartKeyInfoMap().size();
           ozoneManager.getMetrics().incNumExpiredMPUAborted();

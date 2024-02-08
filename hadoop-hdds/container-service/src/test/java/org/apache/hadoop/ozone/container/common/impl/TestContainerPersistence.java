@@ -73,7 +73,6 @@ import org.apache.hadoop.ozone.container.keyvalue.impl.ChunkManagerFactory;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
-import org.apache.ozone.test.GenericTestUtils;
 
 import com.google.common.collect.Maps;
 import org.apache.commons.io.FileUtils;
@@ -82,6 +81,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -98,7 +98,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -113,6 +112,8 @@ public class TestContainerPersistence {
   private static final String SCM_ID = UUID.randomUUID().toString();
   private static final Logger LOGGER =
       LoggerFactory.getLogger(TestContainerPersistence.class);
+  @TempDir
+  private static File hddsFile;
   private static String hddsPath;
   private static OzoneConfiguration conf;
   private static VolumeChoosingPolicy volumeChoosingPolicy;
@@ -138,8 +139,7 @@ public class TestContainerPersistence {
   @BeforeAll
   public static void init() {
     conf = new OzoneConfiguration();
-    hddsPath = GenericTestUtils
-        .getTempPath(TestContainerPersistence.class.getSimpleName());
+    hddsPath = hddsFile.getPath();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, hddsPath);
     conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, hddsPath);
     volumeChoosingPolicy = new RoundRobinVolumeChoosingPolicy();
@@ -248,12 +248,8 @@ public class TestContainerPersistence {
     long testContainerID = getTestContainerID();
 
     Container container = addContainer(containerSet, testContainerID);
-    try {
-      containerSet.addContainer(container);
-      fail("Expected Exception not thrown.");
-    } catch (IOException ex) {
-      assertNotNull(ex);
-    }
+    IOException ex = assertThrows(IOException.class, () -> containerSet.addContainer(container));
+    assertNotNull(ex);
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -544,7 +540,7 @@ public class TestContainerPersistence {
       long actualContainerID = report.getContainerID();
       assertTrue(containerIDs.remove(actualContainerID));
     }
-    assertTrue(containerIDs.isEmpty());
+    assertThat(containerIDs).isEmpty();
   }
 
   /**
@@ -585,7 +581,7 @@ public class TestContainerPersistence {
     }
     // Assert that we listed all the keys that we had put into
     // container.
-    assertTrue(testMap.isEmpty());
+    assertThat(testMap).isEmpty();
   }
 
   private ChunkInfo writeChunkHelper(BlockID blockID) throws IOException {
@@ -799,26 +795,23 @@ public class TestContainerPersistence {
     blockData.setBlockCommitSequenceId(4);
     blockManager.putBlock(container, blockData);
     BlockData readBlockData;
-    try {
+    StorageContainerException sce = assertThrows(StorageContainerException.class, () -> {
       blockID1.setBlockCommitSequenceId(5);
       // read with bcsId higher than container bcsId
       blockManager.
           getBlock(container, blockID1);
-      fail("Expected exception not thrown");
-    } catch (StorageContainerException sce) {
-      assertSame(UNKNOWN_BCSID, sce.getResult());
-    }
+    });
+    assertSame(UNKNOWN_BCSID, sce.getResult());
 
-    try {
+    sce = assertThrows(StorageContainerException.class, () -> {
       blockID1.setBlockCommitSequenceId(4);
       // read with bcsId lower than container bcsId but greater than committed
       // bcsId.
       blockManager.
           getBlock(container, blockID1);
-      fail("Expected exception not thrown");
-    } catch (StorageContainerException sce) {
-      assertSame(BCSID_MISMATCH, sce.getResult());
-    }
+    });
+    assertSame(BCSID_MISMATCH, sce.getResult());
+
     readBlockData = blockManager.
         getBlock(container, blockData.getBlockID());
     ChunkInfo readChunk =

@@ -41,8 +41,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.Assertions;
-import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -80,43 +78,39 @@ public class TestContainerStateMachineIdempotency {
   }
 
   @Test
-  public void testContainerStateMachineIdempotency() throws Exception {
+  void testContainerStateMachineIdempotency() throws Exception {
     ContainerWithPipeline container = storageContainerLocationClient
         .allocateContainer(HddsProtos.ReplicationType.RATIS,
             HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE);
     long containerID = container.getContainerInfo().getContainerID();
     Pipeline pipeline = container.getPipeline();
     XceiverClientSpi client = xceiverClientManager.acquireClient(pipeline);
-    try {
-      //create the container
-      ContainerProtocolCalls.createContainer(client, containerID, null);
-      // call create Container again
-      BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
-      byte[] data =
-          RandomStringUtils.random(RandomUtils.nextInt(0, 1024))
-              .getBytes(UTF_8);
-      ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
-          ContainerTestHelper
-              .getWriteChunkRequest(container.getPipeline(), blockID,
-                  data.length);
-      client.sendCommand(writeChunkRequest);
+    //create the container
+    ContainerProtocolCalls.createContainer(client, containerID, null);
+    // call create Container again
+    BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
+    byte[] data =
+        RandomStringUtils.random(RandomUtils.nextInt(0, 1024)).getBytes(UTF_8);
+    ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
+        ContainerTestHelper
+            .getWriteChunkRequest(container.getPipeline(), blockID,
+                data.length);
+    client.sendCommand(writeChunkRequest);
 
-      //Make the write chunk request again without requesting for overWrite
-      client.sendCommand(writeChunkRequest);
-      // Now, explicitly make a putKey request for the block.
-      ContainerProtos.ContainerCommandRequestProto putKeyRequest =
-          ContainerTestHelper
-              .getPutBlockRequest(pipeline, writeChunkRequest.getWriteChunk());
-      client.sendCommand(putKeyRequest).getPutBlock();
-      // send the putBlock again
-      client.sendCommand(putKeyRequest);
+    //Make the write chunk request again without requesting for overWrite
+    client.sendCommand(writeChunkRequest);
+    // Now, explicitly make a putKey request for the block.
+    ContainerProtos.ContainerCommandRequestProto putKeyRequest =
+        ContainerTestHelper
+            .getPutBlockRequest(pipeline, writeChunkRequest.getWriteChunk());
+    client.sendCommand(putKeyRequest).getPutBlock();
+    // send the putBlock again
+    client.sendCommand(putKeyRequest);
 
-      // close container call
-      ContainerProtocolCalls.closeContainer(client, containerID, null);
-      ContainerProtocolCalls.closeContainer(client, containerID, null);
-    } catch (IOException ioe) {
-      Assertions.fail("Container operation failed" + ioe);
-    }
+    // close container call
+    ContainerProtocolCalls.closeContainer(client, containerID, null);
+    ContainerProtocolCalls.closeContainer(client, containerID, null);
+
     xceiverClientManager.releaseClient(client, false);
   }
 }

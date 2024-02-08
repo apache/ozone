@@ -21,7 +21,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
 import org.apache.hadoop.hdds.scm.ScmConfig;
+import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,17 +44,20 @@ public class TestPipelineChoosePolicyFactory {
 
   private ScmConfig scmConfig;
 
+  private NodeManager nodeManager;
+
   @BeforeEach
   public void setup() {
     //initialize network topology instance
     conf = new OzoneConfiguration();
     scmConfig = conf.getObject(ScmConfig.class);
+    nodeManager = new MockNodeManager(true, 5);
   }
 
   @Test
   public void testDefaultPolicy() throws IOException {
     PipelineChoosePolicy policy = PipelineChoosePolicyFactory
-        .getPolicy(scmConfig, false);
+        .getPolicy(nodeManager, scmConfig, false);
     assertSame(OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
         policy.getClass());
   }
@@ -60,7 +65,7 @@ public class TestPipelineChoosePolicyFactory {
   @Test
   public void testDefaultPolicyEC() throws IOException {
     PipelineChoosePolicy policy = PipelineChoosePolicyFactory
-        .getPolicy(scmConfig, true);
+        .getPolicy(nodeManager, scmConfig, true);
     assertSame(OZONE_SCM_EC_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
         policy.getClass());
   }
@@ -69,7 +74,7 @@ public class TestPipelineChoosePolicyFactory {
   public void testNonDefaultPolicyEC() throws IOException {
     scmConfig.setECPipelineChoosePolicyName(DummyGoodImpl.class.getName());
     PipelineChoosePolicy policy = PipelineChoosePolicyFactory
-        .getPolicy(scmConfig, true);
+        .getPolicy(nodeManager, scmConfig, true);
     assertSame(DummyGoodImpl.class, policy.getClass());
   }
 
@@ -121,10 +126,10 @@ public class TestPipelineChoosePolicyFactory {
     scmConfig.setPipelineChoosePolicyName(DummyImpl.class.getName());
     scmConfig.setECPipelineChoosePolicyName(DummyImpl.class.getName());
     PipelineChoosePolicy policy =
-        PipelineChoosePolicyFactory.getPolicy(scmConfig, false);
+        PipelineChoosePolicyFactory.getPolicy(nodeManager, scmConfig, false);
     assertSame(OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
         policy.getClass());
-    policy = PipelineChoosePolicyFactory.getPolicy(scmConfig, true);
+    policy = PipelineChoosePolicyFactory.getPolicy(nodeManager, scmConfig, true);
     assertSame(OZONE_SCM_EC_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
         policy.getClass());
   }
@@ -137,10 +142,10 @@ public class TestPipelineChoosePolicyFactory {
     scmConfig.setECPipelineChoosePolicyName(
         "org.apache.hadoop.hdds.scm.pipeline.choose.policy.HelloWorld");
     PipelineChoosePolicy policy =
-        PipelineChoosePolicyFactory.getPolicy(scmConfig, false);
+        PipelineChoosePolicyFactory.getPolicy(nodeManager, scmConfig, false);
     assertSame(OZONE_SCM_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
         policy.getClass());
-    policy = PipelineChoosePolicyFactory.getPolicy(scmConfig, true);
+    policy = PipelineChoosePolicyFactory.getPolicy(nodeManager, scmConfig, true);
     assertSame(OZONE_SCM_EC_PIPELINE_CHOOSE_POLICY_IMPL_DEFAULT,
         policy.getClass());
   }

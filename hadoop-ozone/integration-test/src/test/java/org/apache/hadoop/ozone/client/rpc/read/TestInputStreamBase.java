@@ -20,11 +20,12 @@ import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -45,7 +46,7 @@ abstract class TestInputStreamBase {
       ContainerLayoutVersion containerLayout) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
 
-    OzoneClientConfig config = new OzoneClientConfig();
+    OzoneClientConfig config = conf.getObject(OzoneClientConfig.class);
     config.setBytesPerChecksum(BYTES_PER_CHECKSUM);
     conf.setFromObject(config);
 
@@ -63,14 +64,16 @@ abstract class TestInputStreamBase {
     repConf.setInterval(Duration.ofSeconds(1));
     conf.setFromObject(repConf);
 
-    return MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(5)
-        .setTotalPipelineNumLimit(5)
+    ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(BLOCK_SIZE)
         .setChunkSize(CHUNK_SIZE)
         .setStreamBufferFlushSize(FLUSH_SIZE)
         .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
-        .setStreamBufferSizeUnit(StorageUnit.BYTES)
+        .applyTo(conf);
+
+    return MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(5)
+        .setTotalPipelineNumLimit(5)
         .build();
   }
 

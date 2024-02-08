@@ -17,7 +17,6 @@
  */
 package org.apache.hadoop.hdds.conf;
 
-import java.time.temporal.TemporalUnit;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hdds.conf.TimeDurationUtil.ParsedTimeDuration;
@@ -50,10 +49,6 @@ public interface ConfigurationTarget {
   }
 
   default void setTimeDuration(String name, long value, TimeUnit unit) {
-    set(name, value + ParsedTimeDuration.unitFor(unit).suffix());
-  }
-
-  default void setTimeDuration(String name, long value, TemporalUnit unit) {
     set(name, value + ParsedTimeDuration.unitFor(unit).suffix());
   }
 

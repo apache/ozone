@@ -131,6 +131,17 @@ public class OzoneManagerDoubleBufferMetrics {
     queueSize.add(size);
   }
 
+  public void updateFlush(int flushedTransactionsInOneIteration) {
+    incrTotalNumOfFlushOperations();
+    incrTotalSizeOfFlushedTransactions(flushedTransactionsInOneIteration);
+    setAvgFlushTransactionsInOneIteration(getTotalNumOfFlushedTransactions() / (float)getTotalNumOfFlushOperations());
+    final long max = getMaxNumberOfTransactionsFlushedInOneIteration();
+    if (flushedTransactionsInOneIteration > max) {
+      maxNumberOfTransactionsFlushedInOneIteration.incr(flushedTransactionsInOneIteration - max);
+    }
+    updateQueueSize(flushedTransactionsInOneIteration);
+  }
+
   @VisibleForTesting
   public MutableStat getQueueSize() {
     return queueSize;

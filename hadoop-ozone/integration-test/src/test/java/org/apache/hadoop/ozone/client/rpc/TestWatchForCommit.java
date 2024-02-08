@@ -22,16 +22,16 @@ import java.io.OutputStream;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
+import org.apache.commons.lang3.RandomUtils;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolCli
 import org.apache.hadoop.hdds.scm.storage.BlockOutputStream;
 import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -69,7 +70,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.junit.jupiter.api.AfterEach;
@@ -140,13 +141,16 @@ public class TestWatchForCommit {
     conf.setFromObject(raftClientConfig);
 
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 30, TimeUnit.SECONDS);
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(9)
+
+    ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
         .setBlockSize(blockSize)
         .setChunkSize(chunkSize)
         .setStreamBufferFlushSize(flushSize)
         .setStreamBufferMaxSize(maxFlushSize)
-        .setStreamBufferSizeUnit(StorageUnit.BYTES)
+        .applyTo(conf);
+
+    cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(9)
         .build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE, 60000);
@@ -275,25 +279,20 @@ public class TestWatchForCommit {
       cluster.getStorageContainerManager()
           .getPipelineManager().closePipeline(pipeline, false);
       // again write data with more than max buffer limit. This wi
-      try {
-        // just watch for a log index which in not updated in the commitInfo Map
-        // as well as there is no logIndex generate in Ratis.
-        // The basic idea here is just to test if its throws an exception.
-        xceiverClient
-            .watchForCommit(index + new Random().nextInt(100) + 10);
-        fail("expected exception not thrown");
-      } catch (Exception e) {
-        assertInstanceOf(ExecutionException.class, e);
-        // since the timeout value is quite long, the watch request will either
-        // fail with NotReplicated exceptio, RetryFailureException or
-        // RuntimeException
-        assertFalse(HddsClientUtils
-            .checkForException(e) instanceof TimeoutException);
-        // client should not attempt to watch with
-        // MAJORITY_COMMITTED replication level, except the grpc IO issue
-        if (!logCapturer.getOutput().contains("Connection refused")) {
-          assertThat(e.getMessage()).doesNotContain("Watch-MAJORITY_COMMITTED");
-        }
+      // just watch for a log index which in not updated in the commitInfo Map
+      // as well as there is no logIndex generate in Ratis.
+      // The basic idea here is just to test if its throws an exception.
+      ExecutionException e = assertThrows(ExecutionException.class,
+          () -> xceiverClient.watchForCommit(index + RandomUtils.nextInt(0, 100) + 10));
+      // since the timeout value is quite long, the watch request will either
+      // fail with NotReplicated exceptio, RetryFailureException or
+      // RuntimeException
+      assertFalse(HddsClientUtils
+          .checkForException(e) instanceof TimeoutException);
+      // client should not attempt to watch with
+      // MAJORITY_COMMITTED replication level, except the grpc IO issue
+      if (!logCapturer.getOutput().contains("Connection refused")) {
+        assertThat(e.getMessage()).doesNotContain("Watch-MAJORITY_COMMITTED");
       }
       clientManager.releaseClient(xceiverClient, false);
     }
@@ -368,17 +367,13 @@ public class TestWatchForCommit {
       List<Pipeline> pipelineList = new ArrayList<>();
       pipelineList.add(pipeline);
       TestHelper.waitForPipelineClose(pipelineList, cluster);
-      try {
-        // just watch for a log index which in not updated in the commitInfo Map
-        // as well as there is no logIndex generate in Ratis.
-        // The basic idea here is just to test if its throws an exception.
-        xceiverClient
-            .watchForCommit(reply.getLogIndex() +
-                new Random().nextInt(100) + 10);
-        fail("Expected exception not thrown");
-      } catch (Exception e) {
-        assertInstanceOf(GroupMismatchException.class, HddsClientUtils.checkForException(e));
-      }
+      // just watch for a log index which in not updated in the commitInfo Map
+      // as well as there is no logIndex generate in Ratis.
+      // The basic idea here is just to test if its throws an exception.
+      Exception e =
+          assertThrows(Exception.class,
+              () -> xceiverClient.watchForCommit(reply.getLogIndex() + RandomUtils.nextInt(0, 100) + 10));
+      assertInstanceOf(GroupMismatchException.class, HddsClientUtils.checkForException(e));
       clientManager.releaseClient(xceiverClient, false);
     }
   }
