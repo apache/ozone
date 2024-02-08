@@ -89,12 +89,16 @@ public class DecommissionStatusSubCommand extends ScmSubcommand {
     }
 
     String metricsJson = scmClient.getMetrics("Hadoop:service=StorageContainerManager,name=NodeDecommissionMetrics");
-    ObjectMapper objectMapper = new ObjectMapper();
-    JsonFactory factory = objectMapper.getFactory();
-    JsonParser parser = factory.createParser(metricsJson);
-    JsonNode jsonNode = (JsonNode) objectMapper.readTree(parser).get("beans").get(0);
-    JsonNode totalDecom = jsonNode.get("DecommissioningMaintenanceNodesTotal");
-    int numDecomNodes = (totalDecom == null ? -1 : Integer.parseInt(totalDecom.toString()));
+    int numDecomNodes = -1;
+    JsonNode jsonNode = null;
+    if (metricsJson != null) {
+      ObjectMapper objectMapper = new ObjectMapper();
+      JsonFactory factory = objectMapper.getFactory();
+      JsonParser parser = factory.createParser(metricsJson);
+      jsonNode = (JsonNode) objectMapper.readTree(parser).get("beans").get(0);
+      JsonNode totalDecom = jsonNode.get("DecommissioningMaintenanceNodesTotal");
+      numDecomNodes = (totalDecom == null ? -1 : Integer.parseInt(totalDecom.toString()));
+    }
 
     for (HddsProtos.Node node : decommissioningNodes) {
       DatanodeDetails datanode = DatanodeDetails.getFromProtoBuf(
