@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -28,6 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -38,7 +40,6 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.junit.jupiter.api.Test;
 
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
@@ -321,8 +322,7 @@ public class TestS3MultipartUploadCompleteRequest
   protected void addKeyToTable(String volumeName, String bucketName,
                              String keyName, long clientID) throws Exception {
     OMRequestTestUtils.addKeyToTable(true, true, volumeName, bucketName,
-            keyName, clientID, HddsProtos.ReplicationType.RATIS,
-            HddsProtos.ReplicationFactor.ONE, omMetadataManager);
+        keyName, clientID, RatisReplicationConfig.getInstance(ONE), omMetadataManager);
   }
 
   protected String getMultipartKey(String volumeName, String bucketName,

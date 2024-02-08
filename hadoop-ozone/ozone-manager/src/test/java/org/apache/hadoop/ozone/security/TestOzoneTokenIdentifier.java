@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.security;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
 import javax.crypto.KeyGenerator;
 import javax.crypto.Mac;
 import javax.crypto.SecretKey;
@@ -298,7 +297,7 @@ public class TestOzoneTokenIdentifier {
   }
 
   @Test
-  public void testTokenPersistence() throws IOException {
+  void testTokenPersistence() throws IOException {
     OzoneTokenIdentifier idWrite = getIdentifierInst();
     idWrite.setOmServiceId("defaultServiceId");
 
@@ -306,11 +305,7 @@ public class TestOzoneTokenIdentifier {
     Codec<OzoneTokenIdentifier> idCodec = TokenIdentifierCodec.get();
 
     OzoneTokenIdentifier idRead = null;
-    try {
-      idRead =  idCodec.fromPersistedFormat(oldIdBytes);
-    } catch (IOException ex) {
-      fail("Should not fail to load old token format");
-    }
+    idRead =  idCodec.fromPersistedFormat(oldIdBytes);
     assertEquals(idWrite, idRead,
         "Deserialize Serialized Token should equal.");
   }

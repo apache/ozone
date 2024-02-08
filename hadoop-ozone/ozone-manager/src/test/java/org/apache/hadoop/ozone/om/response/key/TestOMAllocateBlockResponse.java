@@ -92,7 +92,7 @@ public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
 
   protected OmKeyInfo createOmKeyInfo() throws Exception {
     return OMRequestTestUtils.createOmKeyInfo(volumeName,
-            bucketName, keyName, replicationType, replicationFactor);
+        bucketName, keyName, replicationConfig).build();
   }
 
   protected String getOpenKey() throws Exception {

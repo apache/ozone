@@ -65,6 +65,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
@@ -74,7 +75,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.fail;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
@@ -102,15 +102,20 @@ public class TestDeleteWithInAdequateDN {
    */
   @BeforeAll
   public static void init() throws Exception {
+    final int numOfDatanodes = 3;
+
     conf = new OzoneConfiguration();
     path = GenericTestUtils
         .getTempPath(TestContainerStateMachineFailures.class.getSimpleName());
     File baseDir = new File(path);
     baseDir.mkdirs();
 
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 100,
+        TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
+    conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT, numOfDatanodes + FACTOR_THREE_PIPELINE_COUNT);
     // Make the stale, dead and server failure timeout higher so that a dead
     // node is not detecte at SCM as well as the pipeline close action
     // never gets initiated early at Datanode in the test.
@@ -157,12 +162,8 @@ public class TestDeleteWithInAdequateDN {
     conf.setFromObject(ratisClientConfig);
 
     conf.setQuietMode(false);
-    int numOfDatanodes = 3;
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(numOfDatanodes)
-        .setTotalPipelineNumLimit(
-            numOfDatanodes + FACTOR_THREE_PIPELINE_COUNT)
-        .setHbInterval(100)
         .build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(THREE, 60000);
@@ -201,7 +202,7 @@ public class TestDeleteWithInAdequateDN {
    * data is not deleted from any of the nodes which have the closed replica.
    */
   @Test
-  public void testDeleteKeyWithInAdequateDN() throws Exception {
+  void testDeleteKeyWithInAdequateDN() throws Exception {
     String keyName = "ratis";
     OzoneOutputStream key =
         objectStore.getVolume(volumeName).getBucket(bucketName)
@@ -289,14 +290,11 @@ public class TestDeleteWithInAdequateDN {
         deleteKey("ratis");
     // make sure the chunk was never deleted on the leader even though
     // deleteBlock handler is invoked
-    try {
-      for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
-        keyValueHandler.getChunkManager()
-            .readChunk(container, blockID, ChunkInfo.getFromProtoBuf(chunkInfo),
-                null);
-      }
-    } catch (IOException ioe) {
-      fail("Exception should not be thrown.");
+
+    for (ContainerProtos.ChunkInfo chunkInfo : blockData.getChunks()) {
+      keyValueHandler.getChunkManager()
+          .readChunk(container, blockID, ChunkInfo.getFromProtoBuf(chunkInfo),
+              null);
     }
     long numReadStateMachineOps =
         stateMachine.getMetrics().getNumReadStateMachineOps();

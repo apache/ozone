@@ -26,8 +26,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
-import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 import java.util.Iterator;
@@ -36,7 +34,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -45,7 +42,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationTarget;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
@@ -85,19 +81,16 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.commons.io.FileUtils;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD;
-import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_ADMIN_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_DATASTREAM_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.DFS_CONTAINER_RATIS_SERVER_PORT;
-import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
@@ -655,62 +648,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       Files.createDirectories(metaDir);
       conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDir.toString());
       // conf.setBoolean(ScmConfigKeys.OZONE_SCM_HA_ENABLE_KEY, true);
-      if (!chunkSize.isPresent()) {
-        //set it to 1MB by default in tests
-        chunkSize = Optional.of(1);
-      }
-      if (!streamBufferSize.isPresent()) {
-        streamBufferSize = OptionalInt.of(chunkSize.get());
-      }
-      if (!streamBufferFlushSize.isPresent()) {
-        streamBufferFlushSize = Optional.of((long) chunkSize.get());
-      }
-      if (!streamBufferMaxSize.isPresent()) {
-        streamBufferMaxSize = Optional.of(2 * streamBufferFlushSize.get());
-      }
-      if (!dataStreamBufferFlushSize.isPresent()) {
-        dataStreamBufferFlushSize = Optional.of((long) 4 * chunkSize.get());
-      }
-      if (!dataStreamMinPacketSize.isPresent()) {
-        dataStreamMinPacketSize = OptionalInt.of(chunkSize.get() / 4);
-      }
-      if (!datastreamWindowSize.isPresent()) {
-        datastreamWindowSize = Optional.of((long) 8 * chunkSize.get());
-      }
-      if (!blockSize.isPresent()) {
-        blockSize = Optional.of(2 * streamBufferMaxSize.get());
-      }
 
-      if (!streamBufferSizeUnit.isPresent()) {
-        streamBufferSizeUnit = Optional.of(StorageUnit.MB);
-      }
-
-      OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-      clientConfig.setStreamBufferSize(
-          (int) Math.round(
-              streamBufferSizeUnit.get().toBytes(streamBufferSize.getAsInt())));
-      clientConfig.setStreamBufferMaxSize(Math.round(
-          streamBufferSizeUnit.get().toBytes(streamBufferMaxSize.get())));
-      clientConfig.setStreamBufferFlushSize(Math.round(
-          streamBufferSizeUnit.get().toBytes(streamBufferFlushSize.get())));
-      clientConfig.setDataStreamBufferFlushSize(Math.round(
-          streamBufferSizeUnit.get().toBytes(dataStreamBufferFlushSize.get())));
-      clientConfig.setDataStreamMinPacketSize((int) Math.round(
-          streamBufferSizeUnit.get()
-              .toBytes(dataStreamMinPacketSize.getAsInt())));
-      clientConfig.setStreamWindowSize(Math.round(
-          streamBufferSizeUnit.get().toBytes(datastreamWindowSize.get())));
-      conf.setFromObject(clientConfig);
-
-      conf.setStorageSize(ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY,
-          chunkSize.get(), streamBufferSizeUnit.get());
-
-      conf.setStorageSize(OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE, blockSize.get(),
-          streamBufferSizeUnit.get());
-      // MiniOzoneCluster should have global pipeline upper limit.
-      conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT,
-          pipelineNumLimit >= DEFAULT_PIPELINE_LIMIT ?
-              pipelineNumLimit : DEFAULT_PIPELINE_LIMIT);
       conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
           DEFAULT_RATIS_RPC_TIMEOUT_SEC, TimeUnit.SECONDS);
       SCMClientConfig scmClientConfig = conf.getObject(SCMClientConfig.class);
@@ -736,14 +674,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     protected StorageContainerManager createSCM()
         throws IOException, AuthenticationException {
       configureSCM();
-      SCMStorageConfig scmStore;
 
-      // Set non standard layout version if needed.
-      scmLayoutVersion.ifPresent(integer ->
-          conf.set(HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION,
-              String.valueOf(integer)));
-
-      scmStore = new SCMStorageConfig(conf);
+      SCMStorageConfig scmStore = new SCMStorageConfig(conf);
       initializeScmStorage(scmStore);
       StorageContainerManager scm = HddsTestUtils.getScmSimple(conf,
           scmConfigurator);
@@ -800,9 +732,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     protected OzoneManager createOM()
         throws IOException, AuthenticationException {
       configureOM();
-      omLayoutVersion.ifPresent(integer ->
-          conf.set(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION,
-              String.valueOf(integer)));
       OMStorage omStore = new OMStorage(conf);
       initializeOmStorage(omStore);
       return OzoneManager.createOm(conf);
@@ -905,30 +834,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           localhostWithFreePort());
       conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
           "3s");
-      configureSCMheartbeat();
-    }
-
-    private void configureSCMheartbeat() {
-      if (hbInterval.isPresent()) {
-        conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL,
-            hbInterval.get(), TimeUnit.MILLISECONDS);
-      } else {
-        conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL,
-            DEFAULT_HB_INTERVAL_MS,
-            TimeUnit.MILLISECONDS);
-      }
-
-      if (hbProcessorInterval.isPresent()) {
-        conf.setTimeDuration(
-            ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
-            hbProcessorInterval.get(),
-            TimeUnit.MILLISECONDS);
-      } else {
-        conf.setTimeDuration(
-            ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
-            DEFAULT_HB_PROCESSOR_INTERVAL_MS,
-            TimeUnit.MILLISECONDS);
-      }
     }
 
     private void configureOM() {
