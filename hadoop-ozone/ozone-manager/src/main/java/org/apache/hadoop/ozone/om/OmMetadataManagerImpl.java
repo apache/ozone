@@ -1288,11 +1288,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         cacheKeyMap.put(key, omKeyInfo);
       }
     }
-
+    long startNano, stopNano = 0;
     // Get maxKeys from DB if it has.
-    long startNano = Time.monotonicNowNanos();
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
              keyIter = getKeyTable(getBucketLayout()).iterator()) {
+      startNano = Time.monotonicNowNanos();
       KeyValue< String, OmKeyInfo > kv;
       keyIter.seek(seekKey);
       // we need to iterate maxKeys + 1 here because if skipStartKey is true,
@@ -1315,8 +1315,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           break;
         }
       }
+      stopNano = Time.monotonicNowNanos();
     }
-    perfMetrics.addListKeysReadFromRocksDbLatencyNs(Time.monotonicNowNanos() - startNano);
     boolean isTruncated = cacheKeyMap.size() > maxKeys;
     if (perfMetrics != null) {
       long averagePagination;
@@ -1329,6 +1329,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       long opsPerSec =
           averagePagination / (Time.monotonicNowNanos() - startNanos);
       perfMetrics.setListKeysOpsPerSec(opsPerSec);
+      perfMetrics.addListKeysReadFromRocksDbLatencyNs(stopNano - startNano);
     }
     // Finally DB entries and cache entries are merged, then return the count
     // of maxKeys from the sorted map.
