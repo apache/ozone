@@ -482,8 +482,9 @@ public class TestSnapshotDeletingService {
     client.getProxy().deleteKey(VOLUME_NAME, BUCKET_NAME_ONE,
         "bucket1key0", false);
     assertTableRowCount(keyTable, 0);
-    // bucket1key0 should also be reclaimed as it not same
-    assertTableRowCount(deletedTable, 1);
+    // one copy of bucket1key0 should also be reclaimed as it not same
+    // but original deleted key created during overwrite should not be deleted
+    assertTableRowCount(deletedTable, 2);
 
     // Create Snapshot 2.
     client.getProxy().createSnapshot(VOLUME_NAME, BUCKET_NAME_ONE,
