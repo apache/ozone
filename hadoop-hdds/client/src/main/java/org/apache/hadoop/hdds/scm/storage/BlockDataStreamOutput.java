@@ -134,7 +134,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   private final DataStreamOutput out;
   private CompletableFuture<DataStreamReply> dataStreamCloseReply;
   private List<CompletableFuture<DataStreamReply>> futures = new ArrayList<>();
-  private final long syncSize = 0; // TODO: disk sync is disabled for now
+  private static final long SYNC_SIZE = 0; // TODO: disk sync is disabled for now
   private long syncPosition = 0;
   private StreamBuffer currentBuffer;
   private XceiverClientMetrics metrics;
@@ -630,9 +630,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   private boolean needSync(long position) {
-    if (syncSize > 0) {
+    if (SYNC_SIZE > 0) {
       // TODO: or position >= fileLength
-      if (position - syncPosition >= syncSize) {
+      if (position - syncPosition >= SYNC_SIZE) {
         syncPosition = position;
         return true;
       }

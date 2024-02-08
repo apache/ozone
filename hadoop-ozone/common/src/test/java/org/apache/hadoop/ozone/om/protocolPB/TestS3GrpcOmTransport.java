@@ -60,13 +60,13 @@ public class TestS3GrpcOmTransport {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestS3GrpcOmTransport.class);
 
-  private final String leaderOMNodeId = "TestOM";
+  private static final String LEADER_OM_NODE_ID = "TestOM";
 
   private final OMResponse omResponse = OMResponse.newBuilder()
       .setSuccess(true)
       .setStatus(org.apache.hadoop.ozone.protocol
           .proto.OzoneManagerProtocolProtos.Status.OK)
-      .setLeaderOMNodeId(leaderOMNodeId)
+      .setLeaderOMNodeId(LEADER_OM_NODE_ID)
       .setCmdType(Type.AllocateBlock)
       .build();
 
@@ -167,7 +167,7 @@ public class TestS3GrpcOmTransport {
     final OMResponse resp = client.submitRequest(omRequest);
     assertEquals(resp.getStatus(), org.apache.hadoop.ozone.protocol
         .proto.OzoneManagerProtocolProtos.Status.OK);
-    assertEquals(resp.getLeaderOMNodeId(), leaderOMNodeId);
+    assertEquals(resp.getLeaderOMNodeId(), LEADER_OM_NODE_ID);
   }
 
   @Test
@@ -191,7 +191,7 @@ public class TestS3GrpcOmTransport {
     final OMResponse resp = client.submitRequest(omRequest);
     assertEquals(resp.getStatus(), org.apache.hadoop.ozone.protocol
         .proto.OzoneManagerProtocolProtos.Status.OK);
-    assertEquals(resp.getLeaderOMNodeId(), leaderOMNodeId);
+    assertEquals(resp.getLeaderOMNodeId(), LEADER_OM_NODE_ID);
   }
 
   @Test

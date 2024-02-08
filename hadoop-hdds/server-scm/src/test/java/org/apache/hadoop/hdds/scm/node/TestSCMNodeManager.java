@@ -26,7 +26,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -773,8 +772,7 @@ public class TestSCMNodeManager {
    * @throws AuthenticationException
    */
   @Test
-  public void testScmHandleJvmPause()
-      throws IOException, InterruptedException, AuthenticationException {
+  void testScmHandleJvmPause() throws Exception {
     final int healthCheckInterval = 200; // milliseconds
     final int heartbeatInterval = 1; // seconds
     final int staleNodeInterval = 3; // seconds
@@ -830,14 +828,11 @@ public class TestSCMNodeManager {
       schedFuture = nodeManager.unpauseHealthCheck();
 
       // Step 3 : wait for 1 iteration of health check
-      try {
-        schedFuture.get();
-        assertThat(nodeManager.getSkippedHealthChecks())
-            .withFailMessage("We did not skip any heartbeat checks")
-            .isGreaterThan(0);
-      } catch (ExecutionException e) {
-        fail("Unexpected exception waiting for Scheduled Health Check");
-      }
+
+      schedFuture.get();
+      assertThat(nodeManager.getSkippedHealthChecks())
+          .withFailMessage("We did not skip any heartbeat checks")
+          .isGreaterThan(0);
 
       // Step 4 : all nodes should still be HEALTHY
       assertEquals(2, nodeManager.getAllNodes().size());

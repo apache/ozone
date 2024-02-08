@@ -37,7 +37,9 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.File;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -72,9 +74,9 @@ public class TestSCMCommonPlacementPolicy {
   private OzoneConfiguration conf;
 
   @BeforeEach
-  public void setup() {
+  void setup(@TempDir File testDir) {
     nodeManager = new MockNodeManager(true, 10);
-    conf = SCMTestUtils.getConf();
+    conf = SCMTestUtils.getConf(testDir);
   }
 
   @Test

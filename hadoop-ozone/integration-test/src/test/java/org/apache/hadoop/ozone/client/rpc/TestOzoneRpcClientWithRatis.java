@@ -48,7 +48,6 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
@@ -135,8 +134,6 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
       byte[] b = new byte[value.getBytes(UTF_8).length];
       is.read(b);
       assertArrayEquals(b, value.getBytes(UTF_8));
-    } catch (OzoneChecksumException e) {
-      fail("Read key should succeed");
     }
 
     // read file with topology aware read enabled
@@ -144,8 +141,6 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
       byte[] b = new byte[value.getBytes(UTF_8).length];
       is.read(b);
       assertArrayEquals(b, value.getBytes(UTF_8));
-    } catch (OzoneChecksumException e) {
-      fail("Read file should succeed");
     }
 
     // read key with topology aware read disabled
@@ -159,8 +154,6 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
         byte[] b = new byte[value.getBytes(UTF_8).length];
         is.read(b);
         assertArrayEquals(b, value.getBytes(UTF_8));
-      } catch (OzoneChecksumException e) {
-        fail("Read key should succeed");
       }
 
       // read file with topology aware read disabled
@@ -168,8 +161,6 @@ public class TestOzoneRpcClientWithRatis extends TestOzoneRpcClientAbstract {
         byte[] b = new byte[value.getBytes(UTF_8).length];
         is.read(b);
         assertArrayEquals(b, value.getBytes(UTF_8));
-      } catch (OzoneChecksumException e) {
-        fail("Read file should succeed");
       }
     }
   }

@@ -31,7 +31,7 @@ import org.apache.hadoop.util.ToolRunner;
 @InterfaceAudience.Private
 public class OzoneFsShell extends FsShell {
 
-  private final String ozoneUsagePrefix = "Usage: ozone fs [generic options]";
+  private static final String OZONE_USAGE_PREFIX = "Usage: ozone fs [generic options]";
 
   /**
    * Default ctor with no configuration.  Be sure to invoke
@@ -66,7 +66,7 @@ public class OzoneFsShell extends FsShell {
 
   @Override
   protected String getUsagePrefix() {
-    return ozoneUsagePrefix;
+    return OZONE_USAGE_PREFIX;
   }
 
   /**
