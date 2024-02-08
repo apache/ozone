@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -81,11 +82,11 @@ public class TestOMDBUpdatesHandler {
   @BeforeEach
   public void setUp() throws Exception {
     OzoneConfiguration configuration = createNewTestPath("config");
-    omMetadataManager = new OmMetadataManagerImpl(configuration, null);
+    omMetadataManager = new OmMetadataManagerImpl(configuration, null, new OMPerformanceMetrics());
 
     OzoneConfiguration reconConfiguration = createNewTestPath("reconConfig");
     reconOmMetadataManager = new OmMetadataManagerImpl(reconConfiguration,
-        null);
+        null, new OMPerformanceMetrics());
   }
 
   @Test

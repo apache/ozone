@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -79,7 +80,7 @@ public final class OMMetadataManagerTestUtils {
     omConfiguration.set(OZONE_OM_DB_DIRS,
         omDbDir.getAbsolutePath());
     OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(
-        omConfiguration, null);
+        omConfiguration, null, new OMPerformanceMetrics());
 
     String volumeKey = omMetadataManager.getVolumeKey("sampleVol");
     OmVolumeArgs args =
@@ -113,7 +114,7 @@ public final class OMMetadataManagerTestUtils {
     OzoneConfiguration omConfiguration = new OzoneConfiguration();
     omConfiguration.set(OZONE_OM_DB_DIRS,
         omDbDir.getAbsolutePath());
-    return new OmMetadataManagerImpl(omConfiguration, null);
+    return new OmMetadataManagerImpl(omConfiguration, null, new OMPerformanceMetrics());
   }
 
   /**

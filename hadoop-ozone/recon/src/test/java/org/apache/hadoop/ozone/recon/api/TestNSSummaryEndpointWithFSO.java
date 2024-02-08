@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -838,7 +839,7 @@ public class TestNSSummaryEndpointWithFSO {
     omConfiguration.set(OZONE_OM_DB_DIRS,
             omDbDir.getAbsolutePath());
     OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(
-            omConfiguration, null);
+            omConfiguration, null, new OMPerformanceMetrics());
 
     String volumeKey = omMetadataManager.getVolumeKey(VOL);
     OmVolumeArgs args =
