@@ -89,6 +89,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
@@ -4683,7 +4684,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public OmKeyInfo recoverLease(String volumeName, String bucketName, String keyName, boolean force) {
+  public LeaseKeyInfo recoverLease(String volumeName, String bucketName, String keyName, boolean force) {
     return null;
   }
 

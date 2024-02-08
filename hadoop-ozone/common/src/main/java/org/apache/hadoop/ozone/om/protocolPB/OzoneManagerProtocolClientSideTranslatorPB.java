@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
+import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -2476,7 +2477,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public OmKeyInfo recoverLease(String volumeName, String bucketName, String keyName, boolean force)
+  public LeaseKeyInfo recoverLease(String volumeName, String bucketName, String keyName, boolean force)
       throws IOException {
     RecoverLeaseRequest recoverLeaseRequest =
         RecoverLeaseRequest.newBuilder()
@@ -2492,7 +2493,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     RecoverLeaseResponse recoverLeaseResponse =
         handleError(submitRequest(omRequest)).getRecoverLeaseResponse();
 
-    return OmKeyInfo.getFromProtobuf(recoverLeaseResponse.getKeyInfo());
+    return new LeaseKeyInfo(OmKeyInfo.getFromProtobuf(recoverLeaseResponse.getKeyInfo()),
+        recoverLeaseResponse.getIsKeyInfo());
   }
 
   @Override
