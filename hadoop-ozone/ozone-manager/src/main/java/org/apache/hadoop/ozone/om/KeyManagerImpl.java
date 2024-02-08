@@ -614,10 +614,14 @@ public class KeyManagerImpl implements KeyManager {
     // underlying table using an iterator. That automatically creates a
     // snapshot of the data, so we don't need these locks at a higher level
     // when we iterate.
-    startKey = OMClientRequest
-        .validateAndNormalizeKey(enableFileSystemPaths, startKey, omBucketInfo.getBucketLayout());
-    keyPrefix = OMClientRequest
-        .validateAndNormalizeKey(enableFileSystemPaths, keyPrefix, omBucketInfo.getBucketLayout());
+    if (!startKey.isEmpty()) {
+      startKey = OMClientRequest
+          .validateAndNormalizeKey(enableFileSystemPaths, startKey, omBucketInfo.getBucketLayout());
+    }
+    if (!keyPrefix.isEmpty()) {
+      keyPrefix = OMClientRequest
+          .validateAndNormalizeKey(enableFileSystemPaths, keyPrefix, omBucketInfo.getBucketLayout());
+    }
 
     ListKeysResult listKeysResult =
         metadataManager.listKeys(volumeName, bucketName, startKey, keyPrefix,
