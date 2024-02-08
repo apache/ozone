@@ -78,7 +78,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(OrderAnnotation.class)
 public class TestSstFilteringService {
-  public static final String SST_FILE_EXTENSION = ".sst";;
+  private static final String SST_FILE_EXTENSION = ".sst";;
   private OzoneManagerProtocol writeClient;
   private OzoneManager om;
   private OzoneConfiguration conf;
@@ -313,7 +313,7 @@ public class TestSstFilteringService {
     assertEquals(snap1SstFileCountBeforeFilter, snap1SstFileCountAfterFilter);
     // If method with order 1 is run .sst file from /vol1/buck1 and /vol1/buck2 will be deleted.
     // As part of this method .sst file from /volume1/bucket2/ will be deleted.
-    // sstFiltering won't run on deleted snapshots /volume1/bucket1.
+    // sstFiltering won't run on deleted snapshots in /volume1/bucket1.
     assertThat(snap2SstFileCountBeforeFilter).isGreaterThan(snap2SstFileCountAfterFilter);
   }
 
