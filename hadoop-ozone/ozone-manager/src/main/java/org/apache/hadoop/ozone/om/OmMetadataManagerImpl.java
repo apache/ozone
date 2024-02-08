@@ -1214,11 +1214,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           ResultCodes.BUCKET_NOT_FOUND);
     }
 
-    String bucketNameBytes = getBucketKey(volumeName, bucketName);
-    if (getBucketTable().get(bucketNameBytes) == null) {
-      throw new OMException("Bucket " + bucketName + " not found.",
-          ResultCodes.BUCKET_NOT_FOUND);
-    }
+    validateBucket(volumeName, bucketName);
 
     String seekKey;
     boolean skipStartKey = false;
@@ -1319,6 +1315,17 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     cacheKeyMap.clear();
 
     return new ListKeysResult(result, isTruncated);
+  }
+
+  @Override
+  public OmBucketInfo validateBucket(String volumeName, String bucketName) throws IOException {
+    String bucketNameBytes = getBucketKey(volumeName, bucketName);
+    OmBucketInfo omBucketInfo = getBucketTable().get(bucketNameBytes);
+    if (omBucketInfo == null) {
+      throw new OMException("Bucket " + bucketName + " not found.",
+          ResultCodes.BUCKET_NOT_FOUND);
+    }
+    return omBucketInfo;
   }
 
   // TODO: HDDS-2419 - Complete stub below for core logic
