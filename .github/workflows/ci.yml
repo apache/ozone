@@ -440,6 +440,7 @@ jobs:
           - om
           - ozone
           - shell
+          - snapshot
           - flaky
       fail-fast: false
     steps:
