@@ -615,7 +615,6 @@ public class KeyManagerImpl implements KeyManager {
     // underlying table using an iterator. That automatically creates a
     // snapshot of the data, so we don't need these locks at a higher level
     // when we iterate.
-
     startKey = OMClientRequest
         .validateAndNormalizeKey(enableFileSystemPaths, startKey, omBucketInfo.getBucketLayout());
     keyPrefix = OMClientRequest
