@@ -126,7 +126,7 @@ public class TestScmSafeMode {
   }
 
   @Test
-  public void testSafeModeOperations() throws Exception {
+  void testSafeModeOperations() throws Exception {
     // Create {numKeys} random names keys.
     TestStorageContainerManagerHelper helper =
         new TestStorageContainerManagerHelper(cluster, conf);
@@ -148,12 +148,7 @@ public class TestScmSafeMode {
 
     cluster.stop();
 
-    try {
-      cluster = builder.build();
-    } catch (IOException e) {
-      fail("failed");
-    }
-
+    cluster = builder.build();
 
     StorageContainerManager scm;
 
@@ -179,17 +174,13 @@ public class TestScmSafeMode {
    * Tests inSafeMode & forceExitSafeMode api calls.
    */
   @Test
-  public void testIsScmInSafeModeAndForceExit() throws Exception {
+  void testIsScmInSafeModeAndForceExit() throws Exception {
     // Test 1: SCM should be out of safe mode.
     assertFalse(storageContainerLocationClient.inSafeMode());
     cluster.stop();
     // Restart the cluster with same metadata dir.
 
-    try {
-      cluster = builder.build();
-    } catch (IOException e) {
-      fail("Cluster startup failed.");
-    }
+    cluster = builder.build();
 
     // Test 2: Scm should be in safe mode as datanodes are not started yet.
     storageContainerLocationClient = cluster
@@ -212,15 +203,12 @@ public class TestScmSafeMode {
   }
 
   @Test
-  public void testSCMSafeMode() throws Exception {
+  void testSCMSafeMode() throws Exception {
     // Test1: Test safe mode  when there are no containers in system.
     cluster.stop();
 
-    try {
-      cluster = builder.build();
-    } catch (IOException e) {
-      fail("Cluster startup failed.");
-    }
+    cluster = builder.build();
+
     assertTrue(cluster.getStorageContainerManager().isInSafeMode());
     cluster.startHddsDatanodes();
     cluster.waitForClusterToBeReady();
@@ -259,11 +247,7 @@ public class TestScmSafeMode {
         .captureLogs(SCMSafeModeManager.getLogger());
     logCapturer.clearOutput();
 
-    try {
-      cluster = builder.build();
-    } catch (IOException ex) {
-      fail("failed");
-    }
+    cluster = builder.build();
 
     StorageContainerManager scm;
 

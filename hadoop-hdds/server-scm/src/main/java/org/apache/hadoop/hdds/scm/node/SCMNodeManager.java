@@ -272,7 +272,7 @@ public class SCMNodeManager implements NodeManager {
    * Returns the Number of Datanodes by State they are in. Passing null for
    * either of the states acts like a wildcard for that state.
    *
-   * @parem nodeOpState - The Operational State of the node
+   * @param nodeOpState - The Operational State of the node
    * @param health - The health of the node
    * @return count
    */

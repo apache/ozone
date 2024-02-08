@@ -32,9 +32,11 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
@@ -59,11 +61,11 @@ import static org.mockito.Mockito.any;
 public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
 
   @BeforeEach
-  public void setup() throws NodeNotFoundException,
+  void setup(@TempDir File testDir) throws NodeNotFoundException,
       CommandTargetOverloadedException, NotLeaderException {
     RatisReplicationConfig repConfig = RatisReplicationConfig
             .getInstance(ReplicationFactor.THREE);
-    setup(repConfig);
+    setup(repConfig, testDir);
   }
 
   @ParameterizedTest

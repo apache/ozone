@@ -85,7 +85,7 @@ public class TestDiscardPreallocatedBlocks {
     chunkSize = (int) OzoneConsts.MB;
     blockSize = 4 * chunkSize;
 
-    OzoneClientConfig config = new OzoneClientConfig();
+    OzoneClientConfig config = conf.getObject(OzoneClientConfig.class);
     config.setChecksumType(ChecksumType.NONE);
     conf.setFromObject(config);
 

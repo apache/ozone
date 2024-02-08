@@ -19,16 +19,21 @@
 
 package org.apache.hadoop.ozone.om.request.bucket;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+
+import java.util.ArrayList;
 import java.util.UUID;
 
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.junit.jupiter.api.Test;
@@ -119,12 +124,10 @@ public class TestOMBucketDeleteRequest extends TestBucketRequest {
         new OMBucketDeleteRequest(omRequest);
 
     // Create a MPU key in the MPU table to simulate incomplete MPU
-    long creationTime = Time.now();
     String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
-    final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
-        bucketName, UUID.randomUUID().toString(),
-        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE,
-        0L, creationTime, true);
+    final OmKeyInfo keyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, UUID.randomUUID().toString(),
+            RatisReplicationConfig.getInstance(ONE), new OmKeyLocationInfoGroup(0L, new ArrayList<>(), true))
+        .build();
     final OmMultipartKeyInfo multipartKeyInfo = OMRequestTestUtils.
         createOmMultipartKeyInfo(uploadId, Time.now(),
             HddsProtos.ReplicationType.RATIS,
