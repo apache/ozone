@@ -16,9 +16,12 @@
  */
 package org.apache.hadoop.ozone.container.diskbalancer;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.storage.DiskBalancerConfiguration;
 
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * DiskBalancer's information to persist.
@@ -64,6 +67,18 @@ public class DiskBalancerInfo {
     if (parallelThread != diskBalancerConf.getParallelThread()) {
       setParallelThread(diskBalancerConf.getParallelThread());
     }
+  }
+
+  public StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto toDiskBalancerReportProto() {
+    DiskBalancerConfiguration conf = new DiskBalancerConfiguration(Optional.of(threshold),
+        Optional.of(bandwidthInMB), Optional.of(parallelThread));
+    HddsProtos.DiskBalancerConfigurationProto confProto = conf.toProtobufBuilder().build();
+
+    StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto.Builder builder =
+        StorageContainerDatanodeProtocolProtos.DiskBalancerReportProto.newBuilder();
+    builder.setIsRunning(shouldRun);
+    builder.setDiskBalancerConf(confProto);
+    return builder.build();
   }
 
   public boolean isShouldRun() {
