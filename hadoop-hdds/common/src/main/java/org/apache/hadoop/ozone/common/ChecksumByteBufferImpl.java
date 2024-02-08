@@ -75,6 +75,17 @@ public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
   //        should be refactored to simply call checksum.update(buffer), as the
   //        Checksum interface has been enhanced to allow this since Java 9.
   public void update(ByteBuffer buffer) {
+    // Prefer JDK9+ implementation that allows ByteBuffer. This allows DirectByteBuffer to be checksum directly in
+    // native memory.
+    if (BYTE_BUFFER_UPDATE != null) {
+      try {
+        BYTE_BUFFER_UPDATE.invokeExact(checksum, buffer);
+        return;
+      } catch (Throwable e) {
+        throw new IllegalStateException("Error invoking " + BYTE_BUFFER_UPDATE,  e);
+      }
+    }
+
     // this is a hack to not do memory copy.
     if (IS_READY_ONLY_FIELD != null) {
       try {
@@ -87,15 +98,7 @@ public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
     if (buffer.hasArray()) {
       checksum.update(buffer.array(), buffer.position() + buffer.arrayOffset(),
           buffer.remaining());
-    } else if (BYTE_BUFFER_UPDATE != null && buffer.isDirect()) {
-      // fast path for direct buffer.
-      try {
-        BYTE_BUFFER_UPDATE.invokeExact(checksum, buffer);
-      } catch (Throwable e) {
-        throw new IllegalStateException("Error invoking " + BYTE_BUFFER_UPDATE,  e);
-      }
     } else {
-      // slow path for direct buffer
       byte[] b = new byte[buffer.remaining()];
       buffer.get(b);
       checksum.update(b, 0, b.length);
