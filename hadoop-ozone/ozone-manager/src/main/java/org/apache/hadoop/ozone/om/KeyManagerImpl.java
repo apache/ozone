@@ -609,13 +609,14 @@ public class KeyManagerImpl implements KeyManager {
       int maxKeys) throws IOException {
     Preconditions.checkNotNull(volumeName);
     Preconditions.checkNotNull(bucketName);
+    OmBucketInfo omBucketInfo = metadataManager.validateBucket(volumeName, bucketName);
 
     // We don't take a lock in this path, since we walk the
     // underlying table using an iterator. That automatically creates a
     // snapshot of the data, so we don't need these locks at a higher level
     // when we iterate.
 
-    if (enableFileSystemPaths) {
+    if (enableFileSystemPaths && omBucketInfo.getBucketLayout() == BucketLayout.LEGACY) {
       startKey = OmUtils.normalizeKey(startKey, true);
       keyPrefix = OmUtils.normalizeKey(keyPrefix, true);
     }
