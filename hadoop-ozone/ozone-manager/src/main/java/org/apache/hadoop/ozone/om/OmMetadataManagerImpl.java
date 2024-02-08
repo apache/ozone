@@ -1290,7 +1290,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     }
 
     // Get maxKeys from DB if it has.
-
+    long startNano = Time.monotonicNowNanos();
     try (TableIterator<String, ? extends KeyValue<String, OmKeyInfo>>
              keyIter = getKeyTable(getBucketLayout()).iterator()) {
       KeyValue< String, OmKeyInfo > kv;
@@ -1316,6 +1316,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         }
       }
     }
+    perfMetrics.addListKeysReadFromRocksDbLatencyNs(Time.monotonicNowNanos() - startNano);
     boolean isTruncated = cacheKeyMap.size() > maxKeys;
     if (perfMetrics != null) {
       long averagePagination;

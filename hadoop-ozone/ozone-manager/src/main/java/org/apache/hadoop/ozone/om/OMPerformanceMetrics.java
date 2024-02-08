@@ -125,6 +125,9 @@ public class OMPerformanceMetrics {
   @Metric(about = "resolveBucketLink latency in listKeys")
   private MutableRate listKeysResolveBucketLatencyNs;
 
+  @Metric(about = "readFromRockDb latency in listKeys")
+  private MutableRate listKeysReadFromRocksDbLatencyNs;
+
   public void addLookupLatency(long latencyInNs) {
     lookupLatencyNs.add(latencyInNs);
   }
@@ -236,5 +239,9 @@ public class OMPerformanceMetrics {
 
   public MutableRate getListKeysResolveBucketLatencyNs() {
     return listKeysResolveBucketLatencyNs;
+  }
+
+  public void addListKeysReadFromRocksDbLatencyNs(long latencyInNs) {
+    listKeysReadFromRocksDbLatencyNs.add(latencyInNs);
   }
 }
