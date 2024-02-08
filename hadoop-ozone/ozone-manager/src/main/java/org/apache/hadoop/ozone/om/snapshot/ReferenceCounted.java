@@ -48,7 +48,13 @@ public class ReferenceCounted<T>
    */
   private final Object refCountLock = new Object();
 
-  public ReferenceCounted(T obj, boolean disableCounter) {
+  /**
+   * Parent instance whose callback will be triggered upon this RC closure.
+   */
+  private final Object parentWithCallback;
+
+  public ReferenceCounted(T obj, boolean disableCounter,
+      Object parentWithCallback) {
     // A param to allow disabling ref counting to reduce active DB
     //  access penalties due to AtomicLong operations.
     this.obj = obj;
@@ -59,6 +65,7 @@ public class ReferenceCounted<T>
       this.threadMap = new ConcurrentHashMap<>();
       this.refCount = new AtomicLong(0L);
     }
+    this.parentWithCallback = parentWithCallback;
   }
 
   /**

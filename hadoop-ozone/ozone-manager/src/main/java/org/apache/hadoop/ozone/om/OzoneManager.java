@@ -847,7 +847,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         this, LOG, AUDIT, metrics, accessAuthorizer);
     // Active DB's OmMetadataReader instance does not need to be reference
     // counted, but it still needs to be wrapped to be consistent.
-    rcOmMetadataReader = new ReferenceCounted<>(omMetadataReader, true);
+    rcOmMetadataReader = new ReferenceCounted<>(omMetadataReader, true, null);
 
     // Reload snapshot feature config flag
     fsSnapshotEnabled = configuration.getBoolean(

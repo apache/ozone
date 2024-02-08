@@ -139,7 +139,7 @@ public class SnapshotCache {
           if (v == null) {
             LOG.info("Loading snapshot. Table key: {}", k);
             try {
-              v = new ReferenceCounted<>(cacheLoader.load(k), false);
+              v = new ReferenceCounted<>(cacheLoader.load(k), false, this);
             } catch (OMException omEx) {
               // Return null if the snapshot is no longer active
               if (!omEx.getResult().equals(FILE_NOT_FOUND)) {
