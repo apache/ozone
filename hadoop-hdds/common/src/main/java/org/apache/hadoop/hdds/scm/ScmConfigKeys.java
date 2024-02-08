@@ -122,7 +122,7 @@ public final class ScmConfigKeys {
       TimeDuration.valueOf(600000, TimeUnit.MILLISECONDS);
   public static final String
       OZONE_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY =
-      "ozone.ratis.leader.election.minimum.timeout.duration ";
+      "ozone.ratis.leader.election.minimum.timeout.duration";
   public static final TimeDuration
       DFS_RATIS_LEADER_ELECTION_MINIMUM_TIMEOUT_DURATION_DEFAULT =
       TimeDuration.valueOf(5, TimeUnit.SECONDS);

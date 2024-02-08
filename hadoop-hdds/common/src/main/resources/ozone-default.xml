@@ -342,7 +342,7 @@
     <description>Retry Cache entry timeout for ratis server.</description>
   </property>
   <property>
-    <name>ozone.ratis.leader.election.minimum.timeout.duration </name>
+    <name>ozone.ratis.leader.election.minimum.timeout.duration</name>
     <value>5s</value>
     <tag>OZONE, RATIS, MANAGEMENT</tag>
     <description>The minimum timeout duration for ratis leader election.
