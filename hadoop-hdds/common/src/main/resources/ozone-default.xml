@@ -53,19 +53,19 @@
   </property>
 
   <property>
-    <name>dfs.container.ratis.datastream.enabled</name>
+    <name>ozone.container.ratis.datastream.enabled</name>
     <value>false</value>
     <tag>OZONE, CONTAINER, RATIS, DATASTREAM</tag>
     <description>It specifies whether to enable data stream of container.</description>
   </property>
   <property>
-    <name>dfs.container.ratis.datastream.port</name>
+    <name>ozone.container.ratis.datastream.port</name>
     <value>9855</value>
     <tag>OZONE, CONTAINER, RATIS, DATASTREAM</tag>
     <description>The datastream port number of container.</description>
   </property>
   <property>
-    <name>dfs.container.ratis.datastream.random.port</name>
+    <name>ozone.container.ratis.datastream.random.port</name>
     <value>false</value>
     <tag>OZONE, CONTAINER, RATIS, DATASTREAM</tag>
     <description>Allocates a random free port for ozone container datastream.
@@ -82,7 +82,7 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.chunk.write.sync</name>
+    <name>ozone.container.chunk.write.sync</name>
     <value>false</value>
     <tag>OZONE, CONTAINER, MANAGEMENT</tag>
     <description>Determines whether the chunk writes in the container happen as
@@ -97,7 +97,7 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.statemachinedata.sync.retries</name>
+    <name>ozone.container.ratis.statemachinedata.sync.retries</name>
     <value/>
     <tag>OZONE, DEBUG, CONTAINER, RATIS</tag>
     <description>Number of times the WriteStateMachineData op will be tried
@@ -112,21 +112,21 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.log.queue.num-elements</name>
+    <name>ozone.container.ratis.log.queue.num-elements</name>
     <value>1024</value>
     <tag>OZONE, DEBUG, CONTAINER, RATIS</tag>
     <description>Limit for the number of operations in Ratis Log Worker.
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.log.queue.byte-limit</name>
+    <name>ozone.container.ratis.log.queue.byte-limit</name>
     <value>4GB</value>
     <tag>OZONE, DEBUG, CONTAINER, RATIS</tag>
     <description>Byte limit for Ratis Log Worker queue.
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.log.appender.queue.num-elements</name>
+    <name>ozone.container.ratis.log.appender.queue.num-elements</name>
     <value>1</value>
     <tag>OZONE, DEBUG, CONTAINER, RATIS</tag>
     <description>Limit for number of append entries in ratis leader's
@@ -134,14 +134,14 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.log.appender.queue.byte-limit</name>
+    <name>ozone.container.ratis.log.appender.queue.byte-limit</name>
     <value>32MB</value>
     <tag>OZONE, DEBUG, CONTAINER, RATIS</tag>
     <description>Byte limit for ratis leader's log appender queue.
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.log.purge.gap</name>
+    <name>ozone.container.ratis.log.purge.gap</name>
     <value>1000000</value>
     <tag>OZONE, DEBUG, CONTAINER, RATIS</tag>
     <description>Purge gap between the last purged commit index
@@ -238,13 +238,13 @@
     <description>The ipc port number of container for clients.</description>
   </property>
   <property>
-    <name>dfs.container.ratis.admin.port</name>
+    <name>ozone.container.ratis.admin.port</name>
     <value>9857</value>
     <tag>OZONE, CONTAINER, PIPELINE, RATIS, MANAGEMENT</tag>
     <description>The ipc port number of container for admin requests.</description>
   </property>
   <property>
-    <name>dfs.container.ratis.server.port</name>
+    <name>ozone.container.ratis.server.port</name>
     <value>9856</value>
     <tag>OZONE, CONTAINER, PIPELINE, RATIS, MANAGEMENT</tag>
     <description>The ipc port number of container for server-server communication.</description>
@@ -276,7 +276,7 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.statemachine.max.pending.apply-transactions</name>
+    <name>ozone.container.ratis.statemachine.max.pending.apply-transactions</name>
     <value>10000</value>
     <tag>OZONE, RATIS</tag>
     <description>Maximum number of pending apply transactions in a data
@@ -285,7 +285,7 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.num.write.chunk.threads.per.volume</name>
+    <name>ozone.container.ratis.num.write.chunk.threads.per.volume</name>
     <value>10</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
     <description>Maximum number of threads in the thread pool that Datanode
@@ -295,7 +295,7 @@
     </description>
   </property>
   <property>
-    <name>dfs.container.ratis.leader.pending.bytes.limit</name>
+    <name>ozone.container.ratis.leader.pending.bytes.limit</name>
     <value>1GB</value>
     <tag>OZONE, RATIS, PERFORMANCE</tag>
     <description>Limit on the total bytes of pending requests after which
@@ -336,7 +336,7 @@
     </description>
   </property>
   <property>
-    <name>dfs.ratis.server.retry-cache.timeout.duration</name>
+    <name>ozone.ratis.server.retry-cache.timeout.duration</name>
     <value>600000ms</value>
     <tag>OZONE, RATIS, MANAGEMENT</tag>
     <description>Retry Cache entry timeout for ratis server.</description>

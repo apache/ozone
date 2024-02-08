@@ -37,7 +37,7 @@
   </property>
 
   <property>
-    <name>dfs.container.ratis.num.write.chunk.threads.per.volume</name>
+    <name>ozone.container.ratis.num.write.chunk.threads.per.volume</name>
     <value>4</value>
   </property>
 
@@ -52,7 +52,7 @@
   </property>
 
   <property>
-    <name>dfs.container.ratis.datastream.enabled</name>
+    <name>ozone.container.ratis.datastream.enabled</name>
     <value>true</value>
   </property>
 
@@ -67,7 +67,7 @@
   </property>
 
   <property>
-    <name>dfs.container.ratis.log.appender.queue.byte-limit</name>
+    <name>ozone.container.ratis.log.appender.queue.byte-limit</name>
     <value>8MB</value>
   </property>
   <property>

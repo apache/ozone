@@ -65,13 +65,13 @@ public final class OzoneConfigKeys {
       false;
 
   public static final String DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT =
-      "dfs.container.ratis.datastream.random.port";
+      "ozone.container.ratis.datastream.random.port";
   public static final boolean
       DFS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT_DEFAULT =
       false;
 
   public static final String DFS_CONTAINER_CHUNK_WRITE_SYNC_KEY =
-      "dfs.container.chunk.write.sync";
+      "ozone.container.chunk.write.sync";
   public static final boolean DFS_CONTAINER_CHUNK_WRITE_SYNC_DEFAULT = false;
   /**
    * Ratis Port where containers listen to.
@@ -83,24 +83,24 @@ public final class OzoneConfigKeys {
    * Ratis Port where containers listen to admin requests.
    */
   public static final String DFS_CONTAINER_RATIS_ADMIN_PORT =
-      "dfs.container.ratis.admin.port";
+      "ozone.container.ratis.admin.port";
   public static final int DFS_CONTAINER_RATIS_ADMIN_PORT_DEFAULT = 9857;
   /**
    * Ratis Port where containers listen to server-to-server requests.
    */
   public static final String DFS_CONTAINER_RATIS_SERVER_PORT =
-      "dfs.container.ratis.server.port";
+      "ozone.container.ratis.server.port";
   public static final int DFS_CONTAINER_RATIS_SERVER_PORT_DEFAULT = 9856;
 
   /**
    * Ratis Port where containers listen to datastream requests.
    */
   public static final String DFS_CONTAINER_RATIS_DATASTREAM_ENABLED
-      = "dfs.container.ratis.datastream.enabled";
+      = "ozone.container.ratis.datastream.enabled";
   public static final boolean DFS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT
       = false;
   public static final String DFS_CONTAINER_RATIS_DATASTREAM_PORT
-      = "dfs.container.ratis.datastream.port";
+      = "ozone.container.ratis.datastream.port";
   public static final int DFS_CONTAINER_RATIS_DATASTREAM_PORT_DEFAULT
       = 9855;
 
