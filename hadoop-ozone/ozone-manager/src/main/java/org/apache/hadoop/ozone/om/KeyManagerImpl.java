@@ -56,6 +56,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -120,6 +121,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT;
@@ -609,19 +611,19 @@ public class KeyManagerImpl implements KeyManager {
     Preconditions.checkNotNull(volumeName);
     Preconditions.checkNotNull(bucketName);
     OmBucketInfo omBucketInfo = metadataManager.validateBucket(volumeName, bucketName);
-
+    BucketLayout bucketLayout = omBucketInfo.getBucketLayout();
     // We don't take a lock in this path, since we walk the
     // underlying table using an iterator. That automatically creates a
     // snapshot of the data, so we don't need these locks at a higher level
     // when we iterate.
-    if (!startKey.isEmpty()) {
-      startKey = OMClientRequest
-          .validateAndNormalizeKey(enableFileSystemPaths, startKey, omBucketInfo.getBucketLayout());
+    if (bucketLayout.shouldNormalizePaths(enableFileSystemPaths)) {
+      startKey = OmUtils.normalizeKey(startKey, true);
+      keyPrefix = OmUtils.normalizeKey(keyPrefix, true);
     }
-    if (!keyPrefix.isEmpty()) {
-      keyPrefix = OMClientRequest
-          .validateAndNormalizeKey(enableFileSystemPaths, keyPrefix, omBucketInfo.getBucketLayout());
-    }
+    /*startKey = OMClientRequest
+        .validateAndNormalizeKey(enableFileSystemPaths, startKey, bucketLayout);
+    keyPrefix = OMClientRequest
+        .validateAndNormalizeKey(enableFileSystemPaths, keyPrefix, bucketLayout);*/
 
     ListKeysResult listKeysResult =
         metadataManager.listKeys(volumeName, bucketName, startKey, keyPrefix,
