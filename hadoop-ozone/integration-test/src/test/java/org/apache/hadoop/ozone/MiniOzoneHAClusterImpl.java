@@ -337,12 +337,12 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   public static class Builder extends MiniOzoneClusterImpl.Builder {
 
     private static final String OM_NODE_ID_PREFIX = "omNode-";
-    private List<OzoneManager> activeOMs = new ArrayList<>();
-    private List<OzoneManager> inactiveOMs = new ArrayList<>();
+    private final List<OzoneManager> activeOMs = new ArrayList<>();
+    private final List<OzoneManager> inactiveOMs = new ArrayList<>();
 
     private static final String SCM_NODE_ID_PREFIX = "scmNode-";
-    private List<StorageContainerManager> activeSCMs = new ArrayList<>();
-    private List<StorageContainerManager> inactiveSCMs = new ArrayList<>();
+    private final List<StorageContainerManager> activeSCMs = new ArrayList<>();
+    private final List<StorageContainerManager> inactiveSCMs = new ArrayList<>();
 
     /**
      * Creates a new Builder.
@@ -847,17 +847,17 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    * @param <Type>
    */
   static class MiniOzoneHAService<Type> {
-    private Map<String, Type> serviceMap;
-    private List<Type> services;
-    private String serviceId;
-    private String serviceName;
+    private final Map<String, Type> serviceMap;
+    private final List<Type> services;
+    private final String serviceId;
+    private final String serviceName;
 
     // Active services s denote OM/SCM services which are up and running
-    private List<Type> activeServices;
-    private List<Type> inactiveServices;
+    private final List<Type> activeServices;
+    private final List<Type> inactiveServices;
 
     // Function to extract the Id from service
-    private Function<Type, String> serviceIdProvider;
+    private final Function<Type, String> serviceIdProvider;
 
     MiniOzoneHAService(String name, List<Type> activeList,
         List<Type> inactiveList, String serviceId,
@@ -983,8 +983,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   private static final class ExitManagerForOM extends ExitManager {
 
-    private MiniOzoneHAClusterImpl cluster;
-    private String omNodeId;
+    private final MiniOzoneHAClusterImpl cluster;
+    private final String omNodeId;
 
     private ExitManagerForOM(MiniOzoneHAClusterImpl cluster, String nodeId) {
       this.cluster = cluster;
