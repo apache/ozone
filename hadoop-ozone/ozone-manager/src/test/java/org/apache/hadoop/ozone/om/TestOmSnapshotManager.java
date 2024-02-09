@@ -65,7 +65,6 @@ import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.getINode;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.truncateFileName;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.timeout;
@@ -177,9 +176,9 @@ public class TestOmSnapshotManager {
 
     // retrieve it and setup store mock
     OmSnapshotManager omSnapshotManager = om.getOmSnapshotManager();
-    OmSnapshot firstSnapshot = (OmSnapshot) omSnapshotManager
-        .checkForSnapshot(first.getVolumeName(),
-        first.getBucketName(), getSnapshotPrefix(first.getName()), false).get();
+    OmSnapshot firstSnapshot = omSnapshotManager
+        .getActiveSnapshot(first.getVolumeName(), first.getBucketName(), first.getName())
+        .get();
     DBStore firstSnapshotStore = mock(DBStore.class);
     HddsWhiteboxTestUtils.setInternalState(
         firstSnapshot.getMetadataManager(), "store", firstSnapshotStore);
@@ -193,13 +192,12 @@ public class TestOmSnapshotManager {
 
     // read in second snapshot to evict first
     omSnapshotManager
-        .checkForSnapshot(second.getVolumeName(),
-        second.getBucketName(), getSnapshotPrefix(second.getName()), false);
+        .getActiveSnapshot(second.getVolumeName(), second.getBucketName(), second.getName());
 
     // As a workaround, invalidate all cache entries in order to trigger
     // instances close in this test case, since JVM GC most likely would not
     // have triggered and closed the instances yet at this point.
-    omSnapshotManager.getSnapshotCache().invalidateAll();
+    omSnapshotManager.invalidateCache();
 
     // confirm store was closed
     verify(firstSnapshotStore, timeout(3000).times(1)).close();

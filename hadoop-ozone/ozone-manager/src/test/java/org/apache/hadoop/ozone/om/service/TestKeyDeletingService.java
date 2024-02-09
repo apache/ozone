@@ -36,7 +36,6 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -52,7 +51,6 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.io.TempDir;
@@ -79,7 +77,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPrefix;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import org.junit.jupiter.api.AfterEach;
@@ -546,10 +543,9 @@ t
 
     keyDeletingService.resume();
 
-    try (ReferenceCounted<IOmMetadataReader, SnapshotCache> rcOmSnapshot =
-        om.getOmSnapshotManager().checkForSnapshot(
-            volumeName, bucketName, getSnapshotPrefix("snap3"), true)) {
-      OmSnapshot snap3 = (OmSnapshot) rcOmSnapshot.get();
+    try (ReferenceCounted<OmSnapshot> rcOmSnapshot =
+        om.getOmSnapshotManager().getSnapshot(volumeName, bucketName, "snap3", true)) {
+      OmSnapshot snap3 = rcOmSnapshot.get();
 
       Table<String, RepeatedOmKeyInfo> snap3deletedTable =
           snap3.getMetadataManager().getDeletedTable();

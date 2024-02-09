@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -108,8 +107,6 @@ public class TestOMSnapshotDeleteRequest {
     Mockito.doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
 
     OmSnapshotManager omSnapshotManager = mock(OmSnapshotManager.class);
-    when(omSnapshotManager.getSnapshotCache())
-        .thenReturn(mock(SnapshotCache.class));
     when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
 
     volumeName = UUID.randomUUID().toString();

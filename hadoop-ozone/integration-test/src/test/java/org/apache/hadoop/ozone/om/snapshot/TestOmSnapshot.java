@@ -2052,7 +2052,7 @@ public abstract class TestOmSnapshot {
     String snapPrefix = createSnapshot(volumeName, bucketName);
     try (RDBStore snapshotDBStore = (RDBStore)
         ((OmSnapshot) cluster.getOzoneManager().getOmSnapshotManager()
-            .checkForSnapshot(volumeName, bucketName, snapPrefix, false).get())
+            .getActiveFsMetadataOrSnapshot(volumeName, bucketName, snapPrefix).get())
             .getMetadataManager().getStore()) {
       for (String table : snapshotDBStore.getTableNames().values()) {
         assertTrue(snapshotDBStore.getDb().getColumnFamily(table)
@@ -2182,7 +2182,7 @@ public abstract class TestOmSnapshot {
 
     OmSnapshot omSnapshot = (OmSnapshot) cluster.getOzoneManager()
         .getOmSnapshotManager()
-        .checkForSnapshot(volumeName, bucketName, snapshotName, false).get();
+        .getActiveFsMetadataOrSnapshot(volumeName, bucketName, snapshotName).get();
 
     RDBStore snapshotDbStore =
         (RDBStore) omSnapshot.getMetadataManager().getStore();
