@@ -36,6 +36,9 @@ import org.apache.ratis.server.raftlog.RaftLog;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
@@ -43,15 +46,23 @@ import org.slf4j.event.Level;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Iterator;
 
 /**
  * Test for OmBucketReadWriteKeyOps.
  */
+@RunWith(Parameterized.class)
 public class TestOmBucketReadWriteKeyOps {
 
   // TODO: Remove code duplication of TestOmBucketReadWriteKeyOps with
   //  TestOmBucketReadWriteFileOps.
+
+  @Parameters
+  public static Collection<Boolean> enableFileSystemPaths() {
+    return Arrays.asList(false, true);
+  }
 
   private String path;
   private OzoneConfiguration conf = null;
@@ -60,6 +71,12 @@ public class TestOmBucketReadWriteKeyOps {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOmBucketReadWriteKeyOps.class);
   private OzoneClient client;
+
+  private boolean fsPathsEnabled;
+
+  public TestOmBucketReadWriteKeyOps(boolean fsPathsEnabled) {
+    this.fsPathsEnabled = fsPathsEnabled;
+  }
 
   @Before
   public void setup() {
@@ -86,8 +103,9 @@ public class TestOmBucketReadWriteKeyOps {
    *
    * @throws IOException
    */
-  private void startCluster() throws Exception {
+  private void startCluster(boolean enableFileSystemPaths) throws Exception {
     conf = getOzoneConfiguration();
+    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, enableFileSystemPaths);
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         BucketLayout.OBJECT_STORE.name());
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(5).build();
@@ -105,7 +123,7 @@ public class TestOmBucketReadWriteKeyOps {
   @Test
   public void testOmBucketReadWriteKeyOps() throws Exception {
     try {
-      startCluster();
+      startCluster(fsPathsEnabled);
       FileOutputStream out = FileUtils.openOutputStream(new File(path,
           "conf"));
       cluster.getConf().writeXml(out);
