@@ -278,7 +278,7 @@ public class TestDecommissionStatusSubCommand {
     return containerMap;
   }
 
-  private ArrayList<String> getMetrics () {
+  private ArrayList<String> getMetrics() {
     ArrayList<String> result = new ArrayList<>();
     // no nodes decommissioning
     result.add("{  \"beans\" : [ {    " +
