@@ -91,8 +91,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
             trxnLogIndex, updatedSnapInfos);
         updateSnapshotChainAndCache(omMetadataManager, fromSnapshot,
             trxnLogIndex, updatedPathPreviousAndGlobalSnapshots);
-        ozoneManager.getOmSnapshotManager().getSnapshotCache()
-            .invalidate(snapTableKey);
+        ozoneManager.getOmSnapshotManager().invalidateCacheEntry(snapTableKey);
       }
 
       omClientResponse = new OMSnapshotPurgeResponse(omResponse.build(),
