@@ -332,14 +332,19 @@ public final class OmSnapshotManager implements AutoCloseable {
       @Nonnull
       @Override
       public OmSnapshot load(@Nonnull UUID snapshotId) throws IOException {
-        // Check if the snapshot exists
-        String snapshotTableKey = ((OmMetadataManagerImpl) ozoneManager.getMetadataManager()).getSnapshotChainManager()
+        String snapshotTableKey = ((OmMetadataManagerImpl) ozoneManager.getMetadataManager())
+            .getSnapshotChainManager()
             .getTableKey(snapshotId);
-        final SnapshotInfo snapshotInfo = getSnapshotInfo(snapshotTableKey);
 
-        // Block snapshot from loading when it is no longer active e.g. DELETED,
-        // unless this is called from SnapshotDeletingService.
-        checkSnapshotActive(snapshotInfo, true);
+        if (snapshotTableKey == null) {
+          // SnapshotChain is basically in-memory reverse mapping of snapshotId to snapshotName based on
+          // snapshotInfoTable. So it should not happen ideally.
+          // If it happens, then either snapshot has been purged in between or SnapshotChain is corrupted
+          // and missing some entries which needs investigation.
+          throw new IOException("No snapshot exist with snapshotId: " + snapshotId);
+        }
+
+        final SnapshotInfo snapshotInfo = getSnapshotInfo(snapshotTableKey);
 
         CacheValue<SnapshotInfo> cacheValue = ozoneManager.getMetadataManager()
             .getSnapshotInfoTable()
