@@ -35,6 +35,7 @@ import java.util.concurrent.TimeoutException;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
+import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -401,8 +402,12 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   }
 
   private static void overrideDatanodeVersions(int dnInitialVersion, int dnCurrentVersion) {
-    mockDNStatic.when(HddsDatanodeService::getDefaultInitialVersion).thenReturn(dnInitialVersion);
-    mockDNStatic.when(HddsDatanodeService::getDefaultCurrentVersion).thenReturn(dnCurrentVersion);
+    if (dnInitialVersion != DatanodeVersion.FUTURE_VERSION.toProtoValue()) {
+      mockDNStatic.when(HddsDatanodeService::getDefaultInitialVersion).thenReturn(dnInitialVersion);
+    }
+    if (dnCurrentVersion != DatanodeVersion.FUTURE_VERSION.toProtoValue()) {
+      mockDNStatic.when(HddsDatanodeService::getDefaultCurrentVersion).thenReturn(dnCurrentVersion);
+    }
   }
 
   @Override

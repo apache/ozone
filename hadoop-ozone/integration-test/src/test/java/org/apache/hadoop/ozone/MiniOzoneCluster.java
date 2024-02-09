@@ -330,8 +330,8 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected Optional<Integer> scmLayoutVersion = Optional.empty();
     protected Optional<Integer> dnLayoutVersion = Optional.empty();
 
-    protected int dnInitialVersion = DatanodeVersion.CURRENT_VERSION;
-    protected int dnCurrentVersion = DatanodeVersion.CURRENT_VERSION;
+    protected int dnInitialVersion = DatanodeVersion.FUTURE_VERSION.toProtoValue();
+    protected int dnCurrentVersion = DatanodeVersion.FUTURE_VERSION.toProtoValue();
 
     // Use relative smaller number of handlers for testing
     protected int numOfOmHandlers = 20;
