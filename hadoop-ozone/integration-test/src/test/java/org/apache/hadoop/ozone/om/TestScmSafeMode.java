@@ -358,14 +358,17 @@ public class TestScmSafeMode {
     final String rootPath = String.format("%s://%s/",
         OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
     conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    OMMetrics omMetrics = cluster.getOzoneManager().getMetrics();
+    long allocateBlockReqCount = omMetrics.getNumBlockAllocateFails();
 
     try (FileSystem fs = FileSystem.get(conf)) {
       assertTrue(((SafeMode)fs).setSafeMode(SafeModeAction.GET));
 
       Thread t = new Thread(() -> {
         try {
-          LOG.info("Sleep 10 seconds and then start DataNodes.");
-          Thread.sleep(10 * 1000);
+          LOG.info("Wait for allocate block fails at least once");
+          GenericTestUtils.waitFor(() -> omMetrics.getNumBlockAllocateFails() > allocateBlockReqCount,
+              100, 10000);
 
           cluster.startHddsDatanodes();
           cluster.waitForClusterToBeReady();
