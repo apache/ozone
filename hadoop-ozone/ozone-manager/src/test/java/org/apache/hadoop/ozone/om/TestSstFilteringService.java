@@ -78,7 +78,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(OrderAnnotation.class)
 public class TestSstFilteringService {
-  private static final String SST_FILE_EXTENSION = ".sst";;
+  private static final String SST_FILE_EXTENSION = ".sst";
   private OzoneManagerProtocol writeClient;
   private OzoneManager om;
   private OzoneConfiguration conf;
@@ -189,8 +189,7 @@ public class TestSstFilteringService {
     activeDbStore.getDb().flush(OmMetadataManagerImpl.KEY_TABLE);
     List<LiveFileMetaData> allFiles = activeDbStore.getDb().getSstFileList();
     String snapshotName1 = "snapshot1";
-    writeClient.createSnapshot(volumeName, bucketName2, snapshotName1);
-    countTotalSnapshots++;
+    createSnapshot(volumeName, bucketName2, snapshotName1);
     SnapshotInfo snapshotInfo = om.getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(volumeName, bucketName2, snapshotName1));
     assertFalse(snapshotInfo.isSstFiltered());
@@ -227,8 +226,7 @@ public class TestSstFilteringService {
     try (BootstrapStateHandler.Lock lock =
              filteringService.getBootstrapStateLock().lock()) {
       count = filteringService.getSnapshotFilteredCount().get();
-      writeClient.createSnapshot(volumeName, bucketName2, snapshotName2);
-      countTotalSnapshots++;
+      createSnapshot(volumeName, bucketName2, snapshotName2);
 
       assertThrows(TimeoutException.class,
           () -> waitForSnapshotsAtLeast(filteringService, count + 1));
@@ -272,10 +270,8 @@ public class TestSstFilteringService {
         keyManager.getSnapshotSstFilteringService();
     sstFilteringService.pause();
 
-    writeClient.createSnapshot(volumeName, bucketNames.get(0), "snap1");
-    countTotalSnapshots++;
-    writeClient.createSnapshot(volumeName, bucketNames.get(0), "snap2");
-    countTotalSnapshots++;
+    createSnapshot(volumeName, bucketNames.get(0), "snap1");
+    createSnapshot(volumeName, bucketNames.get(0), "snap2");
 
     SnapshotInfo snapshot1Info = om.getMetadataManager().getSnapshotInfoTable()
         .get(SnapshotInfo.getTableKey(volumeName, bucketNames.get(0), "snap1"));
@@ -422,8 +418,7 @@ public class TestSstFilteringService {
     List<String> snapshotNames = Arrays.asList("snap", "snap-1", "snap-2");
 
     for (int i = 0; i < 3; i++) {
-      writeClient.createSnapshot(volumeName, bucketNames.get(i), snapshotNames.get(i));
-      countTotalSnapshots++;
+      createSnapshot(volumeName, bucketNames.get(i), snapshotNames.get(i));
     }
 
     SstFilteringService sstFilteringService =
@@ -483,5 +478,10 @@ public class TestSstFilteringService {
       OmSnapshot omSnapshot = (OmSnapshot) snapshotMetadataReader.get();
       return getKeysFromDb(omSnapshot.getMetadataManager(), volume, bucket);
     }
+  }
+
+  private void createSnapshot(String volumeName, String bucketName, String snapshotName) throws IOException {
+    writeClient.createSnapshot(volumeName, bucketName, snapshotName);
+    countTotalSnapshots++;
   }
 }
