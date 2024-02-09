@@ -590,13 +590,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       List<HddsDatanodeService> hddsDatanodes = Collections.emptyList();
       try {
         scm = createAndStartSingleSCM();
-
-        om = createOM();
-        setClients(om);
-        om.start();
-
+        om = createAndStartSingleOM();
         reconServer = createRecon();
-
         hddsDatanodes = createHddsDatanodes();
 
         MiniOzoneClusterImpl cluster = new MiniOzoneClusterImpl(conf,
@@ -730,6 +725,13 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         OzoneManager.initializeSecurity(conf, omStorage, scmId);
       }
       omStorage.initialize();
+    }
+
+    protected OzoneManager createAndStartSingleOM() throws AuthenticationException, IOException {
+      OzoneManager om = createOM();
+      setClients(om);
+      om.start();
+      return om;
     }
 
     /**
