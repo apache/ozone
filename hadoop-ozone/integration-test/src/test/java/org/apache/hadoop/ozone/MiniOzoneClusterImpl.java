@@ -601,7 +601,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         reconServer = createRecon();
 
         hddsDatanodes = createHddsDatanodes(
-            Collections.singletonList(scm), reconServer);
+            Collections.singletonList(scm));
 
         MiniOzoneClusterImpl cluster = new MiniOzoneClusterImpl(conf,
             scmConfigurator, om, scm,
@@ -755,6 +755,12 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         configureRecon();
         reconServer = new ReconServer();
         reconServer.execute(new String[] {});
+
+        OzoneStorageContainerManager reconScm =
+            reconServer.getReconStorageContainerManager();
+        conf.set(OZONE_RECON_ADDRESS_KEY,
+            reconScm.getDatanodeRpcAddress().getHostString() + ":" +
+                reconScm.getDatanodeRpcAddress().getPort());
       }
       return reconServer;
     }
@@ -766,7 +772,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
      * @throws IOException
      */
     protected List<HddsDatanodeService> createHddsDatanodes(
-        List<StorageContainerManager> scms, ReconServer reconServer)
+        List<StorageContainerManager> scms)
         throws IOException {
       String scmAddress = getSCMAddresses(scms);
       String[] args = new String[] {};
@@ -801,13 +807,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
             reservedSpaceString);
         dnConf.set(OzoneConfigKeys.DFS_CONTAINER_RATIS_DATANODE_STORAGE_DIR,
             ratisDir.toString());
-        if (reconServer != null) {
-          OzoneStorageContainerManager reconScm =
-              reconServer.getReconStorageContainerManager();
-          dnConf.set(OZONE_RECON_ADDRESS_KEY,
-              reconScm.getDatanodeRpcAddress().getHostString() + ":" +
-                  reconScm.getDatanodeRpcAddress().getPort());
-        }
 
         HddsDatanodeService datanode = new HddsDatanodeService(args);
         datanode.setConfiguration(dnConf);

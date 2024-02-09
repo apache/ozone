@@ -314,7 +314,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
       }
 
       final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes(
-          scmService.getActiveServices(), null);
+          scmService.getActiveServices());
 
       MiniOzoneChaosCluster cluster =
           new MiniOzoneChaosCluster(conf, omService, scmService, hddsDatanodes,
