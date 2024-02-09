@@ -426,14 +426,6 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     stopRecon(reconServer);
   }
 
-  /**
-   * Start Scm.
-   */
-  @Override
-  public void startScm() throws IOException {
-    scm.start();
-  }
-
   public void startHddsDatanode(HddsDatanodeService datanode) {
     try {
       datanode.setCertificateClient(getCAClient());

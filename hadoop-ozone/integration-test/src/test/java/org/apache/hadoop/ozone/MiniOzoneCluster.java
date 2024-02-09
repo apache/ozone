@@ -242,11 +242,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
   void stop();
 
   /**
-   * Start Scm.
-   */
-  void startScm() throws IOException;
-
-  /**
    * Start DataNodes.
    */
   void startHddsDatanodes();
