@@ -372,9 +372,6 @@ public class DatanodeDetails extends NodeImpl implements
       builder.setPersistedOpStateExpiry(
           datanodeDetailsProto.getPersistedOpStateExpiry());
     }
-    if (datanodeDetailsProto.hasInitialVersion()) {
-      builder.setInitialVersion(datanodeDetailsProto.getInitialVersion());
-    }
     if (datanodeDetailsProto.hasCurrentVersion()) {
       builder.setCurrentVersion(datanodeDetailsProto.getCurrentVersion());
     }
@@ -482,7 +479,6 @@ public class DatanodeDetails extends NodeImpl implements
       }
     }
 
-    builder.setInitialVersion(initialVersion);
     builder.setCurrentVersion(currentVersion);
 
     return builder;

@@ -73,7 +73,6 @@ public class TestBlockDataStreamOutput {
   private static String volumeName;
   private static String bucketName;
   private static String keyString;
-  private static final int DN_INITIAL_VERSION = DatanodeVersion.DEFAULT_VERSION.toProtoValue();
   private static final int DN_CURRENT_VERSION = DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE.toProtoValue();
 
   /**
@@ -100,7 +99,6 @@ public class TestBlockDataStreamOutput {
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(5)
-        .setDatanodeInitialVersion(DN_INITIAL_VERSION)
         .setDatanodeCurrentVersion(DN_CURRENT_VERSION)
         .setTotalPipelineNumLimit(3)
         .setBlockSize(blockSize)
@@ -281,7 +279,6 @@ public class TestBlockDataStreamOutput {
     List<HddsDatanodeService> dns = cluster.getHddsDatanodes();
     for (HddsDatanodeService dn : dns) {
       DatanodeDetails details = dn.getDatanodeDetails();
-      assertEquals(DN_INITIAL_VERSION, details.getInitialVersion());
       assertEquals(DN_CURRENT_VERSION, details.getCurrentVersion());
     }
 
@@ -293,7 +290,6 @@ public class TestBlockDataStreamOutput {
     // Now check 3 DNs in a random pipeline returns the correct DN versions
     List<DatanodeDetails> streamDnDetails = stream.getPipeline().getNodes();
     for (DatanodeDetails details : streamDnDetails) {
-      assertEquals(DN_INITIAL_VERSION, details.getInitialVersion());
       assertEquals(DN_CURRENT_VERSION, details.getCurrentVersion());
     }
   }
