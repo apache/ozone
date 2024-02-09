@@ -81,6 +81,8 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 
 import org.apache.commons.io.FileUtils;
+
+import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY;
@@ -587,8 +589,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       ReconServer reconServer = null;
       List<HddsDatanodeService> hddsDatanodes = Collections.emptyList();
       try {
-        scm = createSCM();
-        scm.start();
+        scm = createAndStartSingleSCM();
+
         om = createOM();
         if (certClient != null) {
           om.setCertClient(certClient);
@@ -600,8 +602,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
         reconServer = createRecon();
 
-        hddsDatanodes = createHddsDatanodes(
-            Collections.singletonList(scm));
+        hddsDatanodes = createHddsDatanodes();
 
         MiniOzoneClusterImpl cluster = new MiniOzoneClusterImpl(conf,
             scmConfigurator, om, scm,
@@ -659,6 +660,14 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
     void removeConfiguration() {
       FileUtils.deleteQuietly(new File(path));
+    }
+
+    protected StorageContainerManager createAndStartSingleSCM()
+        throws AuthenticationException, IOException {
+      StorageContainerManager scm = createSCM();
+      scm.start();
+      configureScmDatanodeAddress(singletonList(scm));
+      return scm;
     }
 
     /**
@@ -749,6 +758,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       return stringBuilder.toString();
     }
 
+    protected void configureScmDatanodeAddress(List<StorageContainerManager> scms) {
+      conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, getSCMAddresses(scms));
+    }
+
     protected ReconServer createRecon() {
       ReconServer reconServer = null;
       if (includeRecon) {
@@ -771,12 +784,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
      * @return List of HddsDatanodeService
      * @throws IOException
      */
-    protected List<HddsDatanodeService> createHddsDatanodes(
-        List<StorageContainerManager> scms)
+    protected List<HddsDatanodeService> createHddsDatanodes()
         throws IOException {
-      String scmAddress = getSCMAddresses(scms);
       String[] args = new String[] {};
-      conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, scmAddress);
       List<HddsDatanodeService> hddsDatanodes = new ArrayList<>();
       for (int i = 0; i < numOfDatanodes; i++) {
         OzoneConfiguration dnConf = new OzoneConfiguration(conf);

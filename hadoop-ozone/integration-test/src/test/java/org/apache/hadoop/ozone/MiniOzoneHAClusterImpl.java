@@ -406,8 +406,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
         throw new IOException("Unable to build MiniOzoneCluster. ", ex);
       }
 
-      final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes(
-          scmService.getActiveServices());
+      final List<HddsDatanodeService> hddsDatanodes = createHddsDatanodes();
 
       MiniOzoneHAClusterImpl cluster = new MiniOzoneHAClusterImpl(conf,
           scmConfigurator, omService, scmService, hddsDatanodes, path,
@@ -522,8 +521,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     protected SCMHAService createSCMService()
         throws IOException, AuthenticationException {
       if (scmServiceId == null) {
-        StorageContainerManager scm = createSCM();
-        scm.start();
+        StorageContainerManager scm = createAndStartSingleSCM();
         return new SCMHAService(singletonList(scm), null, null);
       }
 
@@ -587,6 +585,8 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
               retryCount, e);
         }
       }
+
+      configureScmDatanodeAddress(activeSCMs);
 
       return new SCMHAService(activeSCMs, inactiveSCMs, scmServiceId);
     }
