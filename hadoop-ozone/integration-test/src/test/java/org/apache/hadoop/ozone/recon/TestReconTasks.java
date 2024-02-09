@@ -41,8 +41,12 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.hadoop.ozone.recon.schema.ContainerSchemaDefinition;
 import org.hadoop.ozone.recon.schema.tables.pojos.UnhealthyContainers;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.slf4j.event.Level;
@@ -58,12 +62,14 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
  * Integration Tests for Recon's tasks.
  */
 @Timeout(300)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@TestMethodOrder(OrderAnnotation.class)
 public class TestReconTasks {
   private MiniOzoneCluster cluster = null;
   private OzoneConfiguration conf;
 
-  @BeforeEach
-  public void init() throws Exception {
+  @BeforeAll
+  void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(HDDS_CONTAINER_REPORT_INTERVAL, "5s");
     conf.set(HDDS_PIPELINE_REPORT_INTERVAL, "5s");
@@ -81,14 +87,15 @@ public class TestReconTasks {
         Level.DEBUG);
   }
 
-  @AfterEach
-  public void shutdown() {
+  @AfterAll
+  void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }
   }
 
   @Test
+  @Order(2)
   public void testSyncSCMContainerInfo() throws Exception {
     ReconStorageContainerManagerFacade reconScm =
         (ReconStorageContainerManagerFacade)
@@ -121,6 +128,7 @@ public class TestReconTasks {
   }
 
   @Test
+  @Order(3)
   public void testMissingContainerDownNode() throws Exception {
     ReconStorageContainerManagerFacade reconScm =
         (ReconStorageContainerManagerFacade)
@@ -202,6 +210,7 @@ public class TestReconTasks {
    * @throws Exception
    */
   @Test
+  @Order(1)
   public void testEmptyMissingContainerDownNode() throws Exception {
     ReconStorageContainerManagerFacade reconScm =
         (ReconStorageContainerManagerFacade)
